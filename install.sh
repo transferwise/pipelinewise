@@ -1,7 +1,6 @@
 
 DIR=$(pwd)
 VENV_DIR=$DIR/.virtualenvs
-SINGER_ADMIN_DIR=$DIR/singer-admin
 
 create_virtualenv() {
     python3 -m venv $VENV_DIR/$1
@@ -33,6 +32,11 @@ install_rest_api() {
     make_virtualenv rest-api
 }
 
+install_admin_console() {
+    cd $DIR/admin-console
+    npm run setup
+}
+
 # Install Singer connectors
 install_connector tap-mysql
 install_connector tap-postgres
@@ -45,4 +49,16 @@ install_cli
 install_rest_api 
 
 # Install web frontent
-cd $SINGER_ADMIN_DIR && npm run setup
+install_admin_console
+
+echo "--------------------------------------------------------------------------"
+echo "ETLWise installed successfully"
+echo "--------------------------------------------------------------------------"
+echo
+echo "To start REST API:"
+echo "> source .virtualenvs/rest-api/bin/activate && cd rest-api && export FLASK_APP=rest_api && export FLASK_DEBUG=1 && flask run"
+echo
+echo "To start Web Interface:"
+echo "> cd admin-console && npm run start"
+echo
+echo "--------------------------------------------------------------------------"

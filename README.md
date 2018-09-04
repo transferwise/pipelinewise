@@ -21,8 +21,14 @@ ETLWise is an ETL Framework using the singer.io specification to load data from 
 * **tap-postgres** (WiP): Extract data from PostgreSQL databases. Supporting Log-Based Inremental, Key-Based Incremental and Full Table replications
 * **target-postgres** (WiP): Loads data from any tap into PostgreSQL database
 
-### Installation
-1. `./intall.sh` : Install singer virtual environments, REST API and Web Frontend
+## Installation
+
+### Requirements
+* Python 3.x
+* Node 8.x
+
+### Build from source:
+1. `./intall.sh` : Install singer connectors in separated virtual environments, CLI, REST API and Web Frontend
 
 ### To run:
 1. `. .virtualenvs/rest-api/bin/activate && cd rest-api && export FLASK_APP=rest_api && export FLASK_DEBUG=1 && flask run` : Start REST API at `http://localhost:5000`
