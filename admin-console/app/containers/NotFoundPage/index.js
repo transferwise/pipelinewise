@@ -17,7 +17,7 @@ export default function NotFound() {
         <title>Not Found</title>
         <meta
           name="description"
-          content="AnalyticsDB page not found"
+          content="ETLWise page not found"
         />
       </Helmet>
       <h1>

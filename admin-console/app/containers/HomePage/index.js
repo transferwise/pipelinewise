@@ -13,7 +13,7 @@ export default class HomePage extends React.Component {
           <title>Home Page</title>
           <meta
             name="description"
-            content="AnalyticsDB home page"
+            content="ETLWise home page"
           />
         </Helmet>
         <h1 className="mt-5"><FormattedMessage {...messages.mainTopic} /></h1>

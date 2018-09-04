@@ -7,11 +7,11 @@ import { defineMessages } from 'react-intl';
 
 export default defineMessages({
   header: {
-    id: 'analyticsdb.containers.NotFoundPage.header',
+    id: 'ETLWise.containers.NotFoundPage.header',
     defaultMessage: 'Page not found.',
   },
   description: {
-    id: 'analyticsdb.containers.NotFoundPage.description',
+    id: 'ETLWise.containers.NotFoundPage.description',
     defaultMessage: 'This is not the web page you are looking for.',
   },
 });

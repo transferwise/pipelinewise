@@ -2,15 +2,15 @@ import { defineMessages } from 'react-intl';
 
 export default defineMessages({
   brand: {
-    id: 'analyticsdb.components.Header.brand',
+    id: 'ETLWise.components.Header.brand',
     defaultMessage: 'OpenSync',
   },
   integrations: {
-    id: 'analyticsdb.components.Header.integrations',
+    id: 'ETLWise.components.Header.integrations',
     defaultMessage: 'Integrations',
   },
   target: {
-    id: 'analyticsdb.components.Header.target',
+    id: 'ETLWise.components.Header.target',
     defaultMessage: 'Destination',
   },
 });

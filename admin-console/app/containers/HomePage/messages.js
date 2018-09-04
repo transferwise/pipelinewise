@@ -7,11 +7,11 @@ import { defineMessages } from 'react-intl';
 
 export default defineMessages({
   mainTopic: {
-    id: 'analyticsdb.containers.HomePage.header',
-    defaultMessage: 'AnalyticsDB',
+    id: 'ETLWise.containers.HomePage.header',
+    defaultMessage: 'ETLWise',
   },
   intro: {
-    id: 'analyticsdb.containers.HomePage.intro',
-    defaultMessage: 'Hello, this is the admin page of AnalyticsDB',
+    id: 'ETLWise.containers.HomePage.intro',
+    defaultMessage: 'Hello, this is the admin page of ETLWise',
   },
 });
