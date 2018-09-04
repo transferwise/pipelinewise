@@ -1,0 +1,11 @@
+--2018-08-30 19:17:46--  https://www.google.ee/url?sa=i
+Resolving www.google.ee (www.google.ee)... 74.125.206.94, 2a00:1450:400c:c04::5e
+Connecting to www.google.ee (www.google.ee)|74.125.206.94|:443... connected.
+HTTP request sent, awaiting response... 200 OK
+Length: unspecified [text/html]
+Saving to: ‘url?sa=i’
+
+url?sa=i                                   [<=>                                                                          ]       0  --.-KB/s               url?sa=i                                   [ <=>                                                                         ]   1.28K  --.-KB/s    in 0s      
+
+2018-08-30 19:17:46 (3.99 MB/s) - ‘url?sa=i’ saved [1315]
+

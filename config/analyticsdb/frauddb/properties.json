@@ -1,0 +1,102 @@
+{
+  "streams": [
+    {
+      "metadata": [
+        {
+          "breadcrumb": [],
+          "metadata": {
+            "database-name": "inventory",
+            "is-view": false,
+            "replication-method": "FULL_TABLE",
+            "row-count": 6,
+            "schema-name": "public",
+            "selected": true,
+            "table-key-properties": [
+              "id"
+            ]
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "last_name"
+          ],
+          "metadata": {
+            "inclusion": "available",
+            "selected": true,
+            "selected-by-default": true,
+            "sql-datatype": "text"
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "id"
+          ],
+          "metadata": {
+            "inclusion": "automatic",
+            "selected-by-default": true,
+            "sql-datatype": "integer"
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "first_name"
+          ],
+          "metadata": {
+            "inclusion": "available",
+            "selected": true,
+            "selected-by-default": true,
+            "sql-datatype": "text"
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "email"
+          ],
+          "metadata": {
+            "inclusion": "available",
+            "selected": true,
+            "selected-by-default": true,
+            "sql-datatype": "text"
+          }
+        }
+      ],
+      "schema": {
+        "properties": {
+          "email": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "first_name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "id": {
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "type": [
+              "integer"
+            ]
+          },
+          "last_name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "stream": "customers",
+      "table_name": "customers",
+      "tap_stream_id": "inventory-public-customers"
+    }
+  ]
+}

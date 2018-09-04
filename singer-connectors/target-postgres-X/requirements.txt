@@ -1,0 +1,3 @@
+singer-python==5.1.1
+psycopg2==2.7.5
+inflection==0.3.1

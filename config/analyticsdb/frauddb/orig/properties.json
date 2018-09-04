@@ -1,0 +1,2593 @@
+{
+  "streams": [
+    {
+      "tap_stream_id": "inventory-public-customers",
+      "table_name": "customers",
+      "schema": {
+        "properties": {
+          "last_name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "id": {
+            "minimum": -2147483648,
+            "maximum": 2147483647,
+            "type": [
+              "integer"
+            ]
+          },
+          "first_name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "email": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "stream": "customers",
+      "metadata": [
+        {
+          "breadcrumb": [],
+          "metadata": {
+            "selected": true,
+            "replication-method": "FULL_TABLE",
+            "table-key-properties": [
+              "id"
+            ],
+            "schema-name": "public",
+            "database-name": "inventory",
+            "row-count": 6,
+            "is-view": false
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "last_name"
+          ],
+          "metadata": {
+            "sql-datatype": "text",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "id"
+          ],
+          "metadata": {
+            "sql-datatype": "integer",
+            "inclusion": "automatic",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "first_name"
+          ],
+          "metadata": {
+            "sql-datatype": "text",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "email"
+          ],
+          "metadata": {
+            "sql-datatype": "text",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        }
+      ]
+    },
+    {
+      "tap_stream_id": "pgninja_target-pgninja_target_clean-test_table_2",
+      "table_name": "test_table_2",
+      "schema": {
+        "properties": {
+          "name": {
+            "maxLength": 128,
+            "type": [
+              "string"
+            ]
+          },
+          "name2": {
+            "maxLength": 128,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "salary": {
+            "minimum": -2147483648,
+            "maximum": 2147483647,
+            "type": [
+              "null",
+              "integer"
+            ]
+          },
+          "dob": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "spec": {
+            "minimum": -2147483648,
+            "maximum": 2147483647,
+            "type": [
+              "null",
+              "integer"
+            ]
+          },
+          "n": {
+            "minimum": -2147483648,
+            "maximum": 2147483647,
+            "type": [
+              "null",
+              "integer"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "stream": "test_table_2",
+      "metadata": [
+        {
+          "breadcrumb": [],
+          "metadata": {
+            "table-key-properties": [
+              "name"
+            ],
+            "schema-name": "pgninja_target_clean",
+            "database-name": "pgninja_target",
+            "row-count": 1,
+            "is-view": false
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "name"
+          ],
+          "metadata": {
+            "sql-datatype": "character varying",
+            "inclusion": "automatic",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "name2"
+          ],
+          "metadata": {
+            "sql-datatype": "character varying",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "salary"
+          ],
+          "metadata": {
+            "sql-datatype": "integer",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "dob"
+          ],
+          "metadata": {
+            "sql-datatype": "date",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "spec"
+          ],
+          "metadata": {
+            "sql-datatype": "integer",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "n"
+          ],
+          "metadata": {
+            "sql-datatype": "integer",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        }
+      ]
+    },
+    {
+      "tap_stream_id": "pgninja_target-pgninja_target_clean-test_table",
+      "table_name": "test_table",
+      "schema": {
+        "properties": {
+          "abc": {
+            "minimum": -2147483648,
+            "maximum": 2147483647,
+            "type": [
+              "null",
+              "integer"
+            ]
+          },
+          "x": {
+            "minimum": -2147483648,
+            "maximum": 2147483647,
+            "type": [
+              "null",
+              "integer"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "stream": "test_table",
+      "metadata": [
+        {
+          "breadcrumb": [],
+          "metadata": {
+            "table-key-properties": [],
+            "schema-name": "pgninja_target_clean",
+            "database-name": "pgninja_target",
+            "row-count": 0,
+            "is-view": false
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "abc"
+          ],
+          "metadata": {
+            "sql-datatype": "integer",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "x"
+          ],
+          "metadata": {
+            "sql-datatype": "integer",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        }
+      ]
+    },
+    {
+      "tap_stream_id": "pgninja_target-pgninja_target_clean-test_table_3",
+      "table_name": "test_table_3",
+      "schema": {
+        "properties": {
+          "xyz": {
+            "minimum": -2147483648,
+            "maximum": 2147483647,
+            "type": [
+              "integer"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "stream": "test_table_3",
+      "metadata": [
+        {
+          "breadcrumb": [],
+          "metadata": {
+            "table-key-properties": [
+              "xyz"
+            ],
+            "schema-name": "pgninja_target_clean",
+            "database-name": "pgninja_target",
+            "row-count": 6,
+            "is-view": false
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "xyz"
+          ],
+          "metadata": {
+            "sql-datatype": "integer",
+            "inclusion": "automatic",
+            "selected-by-default": true
+          }
+        }
+      ]
+    },
+    {
+      "tap_stream_id": "pgninja_target-pgninja_target_obf-test_table_2",
+      "table_name": "test_table_2",
+      "schema": {
+        "properties": {
+          "name": {
+            "maxLength": 128,
+            "type": [
+              "string"
+            ]
+          },
+          "name2": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "salary": {
+            "minimum": -2147483648,
+            "maximum": 2147483647,
+            "type": [
+              "null",
+              "integer"
+            ]
+          },
+          "dob": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "spec": {
+            "minimum": -2147483648,
+            "maximum": 2147483647,
+            "type": [
+              "null",
+              "integer"
+            ]
+          },
+          "n": {
+            "minimum": -2147483648,
+            "maximum": 2147483647,
+            "type": [
+              "null",
+              "integer"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "stream": "test_table_2",
+      "metadata": [
+        {
+          "breadcrumb": [],
+          "metadata": {
+            "table-key-properties": [
+              "name"
+            ],
+            "schema-name": "pgninja_target_obf",
+            "database-name": "pgninja_target",
+            "row-count": 1,
+            "is-view": false
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "name"
+          ],
+          "metadata": {
+            "sql-datatype": "character varying",
+            "inclusion": "automatic",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "name2"
+          ],
+          "metadata": {
+            "sql-datatype": "text",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "salary"
+          ],
+          "metadata": {
+            "sql-datatype": "integer",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "dob"
+          ],
+          "metadata": {
+            "sql-datatype": "date",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "spec"
+          ],
+          "metadata": {
+            "sql-datatype": "integer",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "n"
+          ],
+          "metadata": {
+            "sql-datatype": "integer",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        }
+      ]
+    },
+    {
+      "tap_stream_id": "pgninja_target-pgninja_target_obf-test_table",
+      "table_name": "test_table",
+      "schema": {
+        "properties": {
+          "abc": {
+            "minimum": -2147483648,
+            "maximum": 2147483647,
+            "type": [
+              "null",
+              "integer"
+            ]
+          },
+          "x": {
+            "minimum": -2147483648,
+            "maximum": 2147483647,
+            "type": [
+              "null",
+              "integer"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "stream": "test_table",
+      "metadata": [
+        {
+          "breadcrumb": [],
+          "metadata": {
+            "table-key-properties": [],
+            "schema-name": "pgninja_target_obf",
+            "database-name": "pgninja_target",
+            "row-count": 0,
+            "is-view": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "abc"
+          ],
+          "metadata": {
+            "sql-datatype": "integer",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "x"
+          ],
+          "metadata": {
+            "sql-datatype": "integer",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        }
+      ]
+    },
+    {
+      "tap_stream_id": "pgninja_target-pgninja_target_obf-test_table_3",
+      "table_name": "test_table_3",
+      "schema": {
+        "properties": {
+          "xyz": {
+            "minimum": -2147483648,
+            "maximum": 2147483647,
+            "type": [
+              "null",
+              "integer"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "stream": "test_table_3",
+      "metadata": [
+        {
+          "breadcrumb": [],
+          "metadata": {
+            "table-key-properties": [],
+            "schema-name": "pgninja_target_obf",
+            "database-name": "pgninja_target",
+            "row-count": 0,
+            "is-view": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "xyz"
+          ],
+          "metadata": {
+            "sql-datatype": "integer",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        }
+      ]
+    },
+    {
+      "tap_stream_id": "pgninja_target-sch_ninja-v_version",
+      "table_name": "v_version",
+      "schema": {
+        "properties": {
+          "t_version": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "stream": "v_version",
+      "metadata": [
+        {
+          "breadcrumb": [],
+          "metadata": {
+            "table-key-properties": [],
+            "schema-name": "sch_ninja",
+            "database-name": "pgninja_target",
+            "row-count": 0,
+            "is-view": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "t_version"
+          ],
+          "metadata": {
+            "sql-datatype": "text",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        }
+      ]
+    },
+    {
+      "tap_stream_id": "pgninja_target-sch_ninja-t_error_log",
+      "table_name": "t_error_log",
+      "schema": {
+        "properties": {
+          "i_id_log": {
+            "minimum": -9223372036854775808,
+            "maximum": 9223372036854775807,
+            "type": [
+              "integer"
+            ]
+          },
+          "i_id_batch": {
+            "minimum": -9223372036854775808,
+            "maximum": 9223372036854775807,
+            "type": [
+              "null",
+              "integer"
+            ]
+          },
+          "i_id_source": {
+            "minimum": -9223372036854775808,
+            "maximum": 9223372036854775807,
+            "type": [
+              "null",
+              "integer"
+            ]
+          },
+          "v_table_name": {
+            "maxLength": 100,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "v_schema_name": {
+            "maxLength": 100,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "t_table_pkey": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "t_binlog_name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "i_binlog_position": {
+            "minimum": -9223372036854775808,
+            "maximum": 9223372036854775807,
+            "type": [
+              "null",
+              "integer"
+            ]
+          },
+          "ts_error": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "t_sql": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "t_error_message": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "stream": "t_error_log",
+      "metadata": [
+        {
+          "breadcrumb": [],
+          "metadata": {
+            "table-key-properties": [
+              "i_id_log"
+            ],
+            "schema-name": "sch_ninja",
+            "database-name": "pgninja_target",
+            "row-count": 0,
+            "is-view": false
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "i_id_log"
+          ],
+          "metadata": {
+            "sql-datatype": "bigint",
+            "inclusion": "automatic",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "i_id_batch"
+          ],
+          "metadata": {
+            "sql-datatype": "bigint",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "i_id_source"
+          ],
+          "metadata": {
+            "sql-datatype": "bigint",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "v_table_name"
+          ],
+          "metadata": {
+            "sql-datatype": "character varying",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "v_schema_name"
+          ],
+          "metadata": {
+            "sql-datatype": "character varying",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "t_table_pkey"
+          ],
+          "metadata": {
+            "sql-datatype": "text",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "t_binlog_name"
+          ],
+          "metadata": {
+            "sql-datatype": "text",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "i_binlog_position"
+          ],
+          "metadata": {
+            "sql-datatype": "bigint",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "ts_error"
+          ],
+          "metadata": {
+            "sql-datatype": "timestamp without time zone",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "t_sql"
+          ],
+          "metadata": {
+            "sql-datatype": "text",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "t_error_message"
+          ],
+          "metadata": {
+            "sql-datatype": "text",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        }
+      ]
+    },
+    {
+      "tap_stream_id": "pgninja_target-sch_ninja-t_last_received",
+      "table_name": "t_last_received",
+      "schema": {
+        "properties": {
+          "i_id_source": {
+            "minimum": -9223372036854775808,
+            "maximum": 9223372036854775807,
+            "type": [
+              "integer"
+            ]
+          },
+          "ts_last_received": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "b_paused": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "stream": "t_last_received",
+      "metadata": [
+        {
+          "breadcrumb": [],
+          "metadata": {
+            "table-key-properties": [
+              "i_id_source"
+            ],
+            "schema-name": "sch_ninja",
+            "database-name": "pgninja_target",
+            "row-count": 1,
+            "is-view": false
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "i_id_source"
+          ],
+          "metadata": {
+            "sql-datatype": "bigint",
+            "inclusion": "automatic",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "ts_last_received"
+          ],
+          "metadata": {
+            "sql-datatype": "timestamp without time zone",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "b_paused"
+          ],
+          "metadata": {
+            "sql-datatype": "boolean",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        }
+      ]
+    },
+    {
+      "tap_stream_id": "pgninja_target-sch_ninja-t_last_replayed",
+      "table_name": "t_last_replayed",
+      "schema": {
+        "properties": {
+          "i_id_source": {
+            "minimum": -9223372036854775808,
+            "maximum": 9223372036854775807,
+            "type": [
+              "integer"
+            ]
+          },
+          "ts_last_replayed": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "b_paused": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "stream": "t_last_replayed",
+      "metadata": [
+        {
+          "breadcrumb": [],
+          "metadata": {
+            "table-key-properties": [
+              "i_id_source"
+            ],
+            "schema-name": "sch_ninja",
+            "database-name": "pgninja_target",
+            "row-count": 1,
+            "is-view": false
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "i_id_source"
+          ],
+          "metadata": {
+            "sql-datatype": "bigint",
+            "inclusion": "automatic",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "ts_last_replayed"
+          ],
+          "metadata": {
+            "sql-datatype": "timestamp without time zone",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "b_paused"
+          ],
+          "metadata": {
+            "sql-datatype": "boolean",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        }
+      ]
+    },
+    {
+      "tap_stream_id": "pgninja_target-sch_ninja-t_log_replica_example_1",
+      "table_name": "t_log_replica_example_1",
+      "schema": {
+        "properties": {
+          "i_id_event": {
+            "minimum": -9223372036854775808,
+            "maximum": 9223372036854775807,
+            "type": [
+              "integer"
+            ]
+          },
+          "i_id_batch": {
+            "minimum": -9223372036854775808,
+            "maximum": 9223372036854775807,
+            "type": [
+              "null",
+              "integer"
+            ]
+          },
+          "v_table_name": {
+            "maxLength": 100,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "v_schema_name": {
+            "maxLength": 100,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "enm_binlog_event": {},
+          "t_binlog_name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "i_binlog_position": {
+            "minimum": -9223372036854775808,
+            "maximum": 9223372036854775807,
+            "type": [
+              "null",
+              "integer"
+            ]
+          },
+          "ts_event_datetime": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "jsb_event_after": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "jsb_event_before": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "t_query": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "i_my_event_time": {
+            "minimum": -9223372036854775808,
+            "maximum": 9223372036854775807,
+            "type": [
+              "null",
+              "integer"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "stream": "t_log_replica_example_1",
+      "metadata": [
+        {
+          "breadcrumb": [],
+          "metadata": {
+            "table-key-properties": [
+              "i_id_event"
+            ],
+            "schema-name": "sch_ninja",
+            "database-name": "pgninja_target",
+            "row-count": 0,
+            "is-view": false
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "i_id_event"
+          ],
+          "metadata": {
+            "sql-datatype": "bigint",
+            "inclusion": "automatic",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "i_id_batch"
+          ],
+          "metadata": {
+            "sql-datatype": "bigint",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "v_table_name"
+          ],
+          "metadata": {
+            "sql-datatype": "character varying",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "v_schema_name"
+          ],
+          "metadata": {
+            "sql-datatype": "character varying",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "enm_binlog_event"
+          ],
+          "metadata": {
+            "sql-datatype": "sch_ninja.en_binlog_event",
+            "inclusion": "unsupported",
+            "selected-by-default": false
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "t_binlog_name"
+          ],
+          "metadata": {
+            "sql-datatype": "text",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "i_binlog_position"
+          ],
+          "metadata": {
+            "sql-datatype": "bigint",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "ts_event_datetime"
+          ],
+          "metadata": {
+            "sql-datatype": "timestamp without time zone",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "jsb_event_after"
+          ],
+          "metadata": {
+            "sql-datatype": "jsonb",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "jsb_event_before"
+          ],
+          "metadata": {
+            "sql-datatype": "jsonb",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "t_query"
+          ],
+          "metadata": {
+            "sql-datatype": "text",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "i_my_event_time"
+          ],
+          "metadata": {
+            "sql-datatype": "bigint",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        }
+      ]
+    },
+    {
+      "tap_stream_id": "pgninja_target-sch_ninja-t_log_replica_example_2",
+      "table_name": "t_log_replica_example_2",
+      "schema": {
+        "properties": {
+          "i_id_event": {
+            "minimum": -9223372036854775808,
+            "maximum": 9223372036854775807,
+            "type": [
+              "integer"
+            ]
+          },
+          "i_id_batch": {
+            "minimum": -9223372036854775808,
+            "maximum": 9223372036854775807,
+            "type": [
+              "null",
+              "integer"
+            ]
+          },
+          "v_table_name": {
+            "maxLength": 100,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "v_schema_name": {
+            "maxLength": 100,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "enm_binlog_event": {},
+          "t_binlog_name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "i_binlog_position": {
+            "minimum": -9223372036854775808,
+            "maximum": 9223372036854775807,
+            "type": [
+              "null",
+              "integer"
+            ]
+          },
+          "ts_event_datetime": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "jsb_event_after": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "jsb_event_before": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "t_query": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "i_my_event_time": {
+            "minimum": -9223372036854775808,
+            "maximum": 9223372036854775807,
+            "type": [
+              "null",
+              "integer"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "stream": "t_log_replica_example_2",
+      "metadata": [
+        {
+          "breadcrumb": [],
+          "metadata": {
+            "table-key-properties": [
+              "i_id_event"
+            ],
+            "schema-name": "sch_ninja",
+            "database-name": "pgninja_target",
+            "row-count": 0,
+            "is-view": false
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "i_id_event"
+          ],
+          "metadata": {
+            "sql-datatype": "bigint",
+            "inclusion": "automatic",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "i_id_batch"
+          ],
+          "metadata": {
+            "sql-datatype": "bigint",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "v_table_name"
+          ],
+          "metadata": {
+            "sql-datatype": "character varying",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "v_schema_name"
+          ],
+          "metadata": {
+            "sql-datatype": "character varying",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "enm_binlog_event"
+          ],
+          "metadata": {
+            "sql-datatype": "sch_ninja.en_binlog_event",
+            "inclusion": "unsupported",
+            "selected-by-default": false
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "t_binlog_name"
+          ],
+          "metadata": {
+            "sql-datatype": "text",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "i_binlog_position"
+          ],
+          "metadata": {
+            "sql-datatype": "bigint",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "ts_event_datetime"
+          ],
+          "metadata": {
+            "sql-datatype": "timestamp without time zone",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "jsb_event_after"
+          ],
+          "metadata": {
+            "sql-datatype": "jsonb",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "jsb_event_before"
+          ],
+          "metadata": {
+            "sql-datatype": "jsonb",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "t_query"
+          ],
+          "metadata": {
+            "sql-datatype": "text",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "i_my_event_time"
+          ],
+          "metadata": {
+            "sql-datatype": "bigint",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        }
+      ]
+    },
+    {
+      "tap_stream_id": "pgninja_target-sch_ninja-t_log_replica",
+      "table_name": "t_log_replica",
+      "schema": {
+        "properties": {
+          "i_id_event": {
+            "minimum": -9223372036854775808,
+            "maximum": 9223372036854775807,
+            "type": [
+              "integer"
+            ]
+          },
+          "i_id_batch": {
+            "minimum": -9223372036854775808,
+            "maximum": 9223372036854775807,
+            "type": [
+              "null",
+              "integer"
+            ]
+          },
+          "v_table_name": {
+            "maxLength": 100,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "v_schema_name": {
+            "maxLength": 100,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "enm_binlog_event": {},
+          "t_binlog_name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "i_binlog_position": {
+            "minimum": -9223372036854775808,
+            "maximum": 9223372036854775807,
+            "type": [
+              "null",
+              "integer"
+            ]
+          },
+          "ts_event_datetime": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "jsb_event_after": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "jsb_event_before": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "t_query": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "i_my_event_time": {
+            "minimum": -9223372036854775808,
+            "maximum": 9223372036854775807,
+            "type": [
+              "null",
+              "integer"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "stream": "t_log_replica",
+      "metadata": [
+        {
+          "breadcrumb": [],
+          "metadata": {
+            "table-key-properties": [
+              "i_id_event"
+            ],
+            "schema-name": "sch_ninja",
+            "database-name": "pgninja_target",
+            "row-count": 0,
+            "is-view": false
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "i_id_event"
+          ],
+          "metadata": {
+            "sql-datatype": "bigint",
+            "inclusion": "automatic",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "i_id_batch"
+          ],
+          "metadata": {
+            "sql-datatype": "bigint",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "v_table_name"
+          ],
+          "metadata": {
+            "sql-datatype": "character varying",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "v_schema_name"
+          ],
+          "metadata": {
+            "sql-datatype": "character varying",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "enm_binlog_event"
+          ],
+          "metadata": {
+            "sql-datatype": "sch_ninja.en_binlog_event",
+            "inclusion": "unsupported",
+            "selected-by-default": false
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "t_binlog_name"
+          ],
+          "metadata": {
+            "sql-datatype": "text",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "i_binlog_position"
+          ],
+          "metadata": {
+            "sql-datatype": "bigint",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "ts_event_datetime"
+          ],
+          "metadata": {
+            "sql-datatype": "timestamp without time zone",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "jsb_event_after"
+          ],
+          "metadata": {
+            "sql-datatype": "jsonb",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "jsb_event_before"
+          ],
+          "metadata": {
+            "sql-datatype": "jsonb",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "t_query"
+          ],
+          "metadata": {
+            "sql-datatype": "text",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "i_my_event_time"
+          ],
+          "metadata": {
+            "sql-datatype": "bigint",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        }
+      ]
+    },
+    {
+      "tap_stream_id": "pgninja_target-sch_ninja-t_discarded_rows",
+      "table_name": "t_discarded_rows",
+      "schema": {
+        "properties": {
+          "i_id_row": {
+            "minimum": -9223372036854775808,
+            "maximum": 9223372036854775807,
+            "type": [
+              "integer"
+            ]
+          },
+          "i_id_batch": {
+            "minimum": -9223372036854775808,
+            "maximum": 9223372036854775807,
+            "type": [
+              "null",
+              "integer"
+            ]
+          },
+          "ts_discard": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "v_table_name": {
+            "maxLength": 100,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "v_schema_name": {
+            "maxLength": 100,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "t_row_data": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "stream": "t_discarded_rows",
+      "metadata": [
+        {
+          "breadcrumb": [],
+          "metadata": {
+            "table-key-properties": [
+              "i_id_row"
+            ],
+            "schema-name": "sch_ninja",
+            "database-name": "pgninja_target",
+            "row-count": 0,
+            "is-view": false
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "i_id_row"
+          ],
+          "metadata": {
+            "sql-datatype": "bigint",
+            "inclusion": "automatic",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "i_id_batch"
+          ],
+          "metadata": {
+            "sql-datatype": "bigint",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "ts_discard"
+          ],
+          "metadata": {
+            "sql-datatype": "timestamp with time zone",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "v_table_name"
+          ],
+          "metadata": {
+            "sql-datatype": "character varying",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "v_schema_name"
+          ],
+          "metadata": {
+            "sql-datatype": "character varying",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "t_row_data"
+          ],
+          "metadata": {
+            "sql-datatype": "text",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        }
+      ]
+    },
+    {
+      "tap_stream_id": "pgninja_target-sch_ninja-t_sources",
+      "table_name": "t_sources",
+      "schema": {
+        "properties": {
+          "i_id_source": {
+            "minimum": -9223372036854775808,
+            "maximum": 9223372036854775807,
+            "type": [
+              "integer"
+            ]
+          },
+          "t_source": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "jsb_schema_mappings": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "enm_status": {},
+          "t_binlog_name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "i_binlog_position": {
+            "minimum": -9223372036854775808,
+            "maximum": 9223372036854775807,
+            "type": [
+              "null",
+              "integer"
+            ]
+          },
+          "b_consistent": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "b_paused": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "b_maintenance": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "ts_last_maintenance": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "v_log_table": {}
+        },
+        "type": "object"
+      },
+      "stream": "t_sources",
+      "metadata": [
+        {
+          "breadcrumb": [],
+          "metadata": {
+            "table-key-properties": [
+              "i_id_source"
+            ],
+            "schema-name": "sch_ninja",
+            "database-name": "pgninja_target",
+            "row-count": 1,
+            "is-view": false
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "i_id_source"
+          ],
+          "metadata": {
+            "sql-datatype": "bigint",
+            "inclusion": "automatic",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "t_source"
+          ],
+          "metadata": {
+            "sql-datatype": "text",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "jsb_schema_mappings"
+          ],
+          "metadata": {
+            "sql-datatype": "jsonb",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "enm_status"
+          ],
+          "metadata": {
+            "sql-datatype": "sch_ninja.en_src_status",
+            "inclusion": "unsupported",
+            "selected-by-default": false
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "t_binlog_name"
+          ],
+          "metadata": {
+            "sql-datatype": "text",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "i_binlog_position"
+          ],
+          "metadata": {
+            "sql-datatype": "bigint",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "b_consistent"
+          ],
+          "metadata": {
+            "sql-datatype": "boolean",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "b_paused"
+          ],
+          "metadata": {
+            "sql-datatype": "boolean",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "b_maintenance"
+          ],
+          "metadata": {
+            "sql-datatype": "boolean",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "ts_last_maintenance"
+          ],
+          "metadata": {
+            "sql-datatype": "timestamp without time zone",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "v_log_table"
+          ],
+          "metadata": {
+            "sql-datatype": "character varying[]",
+            "inclusion": "unsupported",
+            "selected-by-default": false
+          }
+        }
+      ]
+    },
+    {
+      "tap_stream_id": "pgninja_target-sch_ninja-t_replica_tables",
+      "table_name": "t_replica_tables",
+      "schema": {
+        "properties": {
+          "i_id_table": {
+            "minimum": -9223372036854775808,
+            "maximum": 9223372036854775807,
+            "type": [
+              "integer"
+            ]
+          },
+          "i_id_source": {
+            "minimum": -9223372036854775808,
+            "maximum": 9223372036854775807,
+            "type": [
+              "null",
+              "integer"
+            ]
+          },
+          "v_table_name": {
+            "maxLength": 100,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "v_schema_name": {
+            "maxLength": 100,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "v_table_pkey": {},
+          "t_binlog_name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "i_binlog_position": {
+            "minimum": -9223372036854775808,
+            "maximum": 9223372036854775807,
+            "type": [
+              "null",
+              "integer"
+            ]
+          },
+          "b_replica_enabled": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "stream": "t_replica_tables",
+      "metadata": [
+        {
+          "breadcrumb": [],
+          "metadata": {
+            "table-key-properties": [
+              "i_id_table"
+            ],
+            "schema-name": "sch_ninja",
+            "database-name": "pgninja_target",
+            "row-count": 0,
+            "is-view": false
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "i_id_table"
+          ],
+          "metadata": {
+            "sql-datatype": "bigint",
+            "inclusion": "automatic",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "i_id_source"
+          ],
+          "metadata": {
+            "sql-datatype": "bigint",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "v_table_name"
+          ],
+          "metadata": {
+            "sql-datatype": "character varying",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "v_schema_name"
+          ],
+          "metadata": {
+            "sql-datatype": "character varying",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "v_table_pkey"
+          ],
+          "metadata": {
+            "sql-datatype": "character varying[]",
+            "inclusion": "unsupported",
+            "selected-by-default": false
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "t_binlog_name"
+          ],
+          "metadata": {
+            "sql-datatype": "text",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "i_binlog_position"
+          ],
+          "metadata": {
+            "sql-datatype": "bigint",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "b_replica_enabled"
+          ],
+          "metadata": {
+            "sql-datatype": "boolean",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        }
+      ]
+    },
+    {
+      "tap_stream_id": "pgninja_target-sch_ninja-t_batch_events",
+      "table_name": "t_batch_events",
+      "schema": {
+        "properties": {
+          "i_id_batch": {
+            "minimum": -9223372036854775808,
+            "maximum": 9223372036854775807,
+            "type": [
+              "integer"
+            ]
+          },
+          "i_id_event": {}
+        },
+        "type": "object"
+      },
+      "stream": "t_batch_events",
+      "metadata": [
+        {
+          "breadcrumb": [],
+          "metadata": {
+            "table-key-properties": [
+              "i_id_batch"
+            ],
+            "schema-name": "sch_ninja",
+            "database-name": "pgninja_target",
+            "row-count": 0,
+            "is-view": false
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "i_id_batch"
+          ],
+          "metadata": {
+            "sql-datatype": "bigint",
+            "inclusion": "automatic",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "i_id_event"
+          ],
+          "metadata": {
+            "sql-datatype": "bigint[]",
+            "inclusion": "unsupported",
+            "selected-by-default": false
+          }
+        }
+      ]
+    },
+    {
+      "tap_stream_id": "pgninja_target-sch_ninja-t_replica_batch",
+      "table_name": "t_replica_batch",
+      "schema": {
+        "properties": {
+          "i_id_batch": {
+            "minimum": -9223372036854775808,
+            "maximum": 9223372036854775807,
+            "type": [
+              "integer"
+            ]
+          },
+          "i_id_source": {
+            "minimum": -9223372036854775808,
+            "maximum": 9223372036854775807,
+            "type": [
+              "null",
+              "integer"
+            ]
+          },
+          "t_gtid_set": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "t_binlog_name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "i_binlog_position": {
+            "minimum": -9223372036854775808,
+            "maximum": 9223372036854775807,
+            "type": [
+              "null",
+              "integer"
+            ]
+          },
+          "b_started": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "b_processed": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "b_replayed": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "ts_created": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "ts_processed": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "ts_replayed": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "i_replayed": {
+            "minimum": -9223372036854775808,
+            "maximum": 9223372036854775807,
+            "type": [
+              "null",
+              "integer"
+            ]
+          },
+          "i_skipped": {
+            "minimum": -9223372036854775808,
+            "maximum": 9223372036854775807,
+            "type": [
+              "null",
+              "integer"
+            ]
+          },
+          "i_ddl": {
+            "minimum": -9223372036854775808,
+            "maximum": 9223372036854775807,
+            "type": [
+              "null",
+              "integer"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "stream": "t_replica_batch",
+      "metadata": [
+        {
+          "breadcrumb": [],
+          "metadata": {
+            "table-key-properties": [
+              "i_id_batch"
+            ],
+            "schema-name": "sch_ninja",
+            "database-name": "pgninja_target",
+            "row-count": 3,
+            "is-view": false
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "i_id_batch"
+          ],
+          "metadata": {
+            "sql-datatype": "bigint",
+            "inclusion": "automatic",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "i_id_source"
+          ],
+          "metadata": {
+            "sql-datatype": "bigint",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "t_gtid_set"
+          ],
+          "metadata": {
+            "sql-datatype": "text",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "t_binlog_name"
+          ],
+          "metadata": {
+            "sql-datatype": "text",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "i_binlog_position"
+          ],
+          "metadata": {
+            "sql-datatype": "bigint",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "b_started"
+          ],
+          "metadata": {
+            "sql-datatype": "boolean",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "b_processed"
+          ],
+          "metadata": {
+            "sql-datatype": "boolean",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "b_replayed"
+          ],
+          "metadata": {
+            "sql-datatype": "boolean",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "ts_created"
+          ],
+          "metadata": {
+            "sql-datatype": "timestamp without time zone",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "ts_processed"
+          ],
+          "metadata": {
+            "sql-datatype": "timestamp without time zone",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "ts_replayed"
+          ],
+          "metadata": {
+            "sql-datatype": "timestamp without time zone",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "i_replayed"
+          ],
+          "metadata": {
+            "sql-datatype": "bigint",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "i_skipped"
+          ],
+          "metadata": {
+            "sql-datatype": "bigint",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "i_ddl"
+          ],
+          "metadata": {
+            "sql-datatype": "bigint",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        }
+      ]
+    },
+    {
+      "tap_stream_id": "pgninja_target-dest_schema-test_table",
+      "table_name": "test_table",
+      "schema": {
+        "properties": {
+          "abc": {
+            "minimum": -2147483648,
+            "maximum": 2147483647,
+            "type": [
+              "null",
+              "integer"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "stream": "test_table",
+      "metadata": [
+        {
+          "breadcrumb": [],
+          "metadata": {
+            "table-key-properties": [],
+            "schema-name": "dest_schema",
+            "database-name": "pgninja_target",
+            "row-count": 0,
+            "is-view": false
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "abc"
+          ],
+          "metadata": {
+            "sql-datatype": "integer",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        }
+      ]
+    },
+    {
+      "tap_stream_id": "pgninja_target-obf_schema-test_table",
+      "table_name": "test_table",
+      "schema": {
+        "properties": {
+          "abc": {
+            "minimum": -2147483648,
+            "maximum": 2147483647,
+            "type": [
+              "null",
+              "integer"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "stream": "test_table",
+      "metadata": [
+        {
+          "breadcrumb": [],
+          "metadata": {
+            "table-key-properties": [],
+            "schema-name": "obf_schema",
+            "database-name": "pgninja_target",
+            "row-count": 0,
+            "is-view": true
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "abc"
+          ],
+          "metadata": {
+            "sql-datatype": "integer",
+            "inclusion": "available",
+            "selected-by-default": true
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+# IDE
+.vscode
+.idea/*
+
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.virtualenvs
+
+# Singer Tap state
+.state.json
+
+*.db
+.DS_Store
+venv
+env
+blog_old.md
+node_modules
+*.pyc
+tmp

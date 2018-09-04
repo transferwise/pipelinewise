@@ -1,0 +1,67 @@
+{
+  "streams": [
+    {
+      "tap_stream_id": "pgninja_source-test_table",
+      "table_name": "test_table",
+      "schema": {
+        "properties": {
+          "x": {
+            "inclusion": "available",
+            "minimum": -2147483648,
+            "maximum": 2000,
+            "type": [
+              "null",
+              "integer"
+            ]
+          },
+          "abc": {
+            "inclusion": "available",
+            "minimum": -2147483648,
+            "maximum": 2000,
+            "type": [
+              "null",
+              "text"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "stream": "test_table",
+      "metadata": [
+        {
+          "breadcrumb": [],
+          "metadata": {
+            "selected": true,
+            "replication-method": "FULL_TABLE",
+            "replication-key": "abc",
+            "selected-by-default": false,
+            "database-name": "pgninja_source",
+            "row-count": 13,
+            "is-view": false,
+            "table-key-properties": []
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "abc"
+          ],
+          "metadata": {
+            "selected-by-default": true,
+            "sql-datatype": "text"
+          }
+        },
+        {
+          "breadcrumb": [
+            "properties",
+            "x"
+          ],
+          "metadata": {
+            "selected-by-default": true,
+            "sql-datatype": "int(11)"
+          }
+        }
+      ]
+    }
+  ]
+}
