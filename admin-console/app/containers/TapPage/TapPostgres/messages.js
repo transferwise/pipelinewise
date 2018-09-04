@@ -33,6 +33,18 @@ export default defineMessages({
     id: 'analyticsdb.TapPostgres.replicationMethod',
     defaultMessage: 'Method',
   },
+  replicationMethodFullTable: {
+    id: 'analyticsdb.TapPostgfres.replicationMethodFullTable',
+    defaultMessage: 'Full',
+  },
+  replicationMethodLogBased: {
+    id: 'analyticsdb.TapPostgfres.replicationMethodLogBased',
+    defaultMessage: 'Log Based Incremental',
+  },
+  replicationMethodKeyBased: {
+    id: 'analyticsdb.TapPostgfres.replicationMethodKeyBased',
+    defaultMessage: 'Key Based Incremental',
+  },
   selected: {
     id: 'analyticsdb.TapPostgres.selected',
     defaultMessage: 'Tracked',

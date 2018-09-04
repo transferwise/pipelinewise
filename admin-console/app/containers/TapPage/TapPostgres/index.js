@@ -47,10 +47,28 @@ export class TapPostgresProperties extends React.PureComponent {
     const item = props.item;
     const tableBreadcrumb = item.metadata.find(m => m.breadcrumb.length === 0);
     const tableMetadata = tableBreadcrumb.metadata || {};
+    const replicationMethod = tableMetadata['replication-method'];
+    let replicationMethodString = <FormattedMessage {...messages.notSelected} />
     const targetId = props.delegatedProps.targetId;
     const tapId = props.delegatedProps.tapId;
     const streamId = item['tap_stream_id'];
     const isSelected = props.selectedItem === streamId;
+
+
+    if (replicationMethod) {
+      if (replicationMethod === "FULL_TABLE") {
+        replicationMethodString = <FormattedMessage {...messages.replicationMethodFullTable} />
+      }
+      else if (replicationMethod === "INCREMENTAL") {
+        replicationMethodString = <FormattedMessage {...messages.replicationMethodKeyBased} />
+      }
+      else if (replicationMethod === "LOG_BASED") {
+        replicationMethodString = <FormattedMessage {...messages.replicationMethodLogBased} />
+      }
+      else {
+        replicationMethodString = replicationMethod
+      }
+    }
 
     return (
       <tr className={isSelected ? "table-active" : ""} onClick={() => props.onItemSelect(streamId)}>
@@ -77,7 +95,7 @@ export class TapPostgresProperties extends React.PureComponent {
         <td>{item['table_name']}</td>
         <td>{item['is-view'] ? 'Yes' : ''}</td>
         <td>{tableMetadata['row-count']}</td>
-        <td>{tableMetadata['replication-method'] || <FormattedMessage {...messages.notSelected} />}</td>
+        <td>{replicationMethodString}</td>
       </tr>
     )
   }
