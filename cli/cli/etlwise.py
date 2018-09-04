@@ -7,7 +7,7 @@ import sys
 import logging
 import json
 
-class TransferData(object):
+class ETLWise(object):
     '''...'''
 
     def __init_logger(self, logger_name, level=logging.INFO):
@@ -139,7 +139,7 @@ class TransferData(object):
 
         if polling:
             proc = Popen(shlex.split(command), stdout=PIPE, stderr=STDOUT)
-            stdout = 'xx'
+            stdout = ''
             while True:
                 line = proc.stdout.readline()
                 if proc.poll() is not None:

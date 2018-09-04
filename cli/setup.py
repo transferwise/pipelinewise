@@ -5,7 +5,7 @@ from setuptools import setup, find_packages
 
 setup(name='cli',
     version='0.0.1',
-    description='TransferData ETL Command Line Interface',
+    description='ETLWise Command Line Interface',
     author='xyz',
     url='xzy',
     classifiers=['Programming Language :: Python :: 3 :: Only'],
@@ -15,7 +15,7 @@ setup(name='cli',
     ],
     entry_points='''
         [console_scripts]
-        transferdata=cli:main
+        etlwise=cli:main
     ''',
     packages=['cli']
 )

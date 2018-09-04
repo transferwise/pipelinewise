@@ -2,7 +2,7 @@
 import os
 
 from pkg_resources import get_distribution
-from cli.transferdata import TransferData
+from cli.etlwise import ETLWise
 import argparse
 
 __version__ = get_distribution('cli').version
@@ -29,8 +29,8 @@ def main():
     parser.add_argument('--debug', default=False, required=False, help=debug_help, action="store_true")
 
     args = parser.parse_args()
-    transferdata = TransferData(args, config_dir)
-    getattr(transferdata, args.command)()
+    etlwise = ETLWise(args, config_dir)
+    getattr(etlwise, args.command)()
 
 if __name__ == '__main__':
     main()
