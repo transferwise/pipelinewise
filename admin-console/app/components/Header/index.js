@@ -6,6 +6,8 @@ import LocaleToggle from 'containers/LocaleToggle';
 import HeaderLinksList from './HeaderLinksList';
 import messages from './messages';
 
+import Logo from '../../images/hummingbird.png';
+
 /* eslint-disable react/prefer-stateless-function */
 class Header extends React.Component {
   render() {
@@ -16,7 +18,8 @@ class Header extends React.Component {
       <header>
         <nav className="navbar navbar-expand-md navbar-dark fixed-top bg-blue">
           <a className="navbar-brand" href="/">
-            <FormattedMessage {...messages.brand} />  
+            <img className="img-icon-md" src={Logo}/>
+            &nbsp;<FormattedMessage {...messages.brand} />  
           </a>
           <button className="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarCollapse" aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation">
             <span className="navbar-toggler-icon"></span>

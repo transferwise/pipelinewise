@@ -3,7 +3,7 @@ import { defineMessages } from 'react-intl';
 export default defineMessages({
   brand: {
     id: 'ETLWise.components.Header.brand',
-    defaultMessage: 'OpenSync',
+    defaultMessage: 'ETLWise',
   },
   integrations: {
     id: 'ETLWise.components.Header.integrations',
