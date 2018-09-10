@@ -20,6 +20,9 @@ injectGlobal`
   .container a {
     color: #2f4366 !important;
   }
+  body main.container-fluid {
+    padding: 60px 15px 80px 0;
+  }
   body main.container {
     padding: 60px 15px 80px 0;
   }
@@ -28,13 +31,6 @@ injectGlobal`
   }
   .bg-blue {
     background-color: #37517e !important;
-  }
-  .full-width {
-    position: relative;
-    left: 50%;
-    right: 50%;
-    margin-left: -50vw;
-    margin-right: -50vw;
   }
   .table-wrapper-scroll-y {
     display: block;
@@ -52,6 +48,12 @@ injectGlobal`
     left: 0;
     opacity: 0.5;
   }
+  .modal-visible {
+    display: initial !important;
+  }
+  .modal-hidden {
+    display: none !important;
+  }
   .arrow-right {
     width: 0; 
     height: 0; 
@@ -67,6 +69,9 @@ injectGlobal`
   }
   .img-icon {
     height: 40px;
+  }
+  .img-icon-md {
+    height: 28px;
   }
   .img-icon-sm {
     height: 14px;
