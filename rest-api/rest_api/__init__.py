@@ -10,8 +10,9 @@ from rest_api.auth import requires_auth
 app = Flask(__name__)
 CORS(app)
 
-config_dir = '../config'
-manager = Manager(os.path.join(os.getcwd(), config_dir), app.logger)
+config_dir = os.path.join(os.getcwd(), '../config')
+venv_dir = os.path.join(os.getcwd(), '../.virtualenvs')
+manager = Manager(config_dir, venv_dir, app.logger)
 
 class WebadminException(Exception):
     '''A known exception for which we don't need to pring a stack trace'''
@@ -77,6 +78,13 @@ def api_get_tap(target_id, tap_id):
     return jsonify({
         'status': 200,
         'result': manager.get_tap(target_id, tap_id)
+    })
+
+@app.route("/targets/<target_id>/taps/<tap_id>/discover", methods = ['POST'])
+def api_discover_tap(target_id, tap_id):
+    return jsonify({
+        'status': 200,
+        'result': manager.discover_tap(target_id, tap_id)
     })
 
 @app.route("/targets/<target_id>/taps/<tap_id>/streams", methods = ['GET'])

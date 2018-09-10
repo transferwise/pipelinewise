@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
 import os
+from subprocess import Popen, PIPE, STDOUT
+import shlex
 import logging
 import json
 
@@ -10,9 +12,11 @@ class Manager(object):
     '''...'''
     flows = []
 
-    def __init__(self, config_dir, logger):
+    def __init__(self, config_dir, venv_dir, logger):
         self.logger = logger
         self.config_dir = config_dir
+        self.venv_dir = venv_dir
+        self.etlwise_bin = os.path.join(self.venv_dir, "cli", "bin", "etlwise")
         self.config_path = os.path.join(self.config_dir, "config.json")
         self.load_config()
     
@@ -38,6 +42,37 @@ class Manager(object):
     def load_config(self):
         self.logger.info('Loading config at {}'.format(self.config_path))
         self.config = self.load_json(self.config_path)
+
+    def run_command(self, command, polling=False):
+        self.logger.debug('Running command with polling [{}] : {} with'.format(polling, command))
+
+        if polling:
+            proc = Popen(shlex.split(command), stdout=PIPE, stderr=STDOUT)
+            stdout = ''
+            while True:
+                line = proc.stdout.readline()
+                if proc.poll() is not None:
+                    break
+                if line:
+                    stdout += line.decode('utf-8')
+
+            rc = proc.poll()
+            if rc != 0:
+                self.logger.error(stdout)
+
+            return { 'stdout': stdout, 'stderr': None, 'returncode': rc }
+
+        else:
+            proc = Popen(shlex.split(command), stdout=PIPE, stderr=PIPE)
+            x = proc.communicate()
+            rc = proc.returncode
+            stdout = x[0].decode('utf-8')
+            stderr = x[1].decode('utf-8')
+
+            if rc != 0:
+              self.logger.error(stderr)
+
+            return { 'stdout': stdout, 'stderr': stderr, 'returncode': rc }
 
     def get_tap_dir(self, target_id, tap_id):
         return os.path.join(self.config_dir, target_id, tap_id)
@@ -111,6 +146,12 @@ class Manager(object):
         tap['target'] = self.get_target(target_id)
 
         return tap
+
+    def discover_tap(self, target_id, tap_id):
+        self.logger.info('Discovering {} tap from target {}'.format(tap_id, target_id))
+        command = "{} discover_tap --target {} --tap {}".format(self.etlwise_bin, target_id, tap_id)
+        result = self.run_command(command, False)
+        return result
 
     def get_streams(self, target_id, tap_id):
         self.logger.info('Getting {} tap streams from {} target'.format(tap_id, target_id))
