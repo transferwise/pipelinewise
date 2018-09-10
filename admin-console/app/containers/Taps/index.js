@@ -62,26 +62,6 @@ export class Taps extends React.PureComponent {
   }
 }
 
-/*
-
-        <strong><FormattedMessage {...messages.tapsTopic} /></strong>
-        <Row>
-          <Col md={12}>
-            <TapsTable {...tapsTableProps} />
-          </Col>
-        </Row>
-        <Row>
-          <Col md={12}>
-            <br />
-            <ButtonGroup bsClass="float-right">
-              <Button bsStyle="primary" onClick={this.props.onRefresh}><FormattedMessage {...messages.refresh} /></Button>
-            </ButtonGroup>
-            <br /><br />
-            <TapDetailsViewer {...viewerProps} />
-          </Col>
-        </Row>
-*/
-
 Taps.propTypes = {
   loading: PropTypes.bool,
   error: PropTypes.any,

@@ -13,6 +13,14 @@ export default defineMessages({
     id: 'ETLWise.TapPostgres.database',
     defaultMessage: 'Database',
   },
+  discover: {
+    id: 'ETLWise.TapPostgres.discover',
+    defaultMessage: 'Discover',
+  },
+  discoverErrorTitle: {
+    id: 'ETLWise.TapPostgres.discoverErrorTitle',
+    defaultMessage: 'Failed to discover schema',
+  },
   schema: {
     id: 'ETLWise.TapPostgres.schema',
     defaultMessage: 'Schema',
@@ -72,5 +80,17 @@ export default defineMessages({
   primaryKey: {
     id: 'ETLWise.TapPostgres.primaryKey',
     defaultMessage: 'Key',
+  },
+  newTable: {
+    id: 'ETLWise.TapPostgres.newTable',
+    defaultMessage: 'New Table',
+  },
+  newColumn: {
+    id: 'ETLWise.TapPostgres.newColumn',
+    defaultMessage: 'New Column',
+  },
+  modifiedColumn: {
+    id: 'ETLWise.TapPostgres.modifiedColumn',
+    defaultMessage: 'Data Type Changed',
   },
 });

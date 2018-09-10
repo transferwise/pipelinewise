@@ -7,21 +7,26 @@ import injectReducer from 'utils/injectReducer';
 import injectSaga from 'utils/injectSaga';
 import LoadingIndicator from 'components/LoadingIndicator';
 import ConnectorIcon from 'components/ConnectorIcon';
+import Modal from 'components/Modal';
 import {
   makeSelectStreams,
   makeSelectForceRefreshStreams,
   makeSelectActiveStreamId,
   makeSelectLoading,
-  makeSelectError
+  makeSelectError,
+  makeSelectConsoleOutput
 } from './selectors';
-import { loadStreams, setActiveStreamId, updateStreamToReplicate } from './actions';
+import { loadStreams, setActiveStreamId, updateStreamToReplicate, discoverTap, resetConsoleOutput } from './actions';
 import reducer from './reducer';
 import saga from './saga';
 
 import Toggle from 'react-toggle';
 import { FormattedMessage } from 'react-intl';
 
-import { Grid, Alert, Row, Col } from 'react-bootstrap/lib';
+import { Grid, Alert, Row, Col, ButtonGroup, Button } from 'react-bootstrap/lib';
+import Popup from 'reactjs-popup';
+import SyntaxHighlighter from 'react-syntax-highlighter/prism';
+import { light } from 'react-syntax-highlighter/styles/prism';
 
 import Table from 'components/Table';
 import messages from './messages';
@@ -39,6 +44,7 @@ export class TapPostgresProperties extends React.PureComponent {
         <th><FormattedMessage {...messages.isView} /></th>
         <th><FormattedMessage {...messages.rowCount} /></th>
         <th><FormattedMessage {...messages.replicationMethod} /></th>
+        <th></th>
       </tr>
     )
   }
@@ -96,6 +102,7 @@ export class TapPostgresProperties extends React.PureComponent {
         <td>{item['is-view'] ? 'Yes' : ''}</td>
         <td>{tableMetadata['row-count']}</td>
         <td>{replicationMethodString}</td>
+        <td>{item['is-new'] ? <FormattedMessage {...messages.newTable} /> : ''}</td>
       </tr>
     )
   }
@@ -107,6 +114,7 @@ export class TapPostgresProperties extends React.PureComponent {
         <th><FormattedMessage {...messages.column} /></th>
         <th><FormattedMessage {...messages.type} /></th>
         <th><FormattedMessage {...messages.replicationMethod} /></th>
+        <th></th>
       </tr>
     )
   }
@@ -119,11 +127,18 @@ export class TapPostgresProperties extends React.PureComponent {
     const isAutomatic = item.inclusion === 'automatic';
     const isSelected = item.selected || isAutomatic;
     let method = <FormattedMessage {...messages.notSelected} />
+    let schemaChangeDescription;
 
     if (isAutomatic) {
       method = <FormattedMessage {...messages.automatic} />
     } else if (isSelected) {
       method = <FormattedMessage {...messages.selected} />
+    }
+
+    if (item.isNew) {
+      schemaChangeDescription = <FormattedMessage {...messages.newColumn} />
+    } else if (item.isModified) {
+      schemaChangeDescription = <FormattedMessage {...messages.modifiedColumn} />
     }
 
     return (
@@ -149,6 +164,7 @@ export class TapPostgresProperties extends React.PureComponent {
         <td>{item.isPrimaryKey && <ConnectorIcon className="img-icon-sm" name="key" />} {item.name}</td>
         <td>{item.type}</td>
         <td>{method}</td>
+        <td>{schemaChangeDescription}</td>
       </tr>
     )
   }
@@ -181,8 +197,10 @@ export class TapPostgresProperties extends React.PureComponent {
           selectedByDefault: mdata['selected-by-default'],
           selected: mdata['selected'],
           sqlDatatype: mdata['sql-datatype'],
+          isNew: mdata['is-new'],
+          isModified: mdata['is-modified'],
         }})
-
+      
       return (
         <Grid>
           <Table
@@ -199,8 +217,21 @@ export class TapPostgresProperties extends React.PureComponent {
   }
 
   render() {
-    const { loading, error, targetId, tapId, streams, activeStreamId, onStreamSelect, onUpdateStreamToReplicate } = this.props;
+    const {
+      loading,
+      error,
+      consoleOutput,
+      targetId,
+      tapId,
+      streams,
+      activeStreamId,
+      onStreamSelect,
+      onUpdateStreamToReplicate,
+      onDiscoverTap,
+      onCloseModal
+    } = this.props;
     let alert = <div />;
+    let consolePanel = <div />
     
     if (loading) {
       return <LoadingIndicator />;
@@ -211,9 +242,33 @@ export class TapPostgresProperties extends React.PureComponent {
         alert = <Alert bsStyle="danger" className="full-swidth"><strong>Error!</strong> {error.toString()}</Alert>
       }
 
+      if (consoleOutput !== false) {
+        consolePanel = 
+          <SyntaxHighlighter className="font-sssm" language='shsssell' style={light}
+            showLineNumbers={false}>
+              {consoleOutput}
+          </SyntaxHighlighter> 
+      }
+
       return (
         <Grid>
-          {alert}
+          {consoleOutput ?
+            <Modal
+              show={consoleOutput}
+              title={<FormattedMessage {...messages.discoverErrorTitle} />}
+              body={<Grid>{alert}{consolePanel}</Grid>}
+              onClose={() => onCloseModal()} />
+          : alert }
+
+          <Row>
+            <Col md={12}>
+              <br />
+              <ButtonGroup bsClass="float-right">
+                <Button bsStyle="primary" onClick={() => onDiscoverTap(targetId, tapId)}><FormattedMessage {...messages.discover} /></Button>
+              </ButtonGroup>
+            </Col>
+          </Row>
+
           {Array.isArray(streams) ?
             <Grid>
               <Row>
@@ -268,6 +323,8 @@ export function mapDispatchToProps(dispatch) {
     onLoadStreams: (targetId, tapId) => dispatch(loadStreams(targetId, tapId)),
     onStreamSelect: (streamId) => dispatch(setActiveStreamId(streamId)),
     onUpdateStreamToReplicate: (targetId, tapId, streamId, params) => dispatch(updateStreamToReplicate(targetId, tapId, streamId, params)),
+    onDiscoverTap: (targetId, tapId) => dispatch(discoverTap(targetId, tapId)),
+    onCloseModal: () => dispatch(resetConsoleOutput())
   };
 }
 
@@ -277,6 +334,7 @@ const mapStateToProps = createStructuredSelector({
   activeStreamId: makeSelectActiveStreamId(),
   loading: makeSelectLoading(),
   error: makeSelectError(),
+  consoleOutput: makeSelectConsoleOutput(),
 });
 
 const withConnect = connect(

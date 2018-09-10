@@ -10,14 +10,14 @@ class ConnectionsPage extends React.Component {
   render() {
     const { match: { params } } = this.props;
     return (
-      <main role="main" className="container">
+      <main role="main" className="container-fluid">
         <Helmet>
           <title>Connections</title>
         </Helmet>
         <Targets selectedTargetId={params.target} />
-        <hr className="full-width" />
+        <hr />
         <Target targetId={params.target} />
-        <hr className="full-width" />
+        <hr />
         <Taps targetId={params.target} />
       </main>
     )

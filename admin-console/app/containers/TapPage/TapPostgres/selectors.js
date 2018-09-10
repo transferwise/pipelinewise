@@ -22,6 +22,9 @@ const makeSelectLoading = () =>
 const makeSelectError = () =>
   createSelector(selectTapPostgres, tapPostgresState => tapPostgresState.get('error'));
 
+const makeSelectConsoleOutput = () =>
+  createSelector(selectTapPostgres, tapPostgresState => tapPostgresState.get('consoleOutput'));
+
 export {
   selectTapPostgres,
   
@@ -30,4 +33,5 @@ export {
   makeSelectActiveStreamId,
   makeSelectLoading,
   makeSelectError,
+  makeSelectConsoleOutput,
 };

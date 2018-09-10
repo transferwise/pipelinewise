@@ -8,7 +8,7 @@ import messages from './messages';
 export default class HomePage extends React.Component {
   render() {
     return (
-      <main role="main" className="container">
+      <main role="main" className="container-fluid">
         <Helmet>
           <title>Home Page</title>
           <meta

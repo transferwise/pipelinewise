@@ -25,6 +25,12 @@ import {
   UPDATE_STREAM_TO_REPLICATE,
   UPDATE_STREAM_TO_REPLICATE_SUCCESS,
   UPDATE_STREAM_TO_REPLICATE_ERROR,
+
+  DISCOVER_TAP,
+  DISCOVER_TAP_SUCCESS,
+  DISCOVER_TAP_ERROR,
+
+  RESET_CONSOLE_OUTPUT,
  } from './constants';
 
 export function loadStreams(targetId, tapId) {
@@ -78,4 +84,32 @@ export function updateStreamToReplicateError(error) {
     type: UPDATE_STREAM_TO_REPLICATE_ERROR,
     error, 
   };
+}
+
+export function discoverTap(targetId, tapId) {
+  return {
+    type: DISCOVER_TAP,
+    targetId,
+    tapId,
+  };
+}
+
+export function discoverTapDone(response) {
+  return {
+    type: DISCOVER_TAP_SUCCESS,
+    response
+  };
+}
+
+export function discoverTapError(error) {
+  return {
+    type: DISCOVER_TAP_ERROR,
+    error,
+  };
+}
+
+export function resetConsoleOutput() {
+  return {
+    type: RESET_CONSOLE_OUTPUT,
+  }
 }

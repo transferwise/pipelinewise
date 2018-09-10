@@ -84,26 +84,24 @@ export class TapPage extends React.PureComponent {
     }
 
     if (error != false) {
-      alert = <Alert bsStyle="danger" className="full-swidth"><strong>Error!</strong> {error.toString()}</Alert>
+      alert = <Alert bsStyle="danger"><strong>Error!</strong> {error.toString()}</Alert>
     } else {
       content = (
-        <Grid>
+        <div>
           {this.renderHeader(tap)}
-          <hr className="full-width" />
+          <hr />
           <TapTabbedContent {... { targetId, tap } } />
-        </Grid>
+        </div>
       )
     }
     
     return (
-      <main role="main" className="container">
+      <main role="main" className="container-fluid">
         <Helmet>
           <title>Tap</title>
         </Helmet>
-        <Grid>
-          {alert}
-          {content}
-        </Grid>
+        {alert}
+        {content}
       </main>
     )
   }
