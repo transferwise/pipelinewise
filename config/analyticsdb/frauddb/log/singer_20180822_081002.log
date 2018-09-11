@@ -1,8 +1,0 @@
-INFO Server Parameters: version: 5.7.22-log, wait_timeout: 2700, innodb_lock_wait_timeout: 2700, max_allowed_packet: 4194304, interactive_timeout: 28800
-INFO Beginning sync for InnoDB table pgninja_source.test_table
-INFO Stream test_table is using full table replication
-INFO Running SELECT `x`,`abc` FROM `pgninja_source`.`test_table`
-INFO METRIC: {"type": "counter", "metric": "record_count", "value": 35, "tags": {"database": "pgninja_source", "table": "test_table"}}
-INFO METRIC: {"type": "timer", "metric": "job_duration", "value": 0.01634526252746582, "tags": {"job_type": "sync_table", "database": "pgninja_source", "table": "test_table", "status": "succeeded"}}
-INFO Batch is valid
-INFO Exiting normally
