@@ -200,59 +200,90 @@ class ETLWise(object):
 
                 # Copy stream selection from the old properties
                 else:
+
+                    new_schema["streams"][new_stream_idx]["is-new"] = abc(new_schema["streams"][new_stream_idx]["is-new"], old_stream["is-new"])
+
+                    # Copy is-new flag from the old stream
+                    try:
+                        new_schema["streams"][new_stream_idx]["is-new"] = old_stream["is-new"]
+                    except Exception:
+                        False
+
+                    # Copy selected from the old stream
                     try:
                         new_schema["streams"][new_stream_idx]["metadata"][0]["metadata"]["selected"] = old_stream["metadata"][0]["metadata"]["selected"]
+                    except Exception:
+                        False
+
+                    # Copy replication method from the old stream
+                    try:
                         new_schema["streams"][new_stream_idx]["metadata"][0]["metadata"]["replication-method"] = old_stream["metadata"][0]["metadata"]["replication-method"]
                     except Exception:
                         False
 
-                # Is this new or modified field?
-                new_fields = new_schema["streams"][new_stream_idx]["schema"]["properties"]
-                old_fields = old_schema["streams"][new_stream_idx]["schema"]["properties"]
-                for new_field_key in new_fields:
-                    new_field = new_fields[new_field_key]
-                    new_field_mdata_idx = -1
+                    # Is this new or modified field?
+                    new_fields = new_schema["streams"][new_stream_idx]["schema"]["properties"]
+                    old_fields = old_schema["streams"][new_stream_idx]["schema"]["properties"]
+                    for new_field_key in new_fields:
+                        new_field = new_fields[new_field_key]
+                        new_field_mdata_idx = -1
 
-                    # Find new field metadata index
-                    for i, mdata in enumerate(new_schema["streams"][new_stream_idx]["metadata"]):
-                        if len(mdata["breadcrumb"]) == 2 and mdata["breadcrumb"][0] == "properties" and mdata["breadcrumb"][1] == new_field_key:
-                            new_field_mdata_idx = i
-
-                    # Field exists
-                    if new_field_key in old_fields.keys():
-                        old_field = old_fields[new_field_key]
-                        old_field_mdata_idx = -1
-
-                        # Find old field metadata index
-                        for i, mdata in enumerate(old_stream["metadata"]):
+                        # Find new field metadata index
+                        for i, mdata in enumerate(new_schema["streams"][new_stream_idx]["metadata"]):
                             if len(mdata["breadcrumb"]) == 2 and mdata["breadcrumb"][0] == "properties" and mdata["breadcrumb"][1] == new_field_key:
-                                old_field_mdata_idx = i
+                                new_field_mdata_idx = i
 
-                        # Copy field selection from the old properties
-                        try:
-                            new_schema["streams"][new_stream_idx]["metadata"][new_field_mdata_idx]["metadata"]["selected"] = old_stream["metadata"][old_field_mdata_idx]["metadata"]["selected"]
-                        except Exception:
-                            False
+                        # Field exists
+                        if new_field_key in old_fields.keys():
+                            old_field = old_fields[new_field_key]
+                            old_field_mdata_idx = -1
 
-                        # Field exists and type is the same - Do nothing more in the schema
-                        if new_field == old_field:
-                            self.logger.debug("Field exists in {} stream with the same type: {} : {}".format(new_tap_stream_id, new_field_key, new_field))
+                            # Find old field metadata index
+                            for i, mdata in enumerate(old_stream["metadata"]):
+                                if len(mdata["breadcrumb"]) == 2 and mdata["breadcrumb"][0] == "properties" and mdata["breadcrumb"][1] == new_field_key:
+                                    old_field_mdata_idx = i
 
-                        # Field exists but types are different - Mark the field as modified in the metadata
-                        else:
-                            self.logger.debug("Field exists in {} stream but types are different: {} : {}".format(new_tap_stream_id, new_field_key, new_field))
+                            new_mdata = new_schema["streams"][new_stream_idx]["metadata"][new_field_mdata_idx]["metadata"]
+                            old_mdata = old_stream["metadata"][old_field_mdata_idx]["metadata"]
+
+                            # Copy is-new flag from the old properties
                             try:
-                                new_schema["streams"][new_stream_idx]["metadata"][new_field_mdata_idx]["metadata"]["is-modified"] = True
+                                new_mdata["is-new"] = old_mdata["is-new"]
                             except Exception:
                                 False
 
-                    # New field - Mark the field as new in the metadata
-                    else:
-                        self.logger.debug("New field in stream {}: {} : {}".format(new_tap_stream_id, new_field_key, new_field))
-                        try:
-                            new_schema["streams"][new_stream_idx]["metadata"][new_field_mdata_idx]["metadata"]["is-new"] = True
-                        except Exception:
-                            False
+                            # Copy is-modified flag from the old properties
+                            try:
+                                new_mdata["is-modified"] = old_mdata["is-modified"]
+                            except Exception:
+                                False
+
+                            # Copy field selection from the old properties
+                            try:
+                                new_mdata["selected"] = old_mdata["selected"]
+                            except Exception:
+                                False
+
+                            # Field exists and type is the same - Do nothing more in the schema
+                            if new_field == old_field:
+                                self.logger.debug("Field exists in {} stream with the same type: {} : {}".format(new_tap_stream_id, new_field_key, new_field))
+
+                            # Field exists but types are different - Mark the field as modified in the metadata
+                            else:
+                                self.logger.debug("Field exists in {} stream but types are different: {} : {}".format(new_tap_stream_id, new_field_key, new_field))
+                                try:
+                                    new_schema["streams"][new_stream_idx]["metadata"][new_field_mdata_idx]["metadata"]["is-modified"] = True
+                                    new_schema["streams"][new_stream_idx]["metadata"][new_field_mdata_idx]["metadata"]["is-new"] = False
+                                except Exception:
+                                    False
+
+                        # New field - Mark the field as new in the metadata
+                        else:
+                            self.logger.debug("New field in stream {}: {} : {}".format(new_tap_stream_id, new_field_key, new_field))
+                            try:
+                                new_schema["streams"][new_stream_idx]["metadata"][new_field_mdata_idx]["metadata"]["is-new"] = True
+                            except Exception:
+                                False
 
             schema_with_diff = new_schema
 
