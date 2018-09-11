@@ -43,6 +43,10 @@ class Manager(object):
         self.logger.info('Loading config at {}'.format(self.config_path))
         self.config = self.load_json(self.config_path)
 
+    def save_config(self):
+        self.logger.info('Saving config at {}'.format(self.config_path))
+        self.save_json(self.config, self.config_path)
+
     def run_command(self, command, polling=False):
         self.logger.debug('Running command with polling [{}] : {} with'.format(polling, command))
 
@@ -81,8 +85,6 @@ class Manager(object):
         return os.path.join(self.get_tap_dir(target_id, tap_id), 'log')
     
     def parse_connector_files(self, connector_dir):
-        name = os.path.basename(connector_dir)
-
         return {
             'config': self.load_json(os.path.join(connector_dir, 'config.json')),
             'properties': self.load_json(os.path.join(connector_dir, 'properties.json')),
@@ -147,6 +149,25 @@ class Manager(object):
 
         return tap
 
+    def update_tap(self, target_id, tap_id, params):
+        self.logger.info('Updating {} tap in {} target'.format(tap_id, target_id))
+        tap = self.get_tap(target_id, tap_id)
+
+        try:
+            for target_idx, target in enumerate(self.config["targets"]):
+                if target["id"] == target_id:
+                    for tap_idx, tap in enumerate(target["taps"]):
+                        if tap["id"] == tap_id:
+                            update_key = params["update"]["key"]
+                            update_value = params["update"]["value"]
+
+                            self.config["targets"][target_idx]["taps"][tap_idx][update_key] = update_value
+                            self.save_config()
+
+            return "Tap updated successfully"
+        except Exception as exc:
+            raise Exception("Failed to update {} tap in {} target. Invalid updated parameters: {} - {}".format(tap_id, target_id, params, exc))
+
     def discover_tap(self, target_id, tap_id):
         self.logger.info('Discovering {} tap from target {}'.format(tap_id, target_id))
         command = "{} discover_tap --target {} --tap {}".format(self.etlwise_bin, target_id, tap_id)
@@ -185,7 +206,6 @@ class Manager(object):
             properties_file = os.path.join(tap_dir, 'properties.json')
             properties = self.load_json(properties_file)
             tap_type = params["tapType"]
-            print(tap_type)
 
             if tap_type == "tap-postgres":
                 streams = properties["streams"]

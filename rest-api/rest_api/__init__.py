@@ -80,6 +80,14 @@ def api_get_tap(target_id, tap_id):
         'result': manager.get_tap(target_id, tap_id)
     })
 
+
+@app.route("/targets/<target_id>/taps/<tap_id>", methods = ['PATCH'])
+def api_update_tap(target_id, tap_id):
+    return jsonify({
+        'status': 200,
+        'result': manager.update_tap(target_id, tap_id, request.get_json())
+    })
+
 @app.route("/targets/<target_id>/taps/<tap_id>/discover", methods = ['POST'])
 def api_discover_tap(target_id, tap_id):
     return jsonify({
