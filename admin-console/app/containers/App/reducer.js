@@ -16,6 +16,11 @@ import {
   LOAD_TAP,
   LOAD_TAP_SUCCESS,
   LOAD_TAP_ERROR,
+
+
+  UPDATE_TAP_TO_REPLICATE,
+  UPDATE_TAP_TO_REPLICATE_SUCCESS,
+  UPDATE_TAP_TO_REPLICATE_ERROR,
 } from './constants';
 
 // The initial state of the App
@@ -35,6 +40,9 @@ const initialState = fromJS({
   tapLoading: true,
   tapError: false,
   tap: false,
+
+  forceRefreshTaps: false,
+  forceRefreshTap: false,
 });
 
 function isValidTargets(targets) {
@@ -98,6 +106,7 @@ function appReducer(state = initialState, action) {
       return state
         .set('tapsLoading', true)
         .set('tapsError', false)
+        .set('forceRefreshTaps', false)
         .set('taps', false)
     case LOAD_TAPS_SUCCESS:
       return state
@@ -114,6 +123,7 @@ function appReducer(state = initialState, action) {
       return state
         .set('tapLoading', true)
         .set('tapError', false)
+        .set('forceRefreshTap', false)
         .set('tap', false)
     case LOAD_TAP_SUCCESS:
       return state
@@ -125,6 +135,21 @@ function appReducer(state = initialState, action) {
         .set('tapLoading', false)
         .set('tapError', action.error)
         .set('tap', false)
+
+    case UPDATE_TAP_TO_REPLICATE:
+      return state
+        .set('tapsLoading', true)
+        .set('tapsError', false)
+    case UPDATE_TAP_TO_REPLICATE_SUCCESS:
+      return state
+        .set('tapsLoading', false)
+        .set('tapsError', action.response.status !== 200 ? action.response.message : false)
+        .set('forceRefreshTaps', action.response.status === 200)
+        .set('forceRefreshTap', action.response.status === 200)
+    case UPDATE_TAP_TO_REPLICATE_ERROR:
+      return state
+        .set('tapsLoading', false)
+        .set('tapsError', action.error)
 
     default:
       return state;

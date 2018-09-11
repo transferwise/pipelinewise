@@ -19,9 +19,10 @@ import ArrowRightIcon from '../../images/arrow-right.png';
 import {
   makeSelectTapLoading,
   makeSelectTapError,
-  makeSelectTap
+  makeSelectTap,
+  makeSelectForceRefreshTap,
 } from 'containers/App/selectors';
-import { loadTap } from '../App/actions';
+import { loadTap, updateTapToReplicate } from '../App/actions';
 import reducer from '../App/reducer';
 import saga from './saga';
 import TapTabbedContent from './TapTabbedContent';
@@ -33,8 +34,15 @@ export class TapPage extends React.PureComponent {
     const { match: { params } } = this.props;
     this.props.onLoadTap(params.target, params.tap);
   }
+
+  componentDidUpdate(prevProps) {
+    const { match: { params } } = this.props;
+    if (this.props.forceRefreshTap) {
+      this.props.onLoadTap(params.target, params.tap);
+    }
+  }
   
-  renderHeader(tap) {
+  renderHeader(tap, onUpdateTapToReplicate) {
     return (
       <Grid>
         <Row>
@@ -66,7 +74,11 @@ export class TapPage extends React.PureComponent {
             </Grid>
           </Col>
           <Col md={3} className="mt-3">
-            <Toggle defaultChecked={tap.enabled} disabled={true} className="float-right"/>
+            <Toggle
+              defaultChecked={tap.enabled}
+              className="float-right"
+              onChange={() => onUpdateTapToReplicate(tap.target.id, tap.id, { update: { key: "enabled", value: !tap.enabled }})}
+            />
           </Col>
         </Row>
       </Grid>
@@ -74,7 +86,7 @@ export class TapPage extends React.PureComponent {
   }
 
   render() {
-    const { loading, error, tap, match } = this.props;
+    const { loading, error, tap, match, onUpdateTapToReplicate } = this.props;
     const targetId = match.params.target;
     let alert = <div />;
     let content = <div />;
@@ -88,7 +100,7 @@ export class TapPage extends React.PureComponent {
     } else {
       content = (
         <div>
-          {this.renderHeader(tap)}
+          {this.renderHeader(tap, onUpdateTapToReplicate)}
           <hr />
           <TapTabbedContent {... { targetId, tap } } />
         </div>
@@ -116,6 +128,7 @@ TapPage.propTypes = {
 export function mapDispatchToProps(dispatch) {
   return {
     onLoadTap: (targetId, tapId) => dispatch(loadTap(targetId, tapId)),
+    onUpdateTapToReplicate: (targetId, tapId, params) => dispatch(updateTapToReplicate(targetId, tapId, params)),
   };
 }
 
@@ -123,6 +136,7 @@ const mapStateToProps = createStructuredSelector({
   loading: makeSelectTapLoading(),
   error: makeSelectTapError(),
   tap: makeSelectTap(),
+  forceRefreshTap: makeSelectForceRefreshTap(),
 });
 
 const withConnect = connect(

@@ -14,6 +14,10 @@ import {
   LOAD_TAP,
   LOAD_TAP_SUCCESS,
   LOAD_TAP_ERROR,
+
+  UPDATE_TAP_TO_REPLICATE,
+  UPDATE_TAP_TO_REPLICATE_SUCCESS,
+  UPDATE_TAP_TO_REPLICATE_ERROR,
 } from './constants';
 
 export function loadTargets(selectedTargetId) {
@@ -97,6 +101,29 @@ export function tapLoaded(tap) {
 export function tapLoadingError(error) {
   return {
     type: LOAD_TAP_ERROR,
+    error,
+  };
+}
+
+export function updateTapToReplicate(targetId, tapId, params) {
+  return {
+    type: UPDATE_TAP_TO_REPLICATE,
+    targetId,
+    tapId,
+    params,
+  };
+}
+
+export function updateTapToReplicateDone(response) {
+  return {
+    type: UPDATE_TAP_TO_REPLICATE_SUCCESS,
+    response,
+  };
+}
+
+export function updateTapToReplicateError(error) {
+  return {
+    type: UPDATE_TAP_TO_REPLICATE_ERROR,
     error,
   };
 }

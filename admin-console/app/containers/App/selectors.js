@@ -44,6 +44,12 @@ const makeSelectTapError = () =>
 const makeSelectTap = () =>
   createSelector(selectGlobal, globalState => globalState.get('tap'));
 
+const makeSelectForceRefreshTaps = () =>
+  createSelector(selectGlobal, globalState => globalState.get('forceRefreshTaps'))
+
+const makeSelectForceRefreshTap = () =>
+  createSelector(selectGlobal, globalState => globalState.get('forceRefreshTap'))
+
 const makeSelectLocation = () =>
   createSelector(selectRoute, routeState => routeState.get('location').toJS());
 
@@ -65,6 +71,9 @@ export {
   makeSelectTapLoading,
   makeSelectTapError,
   makeSelectTap,
+
+  makeSelectForceRefreshTaps,
+  makeSelectForceRefreshTap,
 
   makeSelectLocation,
 };

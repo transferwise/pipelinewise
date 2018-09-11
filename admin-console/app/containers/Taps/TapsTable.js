@@ -8,7 +8,7 @@ import LoadingIndicator from 'components/LoadingIndicator';
 import TapsTableHeader from './TapsTableHeader';
 import TapsTableBody from './TapsTableBody';
 
-function TapsTable({ loading, error, target, taps, tap, onTapSelect }) {
+function TapsTable({ loading, error, target, taps, tap, onTapSelect, onUpdateTapToReplicate }) {
   let items = [];
   let alert = <div />;
   let warning = <div />;
@@ -33,6 +33,7 @@ function TapsTable({ loading, error, target, taps, tap, onTapSelect }) {
         headerComponent={TapsTableHeader}
         bodyComponent={TapsTableBody}
         onItemSelect={onTapSelect}
+        delegatedProps={{ onUpdateTapToReplicate }}
       />
       {alert}
       {warning}

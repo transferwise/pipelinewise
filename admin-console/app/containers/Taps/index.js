@@ -11,10 +11,11 @@ import {
   makeSelectTapsLoading,
   makeSelectTapsError,
   makeSelectTarget,
-  makeSelectTaps
+  makeSelectTaps,
+  makeSelectForceRefreshTaps,
 } from 'containers/App/selectors';
 
-import { loadTaps } from '../App/actions';
+import { loadTaps, updateTapToReplicate } from '../App/actions';
 import reducer from '../App/reducer';
 import saga from './saga';
 
@@ -28,13 +29,13 @@ export class Taps extends React.PureComponent {
   componentDidUpdate(prevProps) {
     const prevTargetId = prevProps.target && prevProps.target.id;
     const targetId = this.props.target && this.props.target.id;
-    if (targetId && prevTargetId !== targetId) {
+    if ((targetId && prevTargetId !== targetId) || this.props.forceRefreshTaps) {
       this.props.onLoadTaps(targetId);
     }
   }
   
   render() {
-    const { loading, error, target, taps, tap, onTapSelect } = this.props;
+    const { loading, error, target, taps, tap, onTapSelect, onUpdateTapToReplicate } = this.props;
     const tapsTableProps = {
       loading,
       error,
@@ -42,6 +43,7 @@ export class Taps extends React.PureComponent {
       taps,
       tap,
       onTapSelect,
+      onUpdateTapToReplicate
     };
 
     if (loading) {
@@ -70,12 +72,14 @@ Taps.propTypes = {
   taps: PropTypes.any,
   onLoadTaps: PropTypes.func,
   onTapSelect: PropTypes.func,
+  onUpdateTapToReplicate: PropTypes.func,
 };
 
 export function mapDispatchToProps(dispatch) {
   return {
     onLoadTaps: targetId => dispatch(loadTaps(targetId)),
     onTapSelect: id => dispatch(setTap(id)),
+    onUpdateTapToReplicate: (targetId, tapId, params) => dispatch(updateTapToReplicate(targetId, tapId, params)),
   };
 }
 
@@ -84,6 +88,7 @@ const mapStateToProps = createStructuredSelector({
   error: makeSelectTapsError(),
   target: makeSelectTarget(),
   taps: makeSelectTaps(),
+  forceRefreshTaps: makeSelectForceRefreshTaps(),
 });
 
 const withConnect = connect(
