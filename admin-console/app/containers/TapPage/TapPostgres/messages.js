@@ -85,6 +85,10 @@ export default defineMessages({
     id: 'ETLWise.TapPostgres.newTable',
     defaultMessage: 'New Table',
   },
+  modifiedTable: {
+    id: 'ETLWise.TapPostgres.modifiedTable',
+    defaultMessage: 'Table Schema Changed',
+  },
   newColumn: {
     id: 'ETLWise.TapPostgres.newColumn',
     defaultMessage: 'New Column',

@@ -58,7 +58,10 @@ export class TapPostgresProperties extends React.PureComponent {
     const targetId = props.delegatedProps.targetId;
     const tapId = props.delegatedProps.tapId;
     const streamId = item['tap_stream_id'];
+    const isNew = item['is-new'];
+    const isModified = item['is-modified'];
     const isSelected = props.selectedItem === streamId;
+    let streamChangeDescription;
 
 
     if (replicationMethod) {
@@ -76,8 +79,14 @@ export class TapPostgresProperties extends React.PureComponent {
       }
     }
 
+    if (isNew) {
+      streamChangeDescription = <FormattedMessage {...messages.newTable} />
+    } else if (isModified) {
+      streamChangeDescription = <FormattedMessage {...messages.modifiedTable} />
+    }
+
     return (
-      <tr className={isSelected ? "table-active" : ""} onClick={() => props.onItemSelect(streamId)}>
+      <tr className={`${isSelected ? "table-actives" : ""} ${streamChangeDescription ? "table-warning" : ""}`} onClick={() => props.onItemSelect(streamId)}>
         <td>
           <Toggle
             key={`stream-toggle-${streamId}`}
@@ -142,7 +151,7 @@ export class TapPostgresProperties extends React.PureComponent {
     }
 
     return (
-      <tr>
+      <tr className={schemaChangeDescription ? "table-warning" : ""}>
         <td>
           <Toggle
             key={`column-toggle-${item.name}`}
@@ -184,33 +193,38 @@ export class TapPostgresProperties extends React.PureComponent {
   renderStreamColumns(streams, activeStreamId, delegatedProps) {
     if (activeStreamId) {
       const activeStream = streams.find(s => s['tap_stream_id'] === activeStreamId);
-      const schema = activeStream.schema.properties;
-      const mdataCols = activeStream.metadata.filter(m => m.breadcrumb.length > 0)
-      const columns = Object.keys(schema).map(col => {
-        const mdata = mdataCols.find(m => m.breadcrumb[1] === col).metadata
-        return {
-          name: col,
-          format: schema[col].format,
-          type: schema[col].type[1] || schema[col].type[0],
-          isPrimaryKey: schema[col].type[0] === 'null' ? false : true,
-          inclusion: mdata.inclusion,
-          selectedByDefault: mdata['selected-by-default'],
-          selected: mdata['selected'],
-          sqlDatatype: mdata['sql-datatype'],
-          isNew: mdata['is-new'],
-          isModified: mdata['is-modified'],
-        }})
-      
-      return (
-        <Grid>
-          <Table
-            items={columns}
-            headerComponent={TapPostgresProperties.columnsTableHeader}
-            bodyComponent={TapPostgresProperties.columnsTableBody}
-            delegatedProps={delegatedProps}
-          />
-        </Grid>
-      )
+
+      if (activeStream) {
+        const schema = activeStream.schema.properties;
+        const mdataCols = activeStream.metadata.filter(m => m.breadcrumb.length > 0)
+        const columns = Object.keys(schema).map(col => {
+          const mdata = mdataCols.find(m => m.breadcrumb[1] === col).metadata
+          return {
+            name: col,
+            format: schema[col].format,
+            type: schema[col].type[1] || schema[col].type[0],
+            isPrimaryKey: schema[col].type[0] === 'null' ? false : true,
+            inclusion: mdata.inclusion,
+            selectedByDefault: mdata['selected-by-default'],
+            selected: mdata['selected'],
+            sqlDatatype: mdata['sql-datatype'],
+            isNew: mdata['is-new'],
+            isModified: mdata['is-modified'],
+          }})
+
+        return (
+          <Grid>
+            <Table
+              items={columns}
+              headerComponent={TapPostgresProperties.columnsTableHeader}
+              bodyComponent={TapPostgresProperties.columnsTableBody}
+              delegatedProps={delegatedProps}
+            />
+          </Grid>
+        )
+      } else {
+        return <Alert bsStyle="info" className="full-swidth"><FormattedMessage {...messages.streamNotSelected} /></Alert>
+      }
     } else {
       return <Alert bsStyle="info" className="full-swidth"><FormattedMessage {...messages.streamNotSelected} /></Alert>
     }
