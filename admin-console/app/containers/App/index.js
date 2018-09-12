@@ -25,10 +25,10 @@ export default function App() {
   return (
     <AppWrapper>
       <Helmet
-        titleTemplate="%s - TransferSync"
-        defaultTitle="TransferSync"
+        titleTemplate="%s - PipelineWise"
+        defaultTitle="PipelineWise"
       >
-        <meta name="description" content="TransferSync" />
+        <meta name="description" content="PipelineWise" />
       </Helmet>
       <Route component={Header} />
       <Switch>
