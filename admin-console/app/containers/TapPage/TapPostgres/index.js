@@ -186,6 +186,7 @@ export class TapPostgresProperties extends React.PureComponent {
         <td>
           <TransformationDropdown
             value={transformationType}
+            disabled={item.isPrimaryKey}
             onChange={(value) => props.delegatedProps.onTransformationChange(targetId, tapId, streamId, item.name, value)}
           />
         </td>
