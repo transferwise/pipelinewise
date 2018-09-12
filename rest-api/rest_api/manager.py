@@ -27,7 +27,7 @@ class Manager(object):
                 with open(file) as f:
                     return json.load(f)
             else:
-                return None
+                return {}
         except Exception as exc:
             raise Exception("Error parsing {} {}".format(file, exc))
 
@@ -37,8 +37,8 @@ class Manager(object):
             with open(file, 'w') as f:
                 return json.dump(data, f, indent=2, sort_keys=True)
         except Exception as exc:
-            raise Exception("Cannot save to JSON {} {}".format(file), exc)
- 
+            raise Exception("Cannot save to JSON {} {}".format(file, exc))
+
     def load_config(self):
         self.logger.info('Loading config at {}'.format(self.config_path))
         self.config = self.load_json(self.config_path)
@@ -89,6 +89,7 @@ class Manager(object):
             'config': self.load_json(os.path.join(connector_dir, 'config.json')),
             'properties': self.load_json(os.path.join(connector_dir, 'properties.json')),
             'state': self.load_json(os.path.join(connector_dir, 'state.json')),
+            'transformation': self.load_json(os.path.join(connector_dir, 'transformation.json')),
         }
     
     def get_config(self):
@@ -180,6 +181,12 @@ class Manager(object):
 
         try:
             streams = tap['files']['properties']['streams']
+
+            # Add transformations
+            for idx, stream in enumerate(streams):
+                transformations = self.get_transformations(target_id, tap_id, stream["tap_stream_id"])
+                streams[idx]["transformations"] = transformations
+
         except Exception as exc:
             raise Exception("Cannot find streams for {} tap in {} target. {}".format(tap_id, target_id, exc))
         
@@ -228,7 +235,7 @@ class Manager(object):
 
                                 else:
                                     raise Exception("Unknown method to update")
-        
+
                         # Save the new stream propertes
                         properties["streams"][stream_idx] = stream
                         self.save_json(properties, properties_file)
@@ -238,6 +245,64 @@ class Manager(object):
                 raise Exception("Not supported tap type {}".format(tap_type))
         except Exception as exc:
             raise Exception("Failed to update {} stream in {} tap in {} target. Invalid updated parameters: {} - {}".format(stream_id, tap_id, target_id, params, exc))
+
+
+    def get_transformations(self, target_id, tap_id, stream_id):
+        self.logger.info('Getting transformations from {} streams in {} tap in {} target'.format(stream_id, tap_id, target_id))
+        transformations = []
+
+        try:
+            tap_dir = self.get_tap_dir(target_id, tap_id)
+
+            if os.path.isdir(tap_dir):
+                transformation_file = os.path.join(tap_dir, 'transformation.json')
+                transformation = self.load_json(transformation_file)
+
+                # Get only the stream specific transformations
+                every_transformation = transformation.get("transformations", [])
+                for t in every_transformation:
+                    if t["targetId"] == target_id and t["tapId"] == tap_id and t["streamId"] == stream_id:
+                        transformations.append(t)
+
+        except Exception as exc:
+            raise Exception("Cannot find transformations for {} stream in {} tap in {} target. {}".format(stream_id, tap_id, target_id, exc))
+
+        return transformations
+
+    def update_transformation(self, target_id, tap_id, stream_id, field_id, params):
+        self.logger.info('Updating {} field transformation in {} stream in {} tap in {} target'.format(field_id, stream_id, tap_id, target_id))
+        tap_dir = self.get_tap_dir(target_id, tap_id)
+
+        if os.path.isdir(tap_dir):
+            transformation_file = os.path.join(tap_dir, 'transformation.json')
+            transformation = self.load_json(transformation_file)
+            transformations = transformation.get("transformations", [])
+
+            try:
+                transformation_type = params["type"]
+
+                if transformation_type == "HASH":
+                    exists = next((t for t in transformations if t["targetId"] == target_id and t["tapId"] == tap_id and t["streamId"] == stream_id and t["fieldId"] == field_id), False)
+
+                    if not exists:
+                        transformations.append({ 'targetId': target_id, "tapId": tap_id, "streamId": stream_id, "fieldId": field_id, "type": transformation_type })
+
+                        # Save the new transformation file
+                        transformation["transformations"] = transformations
+                        self.save_json(transformation, transformation_file)
+
+                elif transformation_type == "STRAIGHT_COPY":
+                    cleaned_transformations = [t for t in transformations if not (t["targetId"] == target_id and t["tapId"] == tap_id and t["streamId"] == stream_id and t["fieldId"] == field_id)]
+
+                    # Save the new transformation file
+                    transformation["transformations"] = cleaned_transformations
+                    self.save_json(transformation, transformation_file)
+                else:
+                    raise Exception("Not supported transformation type {}".format(transformation_type))
+            except Exception as exc:
+                raise Exception("Failed to update {} field transformation in {} stream in {} tap in {} target. Invalid updated parameters: {} - {}".format(field_id, stream_id, tap_id, target_id, params, exc))
+        else:
+            raise Exception("Cannot find tap at {}".format(tap_dir))
 
     def get_tap_logs(self, target_id, tap_id):
         self.logger.info('Getting {} tap logs from {} target'.format(tap_id, target_id))

@@ -116,6 +116,20 @@ def api_update_stream(target_id, tap_id, stream_id):
         'result': manager.update_stream(target_id, tap_id, stream_id, request.get_json())
     })
 
+@app.route("/targets/<target_id>/taps/<tap_id>/streams/<stream_id>/transformations", methods = ['GET'])
+def api_get_transformations(target_id, tap_id, stream_id):
+    return jsonify({
+        'status': 200,
+        'result': manager.get_transformations(target_id, tap_id, stream_id)
+    })
+
+@app.route("/targets/<target_id>/taps/<tap_id>/streams/<stream_id>/transformations/<field_id>", methods = ['PATCH'])
+def api_update_transformation(target_id, tap_id, stream_id, field_id):
+    return jsonify({
+        'status': 200,
+        'result': manager.update_transformation(target_id, tap_id, stream_id, field_id, request.get_json())
+    })
+
 @app.route("/targets/<target_id>/taps/<tap_id>/logs", methods = ['GET'])
 def api_get_tap_logs(target_id, tap_id):
     return jsonify({
