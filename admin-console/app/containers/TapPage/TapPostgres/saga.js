@@ -1,12 +1,14 @@
 import { call, put, select, takeLatest } from 'redux-saga/effects';
-import { LOAD_STREAMS, UPDATE_STREAM_TO_REPLICATE, DISCOVER_TAP } from './constants';
+import { LOAD_STREAMS, UPDATE_STREAM_TO_REPLICATE, SET_TRANSFORMATION, DISCOVER_TAP } from './constants';
 import {
   streamsLoaded,
   streamsLoadedError,
   updateStreamToReplicateDone,
   updateStreamToReplicateError,
+  setTransformationDone,
+  setTransformationError,
   discoverTapDone,
-  discoverTapError
+  discoverTapError,
 } from './actions';
 
 import request from 'utils/request';
@@ -37,6 +39,21 @@ export function* updateStreamToReplicate(action) {
   }
 }
 
+export function* setTransformation(action) {
+  const requestURL = `http://localhost:5000/targets/${action.targetId}/taps/${action.tapId}/streams/${action.streamId}/transformations/${action.fieldId}`;
+
+  try {
+    const response = yield call(request, requestURL, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: action.value })
+    })
+    yield put(setTransformationDone(response));
+  } catch (err) {
+    yield put(setTransformationError(err));
+  }
+}
+
 export function* discoverTap(action) {
   const requestURL = `http://localhost:5000/targets/${action.targetId}/taps/${action.tapId}/discover`;
 
@@ -53,5 +70,6 @@ export function* discoverTap(action) {
 export default function* tapPostgresData() {
   yield takeLatest(LOAD_STREAMS, getStreams);
   yield takeLatest(UPDATE_STREAM_TO_REPLICATE, updateStreamToReplicate);
+  yield takeLatest(SET_TRANSFORMATION, setTransformation)
   yield takeLatest(DISCOVER_TAP, discoverTap);
 }

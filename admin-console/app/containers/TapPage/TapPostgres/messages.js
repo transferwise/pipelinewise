@@ -41,6 +41,10 @@ export default defineMessages({
     id: 'ETLWise.TapPostgres.replicationMethod',
     defaultMessage: 'Method',
   },
+  transformation: {
+    id: 'ETLWise.TapPostgres.transformation',
+    defaultMessage: 'Transformation',
+  },
   replicationMethodFullTable: {
     id: 'ETLWise.TapPostgfres.replicationMethodFullTable',
     defaultMessage: 'Full',

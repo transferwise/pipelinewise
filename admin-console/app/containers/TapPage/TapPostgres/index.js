@@ -8,6 +8,7 @@ import injectSaga from 'utils/injectSaga';
 import LoadingIndicator from 'components/LoadingIndicator';
 import ConnectorIcon from 'components/ConnectorIcon';
 import Modal from 'components/Modal';
+import TransformationDropdown from 'components/TransformationDropdown';
 import {
   makeSelectStreams,
   makeSelectForceRefreshStreams,
@@ -16,7 +17,14 @@ import {
   makeSelectError,
   makeSelectConsoleOutput
 } from './selectors';
-import { loadStreams, setActiveStreamId, updateStreamToReplicate, discoverTap, resetConsoleOutput } from './actions';
+import {
+  loadStreams,
+  setActiveStreamId,
+  updateStreamToReplicate,
+  discoverTap,
+  setTransformation,
+  resetConsoleOutput
+} from './actions';
 import reducer from './reducer';
 import saga from './saga';
 
@@ -123,6 +131,7 @@ export class TapPostgresProperties extends React.PureComponent {
         <th><FormattedMessage {...messages.column} /></th>
         <th><FormattedMessage {...messages.type} /></th>
         <th><FormattedMessage {...messages.replicationMethod} /></th>
+        <th><FormattedMessage {...messages.transformation} /></th>
         <th></th>
       </tr>
     )
@@ -136,6 +145,7 @@ export class TapPostgresProperties extends React.PureComponent {
     const isAutomatic = item.inclusion === 'automatic';
     const isSelected = item.selected || isAutomatic;
     let method = <FormattedMessage {...messages.notSelected} />
+    const transformationType = item.transformationType;
     let schemaChangeDescription;
 
     if (isAutomatic) {
@@ -173,6 +183,12 @@ export class TapPostgresProperties extends React.PureComponent {
         <td>{item.isPrimaryKey && <ConnectorIcon className="img-icon-sm" name="key" />} {item.name}</td>
         <td>{item.type}</td>
         <td>{method}</td>
+        <td>
+          <TransformationDropdown
+            value={transformationType}
+            onChange={(value) => props.delegatedProps.onTransformationChange(targetId, tapId, streamId, item.name, value)}
+          />
+        </td>
         <td>{schemaChangeDescription}</td>
       </tr>
     )
@@ -196,9 +212,11 @@ export class TapPostgresProperties extends React.PureComponent {
 
       if (activeStream) {
         const schema = activeStream.schema.properties;
+        const transformations = activeStream.transformations;
         const mdataCols = activeStream.metadata.filter(m => m.breadcrumb.length > 0)
         const columns = Object.keys(schema).map(col => {
           const mdata = mdataCols.find(m => m.breadcrumb[1] === col).metadata
+          const transformation = transformations.find(t => t['streamId'] == activeStreamId && t['fieldId'] == col) || {}
           return {
             name: col,
             format: schema[col].format,
@@ -210,6 +228,7 @@ export class TapPostgresProperties extends React.PureComponent {
             sqlDatatype: mdata['sql-datatype'],
             isNew: mdata['is-new'],
             isModified: mdata['is-modified'],
+            transformationType: transformation.type,
           }})
 
         return (
@@ -241,6 +260,7 @@ export class TapPostgresProperties extends React.PureComponent {
       activeStreamId,
       onStreamSelect,
       onUpdateStreamToReplicate,
+      onTransformationChange,
       onDiscoverTap,
       onCloseModal
     } = this.props;
@@ -305,7 +325,7 @@ export class TapPostgresProperties extends React.PureComponent {
                 <Col md={12}>
                   <strong><FormattedMessage {...messages.columnsToReplicate} /></strong>
                   <Grid>
-                    {this.renderStreamColumns(streams, activeStreamId, { targetId, tapId, streamId: activeStreamId, onUpdateStreamToReplicate })}
+                    {this.renderStreamColumns(streams, activeStreamId, { targetId, tapId, streamId: activeStreamId, onUpdateStreamToReplicate, onTransformationChange })}
                   </Grid>
                 </Col>
               </Row>
@@ -330,6 +350,7 @@ TapPostgresProperties.propTypes = {
   activeStreamId: PropTypes.any,
   onStreamSelect: PropTypes.func,
   onUpdateStreamToReplicate: PropTypes.func,
+  onTransformationChange: PropTypes.func,
 }
 
 export function mapDispatchToProps(dispatch) {
@@ -337,6 +358,7 @@ export function mapDispatchToProps(dispatch) {
     onLoadStreams: (targetId, tapId) => dispatch(loadStreams(targetId, tapId)),
     onStreamSelect: (streamId) => dispatch(setActiveStreamId(streamId)),
     onUpdateStreamToReplicate: (targetId, tapId, streamId, params) => dispatch(updateStreamToReplicate(targetId, tapId, streamId, params)),
+    onTransformationChange: (targetId, tapId, streamId, fieldId, value) => dispatch(setTransformation(targetId, tapId, streamId, fieldId, value)),
     onDiscoverTap: (targetId, tapId) => dispatch(discoverTap(targetId, tapId)),
     onCloseModal: () => dispatch(resetConsoleOutput())
   };

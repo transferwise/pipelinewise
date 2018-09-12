@@ -26,6 +26,10 @@ import {
   UPDATE_STREAM_TO_REPLICATE_SUCCESS,
   UPDATE_STREAM_TO_REPLICATE_ERROR,
 
+  SET_TRANSFORMATION,
+  SET_TRANSFORMATION_SUCCESS,
+  SET_TRANSFORMATION_ERROR,
+
   DISCOVER_TAP,
   DISCOVER_TAP_SUCCESS,
   DISCOVER_TAP_ERROR,
@@ -70,6 +74,31 @@ export function updateStreamToReplicate(targetId, tapId, streamId, params) {
     streamId,
     params,
   };
+}
+
+export function setTransformation(targetId, tapId, streamId, fieldId, value) {
+  return {
+    type: SET_TRANSFORMATION,
+    targetId,
+    tapId,
+    streamId,
+    fieldId,
+    value,
+  }
+}
+
+export function setTransformationDone(response) {
+  return {
+    type: SET_TRANSFORMATION_SUCCESS,
+    response,
+  }
+}
+
+export function setTransformationError(error) {
+  return {
+    type: SET_TRANSFORMATION_ERROR,
+    error,
+  }
 }
 
 export function updateStreamToReplicateDone(response) {

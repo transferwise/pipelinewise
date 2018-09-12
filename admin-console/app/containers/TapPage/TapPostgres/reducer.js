@@ -22,6 +22,10 @@ import {
   UPDATE_STREAM_TO_REPLICATE_SUCCESS,
   UPDATE_STREAM_TO_REPLICATE_ERROR,
 
+  SET_TRANSFORMATION,
+  SET_TRANSFORMATION_SUCCESS,
+  SET_TRANSFORMATION_ERROR,
+
   DISCOVER_TAP,
   DISCOVER_TAP_SUCCESS,
   DISCOVER_TAP_ERROR,
@@ -79,6 +83,23 @@ function tapPostgresReducer(state = initialState, action) {
         .set('forceRefreshStreams', action.response.status === 200)
         .set('consoleOutput', false)
     case UPDATE_STREAM_TO_REPLICATE_ERROR:
+      return state
+        .set('loading', false)
+        .set('error', action.error)
+        .set('consoleOutput', false)
+
+    case SET_TRANSFORMATION:
+      return state
+        .set('loading', true)
+        .set('error', false)
+        .set('consoleOutput', false)
+    case SET_TRANSFORMATION_SUCCESS:
+      return state
+        .set('loading', false)
+        .set('error', action.response.status !== 200 ? action.response.message : false)
+        .set('forceRefreshStreams', action.response.status === 200)
+        .set('consoleOutput', false)
+    case SET_TRANSFORMATION_ERROR:
       return state
         .set('loading', false)
         .set('error', action.error)
