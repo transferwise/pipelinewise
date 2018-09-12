@@ -281,15 +281,16 @@ class Manager(object):
             try:
                 transformation_type = params["type"]
 
-                if transformation_type == "HASH":
-                    exists = next((t for t in transformations if t["targetId"] == target_id and t["tapId"] == tap_id and t["streamId"] == stream_id and t["fieldId"] == field_id), False)
+                if transformation_type == "HASH" or transformation_type == "SET-NULL":
+                    # Delete the previous transformation on this field if exists
+                    transformations = [t for t in transformations if not (t["targetId"] == target_id and t["tapId"] == tap_id and t["streamId"] == stream_id and t["fieldId"] == field_id)]
 
-                    if not exists:
-                        transformations.append({ 'targetId': target_id, "tapId": tap_id, "streamId": stream_id, "fieldId": field_id, "type": transformation_type })
+                    # Add new transformation
+                    transformations.append({ 'targetId': target_id, "tapId": tap_id, "streamId": stream_id, "fieldId": field_id, "type": transformation_type })
 
-                        # Save the new transformation file
-                        transformation["transformations"] = transformations
-                        self.save_json(transformation, transformation_file)
+                    # Save the new transformation file
+                    transformation["transformations"] = transformations
+                    self.save_json(transformation, transformation_file)
 
                 elif transformation_type == "STRAIGHT_COPY":
                     cleaned_transformations = [t for t in transformations if not (t["targetId"] == target_id and t["tapId"] == tap_id and t["streamId"] == stream_id and t["fieldId"] == field_id)]
