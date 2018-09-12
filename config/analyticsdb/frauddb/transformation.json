@@ -1,0 +1,18 @@
+{
+  "transformations": [
+    {
+      "fieldId": "id",
+      "streamId": "inventory-public-customers",
+      "tapId": "frauddb",
+      "targetId": "analyticsdb",
+      "type": "HASH"
+    },
+    {
+      "fieldId": "email",
+      "streamId": "inventory-public-customers",
+      "tapId": "frauddb",
+      "targetId": "analyticsdb",
+      "type": "HASH"
+    }
+  ]
+}
