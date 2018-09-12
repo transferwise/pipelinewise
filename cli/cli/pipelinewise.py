@@ -200,9 +200,6 @@ class PipelineWise(object):
 
                 # Copy stream selection from the old properties
                 else:
-
-                    new_schema["streams"][new_stream_idx]["is-new"] = abc(new_schema["streams"][new_stream_idx]["is-new"], old_stream["is-new"])
-
                     # Copy is-new flag from the old stream
                     try:
                         new_schema["streams"][new_stream_idx]["is-new"] = old_stream["is-new"]
