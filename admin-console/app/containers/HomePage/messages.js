@@ -7,11 +7,11 @@ import { defineMessages } from 'react-intl';
 
 export default defineMessages({
   mainTopic: {
-    id: 'ETLWise.containers.HomePage.header',
-    defaultMessage: 'ETLWise',
+    id: 'PipelineWise.containers.HomePage.header',
+    defaultMessage: 'PipelineWise',
   },
   intro: {
-    id: 'ETLWise.containers.HomePage.intro',
-    defaultMessage: 'Hello, this is the admin page of ETLWise',
+    id: 'PipelineWise.containers.HomePage.intro',
+    defaultMessage: 'Hello, this is the admin page of PipelineWise',
   },
 });

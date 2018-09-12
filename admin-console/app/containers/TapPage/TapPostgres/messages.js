@@ -2,103 +2,103 @@ import { defineMessages } from 'react-intl';
 
 export default defineMessages({
   tablesToReplicate: {
-    id: 'ETLWise.TapPostgres.tablesToReplicate',
+    id: 'PipelineWise.TapPostgres.tablesToReplicate',
     defaultMessage: 'Tables to Replicate',
   },
   columnsToReplicate: {
-    id: 'ETLWise.TapPostgres.columnsToReplicate',
+    id: 'PipelineWise.TapPostgres.columnsToReplicate',
     defaultMessage: 'Fields to Replicate',
   },
   database: {
-    id: 'ETLWise.TapPostgres.database',
+    id: 'PipelineWise.TapPostgres.database',
     defaultMessage: 'Database',
   },
   discover: {
-    id: 'ETLWise.TapPostgres.discover',
+    id: 'PipelineWise.TapPostgres.discover',
     defaultMessage: 'Discover',
   },
   discoverErrorTitle: {
-    id: 'ETLWise.TapPostgres.discoverErrorTitle',
+    id: 'PipelineWise.TapPostgres.discoverErrorTitle',
     defaultMessage: 'Failed to discover schema',
   },
   schema: {
-    id: 'ETLWise.TapPostgres.schema',
+    id: 'PipelineWise.TapPostgres.schema',
     defaultMessage: 'Schema',
   },
   table: {
-    id: 'ETLWise.TapPostgres.table',
+    id: 'PipelineWise.TapPostgres.table',
     defaultMessage: 'Table',
   },
   isView: {
-    id: 'ETLWise.TapPostgres.isView',
+    id: 'PipelineWise.TapPostgres.isView',
     defaultMessage: 'View?',
   },
   rowCount: {
-    id: 'ETLWise.TapPostgres.rowCount',
+    id: 'PipelineWise.TapPostgres.rowCount',
     defaultMessage: 'Approx Rows',
   },
   replicationMethod: {
-    id: 'ETLWise.TapPostgres.replicationMethod',
+    id: 'PipelineWise.TapPostgres.replicationMethod',
     defaultMessage: 'Method',
   },
   transformation: {
-    id: 'ETLWise.TapPostgres.transformation',
+    id: 'PipelineWise.TapPostgres.transformation',
     defaultMessage: 'Transformation',
   },
   replicationMethodFullTable: {
-    id: 'ETLWise.TapPostgfres.replicationMethodFullTable',
+    id: 'PipelineWise.TapPostgfres.replicationMethodFullTable',
     defaultMessage: 'Full',
   },
   replicationMethodLogBased: {
-    id: 'ETLWise.TapPostgfres.replicationMethodLogBased',
+    id: 'PipelineWise.TapPostgfres.replicationMethodLogBased',
     defaultMessage: 'Log Based Incremental',
   },
   replicationMethodKeyBased: {
-    id: 'ETLWise.TapPostgfres.replicationMethodKeyBased',
+    id: 'PipelineWise.TapPostgfres.replicationMethodKeyBased',
     defaultMessage: 'Key Based Incremental',
   },
   selected: {
-    id: 'ETLWise.TapPostgres.selected',
+    id: 'PipelineWise.TapPostgres.selected',
     defaultMessage: 'Tracked',
   },
   notSelected: {
-    id: 'ETLWise.TapPostgres.notSelected',
+    id: 'PipelineWise.TapPostgres.notSelected',
     defaultMessage: 'Not Tracked',
   },
   automatic: {
-    id: 'ETLWise.TapPostgres.automatic',
+    id: 'PipelineWise.TapPostgres.automatic',
     defaultMessage: 'Automatic',
   },
   streamNotSelected: {
-    id: 'ETLWise.TapPostgres.streamNotSelected',
+    id: 'PipelineWise.TapPostgres.streamNotSelected',
     defaultMessage: 'Select a table to see fields',
   },
   column: {
-    id: 'ETLWise.TapPostgres.column',
+    id: 'PipelineWise.TapPostgres.column',
     defaultMessage: 'Field Name',
   },
   type: {
-    id: 'ETLWise.TapPostgres.type',
+    id: 'PipelineWise.TapPostgres.type',
     defaultMessage: 'Type',
   },
   primaryKey: {
-    id: 'ETLWise.TapPostgres.primaryKey',
+    id: 'PipelineWise.TapPostgres.primaryKey',
     defaultMessage: 'Key',
   },
   newTable: {
-    id: 'ETLWise.TapPostgres.newTable',
+    id: 'PipelineWise.TapPostgres.newTable',
     defaultMessage: 'New Table',
   },
   modifiedTable: {
-    id: 'ETLWise.TapPostgres.modifiedTable',
+    id: 'PipelineWise.TapPostgres.modifiedTable',
     defaultMessage: 'Table Schema Changed',
   },
   newColumn: {
-    id: 'ETLWise.TapPostgres.newColumn',
+    id: 'PipelineWise.TapPostgres.newColumn',
     defaultMessage: 'New Column',
   },
   modifiedColumn: {
-    id: 'ETLWise.TapPostgres.modifiedColumn',
+    id: 'PipelineWise.TapPostgres.modifiedColumn',
     defaultMessage: 'Data Type Changed',
   },
 });

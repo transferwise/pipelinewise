@@ -5,7 +5,7 @@ from setuptools import setup, find_packages
 
 setup(name='cli',
     version='0.0.1',
-    description='ETLWise Command Line Interface',
+    description='PipelineWise Command Line Interface',
     author='xyz',
     url='xzy',
     classifiers=['Programming Language :: Python :: 3 :: Only'],
@@ -15,7 +15,7 @@ setup(name='cli',
     ],
     entry_points='''
         [console_scripts]
-        etlwise=cli:main
+        pipelinewise=cli:main
     ''',
     packages=['cli']
 )

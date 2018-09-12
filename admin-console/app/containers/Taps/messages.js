@@ -2,39 +2,39 @@ import { defineMessages } from 'react-intl';
 
 export default defineMessages({
   tapsTopic: {
-    id: 'ETLWise.containers.Taps.header',
+    id: 'PipelineWise.containers.Taps.header',
     defaultMessage: 'Integrations',
   },
   name: {
-    id: 'ETLWise.container.Taps.name',
+    id: 'PipelineWise.container.Taps.name',
     defaultMessage: 'Name',
   },
   status: {
-    id: 'ETLWise.container.Taps.status',
+    id: 'PipelineWise.container.Taps.status',
     defaultMessage: 'Status',
   },
   lastSyncAt: {
-    id: 'ETLWise.container.Taps.lastSyncAt',
+    id: 'PipelineWise.container.Taps.lastSyncAt',
     defaultMessage: 'Last Sync Completed',
   },
   flowsDetailsTopic: {
-    id: 'ETLWise.containers.TapsPage.detailsHeader',
+    id: 'PipelineWise.containers.TapsPage.detailsHeader',
     defaultMessage: 'Properties',
   },
   refresh: {
-    id: 'ETLWise.containers.TapsPage.refresh',
+    id: 'PipelineWise.containers.TapsPage.refresh',
     defaultMessage: 'Refresh',
   },
   error: {
-    id: 'ETLWise.components.TapsList.error.message',
+    id: 'PipelineWise.components.TapsList.error.message',
     defaultMessage: 'Something went wrong, please try again!',
   },
   flowItemNotSelected: {
-    id: 'ETLWise.components.TapDetailsViewer.flowItemNotSelected',
+    id: 'PipelineWise.components.TapDetailsViewer.flowItemNotSelected',
     defaultMessage: 'Select a flow, tap or target to see details.',
   },
   codeNotFound: {
-    id: 'ETLWise.components.TapDetailsViewer.codeNotFound',
+    id: 'PipelineWise.components.TapDetailsViewer.codeNotFound',
     defaultMessage: 'JSON not found',
   }
 });

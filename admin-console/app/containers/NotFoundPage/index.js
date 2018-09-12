@@ -17,7 +17,7 @@ export default function NotFound() {
         <title>Not Found</title>
         <meta
           name="description"
-          content="ETLWise page not found"
+          content="PipelineWise page not found"
         />
       </Helmet>
       <h1>

@@ -2,15 +2,15 @@ import { defineMessages } from 'react-intl';
 
 export default defineMessages({
   brand: {
-    id: 'ETLWise.components.Header.brand',
-    defaultMessage: 'ETLWise',
+    id: 'PipelineWise.components.Header.brand',
+    defaultMessage: 'PipelineWise',
   },
   integrations: {
-    id: 'ETLWise.components.Header.integrations',
+    id: 'PipelineWise.components.Header.integrations',
     defaultMessage: 'Integrations',
   },
   target: {
-    id: 'ETLWise.components.Header.target',
+    id: 'PipelineWise.components.Header.target',
     defaultMessage: 'Destination',
   },
 });

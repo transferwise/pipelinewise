@@ -1,36 +1,35 @@
 {
-  "target": [],
   "targets": [
     {
       "id": "emptytarget",
       "name": "Empty test target",
-      "type": "sdf",
-      "taps": []
+      "taps": [],
+      "type": "sdf"
     },
     {
       "id": "analyticsdb",
       "name": "Analytics DB",
-      "type": "target-postgres",
       "taps": [
         {
-          "id": "servicedb" ,
+          "enabled": true,
+          "id": "servicedb",
           "name": "Service DB",
-          "type": "tap-mysql",
-          "enabled": true
+          "type": "tap-mysql"
         },
         {
+          "enabled": true,
           "id": "monolith",
           "name": "Monolith",
-          "type": "tap-mysql",
-          "enabled": true
+          "type": "tap-mysql"
         },
         {
+          "enabled": true,
           "id": "frauddb",
           "name": "Fraud DB",
-          "type": "tap-postgres",
-          "enabled": true
+          "type": "tap-postgres"
         }
-      ]
+      ],
+      "type": "target-postgres"
     }
   ]
 }

@@ -2,27 +2,27 @@ import { defineMessages } from 'react-intl';
 
 export default defineMessages({
   header: {
-    id: 'ETLWise.containers.TapPage.header',
+    id: 'PipelineWise.containers.TapPage.header',
     defaultMessage: 'Tap Details',
   },
   summary: {
-    id: 'ETLWise.containers.TapPage.summary',
+    id: 'PipelineWise.containers.TapPage.summary',
     defaultMessage: 'Summary',
   },
   config: {
-    id: 'ETLWise.containers.TapPage.config',
+    id: 'PipelineWise.containers.TapPage.config',
     defaultMessage: 'Settings',
   },
   properties: {
-    id: 'ETLWise.containers.TapPage.properties',
+    id: 'PipelineWise.containers.TapPage.properties',
     defaultMessage: 'Tables to Replicate',
   },
   state: {
-    id: 'ETLWise.containers.TapPage.state',
+    id: 'PipelineWise.containers.TapPage.state',
     defaultMessage: 'Loading Report',
   },
   log: {
-    id: 'ETLWise.containers.TapPage.log',
+    id: 'PipelineWise.containers.TapPage.log',
     defaultMessage: 'Extraction Log',
   },
 });

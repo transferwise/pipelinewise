@@ -1,7 +1,7 @@
 {
-  "name": "etlwise-admin-console",
+  "name": "pipelinewise-admin-console",
   "version": "3.6.0",
-  "description": "ETLWise Web Interface to manage singer data flows",
+  "description": "PipelineWise Web Interface to manage singer data flows",
   "repository": {
     "type": "git",
     "url": "git://github.com/react-boilerplate/react-boilerplate.git"

@@ -52,7 +52,7 @@ install_rest_api
 install_admin_console
 
 echo "--------------------------------------------------------------------------"
-echo "ETLWise installed successfully"
+echo "PipelineWise installed successfully"
 echo "--------------------------------------------------------------------------"
 echo
 echo "To start REST API:"

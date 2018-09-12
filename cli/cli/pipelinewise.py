@@ -7,7 +7,7 @@ import sys
 import logging
 import json
 
-class ETLWise(object):
+class PipelineWise(object):
     '''...'''
 
     def __init_logger(self, logger_name, level=logging.INFO):

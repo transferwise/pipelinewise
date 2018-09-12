@@ -16,7 +16,7 @@ class Manager(object):
         self.logger = logger
         self.config_dir = config_dir
         self.venv_dir = venv_dir
-        self.etlwise_bin = os.path.join(self.venv_dir, "cli", "bin", "etlwise")
+        self.pipelinewise_bin = os.path.join(self.venv_dir, "cli", "bin", "pipelinewise")
         self.config_path = os.path.join(self.config_dir, "config.json")
         self.load_config()
     
@@ -171,7 +171,7 @@ class Manager(object):
 
     def discover_tap(self, target_id, tap_id):
         self.logger.info('Discovering {} tap from target {}'.format(tap_id, target_id))
-        command = "{} discover_tap --target {} --tap {}".format(self.etlwise_bin, target_id, tap_id)
+        command = "{} discover_tap --target {} --tap {}".format(self.pipelinewise_bin, target_id, tap_id)
         result = self.run_command(command, False)
         return result
 
