@@ -48,7 +48,7 @@ class Manager(object):
         self.save_json(self.config, self.config_path)
 
     def run_command(self, command, polling=False):
-        self.logger.debug('Running command with polling [{}] : {} with'.format(polling, command))
+        self.logger.debug('Running command with polling [{}] : {}'.format(polling, command))
 
         if polling:
             proc = Popen(shlex.split(command), stdout=PIPE, stderr=STDOUT)
@@ -184,7 +184,7 @@ class Manager(object):
 
             # Add transformations
             for idx, stream in enumerate(streams):
-                transformations = self.get_transformations(target_id, tap_id, stream["tap_stream_id"])
+                transformations = self.get_transformations(target_id, tap_id, stream["table_name"])
                 streams[idx]["transformations"] = transformations
 
         except Exception as exc:
@@ -247,8 +247,8 @@ class Manager(object):
             raise Exception("Failed to update {} stream in {} tap in {} target. Invalid updated parameters: {} - {}".format(stream_id, tap_id, target_id, params, exc))
 
 
-    def get_transformations(self, target_id, tap_id, stream_id):
-        self.logger.info('Getting transformations from {} streams in {} tap in {} target'.format(stream_id, tap_id, target_id))
+    def get_transformations(self, target_id, tap_id, stream):
+        self.logger.info('Getting transformations from {} stream in {} tap in {} target'.format(stream, tap_id, target_id))
         transformations = []
 
         try:
@@ -261,16 +261,16 @@ class Manager(object):
                 # Get only the stream specific transformations
                 every_transformation = transformation.get("transformations", [])
                 for t in every_transformation:
-                    if t["targetId"] == target_id and t["tapId"] == tap_id and t["streamId"] == stream_id:
+                    if t["targetId"] == target_id and t["tapId"] == tap_id and t["stream"] == stream:
                         transformations.append(t)
 
         except Exception as exc:
-            raise Exception("Cannot find transformations for {} stream in {} tap in {} target. {}".format(stream_id, tap_id, target_id, exc))
+            raise Exception("Cannot find transformations for {} stream in {} tap in {} target. {}".format(stream, tap_id, target_id, exc))
 
         return transformations
 
-    def update_transformation(self, target_id, tap_id, stream_id, field_id, params):
-        self.logger.info('Updating {} field transformation in {} stream in {} tap in {} target'.format(field_id, stream_id, tap_id, target_id))
+    def update_transformation(self, target_id, tap_id, stream, field_id, params):
+        self.logger.info('Updating {} field transformation in {} stream in {} tap in {} target'.format(field_id, stream, tap_id, target_id))
         tap_dir = self.get_tap_dir(target_id, tap_id)
 
         if os.path.isdir(tap_dir):
@@ -281,19 +281,19 @@ class Manager(object):
             try:
                 transformation_type = params["type"]
 
-                if transformation_type == "HASH" or transformation_type == "SET-NULL":
+                if any(transformation_type in t for t in ["HASH", "SET-NULL", "MASK-DATE", "MASK-NUMBER"]):
                     # Delete the previous transformation on this field if exists
-                    transformations = [t for t in transformations if not (t["targetId"] == target_id and t["tapId"] == tap_id and t["streamId"] == stream_id and t["fieldId"] == field_id)]
+                    transformations = [t for t in transformations if not (t["targetId"] == target_id and t["tapId"] == tap_id and t["stream"] == stream and t["fieldId"] == field_id)]
 
                     # Add new transformation
-                    transformations.append({ 'targetId': target_id, "tapId": tap_id, "streamId": stream_id, "fieldId": field_id, "type": transformation_type })
+                    transformations.append({ 'targetId': target_id, "tapId": tap_id, "stream": stream, "fieldId": field_id, "type": transformation_type })
 
                     # Save the new transformation file
                     transformation["transformations"] = transformations
                     self.save_json(transformation, transformation_file)
 
                 elif transformation_type == "STRAIGHT_COPY":
-                    cleaned_transformations = [t for t in transformations if not (t["targetId"] == target_id and t["tapId"] == tap_id and t["streamId"] == stream_id and t["fieldId"] == field_id)]
+                    cleaned_transformations = [t for t in transformations if not (t["targetId"] == target_id and t["tapId"] == tap_id and t["stream"] == stream and t["fieldId"] == field_id)]
 
                     # Save the new transformation file
                     transformation["transformations"] = cleaned_transformations
@@ -301,7 +301,7 @@ class Manager(object):
                 else:
                     raise Exception("Not supported transformation type {}".format(transformation_type))
             except Exception as exc:
-                raise Exception("Failed to update {} field transformation in {} stream in {} tap in {} target. Invalid updated parameters: {} - {}".format(field_id, stream_id, tap_id, target_id, params, exc))
+                raise Exception("Failed to update {} field transformation in {} stream in {} tap in {} target. Invalid updated parameters: {} - {}".format(field_id, stream, tap_id, target_id, params, exc))
         else:
             raise Exception("Cannot find tap at {}".format(tap_dir))
 

@@ -41,6 +41,7 @@ export const initialState = fromJS({
 
   streams: false,
 
+  activeStream: false,
   activeStreamId: false,
 
   forceRefreshStreams: false,
@@ -69,7 +70,9 @@ function tapPostgresReducer(state = initialState, action) {
 
 
     case SET_ACTIVE_STREAM_ID:
-      return state.set('activeStreamId', action.streamId);
+      return state
+        .set('activeStream', action.stream)
+        .set('activeStreamId', action.streamId);
 
     case UPDATE_STREAM_TO_REPLICATE:
       return state

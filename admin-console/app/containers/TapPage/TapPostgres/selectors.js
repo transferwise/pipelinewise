@@ -13,6 +13,9 @@ const makeSelectStreams = () =>
 const makeSelectForceRefreshStreams = () =>
   createSelector(selectTapPostgres, tapPostgresState => tapPostgresState.get('forceRefreshStreams'))
 
+const makeSelectActiveStream = () =>
+  createSelector(selectTapPostgres, tapPostgresState => tapPostgresState.get('activeStream'));
+
 const makeSelectActiveStreamId = () =>
   createSelector(selectTapPostgres, tapPostgresState => tapPostgresState.get('activeStreamId'));
 
@@ -30,6 +33,7 @@ export {
   
   makeSelectStreams,
   makeSelectForceRefreshStreams,
+  makeSelectActiveStream,
   makeSelectActiveStreamId,
   makeSelectLoading,
   makeSelectError,

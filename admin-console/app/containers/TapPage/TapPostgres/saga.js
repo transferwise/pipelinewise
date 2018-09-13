@@ -40,7 +40,7 @@ export function* updateStreamToReplicate(action) {
 }
 
 export function* setTransformation(action) {
-  const requestURL = `http://localhost:5000/targets/${action.targetId}/taps/${action.tapId}/streams/${action.streamId}/transformations/${action.fieldId}`;
+  const requestURL = `http://localhost:5000/targets/${action.targetId}/taps/${action.tapId}/transformations/${action.stream}/${action.fieldId}`;
 
   try {
     const response = yield call(request, requestURL, {

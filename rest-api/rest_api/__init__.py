@@ -116,18 +116,18 @@ def api_update_stream(target_id, tap_id, stream_id):
         'result': manager.update_stream(target_id, tap_id, stream_id, request.get_json())
     })
 
-@app.route("/targets/<target_id>/taps/<tap_id>/streams/<stream_id>/transformations", methods = ['GET'])
-def api_get_transformations(target_id, tap_id, stream_id):
+@app.route("/targets/<target_id>/taps/<tap_id>/transformations/<stream>", methods = ['GET'])
+def api_get_transformations(target_id, tap_id, stream):
     return jsonify({
         'status': 200,
-        'result': manager.get_transformations(target_id, tap_id, stream_id)
+        'result': manager.get_transformations(target_id, tap_id, stream)
     })
 
-@app.route("/targets/<target_id>/taps/<tap_id>/streams/<stream_id>/transformations/<field_id>", methods = ['PATCH'])
-def api_update_transformation(target_id, tap_id, stream_id, field_id):
+@app.route("/targets/<target_id>/taps/<tap_id>/transformations/<stream>/<field_id>", methods = ['PATCH'])
+def api_update_transformation(target_id, tap_id, stream, field_id):
     return jsonify({
         'status': 200,
-        'result': manager.update_transformation(target_id, tap_id, stream_id, field_id, request.get_json())
+        'result': manager.update_transformation(target_id, tap_id, stream, field_id, request.get_json())
     })
 
 @app.route("/targets/<target_id>/taps/<tap_id>/logs", methods = ['GET'])

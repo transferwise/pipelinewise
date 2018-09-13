@@ -59,9 +59,10 @@ export function streamsLoadedError(error) {
   }
 }
 
-export function setActiveStreamId(streamId) {
+export function setActiveStreamId(stream, streamId) {
   return {
     type: SET_ACTIVE_STREAM_ID,
+    stream,
     streamId,
   };
 }
@@ -76,12 +77,12 @@ export function updateStreamToReplicate(targetId, tapId, streamId, params) {
   };
 }
 
-export function setTransformation(targetId, tapId, streamId, fieldId, value) {
+export function setTransformation(targetId, tapId, stream, fieldId, value) {
   return {
     type: SET_TRANSFORMATION,
     targetId,
     tapId,
-    streamId,
+    stream,
     fieldId,
     value,
   }
