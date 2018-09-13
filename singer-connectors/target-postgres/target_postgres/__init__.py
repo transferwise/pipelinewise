@@ -127,7 +127,6 @@ class TargetPostgres(object):
         '''Takes a raw line from stdin and handles it, updating state and possibly
         flushing the batch to the Gate and the state to the output
         stream'''
-        print(line)
         try :
             message = singer.parse_message(line)
 
