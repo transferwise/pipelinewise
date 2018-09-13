@@ -2,14 +2,28 @@
   "transformations": [
     {
       "fieldId": "email",
-      "streamId": "inventory-public-customers",
+      "stream": "customers",
       "tapId": "frauddb",
       "targetId": "analyticsdb",
-      "type": "HASH"
+      "type": "SET-NULL"
+    },
+    {
+      "fieldId": "salary",
+      "stream": "customers",
+      "tapId": "frauddb",
+      "targetId": "analyticsdb",
+      "type": "MASK-NUMBER"
+    },
+    {
+      "fieldId": "dob",
+      "stream": "customers",
+      "tapId": "frauddb",
+      "targetId": "analyticsdb",
+      "type": "MASK-DATE"
     },
     {
       "fieldId": "first_name",
-      "streamId": "inventory-public-customers",
+      "stream": "customers",
       "tapId": "frauddb",
       "targetId": "analyticsdb",
       "type": "HASH"
