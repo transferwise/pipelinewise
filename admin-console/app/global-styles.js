@@ -140,4 +140,5 @@ injectGlobal`
     width: auto;
     max-width: 680px;
     padding: 0 15px;
+  }
 `;

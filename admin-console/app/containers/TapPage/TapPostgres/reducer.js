@@ -16,6 +16,14 @@ import {
   LOAD_STREAMS_SUCCESS,
   LOAD_STREAMS_ERROR,
 
+  SAVE_CONFIG,
+  SAVE_CONFIG_SUCCESS,
+  SAVE_CONFIG_ERROR,
+
+  TEST_CONNECTION,
+  TEST_CONNECTION_SUCCESS,
+  TEST_CONNECTION_ERROR,
+
   SET_ACTIVE_STREAM_ID,
 
   UPDATE_STREAM_TO_REPLICATE,
@@ -38,6 +46,12 @@ export const initialState = fromJS({
   loading: true,
   error: false,
   consoleOutput: false,
+
+  saving: false,
+  savingError: false,
+
+  testingConnection: false,
+  testingConnectionError: false,
 
   streams: false,
 
@@ -68,6 +82,39 @@ function tapPostgresReducer(state = initialState, action) {
         .set('streams', false)
         .set('consoleOutput', false)
 
+    case SAVE_CONFIG:
+      return state
+        .set('saving', true)
+        .set('savingError', false)
+        .set('testingConnectionError', false)
+        .set('consoleOutput', false)
+    case SAVE_CONFIG_SUCCESS:
+      return state
+        .set('saving', false)
+        .set('savingError', action.streams.status !== 200 ? action.streams.message : false)
+        .set('consoleOutput', false)
+    case SAVE_CONFIG_ERROR:
+      return state
+        .set('saving', false)
+        .set('savingError', action.error)
+        .set('consoleOutput', false)
+
+    case TEST_CONNECTION:
+      return state
+        .set('testingConnection', true)
+        .set('testingConnectionError', false)
+        .set('savingError', false)
+        .set('consoleOutput', false)
+    case TEST_CONNECTION_SUCCESS:
+      return state
+        .set('testingConnection', false)
+        .set('testingConnectionError', action.streams.status !== 200 ? action.streams.message : false)
+        .set('consoleOutput', false)
+    case TEST_CONNECTION_ERROR:
+      return state
+        .set('testingConnection', false)
+        .set('testingConnectionError', action.error)
+        .set('consoleOutput', false)
 
     case SET_ACTIVE_STREAM_ID:
       return state

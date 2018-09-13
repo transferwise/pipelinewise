@@ -7,6 +7,7 @@ import SyntaxHighlighter from 'react-syntax-highlighter/prism';
 import { light } from 'react-syntax-highlighter/styles/prism';
 import TabbedContent from 'components/TabbedContent';
 
+import TapPostgresConfig from './TapPostgres/Config';
 import TapPostgresProperties from './TapPostgres/Loadable';
 import messages from './messages';
 
@@ -34,8 +35,16 @@ function summaryContent(tap) {
   )
 }
 
-function configContent(tap) {
-  try { return codeContent(valueToString(tap.files.config)) }
+function configContent(targetId, tap) {
+  // Try to find tap specific layout
+  switch (tap.type) {
+    case 'tap-postgres': return <TapPostgresConfig tap={tap} config={tap.files.config} />
+  }
+
+  // Render standard tap config layout only with the raw JSON
+  try {
+    return codeContent(valueToString(tap.files.config))
+  }
   catch(e) {
     return <Alert bsStyle="danger" className="full-swidth"><strong>Error!</strong> Config file not exist</Alert>
   }
@@ -47,7 +56,7 @@ function propertiesContent(targetId, tap) {
     case 'tap-postgres': return <TapPostgresProperties targetId={targetId} tapId={tap.id} />
   }
 
-  // Render standard tap properties layout only with the raw code
+  // Render standard tap properties layout only with the raw JSON
   try {
     return codeContent(valueToString(tap.files.properties))
   }
@@ -76,7 +85,7 @@ function TapTabbedContent({ targetId, tap }) {
     { title: messages.properties.defaultMessage, content: propertiesContent(targetId, tap) },
     { title: messages.log.defaultMessage, content: logContent(tap) },
     { title: messages.state.defaultMessage, content: stateContent(tap) },
-    { title: messages.config.defaultMessage, content: configContent(tap) },
+    { title: messages.config.defaultMessage, content: configContent(targetId, tap) },
   ];
 
   return (

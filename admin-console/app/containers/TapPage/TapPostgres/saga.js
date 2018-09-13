@@ -1,14 +1,25 @@
 import { call, put, select, takeLatest } from 'redux-saga/effects';
-import { LOAD_STREAMS, UPDATE_STREAM_TO_REPLICATE, SET_TRANSFORMATION, DISCOVER_TAP } from './constants';
+import {
+  LOAD_STREAMS,
+  SAVE_CONFIG,
+  TEST_CONNECTION,
+  UPDATE_STREAM_TO_REPLICATE,
+  SET_TRANSFORMATION,
+  DISCOVER_TAP
+} from './constants';
 import {
   streamsLoaded,
   streamsLoadedError,
+  saveConfigDone,
+  saveConfigError,
   updateStreamToReplicateDone,
   updateStreamToReplicateError,
   setTransformationDone,
   setTransformationError,
   discoverTapDone,
   discoverTapError,
+  testConnectionSucces,
+  testConnectionError,
 } from './actions';
 
 import request from 'utils/request';
@@ -21,6 +32,38 @@ export function* getStreams(action) {
     yield put(streamsLoaded(streams));
   } catch (err) {
     yield put(streamsLoadedError(err));
+  }
+}
+
+export function* saveConfig(action) {
+  const requestURL = `http://localhost:5000/targets/${action.targetId}/taps/${action.tapId}/config`
+  console.log(requestURL)
+
+  try {
+    const response = yield call(request, requestURL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(action.config)
+    });
+    yield put(saveConfigDone(response))
+  } catch (err) {
+    yield put(saveConfigError(err))
+  }
+}
+
+export function* testConnection(action) {
+  const requestURL = `http://localhost:5000/targets/${action.targetId}/taps/${action.tapId}/testconnection`
+  console.log(requestURL)
+
+  try {
+    const response = yield call(request, requestURL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(action.config)
+    });
+    yield put(testConnectionSucces(response))
+  } catch (err) {
+    yield put(testConnectionError(err))
   }
 }
 
@@ -69,6 +112,8 @@ export function* discoverTap(action) {
 
 export default function* tapPostgresData() {
   yield takeLatest(LOAD_STREAMS, getStreams);
+  yield takeLatest(SAVE_CONFIG, saveConfig);
+  yield takeLatest(TEST_CONNECTION, testConnection);
   yield takeLatest(UPDATE_STREAM_TO_REPLICATE, updateStreamToReplicate);
   yield takeLatest(SET_TRANSFORMATION, setTransformation)
   yield takeLatest(DISCOVER_TAP, discoverTap);

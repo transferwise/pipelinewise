@@ -25,6 +25,18 @@ const makeSelectLoading = () =>
 const makeSelectError = () =>
   createSelector(selectTapPostgres, tapPostgresState => tapPostgresState.get('error'));
 
+const makeSelectSaving = () =>
+  createSelector(selectTapPostgres, tapPostgresState => tapPostgresState.get('saving'));
+
+const makeSelectSavingError = () =>
+    createSelector(selectTapPostgres, tapPostgresState => tapPostgresState.get('savingError'));
+
+const makeSelectTestingConnection = () =>
+    createSelector(selectTapPostgres, tapPostgresState => tapPostgresState.get('testingConnection'));
+
+const makeSelectTestingConnectionError = () =>
+    createSelector(selectTapPostgres, tapPostgresState => tapPostgresState.get('testingConnectionError'));
+
 const makeSelectConsoleOutput = () =>
   createSelector(selectTapPostgres, tapPostgresState => tapPostgresState.get('consoleOutput'));
 
@@ -37,5 +49,9 @@ export {
   makeSelectActiveStreamId,
   makeSelectLoading,
   makeSelectError,
+  makeSelectSaving,
+  makeSelectSavingError,
+  makeSelectTestingConnection,
+  makeSelectTestingConnectionError,
   makeSelectConsoleOutput,
 };

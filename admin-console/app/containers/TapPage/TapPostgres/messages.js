@@ -1,6 +1,14 @@
 import { defineMessages } from 'react-intl';
 
 export default defineMessages({
+  save: {
+    id: 'PipelineWise.TapPostgres.save',
+    defaultMessage: 'Save',
+  },
+  testConnection: {
+    id: 'PipelineWise.TapPostgres.testConnection',
+    defaultMessage: 'Test Connection',
+  },
   tablesToReplicate: {
     id: 'PipelineWise.TapPostgres.tablesToReplicate',
     defaultMessage: 'Tables to Replicate',

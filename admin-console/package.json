@@ -167,6 +167,7 @@
     "react-dom": "16.4.1",
     "react-helmet": "5.2.0",
     "react-intl": "2.4.0",
+    "react-jsonschema-form": "1.0.4",
     "react-loadable": "5.4.0",
     "react-redux": "5.0.7",
     "react-router-dom": "4.3.1",

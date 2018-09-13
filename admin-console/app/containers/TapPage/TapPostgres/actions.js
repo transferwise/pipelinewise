@@ -20,6 +20,16 @@ import {
   LOAD_STREAMS_SUCCESS,
   LOAD_STREAMS_ERROR,
 
+  SET_SAVE_CONFIG,
+  SAVE_CONFIG,
+  SAVE_CONFIG_SUCCESS,
+  SAVE_CONFIG_ERROR,
+
+  SET_TEST_CONNECTION,
+  TEST_CONNECTION,
+  TEST_CONNECTION_SUCCESS,
+  TEST_CONNECTION_ERROR,
+
   SET_ACTIVE_STREAM_ID,
 
   UPDATE_STREAM_TO_REPLICATE,
@@ -55,6 +65,52 @@ export function streamsLoaded(streams) {
 export function streamsLoadedError(error) {
   return {
     type: LOAD_STREAMS_ERROR,
+    error,
+  }
+}
+
+export function saveConfig(targetId, tapId, config) {
+  return {
+    type: SAVE_CONFIG,
+    targetId,
+    tapId,
+    config
+  }
+}
+
+export function saveConfigDone(response) {
+  return {
+    type: SAVE_CONFIG_SUCCESS,
+    response,
+  }
+}
+
+export function saveConfigError(error) {
+  return {
+    type: SAVE_CONFIG_ERROR,
+    error,
+  }
+}
+
+export function testConnection(targetId, tapId, config) {
+  return {
+    type: TEST_CONNECTION,
+    targetId,
+    tapId,
+    config,
+  }
+}
+
+export function testConnectionSucces(streams) {
+  return {
+    type: TEST_CONNECTION_SUCCESS,
+    streams,
+  }
+}
+
+export function testConnectionError(error) {
+  return {
+    type: TEST_CONNECTION_ERROR,
     error,
   }
 }
