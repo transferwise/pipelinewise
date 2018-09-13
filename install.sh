@@ -41,6 +41,7 @@ install_admin_console() {
 install_connector tap-mysql
 install_connector tap-postgres
 install_connector target-postgres
+install_connector transform-field
 
 # Install CLI
 install_cli

@@ -7,6 +7,8 @@ function TransformationDropdown(props) {
       <option key={`transformation-straight-copy`} value="STRAIGHT_COPY">Straight Copy</option>
       <option key={`transformation-hash`} value="HASH">Hash</option>
       <option key={`transformation-setnull`} value="SET-NULL">Set to Null</option>
+      <option key={`transformation-maskdate`} value="MASK-DATE">Mask Date</option>
+      <option key={`transformation-masknumber`} value="MASK-NUMBER">Mask Number</option>
     </select>
   )
 }
