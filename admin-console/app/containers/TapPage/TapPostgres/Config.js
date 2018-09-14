@@ -6,19 +6,35 @@ import { createStructuredSelector } from 'reselect';
 import injectReducer from 'utils/injectReducer';
 import injectSaga from 'utils/injectSaga';
 import LoadingIndicator from 'components/LoadingIndicator';
+import Modal from 'components/Modal';
 
 import { FormattedMessage } from 'react-intl';
 import { Grid, Alert, Button } from 'react-bootstrap/lib';
+import SyntaxHighlighter from 'react-syntax-highlighter/prism';
+import { light } from 'react-syntax-highlighter/styles/prism';
 import Form from "react-jsonschema-form";
 import {
+  makeSelectConfig,
+  makeSelectForceReloadConfig,
+  makeSelectLoading,
+  makeSelectError,
   makeSelectSaving,
   makeSelectSavingError,
+  makeSelectSavingSuccess,
+  makeSelectSaveConfigButtonEnabled,
   makeSelectTestingConnection,
-  makeSelectTestingConnectionError
+  makeSelectTestingConnectionError,
+  makeSelectTestingConnectionSuccess,
+  makeSelectTestConnectionButtonEnabled,
+  makeSelectConsoleOutput,
 } from './selectors';
 import {
+  loadConfig,
   saveConfig,
+  setSaveConfigButtonState,
   testConnection,
+  setTestConnectionButtonState,
+  resetConsoleOutput,
 } from './actions';
 import reducer from './reducer';
 import saga from './saga';
@@ -47,74 +63,111 @@ const uiSchema = {
 export class TapPostgresConfig extends React.PureComponent {
   constructor(props) {
     super(props)
-    this.state = {
-      saveConfigButtonEnabled: false,
-      testConnectionButtonEnabled: true,
-      config: props.config,
-    }
+    this.state = { config: undefined }
+  }
+  
+  componentDidMount() {
+    const { targetId, tapId } = this.props
+    this.props.onLoadConfig(targetId, tapId);
   }
 
   onFormChange(event) {
     if (event.errors.length === 0) {
       this.setState({
-        saveConfigButtonEnabled: true,
-        testConnectionButtonEnabled: true,
         config: JSON.parse(JSON.stringify(event.formData)),
       });
+
+      this.props.onSetSaveConfigButtonState(true)
+      this.props.onSetTestConnectionButtonState(false)
     } else {
-      this.setState({
-        saveConfigButtonEnabled: false,
-        testConnectionButtonEnabled: false,
-      });
+      this.props.onSetSaveConfigButtonState(false)
+      this.props.onSetTestConnectionButtonState(false)
     }
   }
 
   onFormSubmit(event) {
     if (event.errors.length === 0) {
-      const tap = this.props.tap;
-      if (tap) {
-        this.props.onSaveConfig(tap.target.id, tap.id, this.state.config)
-      }
+      const { targetId, tapId } = this.props;
+      this.props.onSaveConfig(targetId, tapId, this.state.config)
     }
   }
 
   onTestConnection() {
-    const tap = this.props.tap;
-    this.props.onTestConnection(tap.target.id, tap.id, this.state.config)
+    const { targetId, tapId } = this.props;
+    this.props.onTestConnection(targetId, tapId, this.state.config)
   }
 
   render() {
-    const { saving, savingError, testingConnection, testingConnectionError, tap } = this.props;
+    const {
+      loading,
+      error,
+      title,
+      config,
+      saving,
+      savingError,
+      savingSuccess,
+      saveConfigButtonEnabled,
+      testingConnection,
+      testingConnectionError,
+      testingConnectionSuccess,
+      testConnectionButtonEnabled,
+      consoleOutput,
+      onCloseModal,
+    } = this.props;
     let alert = <div />
+    let consolePanel = <div />
 
-    if (saving || testingConnection) {
+    if (loading || saving || testingConnection) {
       return <LoadingIndicator />;
+    }
+    else if (error !== false) {
+      return <Alert bsStyle="danger" className="full-swidth"><strong>Error!</strong> {error.toString()}</Alert>;
     }
 
     if (savingError !== false) {
-      alert = <Alert bsStyle="danger" className="full-swidth"><strong>Error when saving!</strong> {savingError.toString()}</Alert>
+      alert = <Alert bsStyle="danger" className="full-swidth"><strong><FormattedMessage {...messages.saveConnectionError} /></strong> {savingError.toString()}</Alert>
+    }
+    else if (savingSuccess) {
+      alert = <Alert bsStyle="info" className="full-width"><strong><FormattedMessage {...messages.saveConnectionSuccess} /></strong></Alert>
     }
 
-    if (testingConnectionError !== false) {
-      alert = <Alert bsStyle="danger" className="full-swidth"><strong>Cannot test connection!</strong> {testingConnectionError.toString()}</Alert>
+    else if (testingConnectionError !== false) {
+      alert = <Alert bsStyle="danger" className="full-swidth"><strong><FormattedMessage {...messages.testConnectionError} /></strong> {testingConnectionError.toString()}</Alert>
+    }
+    else if (testingConnectionSuccess) {
+      alert = <Alert bsStyle="success" className="full-width"><strong><FormattedMessage {...messages.testConnectionSuccess} /></strong></Alert>
     }
 
-    schema.title = `${tap.name} Connection`;
+    if (consoleOutput !== false) {
+      consolePanel = 
+        <SyntaxHighlighter className="font-sssm" language='shsssell' style={light}
+          showLineNumbers={false}>
+            {consoleOutput}
+        </SyntaxHighlighter> 
+    }
+
+    schema.title = title || "Connection Details";
     return (
       <Grid>
-        {alert}
+        {consoleOutput ?
+          <Modal
+            show={consoleOutput}
+            title={<FormattedMessage {...messages.testConnectionError} />}
+            body={<Grid>{alert}{consolePanel}</Grid>}
+            onClose={() => onCloseModal()} />
+        : alert }
         <Form
           schema={schema}
           uiSchema={uiSchema}
-          formData={this.state.config}
+          formData={this.state.config || config}
           showErrorList={false}
           liveValidate={true}
           onChange={(event) => this.onFormChange(event)}
           onSubmit={(event) => this.onFormSubmit(event)}
         >
-          <Button bsStyle="primary" type="submit" disabled={!this.state.saveConfigButtonEnabled}><FormattedMessage {...messages.save} /></Button>
+          <Button bsStyle={saveConfigButtonEnabled ? "primary" : "default"} type="submit" disabled={!saveConfigButtonEnabled}><FormattedMessage {...messages.save} /></Button>
           &nbsp;
-          <Button bsStyle="success" disabled={!this.state.testConnectionButtonEnabled} onClick={() => this.onTestConnection()}><FormattedMessage {...messages.testConnection} /></Button>
+          <Button bsStyle={testConnectionButtonEnabled ? "success" : "default"} disabled={!testConnectionButtonEnabled} onClick={() => this.onTestConnection()}><FormattedMessage {...messages.testConnection} /></Button>
         </Form>
       </Grid>
     )
@@ -122,22 +175,40 @@ export class TapPostgresConfig extends React.PureComponent {
 }
 
 TapPostgresConfig.propTypes = {
-  tap: PropTypes.any,
+  loading: PropTypes.any,
+  error: PropTypes.any,
+  title: PropTypes.any,
+  targetId: PropTypes.any,
+  tapId: PropTypes.any,
   config: PropTypes.any,
+  forceReloadConfig: PropTypes.any,
 }
 
 export function mapDispatchToProps(dispatch) {
   return {
+    onLoadConfig: (targetId, tapId) => dispatch(loadConfig(targetId, tapId)),
     onSaveConfig: (targetId, tapId, config) => dispatch(saveConfig(targetId, tapId, config)),
+    onSetSaveConfigButtonState: (enabled) => dispatch(setSaveConfigButtonState(enabled)),
     onTestConnection: (targetId, tapId, config) => dispatch(testConnection(targetId, tapId, config)),
+    onSetTestConnectionButtonState: (enabled) => dispatch(setTestConnectionButtonState(enabled)),
+    onCloseModal: () => dispatch(resetConsoleOutput())
   };
 }
 
 const mapStateToProps = createStructuredSelector({
+  config: makeSelectConfig(),
+  forceReloadConfig: makeSelectForceReloadConfig(),
+  loading: makeSelectLoading(),
+  error: makeSelectError(),
   saving: makeSelectSaving(),
   savingError: makeSelectSavingError(),
+  savingSuccess: makeSelectSavingSuccess(),
+  saveConfigButtonEnabled: makeSelectSaveConfigButtonEnabled(),
   testingConnection: makeSelectTestingConnection(),
   testingConnectionError: makeSelectTestingConnectionError(),
+  testingConnectionSuccess: makeSelectTestingConnectionSuccess(),
+  testConnectionButtonEnabled: makeSelectTestConnectionButtonEnabled(),
+  consoleOutput: makeSelectConsoleOutput(),
 });
 
 const withConnect = connect(

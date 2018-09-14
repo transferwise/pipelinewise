@@ -83,13 +83,22 @@ class Manager(object):
 
     def get_tap_log_dir(self, target_id, tap_id):
         return os.path.join(self.get_tap_dir(target_id, tap_id), 'log')
+  
+    def get_connector_files(self, connector_dir):
+        return {
+            'config': os.path.join(connector_dir, 'config.json'),
+            'properties': os.path.join(connector_dir, 'properties.json'),
+            'state': os.path.join(connector_dir, 'state.json'),
+            'transformation': os.path.join(connector_dir, 'transformation.json'),
+        }
     
     def parse_connector_files(self, connector_dir):
+        connector_files = self.get_connector_files(connector_dir)
         return {
-            'config': self.load_json(os.path.join(connector_dir, 'config.json')),
-            'properties': self.load_json(os.path.join(connector_dir, 'properties.json')),
-            'state': self.load_json(os.path.join(connector_dir, 'state.json')),
-            'transformation': self.load_json(os.path.join(connector_dir, 'transformation.json')),
+            'config': self.load_json(connector_files['config']),
+            'properties': self.load_json(connector_files['properties']),
+            'state': self.load_json(connector_files['state']),
+            'transformation': self.load_json(connector_files['transformation']),
         }
     
     def get_config(self):
@@ -173,6 +182,30 @@ class Manager(object):
         self.logger.info('Discovering {} tap from target {}'.format(tap_id, target_id))
         command = "{} discover_tap --target {} --tap {}".format(self.pipelinewise_bin, target_id, tap_id)
         result = self.run_command(command, False)
+        return result
+
+    def get_tap_config(self, target_id, tap_id):
+        self.logger.info('Getting {} tap config from target {}'.format(tap_id, target_id))
+        tap = self.get_tap(target_id, tap_id)
+        return tap["files"]["config"]
+
+    def update_tap_config(self, target_id, tap_id, tap_config):
+        self.logger.info('Updating {} tap config in target {}'.format(tap_id, target_id))
+
+        try:
+            tap_dir = self.get_tap_dir(target_id, tap_id)
+            tap_connector_files = self.get_connector_files(tap_dir)
+            self.save_json(tap_config, tap_connector_files['config'])
+
+            return "Tap config updated successfully"
+        except Exception as exc:
+            raise Exception("Failed to update {} tap config in {} target: {}".format(tap_id, target_id, exc))
+
+    def test_tap_connection(self, target_id, tap_id):
+        self.logger.info('Testing {} tap connection in target {}'.format(tap_id, target_id))
+        command = "{} test_tap_connection --target {} --tap {}".format(self.pipelinewise_bin, target_id, tap_id)
+        result = self.run_command(command, False)
+        self.logger.info(result)
         return result
 
     def get_streams(self, target_id, tap_id):

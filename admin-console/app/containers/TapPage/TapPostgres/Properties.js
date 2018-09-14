@@ -283,7 +283,7 @@ export class TapPostgresProperties extends React.PureComponent {
 
       if (consoleOutput !== false) {
         consolePanel = 
-          <SyntaxHighlighter className="font-sm" language='shell' style={light}
+          <SyntaxHighlighter className="font-sssm" language='shsssell' style={light}
             showLineNumbers={false}>
               {consoleOutput}
           </SyntaxHighlighter> 

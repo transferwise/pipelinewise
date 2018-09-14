@@ -91,6 +91,7 @@ class PipelineWise(object):
             'config': os.path.join(connector_dir, 'config.json'),
             'properties': os.path.join(connector_dir, 'properties.json'),
             'state': os.path.join(connector_dir, 'state.json'),
+            'transformation': os.path.join(connector_dir, 'transformation.json'),
         }
         
     def get_targets(self):
@@ -285,6 +286,31 @@ class PipelineWise(object):
             schema_with_diff = new_schema
 
         return schema_with_diff
+
+    def test_tap_connection(self):
+        tap_id = self.tap["id"]
+        tap_type = self.tap["type"]
+        target_id = self.target["id"]
+        target_type = self.target["type"]
+
+        self.logger.info("Testing {} ({}) tap connection in {} ({}) target".format(tap_id, tap_type, target_id, target_type))
+
+        # Generate and run the command to run the tap directly
+        # We will use the discover option to test connection
+        tap_config = self.tap["files"]["config"]
+        command = "{} --config {} --discover".format(self.tap_bin, tap_config)
+        result = self.run_command(command, False)
+
+        # Get output and errors from tap
+        new_schema, tap_output = result
+        self.logger.info("Tap output: {}".format(tap_output))
+
+        # If the connection success then the response needs to be a valid JSON string
+        try:
+            new_schema = json.loads(new_schema)
+        except Exception as exc:
+            self.logger.error("Schema discovered by {} ({}) is not a valid JSON.".format(tap_id, tap_type))
+            sys.exit(1)
 
     def discover_tap(self):
         tap_id = self.tap["id"]

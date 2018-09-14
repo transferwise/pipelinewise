@@ -5,9 +5,25 @@ export default defineMessages({
     id: 'PipelineWise.TapPostgres.save',
     defaultMessage: 'Save',
   },
+  saveConnectionError: {
+    id: 'PipelineWise.TapPostgres.saveConnectionSuccess',
+    defaultMessage: 'Cannot save connection details!',
+  },
+  saveConnectionSuccess: {
+    id: 'PipelineWise.TapPostgres.saveConnectionSuccess',
+    defaultMessage: 'Connection Saved.',
+  },
   testConnection: {
     id: 'PipelineWise.TapPostgres.testConnection',
     defaultMessage: 'Test Connection',
+  },
+  testConnectionError: {
+    id: 'PipelineWise.TapPostgres.testConnectionError',
+    defaultMessage: 'Cannot connect to database!',
+  },
+  testConnectionSuccess: {
+    id: 'PipelineWise.TapPostgres.testConnectionSuccess',
+    defaultMessage: 'Test Connection Passed.',
   },
   tablesToReplicate: {
     id: 'PipelineWise.TapPostgres.tablesToReplicate',

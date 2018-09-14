@@ -7,8 +7,8 @@ import SyntaxHighlighter from 'react-syntax-highlighter/prism';
 import { light } from 'react-syntax-highlighter/styles/prism';
 import TabbedContent from 'components/TabbedContent';
 
-import TapPostgresConfig from './TapPostgres/Config';
-import TapPostgresProperties from './TapPostgres/Loadable';
+import TapPostgresConfig from './TapPostgres/LoadableConfig';
+import TapPostgresProperties from './TapPostgres/LoadableProperties';
 import messages from './messages';
 
 function valueToString(value) {
@@ -38,7 +38,7 @@ function summaryContent(tap) {
 function configContent(targetId, tap) {
   // Try to find tap specific layout
   switch (tap.type) {
-    case 'tap-postgres': return <TapPostgresConfig tap={tap} config={tap.files.config} />
+    case 'tap-postgres': return <TapPostgresConfig targetId={targetId} tapId={tap.id} title={`${tap.name} Connection Details`}/>
   }
 
   // Render standard tap config layout only with the raw JSON

@@ -13,13 +13,19 @@ export const LOAD_STREAMS = 'TapPostgres/LOAD_STREAMS';
 export const LOAD_STREAMS_SUCCESS = 'TapPostgres/LOAD_STREAMS_SUCCESS';
 export const LOAD_STREAMS_ERROR = 'TapPostgres/LOAD_STREAMS_ERROR';
 
+export const LOAD_CONFIG = 'TapPostgres/LOAD_CONFIG';
+export const LOAD_CONFIG_SUCCESS = 'TapPostgres/LOAD_CONFIG_SUCCESS';
+export const LOAD_CONFIG_ERROR = 'TapPostgres/LOAD_CONFIG_ERROR';
+
 export const SAVE_CONFIG = 'TapPostgres/SAVE_CONFIG';
 export const SAVE_CONFIG_SUCCESS = 'TapPostgres/SAVE_CONFIG_SUCCESS';
 export const SAVE_CONFIG_ERROR = 'TapPostgres/SAVE_CONFIG_ERROR';
+export const SET_SAVE_CONFIG_BUTTON_STATE = 'TapPostgres/SET_SAVE_CONFIG_BUTTON_STATE';
 
 export const TEST_CONNECTION = 'TapPostgres/TEST_CONNECTION';
 export const TEST_CONNECTION_SUCCESS = 'TapPostgres/TEST_CONNECTION_SUCCESS';
 export const TEST_CONNECTION_ERROR = 'TapPostgres/TEST_CONNECTION_ERROR';
+export const SET_TEST_CONNECTION_BUTTON_STATE = 'TapPostgres/SET_TEST_CONNECTION_BUTTON_STATE';
 
 export const SET_ACTIVE_STREAM_ID = 'TapPostgres/SET_ACTIVE_STREAM_ID';
 

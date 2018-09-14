@@ -95,6 +95,27 @@ def api_discover_tap(target_id, tap_id):
         'result': manager.discover_tap(target_id, tap_id)
     })
 
+@app.route("/targets/<target_id>/taps/<tap_id>/config", methods = ['GET'])
+def api_get_tap_config(target_id, tap_id):
+    return jsonify({
+        'status': 200,
+        'result': manager.get_tap_config(target_id, tap_id)
+    })
+
+@app.route("/targets/<target_id>/taps/<tap_id>/config", methods = ['POST'])
+def api_update_tap_config(target_id, tap_id):
+    return jsonify({
+        'status': 200,
+        'result': manager.update_tap_config(target_id, tap_id, request.get_json())
+    })
+
+@app.route("/targets/<target_id>/taps/<tap_id>/testconnection", methods = ['GET'])
+def api_test_tap_connection(target_id, tap_id):
+    return jsonify({
+        'status': 200,
+        'result': manager.test_tap_connection(target_id, tap_id)
+    })
+
 @app.route("/targets/<target_id>/taps/<tap_id>/streams", methods = ['GET'])
 def api_get_streams(target_id, tap_id):
     return jsonify({

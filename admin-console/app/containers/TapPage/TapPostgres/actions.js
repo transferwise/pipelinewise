@@ -20,15 +20,19 @@ import {
   LOAD_STREAMS_SUCCESS,
   LOAD_STREAMS_ERROR,
 
-  SET_SAVE_CONFIG,
+  LOAD_CONFIG,
+  LOAD_CONFIG_SUCCESS,
+  LOAD_CONFIG_ERROR,
+
   SAVE_CONFIG,
   SAVE_CONFIG_SUCCESS,
   SAVE_CONFIG_ERROR,
+  SET_SAVE_CONFIG_BUTTON_STATE,
 
-  SET_TEST_CONNECTION,
   TEST_CONNECTION,
   TEST_CONNECTION_SUCCESS,
   TEST_CONNECTION_ERROR,
+  SET_TEST_CONNECTION_BUTTON_STATE,
 
   SET_ACTIVE_STREAM_ID,
 
@@ -69,6 +73,28 @@ export function streamsLoadedError(error) {
   }
 }
 
+export function loadConfig(targetId, tapId) {
+  return {
+    type: LOAD_CONFIG,
+    targetId,
+    tapId,
+  }
+}
+
+export function configLoaded(config) {
+  return {
+    type: LOAD_CONFIG_SUCCESS,
+    config,
+  }
+}
+
+export function loadConfigError(error) {
+  return {
+    type: LOAD_CONFIG_ERROR,
+    error,
+  }
+}
+
 export function saveConfig(targetId, tapId, config) {
   return {
     type: SAVE_CONFIG,
@@ -92,6 +118,13 @@ export function saveConfigError(error) {
   }
 }
 
+export function setSaveConfigButtonState(enabled) {
+  return {
+    type: SET_SAVE_CONFIG_BUTTON_STATE,
+    enabled,
+  }
+}
+
 export function testConnection(targetId, tapId, config) {
   return {
     type: TEST_CONNECTION,
@@ -101,10 +134,10 @@ export function testConnection(targetId, tapId, config) {
   }
 }
 
-export function testConnectionSucces(streams) {
+export function testConnectionSucces(response) {
   return {
     type: TEST_CONNECTION_SUCCESS,
-    streams,
+    response,
   }
 }
 
@@ -112,6 +145,13 @@ export function testConnectionError(error) {
   return {
     type: TEST_CONNECTION_ERROR,
     error,
+  }
+}
+
+export function setTestConnectionButtonState(enabled) {
+  return {
+    type: SET_TEST_CONNECTION_BUTTON_STATE,
+    enabled,
   }
 }
 

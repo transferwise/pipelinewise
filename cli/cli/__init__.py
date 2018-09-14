@@ -10,7 +10,8 @@ config_dir = os.path.join(os.getcwd(), '../config')
 
 commands = [
   'run_tap',
-  'discover_tap'
+  'discover_tap',
+  'test_tap_connection'
 ]
 
 command_help = """Available commands, """ + ','.join(commands)
