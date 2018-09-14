@@ -2,10 +2,11 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import { FormattedMessage } from 'react-intl';
 
-import { Grid, Alert } from 'react-bootstrap/lib';
+import { Grid, Row, Col, Alert } from 'react-bootstrap/lib';
 import SyntaxHighlighter from 'react-syntax-highlighter/prism';
 import { light } from 'react-syntax-highlighter/styles/prism';
 import TabbedContent from 'components/TabbedContent';
+import ConnectorIcon from 'components/ConnectorIcon';
 
 import TapPostgresConfig from './TapPostgres/LoadableConfig';
 import TapPostgresProperties from './TapPostgres/LoadableProperties';
@@ -30,15 +31,28 @@ function codeContent(codeString) {
 function summaryContent(tap) {
   return (
     <Grid>
-      kakamaci
+      <Row>
+        <Col md={6}>
+          <Grid className="shadow p-3 mb-5 rounded">
+            <h4>Tap Summary</h4>
+            <Row>
+              <Col md={6}><strong>Tap Name:</strong></Col><Col md={6}>{tap.name}</Col>
+              <Col md={6}><strong>Tap Type:</strong></Col><Col md={6}><ConnectorIcon name={tap.type} /> {tap.type}</Col>
+            </Row>
+          </Grid>
+        </Col>
+        <Col md={6}>
+          {configContent(tap)}
+        </Col>
+      </Row>
     </Grid>
   )
 }
 
-function configContent(targetId, tap) {
+function configContent(tap) {
   // Try to find tap specific layout
   switch (tap.type) {
-    case 'tap-postgres': return <TapPostgresConfig targetId={targetId} tapId={tap.id} title={`${tap.name} Connection Details`}/>
+    case 'tap-postgres': return <TapPostgresConfig targetId={tap.target.id} tapId={tap.id} title={`${tap.name} Connection Details`}/>
   }
 
   // Render standard tap config layout only with the raw JSON
@@ -85,7 +99,6 @@ function TapTabbedContent({ targetId, tap }) {
     { title: messages.properties.defaultMessage, content: propertiesContent(targetId, tap) },
     { title: messages.log.defaultMessage, content: logContent(tap) },
     { title: messages.state.defaultMessage, content: stateContent(tap) },
-    { title: messages.config.defaultMessage, content: configContent(targetId, tap) },
   ];
 
   return (

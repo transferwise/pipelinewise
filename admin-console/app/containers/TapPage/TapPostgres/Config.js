@@ -148,7 +148,7 @@ export class TapPostgresConfig extends React.PureComponent {
 
     schema.title = title || "Connection Details";
     return (
-      <Grid>
+      <Grid className="shadow p-3 mb-5 rounded">
         {consoleOutput ?
           <Modal
             show={consoleOutput}
