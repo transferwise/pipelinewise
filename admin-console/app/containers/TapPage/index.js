@@ -46,7 +46,7 @@ export class TapPage extends React.PureComponent {
     return (
       <Grid>
         <Row>
-          <Col md={6} className="mt-1">
+          <Col md={5} className="mt-1">
             <Row>
               <Col md={6} className="mt-2">
                 <h4>{messages.tap.defaultMessage}:</h4>
@@ -61,6 +61,11 @@ export class TapPage extends React.PureComponent {
                 </Row>
               </Col>
             </Row>
+          </Col>
+          <Col md={1} className="mt-2">
+            <Grid>
+              <img className="img-icon" src={ArrowRightIcon} />
+            </Grid>
           </Col>
           <Col md={5} className="mt-1">
             <Row>
