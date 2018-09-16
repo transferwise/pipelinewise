@@ -18,6 +18,8 @@ function decoratorsByName(name) {
       return { logo: MysqlLogo, name: 'MySQL' };
     } else if (name.match(/(tap|target)-postgres/)) {
       return { logo: PostgresLogo, name: 'PostgreSQL' };
+    } else {
+      return { logo: UnknownIcon, name }
     }
   } else {
     return { logo: UnknownIcon, name: 'Not defined' };

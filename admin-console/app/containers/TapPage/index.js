@@ -46,34 +46,39 @@ export class TapPage extends React.PureComponent {
     return (
       <Grid>
         <Row>
-          <Col md={4} className="mt-1">
-            <Grid>
-              <Row>
-                <ConnectorIcon name={tap.type} />
-                <div>
-                  <strong>{tap.name}</strong>
-                  <div><span className="text-muted">Tap Type:</span> {tap.type}</div>
-                </div>
-              </Row>
-            </Grid>
+          <Col md={6} className="mt-1">
+            <Row>
+              <Col md={6} className="mt-2">
+                <h4>{messages.tap.defaultMessage}:</h4>
+              </Col>
+              <Col md={6}>
+                <Row>
+                  <ConnectorIcon name={tap.type} />
+                  <div>
+                    <strong>{tap.name}</strong>
+                    <div><span className="text-muted"><FormattedMessage {...messages.tapType} />:</span> {tap.type}</div>
+                  </div>
+                </Row>
+              </Col>
+            </Row>
           </Col>
-          <Col md={1}>
-            <Grid>
-              <img className="img-icon" src={ArrowRightIcon} />
-            </Grid>
+          <Col md={5} className="mt-1">
+            <Row>
+              <Col md={6} className="mt-2">
+                <h4>{messages.target.defaultMessage}:</h4>
+              </Col>
+              <Col md={6}>
+                <Row className="float-right">
+                  <ConnectorIcon name={tap.target.type} />
+                  <div>
+                    <a href={`/targets/${tap.target.id}`}><strong>{tap.target.name}</strong></a>
+                    <div><span className="text-muted"><FormattedMessage {...messages.targetType} />:</span> {tap.target.type}</div>
+                  </div>
+                </Row>
+              </Col>
+            </Row>
           </Col>
-          <Col md={4} className="mt-1">
-            <Grid>
-              <Row className="float-right">
-                <ConnectorIcon name={tap.target.type} />
-                <div>
-                  <a href={`/targets/${tap.target.id}`}><strong>{tap.target.name}</strong></a>
-                  <div><span className="text-muted">Target Type:</span> {tap.target.type}</div>
-                </div>
-              </Row>
-            </Grid>
-          </Col>
-          <Col md={3} className="mt-3">
+          <Col md={1} className="mt-3">
             <Toggle
               defaultChecked={tap.enabled}
               className="float-right"

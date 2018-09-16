@@ -17,8 +17,9 @@ import { loadTarget } from '../App/actions';
 import reducer from '../App/reducer';
 import saga from './saga';
 
-import { Grid, Alert } from 'react-bootstrap/lib';
+import { Grid, Row, Col, Alert } from 'react-bootstrap/lib';
 import LoadingIndicator from 'components/LoadingIndicator';
+import ConnectorIcon from 'components/ConnectorIcon';
 import messages from './messages';
 
 /* eslint-disable react/prefer-stateless-function */
@@ -27,11 +28,15 @@ export class Target extends React.PureComponent {
     this.props.onLoadTarget(this.props.targetId);
   }
 
-  renderTarget(target) {
+  renderTargetSummary(target) {
     if (target) {
       return (
-        <Grid>
-          {target.id} - {target.name}
+        <Grid className="shadow-sm p-3 mb-5 rounded">
+          <h4>{messages.targetSummary.defaultMessage}</h4>
+          <Row>
+            <Col md={6}><strong><FormattedMessage {...messages.targetName} />:</strong></Col><Col md={6}>{target.name}</Col>
+            <Col md={6}><strong><FormattedMessage {...messages.targetType} />:</strong></Col><Col md={6}><ConnectorIcon name={target.type} /> {target.type}</Col>
+          </Row>
         </Grid>
       );
     } else {
@@ -53,10 +58,12 @@ export class Target extends React.PureComponent {
     
     return (
       <Grid>
-        <strong><FormattedMessage {...messages.header} /></strong>
-        <br /><br />
-        {this.renderTarget(target)}
-        {alert}
+        <Row>
+          <Col md={6}>
+            {this.renderTargetSummary(target)}
+            {alert}
+          </Col>
+        </Row>
       </Grid>
     );
   }

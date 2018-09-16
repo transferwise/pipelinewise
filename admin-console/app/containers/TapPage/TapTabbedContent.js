@@ -33,11 +33,11 @@ function summaryContent(tap) {
     <Grid>
       <Row>
         <Col md={6}>
-          <Grid className="shadow p-3 mb-5 rounded">
-            <h4>Tap Summary</h4>
+          <Grid className="shadow-sm p-3 mb-5 rounded">
+            <h4>{messages.tapSummary.defaultMessage}</h4>
             <Row>
-              <Col md={6}><strong>Tap Name:</strong></Col><Col md={6}>{tap.name}</Col>
-              <Col md={6}><strong>Tap Type:</strong></Col><Col md={6}><ConnectorIcon name={tap.type} /> {tap.type}</Col>
+              <Col md={6}><strong><FormattedMessage {...messages.tapName} />:</strong></Col><Col md={6}>{tap.name}</Col>
+              <Col md={6}><strong><FormattedMessage {...messages.tapType} />:</strong></Col><Col md={6}><ConnectorIcon name={tap.type} /> {tap.type}</Col>
             </Row>
           </Grid>
         </Col>

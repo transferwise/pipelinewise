@@ -1,9 +1,13 @@
 import { defineMessages } from 'react-intl';
 
 export default defineMessages({
-  header: {
-    id: 'PipelineWise.containers.TapPage.header',
-    defaultMessage: 'Tap Details',
+  tap: {
+    id: 'PipelineWise.containers.TapPage.tap',
+    defaultMessage: 'Data Source',
+  },
+  target: {
+    id: 'PipelineWise.containers.TapPage.target',
+    defaultMessage: 'Destination',
   },
   summary: {
     id: 'PipelineWise.containers.TapPage.summary',
@@ -24,5 +28,21 @@ export default defineMessages({
   log: {
     id: 'PipelineWise.containers.TapPage.log',
     defaultMessage: 'Extraction Log',
+  },
+  tapSummary: {
+    id: 'PipelineWise.containers.TapTab.summary',
+    defaultMessage: 'Tap Summary',
+  },
+  targetType: {
+    id: 'PipelineWise.containers.TapTab.targetType',
+    defaultMessage: 'Type'
+  },
+  tapType: {
+    id: 'PipelineWise.containers.TapTab.tapType',
+    defaultMessage: 'Type'
+  },
+  tapName: {
+    id: 'PipelineWise.containers.TapTab.tapName',
+    defaultMessage: 'Name'
   },
 });

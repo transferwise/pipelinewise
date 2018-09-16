@@ -52,8 +52,7 @@ export class Taps extends React.PureComponent {
 
     return (
       <Grid>
-        <strong><FormattedMessage {...messages.tapsTopic} /></strong>
-        <br /><br />
+        <h5>{messages.tapsTopic.defaultMessage}</h5>
         <Row>
           <Col md={12}>
             <TapsTable {...tapsTableProps} />

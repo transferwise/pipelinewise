@@ -3,7 +3,7 @@ import { defineMessages } from 'react-intl';
 export default defineMessages({
   tapsTopic: {
     id: 'PipelineWise.containers.Taps.header',
-    defaultMessage: 'Integrations',
+    defaultMessage: 'Data Sources',
   },
   name: {
     id: 'PipelineWise.container.Taps.name',

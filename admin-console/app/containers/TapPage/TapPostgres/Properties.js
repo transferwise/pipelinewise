@@ -313,7 +313,7 @@ export class TapPostgresProperties extends React.PureComponent {
               <Row>
                 <Col md={12}> 
                   <strong><FormattedMessage {...messages.tablesToReplicate} /></strong>
-                  <Grid className="table-wrapper-scroll-y shadow p-3 mb-5 rounded">
+                  <Grid className="table-wrapper-scroll-y">
                     <Table
                       items={streams}
                       selectedItem={activeStreamId}
@@ -329,7 +329,7 @@ export class TapPostgresProperties extends React.PureComponent {
               <Row>
                 <Col md={12}>
                   <strong><FormattedMessage {...messages.columnsToReplicate} /></strong>
-                  <Grid className="shadow p-3 mb-5 rounded">
+                  <Grid>
                     {this.renderStreamColumns(streams, activeStream, activeStreamId, { targetId, tapId, stream: activeStream, streamId: activeStreamId, onUpdateStreamToReplicate, onTransformationChange })}
                   </Grid>
                 </Col>
