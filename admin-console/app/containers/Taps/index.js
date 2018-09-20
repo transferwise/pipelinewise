@@ -1,4 +1,5 @@
 import React from 'react';
+import { Redirect } from 'react-router-dom'
 import PropTypes from 'prop-types';
 import { FormattedMessage } from 'react-intl';
 import { connect } from 'react-redux';
@@ -19,18 +20,33 @@ import { loadTaps, updateTapToReplicate } from '../App/actions';
 import reducer from '../App/reducer';
 import saga from './saga';
 
-import { Grid, Col, Row } from 'react-bootstrap/lib';
+import { Grid, Col, Row, ButtonGroup, Button } from 'react-bootstrap/lib';
 import LoadingIndicator from 'components/LoadingIndicator';
 import TapsTable from './TapsTable';
 import messages from './messages';
 
 /* eslint-disable react/prefer-stateless-function */
 export class Taps extends React.PureComponent {
+  constructor(props) {
+    super(props)
+    this.state = { redirectToAddSource: false }
+  }
+
   componentDidUpdate(prevProps) {
     const prevTargetId = prevProps.target && prevProps.target.id;
     const targetId = this.props.target && this.props.target.id;
     if ((targetId && prevTargetId !== targetId) || this.props.forceRefreshTaps) {
       this.props.onLoadTaps(targetId);
+    }
+  }
+
+  onAddDataSourceTap() {
+    this.setState({ redirectToAddSource: true });
+  }
+
+  renderRedirectToAddSource() {
+    if (this.state.redirectToAddSource) {
+      return <Redirect to={`/targets/${this.props.target.id}/add`} />
     }
   }
   
@@ -52,7 +68,20 @@ export class Taps extends React.PureComponent {
 
     return (
       <Grid>
-        <h5>{messages.tapsTopic.defaultMessage}</h5>
+        {this.renderRedirectToAddSource()}
+
+        <h5>{messages.tapsTopic.defaultMessage}
+          <ButtonGroup bsClass="float-right">
+            <Button bsStyle="primary" onClick={() => this.onAddDataSourceTap()}><FormattedMessage {...messages.addSource} /></Button>
+          </ButtonGroup>
+        </h5>
+        <Row>
+          <Col md={12}>
+          </Col>
+        </Row>
+
+        <br />
+
         <Row>
           <Col md={12}>
             <TapsTable {...tapsTableProps} />

@@ -5,6 +5,10 @@ export default defineMessages({
     id: 'PipelineWise.containers.Taps.header',
     defaultMessage: 'Data Sources',
   },
+  addSource: {
+    id: 'PipelineWise.containers.Taps.addSource',
+    defaultMessage: 'Add Data Source',
+  },
   name: {
     id: 'PipelineWise.container.Taps.name',
     defaultMessage: 'Name',
