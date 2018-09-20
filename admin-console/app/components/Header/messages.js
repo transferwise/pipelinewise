@@ -13,4 +13,8 @@ export default defineMessages({
     id: 'PipelineWise.components.Header.target',
     defaultMessage: 'Destination',
   },
+  targets: {
+    id: 'PipelineWise.components.Header.targets',
+    defaultMessage: 'Destinations',
+  }
 });
