@@ -66,6 +66,13 @@ def api_get_target(target_id):
         'result': manager.get_target(target_id)
     })
 
+@app.route("/targets/<target_id>/add", methods = ["POST"])
+def api_add_tap(target_id):
+    return jsonify({
+        'status': 200,
+        'result': manager.add_tap(target_id, request.get_json())
+    })
+
 @app.route("/targets/<target_id>/taps", methods = ['GET'])
 def api_get_taps(target_id):
     return jsonify({

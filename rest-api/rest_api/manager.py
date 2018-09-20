@@ -78,6 +78,9 @@ class Manager(object):
 
             return { 'stdout': stdout, 'stderr': stderr, 'returncode': rc }
 
+    def gen_tap_id_by_name(self, tap_name):
+        return ''.join(tap_name.strip().split()).lower()
+
     def get_tap_dir(self, target_id, tap_id):
         return os.path.join(self.config_dir, target_id, tap_id)
 
@@ -177,6 +180,53 @@ class Manager(object):
             return "Tap updated successfully"
         except Exception as exc:
             raise Exception("Failed to update {} tap in {} target. Invalid updated parameters: {} - {}".format(tap_id, target_id, params, exc))
+
+    def add_tap(self, target_id, tap):
+        self.logger.info('Adding tap to target {}'.format(target_id))
+        target = self.get_target(target_id)
+
+        try:
+            tap_name = tap["name"]
+            tap_type = tap["type"]
+            tap_id = self.gen_tap_id_by_name(tap["name"])
+
+            if tap_type in ["tap-postgres"]:
+
+                tap_dir = self.get_tap_dir(target_id, tap_id)
+                if not os.path.isdir(tap_dir):
+                    tap_exists = False
+                    target_i = -1
+
+                    # Check if the tap already exists
+                    for target_idx, target in enumerate(self.config["targets"]):
+                        if target["id"] == target_id:
+                            target_i = target_idx
+                            for tap_idx, tap in enumerate(target["taps"]):
+                                if tap["id"] == tap_id:
+                                    tap_exists = True
+
+                    if not tap_exists:
+                        new_tap = { 'enabled': False, 'id': tap_id, 'name': tap_name, 'type': tap_type }
+
+                        # Add new tap to config
+                        self.config["targets"][target_i]["taps"].append(new_tap)
+
+                        # Create tap dir
+                        os.makedirs(tap_dir)
+
+                        # Save configuration
+                        self.save_config()
+                    else:
+                        raise Exception("Tap already exists in target config: {}".format(tap_id))
+                else:
+                    raise Exception("Tap directory already exists: {}".format(tap_id))
+            else:
+                raise Exception("Invalid tap type: {}".format(tap_type))
+
+            return "Tap added successfully"
+        except Exception as exc:
+            print ("EXC {}".format(exc))
+            raise Exception("Failed to add tap to target {}. {}".format(target_id, exc))
 
     def discover_tap(self, target_id, tap_id):
         self.logger.info('Discovering {} tap from target {}'.format(tap_id, target_id))
