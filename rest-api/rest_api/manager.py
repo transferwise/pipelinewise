@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os
+import shutil
 from subprocess import Popen, PIPE, STDOUT
 import shlex
 import logging
@@ -225,7 +226,6 @@ class Manager(object):
 
             return "Tap added successfully"
         except Exception as exc:
-            print ("EXC {}".format(exc))
             raise Exception("Failed to add tap to target {}. {}".format(target_id, exc))
 
     def discover_tap(self, target_id, tap_id):
@@ -233,6 +233,33 @@ class Manager(object):
         command = "{} discover_tap --target {} --tap {}".format(self.pipelinewise_bin, target_id, tap_id)
         result = self.run_command(command, False)
         return result
+
+    def delete_tap(self, target_id, tap_id):
+        self.logger.info('Deleting {} tap from target {}'.format(tap_id, target_id))
+        tap_dir = self.get_tap_dir(target_id, tap_id)
+
+        try:
+            # Find and delete tap from config
+            new_taps =[]
+            for target_idx, target in enumerate(self.config["targets"]):
+                if target["id"] == target_id:
+                    new_taps = []
+                    for tap in target["taps"]:
+                        if tap["id"] != tap_id:
+                            new_taps.append(tap)
+
+                    self.config["targets"][target_idx]["taps"] = new_taps
+
+            # Delete tap dir if exists
+            if os.path.isdir(tap_dir):
+                shutil.rmtree(tap_dir)
+
+            # Save configuration
+            self.save_config()
+
+            return "Tap deleted successfully"
+        except Exception as exc:
+            raise Exception("Failed to delete {} tap from target {}. {}".format(tap_id, target_id, exc))
 
     def get_tap_config(self, target_id, tap_id):
         self.logger.info('Getting {} tap config from target {}'.format(tap_id, target_id))
