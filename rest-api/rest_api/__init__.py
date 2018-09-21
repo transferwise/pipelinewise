@@ -52,6 +52,13 @@ def api_config():
         'result': manager.get_config()
     })
 
+@app.route("/add", methods = ["POST"])
+def api_add_target():
+    return jsonify({
+        'status': 200,
+        'result': manager.add_target(request.get_json())
+    })
+
 @app.route("/targets", methods = ['GET'])
 def api_get_targets():
     return jsonify({

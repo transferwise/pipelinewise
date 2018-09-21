@@ -79,8 +79,11 @@ class Manager(object):
 
             return { 'stdout': stdout, 'stderr': stderr, 'returncode': rc }
 
-    def gen_tap_id_by_name(self, tap_name):
+    def gen_id_by_name(self, tap_name):
         return ''.join(tap_name.strip().split()).lower()
+
+    def get_target_dir(self, target_id):
+        return os.path.join(self.config_dir, target_id)
 
     def get_tap_dir(self, target_id, tap_id):
         return os.path.join(self.config_dir, target_id, tap_id)
@@ -120,6 +123,44 @@ class Manager(object):
         self.load_config()
         return self.config 
     
+    def add_target(self, target):
+        self.logger.info('Adding target')
+        targets = self.get_targets()
+
+        try:
+            target_name = target["name"]
+            target_type = target["type"]
+            target_id = self.gen_id_by_name(target["name"])
+
+            if target_type in ["target-postgres"]:
+                target_dir = self.get_target_dir(target_id)
+
+                if not os.path.isdir(target_dir):
+                    new_tap = { 'id': target_id, 'name': target_name, 'taps': [], 'type': target_type }
+
+                    target = False
+                    target = next((item for item in targets if item["id"] == target_id), False)
+
+                    if not target:
+                        # Add new tap to config
+                        self.config["targets"].append(new_tap)
+
+                        # Create tap dir
+                        os.makedirs(target_dir)
+
+                        # Save configuration
+                        self.save_config()
+                    else:
+                        raise Exception("Target already exists in target config: {}".format(target_id))
+                else:
+                    raise Exception("Target directory already exists: {}".format(target_id))
+            else:
+                raise Exception("Invalid target type: {}".format(target_type))
+
+            return "Target added successfully"
+        except Exception as exc:
+            raise Exception("Failed to add target. {}".format(exc))
+
     def get_targets(self):
         self.logger.info('Getting targets from {}'.format(self.config_path))
         self.load_config()
@@ -206,7 +247,7 @@ class Manager(object):
         try:
             tap_name = tap["name"]
             tap_type = tap["type"]
-            tap_id = self.gen_tap_id_by_name(tap["name"])
+            tap_id = self.gen_id_by_name(tap["name"])
 
             if tap_type in ["tap-postgres"]:
 
