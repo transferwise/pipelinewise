@@ -105,6 +105,17 @@ class Manager(object):
             'transformation': self.load_json(connector_files['transformation']),
         }
     
+    def detect_tap_status(self, target_id, tap_id):
+        self.logger.info('Detecting {} tap status in {} target'.format(tap_id, target_id))
+        tap_dir = self.get_tap_dir(target_id, tap_id)
+        connector_files = self.get_connector_files(tap_dir)
+
+        # Tap exists but configuration not completed
+        if not os.path.isfile(connector_files["config"]):
+            return "not-configured"
+
+        return 'ready'
+
     def get_config(self):
         self.load_config()
         return self.config 
@@ -137,8 +148,13 @@ class Manager(object):
 
         try:
             taps = target['taps']
+
+            # Add tap status
+            for tap_idx, tap in enumerate(taps):
+                taps[tap_idx]['status'] = self.detect_tap_status(target_id, tap["id"])
+
         except Exception as exc:
-            raise Exception("No taps defined for {} target".format(target_id))
+            raise Exception("No taps defined for {} target. {}".format(target_id, exc))
         
         return taps
     
@@ -158,8 +174,9 @@ class Manager(object):
         else:
             raise Exception("Cannot find tap at {}".format(tap_dir))
         
-        # Add target details
+        # Add target and status details
         tap['target'] = self.get_target(target_id)
+        tap['status'] = self.detect_tap_status(target_id, tap_id)
 
         return tap
 
