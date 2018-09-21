@@ -13,6 +13,10 @@ export default defineMessages({
     id: 'PipelineWise.containers.TapPage.summary',
     defaultMessage: 'Summary',
   },
+  deleteTap: {
+    id: 'PipelineWise.containers.TapPage.deleteTap',
+    defaultMessage: 'Danger Zone'
+  },
   config: {
     id: 'PipelineWise.containers.TapPage.config',
     defaultMessage: 'Settings',

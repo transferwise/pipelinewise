@@ -2,12 +2,13 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import { FormattedMessage } from 'react-intl';
 
-import { Grid, Row, Col, Alert } from 'react-bootstrap/lib';
+import { Grid, Row, Col, Alert, Button } from 'react-bootstrap/lib';
 import SyntaxHighlighter from 'react-syntax-highlighter/prism';
 import { light } from 'react-syntax-highlighter/styles/prism';
 import TabbedContent from 'components/TabbedContent';
 import ConnectorIcon from 'components/ConnectorIcon';
 
+import TapDangerZone from './TapDangerZone/Loadable';
 import TapPostgresConfig from './TapPostgres/LoadableConfig';
 import TapPostgresProperties from './TapPostgres/LoadableProperties';
 import messages from './messages';
@@ -28,7 +29,7 @@ function codeContent(codeString) {
   )
 }
 
-function summaryContent(tap) {
+function summaryContent(tap, deleteTapButtonEnabled) {
   return (
     <Grid>
       <Row>
@@ -40,6 +41,7 @@ function summaryContent(tap) {
               <Col md={6}><strong><FormattedMessage {...messages.tapType} />:</strong></Col><Col md={6}><ConnectorIcon name={tap.type} /> {tap.type}</Col>
             </Row>
           </Grid>
+          <TapDangerZone targetId={tap.target.id} tapId={tap.id} />
         </Col>
         <Col md={6}>
           {configContent(tap)}
@@ -93,9 +95,9 @@ function logContent(tap) {
   }
 }
 
-function TapTabbedContent({ targetId, tap }) {
+function TapTabbedContent({ targetId, tap, deleteTapButtonEnabled }) {
   const tabs = [
-    { title: messages.summary.defaultMessage, content: summaryContent(tap) },
+    { title: messages.summary.defaultMessage, content: summaryContent(tap, deleteTapButtonEnabled) },
     { title: messages.properties.defaultMessage, content: propertiesContent(targetId, tap) },
     { title: messages.log.defaultMessage, content: logContent(tap) },
     { title: messages.state.defaultMessage, content: stateContent(tap) },

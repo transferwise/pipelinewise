@@ -1,5 +1,4 @@
 import React from 'react';
-import { Redirect } from 'react-router-dom'
 import PropTypes from 'prop-types';
 import { connect } from 'react-redux';
 import { compose } from 'redux';
@@ -19,7 +18,6 @@ import {
   makeSelectError,
   makeSelectSuccess,
   makeSelectAddTapButtonEnabled,
-  makeSelectForceRedirectToConnectionsPage,
 } from './selectors';
 
 import {
@@ -83,7 +81,6 @@ export class AddTapPage extends React.PureComponent {
       success,
       newTap,
       addTapButtonEnabled,
-      forceRedirectToConnectionsPage,
       match
     } = this.props;
     let alert = <div />;
@@ -156,7 +153,6 @@ const mapStateToProps = createStructuredSelector({
   success: makeSelectSuccess(),
   newTap: makeSelectNewTap(),
   addTapButtonEnabled: makeSelectAddTapButtonEnabled(),
-  forceRedirectToConnectionsPage: makeSelectForceRedirectToConnectionsPage(),
 });
 
 const withConnect = connect(

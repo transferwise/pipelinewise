@@ -22,9 +22,6 @@ const makeSelectSuccess = () =>
 const makeSelectAddTapButtonEnabled = () =>
   createSelector(selectAddTap, addTapState => addTapState.get('addTapButtonEnabled'));
 
-const makeSelectForceRedirectToConnectionsPage = () =>
-  createSelector(selectAddTap, addTapState => addTapState.get('forceRedirectToConnectionsPage'));
-
 export {
   selectAddTap,
 
@@ -35,6 +32,4 @@ export {
   makeSelectSuccess,
 
   makeSelectAddTapButtonEnabled,
-
-  makeSelectForceRedirectToConnectionsPage,
 };

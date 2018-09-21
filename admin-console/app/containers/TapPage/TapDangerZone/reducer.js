@@ -1,11 +1,11 @@
 import { fromJS } from 'immutable';
 
 import {
-  ADD_TAP,
-  ADD_TAP_SUCCESS,
-  ADD_TAP_ERROR,
+  DELETE_TAP,
+  DELETE_TAP_SUCCESS,
+  DELETE_TAP_ERROR,
 
-  SET_ADD_TAP_BUTTON_STATE,
+  SET_DELETE_TAP_BUTTON_STATE,
 } from './constants';
 
 // The initial state of the App
@@ -14,36 +14,36 @@ export const initialState = fromJS({
   error: false,
   success: false,
 
-  newTap: false,
-  addTapButtonEnabled: false,
+  tapToDelete: false,
+  deleteTapButtonEnabled: false,
 });
 
-function addTapReducer(state = initialState, action) {
+function deleteTapReducer(state = initialState, action) {
   switch (action.type) {
-    case ADD_TAP:
+    case DELETE_TAP:
       return state
         .set('loading', false)
         .set('error', false)
         .set('success', false)
-    case ADD_TAP_SUCCESS:
+    case DELETE_TAP_SUCCESS:
       return state
         .set('loading', false)
         .set('error', action.response.status !== 200 ? action.response.message : false)
         .set('success', action.response.status === 200)
-    case ADD_TAP_ERROR:
+    case DELETE_TAP_ERROR:
       return state
         .set('loading', false)
         .set('error', action.error)
-        .set('newTap', false)
+        .set('tapToDelete', false)
         .set('success', false)
 
-    case SET_ADD_TAP_BUTTON_STATE:
+    case SET_DELETE_TAP_BUTTON_STATE:
         return state
-          .set('addTapButtonEnabled', action.enabled)
+          .set('deleteTapButtonEnabled', action.enabled)
 
     default:
       return state;
   }
 }
 
-export default addTapReducer;
+export default deleteTapReducer;
