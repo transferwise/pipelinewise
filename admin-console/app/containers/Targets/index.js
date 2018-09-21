@@ -1,4 +1,5 @@
 import React from 'react';
+import { Redirect } from 'react-router-dom'
 import PropTypes from 'prop-types';
 import { FormattedMessage } from 'react-intl';
 import { connect } from 'react-redux';
@@ -17,18 +18,33 @@ import { loadTargets } from '../App/actions';
 import reducer from '../App/reducer';
 import saga from './saga';
 
-import { Grid, Alert } from 'react-bootstrap/lib';
+import { Grid, Alert, ButtonGroup, Button } from 'react-bootstrap/lib';
 import LoadingIndicator from 'components/LoadingIndicator';
 import messages from './messages';
 
 /* eslint-disable react/prefer-stateless-function */
 export class Targets extends React.PureComponent {
+  constructor(props) {
+    super(props)
+    this.state = { redirectToAddTarget: false }
+  }
+
   static redirectNewTarget(targetId) {
     window.location = `/targets/${targetId}`;
   }
 
   componentDidMount() {
     this.props.onLoadTargets(this.props.selectedTargetId);
+  }
+
+  onAddTarget() {
+    this.setState({ redirectToAddTarget: true });
+  }
+
+  renderRedirectToAddTarget() {
+    if (this.state.redirectToAddTarget) {
+      return <Redirect to={`/add`} />
+    }
   }
 
   renderDropdown(targets, selectedTargetId) {
@@ -66,8 +82,13 @@ export class Targets extends React.PureComponent {
 
     return (
       <Grid>
-        <strong><FormattedMessage {...messages.header} /></strong>
-        <br /><br />
+        {this.renderRedirectToAddTarget()}
+
+        <h5>{messages.header.defaultMessage}
+          <ButtonGroup bsClass="float-right">
+            <Button bsStyle="primary" onClick={() => this.onAddTarget()}><FormattedMessage {...messages.addTarget} /></Button>
+          </ButtonGroup>
+        </h5>
         {this.renderDropdown(targets, selectedTargetId)}
         {alert}
         {warning}

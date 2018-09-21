@@ -13,6 +13,7 @@ import { Switch, Route } from 'react-router-dom';
 
 import Header from 'components/Header';
 import HomePage from 'containers/HomePage/Loadable';
+import AddTargetPage from 'containers/AddTargetPage/Loadable';
 import ConnectionsPage from 'containers/ConnectionsPage/Loadable';
 import TapPage from 'containers/TapPage/Loadable';
 import AddTapPage from 'containers/AddTapPage/Loadable';
@@ -34,6 +35,7 @@ export default function App() {
       <Route component={Header} />
       <Switch>
         <Route exact path="/" component={HomePage} />
+        <Route exact path="/add" component={AddTargetPage} />
         <Route exact path="/targets" component={ConnectionsPage} />
         <Route exact path="/targets/:target" component={ConnectionsPage} />
         <Route exact path="/targets/:target/add" component={AddTapPage} />
