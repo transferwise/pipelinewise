@@ -92,7 +92,7 @@ export class AddTapPage extends React.PureComponent {
       alert = <Alert bsStyle="danger" className="full-swidth"><strong>Error!</strong> {error.toString()}</Alert>;
     }
     else if (success) {
-      alert = <Alert bsStyle="info" className="full-width"><strong><FormattedMessage {...messages.addTapSuccess} /></strong></Alert>
+      window.location.href = `/targets/${match.params.target}`;
     }
 
     return (
@@ -103,27 +103,21 @@ export class AddTapPage extends React.PureComponent {
         <Grid>
           <Row>
             <Col md={2} />
-            {success
-            ? <Col md={8} className="text-center">
-                <br />
-                <h4>{messages.addTapSuccess.defaultMessage}</h4>
-                <Button bsStyle="primary" href={`/targets/${match.params.target}`}>Back</Button>
-              </Col>
-            : <Col md={8}>
-                <Form
-                  schema={schema}
-                  uiSchema={uiSchema}
-                  formData={this.state.newTap || newTap}
-                  showErrorList={false}
-                  liveValidate={true}
-                  onChange={(event) => this.onFormChange(event)}
-                  onSubmit={(event) => this.onFormSubmit(event)}
-                >
-                  <Button bsStyle={addTapButtonEnabled ? "primary" : "default"} type="submit" disabled={!addTapButtonEnabled}><FormattedMessage {...messages.add} /></Button>
-                </Form>
-                <br />
-                {alert}
-              </Col>}
+            <Col md={8}>
+              <Form
+                schema={schema}
+                uiSchema={uiSchema}
+                formData={this.state.newTap || newTap}
+                showErrorList={false}
+                liveValidate={true}
+                onChange={(event) => this.onFormChange(event)}
+                onSubmit={(event) => this.onFormSubmit(event)}
+              >
+                <Button bsStyle={addTapButtonEnabled ? "primary" : "default"} type="submit" disabled={!addTapButtonEnabled}><FormattedMessage {...messages.add} /></Button>
+              </Form>
+              <br />
+              {alert}
+            </Col>
             <Col md={2} />
           </Row>
         </Grid>
