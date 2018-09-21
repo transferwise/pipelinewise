@@ -40,5 +40,17 @@ export default defineMessages({
   codeNotFound: {
     id: 'PipelineWise.components.TapDetailsViewer.codeNotFound',
     defaultMessage: 'JSON not found',
-  }
+  },
+  statusNotConfigured: {
+    id: 'PipelineWise.components.TapDetailsViewer.statusNotConfigured',
+    defaultMessage: 'Not Configured',
+  },
+  statusReady: {
+    id: 'PipelineWise.components.TapDetailsViewer.ready',
+    defaultMessage: 'Ready to Run',
+  },
+  statusUnknown: {
+    id: 'PipelineWise.components.TapDetailsViewer.statusUnknown',
+    defaultMessage: 'Unkown',
+  },
 });
