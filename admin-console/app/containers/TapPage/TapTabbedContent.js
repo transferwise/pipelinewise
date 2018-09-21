@@ -34,17 +34,18 @@ function summaryContent(tap, deleteTapButtonEnabled) {
     <Grid>
       <Row>
         <Col md={6}>
+          {configContent(tap)}
+        </Col>
+        <Col md={6}>
           <Grid className="shadow-sm p-3 mb-5 rounded">
             <h4>{messages.tapSummary.defaultMessage}</h4>
             <Row>
+              <Col md={6}><strong><FormattedMessage {...messages.tapId} />:</strong></Col><Col md={6}>{tap.id}</Col>
               <Col md={6}><strong><FormattedMessage {...messages.tapName} />:</strong></Col><Col md={6}>{tap.name}</Col>
               <Col md={6}><strong><FormattedMessage {...messages.tapType} />:</strong></Col><Col md={6}><ConnectorIcon name={tap.type} /> {tap.type}</Col>
             </Row>
           </Grid>
           <TapDangerZone targetId={tap.target.id} tapId={tap.id} />
-        </Col>
-        <Col md={6}>
-          {configContent(tap)}
         </Col>
       </Row>
     </Grid>

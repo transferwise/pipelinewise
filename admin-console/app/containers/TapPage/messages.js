@@ -41,6 +41,10 @@ export default defineMessages({
     id: 'PipelineWise.containers.TapTab.targetType',
     defaultMessage: 'Type'
   },
+  tapId: {
+    id: 'PipelineWise.containers.TapTab.tapId',
+    defaultMessage: 'Id'
+  },
   tapType: {
     id: 'PipelineWise.containers.TapTab.tapType',
     defaultMessage: 'Type'
