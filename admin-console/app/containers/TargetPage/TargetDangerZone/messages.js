@@ -11,7 +11,7 @@ export default defineMessages({
   },
   enterTargetIdToDelete: {
     id: 'PipelineWise.containers.TargetDangerZone.enterTargetIdToDelete',
-    defaultMessage: 'Enter target id to delete. This will delete every child integrations too.',
+    defaultMessage: 'Enter Data Warehouse id to delete. This will delete every child data source too.',
   },
   delete: {
     id: 'PipelineWise.containers.TargetDangerZone.delete',
