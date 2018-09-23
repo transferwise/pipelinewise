@@ -80,7 +80,6 @@ export class AddTargetPage extends React.PureComponent {
       success,
       newTarget,
       addTargetButtonEnabled,
-      match
     } = this.props;
     let alert = <div />;
   
@@ -91,7 +90,7 @@ export class AddTargetPage extends React.PureComponent {
       alert = <Alert bsStyle="danger" className="full-swidth"><strong>Error!</strong> {error.toString()}</Alert>;
     }
     else if (success) {
-      window.location.href = `/targets/${match.params.target}`;
+      window.location.href = `/targets/${newTarget.id}`;
     }
 
     return (
@@ -144,7 +143,7 @@ const mapStateToProps = createStructuredSelector({
   loading: makeSelectLoading(),
   error: makeSelectError(),
   success: makeSelectSuccess(),
-  newTap: makeSelectNewTarget(),
+  newTarget: makeSelectNewTarget(),
   addTargetButtonEnabled: makeSelectAddTargetButtonEnabled(),
 });
 

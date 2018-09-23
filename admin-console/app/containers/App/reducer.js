@@ -60,11 +60,6 @@ function appReducer(state = initialState, action) {
         .set('target', false)
         .set('taps', false);
     case LOAD_TARGETS_SUCCESS:
-      // Redirect to the first target if not specified in the URL
-      if (isValidTargets(action.targets) && !action.selectedTargetId) {     
-        window.location = `/targets/${action.targets.result[0].id}`;
-      }
-      
       return state
         .set('targetsLoading', false)
         .set('targetsError', action.targets.status !== 200 ? action.target.message : false)

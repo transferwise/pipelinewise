@@ -29,7 +29,7 @@ function codeContent(codeString) {
   )
 }
 
-function summaryContent(tap, deleteTapButtonEnabled) {
+function summaryContent(tap) {
   return (
     <Grid>
       <Row>
@@ -96,9 +96,9 @@ function logContent(tap) {
   }
 }
 
-function TapTabbedContent({ targetId, tap, deleteTapButtonEnabled }) {
+function TapTabbedContent({ targetId, tap }) {
   const tabs = [
-    { title: messages.summary.defaultMessage, content: summaryContent(tap, deleteTapButtonEnabled) },
+    { title: messages.summary.defaultMessage, content: summaryContent(tap) },
     { title: messages.properties.defaultMessage, content: propertiesContent(targetId, tap) },
     { title: messages.log.defaultMessage, content: logContent(tap) },
     { title: messages.state.defaultMessage, content: stateContent(tap) },

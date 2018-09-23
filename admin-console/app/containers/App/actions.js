@@ -42,10 +42,10 @@ export function targetsLoadingError(error) {
   };
 }
 
-export function loadTarget(id) {
+export function loadTarget(targetId) {
   return {
     type: LOAD_TARGET,
-    id,
+    targetId,
   };
 }
 

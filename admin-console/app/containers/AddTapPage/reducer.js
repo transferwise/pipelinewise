@@ -30,6 +30,7 @@ function addTapReducer(state = initialState, action) {
         .set('loading', false)
         .set('error', action.response.status !== 200 ? action.response.message : false)
         .set('success', action.response.status === 200)
+        .set('newTap', action.response.result)
     case ADD_TAP_ERROR:
       return state
         .set('loading', false)

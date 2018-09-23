@@ -32,6 +32,11 @@ export class Taps extends React.PureComponent {
     this.state = { redirectToAddSource: false }
   }
 
+  componentDidMount() {
+    const { targetId } = this.props;
+    this.props.onLoadTaps(targetId);
+  }
+
   componentDidUpdate(prevProps) {
     const prevTargetId = prevProps.target && prevProps.target.id;
     const targetId = this.props.target && this.props.target.id;

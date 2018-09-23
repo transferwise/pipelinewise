@@ -5,7 +5,7 @@ import { targetLoaded, targetLoadingError } from 'containers/App/actions';
 import request from 'utils/request';
 
 export function* getTarget(action) {
-  const requestURL = `http://localhost:5000/targets/${action.id}`;
+  const requestURL = `http://localhost:5000/targets/${action.targetId}`;
 
   try {
     const target = yield call(request, requestURL);

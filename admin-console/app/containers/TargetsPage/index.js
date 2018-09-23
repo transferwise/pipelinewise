@@ -8,6 +8,7 @@ import { createStructuredSelector } from 'reselect';
 import injectReducer from 'utils/injectReducer';
 import injectSaga from 'utils/injectSaga';
 
+import { Helmet } from 'react-helmet';
 import {
   makeSelectTargetsLoading,
   makeSelectTargetsError,
@@ -18,19 +19,16 @@ import { loadTargets } from '../App/actions';
 import reducer from '../App/reducer';
 import saga from './saga';
 
-import { Grid, Alert, ButtonGroup, Button } from 'react-bootstrap/lib';
+import { Grid, Row, Col, Alert, ButtonGroup, Button } from 'react-bootstrap/lib';
 import LoadingIndicator from 'components/LoadingIndicator';
+import TargetsTable from './TargetsTable';
 import messages from './messages';
 
 /* eslint-disable react/prefer-stateless-function */
-export class Targets extends React.PureComponent {
+export class TargetsPage extends React.PureComponent {
   constructor(props) {
     super(props)
     this.state = { redirectToAddTarget: false }
-  }
-
-  static redirectNewTarget(targetId) {
-    window.location = `/targets/${targetId}`;
   }
 
   componentDidMount() {
@@ -47,26 +45,15 @@ export class Targets extends React.PureComponent {
     }
   }
 
-  renderDropdown(targets, selectedTargetId) {
-    if (Array.isArray(targets) && targets.length > 0) {
-      const options = targets.map((target, i) => (
-        <option key={`target-${target.id}`} value={target.id}>{target.name}</option>
-      ));
-    
-      return (
-        <select value={selectedTargetId} onChange={(event) => Targets.redirectNewTarget(event.target.value)}>
-          {options}
-        </select>
-      );
-    }
-
-    return <div />;
-  }
-
   render() {
-    const { loading, error, targets, selectedTargetId } = this.props;
+    const { loading, error, targets } = this.props;
+    const targetsTableProps = {
+      loading,
+      error,
+      targets,
+    };
     let alert = <div />;
-    let warning = <div />;
+    let content = <div />;
 
     if (loading) {
       return <LoadingIndicator />;
@@ -75,30 +62,44 @@ export class Targets extends React.PureComponent {
     if (error != false) {
       alert = <Alert bsStyle="danger"><strong>Error!</strong> {error.toString()}</Alert>
     } else {
-      if (targets.length === 0) {
-        warning = <Alert bsStyle="warning"><strong>Tip!</strong> No Integrations</Alert>
-      }
+      content = (
+        <Grid>
+          {this.renderRedirectToAddTarget()}
+
+          <h5>{messages.header.defaultMessage}
+            <ButtonGroup bsClass="float-right">
+              <Button bsStyle="primary" onClick={() => this.onAddTarget()}><FormattedMessage {...messages.addTarget} /></Button>
+            </ButtonGroup>
+          </h5>
+          <Row>
+            <Col md={12}>
+            </Col>
+          </Row>
+
+          <br />
+
+          <Row>
+            <Col md={12}>
+              <TargetsTable {...targetsTableProps} />
+            </Col>
+          </Row>
+        </Grid>
+      )
     }
 
     return (
-      <Grid>
-        {this.renderRedirectToAddTarget()}
-
-        <h5>{messages.header.defaultMessage}
-          <ButtonGroup bsClass="float-right">
-            <Button bsStyle="primary" onClick={() => this.onAddTarget()}><FormattedMessage {...messages.addTarget} /></Button>
-          </ButtonGroup>
-        </h5>
-        {this.renderDropdown(targets, selectedTargetId)}
+      <main role="main" className="container-fluid">
+        <Helmet>
+          <title>Targets</title>
+        </Helmet>
         {alert}
-        {warning}
-      </Grid>
-    );
+        {content}
+      </main>
+    )
   }
 }
 
-
-Targets.propTypes = {
+TargetsPage.propTypes = {
   loading: PropTypes.bool,
   error: PropTypes.any,
   targets: PropTypes.any,
@@ -130,4 +131,4 @@ export default compose(
   withReducer,
   withSaga,
   withConnect,
-)(Targets);
+)(TargetsPage);

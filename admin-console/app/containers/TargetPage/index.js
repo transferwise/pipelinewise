@@ -7,6 +7,7 @@ import { createStructuredSelector } from 'reselect';
 import injectReducer from 'utils/injectReducer';
 import injectSaga from 'utils/injectSaga';
 
+import { Helmet } from 'react-helmet';
 import {
   makeSelectTargetLoading,
   makeSelectTargetError,
@@ -16,6 +17,7 @@ import {
 import { loadTarget } from '../App/actions';
 import reducer from '../App/reducer';
 import saga from './saga';
+import TargetTabbedContent from './TargetTabbedContent';
 
 import { Grid, Row, Col, Alert } from 'react-bootstrap/lib';
 import LoadingIndicator from 'components/LoadingIndicator';
@@ -23,30 +25,41 @@ import ConnectorIcon from 'components/ConnectorIcon';
 import messages from './messages';
 
 /* eslint-disable react/prefer-stateless-function */
-export class Target extends React.PureComponent {
+export class TargetPage extends React.PureComponent {
   componentDidMount() {
-    this.props.onLoadTarget(this.props.targetId);
+    const { match: { params } } = this.props;
+    this.props.onLoadTarget(params.target);
   }
 
-  renderTargetSummary(target) {
-    if (target) {
-      return (
-        <Grid className="shadow-sm p-3 mb-5 rounded">
-          <h4>{messages.targetSummary.defaultMessage}</h4>
-          <Row>
-            <Col md={6}><strong><FormattedMessage {...messages.targetName} />:</strong></Col><Col md={6}>{target.name}</Col>
-            <Col md={6}><strong><FormattedMessage {...messages.targetType} />:</strong></Col><Col md={6}><ConnectorIcon name={target.type} /> {target.type}</Col>
-          </Row>
-        </Grid>
-      );
-    } else {
-      return <div />
-    }
+  renderHeader(target) {
+    return (
+      <Grid>
+        <Row>
+          <Col md={5} className="mt-1">
+            <Row>
+              <Col md={6} className="mt-2">
+                <h4>{messages.target.defaultMessage}:</h4>
+              </Col>
+              <Col md={6}>
+                <Row>
+                  <ConnectorIcon name={target.type} />
+                  <div>
+                    <strong>{target.name}</strong>
+                    <div><span className="text-muted"><FormattedMessage {...messages.targetType} />:</span> {target.type}</div>
+                  </div>
+                </Row>
+              </Col>
+            </Row>
+          </Col>
+        </Row>
+      </Grid>
+    )
   }
 
   render() {
     const { loading, error, target } = this.props;
     let alert = <div />;
+    let content = <div />;
 
     if (loading) {
       return <LoadingIndicator />;
@@ -54,32 +67,37 @@ export class Target extends React.PureComponent {
 
     if (error != false) {
       alert = <Alert bsStyle="danger" className="full-swidth"><strong>Error!</strong> {error.toString()}</Alert>
+    } else {
+      content = (
+        <Grid>
+          {this.renderHeader(target)}
+          <hr />
+          <TargetTabbedContent {... { target } } />
+        </Grid>
+      )
     }
-    
+
     return (
-      <Grid>
-        <Row>
-          <Col md={6}>
-            {this.renderTargetSummary(target)}
-            {alert}
-          </Col>
-        </Row>
-      </Grid>
+      <main role="main" className="container-fluid">
+        <Helmet>
+          <title>Target</title>
+        </Helmet>
+        {alert}
+        {content}
+      </main>
     );
   }
 }
 
-Target.propTypes = {
+TargetPage.propTypes = {
   loading: PropTypes.bool,
   error: PropTypes.any,
   target: PropTypes.any,
-  targetId: PropTypes.any,
-  onLoadTarget: PropTypes.func,
 };
 
 export function mapDispatchToProps(dispatch) {
   return {
-    onLoadTarget: id => dispatch(loadTarget(id)),
+    onLoadTarget: (targetId) => dispatch(loadTarget(targetId)),
   };
 }
 
@@ -101,4 +119,4 @@ export default compose(
   withReducer,
   withSaga,
   withConnect,
-)(Target);
+)(TargetPage);

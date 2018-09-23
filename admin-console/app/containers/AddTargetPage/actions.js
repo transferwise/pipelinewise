@@ -7,7 +7,6 @@ import {
  } from './constants';
 
 export function addTarget(newTarget) {
-  console.log(newTarget)
   return {
     type: ADD_TARGET,
     newTarget,

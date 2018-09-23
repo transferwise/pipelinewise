@@ -14,7 +14,8 @@ import { Switch, Route } from 'react-router-dom';
 import Header from 'components/Header';
 import HomePage from 'containers/HomePage/Loadable';
 import AddTargetPage from 'containers/AddTargetPage/Loadable';
-import ConnectionsPage from 'containers/ConnectionsPage/Loadable';
+import TargetsPage from 'containers/TargetsPage/Loadable';
+import TargetPage from 'containers/TargetPage/Loadable';
 import TapPage from 'containers/TapPage/Loadable';
 import AddTapPage from 'containers/AddTapPage/Loadable';
 import NotFoundPage from 'containers/NotFoundPage/Loadable';
@@ -34,10 +35,10 @@ export default function App() {
       </Helmet>
       <Route component={Header} />
       <Switch>
-        <Route exact path="/" component={HomePage} />
+        <Route exact path="/" component={TargetsPage} />
         <Route exact path="/add" component={AddTargetPage} />
-        <Route exact path="/targets" component={ConnectionsPage} />
-        <Route exact path="/targets/:target" component={ConnectionsPage} />
+        <Route exact path="/targets" component={TargetsPage} />
+        <Route exact path="/targets/:target" component={TargetPage} />
         <Route exact path="/targets/:target/add" component={AddTapPage} />
         <Route exact path="/targets/:target/taps/:tap" component={TapPage} />
         <Route path="" component={NotFoundPage} />

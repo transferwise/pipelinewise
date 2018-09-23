@@ -109,11 +109,11 @@ export class TapPage extends React.PureComponent {
       alert = <Alert bsStyle="danger"><strong>Error!</strong> {error.toString()}</Alert>
     } else {
       content = (
-        <div>
+        <Grid>
           {this.renderHeader(tap, onUpdateTapToReplicate)}
           <hr />
           <TapTabbedContent {... { targetId, tap } } />
-        </div>
+        </Grid>
       )
     }
     

@@ -92,7 +92,7 @@ export class AddTapPage extends React.PureComponent {
       alert = <Alert bsStyle="danger" className="full-swidth"><strong>Error!</strong> {error.toString()}</Alert>;
     }
     else if (success) {
-      window.location.href = `/targets/${match.params.target}`;
+      window.location.href = `/targets/${newTap.target.id}`;
     }
 
     return (
