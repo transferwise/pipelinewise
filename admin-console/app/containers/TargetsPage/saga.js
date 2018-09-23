@@ -9,7 +9,7 @@ export function* getTargets(action) {
 
   try {
     const targets = yield call(request, requestURL);
-    yield put(targetsLoaded(targets, action.selectedTargetId));
+    yield put(targetsLoaded(targets));
   } catch (err) {
     yield put(targetsLoadingError(err));
   }

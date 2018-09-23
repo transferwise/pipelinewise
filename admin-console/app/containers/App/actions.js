@@ -27,11 +27,10 @@ export function loadTargets(selectedTargetId) {
   };
 }
 
-export function targetsLoaded(targets, selectedTargetId) {
+export function targetsLoaded(targets) {
   return {
     type: LOAD_TARGETS_SUCCESS,
     targets,
-    selectedTargetId,
   };
 }
 

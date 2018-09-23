@@ -62,7 +62,7 @@ function appReducer(state = initialState, action) {
     case LOAD_TARGETS_SUCCESS:
       return state
         .set('targetsLoading', false)
-        .set('targetsError', action.targets.status !== 200 ? action.target.message : false)
+        .set('targetsError', action.targets.status !== 200 ? action.targets.message : false)
         .set('targets', action.targets.result)
         .set('target', false)
         .set('taps', false);
