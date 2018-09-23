@@ -12,7 +12,6 @@ function TargetsTable({ loading, error, targets }) {
   let items = [];
   let alert = <div />;
   let warning = <div />;
-  console.log(targets)
 
   if (loading) {
     return <List component={LoadingIndicator} />;
