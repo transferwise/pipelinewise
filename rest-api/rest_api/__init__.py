@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os
+from pathlib import Path
 
 from flask import Flask, Response, url_for, jsonify, request
 from flask_cors import CORS
@@ -10,7 +11,8 @@ from rest_api.auth import requires_auth
 app = Flask(__name__)
 CORS(app)
 
-config_dir = os.path.join(os.getcwd(), '../config')
+
+config_dir = os.path.join(Path.home(), '.pipelinewise')
 venv_dir = os.path.join(os.getcwd(), '../.virtualenvs')
 manager = Manager(config_dir, venv_dir, app.logger)
 

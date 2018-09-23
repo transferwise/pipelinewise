@@ -19,7 +19,6 @@ class Manager(object):
         self.venv_dir = venv_dir
         self.pipelinewise_bin = os.path.join(self.venv_dir, "cli", "bin", "pipelinewise")
         self.config_path = os.path.join(self.config_dir, "config.json")
-        self.load_config()
     
     def load_json(self, file):
         try:
@@ -42,6 +41,21 @@ class Manager(object):
 
     def load_config(self):
         self.logger.info('Loading config at {}'.format(self.config_path))
+
+        try:
+            self.logger.info('Config file not found. Creating default config at {}'.format(self.config_path))
+
+            # Create config directory if not exists
+            if not os.path.isdir(self.config_dir):
+                os.makedirs(self.config_dir)
+
+            # Create minimal config file
+            if not os.path.isfile(self.config_path):
+                self.save_json({ "targets": [] }, self.config_path)
+
+        except Exception as exc:
+            raise Exception("Config file not exists and cannot create at {} - Check permission".format(self.config_path))
+
         self.config = self.load_json(self.config_path)
 
     def save_config(self):
