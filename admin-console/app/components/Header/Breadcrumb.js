@@ -20,7 +20,7 @@ function Breadcrumb(location) {
       breadcrumbItems.push({ id: ids[1], name: ids[1], href: `/targets/${ids[0]}/taps/${ids[1]}`, className: ids.length === 2 ? 'active' : '' });
     }
   } else {
-    breadcrumbItems.push({ id: 'destinations', name: messages.targets.defaultMessage, href: '/targets' });
+    breadcrumbItems.push({ id: 'Data Warehouses', name: messages.targets.defaultMessage, href: '/targets' });
   }
 
   return (

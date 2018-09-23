@@ -5,16 +5,8 @@ export default defineMessages({
     id: 'PipelineWise.components.Header.brand',
     defaultMessage: 'PipelineWise',
   },
-  integrations: {
-    id: 'PipelineWise.components.Header.integrations',
-    defaultMessage: 'Integrations',
-  },
-  target: {
-    id: 'PipelineWise.components.Header.target',
-    defaultMessage: 'Destination',
-  },
   targets: {
     id: 'PipelineWise.components.Header.targets',
-    defaultMessage: 'Destinations',
+    defaultMessage: 'Data Warehouses',
   }
 });

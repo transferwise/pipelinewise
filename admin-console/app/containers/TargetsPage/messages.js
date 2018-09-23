@@ -9,6 +9,10 @@ export default defineMessages({
     id: 'PipelineWise.containers.Targets.addTarget',
     defaultMessage: 'Add Data Warehouse',
   },
+  noTarget: {
+    id: 'PipelineWise.containers.Targets.noTarget',
+    defaultMessage: 'Target Data Warehouse is not defined. You need to create at least one Data Warehouse to load data from source systems.',
+  },
   name: {
     id: 'PipelineWise.container.Targets.name',
     defaultMessage: 'Name',

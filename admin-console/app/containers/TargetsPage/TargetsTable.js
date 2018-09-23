@@ -7,6 +7,7 @@ import Table from 'components/Table';
 import LoadingIndicator from 'components/LoadingIndicator';
 import TargetsTableHeader from './TargetsTableHeader';
 import TargetsTableBody from './TargetsTableBody';
+import messages from './messages';
 
 function TargetsTable({ loading, error, targets }) {
   let items = [];
@@ -20,7 +21,7 @@ function TargetsTable({ loading, error, targets }) {
   if (error != false) {
     alert = <Alert bsStyle="danger"><strong>Error!</strong> {error.toString()}</Alert>
   } else if (targets.length === 0) {
-    warning = <Alert bsStyle="warning"><strong>Tip!</strong> No Destinations</Alert>
+    warning = <Alert bsStyle="warning"><strong>Tip!</strong> {messages.noTarget.defaultMessage}</Alert>
   }
 
   return (
