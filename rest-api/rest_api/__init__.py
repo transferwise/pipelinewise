@@ -73,6 +73,27 @@ def api_get_target(target_id):
         'result': manager.get_target(target_id)
     })
 
+@app.route("/targets/<target_id>/delete", methods = ['DELETE'])
+def api_delete_target(target_id):
+    return jsonify({
+        'status': 200,
+        'result': manager.delete_target(target_id)
+    })
+
+@app.route("/targets/<target_id>/config", methods = ['GET'])
+def api_get_target_config(target_id):
+    return jsonify({
+        'status': 200,
+        'result': manager.get_target_config(target_id)
+    })
+
+@app.route("/targets/<target_id>/config", methods = ['POST'])
+def api_update_target_config(target_id):
+    return jsonify({
+        'status': 200,
+        'result': manager.update_target_config(target_id, request.get_json())
+    })
+
 @app.route("/targets/<target_id>/add", methods = ["POST"])
 def api_add_tap(target_id):
     return jsonify({

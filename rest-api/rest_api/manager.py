@@ -107,7 +107,18 @@ class Manager(object):
             'state': self.load_json(connector_files['state']),
             'transformation': self.load_json(connector_files['transformation']),
         }
-    
+
+    def detect_target_status(self, target_id):
+        self.logger.info('Detecting {} target status'.format(target_id))
+        target_dir = self.get_target_dir(target_id)
+        connector_files = self.get_connector_files(target_dir)
+
+        # Target exists but configuration not completed
+        if not os.path.isfile(connector_files["config"]):
+            return "not-configured"
+
+        return 'ready'
+
     def detect_tap_status(self, target_id, tap_id):
         self.logger.info('Detecting {} tap status in {} target'.format(tap_id, target_id))
         tap_dir = self.get_tap_dir(target_id, tap_id)
@@ -157,7 +168,7 @@ class Manager(object):
             else:
                 raise Exception("Invalid target type: {}".format(target_type))
 
-            return "Target added successfully"
+            return self.get_target(target_id)
         except Exception as exc:
             raise Exception("Failed to add target. {}".format(exc))
 
@@ -166,6 +177,11 @@ class Manager(object):
         self.load_config()
         try:
             targets = self.config['targets']
+
+            # Add target status
+            for target_idx, target in enumerate(targets):
+                targets[target_idx]['status'] = self.detect_target_status(target["id"])
+
         except Exception as exc:
             raise Exception("Targets not defined")
 
@@ -181,8 +197,58 @@ class Manager(object):
         if target == False:
             raise Exception("Cannot find {} target".format(target_id))
 
+        target_dir = self.get_target_dir(target_id)
+        if os.path.isdir(target_dir):
+            target['files'] = self.parse_connector_files(target_dir)
+        else:
+            raise Exception("Cannot find target at {}".format(target_dir))
+
+        # Add target and status details
+        target['status'] = self.detect_target_status(target_id)
+
         return target
-    
+
+    def delete_target(self, target_id):
+        self.logger.info('Deleting {} target'.format(target_id))
+        target_dir = self.get_target_dir(target_id)
+
+        try:
+            # Remove target from config
+            new_targets =[]
+            for target_idx, target in enumerate(self.config["targets"]):
+                if target["id"] != target_id:
+                    new_targets.append(target)
+
+            self.config["targets"] = new_targets
+
+            # Delete target dir if exists
+            if os.path.isdir(target_dir):
+                shutil.rmtree(target_dir)
+
+            # Save configuration
+            self.save_config()
+
+            return "Target deleted successfully"
+        except Exception as exc:
+            raise Exception("Failed to delete {} target. {}".format(target_id, exc))
+
+    def get_target_config(self, target_id):
+        self.logger.info('Getting {} target config'.format(target_id))
+        target = self.get_target(target_id)
+        return target["files"]["config"]
+
+    def update_target_config(self, target_id, target_config):
+        self.logger.info('Updating {} target config'.format(target_id))
+
+        try:
+            target_dir = self.get_target_dir(target_id)
+            target_connector_files = self.get_connector_files(target_dir)
+            self.save_json(target_config, target_connector_files['config'])
+
+            return "Target config updated successfully"
+        except Exception as exc:
+            raise Exception("Failed to update {} target config: {}".format(target_id, exc))
+
     def get_taps(self, target_id):
         self.logger.info('Getting taps from {} target'.format(target_id))
         target = self.get_target(target_id)
@@ -282,7 +348,7 @@ class Manager(object):
             else:
                 raise Exception("Invalid tap type: {}".format(tap_type))
 
-            return "Tap added successfully"
+            return self.get_tap(target_id, tap_id)
         except Exception as exc:
             raise Exception("Failed to add tap to target {}. {}".format(target_id, exc))
 
