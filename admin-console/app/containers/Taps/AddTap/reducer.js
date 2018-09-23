@@ -5,6 +5,7 @@ import {
   ADD_TAP_SUCCESS,
   ADD_TAP_ERROR,
 
+  SET_SUCCESS,
   SET_ADD_TAP_BUTTON_STATE,
 } from './constants';
 
@@ -38,9 +39,13 @@ function addTapReducer(state = initialState, action) {
         .set('newTap', false)
         .set('success', false)
 
+    case SET_SUCCESS:
+      return state
+        .set('success', action.success)
+
     case SET_ADD_TAP_BUTTON_STATE:
-        return state
-          .set('addTapButtonEnabled', action.enabled)
+      return state
+        .set('addTapButtonEnabled', action.enabled)
 
     default:
       return state;

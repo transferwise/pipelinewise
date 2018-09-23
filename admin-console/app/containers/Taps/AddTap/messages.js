@@ -3,15 +3,15 @@ import { defineMessages } from 'react-intl';
 export default defineMessages({
   title: {
     id: 'PipelineWise.addTap.add',
-    defaultMessage: 'Add new data source',
+    defaultMessage: 'Add New Data Source',
   },
   add: {
     id: 'PipelineWise.addTap.add',
     defaultMessage: 'Add',
   },
-  back: {
-    id: 'PipelineWise.addTap.back',
-    defaultMessage: 'Back',
+  cancel: {
+    id: 'PipelineWise.addTap.cancel',
+    defaultMessage: 'Cancel',
   },
   addTapSuccess: {
     id: 'PipelineWise.addTap.success',

@@ -3,6 +3,7 @@ import {
   ADD_TARGET_SUCCESS,
   ADD_TARGET_ERROR,
 
+  SET_SUCCESS,
   SET_ADD_TARGET_BUTTON_STATE,
  } from './constants';
 
@@ -24,6 +25,13 @@ export function targetAddedError(error) {
   return {
     type: ADD_TARGET_ERROR,
     error,
+  }
+}
+
+export function setSuccess(success) {
+  return {
+    type: SET_SUCCESS,
+    success,
   }
 }
 

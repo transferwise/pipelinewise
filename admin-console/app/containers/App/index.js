@@ -15,7 +15,6 @@ import Header from 'components/Header';
 import TargetsPage from 'containers/TargetsPage/Loadable';
 import TargetPage from 'containers/TargetPage/Loadable';
 import TapPage from 'containers/TapPage/Loadable';
-import AddTapPage from 'containers/AddTapPage/Loadable';
 import NotFoundPage from 'containers/NotFoundPage/Loadable';
 import Footer from 'components/Footer';
 
@@ -36,7 +35,6 @@ export default function App() {
         <Route exact path="/" component={TargetsPage} />
         <Route exact path="/targets" component={TargetsPage} />
         <Route exact path="/targets/:target" component={TargetPage} />
-        <Route exact path="/targets/:target/add" component={AddTapPage} />
         <Route exact path="/targets/:target/taps/:tap" component={TapPage} />
         <Route path="" component={NotFoundPage} />
       </Switch>

@@ -2,4 +2,5 @@ export const ADD_TARGET = 'AddTap/ADD_TARGET';
 export const ADD_TARGET_SUCCESS = 'AddTap/ADD_TARGET_SUCCESS';
 export const ADD_TARGET_ERROR = 'AddTap/ADD_TARGET_ERROR';
 
+export const SET_SUCCESS = 'AddTap/SET_SUCCESS';
 export const SET_ADD_TARGET_BUTTON_STATE = 'AddTap/SET_ADD_TARGET_BUTTON_STATE';

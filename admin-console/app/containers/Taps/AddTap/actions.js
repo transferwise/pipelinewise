@@ -3,6 +3,7 @@ import {
   ADD_TAP_SUCCESS,
   ADD_TAP_ERROR,
 
+  SET_SUCCESS,
   SET_ADD_TAP_BUTTON_STATE,
  } from './constants';
 
@@ -25,6 +26,13 @@ export function tapAddedError(error) {
   return {
     type: ADD_TAP_ERROR,
     error,
+  }
+}
+
+export function setSuccess(success) {
+  return {
+    type: SET_SUCCESS,
+    success,
   }
 }
 

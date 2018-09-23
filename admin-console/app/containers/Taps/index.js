@@ -1,5 +1,4 @@
 import React from 'react';
-import { Redirect } from 'react-router-dom'
 import PropTypes from 'prop-types';
 import { FormattedMessage } from 'react-intl';
 import { connect } from 'react-redux';
@@ -22,6 +21,7 @@ import saga from './saga';
 
 import { Grid, Col, Row, ButtonGroup, Button } from 'react-bootstrap/lib';
 import LoadingIndicator from 'components/LoadingIndicator';
+import AddTap from './AddTap/Loadable';
 import TapsTable from './TapsTable';
 import messages from './messages';
 
@@ -29,7 +29,7 @@ import messages from './messages';
 export class Taps extends React.PureComponent {
   constructor(props) {
     super(props)
-    this.state = { redirectToAddSource: false }
+    this.state = { addTapVisible: false }
   }
 
   componentDidMount() {
@@ -45,13 +45,33 @@ export class Taps extends React.PureComponent {
     }
   }
 
-  onAddDataSourceTap() {
-    this.setState({ redirectToAddSource: true });
+  onAddTap() {
+    this.setState({ addTapVisible: true });
   }
 
-  renderRedirectToAddSource() {
-    if (this.state.redirectToAddSource) {
-      return <Redirect to={`/targets/${this.props.target.id}/add`} />
+  onCancelAddTap() {
+    this.setState({ addTapVisible: false });
+  }
+
+  onTapAdded() {
+    this.setState({ addTapVisible: false })
+    const targetId = this.props.target && this.props.target.id;
+    if (targetId) {
+      this.props.onLoadTaps(this.props.targetId)
+    }
+  }
+
+  renderAddTapForm() {
+    if (this.state.addTapVisible) {
+      return (
+        <Row>
+          <Col md={12}></Col>
+          <AddTap
+            targetId={this.props.target.id}
+            onSuccess={() => this.onTapAdded()}
+            onCancel={() => this.onCancelAddTap()}/>
+        </Row>
+      )
     }
   }
   
@@ -73,20 +93,14 @@ export class Taps extends React.PureComponent {
 
     return (
       <Grid>
-        {this.renderRedirectToAddSource()}
-
         <h5>{messages.tapsTopic.defaultMessage}
           <ButtonGroup bsClass="float-right">
-            <Button bsStyle="primary" onClick={() => this.onAddDataSourceTap()}><FormattedMessage {...messages.addSource} /></Button>
+            <Button bsStyle="primary" onClick={() => this.onAddTap()}><FormattedMessage {...messages.addSource} /></Button>
           </ButtonGroup>
         </h5>
-        <Row>
-          <Col md={12}>
-          </Col>
-        </Row>
-
+        <Row><Col md={12} /></Row>
         <br />
-
+        {this.renderAddTapForm()}
         <Row>
           <Col md={12}>
             <TapsTable {...tapsTableProps} />

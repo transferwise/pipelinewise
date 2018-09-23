@@ -5,6 +5,7 @@ import {
   ADD_TARGET_SUCCESS,
   ADD_TARGET_ERROR,
 
+  SET_SUCCESS,
   SET_ADD_TARGET_BUTTON_STATE,
 } from './constants';
 
@@ -37,10 +38,14 @@ function addTargetReducer(state = initialState, action) {
         .set('error', action.error)
         .set('newTarget', false)
         .set('success', false)
+    
+    case SET_SUCCESS:
+      return state
+        .set('success', action.success)
 
     case SET_ADD_TARGET_BUTTON_STATE:
-        return state
-          .set('addTargetButtonEnabled', action.enabled)
+      return state
+        .set('addTargetButtonEnabled', action.enabled)
 
     default:
       return state;

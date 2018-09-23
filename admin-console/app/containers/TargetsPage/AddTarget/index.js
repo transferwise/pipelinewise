@@ -21,6 +21,7 @@ import {
 } from './selectors';
 
 import {
+  setSuccess,
   setAddTargetButtonState,
   addTarget,
 } from './actions';
@@ -57,6 +58,7 @@ export class AddTarget extends React.PureComponent {
   componentDidUpdate() {
     if (this.props.success && this.props.onSuccess) {
       this.props.onSuccess()
+      this.props.onSetSuccess(false)
     }
   }
 
@@ -121,7 +123,6 @@ export class AddTarget extends React.PureComponent {
                 &nbsp;
                 <Button bsStyle={addTargetButtonEnabled ? "primary" : "default"} type="submit" disabled={!addTargetButtonEnabled}><FormattedMessage {...messages.add} /></Button>
               </ButtonGroup>
-
             </Form>
             <br /><br />
             {alert}
@@ -145,6 +146,7 @@ AddTarget.propTypes = {
 
 export function mapDispatchToProps(dispatch) {
   return {
+    onSetSuccess: (success) => dispatch(setSuccess(success)),
     onSetAddTargetButtonState: (enabled) => dispatch(setAddTargetButtonState(enabled)),
     onAddTarget: (newTarget) => dispatch(addTarget(newTarget)),
   };

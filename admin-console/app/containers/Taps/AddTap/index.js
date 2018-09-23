@@ -7,9 +7,8 @@ import injectReducer from 'utils/injectReducer';
 import injectSaga from 'utils/injectSaga';
 import LoadingIndicator from 'components/LoadingIndicator';
 
-import { Helmet } from 'react-helmet';
 import { FormattedMessage } from 'react-intl';
-import { Grid, Alert, Row, Col, Button } from 'react-bootstrap/lib';
+import { Grid, Alert, Row, Col, ButtonGroup, Button } from 'react-bootstrap/lib';
 import Form from "react-jsonschema-form";
 
 import {
@@ -21,6 +20,7 @@ import {
 } from './selectors';
 
 import {
+  setSuccess,
   setAddTapButtonState,
   addTap,
 } from './actions';
@@ -48,10 +48,17 @@ const schema = {
 const uiSchema = {};
 
 /* eslint-disable react/prefer-stateless-function */
-export class AddTapPage extends React.PureComponent {
+export class AddTap extends React.PureComponent {
   constructor(props) {
     super(props)
     this.state = { newTap: undefined }
+  }
+
+  componentDidUpdate() {
+    if (this.props.success && this.props.onSuccess) {
+      this.props.onSuccess()
+      this.props.onSetSuccess(false)
+    }
   }
 
   onFormChange(event) {
@@ -68,8 +75,7 @@ export class AddTapPage extends React.PureComponent {
 
   onFormSubmit(event) {
     if (event.errors.length === 0) {
-      const { match } = this.props;
-      const targetId = match.params.target;
+      const targetId = this.props.targetId;
       this.props.onAddTap(targetId, this.state.newTap)
     }
   }
@@ -81,7 +87,6 @@ export class AddTapPage extends React.PureComponent {
       success,
       newTap,
       addTapButtonEnabled,
-      match
     } = this.props;
     let alert = <div />;
   
@@ -92,50 +97,57 @@ export class AddTapPage extends React.PureComponent {
       alert = <Alert bsStyle="danger" className="full-swidth"><strong>Error!</strong> {error.toString()}</Alert>;
     }
     else if (success) {
-      window.location.href = `/targets/${newTap.target.id}`;
+      if (!this.props.onSuccess) {
+        window.location.href = `/targets/${newTap.target.id}`;
+      }
     }
 
     return (
-      <main role="main" className="container-fluid">
-        <Helmet>
-          <title>Add Tap</title>
-        </Helmet>
-        <Grid>
-          <Row>
-            <Col md={2} />
-            <Col md={8}>
-              <Form
-                schema={schema}
-                uiSchema={uiSchema}
-                formData={this.state.newTap || newTap}
-                showErrorList={false}
-                liveValidate={true}
-                onChange={(event) => this.onFormChange(event)}
-                onSubmit={(event) => this.onFormSubmit(event)}
-              >
+      <Grid>
+        <Row>
+          <Col md={2} />
+          <Col md={8} className="shadow-sm p-3 mb-5 rounded">
+            <Form
+              schema={schema}
+              uiSchema={uiSchema}
+              formData={this.state.newTap || newTap}
+              showErrorList={false}
+              liveValidate={true}
+              onChange={(event) => this.onFormChange(event)}
+              onSubmit={(event) => this.onFormSubmit(event)}
+            >
+              <ButtonGroup bsClass="float-right">
+                {this.props.onCancel
+                ? <Button bsStyle="warning" onClick={() => this.props.onCancel()}><FormattedMessage {...messages.cancel} /></Button>
+                : <Grid />}
+                &nbsp;
                 <Button bsStyle={addTapButtonEnabled ? "primary" : "default"} type="submit" disabled={!addTapButtonEnabled}><FormattedMessage {...messages.add} /></Button>
-              </Form>
-              <br />
-              {alert}
-            </Col>
-            <Col md={2} />
-          </Row>
-        </Grid>
-      </main>
+              </ButtonGroup>
+            </Form>
+            <br /><br />
+            {alert}
+          </Col>
+          <Col md={2} />
+        </Row>
+      </Grid>
     )
   }
 }
 
-AddTapPage.propTypes = {
+AddTap.propTypes = {
   loading: PropTypes.bool,
   error: PropTypes.any,
   success: PropTypes.any,
+  targetId: PropTypes.any,
   newTap: PropTypes.any,
   addTapButtonEnabled: PropTypes.any,
+  onSuccess: PropTypes.func,
+  onCancel: PropTypes.func,
 };
 
 export function mapDispatchToProps(dispatch) {
   return {
+    onSetSuccess: (success) => dispatch(setSuccess(success)),
     onSetAddTapButtonState: (enabled) => dispatch(setAddTapButtonState(enabled)),
     onAddTap: (targetId, newTap) => dispatch(addTap(targetId, newTap)),
   };
@@ -161,5 +173,5 @@ export default compose(
   withReducer,
   withSaga,
   withConnect,
-)(AddTapPage);
+)(AddTap);
 
