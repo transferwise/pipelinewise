@@ -3,11 +3,11 @@ import { defineMessages } from 'react-intl';
 export default defineMessages({
   target: {
     id: 'PipelineWise.containers.TargetPage.target',
-    defaultMessage: 'Destination',
+    defaultMessage: 'Data Warehouse',
   },
   targetSummary: {
     id: 'PipelineWise.containers.TargetPage.summary',
-    defaultMessage: 'Destination Summary',
+    defaultMessage: 'Date Warehouse Summary',
   },
   targetId: {
     id: 'PipelineWise.containers.TargetPage.targetId',

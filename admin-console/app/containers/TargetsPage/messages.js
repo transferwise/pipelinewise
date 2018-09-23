@@ -3,11 +3,11 @@ import { defineMessages } from 'react-intl';
 export default defineMessages({
   header: {
     id: 'PipelineWise.containers.Targets.header',
-    defaultMessage: 'Destinations',
+    defaultMessage: 'Data Warehouses',
   },
   addTarget: {
     id: 'PipelineWise.containers.Targets.addTarget',
-    defaultMessage: 'Add Destination',
+    defaultMessage: 'Add Data Warehouse',
   },
   name: {
     id: 'PipelineWise.container.Targets.name',
