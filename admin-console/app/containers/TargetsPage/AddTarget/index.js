@@ -123,7 +123,7 @@ export class AddTarget extends React.PureComponent {
               </ButtonGroup>
 
             </Form>
-            <br />
+            <br /><br />
             {alert}
           </Col>
           <Col md={2} />
