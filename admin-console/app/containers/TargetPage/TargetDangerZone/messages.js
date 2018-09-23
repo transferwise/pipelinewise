@@ -7,7 +7,7 @@ export default defineMessages({
   },
   targetId: {
     id: 'PipelineWise.containers.TargetDangerZone.targetId',
-    defaultMessage: 'Target ID'
+    defaultMessage: 'Data Warehouse ID'
   },
   enterTargetIdToDelete: {
     id: 'PipelineWise.containers.TargetDangerZone.enterTargetIdToDelete',
@@ -15,7 +15,7 @@ export default defineMessages({
   },
   delete: {
     id: 'PipelineWise.containers.TargetDangerZone.delete',
-    defaultMessage: 'Delete Data Source',
+    defaultMessage: 'Delete Data Warehouse',
   },
   deleteTargetSuccess: {
     id: 'PipelineWise.containers.TargetDangerZone.deleteTargetSuccess',

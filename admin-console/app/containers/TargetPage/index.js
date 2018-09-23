@@ -35,7 +35,7 @@ export class TargetPage extends React.PureComponent {
     return (
       <Grid>
         <Row>
-          <Col md={5} className="mt-1">
+          <Col md={6} className="mt-1">
             <Row>
               <Col md={6} className="mt-2">
                 <h4>{messages.target.defaultMessage}:</h4>

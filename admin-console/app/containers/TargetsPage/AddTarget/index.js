@@ -8,9 +8,8 @@ import injectReducer from 'utils/injectReducer';
 import injectSaga from 'utils/injectSaga';
 import LoadingIndicator from 'components/LoadingIndicator';
 
-import { Helmet } from 'react-helmet';
 import { FormattedMessage } from 'react-intl';
-import { Grid, Alert, Row, Col, Button } from 'react-bootstrap/lib';
+import { Grid, Alert, Row, Col, ButtonGroup, Button } from 'react-bootstrap/lib';
 import Form from "react-jsonschema-form";
 
 import {
@@ -49,10 +48,16 @@ const schema = {
 const uiSchema = {};
 
 /* eslint-disable react/prefer-stateless-function */
-export class AddTargetPage extends React.PureComponent {
+export class AddTarget extends React.PureComponent {
   constructor(props) {
     super(props)
     this.state = { newTarget: undefined }
+  }
+
+  componentDidUpdate() {
+    if (this.props.success && this.props.onSuccess) {
+      this.props.onSuccess()
+    }
   }
 
   onFormChange(event) {
@@ -90,46 +95,52 @@ export class AddTargetPage extends React.PureComponent {
       alert = <Alert bsStyle="danger" className="full-swidth"><strong>Error!</strong> {error.toString()}</Alert>;
     }
     else if (success) {
-      window.location.href = `/targets/${newTarget.id}`;
+      if (!this.props.onSuccess) {
+        window.location.href = `/targets`;
+      }
     }
 
     return (
-      <main role="main" className="container-fluid">
-        <Helmet>
-          <title>Add Target</title>
-        </Helmet>
-        <Grid>
-          <Row>
-            <Col md={2} />
-            <Col md={8}>
-              <Form
-                schema={schema}
-                uiSchema={uiSchema}
-                formData={this.state.newTarget || newTarget}
-                showErrorList={false}
-                liveValidate={true}
-                onChange={(event) => this.onFormChange(event)}
-                onSubmit={(event) => this.onFormSubmit(event)}
-              >
+      <Grid>
+        <Row>
+          <Col md={2} />
+          <Col md={8} className="shadow-sm p-3 mb-5 rounded">
+            <Form
+              schema={schema}
+              uiSchema={uiSchema}
+              formData={this.state.newTarget || newTarget}
+              showErrorList={false}
+              liveValidate={true}
+              onChange={(event) => this.onFormChange(event)}
+              onSubmit={(event) => this.onFormSubmit(event)}
+            >
+              <ButtonGroup bsClass="float-right">
+                {this.props.onCancel
+                ? <Button bsStyle="warning" onClick={() => this.props.onCancel()}><FormattedMessage {...messages.cancel} /></Button>
+                : <Grid />}
+                &nbsp;
                 <Button bsStyle={addTargetButtonEnabled ? "primary" : "default"} type="submit" disabled={!addTargetButtonEnabled}><FormattedMessage {...messages.add} /></Button>
-              </Form>
-              <br />
-              {alert}
-            </Col>
-            <Col md={2} />
-          </Row>
-        </Grid>
-      </main>
+              </ButtonGroup>
+
+            </Form>
+            <br />
+            {alert}
+          </Col>
+          <Col md={2} />
+        </Row>
+      </Grid>
     )
   }
 }
 
-AddTargetPage.propTypes = {
+AddTarget.propTypes = {
   loading: PropTypes.bool,
   error: PropTypes.any,
   success: PropTypes.any,
   newTarget: PropTypes.any,
   addTargetButtonEnabled: PropTypes.any,
+  onSuccess: PropTypes.func,
+  onCancel: PropTypes.func,
 };
 
 export function mapDispatchToProps(dispatch) {
@@ -159,5 +170,5 @@ export default compose(
   withReducer,
   withSaga,
   withConnect,
-)(AddTargetPage);
+)(AddTarget);
 

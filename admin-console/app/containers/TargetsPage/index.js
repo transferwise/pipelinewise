@@ -21,6 +21,7 @@ import saga from './saga';
 
 import { Grid, Row, Col, Alert, ButtonGroup, Button } from 'react-bootstrap/lib';
 import LoadingIndicator from 'components/LoadingIndicator';
+import AddTarget from './AddTarget/Loadable';
 import TargetsTable from './TargetsTable';
 import messages from './messages';
 
@@ -28,7 +29,7 @@ import messages from './messages';
 export class TargetsPage extends React.PureComponent {
   constructor(props) {
     super(props)
-    this.state = { redirectToAddTarget: false }
+    this.state = { addTargetVisible: false }
   }
 
   componentDidMount() {
@@ -36,12 +37,28 @@ export class TargetsPage extends React.PureComponent {
   }
 
   onAddTarget() {
-    this.setState({ redirectToAddTarget: true });
+    this.setState({ addTargetVisible: true });
   }
 
-  renderRedirectToAddTarget() {
-    if (this.state.redirectToAddTarget) {
-      return <Redirect to={`/add`} />
+  onCancelAddTarget() {
+    this.setState({ addTargetVisible: false });
+  }
+
+  onTargetAdded() {
+    this.setState({ addTargetVisible: false })
+    this.props.onLoadTargets(this.props.selectedTargetId)
+  }
+
+  renderAddTargetForm() {
+    if (this.state.addTargetVisible) {
+      return (
+        <Row>
+          <Col md={12}></Col>
+          <AddTarget
+            onSuccess={() => this.onTargetAdded()}
+            onCancel={() => this.onCancelAddTarget()}/>
+        </Row>
+      )
     }
   }
 
@@ -64,20 +81,14 @@ export class TargetsPage extends React.PureComponent {
     } else {
       content = (
         <Grid>
-          {this.renderRedirectToAddTarget()}
-
           <h5>{messages.header.defaultMessage}
             <ButtonGroup bsClass="float-right">
               <Button bsStyle="primary" onClick={() => this.onAddTarget()}><FormattedMessage {...messages.addTarget} /></Button>
             </ButtonGroup>
           </h5>
-          <Row>
-            <Col md={12}>
-            </Col>
-          </Row>
-
+          <Row><Col md={12} /></Row>
           <br />
-
+          {this.renderAddTargetForm()}
           <Row>
             <Col md={12}>
               <TargetsTable {...targetsTableProps} />
