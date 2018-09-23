@@ -9,8 +9,9 @@ import TabbedContent from 'components/TabbedContent';
 import ConnectorIcon from 'components/ConnectorIcon';
 
 import TapDangerZone from './TapDangerZone/Loadable';
-import TapPostgresConfig from './TapPostgres/LoadableConfig';
-import TapPostgresProperties from './TapPostgres/LoadableProperties';
+import SingerTapConfig from '../../singerConnectors/SingerTapConfig';
+import SingerTapProperties from '../../singerConnectors/SingerTapProperties';
+
 import messages from './messages';
 
 function valueToString(value) {
@@ -34,7 +35,7 @@ function summaryContent(tap) {
     <Grid>
       <Row>
         <Col md={6}>
-          {configContent(tap)}
+          <SingerTapConfig tap={tap} />
         </Col>
         <Col md={6}>
           <Grid className="shadow-sm p-3 mb-5 rounded">
@@ -52,34 +53,8 @@ function summaryContent(tap) {
   )
 }
 
-function configContent(tap) {
-  // Try to find tap specific layout
-  switch (tap.type) {
-    case 'tap-postgres': return <TapPostgresConfig targetId={tap.target.id} tapId={tap.id} title={`${tap.name} Connection Details`}/>
-  }
-
-  // Render standard tap config layout only with the raw JSON
-  try {
-    return codeContent(valueToString(tap.files.config))
-  }
-  catch(e) {
-    return <Alert bsStyle="danger" className="full-swidth"><strong>Error!</strong> Config file not exist</Alert>
-  }
-}
-
-function propertiesContent(targetId, tap) {
-  // Try to find tap specific layout
-  switch (tap.type) {
-    case 'tap-postgres': return <TapPostgresProperties targetId={targetId} tapId={tap.id} />
-  }
-
-  // Render standard tap properties layout only with the raw JSON
-  try {
-    return codeContent(valueToString(tap.files.properties))
-  }
-  catch(e) {
-    return <Alert bsStyle="danger" className="full-swidth"><strong>Error!</strong> Properties file content not found</Alert>
-  }
+function propertiesContent(tap) {
+  return <SingerTapProperties tap={tap} />
 }
 
 function stateContent(tap) {
@@ -99,7 +74,7 @@ function logContent(tap) {
 function TapTabbedContent({ targetId, tap }) {
   const tabs = [
     { title: messages.summary.defaultMessage, content: summaryContent(tap) },
-    { title: messages.properties.defaultMessage, content: propertiesContent(targetId, tap) },
+    { title: messages.properties.defaultMessage, content: propertiesContent(tap) },
     { title: messages.log.defaultMessage, content: logContent(tap) },
     { title: messages.state.defaultMessage, content: stateContent(tap) },
   ];
