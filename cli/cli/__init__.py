@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 import os
+from pathlib import Path
 
 from pkg_resources import get_distribution
 from cli.pipelinewise import PipelineWise
 import argparse
 
 __version__ = get_distribution('cli').version
-config_dir = os.path.join(os.getcwd(), '../config')
+config_dir = os.path.join(Path.home(), '.pipelinewise')
+venv_dir = os.path.join(os.getcwd(), '../.virtualenvs')
 
 commands = [
   'run_tap',
@@ -30,7 +32,7 @@ def main():
     parser.add_argument('--debug', default=False, required=False, help=debug_help, action="store_true")
 
     args = parser.parse_args()
-    pipelinewise = PipelineWise(args, config_dir)
+    pipelinewise = PipelineWise(args, config_dir, venv_dir)
     getattr(pipelinewise, args.command)()
 
 if __name__ == '__main__':

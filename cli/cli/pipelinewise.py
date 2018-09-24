@@ -32,11 +32,12 @@ class PipelineWise(object):
 
         self.logger.addHandler(fh)
 
-    def __init__(self, args, config_dir):
+    def __init__(self, args, config_dir, venv_dir):
         self.args = args
         self.__init_logger('TransferData CLI')
 
         self.config_dir = config_dir
+        self.venv_dir = venv_dir
         self.config_path = os.path.join(self.config_dir, "config.json")
         self.load_config()
 
@@ -75,7 +76,6 @@ class PipelineWise(object):
     def load_config(self):
         self.logger.debug('Loading config at {}'.format(self.config_path))
         self.config = self.load_json(self.config_path)
-        self.venv_dir = os.path.join(os.getcwd(), '../.virtualenvs')
 
     def get_tap_dir(self, target_id, tap_id):
         return os.path.join(self.config_dir, target_id, tap_id)
