@@ -549,6 +549,11 @@ class Manager(object):
                     self.save_json(transformation, transformation_file)
                 else:
                     raise Exception("Not supported transformation type {}".format(transformation_type))
+
+                # Delete transformation file if empty
+                if len(transformation["transformations"]) == 0 and os.path.isfile(transformation_file):
+                    os.remove(transformation_file)
+
             except Exception as exc:
                 raise Exception("Failed to update {} field transformation in {} stream in {} tap in {} target. Invalid updated parameters: {} - {}".format(field_id, stream, tap_id, target_id, params, exc))
         else:
