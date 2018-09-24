@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
 import os
+from rest_api.settings import *
+
 from pathlib import Path
 
 from flask import Flask, Response, url_for, jsonify, request
@@ -9,6 +11,23 @@ from rest_api.manager import Manager
 from rest_api.auth import requires_auth
 
 app = Flask(__name__)
+
+# There are three pre-defined settings:
+# Development, Testing and Default (Production)
+config = {
+    'development': 'rest_api.DevelopmentSettings',
+    'testing': 'rest_api.TestingSettings',
+    'default': 'rest_api.ProductionSettings'
+}
+
+# Load one of the pre-defined settings
+# The desired settings needs to be defined in the PIPELINEWISW_SETTINGS environment variable
+config_name = os.getenv('PIPELINEWISE_SETTINGS', 'default')
+app.config.from_object(config[config_name])
+
+# Override any pre-defined settings from an external file
+# The file path needs to be defined in the PIPELINEWISE_SETTINGS_FILE environment variable
+app.config.from_envvar('PIPELINEWISE_SETTINGS_FILE', silent=True)
 CORS(app)
 
 
@@ -211,7 +230,7 @@ def api_get_tap_log(target_id, tap_id, log_id):
 
 def main():
     '''Main entry point'''
-    app.run()
+    app.run(host = app.config["HOST"], port = app.config["PORT"])
 
 if __name__ == '__main__':
     main()

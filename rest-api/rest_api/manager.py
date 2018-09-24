@@ -7,7 +7,6 @@ import shlex
 import logging
 import json
 
-LOGGER = logging.getLogger('REST API')
 
 class Manager(object):
     '''...'''
@@ -43,7 +42,9 @@ class Manager(object):
         self.logger.info('Loading config at {}'.format(self.config_path))
 
         try:
-            self.logger.info('Config file not found. Creating default config at {}'.format(self.config_path))
+            # Check if config file exists
+            if not os.path.isdir(self.config_dir) or not os.path.isfile(self.config_path):
+                self.logger.info('Config file not found. Creating default config at {}'.format(self.config_path))
 
             # Create config directory if not exists
             if not os.path.isdir(self.config_dir):
