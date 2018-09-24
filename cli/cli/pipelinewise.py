@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os
+import datetime
 from subprocess import Popen, PIPE, STDOUT
 import shlex
 import sys
@@ -45,6 +46,7 @@ class PipelineWise(object):
         self.target = self.get_target(args.target)
         
         self.tap_bin = self.get_connector_bin(self.tap["type"])
+        self.tranform_field_bin = self.get_connector_bin("transform-field")
         self.target_bin = self.get_connector_bin(self.target["type"])
 
     def is_json(self, string):
@@ -148,26 +150,51 @@ class PipelineWise(object):
 
         return tap
     
-    def run_command(self, command, polling=False):
-        self.logger.info('Running command with polling [{}] : {}'.format(polling, command))
+    def run_command(self, command, log_file=False):
+        self.logger.info('Running command: {}'.format(command))
 
-        if polling:
+        # Logfile is needed: Continuously polling STDOUT and STDERR and writing into a log file
+        # Once the command finished STDERR redirects to STDOUT and returns _only_ STDOUT
+        if log_file:
+            self.logger.info('Writing output into {}'.format(log_file))
+
+            # Create log dir if not exists
+            os.makedirs(os.path.dirname(log_file), exist_ok=True)
+
+            # Status embedded in the log file name
+            log_file_running = "{}.running".format(log_file)
+            log_file_failed = "{}.failed".format(log_file)
+            log_file_success = "{}.success".format(log_file)
+
+            # Start command
             proc = Popen(shlex.split(command), stdout=PIPE, stderr=STDOUT)
+            f = open("{}".format(log_file_running), "w")
             stdout = ''
             while True:
                 line = proc.stdout.readline()
                 if proc.poll() is not None:
                     break
                 if line:
-                    stdout += line.decode('utf-8')
+                    decoded_line = line.decode('utf-8')
+                    stdout += decoded_line
+                    f.write(decoded_line)
             
+            f.close()
             rc = proc.poll()
             if rc != 0:
+                # Add failed status to the log file name
+                os.rename(log_file_running, log_file_failed)
+
+                # Print debug and exit with error code
                 self.logger.error(stdout)
                 sys.exit(rc)
+            else:
+                # Add success status to the log file name
+                os.rename(log_file_running, log_file_success)
             
             return [stdout, None]     
         
+        # No logfile needed: STDOUT and STDERR returns in an array once the command finished
         else:
             proc = Popen(shlex.split(command), stdout=PIPE, stderr=PIPE)
             x = proc.communicate()
@@ -299,7 +326,7 @@ class PipelineWise(object):
         # We will use the discover option to test connection
         tap_config = self.tap["files"]["config"]
         command = "{} --config {} --discover".format(self.tap_bin, tap_config)
-        result = self.run_command(command, False)
+        result = self.run_command(command)
 
         # Get output and errors from tap
         new_schema, tap_output = result
@@ -324,7 +351,7 @@ class PipelineWise(object):
         # Generate and run the command to run the tap directly
         tap_config = self.tap["files"]["config"]
         command = "{} --config {} --discover".format(self.tap_bin, tap_config)
-        result = self.run_command(command, False)
+        result = self.run_command(command)
 
         # Get output and errors from tap
         new_schema, tap_output = result
@@ -354,4 +381,28 @@ class PipelineWise(object):
             sys.exit(1)
 
     def run_tap(self):
-        self.logger.info("Running {} tap in {} target".format(self.tap, self.target))
+        tap_id = self.tap["id"]
+        target_id = self.target["id"]
+
+        self.logger.info("Running {} tap in {} target".format(tap_id, target_id))
+
+        # Generate and run the command to run the tap directly
+        tap_config = self.tap["files"]["config"]
+        tap_properties = self.tap["files"]["properties"]
+        tap_transformation = self.tap["files"]["transformation"]
+
+        # Run without transformation in the middle
+        if not os.path.isfile(tap_transformation):
+            command = "{} --config {} --properties {}".format(self.tap_bin, tap_config, tap_properties)
+
+        # Run with transformation in the middle
+        else:
+            command = "{} --config {} --properties {} | {} --config {}".format(self.tap_bin, tap_config, tap_properties, self.tranform_field_bin, tap_transformation)
+
+        # Output will be redirected into a log file
+        log_dir = self.get_tap_log_dir(target_id, tap_id)
+        current_time = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        log_file = os.path.join(log_dir, "{}-{}-{}.log".format(target_id, tap_id, current_time))
+
+        # Run command
+        result = self.run_command(command, log_file)
