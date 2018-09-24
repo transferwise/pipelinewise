@@ -30,9 +30,14 @@ PipelineWise is an ETL and Data Pipeline Framework using the singer.io specifica
 ### Build from source:
 1. `./intall.sh` : Install singer connectors in separated virtual environments, CLI, REST API and Web Frontend
 
-### To run:
-1. `. .virtualenvs/rest-api/bin/activate && cd rest-api && export FLASK_APP=rest_api && export FLASK_DEBUG=1 && flask run` : Start REST API at `http://localhost:5000`
+### To run in development mode:
+
+Development mode detects code changes both in the python REST API and the Node.JS User interface and reloads the application automatically for a conveninent development experience
+
+#### REST-API (Dev Mode)
+
+1. `. .virtualenvs/rest-api/bin/activate && cd rest-api && export FLASK_APP=rest_api && export FLASK_DEBUG=1 && export PIPELINEWISE_SETTINGS=development && flask run` : Start REST API at `http://localhost:5000`
+
+#### User Interface (Dev Mode)
+
 2. `cd admin-console && npm run start` : Start web interface at `http://localhost:3000`
-
-
-
