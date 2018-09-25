@@ -63,26 +63,12 @@ class Manager(object):
         self.logger.info('Saving config at {}'.format(self.config_path))
         self.save_json(self.config, self.config_path)
 
-    def run_command(self, command, polling=False):
-        self.logger.debug('Running command with polling [{}] : {}'.format(polling, command))
+    def run_command(self, command, background=False):
+        self.logger.debug('Running command [Background Mode: {}] : {}'.format(background, command))
 
-        if polling:
-            proc = Popen(shlex.split(command), stdout=PIPE, stderr=STDOUT)
-            stdout = ''
-            while True:
-                line = proc.stdout.readline()
-                if proc.poll() is not None:
-                    break
-                if line:
-                    stdout += line.decode('utf-8')
-
-            rc = proc.poll()
-            if rc != 0:
-                self.logger.error(stdout)
-
-            return { 'stdout': stdout, 'stderr': None, 'returncode': rc }
-
-        else:
+        # Run command synchronously
+        # Function will return once the command finished with return code, stdout and stderr
+        if not background:
             proc = Popen(shlex.split(command), stdout=PIPE, stderr=PIPE)
             x = proc.communicate()
             rc = proc.returncode
@@ -93,6 +79,13 @@ class Manager(object):
               self.logger.error(stderr)
 
             return { 'stdout': stdout, 'stderr': stderr, 'returncode': rc }
+
+        # Run the command in the background
+        # Function will return immediatedly as success with empty stdout and stderr
+        else:
+            proc = Popen(shlex.split(command))
+
+            return { 'stdout': None, 'stderr': None, 'returncode': 0 }
 
     def gen_id_by_name(self, tap_name):
         return ''.join(tap_name.strip().split()).lower()
@@ -370,7 +363,13 @@ class Manager(object):
     def discover_tap(self, target_id, tap_id):
         self.logger.info('Discovering {} tap from target {}'.format(tap_id, target_id))
         command = "{} discover_tap --target {} --tap {}".format(self.pipelinewise_bin, target_id, tap_id)
-        result = self.run_command(command, False)
+        result = self.run_command(command)
+        return result
+
+    def run_tap(self, target_id, tap_id):
+        self.logger.info('Running {} tap in target {}'.format(tap_id, target_id))
+        command = "{} run_tap --target {} --tap {}".format(self.pipelinewise_bin, target_id, tap_id)
+        result = self.run_command(command, background=True)
         return result
 
     def delete_tap(self, target_id, tap_id):
@@ -420,7 +419,7 @@ class Manager(object):
     def test_tap_connection(self, target_id, tap_id):
         self.logger.info('Testing {} tap connection in target {}'.format(tap_id, target_id))
         command = "{} test_tap_connection --target {} --tap {}".format(self.pipelinewise_bin, target_id, tap_id)
-        result = self.run_command(command, False)
+        result = self.run_command(command)
         self.logger.info(result)
         return result
 
