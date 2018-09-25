@@ -6,6 +6,8 @@ from subprocess import Popen, PIPE, STDOUT
 import shlex
 import logging
 import json
+import re
+from datetime import datetime
 
 
 class Manager(object):
@@ -137,6 +139,34 @@ class Manager(object):
             return "not-configured"
 
         return 'ready'
+
+    def extract_log_attributes(self, log_file):
+        self.logger.info('Extracting attributes from log file {}'.format(log_file))
+        target_id = 'unknown'
+        tap_id = 'unknown'
+        timestamp = datetime.utcfromtimestamp(0).isoformat()
+        status = 'unkown'
+
+        try:
+            # Extract attributes from log file name
+            log_attr = re.search('(.*)-(.*)-(.*).log.(.*)', log_file)
+            target_id = log_attr.group(1)
+            tap_id = log_attr.group(2)
+            timestamp = datetime.strptime(log_attr.group(3), '%Y%m%d_%H%M%S').isoformat()
+            status = log_attr.group(4)
+
+        # Ignore exception when attributes cannot be extracted - Defaults will be used
+        except Exception:
+            pass
+
+        # Return as a dictionary
+        return {
+            'filename': log_file,
+            'target_id': target_id,
+            'tap_id': tap_id,
+            'timestamp': timestamp,
+            'status': status
+        }
 
     def get_config(self):
         self.load_config()
@@ -565,9 +595,10 @@ class Manager(object):
         try:
             log_dir = self.get_tap_log_dir(target_id, tap_id)
             if os.path.isdir(log_dir):
-                for log in os.listdir(log_dir):
-                    if log.endswith('.log'):
-                        logs.append(log)
+                for log_file in os.listdir(log_dir):
+                    if log_file.endswith(tuple(['.log.running', '.log.success', '.log.failed'])):
+                        logs.append(self.extract_log_attributes(log_file))
+
         except Exception as exc:
             raise Exception("Cannot find logs for {} tap in {} target. {}".format(tap_id, target_id, exc))
 
