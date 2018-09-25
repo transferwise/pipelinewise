@@ -31,7 +31,7 @@ export default defineMessages({
   },
   log: {
     id: 'PipelineWise.containers.TapPage.log',
-    defaultMessage: 'Extraction Log',
+    defaultMessage: 'Data Sync Log',
   },
   tapSummary: {
     id: 'PipelineWise.containers.TapTab.summary',

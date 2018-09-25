@@ -2,13 +2,14 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import { FormattedMessage } from 'react-intl';
 
-import { Grid, Row, Col, Alert, ButtonGroup, Button } from 'react-bootstrap/lib';
+import { Grid, Row, Col, Alert } from 'react-bootstrap/lib';
 import SyntaxHighlighter from 'react-syntax-highlighter/prism';
 import { light } from 'react-syntax-highlighter/styles/prism';
 import TabbedContent from 'components/TabbedContent';
 
 import TapControlCard from './TapControlCard/Loadable';
 import TapDangerZone from './TapDangerZone/Loadable';
+import TapRunLogs from './TapRunLogs/Loadable';
 import SingerTapConfig from '../../singerConnectors/SingerTapConfig';
 import SingerTapProperties from '../../singerConnectors/SingerTapProperties';
 
@@ -58,10 +59,7 @@ function stateContent(tap) {
 }
 
 function logContent(tap) {
-  try { return codeContent(valueToString(tap.files.log)) }
-  catch(e) {
-    return <Alert bsStyle="danger" className="full-swidth"><strong>Error!</strong> Log file content not found</Alert>
-  }
+  return <TapRunLogs targetId={tap.target.id} tapId={tap.id} />
 }
 
 function TapTabbedContent(props) {
