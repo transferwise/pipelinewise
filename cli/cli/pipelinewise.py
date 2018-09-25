@@ -151,7 +151,8 @@ class PipelineWise(object):
         return tap
     
     def run_command(self, command, log_file=False):
-        self.logger.info('Running command: {}'.format(command))
+        piped_command = "/bin/bash -o pipefail -c '{}'".format(command)
+        self.logger.info('Running command: {}'.format(piped_command))
 
         # Logfile is needed: Continuously polling STDOUT and STDERR and writing into a log file
         # Once the command finished STDERR redirects to STDOUT and returns _only_ STDOUT
@@ -167,7 +168,7 @@ class PipelineWise(object):
             log_file_success = "{}.success".format(log_file)
 
             # Start command
-            proc = Popen(shlex.split(command), stdout=PIPE, stderr=STDOUT)
+            proc = Popen(shlex.split(piped_command), stdout=PIPE, stderr=STDOUT)
             f = open("{}".format(log_file_running), "w")
             stdout = ''
             while True:
@@ -196,7 +197,7 @@ class PipelineWise(object):
         
         # No logfile needed: STDOUT and STDERR returns in an array once the command finished
         else:
-            proc = Popen(shlex.split(command), stdout=PIPE, stderr=PIPE)
+            proc = Popen(shlex.split(piped_command), stdout=PIPE, stderr=PIPE)
             x = proc.communicate()
             rc = proc.returncode
             stdout = x[0].decode('utf-8')
