@@ -96,8 +96,7 @@ export class TapPage extends React.PureComponent {
   }
 
   render() {
-    const { loading, error, tap, match, onUpdateTapToReplicate } = this.props;
-    const targetId = match.params.target;
+    const { loading, error, tap, onUpdateTapToReplicate } = this.props;
     let alert = <div />;
     let content = <div />;
     
@@ -112,7 +111,7 @@ export class TapPage extends React.PureComponent {
         <Grid>
           {this.renderHeader(tap, onUpdateTapToReplicate)}
           <hr />
-          <TapTabbedContent {... { targetId, tap } } />
+          <TapTabbedContent tap={tap} />
         </Grid>
       )
     }

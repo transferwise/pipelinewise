@@ -2,12 +2,12 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import { FormattedMessage } from 'react-intl';
 
-import { Grid, Row, Col, Alert, Button } from 'react-bootstrap/lib';
+import { Grid, Row, Col, Alert, ButtonGroup, Button } from 'react-bootstrap/lib';
 import SyntaxHighlighter from 'react-syntax-highlighter/prism';
 import { light } from 'react-syntax-highlighter/styles/prism';
 import TabbedContent from 'components/TabbedContent';
-import ConnectorIcon from 'components/ConnectorIcon';
 
+import TapControlCard from './TapControlCard/Loadable';
 import TapDangerZone from './TapDangerZone/Loadable';
 import SingerTapConfig from '../../singerConnectors/SingerTapConfig';
 import SingerTapProperties from '../../singerConnectors/SingerTapProperties';
@@ -38,14 +38,7 @@ function summaryContent(tap) {
           <SingerTapConfig tap={tap} />
         </Col>
         <Col md={6}>
-          <Grid className="shadow-sm p-3 mb-5 rounded">
-            <h4>{messages.tapSummary.defaultMessage}</h4>
-            <Row>
-              <Col md={6}><strong><FormattedMessage {...messages.tapId} />:</strong></Col><Col md={6}>{tap.id}</Col>
-              <Col md={6}><strong><FormattedMessage {...messages.tapName} />:</strong></Col><Col md={6}>{tap.name}</Col>
-              <Col md={6}><strong><FormattedMessage {...messages.tapType} />:</strong></Col><Col md={6}><ConnectorIcon name={tap.type} /> {tap.type}</Col>
-            </Row>
-          </Grid>
+          <TapControlCard tap={tap} />
           <TapDangerZone targetId={tap.target.id} tapId={tap.id} />
         </Col>
       </Row>
@@ -71,7 +64,9 @@ function logContent(tap) {
   }
 }
 
-function TapTabbedContent({ targetId, tap }) {
+function TapTabbedContent(props) {
+  const { tap } = props
+
   const tabs = [
     { title: messages.summary.defaultMessage, content: summaryContent(tap) },
     { title: messages.properties.defaultMessage, content: propertiesContent(tap) },
@@ -84,10 +79,6 @@ function TapTabbedContent({ targetId, tap }) {
       <TabbedContent tabs={tabs} />
     </Grid>
   );
-}
-
-TapTabbedContent.propTypes = {
-  tabs: PropTypes.any,
 }
 
 export default TapTabbedContent;

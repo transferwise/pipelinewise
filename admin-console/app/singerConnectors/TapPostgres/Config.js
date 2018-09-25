@@ -149,13 +149,6 @@ export class TapPostgresConfig extends React.PureComponent {
     schema.title = title || "Connection Details";
     return (
       <Grid className="shadow-sm p-3 mb-5 rounded">
-        {consoleOutput ?
-          <Modal
-            show={consoleOutput}
-            title={<FormattedMessage {...messages.testConnectionError} />}
-            body={<Grid>{alert}{consolePanel}</Grid>}
-            onClose={() => onCloseModal()} />
-        : alert }
         <Form
           schema={schema}
           uiSchema={uiSchema}
@@ -169,6 +162,14 @@ export class TapPostgresConfig extends React.PureComponent {
           &nbsp;
           <Button bsStyle={testConnectionButtonEnabled ? "success" : "default"} disabled={!testConnectionButtonEnabled} onClick={() => this.onTestConnection()}><FormattedMessage {...messages.testConnection} /></Button>
         </Form>
+        <br />
+        {consoleOutput ?
+          <Modal
+            show={consoleOutput}
+            title={<FormattedMessage {...messages.testConnectionError} />}
+            body={<Grid>{alert}{consolePanel}</Grid>}
+            onClose={() => onCloseModal()} />
+        : alert }
       </Grid>
     )
   }

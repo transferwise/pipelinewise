@@ -87,7 +87,6 @@ export class TapDangerZone extends React.PureComponent {
 
     return (
       <Grid className="shadow-sm p-3 mb-5 rounded">
-        {alert}
         <Form
           schema={schema}
           uiSchema={uiSchema}
@@ -100,6 +99,8 @@ export class TapDangerZone extends React.PureComponent {
         >
           <Button bsStyle={deleteTapButtonEnabled ? "danger" : "default"} type="submit" disabled={!deleteTapButtonEnabled}><FormattedMessage {...messages.delete} /></Button>
         </Form>
+        <br />
+        {alert}
       </Grid>
     )
   }
