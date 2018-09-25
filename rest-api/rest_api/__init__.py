@@ -151,6 +151,13 @@ def api_discover_tap(target_id, tap_id):
         'result': manager.discover_tap(target_id, tap_id)
     })
 
+@app.route("/targets/<target_id>/taps/<tap_id>/run", methods = ['POST'])
+def api_run_tap(target_id, tap_id):
+    return jsonify({
+        'status': 200,
+        'result': manager.run_tap(target_id, tap_id)
+    })
+
 @app.route("/targets/<target_id>/taps/<tap_id>/delete", methods = ['DELETE'])
 def api_delete_tap(target_id, tap_id):
     return jsonify({
