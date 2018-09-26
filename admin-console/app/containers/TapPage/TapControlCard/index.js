@@ -56,7 +56,6 @@ export class TapControlCard extends React.PureComponent {
     const runTapButtonEnabled = tap.enabled && tap.status && tap.status == 'ready';
     const targetId = tap.target.id;
     const tapId = tap.id;
-    console.log(tap)
 
     if (runTapLoading) {
       return <LoadingIndicator />;
