@@ -118,6 +118,16 @@ class Manager(object):
             'transformation': self.load_json(connector_files['transformation']),
         }
 
+    def find_files(self, f_dir, endswith=[]):
+        files = []
+        if os.path.isdir(f_dir):
+            for f in os.listdir(f_dir):
+                file_path = os.path.join(f_dir, f)
+                if os.path.isfile(file_path) and f.endswith(tuple(endswith)):
+                    files.append(f)
+
+        return files
+
     def detect_target_status(self, target_id):
         self.logger.info('Detecting {} target status'.format(target_id))
         target_dir = self.get_target_dir(target_id)
@@ -132,11 +142,17 @@ class Manager(object):
     def detect_tap_status(self, target_id, tap_id):
         self.logger.info('Detecting {} tap status in {} target'.format(tap_id, target_id))
         tap_dir = self.get_tap_dir(target_id, tap_id)
+        log_dir = self.get_tap_log_dir(target_id, tap_id)
         connector_files = self.get_connector_files(tap_dir)
 
         # Tap exists but configuration not completed
         if not os.path.isfile(connector_files["config"]):
             return "not-configured"
+
+        # Tap exists and has log in running status
+        if os.path.isdir(log_dir):
+            if len(self.find_files(log_dir, ['.running'])) > 0:
+                return "running"
 
         return 'ready'
 
@@ -594,16 +610,15 @@ class Manager(object):
 
         try:
             log_dir = self.get_tap_log_dir(target_id, tap_id)
-            if os.path.isdir(log_dir):
-                for log_file in os.listdir(log_dir):
-                    if log_file.endswith(tuple(['.log.running', '.log.success', '.log.failed'])):
-                        logs.append(self.extract_log_attributes(log_file))
+            log_files = self.find_files(log_dir, endswith=['.log.running', '.log.success', '.log.failed'])
+            for log_file in log_files:
+                logs.append(self.extract_log_attributes(log_file))
 
         except Exception as exc:
             raise Exception("Cannot find logs for {} tap in {} target. {}".format(tap_id, target_id, exc))
 
-        return logs  
-    
+        return logs
+
     def get_tap_log(self, target_id, tap_id, log_id):
         self.logger.info('Getting {} tap log from {} tap in {} target'.format(log_id, target_id, tap_id))
         log_content = '_EMPTY_FILE_'
