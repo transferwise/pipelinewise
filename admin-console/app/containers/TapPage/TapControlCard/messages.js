@@ -3,11 +3,19 @@ import { defineMessages } from 'react-intl';
 export default defineMessages({
   title: {
     id: 'PipelineWise.containers.TapControlCard.title',
-    defaultMessage: 'Danger Zone'
+    defaultMessage: 'Data Source Summary'
+  },
+  tap: {
+    id: 'PipelineWise.containers.TapControlCard.target',
+    defaultMessage: 'Data Source'
+  },
+  target: {
+    id: 'PipelineWise.containers.TapControlCard.target',
+    defaultMessage: 'Destination'
   },
   tapId: {
     id: 'PipelineWise.containers.TapControlCard.tapId',
-    defaultMessage: 'Tap ID'
+    defaultMessage: 'Data Source ID'
   },
   tapType: {
     id: 'PipelineWise.containers.TapControlCard.tapType',

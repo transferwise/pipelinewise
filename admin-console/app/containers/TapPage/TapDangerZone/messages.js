@@ -7,11 +7,11 @@ export default defineMessages({
   },
   tapId: {
     id: 'PipelineWise.containers.TapDangerZone.tapId',
-    defaultMessage: 'Tap ID'
+    defaultMessage: 'Data Source ID'
   },
   enterTapIdToDelete: {
     id: 'PipelineWise.containers.TapDangerZone.enterTapIdToDelete',
-    defaultMessage: 'Enter tap id to delete',
+    defaultMessage: 'Enter data source id to delete',
   },
   delete: {
     id: 'PipelineWise.containers.TapDangerZone.delete',

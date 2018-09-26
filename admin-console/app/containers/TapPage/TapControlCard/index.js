@@ -56,6 +56,7 @@ export class TapControlCard extends React.PureComponent {
     const runTapButtonEnabled = tap.enabled && tap.status && tap.status == 'ready';
     const targetId = tap.target.id;
     const tapId = tap.id;
+    console.log(tap)
 
     if (runTapLoading) {
       return <LoadingIndicator />;
@@ -79,9 +80,10 @@ export class TapControlCard extends React.PureComponent {
       <Grid className="shadow-sm p-3 mb-5 rounded">
         <h4>{messages.title.defaultMessage}</h4>
         <Row>
+          <Col md={6}><strong><FormattedMessage {...messages.tap} />:</strong></Col><Col md={6}><ConnectorIcon name={tap.type} /> {tap.name}</Col>
           <Col md={6}><strong><FormattedMessage {...messages.tapId} />:</strong></Col><Col md={6}>{tap.id}</Col>
-          <Col md={6}><strong><FormattedMessage {...messages.tapName} />:</strong></Col><Col md={6}>{tap.name}</Col>
-          <Col md={6}><strong><FormattedMessage {...messages.tapType} />:</strong></Col><Col md={6}><ConnectorIcon name={tap.type} /> {tap.type}</Col>
+          <Col md={12}><br /></Col>
+          <Col md={6}><strong><FormattedMessage {...messages.target} />:</strong></Col><Col md={6}>{tap.target.name}</Col>
         </Row>
         <br /><br />
         <Row className="text-center">
