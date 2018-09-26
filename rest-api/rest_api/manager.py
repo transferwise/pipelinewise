@@ -122,12 +122,13 @@ class Manager(object):
     def search_files(self, search_dir, pattern='*', sort=False):
         files = []
         if os.path.isdir(search_dir):
-            # Search files and cut paths, we only need the filenames
-            files = list(filter(os.path.isfile, glob.glob(os.path.join(search_dir, pattern))))
-            files = map(lambda x: os.path.basename(x), files)
-
+            # Search files and sort if required
+            p_files = list(filter(os.path.isfile, glob.glob(os.path.join(search_dir, pattern))))
             if sort:
-                files.sort(key=lambda x: os.path.getmtime(x), reverse=True)
+                p_files.sort(key=lambda x: os.path.getmtime(x), reverse=True)
+
+            # Cut the whole paths, we only need the filenames
+            files = list(map(lambda x: os.path.basename(x), p_files))
 
         return files
 
