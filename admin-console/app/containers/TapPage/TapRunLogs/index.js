@@ -11,21 +11,85 @@ import {
   makeSelectLoading,
   makeSelectError,
   makeSelectLogs,
+  makeSelectViewerLoading,
+  makeSelectViewerError,
+  makeSelectLog,
+  makeSelectLogViewerVisible,
+  makeSelectActiveLogId,
 } from './selectors';
-import { loadRunLogs } from './actions';
+import {
+  loadRunLogs,
+  setActiveLogId,
+  loadRunViewer,
+  resetLogViewer
+} from './actions';
 import reducer from './reducer';
 import saga from './saga';
 
 import { Grid, Row, Col, Alert, ButtonGroup, Button } from 'react-bootstrap/lib';
 import LoadingIndicator from 'components/LoadingIndicator';
+import SyntaxHighlighter from 'react-syntax-highlighter/prism';
+import { light } from 'react-syntax-highlighter/styles/prism';
+import Modal from 'components/Modal';
 import LogsTable from './LogsTable';
 import messages from './messages';
 
 
 export class TapRunLogs extends React.PureComponent {
+  static getLogByLogId(logs, logId) {
+    if (logs && Array.isArray(logs) && logId) {
+      return logs.find(l => l.filename == logId )
+    }
+
+    return false
+  }
+
+  static timestampToString(ts) {
+    try {
+      return (new Date(ts)).toString()
+    }
+    catch(err) {}
+
+    return 'Unknown'
+  }
+
+  static statusToObj(status) {
+    let obj;
+
+    switch (status) {
+      case 'running': obj = {
+          className: 'text-primary',
+          formattedMessage: <FormattedMessage {...messages.statusRunning} />,
+        }
+        break;
+      case 'success': obj = {
+          className: 'text-success',
+          formattedMessage: <FormattedMessage {...messages.statusSuccess} />,
+        }
+        break;
+      case 'failed': obj = {
+          className: 'text-danger',
+          formattedMessage: <FormattedMessage {...messages.statusFailed} />,
+        }
+        break;
+      default: obj = {
+          formattedMessage: <FormattedMessage {...messages.statusUnknown} />
+        }
+    }
+
+    return obj
+  }
+
   componentDidMount() {
     const { targetId, tapId } = this.props
     this.props.onLoadLogs(targetId, tapId);
+  }
+
+  componentDidUpdate(prevProps) {
+    const { targetId, tapId, activeLogId } = this.props;
+    if (activeLogId != prevProps.activeLogId) {
+      this.props.onLoadLogViewer(targetId, tapId, activeLogId)
+    }
   }
 
   onRefresh() {
@@ -33,12 +97,66 @@ export class TapRunLogs extends React.PureComponent {
     this.props.onLoadLogs(targetId, tapId);
   }
 
+  renderLogViewer() {
+    const { logs, activeLogId, viewerLoading, viewerError, log, logViewerVisible } = this.props
+    const activeLog = TapRunLogs.getLogByLogId(logs, activeLogId)
+    const itemObj = TapRunLogs.statusToObj(activeLog.status);
+    const createdAt = TapRunLogs.timestampToString(activeLog.timestamp);
+    let alert = <div />
+    let logContent = <div />
+
+    const viewerHeader = (
+      <Grid>
+        <Row>
+          <Col md={4}><FormattedMessage {...messages.createdAt} /></Col><Col md={8}>{createdAt}</Col>
+          <Col md={4}><FormattedMessage {...messages.status} /></Col><Col md={8} className={itemObj.className}>{itemObj.formattedMessage}</Col>
+        </Row>
+      </Grid>
+    )
+
+    if (viewerLoading) {
+      logContent =  <LoadingIndicator />
+    }
+    else {
+      if (viewerError) {
+        alert = <Alert bsStyle="danger"><strong>Error!</strong> {error.toString()}</Alert>
+      }
+
+      logContent = (
+        <SyntaxHighlighter className="font-sssm" language='shsssell' style={light} showLineNumbers={false}>
+            {log || '<EMPTY>'}
+        </SyntaxHighlighter>
+      );
+    }
+
+    return (
+      <Modal
+        show={logViewerVisible}
+        title={<FormattedMessage {...messages.logViewerTitle} />}
+        body={<Grid>{viewerHeader}{alert}{logContent}</Grid>}
+        onClose={() => this.props.onCloseLogViewer()} />
+      )
+  }
+
   render() {
-    const { loading, error, logs } = this.props;
+    const {
+      loading,
+      error,
+      logs,
+      viewerLoading,
+      viewerError,
+      log,
+      logViewerVisible,
+      activeLogId,
+      onLogSelect
+    } = this.props;
+    const activeLog = TapRunLogs.getLogByLogId(logs, activeLogId);
     const logsTableProps = {
       loading,
       error,
       logs,
+      activeLog,
+      onLogSelect,
     };
     let alert = <div />
 
@@ -64,6 +182,7 @@ export class TapRunLogs extends React.PureComponent {
             <LogsTable {...logsTableProps} />
           </Col>
         </Row>
+        {this.renderLogViewer()}
       </Grid>
     )
   }
@@ -75,11 +194,19 @@ TapRunLogs.propTypes = {
   loading: PropTypes.bool,
   error: PropTypes.any,
   logs: PropTypes.any,
+  viewerLoading: PropTypes.any,
+  viewerError: PropTypes.any,
+  log: PropTypes.any,
+  logViewerVisible: PropTypes.any,
+  activeLogId: PropTypes.any,
 }
 
 export function mapDispatchToProps(dispatch) {
   return {
     onLoadLogs: (targetId, tapId) => dispatch(loadRunLogs(targetId, tapId)),
+    onLogSelect: (logId) => dispatch(setActiveLogId(logId)),
+    onLoadLogViewer: (targetId, tapId, logId) => dispatch(loadRunViewer(targetId, tapId, logId)),
+    onCloseLogViewer: () => dispatch(resetLogViewer())
   };
 }
 
@@ -87,6 +214,11 @@ const mapStateToProps = createStructuredSelector({
   loading: makeSelectLoading(),
   error: makeSelectError(),
   logs: makeSelectLogs(),
+  viewerLoading: makeSelectViewerLoading(),
+  viewerError: makeSelectViewerError(),
+  log: makeSelectLog(),
+  logViewerVisible: makeSelectLogViewerVisible(),
+  activeLogId: makeSelectActiveLogId(),
 });
 
 const withConnect = connect(

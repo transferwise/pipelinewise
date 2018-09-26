@@ -9,7 +9,7 @@ import LogsTableHeader from './LogsTableHeader';
 import LogsTableBody from './LogsTableBody';
 import messages from './messages';
 
-function LogsTable({ loading, error, logs }) {
+function LogsTable({ loading, error, logs, activeLog, onLogSelect }) {
   let alert = <div />;
   let warning = <div />;
 
@@ -30,8 +30,10 @@ function LogsTable({ loading, error, logs }) {
     <Grid>
       <Table
         items={logs}
+        selectedItem={activeLog}
         headerComponent={LogsTableHeader}
         bodyComponent={LogsTableBody}
+        onItemSelect={onLogSelect}
       />
       {alert}
       {warning}

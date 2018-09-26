@@ -37,4 +37,8 @@ export default defineMessages({
     id: 'PipelineWise.containers.TapRunLogs.statusUnknown',
     defaultMessage: 'Unknown',
   },
+  logViewerTitle: {
+    id: 'PipelineWise.containers.TapRunLogs.logViewerTitle',
+    defaultMessage: 'Data Sync Log',
+  }
 })
