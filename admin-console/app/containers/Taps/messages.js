@@ -17,9 +17,13 @@ export default defineMessages({
     id: 'PipelineWise.container.Taps.status',
     defaultMessage: 'Status',
   },
-  lastSyncAt: {
-    id: 'PipelineWise.container.Taps.lastSyncAt',
+  lastTimestamp: {
+    id: 'PipelineWise.container.Taps.lastTimestamp',
     defaultMessage: 'Last Sync Completed',
+  },
+  lastStatus: {
+    id: 'PipelineWise.container.Taps.lastStatus',
+    defaultMessage: 'Last Sync Result',
   },
   flowsDetailsTopic: {
     id: 'PipelineWise.containers.TapsPage.detailsHeader',

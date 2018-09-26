@@ -5,7 +5,7 @@ import { compose } from 'redux';
 import { createStructuredSelector } from 'reselect';
 import injectReducer from 'utils/injectReducer';
 import injectSaga from 'utils/injectSaga';
-import { statusToObj } from 'utils/helper';
+import { statusToObj, timestampToFormattedString } from 'utils/helper';
 import LoadingIndicator from 'components/LoadingIndicator';
 import ConnectorIcon from 'components/ConnectorIcon';
 import Modal from 'components/Modal';
@@ -54,10 +54,12 @@ export class TapControlCard extends React.PureComponent {
       consoleOutput,
       onCloseModal,
     } = this.props;
-    const runTapButtonEnabled = tap && tap.enabled && tap.status && tap.status == 'ready' && !runTapSuccess;
+    const runTapButtonEnabled = tap && tap.enabled && tap.status && tap.status.currentStatus == 'ready' && !runTapSuccess;
     const targetId = tap && tap.target && tap.target.id;
     const tapId = tap && tap.id;
-    const statusObj = statusToObj(runTapSuccess ? 'started' : tap && tap.status)
+    const currentStatusObj = statusToObj(runTapSuccess ? 'started' : tap && tap.status && tap.status.currentStatus)
+    const lastStatusObj = statusToObj(tap && tap.status && tap.status.lastStatus)
+    const lastTimestamp = tap && tap.status && tap.status.lastTimestamp
     let alert = <div />
     let consolePanel = <div />
 
@@ -88,7 +90,10 @@ export class TapControlCard extends React.PureComponent {
         <Row>
           <Col md={6}><ConnectorIcon name={tap.type} /></Col><Col md={6}><p><strong>{tap.name}</strong><br />(id: {tap.id})</p></Col>
           <Col md={6}><strong><FormattedMessage {...messages.target} />:</strong></Col><Col md={6}><a href={`/targets/${tap.target.id}`}>{tap.target.name}</a></Col>
-          <Col md={6}><strong><FormattedMessage {...messages.status} />:</strong></Col><Col md={6} className={statusObj.className}>{statusObj.formattedMessage}</Col>
+          <Col md={6}><strong><FormattedMessage {...messages.status} />:</strong></Col><Col md={6} className={currentStatusObj.className}>{currentStatusObj.formattedMessage}</Col>
+          <Col md={12}><br /></Col>
+          <Col md={6}><strong><FormattedMessage {...messages.lastTimestamp} />:</strong></Col><Col md={6}>{timestampToFormattedString(lastTimestamp)}</Col>
+          <Col md={6}><strong><FormattedMessage {...messages.lastStatus} />:</strong></Col><Col md={6} className={lastStatusObj.className}>{lastStatusObj.formattedMessage}</Col>
         </Row>
         <br /><br />
         <Row className="text-center">

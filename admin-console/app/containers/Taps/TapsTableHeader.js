@@ -8,7 +8,8 @@ function TapsTableHeader() {
     <th></th>
     <th><FormattedMessage {...messages.name} /></th>
     <th className="text-center"><FormattedMessage {...messages.status} /></th>
-    <th className="text-center"><FormattedMessage {...messages.lastSyncAt} /></th>
+    <th className="text-center"><FormattedMessage {...messages.lastTimestamp} /></th>
+    <th className="text-center"><FormattedMessage {...messages.lastStatus} /></th>
   </tr>;
 }
 

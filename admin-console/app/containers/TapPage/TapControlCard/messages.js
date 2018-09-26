@@ -29,6 +29,14 @@ export default defineMessages({
     id: 'PipelineWise.containers.TapControlCard.status',
     defaultMessage: 'Status',
   },
+  lastTimestamp: {
+    id: 'PipelineWise.container.TapControlCard.lastTimestamp',
+    defaultMessage: 'Last Sync Completed',
+  },
+  lastStatus: {
+    id: 'PipelineWise.container.TapControlCard.lastStatus',
+    defaultMessage: 'Last Sync Result',
+  },
   runTap: {
     id: 'PipelineWise.containers.TapControlCard.runTap',
     defaultMessage: 'Sync Data Now',

@@ -4,11 +4,12 @@ import PropTypes from 'prop-types';
 import Toggle from 'react-toggle';
 
 import ConnectorIcon from 'components/ConnectorIcon';
-import { statusToObj } from 'utils/helper';
+import { statusToObj, timestampToFormattedString } from 'utils/helper';
 
 function TapsTableBody(props) {
   const item = props.item;
-  const itemObj = statusToObj(item.status);
+  const currentStatusObj = statusToObj(item.status.currentStatus);
+  const lastStatusObj = statusToObj(item.status.lastStatus);
 
   return (
     <tr>
@@ -20,8 +21,9 @@ function TapsTableBody(props) {
         />
       </td>
       <td><a href={`/targets/${item.targetId}/taps/${item.id}`}><ConnectorIcon name={item.type} />&nbsp;<strong>{item.name}</strong></a></td>
-      <td className={`text-center ${itemObj.className}`}>{itemObj.formattedMessage}</td>
-      <td>{item.lastSyncAt}</td>
+      <td className={`text-center ${currentStatusObj.className}`}>{currentStatusObj.formattedMessage}</td>
+      <td>{timestampToFormattedString(item.status.lastTimestamp)}</td>
+      <td className={`text-center ${lastStatusObj.className}`}>{lastStatusObj.formattedMessage}</td>
     </tr>
   );
 }
