@@ -1,6 +1,5 @@
 import React from 'react';
 import PropTypes from 'prop-types';
-import { FormattedMessage } from 'react-intl';
 
 import { Grid, Row, Col, Alert } from 'react-bootstrap/lib';
 import SyntaxHighlighter from 'react-syntax-highlighter/prism';
@@ -39,7 +38,7 @@ function summaryContent(tap) {
           <SingerTapConfig tap={tap} />
         </Col>
         <Col md={6}>
-          <TapControlCard tap={tap} />
+          <TapControlCard targetId={tap.target.id} tapId={tap.id} />
           <TapDangerZone targetId={tap.target.id} tapId={tap.id} />
         </Col>
       </Row>

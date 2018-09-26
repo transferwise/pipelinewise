@@ -5,6 +5,10 @@ export default defineMessages({
     id: 'PipelineWise.helper.statusReady',
     defaultMessage: 'Ready to Run',
   },
+  statusStarted: {
+    id: 'PipelineWise.helper.statusStarted',
+    defaultMessage: 'Started',
+  },
   statusRunning: {
     id: 'PipelineWise.helper.statusRunning',
     defaultMessage: 'Running',

@@ -1,4 +1,8 @@
 import {
+  LOAD_TAP,
+  LOAD_TAP_SUCCESS,
+  LOAD_TAP_ERROR,
+
   RUN_TAP,
   RUN_TAP_SUCCESS,
   RUN_TAP_ERROR,
@@ -8,6 +12,27 @@ import {
   SET_RUN_TAP_BUTTON_STATE,
  } from './constants';
 
+export function loadTap(targetId, tapId) {
+  return {
+    type: LOAD_TAP,
+    targetId,
+    tapId,
+  }
+}
+
+export function tapLoaded(tap) {
+  return {
+    type: LOAD_TAP_SUCCESS,
+    tap,
+  }
+}
+
+export function loadTapError(error) {
+  return {
+    type: LOAD_TAP_ERROR,
+    error,
+  }
+}
 export function runTap(targetId, tapId) {
   return {
     type: RUN_TAP,

@@ -28,6 +28,11 @@ function statusToObj(status) {
         formattedMessage: <FormattedMessage {...messages.statusReady} />,
       }
       break;
+    case 'started': obj = {
+        className: 'text-warning',
+        formattedMessage: <FormattedMessage {...messages.statusStarted} />,
+      }
+      break;
     case 'running': obj = {
         className: 'text-primary',
         formattedMessage: <FormattedMessage {...messages.statusRunning} />,

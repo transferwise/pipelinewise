@@ -7,6 +7,15 @@ import { initialState } from './reducer';
 
 const selectTapControlCard = state => state.get('tapControlCard', initialState);
 
+const makeSelectTapLoading = () =>
+  createSelector(selectTapControlCard, TapControlCardState => TapControlCardState.get('tapLoading'));
+
+const makeSelectTapError = () =>
+  createSelector(selectTapControlCard, TapControlCardState => TapControlCardState.get('tapError'));
+
+const makeSelectTap = () =>
+  createSelector(selectTapControlCard, TapControlCardState => TapControlCardState.get('tap'));
+
 const makeSelectRunTapLoading = () =>
   createSelector(selectTapControlCard, TapControlCardState => TapControlCardState.get('runTapLoading'));
 
@@ -24,6 +33,10 @@ const makeSelectRunTapButtonEnabled = () =>
 
 export {
   selectTapControlCard,
+
+  makeSelectTapLoading,
+  makeSelectTapError,
+  makeSelectTap,
   
   makeSelectRunTapLoading,
   makeSelectRunTapError,

@@ -35,11 +35,11 @@ export default defineMessages({
   },
   runTapSuccess: {
     id: 'PipelineWise.containers.TapControlCard.runTapSuccess',
-    defaultMessage: 'Sync started in the background. Check log for details.',
+    defaultMessage: 'Data Sync started. Check logs for details.',
   },
   runTapFailed: {
     id: 'PipelineWise.containers.TapControlCard.runTapFailed',
-    defaultMessage: 'Tap sync failed to start. Check log for details.',
+    defaultMessage: 'Data Sync failed to start. Check logs for details.',
   },
   runTapError: {
     id: 'PipelineWise.containers.TapControlCard.runTapFailed',

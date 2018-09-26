@@ -16,6 +16,9 @@ import { light } from 'react-syntax-highlighter/styles/prism';
 import { Grid, Row, Col, Alert, Button } from 'react-bootstrap/lib';
 
 import {
+  makeSelectTapLoading,
+  makeSelectTapError,
+  makeSelectTap,
   makeSelectRunTapLoading,
   makeSelectRunTapError,
   makeSelectRunTapSuccess,
@@ -23,6 +26,7 @@ import {
   makeSelectConsoleOutput,
 } from './selectors';
 import {
+  loadTap,
   setRunTapButtonState,
   runTap,
   resetConsoleOutput,
@@ -34,32 +38,30 @@ import messages from './messages';
 
 
 export class TapControlCard extends React.PureComponent {
-
-
-  onFormSubmit(event) {
-    if (event.errors.length === 0) {
-      const { targetId, tapId } = this.props;
-      this.props.onDeleteTap(targetId, tapId, this.state.tapToDelete)
-    }
+  componentDidMount() {
+    const { targetId, tapId } = this.props
+      this.props.onLoadTap(targetId, tapId);
   }
 
   render() {
     const {
+      tapLoading,
+      tapError,
+      tap,
       runTapLoading,
       runTapError,
       runTapSuccess,
-      tap,
       consoleOutput,
       onCloseModal,
     } = this.props;
+    const runTapButtonEnabled = tap && tap.enabled && tap.status && tap.status == 'ready' && !runTapSuccess;
+    const targetId = tap && tap.target.id;
+    const tapId = tap && tap.id;
+    const statusObj = statusToObj(runTapSuccess ? 'started' : tap && tap.status)
     let alert = <div />
     let consolePanel = <div />
-    const runTapButtonEnabled = tap.enabled && tap.status && tap.status == 'ready';
-    const targetId = tap.target.id;
-    const tapId = tap.id;
-    const statusObj = statusToObj(tap.status)
 
-    if (runTapLoading) {
+    if (tapLoading || runTapLoading) {
       return <LoadingIndicator />;
     }
     else if (runTapError !== false) {
@@ -76,7 +78,7 @@ export class TapControlCard extends React.PureComponent {
             {consoleOutput}
         </SyntaxHighlighter> 
     }
-    
+
     return (
       <Grid className="shadow-sm p-3 mb-5 rounded">
         <h4>{messages.title.defaultMessage}</h4>
@@ -105,14 +107,19 @@ export class TapControlCard extends React.PureComponent {
 }
 
 TapControlCard.propTypes = {
-  loading: PropTypes.bool,
-  error: PropTypes.any,
+  tapLoading: PropTypes.bool,
+  tapError: PropTypes.any,
+  tap: PropTypes.any,
+  runTapLoading: PropTypes.bool,
+  runTapError: PropTypes.any,
+  runTapSuccess: PropTypes.bool,
   success: PropTypes.any,
   runTapButtonEnabled: PropTypes.any,
 }
 
 export function mapDispatchToProps(dispatch) {
   return {
+    onLoadTap: (targetId, tapId) => dispatch(loadTap(targetId, tapId)),
     onSetRunTapButtonState: (enabled) => dispatch(setRunTapButtonState(enabled)),
     onRunTap: (targetId, tapId) => dispatch(runTap(targetId, tapId)),
     onCloseModal: () => dispatch(resetConsoleOutput())
@@ -120,6 +127,9 @@ export function mapDispatchToProps(dispatch) {
 }
 
 const mapStateToProps = createStructuredSelector({
+  tapLoading: makeSelectTapLoading(),
+  tapError: makeSelectTapError(),
+  tap: makeSelectTap(),
   runTapLoading: makeSelectRunTapLoading(),
   runTapError: makeSelectRunTapError(),
   runTapSuccess: makeSelectRunTapSuccess(),

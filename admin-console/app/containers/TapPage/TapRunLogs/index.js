@@ -101,10 +101,6 @@ export class TapRunLogs extends React.PureComponent {
       loading,
       error,
       logs,
-      viewerLoading,
-      viewerError,
-      log,
-      logViewerVisible,
       activeLogId,
       onLogSelect
     } = this.props;
