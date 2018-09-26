@@ -119,21 +119,22 @@ export class TapRunLogs extends React.PureComponent {
     }
     else {
       if (viewerError) {
-        alert = <Alert bsStyle="danger"><strong>Error!</strong> {error.toString()}</Alert>
+        alert = <Alert bsStyle="danger"><strong>Error!</strong> {viewerError.toString()}</Alert>
       }
-
-      logContent = (
-        <SyntaxHighlighter className="font-sssm" language='shsssell' style={light} showLineNumbers={false}>
-            {log || '<EMPTY>'}
-        </SyntaxHighlighter>
-      );
+      else {
+        logContent = (
+          <SyntaxHighlighter className="font-sssm" language='shsssell' style={light} showLineNumbers={false}>
+              {log || '<EMPTY>'}
+          </SyntaxHighlighter>
+        );
+      }
     }
 
     return (
       <Modal
         show={logViewerVisible}
         title={<FormattedMessage {...messages.logViewerTitle} />}
-        body={<Grid>{viewerHeader}{alert}{logContent}</Grid>}
+        body={<Grid>{viewerHeader}<br />{alert}{logContent}</Grid>}
         onClose={() => this.props.onCloseLogViewer()} />
       )
   }
