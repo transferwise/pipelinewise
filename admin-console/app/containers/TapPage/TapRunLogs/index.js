@@ -6,7 +6,7 @@ import { compose } from 'redux';
 import { createStructuredSelector } from 'reselect';
 import injectReducer from 'utils/injectReducer';
 import injectSaga from 'utils/injectSaga';
-import { findItemByKey, timestampToFormattedString, statusToObj } from 'utils/helper';
+import { formatDate, findItemByKey, statusToObj } from 'utils/helper';
 
 import {
   makeSelectLoading,
@@ -58,7 +58,7 @@ export class TapRunLogs extends React.PureComponent {
     const { logs, activeLogId, viewerLoading, viewerError, log, logViewerVisible } = this.props
     const activeLog = findItemByKey(logs, 'filename', activeLogId)
     const itemObj = statusToObj(activeLog.status);
-    const createdAt = timestampToFormattedString(activeLog.timestamp);
+    const createdAt = formatDate(activeLog.timestamp);
     let alert = <div />
     let logContent = <div />
 

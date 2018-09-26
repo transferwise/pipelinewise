@@ -1,22 +1,22 @@
 import React from 'react';
 import { FormattedMessage } from 'react-intl';
+import dateFormat from 'dateformat';
+
 import messages from './messages';
+
+function formatDate(ts, format="yyyy-mm-dd hh:MM:ss") {
+  try {
+    return dateFormat(ts, format)
+  } catch(err) {}
+
+  return "Unknown"
+}
 
 function findItemByKey(a, k, m) {
   if (a && Array.isArray(a) && m) {
     return a.find(i => i[k] == m)
   }
   return false
-}
-
-
-function timestampToFormattedString(ts) {
-  try {
-    return (new Date(ts)).toString()
-  }
-  catch(err) {}
-
-  return 'Unknown'
 }
 
 function statusToObj(status) {
@@ -58,7 +58,7 @@ function statusToObj(status) {
 }
 
 export {
+  formatDate,
   findItemByKey,
-  timestampToFormattedString,
   statusToObj,
 }
