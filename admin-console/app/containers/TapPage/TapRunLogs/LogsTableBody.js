@@ -1,35 +1,8 @@
 import React from 'react';
-import { FormattedMessage } from 'react-intl';
 import PropTypes from 'prop-types';
 
-import messages from './messages';
+import { statusToObj } from 'utils/helper';
 
-function statusToObj(status) {
-  let obj;
-
-  switch (status) {
-    case 'running': obj = {
-        className: 'text-primary',
-        formattedMessage: <FormattedMessage {...messages.statusRunning} />,
-      }
-      break;
-    case 'success': obj = {
-        className: 'text-success',
-        formattedMessage: <FormattedMessage {...messages.statusSuccess} />,
-      }
-      break;
-    case 'failed': obj = {
-        className: 'text-danger',
-        formattedMessage: <FormattedMessage {...messages.statusFailed} />,
-      }
-      break;
-    default: obj = {
-        formattedMessage: <FormattedMessage {...messages.statusUnknown} />
-      }
-  }
-
-  return obj
-}
 
 function LogsTableBody(props) {
   const { item, selectedItem } = props;

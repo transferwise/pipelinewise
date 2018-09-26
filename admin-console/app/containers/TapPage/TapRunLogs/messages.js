@@ -21,22 +21,6 @@ export default defineMessages({
     id: 'PipelineWise.containers.TapRunLogs.status',
     defaultMessage: 'Status',
   },
-  statusRunning: {
-    id: 'PipelineWise.containers.TapRunLogs.statusRunning',
-    defaultMessage: 'Running',
-  },
-  statusSuccess: {
-    id: 'PipelineWise.containers.TapRunLogs.statusSuccess',
-    defaultMessage: 'Success',
-  },
-  statusFailed: {
-    id: 'PipelineWise.containers.TapRunLogs.statusFailed',
-    defaultMessage: 'Failed',
-  },
-  statusUnknown: {
-    id: 'PipelineWise.containers.TapRunLogs.statusUnknown',
-    defaultMessage: 'Unknown',
-  },
   logViewerTitle: {
     id: 'PipelineWise.containers.TapRunLogs.logViewerTitle',
     defaultMessage: 'Data Sync Log',

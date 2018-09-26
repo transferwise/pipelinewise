@@ -22,9 +22,10 @@ function summaryContent(target) {
           <Grid className="shadow-sm p-3 mb-5 rounded">
             <h4>{messages.targetSummary.defaultMessage}</h4>
             <Row>
-              <Col md={6}><strong><FormattedMessage {...messages.targetId} />:</strong></Col><Col md={6}>{target.id}</Col>
-              <Col md={6}><strong><FormattedMessage {...messages.targetName} />:</strong></Col><Col md={6}>{target.name}</Col>
-              <Col md={6}><strong><FormattedMessage {...messages.targetType} />:</strong></Col><Col md={6}><ConnectorIcon name={target.type} /> {target.type}</Col>
+              <Col md={6}><ConnectorIcon name={target.type} /></Col><Col md={6}><p><strong>{target.name}</strong><br />(id: {target.id})</p></Col>
+              <Col md={6}><strong><FormattedMessage {...messages.targetType} />:</strong></Col><Col md={6}>{target.type}</Col>
+              <Col md={12}><br /></Col>
+              <Col md={6}><strong><FormattedMessage {...messages.taps} />:</strong></Col><Col md={6}>{target.taps.length}</Col>
             </Row>
           </Grid>
           <TargetDangerZone targetId={target.id} />

@@ -5,6 +5,7 @@ import { compose } from 'redux';
 import { createStructuredSelector } from 'reselect';
 import injectReducer from 'utils/injectReducer';
 import injectSaga from 'utils/injectSaga';
+import { statusToObj } from 'utils/helper';
 import LoadingIndicator from 'components/LoadingIndicator';
 import ConnectorIcon from 'components/ConnectorIcon';
 import Modal from 'components/Modal';
@@ -56,6 +57,7 @@ export class TapControlCard extends React.PureComponent {
     const runTapButtonEnabled = tap.enabled && tap.status && tap.status == 'ready';
     const targetId = tap.target.id;
     const tapId = tap.id;
+    const statusObj = statusToObj(tap.status)
 
     if (runTapLoading) {
       return <LoadingIndicator />;
@@ -79,10 +81,9 @@ export class TapControlCard extends React.PureComponent {
       <Grid className="shadow-sm p-3 mb-5 rounded">
         <h4>{messages.title.defaultMessage}</h4>
         <Row>
-          <Col md={6}><strong><FormattedMessage {...messages.tap} />:</strong></Col><Col md={6}><ConnectorIcon name={tap.type} /> {tap.name}</Col>
-          <Col md={6}><strong><FormattedMessage {...messages.tapId} />:</strong></Col><Col md={6}>{tap.id}</Col>
-          <Col md={12}><br /></Col>
-          <Col md={6}><strong><FormattedMessage {...messages.target} />:</strong></Col><Col md={6}>{tap.target.name}</Col>
+          <Col md={6}><ConnectorIcon name={tap.type} /></Col><Col md={6}><p><strong>{tap.name}</strong><br />(id: {tap.id})</p></Col>
+          <Col md={6}><strong><FormattedMessage {...messages.target} />:</strong></Col><Col md={6}><a href={`/targets/${tap.target.id}`}>{tap.target.name}</a></Col>
+          <Col md={6}><strong><FormattedMessage {...messages.status} />:</strong></Col><Col md={6} className={statusObj.className}>{statusObj.formattedMessage}</Col>
         </Row>
         <br /><br />
         <Row className="text-center">

@@ -6,6 +6,7 @@ import { compose } from 'redux';
 import { createStructuredSelector } from 'reselect';
 import injectReducer from 'utils/injectReducer';
 import injectSaga from 'utils/injectSaga';
+import { findItemByKey, timestampToFormattedString, statusToObj } from 'utils/helper';
 
 import {
   makeSelectLoading,
@@ -36,50 +37,6 @@ import messages from './messages';
 
 
 export class TapRunLogs extends React.PureComponent {
-  static getLogByLogId(logs, logId) {
-    if (logs && Array.isArray(logs) && logId) {
-      return logs.find(l => l.filename == logId )
-    }
-
-    return false
-  }
-
-  static timestampToString(ts) {
-    try {
-      return (new Date(ts)).toString()
-    }
-    catch(err) {}
-
-    return 'Unknown'
-  }
-
-  static statusToObj(status) {
-    let obj;
-
-    switch (status) {
-      case 'running': obj = {
-          className: 'text-primary',
-          formattedMessage: <FormattedMessage {...messages.statusRunning} />,
-        }
-        break;
-      case 'success': obj = {
-          className: 'text-success',
-          formattedMessage: <FormattedMessage {...messages.statusSuccess} />,
-        }
-        break;
-      case 'failed': obj = {
-          className: 'text-danger',
-          formattedMessage: <FormattedMessage {...messages.statusFailed} />,
-        }
-        break;
-      default: obj = {
-          formattedMessage: <FormattedMessage {...messages.statusUnknown} />
-        }
-    }
-
-    return obj
-  }
-
   componentDidMount() {
     const { targetId, tapId } = this.props
     this.props.onLoadLogs(targetId, tapId);
@@ -99,9 +56,9 @@ export class TapRunLogs extends React.PureComponent {
 
   renderLogViewer() {
     const { logs, activeLogId, viewerLoading, viewerError, log, logViewerVisible } = this.props
-    const activeLog = TapRunLogs.getLogByLogId(logs, activeLogId)
-    const itemObj = TapRunLogs.statusToObj(activeLog.status);
-    const createdAt = TapRunLogs.timestampToString(activeLog.timestamp);
+    const activeLog = findItemByKey(logs, 'filename', activeLogId)
+    const itemObj = statusToObj(activeLog.status);
+    const createdAt = timestampToFormattedString(activeLog.timestamp);
     let alert = <div />
     let logContent = <div />
 
@@ -151,7 +108,7 @@ export class TapRunLogs extends React.PureComponent {
       activeLogId,
       onLogSelect
     } = this.props;
-    const activeLog = TapRunLogs.getLogByLogId(logs, activeLogId);
+    const activeLog = findItemByKey(logs, 'filename', activeLogId)
     const logsTableProps = {
       loading,
       error,

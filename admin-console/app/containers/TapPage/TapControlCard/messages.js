@@ -25,6 +25,10 @@ export default defineMessages({
     id: 'PipelineWise.containers.TapControlCard.tapName',
     defaultMessage: 'Tap Name'
   },
+  status: {
+    id: 'PipelineWise.containers.TapControlCard.status',
+    defaultMessage: 'Status',
+  },
   runTap: {
     id: 'PipelineWise.containers.TapControlCard.runTap',
     defaultMessage: 'Sync Data Now',
