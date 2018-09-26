@@ -7,6 +7,7 @@ import shlex
 import logging
 import json
 import re
+import glob
 from datetime import datetime
 
 
@@ -118,13 +119,12 @@ class Manager(object):
             'transformation': self.load_json(connector_files['transformation']),
         }
 
-    def find_files(self, f_dir, endswith=[]):
+    def search_files(self, search_dir, pattern='*', sort=False):
         files = []
-        if os.path.isdir(f_dir):
-            for f in os.listdir(f_dir):
-                file_path = os.path.join(f_dir, f)
-                if os.path.isfile(file_path) and f.endswith(tuple(endswith)):
-                    files.append(f)
+        if os.path.isdir(search_dir):
+            files = list(filter(os.path.isfile, glob.glob(os.path.join(search_dir, pattern))))
+            if sort:
+                files.sort(key=lambda x: os.path.getmtime(x), reverse=True)
 
         return files
 
@@ -144,17 +144,34 @@ class Manager(object):
         tap_dir = self.get_tap_dir(target_id, tap_id)
         log_dir = self.get_tap_log_dir(target_id, tap_id)
         connector_files = self.get_connector_files(tap_dir)
+        status = {
+            'currentStatus': 'unknown',
+            'lastStatus': 'unknown',
+            'lastTimestamp': None
+        }
 
         # Tap exists but configuration not completed
         if not os.path.isfile(connector_files["config"]):
-            return "not-configured"
+            status["currentStatus"] = "not-configured"
 
         # Tap exists and has log in running status
-        if os.path.isdir(log_dir):
-            if len(self.find_files(log_dir, ['.running'])) > 0:
-                return "running"
+        elif os.path.isdir(log_dir) and len(self.search_files(log_dir, pattern='*.log.running')) > 0:
+            status["currentStatus"] = "running"
 
-        return 'ready'
+        # Configured and not running
+        else:
+            status["currentStatus"] = 'ready'
+
+        # Get last run instance
+        if os.path.isdir(log_dir):
+            log_files = self.search_files(log_dir, pattern='*.log.*', sort=True)
+            if len(log_files) > 0:
+                last_log_file = log_files[0]
+                log_attr = self.extract_log_attributes(last_log_file)
+                status["lastStatus"] = log_attr["status"]
+                status["lastTimestamp"] = log_attr["timestamp"]
+
+        return status
 
     def extract_log_attributes(self, log_file):
         self.logger.info('Extracting attributes from log file {}'.format(log_file))
@@ -610,7 +627,7 @@ class Manager(object):
 
         try:
             log_dir = self.get_tap_log_dir(target_id, tap_id)
-            log_files = self.find_files(log_dir, endswith=['.log.running', '.log.success', '.log.failed'])
+            log_files = self.search_files(log_dir, pattern='*.log.*')
             for log_file in log_files:
                 logs.append(self.extract_log_attributes(log_file))
 
