@@ -55,7 +55,7 @@ export class TapControlCard extends React.PureComponent {
       onCloseModal,
     } = this.props;
     const runTapButtonEnabled = tap && tap.enabled && tap.status && tap.status == 'ready' && !runTapSuccess;
-    const targetId = tap && tap.target.id;
+    const targetId = tap && tap.target && tap.target.id;
     const tapId = tap && tap.id;
     const statusObj = statusToObj(runTapSuccess ? 'started' : tap && tap.status)
     let alert = <div />
@@ -63,6 +63,9 @@ export class TapControlCard extends React.PureComponent {
 
     if (tapLoading || runTapLoading) {
       return <LoadingIndicator />;
+    }
+    else if (tapError !== false) {
+      return <Alert bsStyle="danger" className="full-swidth"><strong>Error!</strong> {tapError.toString()}</Alert>;
     }
     else if (runTapError !== false) {
       alert = <Alert bsStyle="danger" className="full-swidth"><strong>Error!</strong> {runTapError.toString()}</Alert>;
