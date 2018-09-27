@@ -32,6 +32,7 @@ import LoadingIndicator from 'components/LoadingIndicator';
 import SyntaxHighlighter from 'react-syntax-highlighter/prism';
 import { light } from 'react-syntax-highlighter/styles/prism';
 import Modal from 'components/Modal';
+import Timeline from 'components/Timeline';
 import LogsTable from './LogsTable';
 import messages from './messages';
 
@@ -52,6 +53,10 @@ export class TapRunLogs extends React.PureComponent {
   onRefresh() {
     const { targetId, tapId } = this.props
     this.props.onLoadLogs(targetId, tapId);
+  }
+
+  onTimeRangeChanged(timerange) {
+    this.setState({ timerange })
   }
 
   renderLogViewer() {
@@ -105,13 +110,11 @@ export class TapRunLogs extends React.PureComponent {
       onLogSelect
     } = this.props;
     const activeLog = findItemByKey(logs, 'filename', activeLogId)
-    const logsTableProps = {
+    const timelineProps = {
       loading,
       error,
       logs,
-      activeLog,
-      onLogSelect,
-    };
+    }
     let alert = <div />
 
     if (loading) {
@@ -133,7 +136,12 @@ export class TapRunLogs extends React.PureComponent {
         {alert}
         <Row>
           <Col md={12}>
-            <LogsTable {...logsTableProps} />
+            <Timeline {...timelineProps} />
+          </Col>
+        </Row>
+        <Row>
+          <Col md={12}>
+            <LogsTable {...this.props} />
           </Col>
         </Row>
         {this.renderLogViewer()}

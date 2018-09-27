@@ -10,7 +10,6 @@ import LogsTableBody from './LogsTableBody';
 import messages from './messages';
 
 function LogsTable({ loading, error, logs, activeLog, onLogSelect }) {
-  let alert = <div />;
   let warning = <div />;
 
   if (loading) {
@@ -18,7 +17,7 @@ function LogsTable({ loading, error, logs, activeLog, onLogSelect }) {
   }
 
   if (error != false) {
-    alert = <Alert bsStyle="danger"><strong>Error!</strong> {error.toString()}</Alert>
+    return <Alert bsStyle="danger"><strong>Error!</strong> {error.toString()}</Alert>
   } else if (logs.length === 0) {
     warning = <Alert bsStyle="warning"><strong>Tip!</strong> {messages.noLog.defaultMessage}</Alert>
   }
@@ -35,7 +34,6 @@ function LogsTable({ loading, error, logs, activeLog, onLogSelect }) {
         bodyComponent={LogsTableBody}
         onItemSelect={onLogSelect}
       />
-      {alert}
       {warning}
     </Grid>
   );
