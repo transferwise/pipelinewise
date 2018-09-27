@@ -119,11 +119,13 @@ class Manager(object):
             'transformation': self.load_json(connector_files['transformation']),
         }
 
-    def search_files(self, search_dir, pattern='*', sort=False):
+    def search_files(self, search_dir, patterns=['*'], sort=False):
         files = []
         if os.path.isdir(search_dir):
             # Search files and sort if required
-            p_files = list(filter(os.path.isfile, glob.glob(os.path.join(search_dir, pattern))))
+            p_files = []
+            for pattern in patterns:
+                p_files.extend(filter(os.path.isfile, glob.glob(os.path.join(search_dir, pattern))))
             if sort:
                 p_files.sort(key=lambda x: os.path.getmtime(x), reverse=True)
 
@@ -159,7 +161,7 @@ class Manager(object):
             status["currentStatus"] = "not-configured"
 
         # Tap exists and has log in running status
-        elif os.path.isdir(log_dir) and len(self.search_files(log_dir, pattern='*.log.running')) > 0:
+        elif os.path.isdir(log_dir) and len(self.search_files(log_dir, patterns=['*.log.running'])) > 0:
             status["currentStatus"] = "running"
 
         # Configured and not running
@@ -168,7 +170,7 @@ class Manager(object):
 
         # Get last run instance
         if os.path.isdir(log_dir):
-            log_files = self.search_files(log_dir, pattern='*.log.*', sort=True)
+            log_files = self.search_files(log_dir, patterns=['*.log.success','*.log.failed'], sort=True)
             if len(log_files) > 0:
                 last_log_file = log_files[0]
                 log_attr = self.extract_log_attributes(last_log_file)
@@ -438,7 +440,6 @@ class Manager(object):
 
         # TODO: Move tap status detection to CLI
         tap_status = self.detect_tap_status(target_id, tap_id)
-        print(tap_status)
         if tap_status["currentStatus"] == "running":
             return { 'stdout': "This data source is already syncing", 'stderr': "", 'returncode': 1 }
 
@@ -638,7 +639,7 @@ class Manager(object):
 
         try:
             log_dir = self.get_tap_log_dir(target_id, tap_id)
-            log_files = self.search_files(log_dir, pattern='*.log.*')
+            log_files = self.search_files(log_dir, patterns=['*.log.*'])
             for log_file in log_files:
                 logs.append(self.extract_log_attributes(log_file))
 
