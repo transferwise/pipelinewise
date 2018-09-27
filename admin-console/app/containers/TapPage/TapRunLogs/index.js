@@ -28,6 +28,7 @@ import reducer from './reducer';
 import saga from './saga';
 
 import { Grid, Row, Col, Alert, ButtonGroup, Button } from 'react-bootstrap/lib';
+import ReactLoading from 'react-loading';
 import LoadingIndicator from 'components/LoadingIndicator';
 import SyntaxHighlighter from 'react-syntax-highlighter/prism';
 import { light } from 'react-syntax-highlighter/styles/prism';
@@ -71,7 +72,11 @@ export class TapRunLogs extends React.PureComponent {
       <Grid>
         <Row>
           <Col md={4}><FormattedMessage {...messages.createdAt} /></Col><Col md={8}>{createdAt}</Col>
-          <Col md={4}><FormattedMessage {...messages.status} /></Col><Col md={8} className={itemObj.className}>{itemObj.formattedMessage}</Col>
+          <Col md={4}><FormattedMessage {...messages.status} /></Col><Col md={8} className={itemObj.className}>
+            {activeLog.status === "running"
+            ? <span><ReactLoading type="bubbles" className="running-anim" />{itemObj.formattedMessage}</span>
+            : itemObj.formattedMessage}
+          </Col>
         </Row>
       </Grid>
     )

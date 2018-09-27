@@ -2,6 +2,7 @@ import React from 'react';
 import { FormattedMessage } from 'react-intl';
 import PropTypes from 'prop-types';
 import Toggle from 'react-toggle';
+import ReactLoading from 'react-loading';
 
 import ConnectorIcon from 'components/ConnectorIcon';
 import { formatDate, statusToObj } from 'utils/helper';
@@ -21,7 +22,13 @@ function TapsTableBody(props) {
         />
       </td>
       <td><a href={`/targets/${item.targetId}/taps/${item.id}`}><ConnectorIcon name={item.type} />&nbsp;<strong>{item.name}</strong></a></td>
-      <td className={`text-center ${currentStatusObj.className}`}>{currentStatusObj.formattedMessage}</td>
+      <td className={`text-center ${currentStatusObj.className}`}>
+        <span>
+          {item.status.currentStatus === "running"
+          ? <span><ReactLoading type="bubbles" className="running-anim" />{currentStatusObj.formattedMessage}</span>
+          : currentStatusObj.formattedMessage}
+        </span>
+      </td>
       <td>{formatDate(item.status.lastTimestamp)}</td>
       <td className={`text-center ${lastStatusObj.className}`}>{lastStatusObj.formattedMessage}</td>
     </tr>

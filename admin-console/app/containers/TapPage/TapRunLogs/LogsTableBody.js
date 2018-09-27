@@ -1,6 +1,7 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 
+import ReactLoading from 'react-loading';
 import { formatDate, statusToObj } from 'utils/helper';
 
 
@@ -18,7 +19,13 @@ function LogsTableBody(props) {
     <tr className={className} onClick={() => props.onItemSelect(item.filename)}>
       <td />
       <td>{formatDate(item.timestamp)}</td>
-      <td className={`text-center active ${itemObj.className}`}>{itemObj.formattedMessage}</td>
+      <td className={`text-center active ${itemObj.className}`}>
+        <span>
+          {item.status === "running"
+          ? <span><ReactLoading type="bubbles" className="running-anim" />{itemObj.formattedMessage}</span>
+          : itemObj.formattedMessage}
+        </span>
+      </td>
     </tr>
   );
 }

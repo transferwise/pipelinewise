@@ -11,7 +11,7 @@ export default defineMessages({
   },
   statusRunning: {
     id: 'PipelineWise.helper.statusRunning',
-    defaultMessage: 'Running',
+    defaultMessage: 'Syncing',
   },
   statusSuccess: {
     id: 'PipelineWise.helper.statusSuccess',

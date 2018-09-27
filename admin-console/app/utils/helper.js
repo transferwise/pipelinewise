@@ -5,11 +5,15 @@ import dateFormat from 'dateformat';
 import messages from './messages';
 
 function formatDate(ts, format="yyyy-mm-dd hh:MM:ss") {
-  try {
-    return dateFormat(ts, format)
-  } catch(err) {}
+  if (ts) {
+    try {
+      return dateFormat(ts, format)
+    } catch(err) {}
 
-  return "Unknown"
+    return "Unknown"
+  }
+
+  return "-"
 }
 
 function findItemByKey(a, k, m) {

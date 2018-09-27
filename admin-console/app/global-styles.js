@@ -139,6 +139,12 @@ injectGlobal`
     box-shadow: 2px 2px 5px rgba(0,0,0,0.15);
     width: 100%
   }
+  .running-anim {
+    fill: lightblue !important;
+    height: 20px !important;
+    margin-top: -20px !important;
+    display: inline-block;
+  }
   .footer {
     position: absolute;
     bottom: 0;

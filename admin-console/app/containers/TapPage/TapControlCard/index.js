@@ -14,6 +14,7 @@ import { FormattedMessage } from 'react-intl';
 import SyntaxHighlighter from 'react-syntax-highlighter/prism';
 import { light } from 'react-syntax-highlighter/styles/prism';
 import { Grid, Row, Col, Alert, Button } from 'react-bootstrap/lib';
+import ReactLoading from 'react-loading';
 
 import {
   makeSelectTapLoading,
@@ -54,12 +55,19 @@ export class TapControlCard extends React.PureComponent {
       consoleOutput,
       onCloseModal,
     } = this.props;
-    const runTapButtonEnabled = tap && tap.enabled && tap.status && tap.status.currentStatus == 'ready' && !runTapSuccess;
     const targetId = tap && tap.target && tap.target.id;
     const tapId = tap && tap.id;
-    const currentStatusObj = statusToObj(runTapSuccess ? 'started' : tap && tap.status && tap.status.currentStatus)
-    const lastStatusObj = statusToObj(tap && tap.status && tap.status.lastStatus)
-    const lastTimestamp = tap && tap.status && tap.status.lastTimestamp
+    const tapEnabled = tap && tap.enabled
+    const tapStatus = tap && tap.status
+    const tapCurrentStatus = tapStatus && tapStatus.currentStatus
+    const tapLastStatus = tapStatus && tapStatus.lastStatus
+    const tapLastTimestamp = tapStatus && tapStatus.lastTimestamp
+
+    const tapRunning = tapCurrentStatus === 'running'
+    const runTapButtonEnabled = tap.enabled && tapCurrentStatus == 'ready' && !runTapSuccess;
+    const currentStatusObj = statusToObj(runTapSuccess ? 'started' : tapCurrentStatus)
+    const lastStatusObj = statusToObj(tapLastStatus)
+    const lastTimestamp = tapLastTimestamp
     let alert = <div />
     let consolePanel = <div />
 
@@ -90,7 +98,11 @@ export class TapControlCard extends React.PureComponent {
         <Row>
           <Col md={6}><ConnectorIcon name={tap.type} /></Col><Col md={6}><p><strong>{tap.name}</strong><br />(id: {tap.id})</p></Col>
           <Col md={6}><strong><FormattedMessage {...messages.target} />:</strong></Col><Col md={6}><a href={`/targets/${tap.target.id}`}>{tap.target.name}</a></Col>
-          <Col md={6}><strong><FormattedMessage {...messages.status} />:</strong></Col><Col md={6} className={currentStatusObj.className}>{currentStatusObj.formattedMessage}</Col>
+          <Col md={6}><strong><FormattedMessage {...messages.status} />:</strong></Col><Col md={6} className={currentStatusObj.className}>
+            {tapRunning
+            ? <span><ReactLoading type="bubbles" className="running-anim" />{currentStatusObj.formattedMessage}</span>
+            : currentStatusObj.formattedMessage}
+          </Col>
           <Col md={12}><br /></Col>
           <Col md={6}><strong><FormattedMessage {...messages.lastTimestamp} />:</strong></Col><Col md={6}>{formatDate(lastTimestamp)}</Col>
           <Col md={6}><strong><FormattedMessage {...messages.lastStatus} />:</strong></Col><Col md={6} className={lastStatusObj.className}>{lastStatusObj.formattedMessage}</Col>
