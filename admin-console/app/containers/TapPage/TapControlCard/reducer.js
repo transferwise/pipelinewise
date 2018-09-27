@@ -65,12 +65,13 @@ function tapControlCardReducer(state = initialState, action) {
       const rc = action.response && action.response.result && action.response.result.returncode
       const stdout = action.response && action.response.result && action.response.result.stdout
       const stderr = action.response && action.response.result && action.response.result.stderr
+      const message = action.response && action.response.message
       
       return state
         .set('runTapLoading', false)
         .set('runTapError', rc !== 0 ? messages.runTapFailed.defaultMessage : false)
         .set('runTapSuccess', action.response.status === 200)
-        .set('consoleOutput', rc !== 0 ? `${stdout} - ${stderr}` : false)
+        .set('consoleOutput', rc !== 0 ? `${stdout} - ${stderr} (${message})` : false)
         .set('runTapButtonEnabled', true)
     case RUN_TAP_ERROR:
       return state
