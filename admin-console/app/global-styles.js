@@ -54,6 +54,17 @@ injectGlobal`
   .modal-hidden {
     display: none !important;
   }
+  .modal-dialog {
+    overflow-y: initial !important;
+  }
+  .modal-body {
+    max-height: 650px;
+    overflow-y: auto;
+  }
+  .syntax-highligher-scrollable {
+    max-height: 500px;
+    overflow-y: auto;
+  }
   .arrow-right {
     width: 0; 
     height: 0; 

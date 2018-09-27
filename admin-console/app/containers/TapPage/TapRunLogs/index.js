@@ -85,7 +85,7 @@ export class TapRunLogs extends React.PureComponent {
       }
       else {
         logContent = (
-          <SyntaxHighlighter className="font-sssm" language='shsssell' style={light} showLineNumbers={false}>
+          <SyntaxHighlighter className="font-sssm syntax-highligher-scrollable" language='shsssell' style={light} showLineNumbers={false}>
               {log || '<EMPTY>'}
           </SyntaxHighlighter>
         );

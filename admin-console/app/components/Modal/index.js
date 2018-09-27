@@ -6,7 +6,7 @@ function Modal(props) {
   const visibleClassName = `modal modal-${props.show ? 'visible' : 'hidden'}`
   return (
     <div className={visibleClassName} tabIndex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true">
-      <div className="modal-dialog modal-lg modal-dialog-centered" role="document">
+      <div className="modal-dialog modal-lg modal-dialog-centered modal-scrollable" role="document">
         <div className="modal-content shadow">
           <div className="modal-header">
             <h5 className="modal-title" id="exampleModalLabel">{props.title}</h5>
