@@ -32,6 +32,7 @@ import ReactLoading from 'react-loading';
 import LoadingIndicator from 'components/LoadingIndicator';
 import SyntaxHighlighter from 'react-syntax-highlighter/prism';
 import { light } from 'react-syntax-highlighter/styles/prism';
+import IntervalTimer from 'react-interval-timer';
 import Modal from 'components/Modal';
 import Timeline from 'components/Timeline';
 import LogsTable from './LogsTable';
@@ -74,7 +75,15 @@ export class TapRunLogs extends React.PureComponent {
           <Col md={4}><FormattedMessage {...messages.createdAt} /></Col><Col md={8}>{createdAt}</Col>
           <Col md={4}><FormattedMessage {...messages.status} /></Col><Col md={8} className={itemObj.className}>
             {activeLog.status === "running"
-            ? <span><ReactLoading type="bubbles" className="running-anim" />{itemObj.formattedMessage}</span>
+            ? <span>
+                <ReactLoading type="bubbles" className="running-anim" />{itemObj.formattedMessage}
+                <IntervalTimer
+                    timeout={10000}
+                    callback={() => this.onRefresh()}
+                    enabled={true}
+                    repeat={true}
+                  />
+              </span>
             : itemObj.formattedMessage}
           </Col>
         </Row>

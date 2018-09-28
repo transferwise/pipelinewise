@@ -13,6 +13,7 @@ import Modal from 'components/Modal';
 import { FormattedMessage } from 'react-intl';
 import SyntaxHighlighter from 'react-syntax-highlighter/prism';
 import { light } from 'react-syntax-highlighter/styles/prism';
+import IntervalTimer from 'react-interval-timer';
 import { Grid, Row, Col, Alert, Button } from 'react-bootstrap/lib';
 import ReactLoading from 'react-loading';
 
@@ -42,6 +43,11 @@ export class TapControlCard extends React.PureComponent {
   componentDidMount() {
     const { targetId, tapId } = this.props
       this.props.onLoadTap(targetId, tapId);
+  }
+
+  onRefresh() {
+    const { targetId, tapId } = this.props
+    this.props.onLoadTap(targetId, tapId);
   }
 
   render() {
@@ -100,7 +106,15 @@ export class TapControlCard extends React.PureComponent {
           <Col md={6}><strong><FormattedMessage {...messages.target} />:</strong></Col><Col md={6}><a href={`/targets/${tap.target.id}`}>{tap.target.name}</a></Col>
           <Col md={6}><strong><FormattedMessage {...messages.status} />:</strong></Col><Col md={6} className={currentStatusObj.className}>
             {tapRunning
-            ? <span><ReactLoading type="bubbles" className="running-anim" />{currentStatusObj.formattedMessage}</span>
+            ? <span>
+                <ReactLoading type="bubbles" className="running-anim" />{currentStatusObj.formattedMessage}
+                <IntervalTimer
+                    timeout={10000}
+                    callback={() => this.onRefresh()}
+                    enabled={true}
+                    repeat={true}
+                  />
+              </span>
             : currentStatusObj.formattedMessage}
           </Col>
           <Col md={12}><br /></Col>
