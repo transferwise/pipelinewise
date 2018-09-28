@@ -7,6 +7,7 @@ import { light } from 'react-syntax-highlighter/styles/prism';
 import TabbedContent from 'components/TabbedContent';
 
 import TapControlCard from './TapControlCard/Loadable';
+import TapInheritableConfig from './TapInheritableConfig';
 import TapDangerZone from './TapDangerZone/Loadable';
 import TapRunLogs from './TapRunLogs/Loadable';
 import SingerTapConfig from '../../singerConnectors/SingerTapConfig';
@@ -36,10 +37,11 @@ function summaryContent(tap) {
       <Row>
         <Col md={6}>
           <SingerTapConfig tap={tap} />
+          <TapDangerZone targetId={tap.target.id} tapId={tap.id} />
         </Col>
         <Col md={6}>
           <TapControlCard targetId={tap.target.id} tapId={tap.id} />
-          <TapDangerZone targetId={tap.target.id} tapId={tap.id} />
+          <TapInheritableConfig targetId={tap.target.id} tapId={tap.id} />
         </Col>
       </Row>
     </Grid>
