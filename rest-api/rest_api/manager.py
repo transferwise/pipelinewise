@@ -105,6 +105,7 @@ class Manager(object):
     def get_connector_files(self, connector_dir):
         return {
             'config': os.path.join(connector_dir, 'config.json'),
+            'inheritable_config': os.path.join(connector_dir, 'inheritable_config.json'),
             'properties': os.path.join(connector_dir, 'properties.json'),
             'state': os.path.join(connector_dir, 'state.json'),
             'transformation': os.path.join(connector_dir, 'transformation.json'),
@@ -114,6 +115,7 @@ class Manager(object):
         connector_files = self.get_connector_files(connector_dir)
         return {
             'config': self.load_json(connector_files['config']),
+            'inheritable_config': self.load_json(connector_files['inheritable_config']),
             'properties': self.load_json(connector_files['properties']),
             'state': self.load_json(connector_files['state']),
             'transformation': self.load_json(connector_files['transformation']),
@@ -490,6 +492,24 @@ class Manager(object):
             return "Tap config updated successfully"
         except Exception as exc:
             raise Exception("Failed to update {} tap config in {} target: {}".format(tap_id, target_id, exc))
+
+    def get_tap_inheritable_config(self, target_id, tap_id):
+        self.logger.info('Getting {} tap inheritable config from target {}'.format(tap_id, target_id))
+        tap = self.get_tap(target_id, tap_id)
+        print(tap["files"]["inheritable_config"])
+        return tap["files"]["inheritable_config"]
+
+    def update_tap_inheritable_config(self, target_id, tap_id, tap_config):
+        self.logger.info('Updating {} tap inheritable config in target {}'.format(tap_id, target_id))
+
+        try:
+            tap_dir = self.get_tap_dir(target_id, tap_id)
+            tap_connector_files = self.get_connector_files(tap_dir)
+            self.save_json(tap_config, tap_connector_files['inheritable_config'])
+
+            return "Tap config updated successfully"
+        except Exception as exc:
+            raise Exception("Failed to update {} tap inheritable config in {} target: {}".format(tap_id, target_id, exc))
 
     def test_tap_connection(self, target_id, tap_id):
         self.logger.info('Testing {} tap connection in target {}'.format(tap_id, target_id))
