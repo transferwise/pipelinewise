@@ -84,6 +84,9 @@ class PipelineWise(object):
 
     def get_tap_log_dir(self, target_id, tap_id):
         return os.path.join(self.get_tap_dir(target_id, tap_id), 'log')
+
+    def get_target_dir(self, target_id):
+        return os.path.join(self.config_dir, target_id)
     
     def get_connector_bin(self, connector_type):
         return os.path.join(self.venv_dir, connector_type, "bin", connector_type)
@@ -115,6 +118,12 @@ class PipelineWise(object):
         
         if target == False:
             raise Exception("Cannot find {} target".format(target_id))
+
+        target_dir = self.get_target_dir(target_id)
+        if os.path.isdir(target_dir):
+            target['files'] = self.get_connector_files(target_dir)
+        else:
+            raise Exception("Cannot find target at {}".format(target_dir))
 
         return target
     
@@ -391,14 +400,15 @@ class PipelineWise(object):
         tap_config = self.tap["files"]["config"]
         tap_properties = self.tap["files"]["properties"]
         tap_transformation = self.tap["files"]["transformation"]
+        target_config = self.target["files"]["config"]
 
         # Run without transformation in the middle
         if not os.path.isfile(tap_transformation):
-            command = "{} --config {} --properties {}".format(self.tap_bin, tap_config, tap_properties)
+            command = "{} --config {} --properties {} | {} --config {}".format(self.tap_bin, tap_config, tap_properties, self.target_bin, target_config)
 
         # Run with transformation in the middle
         else:
-            command = "{} --config {} --properties {} | {} --config {}".format(self.tap_bin, tap_config, tap_properties, self.tranform_field_bin, tap_transformation)
+            command = "{} --config {} --properties {} | {} --config {} | {} --config {}".format(self.tap_bin, tap_config, tap_properties, self.tranform_field_bin, tap_transformation, self.target_bin, target_config)
 
         # Output will be redirected into a log file
         log_dir = self.get_tap_log_dir(target_id, tap_id)
