@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
 import os
+import tempfile
+import errno
 import datetime
 from subprocess import Popen, PIPE, STDOUT
 import shlex
@@ -49,6 +51,17 @@ class PipelineWise(object):
         self.tranform_field_bin = self.get_connector_bin("transform-field")
         self.target_bin = self.get_connector_bin(self.target["type"])
 
+    def silentremove(self, file):
+        self.logger.debug('Removing file at {}'.format(file))
+
+        try:
+            os.remove(file)
+        except OSError as e:
+
+            # errno.ENOENT = no such file or directory
+            if e.errno != errno.ENOENT:
+                raise
+
     def is_json(self, string):
         try:
             json_object = json.loads(string)
@@ -75,6 +88,26 @@ class PipelineWise(object):
         except Exception as exc:
             raise Exception("Cannot save JSON {} {}".format(file, exc))
 
+    def create_consumable_target_config(self, target_config, tap_inheritable_config):
+        try:
+            dictA = self.load_json(target_config)
+            dictB = self.load_json(tap_inheritable_config)
+
+            # Copy everything from dictB into dictA - Not a real merge
+            dictA.update(dictB)
+
+            # Add public as a default target schema if not defined any specific
+            if 'schema' not in dictA or not dictA['schema']:
+                dictA['schema'] = 'public'
+
+            # Save the new dict as JSON into a temp file
+            tempfile_path = tempfile.mkstemp()[1]
+            self.save_json(dictA, tempfile_path)
+
+            return tempfile_path
+        except Exception as exc:
+            raise Exception("Cannot merge JSON files {} {} - {}".format(fileA, fileB, exc))
+
     def load_config(self):
         self.logger.debug('Loading config at {}'.format(self.config_path))
         self.config = self.load_json(self.config_path)
@@ -94,6 +127,7 @@ class PipelineWise(object):
     def get_connector_files(self, connector_dir):
         return {
             'config': os.path.join(connector_dir, 'config.json'),
+            'inheritable_config': os.path.join(connector_dir, 'inheritable_config.json'),
             'properties': os.path.join(connector_dir, 'properties.json'),
             'state': os.path.join(connector_dir, 'state.json'),
             'transformation': os.path.join(connector_dir, 'transformation.json'),
@@ -398,22 +432,35 @@ class PipelineWise(object):
 
         # Generate and run the command to run the tap directly
         tap_config = self.tap["files"]["config"]
+        tap_inheritable_config = self.tap["files"]["inheritable_config"]
         tap_properties = self.tap["files"]["properties"]
         tap_transformation = self.tap["files"]["transformation"]
         target_config = self.target["files"]["config"]
 
-        # Run without transformation in the middle
-        if not os.path.isfile(tap_transformation):
-            command = "{} --config {} --properties {} | {} --config {}".format(self.tap_bin, tap_config, tap_properties, self.target_bin, target_config)
+        # Some target attributes can be passed and override by tap (aka. inheritable config)
+        # We merge the two configs and use that with the target
+        cons_target_config = self.create_consumable_target_config(target_config, tap_inheritable_config)
 
-        # Run with transformation in the middle
-        else:
-            command = "{} --config {} --properties {} | {} --config {} | {} --config {}".format(self.tap_bin, tap_config, tap_properties, self.tranform_field_bin, tap_transformation, self.target_bin, target_config)
+        try:
+            # Run without transformation in the middle
+            if not os.path.isfile(tap_transformation):
+                command = "{} --config {} --properties {} | {} --config {}".format(self.tap_bin, tap_config, tap_properties, self.target_bin, cons_target_config)
 
-        # Output will be redirected into a log file
-        log_dir = self.get_tap_log_dir(target_id, tap_id)
-        current_time = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        log_file = os.path.join(log_dir, "{}-{}-{}.log".format(target_id, tap_id, current_time))
+            # Run with transformation in the middle
+            else:
+                command = "{} --config {} --properties {} | {} --config {} | {} --config {}".format(self.tap_bin, tap_config, tap_properties, self.tranform_field_bin, tap_transformation, self.target_bin, cons_target_config)
 
-        # Run command
-        result = self.run_command(command, log_file)
+            # Output will be redirected into a log file
+            log_dir = self.get_tap_log_dir(target_id, tap_id)
+            current_time = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            log_file = os.path.join(log_dir, "{}-{}-{}.log".format(target_id, tap_id, current_time))
+
+            # Run command
+            result = self.run_command(command, log_file)
+
+        # Delete temp file if there is any
+        except Exception as exc:
+            self.silentremove(cons_target_config)
+            raise exc
+
+        self.silentremove(cons_target_config)
