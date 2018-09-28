@@ -18,8 +18,8 @@ PipelineWise is an ETL and Data Pipeline Framework using the singer.io specifica
 * **Target**: Consumes data from taps and do something with it, like load it into a file, API or database
 
 ### Supported Connectors
-* **tap-postgres** (WiP): Extract data from PostgreSQL databases. Supporting Log-Based Inremental, Key-Based Incremental and Full Table replications
-* **target-postgres** (WiP): Loads data from any tap into PostgreSQL database
+* **tap-postgres**: Extract data from PostgreSQL databases. Supporting Log-Based Inremental, Key-Based Incremental and Full Table replications
+* **target-postgres**: Loads data from any tap into PostgreSQL database
 
 ## Installation
 
