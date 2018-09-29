@@ -575,7 +575,8 @@ class Manager(object):
                                     stream["metadata"][idx]["metadata"]["selected"] = update_value
                                     # Set default replication method
                                     if stream["metadata"][idx]["breadcrumb"] == []:
-                                        stream["metadata"][idx]["metadata"]["replication-method"] = "FULL_TABLE"
+                                        if not stream["metadata"][idx]["metadata"]["replication-method"]:
+                                            stream["metadata"][idx]["metadata"]["replication-method"] = "FULL_TABLE"
 
                                 # Do only certain updates - SET replication method
                                 elif (update_key == 'replication-method'):
