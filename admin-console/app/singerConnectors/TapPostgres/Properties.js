@@ -9,6 +9,7 @@ import LoadingIndicator from 'components/LoadingIndicator';
 import ConnectorIcon from 'components/ConnectorIcon';
 import Modal from 'components/Modal';
 import TransformationDropdown from 'components/TransformationDropdown';
+import ReplicationMethodDropdown from 'components/ReplicationMethodDropdown';
 import {
   makeSelectStreams,
   makeSelectForceRefreshStreams,
@@ -21,8 +22,8 @@ import {
 import {
   loadStreams,
   setActiveStreamId,
-  updateStreamToReplicate,
   discoverTap,
+  updateStreamToReplicate,
   setTransformation,
   resetConsoleOutput
 } from './actions';
@@ -73,22 +74,6 @@ export class TapPostgresProperties extends React.PureComponent {
     const isSelected = props.selectedItem === streamId;
     let streamChangeDescription;
 
-
-    if (replicationMethod) {
-      if (replicationMethod === "FULL_TABLE") {
-        replicationMethodString = <FormattedMessage {...messages.replicationMethodFullTable} />
-      }
-      else if (replicationMethod === "INCREMENTAL") {
-        replicationMethodString = <FormattedMessage {...messages.replicationMethodKeyBased} />
-      }
-      else if (replicationMethod === "LOG_BASED") {
-        replicationMethodString = <FormattedMessage {...messages.replicationMethodLogBased} />
-      }
-      else {
-        replicationMethodString = replicationMethod
-      }
-    }
-
     if (isNew) {
       streamChangeDescription = <FormattedMessage {...messages.newTable} />
     } else if (isModified) {
@@ -120,7 +105,23 @@ export class TapPostgresProperties extends React.PureComponent {
         <td>{item['table_name']}</td>
         <td>{item['is-view'] ? 'Yes' : ''}</td>
         <td>{tableMetadata['row-count']}</td>
-        <td>{replicationMethodString}</td>
+        <td>
+          <ReplicationMethodDropdown
+            value={replicationMethod}
+            onChange={(value) => props.delegatedProps.onUpdateStreamToReplicate(
+              targetId,
+              tapId,
+              streamId,
+              {
+                tapType: "tap-postgres",
+                breadcrumb: [],
+                update: {
+                  key: "replication-method",
+                  value: value
+                }
+              })}
+          />
+        </td>
         <td>{item['is-new'] ? <FormattedMessage {...messages.newTable} /> : ''}</td>
       </tr>
     )
@@ -182,7 +183,8 @@ export class TapPostgresProperties extends React.PureComponent {
                   value: !isSelected
                 }
               })}
-          /></td>
+          />
+        </td>
         <td>{item.isPrimaryKey && <ConnectorIcon className="img-icon-sm" name="key" />} {item.name}</td>
         <td>{item.type}</td>
         <td>{method}</td>

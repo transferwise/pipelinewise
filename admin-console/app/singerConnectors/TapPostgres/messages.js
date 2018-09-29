@@ -63,23 +63,11 @@ export default defineMessages({
   },
   replicationMethod: {
     id: 'PipelineWise.TapPostgres.replicationMethod',
-    defaultMessage: 'Method',
+    defaultMessage: 'Sync Method',
   },
   transformation: {
     id: 'PipelineWise.TapPostgres.transformation',
     defaultMessage: 'Transformation',
-  },
-  replicationMethodFullTable: {
-    id: 'PipelineWise.TapPostgfres.replicationMethodFullTable',
-    defaultMessage: 'Full',
-  },
-  replicationMethodLogBased: {
-    id: 'PipelineWise.TapPostgfres.replicationMethodLogBased',
-    defaultMessage: 'Log Based Incremental',
-  },
-  replicationMethodKeyBased: {
-    id: 'PipelineWise.TapPostgfres.replicationMethodKeyBased',
-    defaultMessage: 'Key Based Incremental',
   },
   selected: {
     id: 'PipelineWise.TapPostgres.selected',
