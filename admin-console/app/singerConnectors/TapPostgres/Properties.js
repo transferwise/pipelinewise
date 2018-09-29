@@ -23,7 +23,7 @@ import {
   loadStreams,
   setActiveStreamId,
   discoverTap,
-  updateStreamToReplicate,
+  updateStream,
   setTransformation,
   resetConsoleOutput
 } from './actions';
@@ -86,7 +86,7 @@ export class TapPostgresProperties extends React.PureComponent {
           <Toggle
             key={`stream-toggle-${streamId}`}
             defaultChecked={tableMetadata.selected}
-            onChange={() => props.delegatedProps.onUpdateStreamToReplicate(
+            onChange={() => props.delegatedProps.onUpdateStream(
               targetId,
               tapId,
               streamId,
@@ -108,7 +108,7 @@ export class TapPostgresProperties extends React.PureComponent {
         <td>
           <ReplicationMethodDropdown
             value={replicationMethod}
-            onChange={(value) => props.delegatedProps.onUpdateStreamToReplicate(
+            onChange={(value) => props.delegatedProps.onUpdateStream(
               targetId,
               tapId,
               streamId,
@@ -171,7 +171,7 @@ export class TapPostgresProperties extends React.PureComponent {
             key={`column-toggle-${item.name}`}
             defaultChecked={isSelected}
             disabled={item.isPrimaryKey}
-            onChange={() => props.delegatedProps.onUpdateStreamToReplicate(
+            onChange={() => props.delegatedProps.onUpdateStream(
               targetId,
               tapId,
               streamId,
@@ -266,7 +266,7 @@ export class TapPostgresProperties extends React.PureComponent {
       activeStream,
       activeStreamId,
       onStreamSelect,
-      onUpdateStreamToReplicate,
+      onUpdateStream,
       onTransformationChange,
       onDiscoverTap,
       onCloseModal
@@ -322,7 +322,7 @@ export class TapPostgresProperties extends React.PureComponent {
                       headerComponent={TapPostgresProperties.streamsTableHeader}
                       bodyComponent={TapPostgresProperties.streamsTableBody}
                       onItemSelect={onStreamSelect}
-                      delegatedProps={{ targetId, tapId, onUpdateStreamToReplicate }}
+                      delegatedProps={{ targetId, tapId, onUpdateStream }}
                     />
                   </Grid>
                 </Col>
@@ -332,7 +332,7 @@ export class TapPostgresProperties extends React.PureComponent {
                 <Col md={12}>
                   <strong><FormattedMessage {...messages.columnsToReplicate} /></strong>
                   <Grid>
-                    {this.renderStreamColumns(streams, activeStream, activeStreamId, { targetId, tapId, stream: activeStream, streamId: activeStreamId, onUpdateStreamToReplicate, onTransformationChange })}
+                    {this.renderStreamColumns(streams, activeStream, activeStreamId, { targetId, tapId, stream: activeStream, streamId: activeStreamId, onUpdateStream, onTransformationChange })}
                   </Grid>
                 </Col>
               </Row>
@@ -356,7 +356,7 @@ TapPostgresProperties.propTypes = {
   forceRefreshStreams: PropTypes.any,
   activeStreamId: PropTypes.any,
   onStreamSelect: PropTypes.func,
-  onUpdateStreamToReplicate: PropTypes.func,
+  onUpdateStream: PropTypes.func,
   onTransformationChange: PropTypes.func,
 }
 
@@ -364,7 +364,7 @@ export function mapDispatchToProps(dispatch) {
   return {
     onLoadStreams: (targetId, tapId) => dispatch(loadStreams(targetId, tapId)),
     onStreamSelect: (stream, streamId) => dispatch(setActiveStreamId(stream, streamId)),
-    onUpdateStreamToReplicate: (targetId, tapId, streamId, params) => dispatch(updateStreamToReplicate(targetId, tapId, streamId, params)),
+    onUpdateStream: (targetId, tapId, streamId, params) => dispatch(updateStream(targetId, tapId, streamId, params)),
     onTransformationChange: (targetId, tapId, stream, fieldId, value) => dispatch(setTransformation(targetId, tapId, stream, fieldId, value)),
     onDiscoverTap: (targetId, tapId) => dispatch(discoverTap(targetId, tapId)),
     onCloseModal: () => dispatch(resetConsoleOutput())

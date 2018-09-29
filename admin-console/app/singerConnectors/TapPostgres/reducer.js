@@ -32,9 +32,9 @@ import {
 
   SET_ACTIVE_STREAM_ID,
 
-  UPDATE_STREAM_TO_REPLICATE,
-  UPDATE_STREAM_TO_REPLICATE_SUCCESS,
-  UPDATE_STREAM_TO_REPLICATE_ERROR,
+  UPDATE_STREAM,
+  UPDATE_STREAM_SUCCESS,
+  UPDATE_STREAM_ERROR,
 
   SET_TRANSFORMATION,
   SET_TRANSFORMATION_SUCCESS,
@@ -192,19 +192,19 @@ function tapPostgresReducer(state = initialState, action) {
         .set('activeStream', action.stream)
         .set('activeStreamId', action.streamId);
 
-    case UPDATE_STREAM_TO_REPLICATE:
+    case UPDATE_STREAM:
       return state
         .set('loading', true)
         .set('error', false)
         .set('consoleOutput', false)
-    case UPDATE_STREAM_TO_REPLICATE_SUCCESS:
+    case UPDATE_STREAM_SUCCESS:
       return state
         .set('loading', false)
         .set('error', action.response.status !== 200 ? action.response.message : false)
         .set('forceReloadConfig', action.response.status === 200)
         .set('forceRefreshStreams', action.response.status === 200)
         .set('consoleOutput', false)
-    case UPDATE_STREAM_TO_REPLICATE_ERROR:
+    case UPDATE_STREAM_ERROR:
       return state
         .set('loading', false)
         .set('error', action.error)

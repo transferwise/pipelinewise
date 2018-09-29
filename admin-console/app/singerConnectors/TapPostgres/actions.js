@@ -36,9 +36,9 @@ import {
 
   SET_ACTIVE_STREAM_ID,
 
-  UPDATE_STREAM_TO_REPLICATE,
-  UPDATE_STREAM_TO_REPLICATE_SUCCESS,
-  UPDATE_STREAM_TO_REPLICATE_ERROR,
+  UPDATE_STREAM,
+  UPDATE_STREAM_SUCCESS,
+  UPDATE_STREAM_ERROR,
 
   SET_TRANSFORMATION,
   SET_TRANSFORMATION_SUCCESS,
@@ -163,13 +163,27 @@ export function setActiveStreamId(stream, streamId) {
   };
 }
 
-export function updateStreamToReplicate(targetId, tapId, streamId, params) {
+export function updateStream(targetId, tapId, streamId, params) {
   return {
-    type: UPDATE_STREAM_TO_REPLICATE,
+    type: UPDATE_STREAM,
     targetId,
     tapId,
     streamId,
     params,
+  };
+}
+
+export function updateStreamDone(response) {
+  return {
+    type: UPDATE_STREAM_SUCCESS,
+    response,
+  };
+}
+
+export function updateStreamError(error) {
+  return {
+    type: UPDATE_STREAM_ERROR,
+    error,
   };
 }
 
@@ -196,20 +210,6 @@ export function setTransformationError(error) {
     type: SET_TRANSFORMATION_ERROR,
     error,
   }
-}
-
-export function updateStreamToReplicateDone(response) {
-  return {
-    type: UPDATE_STREAM_TO_REPLICATE_SUCCESS,
-    response,
-  };
-}
-
-export function updateStreamToReplicateError(error) {
-  return {
-    type: UPDATE_STREAM_TO_REPLICATE_ERROR,
-    error, 
-  };
 }
 
 export function discoverTap(targetId, tapId) {
