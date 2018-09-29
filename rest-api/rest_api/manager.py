@@ -569,12 +569,17 @@ class Manager(object):
                                 # Breadcrumb found, do the update
                                 update_key = params["update"]["key"]
                                 update_value = params["update"]["value"]
-                                # Do only certain updates
+
+                                # Do only certain updates - SELECT to replicate
                                 if (update_key == "selected" and isinstance(update_value, bool)):
                                     stream["metadata"][idx]["metadata"]["selected"] = update_value
                                     # Set default replication method
                                     if stream["metadata"][idx]["breadcrumb"] == []:
                                         stream["metadata"][idx]["metadata"]["replication-method"] = "FULL_TABLE"
+
+                                # Do only certain updates - SET replication method
+                                elif (update_key == 'replication-method'):
+                                    stream["metadata"][idx]["metadata"]["replication-method"] = update_value
 
                                 else:
                                     raise Exception("Unknown method to update")
