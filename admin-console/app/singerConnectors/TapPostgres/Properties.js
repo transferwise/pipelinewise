@@ -34,7 +34,6 @@ import Toggle from 'react-toggle';
 import { FormattedMessage } from 'react-intl';
 
 import { Grid, Alert, Row, Col, ButtonGroup, Button } from 'react-bootstrap/lib';
-import Popup from 'reactjs-popup';
 import SyntaxHighlighter from 'react-syntax-highlighter/prism';
 import { light } from 'react-syntax-highlighter/styles/prism';
 
@@ -353,6 +352,7 @@ export class TapPostgresProperties extends React.PureComponent {
 
       return (
         <Grid>
+          <h5>{messages.properties.defaultMessage}</h5>
           {consoleOutput ?
             <Modal
               show={consoleOutput}
@@ -363,7 +363,6 @@ export class TapPostgresProperties extends React.PureComponent {
 
           <Row>
             <Col md={12}>
-              <br />
               <ButtonGroup bsClass="float-right">
                 <Button bsStyle="primary" onClick={() => onDiscoverTap(targetId, tapId)}><FormattedMessage {...messages.discover} /></Button>
               </ButtonGroup>

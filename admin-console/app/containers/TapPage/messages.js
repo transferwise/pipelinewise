@@ -27,7 +27,7 @@ export default defineMessages({
   },
   state: {
     id: 'PipelineWise.containers.TapPage.state',
-    defaultMessage: 'Loading Report',
+    defaultMessage: 'Bookmarks',
   },
   log: {
     id: 'PipelineWise.containers.TapPage.log',

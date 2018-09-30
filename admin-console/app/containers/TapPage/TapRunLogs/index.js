@@ -120,10 +120,7 @@ export class TapRunLogs extends React.PureComponent {
       loading,
       error,
       logs,
-      activeLogId,
-      onLogSelect
     } = this.props;
-    const activeLog = findItemByKey(logs, 'filename', activeLogId)
     const timelineProps = {
       loading,
       error,

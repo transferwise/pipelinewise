@@ -2,8 +2,7 @@ import React from 'react';
 import PropTypes from 'prop-types';
 
 import { Grid, Row, Col, Alert } from 'react-bootstrap/lib';
-import SyntaxHighlighter from 'react-syntax-highlighter/prism';
-import { light } from 'react-syntax-highlighter/styles/prism';
+import ReactJson from 'react-json-view';
 import TabbedContent from 'components/TabbedContent';
 
 import TapControlCard from './TapControlCard/Loadable';
@@ -17,18 +16,6 @@ import messages from './messages';
 
 function valueToString(value) {
   return JSON.stringify(value, null, 4);
-}
-
-function codeContent(codeString) {
-  return (
-    <SyntaxHighlighter
-      className="font-sm"
-      language='json'
-      style={light}
-      showLineNumbers={true}>
-        {codeString || '"<EMPTY>"'}
-    </SyntaxHighlighter>
-  )
 }
 
 function summaryContent(tap) {
@@ -53,7 +40,21 @@ function propertiesContent(tap) {
 }
 
 function stateContent(tap) {
-  try { return codeContent(valueToString(tap.files.state)) }
+  try {
+    const state = tap.files && tap.files.state
+    return (
+      <Grid>
+        <h5>{messages.state.defaultMessage}</h5>
+        <ReactJson
+          src={state || { "error": "No state for this data source" }}
+          name={null}
+          sortKeys={true}
+          theme="flat"
+          iconStyle="square"
+        />
+      </Grid>
+    )
+  }
   catch(e) {
     return <Alert bsStyle="danger" className="full-swidth"><strong>Error!</strong> State file content not found</Alert>
   }

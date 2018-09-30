@@ -170,6 +170,7 @@
     "react-helmet": "5.2.0",
     "react-interval-timer": "^1.0.4",
     "react-intl": "2.4.0",
+    "react-json-view": "^1.19.1",
     "react-jsonschema-form": "1.0.4",
     "react-loadable": "5.4.0",
     "react-redux": "5.0.7",
