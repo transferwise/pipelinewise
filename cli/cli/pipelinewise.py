@@ -226,6 +226,7 @@ class PipelineWise(object):
                     decoded_line = line.decode('utf-8')
                     stdout += decoded_line
                     f.write(decoded_line)
+                    f.flush()
             
             f.close()
             rc = proc.poll()
