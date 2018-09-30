@@ -10,6 +10,10 @@ import sys
 import logging
 import json
 
+class RunCommandException(Exception):
+    def __init__(self, *args, **kwargs):
+        Exception.__init__(self, *args, **kwargs)
+
 class PipelineWise(object):
     '''...'''
 
@@ -229,9 +233,8 @@ class PipelineWise(object):
                 # Add failed status to the log file name
                 os.rename(log_file_running, log_file_failed)
 
-                # Print debug and exit with error code
-                self.logger.error(stdout)
-                sys.exit(rc)
+                # Raise run command exception
+                raise RunCommandException("Command failed. Return code: {}".format(rc))
             else:
                 # Add success status to the log file name
                 os.rename(log_file_running, log_file_success)
@@ -434,21 +437,37 @@ class PipelineWise(object):
         tap_config = self.tap["files"]["config"]
         tap_inheritable_config = self.tap["files"]["inheritable_config"]
         tap_properties = self.tap["files"]["properties"]
+        tap_state = self.tap["files"]["state"]
         tap_transformation = self.tap["files"]["transformation"]
         target_config = self.target["files"]["config"]
+        new_tap_state = tempfile.mkstemp()[1]
 
         # Some target attributes can be passed and override by tap (aka. inheritable config)
         # We merge the two configs and use that with the target
         cons_target_config = self.create_consumable_target_config(target_config, tap_inheritable_config)
 
+        # Add state arugment if exists to extract data incrementally
+        tap_state_arg = ""
+        if os.path.isfile(tap_state):
+            tap_state_arg = "--state {}".format(tap_state)
+
         try:
             # Run without transformation in the middle
             if not os.path.isfile(tap_transformation):
-                command = "{} --config {} --properties {} | {} --config {}".format(self.tap_bin, tap_config, tap_properties, self.target_bin, cons_target_config)
+                command = ' '.join((
+                    "  {} --config {} --properties {} {}".format(self.tap_bin, tap_config, tap_properties, tap_state_arg),
+                    "| {} --config {}".format(self.target_bin, cons_target_config),
+                    "> {}".format(new_tap_state)
+                ))
 
             # Run with transformation in the middle
             else:
-                command = "{} --config {} --properties {} | {} --config {} | {} --config {}".format(self.tap_bin, tap_config, tap_properties, self.tranform_field_bin, tap_transformation, self.target_bin, cons_target_config)
+                command = ' '.join((
+                    "  {} --config {} --properties {} {}".format(self.tap_bin, tap_config, tap_properties, tap_state_arg),
+                    "| {} --config {}".format(self.tranform_field_bin, tap_transformation),
+                    "| {} --config {}".format(self.target_bin, cons_target_config),
+                    "> {}".format(new_tap_state)
+                ))
 
             # Output will be redirected into a log file
             log_dir = self.get_tap_log_dir(target_id, tap_id)
@@ -459,8 +478,15 @@ class PipelineWise(object):
             result = self.run_command(command, log_file)
 
         # Delete temp file if there is any
+        except RunCommandException as exc:
+            self.logger.error(exc)
+            self.silentremove(cons_target_config)
+            os.rename(new_tap_state, tap_state)
+            sys.exit(1)
         except Exception as exc:
             self.silentremove(cons_target_config)
+            os.rename(new_tap_state, tap_state)
             raise exc
 
         self.silentremove(cons_target_config)
+        os.rename(new_tap_state, tap_state)
