@@ -104,7 +104,7 @@ export class TapPostgresProperties extends React.PureComponent {
     }
 
     return (
-      <tr className={`${isSelected ? "table-actives" : ""} ${streamChangeDescription ? "table-warning" : ""}`} onClick={() => props.onItemSelect(stream, streamId)}>
+      <tr className={`${isSelected ? "table-active" : ""} ${streamChangeDescription ? "table-warning" : ""}`} onClick={() => props.onItemSelect(stream, streamId)}>
         <td>
           <Toggle
             key={`stream-toggle-${streamId}`}
