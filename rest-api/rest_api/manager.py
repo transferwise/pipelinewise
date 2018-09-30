@@ -579,8 +579,12 @@ class Manager(object):
                                             stream["metadata"][idx]["metadata"]["replication-method"] = "FULL_TABLE"
 
                                 # Do only certain updates - SET replication method
-                                elif (update_key == 'replication-method'):
+                                elif (update_key == "replication-method"):
                                     stream["metadata"][idx]["metadata"]["replication-method"] = update_value
+
+                                # Do only certain updates - SET replication-key
+                                elif (update_key == "replication-key"):
+                                    stream["metadata"][idx]["metadata"]["replication-key"] = update_value
 
                                 else:
                                     raise Exception("Unknown method to update")
