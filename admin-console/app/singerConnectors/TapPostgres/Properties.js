@@ -273,8 +273,8 @@ export class TapPostgresProperties extends React.PureComponent {
                     }
                   })}
               >
-                {availableKeyColumns
-                  .map(c => <option key={`col-${c.name}`} value={c.name}>{c.name} ({c.sqlDatatype})</option>)}
+                {(!replicationKey ? [<option key={`col-not-defined`} className="text-danger" value="NOT_DEFINED">{messages.replicationKeyNotDefined.defaultMessage}</option>] : [])
+                  .concat(availableKeyColumns.map(c => <option key={`col-${c.name}`} value={c.name}>{c.name} ({c.sqlDatatype})</option>))}
               </select>
             </Grid>
           )

@@ -69,6 +69,10 @@ export default defineMessages({
     id: 'PipelineWise.TapPostgres.replicationKey',
     defaultMessage: 'Replication Key',
   },
+  replicationKeyNotDefined: {
+    id: 'PipelineWise.TapPostgres.replicationKeyNotDefined',
+    defaultMessage: '<Please select a Replication Key>',
+  },
   transformation: {
     id: 'PipelineWise.TapPostgres.transformation',
     defaultMessage: 'Transformation',
