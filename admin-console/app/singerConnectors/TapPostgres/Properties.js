@@ -256,26 +256,30 @@ export class TapPostgresProperties extends React.PureComponent {
         // Show key dropdown only for Key-Based incremental replication
         if (replicationMethod === 'INCREMENTAL') {
           return (
-            <Grid className="text-right">
-              <FormattedMessage {...messages.replicationKey} />:&nbsp;
-              <select
-                value={replicationKey}
-                onChange={(event) => onUpdateStream(
-                  targetId,
-                  tapId,
-                  activeStreamId,
-                  {
-                    tapType: "tap-postgres",
-                    breadcrumb: [],
-                    update: {
-                      key: "replication-key",
-                      value: event.target.value,
-                    }
-                  })}
-              >
-                {(!replicationKey ? [<option key={`col-not-defined`} className="text-danger" value="NOT_DEFINED">{messages.replicationKeyNotDefined.defaultMessage}</option>] : [])
-                  .concat(availableKeyColumns.map(c => <option key={`col-${c.name}`} value={c.name}>{c.name} ({c.sqlDatatype})</option>))}
-              </select>
+            <Grid className="text-right form-group row">
+              <label htmlFor="replication-key-dropdown" className="col-md-6 col-form-label">{messages.replicationKey.defaultMessage}:</label>
+              <Col md={6}>
+                <select
+                  id="replication-key-dropdown"
+                  className="form-control"
+                  value={replicationKey}
+                  onChange={(event) => onUpdateStream(
+                    targetId,
+                    tapId,
+                    activeStreamId,
+                    {
+                      tapType: "tap-postgres",
+                      breadcrumb: [],
+                      update: {
+                        key: "replication-key",
+                        value: event.target.value,
+                      }
+                    })}
+                >
+                  {(!replicationKey ? [<option key={`col-not-defined`} className="text-danger" value="NOT_DEFINED">{messages.replicationKeyNotDefined.defaultMessage}</option>] : [])
+                    .concat(availableKeyColumns.map(c => <option key={`col-${c.name}`} value={c.name}>{c.name} ({c.sqlDatatype})</option>))}
+                </select>
+              </Col>
             </Grid>
           )
         }
@@ -392,7 +396,7 @@ export class TapPostgresProperties extends React.PureComponent {
                   <br />
                 </Col>
                 <Col md={9}>
-                  {this.renderReplicationKeyDropdown()}<br />
+                  {this.renderReplicationKeyDropdown()}
                 </Col>
               </Row>
               <Row>
