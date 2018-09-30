@@ -14,10 +14,6 @@ import SingerTapProperties from '../../singerConnectors/SingerTapProperties';
 
 import messages from './messages';
 
-function valueToString(value) {
-  return JSON.stringify(value, null, 4);
-}
-
 function summaryContent(tap) {
   return (
     <Grid>
