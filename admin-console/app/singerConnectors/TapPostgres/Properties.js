@@ -66,7 +66,7 @@ export class TapPostgresProperties extends React.PureComponent {
     return Object.keys(schema).map(col => {
       const mdataCols = stream.metadata.filter(m => m.breadcrumb.length > 0)
       const mdata = mdataCols.find(m => m.breadcrumb[1] === col).metadata
-      const transformation = transformations.find(t => t['stream'] == activeStream && t['fieldId'] == col) || {}
+      const transformation = transformations.find(t => t['stream'] == props.activeStream && t['fieldId'] == col) || {}
       return {
         name: col,
         format: schema[col].format,
@@ -240,7 +240,7 @@ export class TapPostgresProperties extends React.PureComponent {
   }
 
   renderReplicationKeyDropdown() {
-    const { streams, activeStreamId, targetId, tapId, onUpdateStream } = this.props
+    const { streams, activeStream, activeStreamId, targetId, tapId, onUpdateStream } = this.props
     let stream
 
     if (activeStreamId) {
@@ -250,7 +250,7 @@ export class TapPostgresProperties extends React.PureComponent {
         const mdataStream = stream.metadata.find(m => m.breadcrumb.length === 0).metadata || {}
         const replicationMethod = mdataStream['replication-method']
         const replicationKey = mdataStream['replication-key']
-        const columns = TapPostgresProperties.getColumnsFromStream(stream, { replicationKey })
+        const columns = TapPostgresProperties.getColumnsFromStream(stream, { activeStream, replicationKey })
         const availableKeyColumns = columns.filter(c => c.type === 'integer' || c.format === 'date-time')
 
         // Show key dropdown only for Key-Based incremental replication
@@ -292,7 +292,7 @@ export class TapPostgresProperties extends React.PureComponent {
       if (stream) {
         const mdataStream = stream.metadata.find(m => m.breadcrumb.length === 0).metadata || {}
         const replicationKey = mdataStream['replication-key']
-        const columns = TapPostgresProperties.getColumnsFromStream(stream, { replicationKey })
+        const columns = TapPostgresProperties.getColumnsFromStream(stream, { activeStream, replicationKey })
         return (
           <Grid>
             <Table
