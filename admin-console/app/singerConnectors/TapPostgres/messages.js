@@ -65,6 +65,10 @@ export default defineMessages({
     id: 'PipelineWise.TapPostgres.replicationMethod',
     defaultMessage: 'Sync Method',
   },
+  replicationKey: {
+    id: 'PipelineWise.TapPostgres.replicationKey',
+    defaultMessage: 'Replication Key',
+  },
   transformation: {
     id: 'PipelineWise.TapPostgres.transformation',
     defaultMessage: 'Transformation',

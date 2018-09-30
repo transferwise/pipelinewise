@@ -58,13 +58,36 @@ export class TapPostgresProperties extends React.PureComponent {
       </tr>
     )
   }
+
+  static getColumnsFromStream(stream, props) {
+    const schema = stream.schema.properties;
+    const transformations = stream.transformations;
+
+    return Object.keys(schema).map(col => {
+      const mdataCols = stream.metadata.filter(m => m.breadcrumb.length > 0)
+      const mdata = mdataCols.find(m => m.breadcrumb[1] === col).metadata
+      const transformation = transformations.find(t => t['stream'] == activeStream && t['fieldId'] == col) || {}
+      return {
+        name: col,
+        format: schema[col].format,
+        type: schema[col].type[1] || schema[col].type[0],
+        isPrimaryKey: schema[col].type[0] === 'null' ? false : true,
+        isReplicationKey: col === props.replicationKey,
+        inclusion: mdata.inclusion,
+        selectedByDefault: mdata['selected-by-default'],
+        selected: mdata['selected'],
+        sqlDatatype: mdata['sql-datatype'],
+        isNew: mdata['is-new'],
+        isModified: mdata['is-modified'],
+        transformationType: transformation.type,
+      }})
+  }
   
   static streamsTableBody(props) {
     const item = props.item;
     const tableBreadcrumb = item.metadata.find(m => m.breadcrumb.length === 0);
     const tableMetadata = tableBreadcrumb.metadata || {};
     const replicationMethod = tableMetadata['replication-method'];
-    let replicationMethodString = <FormattedMessage {...messages.notSelected} />
     const targetId = props.delegatedProps.targetId;
     const tapId = props.delegatedProps.tapId;
     const stream = item["table_name"];
@@ -170,7 +193,7 @@ export class TapPostgresProperties extends React.PureComponent {
           <Toggle
             key={`column-toggle-${item.name}`}
             defaultChecked={isSelected}
-            disabled={item.isPrimaryKey}
+            disabled={item.isPrimaryKey || item.isReplicationKey}
             onChange={() => props.delegatedProps.onUpdateStream(
               targetId,
               tapId,
@@ -185,7 +208,11 @@ export class TapPostgresProperties extends React.PureComponent {
               })}
           />
         </td>
-        <td>{item.isPrimaryKey && <ConnectorIcon className="img-icon-sm" name="key" />} {item.name}</td>
+        <td>
+          {item.isPrimaryKey && <ConnectorIcon className="img-icon-sm" name="key" />}&nbsp;
+          {item.isReplicationKey && <ConnectorIcon className="img-icon-sm" name="replication-key" />}&nbsp;
+          {item.name}
+        </td>
         <td>{item.type}</td>
         <td>{method}</td>
         <td>
@@ -212,31 +239,60 @@ export class TapPostgresProperties extends React.PureComponent {
     }
   }
 
+  renderReplicationKeyDropdown() {
+    const { streams, activeStreamId, targetId, tapId, onUpdateStream } = this.props
+    let stream
+
+    if (activeStreamId) {
+      stream = streams.find(s => s['tap_stream_id'] === activeStreamId);
+
+      if (stream) {
+        const mdataStream = stream.metadata.find(m => m.breadcrumb.length === 0).metadata || {}
+        const replicationMethod = mdataStream['replication-method']
+        const replicationKey = mdataStream['replication-key']
+        const columns = TapPostgresProperties.getColumnsFromStream(stream, { replicationKey })
+        const availableKeyColumns = columns.filter(c => c.type === 'integer' || c.format === 'date-time')
+
+        // Show key dropdown only for Key-Based incremental replication
+        if (replicationMethod === 'INCREMENTAL') {
+          return (
+            <Grid className="text-right">
+              <FormattedMessage {...messages.replicationKey} />:&nbsp;
+              <select
+                value={replicationKey}
+                onChange={(event) => onUpdateStream(
+                  targetId,
+                  tapId,
+                  activeStreamId,
+                  {
+                    tapType: "tap-postgres",
+                    breadcrumb: [],
+                    update: {
+                      key: "replication-key",
+                      value: event.target.value,
+                    }
+                  })}
+              >
+                {availableKeyColumns
+                  .map(c => <option key={`col-${c.name}`} value={c.name}>{c.name} ({c.sqlDatatype})</option>)}
+              </select>
+            </Grid>
+          )
+        }
+      }
+    }
+
+    return <Grid />
+  }
+
   renderStreamColumns(streams, activeStream, activeStreamId, delegatedProps) {
     if (activeStreamId) {
       const stream = streams.find(s => s['tap_stream_id'] === activeStreamId);
 
       if (stream) {
-        const schema = stream.schema.properties;
-        const transformations = stream.transformations;
-        const mdataCols = stream.metadata.filter(m => m.breadcrumb.length > 0)
-        const columns = Object.keys(schema).map(col => {
-          const mdata = mdataCols.find(m => m.breadcrumb[1] === col).metadata
-          const transformation = transformations.find(t => t['stream'] == activeStream && t['fieldId'] == col) || {}
-          return {
-            name: col,
-            format: schema[col].format,
-            type: schema[col].type[1] || schema[col].type[0],
-            isPrimaryKey: schema[col].type[0] === 'null' ? false : true,
-            inclusion: mdata.inclusion,
-            selectedByDefault: mdata['selected-by-default'],
-            selected: mdata['selected'],
-            sqlDatatype: mdata['sql-datatype'],
-            isNew: mdata['is-new'],
-            isModified: mdata['is-modified'],
-            transformationType: transformation.type,
-          }})
-
+        const mdataStream = stream.metadata.find(m => m.breadcrumb.length === 0).metadata || {}
+        const replicationKey = mdataStream['replication-key']
+        const columns = TapPostgresProperties.getColumnsFromStream(stream, { replicationKey })
         return (
           <Grid>
             <Table
@@ -328,9 +384,19 @@ export class TapPostgresProperties extends React.PureComponent {
                 </Col>
               </Row>
               <hr className="full-width" />
+          <Row>
+          </Row>
+              <Row>
+                <Col md={3}>
+                  <strong><FormattedMessage {...messages.columnsToReplicate} /></strong>
+                  <br />
+                </Col>
+                <Col md={9}>
+                  {this.renderReplicationKeyDropdown()}<br />
+                </Col>
+              </Row>
               <Row>
                 <Col md={12}>
-                  <strong><FormattedMessage {...messages.columnsToReplicate} /></strong>
                   <Grid>
                     {this.renderStreamColumns(streams, activeStream, activeStreamId, { targetId, tapId, stream: activeStream, streamId: activeStreamId, onUpdateStream, onTransformationChange })}
                   </Grid>
