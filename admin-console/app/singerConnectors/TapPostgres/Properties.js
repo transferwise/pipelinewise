@@ -351,16 +351,23 @@ export class TapPostgresProperties extends React.PureComponent {
       }
 
       // Find selected tables
-      const selectedStreams = streams.filter(s => {
-        const tableBreadcrumb = s.metadata.find(m => m.breadcrumb.length === 0)
-        const tableMetadata = tableBreadcrumb.metadata || {}
-        return tableMetadata.selected
-      })
+      let selectedStreams = []
+      if (streams) {
+        selectedStreams = streams.filter(s => {
+          const tableBreadcrumb = s.metadata.find(m => m.breadcrumb.length === 0)
+          const tableMetadata = tableBreadcrumb.metadata || {}
+          return tableMetadata.selected
+        })
+      }
 
       // Find selected columns
-      const stream = streams.find(s => s['tap_stream_id'] === activeStreamId);
-      const columns = TapPostgresProperties.getColumnsFromStream(stream, {})
-      const selectedColumns = columns.filter(c => c.selected || c.isPrimaryKey)
+      let columns
+      let selectedColumns = []
+      if (streams) {
+        const stream = streams.find(s => s['tap_stream_id'] === activeStreamId);
+        columns = stream ? TapPostgresProperties.getColumnsFromStream(stream, {}) : []
+        selectedColumns = columns.filter(c => c.selected || c.isPrimaryKey)
+      }
 
       return (
         <Grid>
@@ -386,7 +393,7 @@ export class TapPostgresProperties extends React.PureComponent {
               <Row>
                 <Col md={12}> 
                   <strong><FormattedMessage {...messages.tablesToReplicate} /></strong>&nbsp;
-                  ({selectedStreams.length} / {streams.length} selected)
+                  {streams ? `(${selectedStreams.length} / ${streams.length} selected)` : ''}
                   <Grid className="table-wrapper-scroll-y">
                     <Table
                       items={streams}
@@ -405,7 +412,7 @@ export class TapPostgresProperties extends React.PureComponent {
               <Row>
                 <Col md={5}>
                   <strong><FormattedMessage {...messages.columnsToReplicate} /></strong>&nbsp;
-                  ({selectedColumns.length} / {columns.length} selected)
+                  {columns ? `(${selectedColumns.length} / ${columns.length} selected)` : ''}
                   <br />
                 </Col>
                 <Col md={7}>
