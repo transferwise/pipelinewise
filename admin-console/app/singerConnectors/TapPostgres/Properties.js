@@ -350,6 +350,18 @@ export class TapPostgresProperties extends React.PureComponent {
           </SyntaxHighlighter> 
       }
 
+      // Find selected tables
+      const selectedStreams = streams.filter(s => {
+        const tableBreadcrumb = s.metadata.find(m => m.breadcrumb.length === 0)
+        const tableMetadata = tableBreadcrumb.metadata || {}
+        return tableMetadata.selected
+      })
+
+      // Find selected columns
+      const stream = streams.find(s => s['tap_stream_id'] === activeStreamId);
+      const columns = TapPostgresProperties.getColumnsFromStream(stream, {})
+      const selectedColumns = columns.filter(c => c.selected || c.isPrimaryKey)
+
       return (
         <Grid>
           <h5>{messages.properties.defaultMessage}</h5>
@@ -373,7 +385,8 @@ export class TapPostgresProperties extends React.PureComponent {
             <Grid>
               <Row>
                 <Col md={12}> 
-                  <strong><FormattedMessage {...messages.tablesToReplicate} /></strong>
+                  <strong><FormattedMessage {...messages.tablesToReplicate} /></strong>&nbsp;
+                  ({selectedStreams.length} / {streams.length} selected)
                   <Grid className="table-wrapper-scroll-y">
                     <Table
                       items={streams}
@@ -390,11 +403,12 @@ export class TapPostgresProperties extends React.PureComponent {
           <Row>
           </Row>
               <Row>
-                <Col md={3}>
-                  <strong><FormattedMessage {...messages.columnsToReplicate} /></strong>
+                <Col md={5}>
+                  <strong><FormattedMessage {...messages.columnsToReplicate} /></strong>&nbsp;
+                  ({selectedColumns.length} / {columns.length} selected)
                   <br />
                 </Col>
-                <Col md={9}>
+                <Col md={7}>
                   {this.renderReplicationKeyDropdown()}
                 </Col>
               </Row>
