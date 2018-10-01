@@ -304,6 +304,12 @@ class PipelineWise(object):
                     except Exception:
                         False
 
+                    # Copy replication key from the old stream
+                    try:
+                        new_schema["streams"][new_stream_idx]["metadata"][0]["metadata"]["replication-key"] = old_stream["metadata"][0]["metadata"]["replication-key"]
+                    except Exception:
+                        False
+
                     # Is this new or modified field?
                     new_fields = new_schema["streams"][new_stream_idx]["schema"]["properties"]
                     old_fields = old_schema["streams"][new_stream_idx]["schema"]["properties"]
