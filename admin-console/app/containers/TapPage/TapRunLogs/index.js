@@ -1,5 +1,4 @@
 import React from 'react';
-import ReactDOM from 'react-dom';
 import PropTypes from 'prop-types';
 import { FormattedMessage } from 'react-intl';
 import { connect } from 'react-redux';
@@ -32,7 +31,7 @@ import { Grid, Row, Col, Alert, ButtonGroup, Button } from 'react-bootstrap/lib'
 import ReactLoading from 'react-loading';
 import LoadingIndicator from 'components/LoadingIndicator';
 import SyntaxHighlighter from 'react-syntax-highlighter/prism';
-import { light } from 'react-syntax-highlighter/styles/prism';
+import { darcula } from 'react-syntax-highlighter/styles/prism';
 import IntervalTimer from 'react-interval-timer';
 import Modal from 'components/Modal';
 import Timeline from 'components/Timeline';
@@ -116,7 +115,7 @@ export class TapRunLogs extends React.PureComponent {
       else {
         logContent = (
           <div ref={logContentScrollable => this.logContentScrollable = logContentScrollable} className="syntax-highligher-scrollable">
-            <SyntaxHighlighter className="font-sssm" language='shsssell' style={light} showLineNumbers={false}>
+            <SyntaxHighlighter className="font-sssm" language='shsssell' style={darcula} showLineNumbers={false}>
                 {log || '<EMPTY>'}
             </SyntaxHighlighter>
           </div>
