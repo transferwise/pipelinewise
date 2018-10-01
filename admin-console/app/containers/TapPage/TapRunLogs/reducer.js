@@ -36,7 +36,6 @@ function tapRunLogsReducer(state = initialState, action) {
       return state
         .set('loading', true)
         .set('error', false)
-        .set('logViewerVisible', false)
         .set('viewerLoading', false)
         .set('viewerError', false)
         .set('log', false)
@@ -45,10 +44,8 @@ function tapRunLogsReducer(state = initialState, action) {
         .set('loading', false)
         .set('error', action.logs.status !== 200 ? action.logs.message : false)
         .set('logs', action.logs.result)
-        .set('logViewerVisible', false)
         .set('viewerLoading', false)
         .set('viewerError', false)
-        .set('log', false)
     case LOAD_RUN_LOGS_ERROR:
       return state
         .set('loading', false)
@@ -83,6 +80,7 @@ function tapRunLogsReducer(state = initialState, action) {
         .set('logViewerVisible', false)
         .set('viwerLoading', false)
         .set('viewerErrr', false)
+        .set('activeLogId', false)
         .set('log', false)
 
     case SET_LOG_VIEWER_VISIBLE:

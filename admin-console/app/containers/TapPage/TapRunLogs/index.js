@@ -1,4 +1,5 @@
 import React from 'react';
+import ReactDOM from 'react-dom';
 import PropTypes from 'prop-types';
 import { FormattedMessage } from 'react-intl';
 import { connect } from 'react-redux';
@@ -40,6 +41,16 @@ import messages from './messages';
 
 
 export class TapRunLogs extends React.PureComponent {
+  static scrollToBottom(node) {
+    if (node) {
+      const scrollHeight = node.scrollHeight;
+      const height = node.clientHeight;
+      const maxScrollTop = scrollHeight - height;
+
+      node.scrollTop = maxScrollTop > 0 ? maxScrollTop : 0;
+    }
+  }
+
   componentDidMount() {
     const { targetId, tapId } = this.props
     this.props.onLoadLogs(targetId, tapId);
@@ -47,14 +58,19 @@ export class TapRunLogs extends React.PureComponent {
 
   componentDidUpdate(prevProps) {
     const { targetId, tapId, activeLogId } = this.props;
-    if (activeLogId != prevProps.activeLogId) {
+    if (activeLogId && activeLogId != prevProps.activeLogId) {
       this.props.onLoadLogViewer(targetId, tapId, activeLogId)
     }
+
+    TapRunLogs.scrollToBottom(this.logContentScrollable)
   }
 
   onRefresh() {
-    const { targetId, tapId } = this.props
+    const { targetId, tapId, activeLogId } = this.props
     this.props.onLoadLogs(targetId, tapId);
+    if (activeLogId) {
+      this.props.onLoadLogViewer(targetId, tapId, activeLogId)
+    }
   }
 
   onTimeRangeChanged(timerange) {
@@ -99,9 +115,11 @@ export class TapRunLogs extends React.PureComponent {
       }
       else {
         logContent = (
-          <SyntaxHighlighter className="font-sssm syntax-highligher-scrollable" language='shsssell' style={light} showLineNumbers={false}>
-              {log || '<EMPTY>'}
-          </SyntaxHighlighter>
+          <div ref={logContentScrollable => this.logContentScrollable = logContentScrollable} className="syntax-highligher-scrollable">
+            <SyntaxHighlighter className="font-sssm" language='shsssell' style={light} showLineNumbers={false}>
+                {log || '<EMPTY>'}
+            </SyntaxHighlighter>
+          </div>
         );
       }
     }
