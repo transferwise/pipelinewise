@@ -73,6 +73,16 @@ class PipelineWise(object):
             return False
         return True
 
+    def is_json_file(self, file):
+        try:
+            if os.path.isfile:
+                with open(file) as f:
+                    if json.load(f):
+                        return True
+            return False
+        except Exception as exc:
+            return False
+
     def load_json(self, file):
         try:
             self.logger.debug('Parsing file at {}'.format(file))
@@ -482,12 +492,13 @@ class PipelineWise(object):
         except RunCommandException as exc:
             self.logger.error(exc)
             self.silentremove(cons_target_config)
-            os.rename(new_tap_state, tap_state)
             sys.exit(1)
         except Exception as exc:
             self.silentremove(cons_target_config)
-            os.rename(new_tap_state, tap_state)
             raise exc
 
         self.silentremove(cons_target_config)
-        os.rename(new_tap_state, tap_state)
+
+        # Save the new state file if created correctly
+        if self.is_json_file(new_tap_state):
+            os.rename(new_tap_state, tap_state)
