@@ -7,7 +7,7 @@ from cli.pipelinewise import PipelineWise
 import argparse
 
 __version__ = get_distribution('cli').version
-config_dir = os.path.join(Path.home(), '.pipelinewise')
+config_dir = os.path.join(os.path.expanduser('~'), '.pipelinewise')
 venv_dir = os.path.join(os.getcwd(), '../.virtualenvs')
 
 commands = [

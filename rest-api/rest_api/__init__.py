@@ -31,7 +31,7 @@ app.config.from_envvar('PIPELINEWISE_SETTINGS_FILE', silent=True)
 CORS(app)
 
 
-config_dir = os.path.join(Path.home(), '.pipelinewise')
+config_dir = os.path.join(os.path.expanduser('~'), '.pipelinewise')
 venv_dir = os.path.join(os.getcwd(), '../.virtualenvs')
 manager = Manager(config_dir, venv_dir, app.logger)
 
