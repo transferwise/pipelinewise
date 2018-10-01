@@ -10,6 +10,7 @@ import shlex
 import sys
 import logging
 import json
+import glob
 
 class RunCommandException(Exception):
     def __init__(self, *args, **kwargs):
@@ -66,6 +67,20 @@ class PipelineWise(object):
             # errno.ENOENT = no such file or directory
             if e.errno != errno.ENOENT:
                 raise
+    def search_files(self, search_dir, patterns=['*'], sort=False):
+        files = []
+        if os.path.isdir(search_dir):
+            # Search files and sort if required
+            p_files = []
+            for pattern in patterns:
+                p_files.extend(filter(os.path.isfile, glob.glob(os.path.join(search_dir, pattern))))
+            if sort:
+                p_files.sort(key=lambda x: os.path.getmtime(x), reverse=True)
+
+            # Cut the whole paths, we only need the filenames
+            files = list(map(lambda x: os.path.basename(x), p_files))
+
+        return files
 
     def is_json(self, string):
         try:
@@ -76,7 +91,7 @@ class PipelineWise(object):
 
     def is_json_file(self, file):
         try:
-            if os.path.isfile:
+            if os.path.isfile(file):
                 with open(file) as f:
                     if json.load(f):
                         return True
@@ -491,6 +506,11 @@ class PipelineWise(object):
             log_dir = self.get_tap_log_dir(target_id, tap_id)
             current_time = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             log_file = os.path.join(log_dir, "{}-{}-{}.log".format(target_id, tap_id, current_time))
+
+            # Do not run if another instance is already running
+            if os.path.isdir(log_dir) and len(self.search_files(log_dir, patterns=['*.log.running'])) > 0:
+                self.logger.info("Failed to run. Another instance of the same tap is already running at {} ".format(log_file_running))
+                sys.exit(1)
 
             # Run command
             result = self.run_command(command, log_file)
