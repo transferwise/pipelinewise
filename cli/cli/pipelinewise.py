@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os
+import shutil
 import tempfile
 import errno
 import datetime
@@ -507,4 +508,5 @@ class PipelineWise(object):
 
         # Save the new state file if created correctly
         if self.is_json_file(new_tap_state):
-            os.rename(new_tap_state, tap_state)
+            shutil.copyfile(new_tap_state, tap_state)
+            os.remove(new_tap_state)
