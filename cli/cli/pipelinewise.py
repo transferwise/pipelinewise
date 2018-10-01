@@ -509,7 +509,7 @@ class PipelineWise(object):
 
             # Do not run if another instance is already running
             if os.path.isdir(log_dir) and len(self.search_files(log_dir, patterns=['*.log.running'])) > 0:
-                self.logger.info("Failed to run. Another instance of the same tap is already running at {} ".format(log_file_running))
+                self.logger.info("Failed to run. Another instance of the same tap is already running. Log file detected in running status at {} ".format(log_dir))
                 sys.exit(1)
 
             # Run command
