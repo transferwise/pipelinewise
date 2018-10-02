@@ -1,1 +1,1 @@
-tap-mysql==1.9.20
+tap-mysql==1.9.21
