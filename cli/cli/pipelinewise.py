@@ -328,7 +328,7 @@ class PipelineWise(object):
 
                     # Is this new or modified field?
                     new_fields = new_schema["streams"][new_stream_idx]["schema"]["properties"]
-                    old_fields = old_schema["streams"][new_stream_idx]["schema"]["properties"]
+                    old_fields = old_stream["schema"]["properties"]
                     for new_field_key in new_fields:
                         new_field = new_fields[new_field_key]
                         new_field_mdata_idx = -1
