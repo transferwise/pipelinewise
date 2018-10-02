@@ -302,6 +302,15 @@ class PipelineWise(object):
 
                 # Copy stream selection from the old properties
                 else:
+                    # Find table specific metadata entries in the old and new streams
+                    new_stream_table_mdata_idx = 0
+                    old_stream_table_mdata_idx = 0
+                    try:
+                        new_stream_table_mdata_idx = [i for i, md in enumerate(new_stream["metadata"]) if md["breadcrumb"] == []][0]
+                        old_stream_table_mdata_idx = [i for i, md in enumerate(old_stream["metadata"]) if md["breadcrumb"] == []][0]
+                    except Exception:
+                        False
+
                     # Copy is-new flag from the old stream
                     try:
                         new_schema["streams"][new_stream_idx]["is-new"] = old_stream["is-new"]
@@ -310,19 +319,19 @@ class PipelineWise(object):
 
                     # Copy selected from the old stream
                     try:
-                        new_schema["streams"][new_stream_idx]["metadata"][0]["metadata"]["selected"] = old_stream["metadata"][0]["metadata"]["selected"]
+                        new_schema["streams"][new_stream_idx]["metadata"][new_stream_table_mdata_idx]["metadata"]["selected"] = old_stream["metadata"][old_stream_table_mdata_idx]["metadata"]["selected"]
                     except Exception:
                         False
 
                     # Copy replication method from the old stream
                     try:
-                        new_schema["streams"][new_stream_idx]["metadata"][0]["metadata"]["replication-method"] = old_stream["metadata"][0]["metadata"]["replication-method"]
+                        new_schema["streams"][new_stream_idx]["metadata"][new_stream_table_mdata_idx]["metadata"]["replication-method"] = old_stream["metadata"][old_stream_table_mdata_idx]["metadata"]["replication-method"]
                     except Exception:
                         False
 
                     # Copy replication key from the old stream
                     try:
-                        new_schema["streams"][new_stream_idx]["metadata"][0]["metadata"]["replication-key"] = old_stream["metadata"][0]["metadata"]["replication-key"]
+                        new_schema["streams"][new_stream_idx]["metadata"][new_stream_table_mdata_idx]["metadata"]["replication-key"] = old_stream["metadata"][old_stream_table_mdata_idx]["metadata"]["replication-key"]
                     except Exception:
                         False
 
