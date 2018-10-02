@@ -16,7 +16,7 @@ export class SingerTapProperties extends SingerComponent {
       switch (tap.type) {
         case 'tap-postgres': return <TapPostgresProperties targetId={tap.target.id} tapId={tap.id} title={`${tap.name} Connection Details`}/>
 
-        default: return this.renderJson(target.files.properties)
+        default: return this.renderJson(tap.properties)
       }
     
       // Render standard tap properties layout only with the raw JSON
