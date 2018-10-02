@@ -16,7 +16,7 @@ export class SingerTapConfig extends SingerComponent {
       switch (tap.type) {
         case 'tap-postgres': return <TapPostgresConfig targetId={tap.target.id} tapId={tap.id} title={`${tap.name} Connection Details`}/>
 
-        default: return this.renderJson(target.files.config)
+        default: return this.renderJson(tap.config)
       }
     }
   }
