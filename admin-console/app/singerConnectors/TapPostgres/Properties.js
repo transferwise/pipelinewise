@@ -78,7 +78,7 @@ export class TapPostgresProperties extends React.PureComponent {
         sqlDatatype: mdata['sql-datatype'],
         isNew: mdata['is-new'],
         isModified: mdata['is-modified'],
-        transformationType: transformation.type || 'STRAIGHT_COPY',,
+        transformationType: transformation.type || 'STRAIGHT_COPY',
       }})
   }
   
