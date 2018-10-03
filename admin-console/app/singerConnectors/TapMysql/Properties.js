@@ -70,7 +70,7 @@ export class TapMysqlProperties extends React.PureComponent {
         name: col,
         format: schema[col].format,
         type: schema[col].type[1] || schema[col].type[0],
-        isPrimaryKey: schema[col].type[0] === 'null' ? false : true,
+        isPrimaryKey: Array.isArray(props.tableKeys) && props.tableKeys.indexOf(col) > -1,
         isReplicationKey: col === props.replicationKey,
         inclusion: mdata.inclusion,
         selectedByDefault: mdata['selected-by-default'],
@@ -249,7 +249,8 @@ export class TapMysqlProperties extends React.PureComponent {
         const mdataStream = stream.metadata.find(m => m.breadcrumb.length === 0).metadata || {}
         const replicationMethod = mdataStream['replication-method']
         const replicationKey = mdataStream['replication-key']
-        const columns = TapMysqlProperties.getColumnsFromStream(stream, { activeStream, replicationKey })
+        const tableKeys = mdataStream['table-key-properties']
+        const columns = TapMysqlProperties.getColumnsFromStream(stream, { activeStream, replicationKey, tableKeys })
         const availableKeyColumns = columns.filter(c => c.type === 'integer' || c.format === 'date-time')
 
         // Show key dropdown only for Key-Based incremental replication
@@ -295,7 +296,8 @@ export class TapMysqlProperties extends React.PureComponent {
       if (stream) {
         const mdataStream = stream.metadata.find(m => m.breadcrumb.length === 0).metadata || {}
         const replicationKey = mdataStream['replication-key']
-        const columns = TapMysqlProperties.getColumnsFromStream(stream, { activeStream, replicationKey })
+        const tableKeys = mdataStream['table-key-properties']
+        const columns = TapMysqlProperties.getColumnsFromStream(stream, { activeStream, replicationKey, tableKeys })
         return (
           <Grid>
             <Table
