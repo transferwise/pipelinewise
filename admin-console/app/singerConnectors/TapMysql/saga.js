@@ -28,7 +28,7 @@ import {
 import request from 'utils/request';
 
 export function* getStreams(action) {
-  const requestURL = `http://localhost:5001/targets/${action.targetId}/taps/${action.tapId}/streams`;
+  const requestURL = `http://localhost:5000/targets/${action.targetId}/taps/${action.tapId}/streams`;
 
   try {
     const streams = yield call(request, requestURL);
@@ -39,7 +39,7 @@ export function* getStreams(action) {
 }
 
 export function* loadConfig(action) {
-  const requestURL = `http://localhost:5001/targets/${action.targetId}/taps/${action.tapId}/config`;
+  const requestURL = `http://localhost:5000/targets/${action.targetId}/taps/${action.tapId}/config`;
 
   try {
     const config = yield call(request, requestURL);
@@ -50,7 +50,7 @@ export function* loadConfig(action) {
 }
 
 export function* saveConfig(action) {
-  const requestURL = `http://localhost:5001/targets/${action.targetId}/taps/${action.tapId}/config`
+  const requestURL = `http://localhost:5000/targets/${action.targetId}/taps/${action.tapId}/config`
 
   try {
     const response = yield call(request, requestURL, {
@@ -65,7 +65,7 @@ export function* saveConfig(action) {
 }
 
 export function* testConnection(action) {
-  const requestURL = `http://localhost:5001/targets/${action.targetId}/taps/${action.tapId}/testconnection`
+  const requestURL = `http://localhost:5000/targets/${action.targetId}/taps/${action.tapId}/testconnection`
 
   try {
     const response = yield call(request, requestURL);
@@ -76,7 +76,7 @@ export function* testConnection(action) {
 }
 
 export function* updateStream(action) {
-  const requestURL = `http://localhost:5001/targets/${action.targetId}/taps/${action.tapId}/streams/${action.streamId}`;
+  const requestURL = `http://localhost:5000/targets/${action.targetId}/taps/${action.tapId}/streams/${action.streamId}`;
 
   try {
     const response = yield call(request, requestURL, {
@@ -91,7 +91,7 @@ export function* updateStream(action) {
 }
 
 export function* setTransformation(action) {
-  const requestURL = `http://localhost:5001/targets/${action.targetId}/taps/${action.tapId}/transformations/${action.stream}/${action.fieldId}`;
+  const requestURL = `http://localhost:5000/targets/${action.targetId}/taps/${action.tapId}/transformations/${action.stream}/${action.fieldId}`;
 
   try {
     const response = yield call(request, requestURL, {
@@ -106,7 +106,7 @@ export function* setTransformation(action) {
 }
 
 export function* discoverTap(action) {
-  const requestURL = `http://localhost:5001/targets/${action.targetId}/taps/${action.tapId}/discover`;
+  const requestURL = `http://localhost:5000/targets/${action.targetId}/taps/${action.tapId}/discover`;
 
   try {
     const response = yield call(request, requestURL, {
