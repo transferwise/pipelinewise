@@ -17,13 +17,17 @@ export default defineMessages({
     id: 'PipelineWise.container.Taps.owner',
     defaultMessage: 'Owner',
   },
+  syncPeriod: {
+    id: 'PipelineWise.container.Taps.syncPeriod',
+    defaultMessage: 'Sync Period',
+  },
   status: {
     id: 'PipelineWise.container.Taps.status',
     defaultMessage: 'Status',
   },
   lastTimestamp: {
     id: 'PipelineWise.container.Taps.lastTimestamp',
-    defaultMessage: 'Last Sync Completed',
+    defaultMessage: 'Last Sync',
   },
   lastStatus: {
     id: 'PipelineWise.container.Taps.lastStatus',

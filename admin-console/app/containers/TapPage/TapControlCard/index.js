@@ -8,6 +8,7 @@ import injectSaga from 'utils/injectSaga';
 import { formatDate, statusToObj } from 'utils/helper';
 import LoadingIndicator from 'components/LoadingIndicator';
 import ConnectorIcon from 'components/ConnectorIcon';
+import SyncPeriodDropdown from 'components/SyncPeriodDropDown';
 import Modal from 'components/Modal';
 
 import { FormattedMessage } from 'react-intl';
@@ -68,6 +69,7 @@ export class TapControlCard extends React.PureComponent {
     const tapCurrentStatus = tapStatus && tapStatus.currentStatus
     const tapLastStatus = tapStatus && tapStatus.lastStatus
     const tapLastTimestamp = tapStatus && tapStatus.lastTimestamp
+    const tapSyncPeriod = tap && tap["sync_period"]
 
     const tapRunning = tapCurrentStatus === 'running'
     const runTapButtonEnabled = tap.enabled && tapCurrentStatus == 'ready' && !runTapSuccess;
@@ -121,6 +123,10 @@ export class TapControlCard extends React.PureComponent {
           <Col md={12}><br /></Col>
           <Col md={6}><strong><FormattedMessage {...messages.lastTimestamp} />:</strong></Col><Col md={6}>{formatDate(lastTimestamp)}</Col>
           <Col md={6}><strong><FormattedMessage {...messages.lastStatus} />:</strong></Col><Col md={6} className={lastStatusObj.className}>{lastStatusObj.formattedMessage}</Col>
+        </Row>
+        <br />
+        <Row>
+          <Col md={6}><strong><FormattedMessage {...messages.syncPeriod} />:</strong></Col><Col md={6}><SyncPeriodDropdown value={tapSyncPeriod || -1} disabled={true} /></Col>
         </Row>
         <br /><br />
         <Row className="text-center">

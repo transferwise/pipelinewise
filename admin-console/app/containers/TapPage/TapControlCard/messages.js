@@ -41,6 +41,10 @@ export default defineMessages({
     id: 'PipelineWise.container.TapControlCard.lastStatus',
     defaultMessage: 'Last Sync Result',
   },
+  syncPeriod: {
+    id: 'PipelineWise.container.TapControlCard.syncPeriod',
+    defaultMessage: 'Sync Period',
+  },
   runTap: {
     id: 'PipelineWise.containers.TapControlCard.runTap',
     defaultMessage: 'Sync Data Now',
