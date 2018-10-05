@@ -50,6 +50,7 @@ const schema = {
     user: { type: "string", title: "User" },
     password: { type: "string", title: "Password" },
     dbname: { type: "string", title: "Database name" },
+    filter_dbs: { type: "string", title: "Filter Databases" },
   },
   required: ["host", "port", "user", "password", "dbname"]
 }
