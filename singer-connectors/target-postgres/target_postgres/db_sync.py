@@ -148,7 +148,7 @@ class DbSync:
         flatten = flatten_record(record)
         return ','.join(
             [
-                json.dumps(flatten[name]) if name in flatten and flatten[name] else ''
+                json.dumps(flatten[name]) if name in flatten and (flatten[name] == 0 or flatten[name]) else ''
                 for name in self.flatten_schema
             ]
         )
@@ -329,3 +329,4 @@ class DbSync:
         else:
             logger.info("Table '{}' exists".format(stream))
             self.update_columns()
+
