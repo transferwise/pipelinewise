@@ -69,10 +69,10 @@ export class TapMysqlProperties extends React.PureComponent {
       return {
         name: col,
         format: schema[col].format,
-        type: schema[col].type[1] || schema[col].type[0],
+        type: Array.isArray(schema[col].type) ? (schema[col].type[1] || schema[col].type[0]) : schema[col].description,
         isPrimaryKey: Array.isArray(props.tableKeys) && props.tableKeys.indexOf(col) > -1,
         isReplicationKey: col === props.replicationKey,
-        inclusion: mdata.inclusion,
+        inclusion: schema[col].inclusion,
         selectedByDefault: mdata['selected-by-default'],
         selected: mdata['selected'],
         sqlDatatype: mdata['sql-datatype'],
@@ -170,6 +170,7 @@ export class TapMysqlProperties extends React.PureComponent {
     const streamId = props.delegatedProps.streamId;
     const isAutomatic = item.inclusion === 'automatic';
     const isSelected = item.selected || isAutomatic;
+    const isUnsupported = item.inclusion === 'unsupported';
     let method = <FormattedMessage {...messages.notSelected} />
     const transformationType = item.transformationType;
     let schemaChangeDescription;
@@ -192,7 +193,7 @@ export class TapMysqlProperties extends React.PureComponent {
           <Toggle
             key={`column-toggle-${item.name}`}
             defaultChecked={isSelected}
-            disabled={item.isPrimaryKey || item.isReplicationKey}
+            disabled={item.isPrimaryKey || item.isReplicationKey || isUnsupported}
             onChange={() => props.delegatedProps.onUpdateStream(
               targetId,
               tapId,
@@ -217,7 +218,7 @@ export class TapMysqlProperties extends React.PureComponent {
         <td>
           <TransformationDropdown
             value={transformationType}
-            disabled={item.isPrimaryKey || item.isReplicationKey}
+            disabled={item.isPrimaryKey || item.isReplicationKey || isUnsupported }
             onChange={(value) => props.delegatedProps.onTransformationChange(targetId, tapId, stream, item.name, value)}
           />
         </td>
