@@ -8,7 +8,7 @@ import injectSaga from 'utils/injectSaga';
 import { formatDate, statusToObj } from 'utils/helper';
 import LoadingIndicator from 'components/LoadingIndicator';
 import ConnectorIcon from 'components/ConnectorIcon';
-import SyncPeriodDropdown from 'components/SyncPeriodDropDown';
+import SyncPeriodDropdown from 'components/SyncPeriodDropdown';
 import Modal from 'components/Modal';
 
 import { FormattedMessage } from 'react-intl';
