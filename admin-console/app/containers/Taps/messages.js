@@ -13,6 +13,10 @@ export default defineMessages({
     id: 'PipelineWise.container.Taps.name',
     defaultMessage: 'Name',
   },
+  owner: {
+    id: 'PipelineWise.container.Taps.owner',
+    defaultMessage: 'Owner',
+  },
   status: {
     id: 'PipelineWise.container.Taps.status',
     defaultMessage: 'Status',

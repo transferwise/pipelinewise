@@ -22,6 +22,7 @@ function TapsTableBody(props) {
         />
       </td>
       <td><a href={`/targets/${item.targetId}/taps/${item.id}`}><ConnectorIcon name={item.type} />&nbsp;<strong>{item.name}</strong></a></td>
+      <td>{item.owner || '-'}</td>
       <td className={`text-center ${currentStatusObj.className}`}>
         <span>
           {item.status.currentStatus === "running"

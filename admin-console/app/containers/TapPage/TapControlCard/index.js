@@ -103,6 +103,7 @@ export class TapControlCard extends React.PureComponent {
         <h4>{messages.title.defaultMessage}</h4>
         <Row>
           <Col md={6}><ConnectorIcon name={tap.type} /></Col><Col md={6}><p><strong>{tap.name}</strong><br />(id: {tap.id})</p></Col>
+          <Col md={6}><strong><FormattedMessage {...messages.tapOwner} />:</strong></Col><Col md={6}>{tap.owner || '-'}</Col>
           <Col md={6}><strong><FormattedMessage {...messages.target} />:</strong></Col><Col md={6}><a href={`/targets/${tap.target.id}`}>{tap.target.name}</a></Col>
           <Col md={6}><strong><FormattedMessage {...messages.status} />:</strong></Col><Col md={6} className={currentStatusObj.className}>
             {tapRunning

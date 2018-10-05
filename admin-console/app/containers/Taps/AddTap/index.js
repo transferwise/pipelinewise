@@ -41,11 +41,14 @@ const schema = {
       enumNames: ["PostgreSQL", "MySQL"],
       default: "tap-postgres",
     },
+    owner: { type: "string", title: "Owner" },
   },
   required: ["name", "type"]
 }
 
-const uiSchema = {};
+const uiSchema = {
+  owner: { "ui:help": "Team or email contact who is dealing with this data source."}
+};
 
 /* eslint-disable react/prefer-stateless-function */
 export class AddTap extends React.PureComponent {

@@ -25,6 +25,10 @@ export default defineMessages({
     id: 'PipelineWise.containers.TapControlCard.tapName',
     defaultMessage: 'Tap Name'
   },
+  tapOwner: {
+    id: 'PipelineWise.containers.TapControlCard.tapOwner',
+    defaultMessage: 'Data Source Owner'
+  },
   status: {
     id: 'PipelineWise.containers.TapControlCard.status',
     defaultMessage: 'Status',

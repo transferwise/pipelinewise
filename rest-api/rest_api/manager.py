@@ -392,6 +392,7 @@ class Manager(object):
         try:
             tap_name = tap["name"]
             tap_type = tap["type"]
+            tap_owner = tap["owner"]
             tap_id = self.gen_id_by_name(tap["name"])
 
             if tap_type in ["tap-postgres", "tap-mysql"]:
@@ -410,7 +411,7 @@ class Manager(object):
                                     tap_exists = True
 
                     if not tap_exists:
-                        new_tap = { 'enabled': False, 'id': tap_id, 'name': tap_name, 'type': tap_type }
+                        new_tap = { 'enabled': False, 'id': tap_id, 'name': tap_name, 'type': tap_type, 'owner': tap_owner }
 
                         # Add new tap to config
                         self.config["targets"][target_i]["taps"].append(new_tap)
