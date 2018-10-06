@@ -513,7 +513,7 @@ class PipelineWise(object):
 
             # Output will be redirected into a log file
             log_dir = self.get_tap_log_dir(target_id, tap_id)
-            current_time = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            current_time = datetime.datetime.utcnow().strftime("%Y%m%d_%H%M%S")
             log_file = os.path.join(log_dir, "{}-{}-{}.log".format(target_id, tap_id, current_time))
 
             # Do not run if another instance is already running

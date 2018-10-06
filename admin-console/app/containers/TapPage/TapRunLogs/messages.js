@@ -15,7 +15,7 @@ export default defineMessages({
   },
   createdAt: {
     id: 'PipelineWise.containers.TapRunLogs.created',
-    defaultMessage: 'Created At',
+    defaultMessage: 'Created At (UTC)',
   },
   status: {
     id: 'PipelineWise.containers.TapRunLogs.status',

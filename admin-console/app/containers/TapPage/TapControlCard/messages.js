@@ -35,7 +35,7 @@ export default defineMessages({
   },
   lastTimestamp: {
     id: 'PipelineWise.container.TapControlCard.lastTimestamp',
-    defaultMessage: 'Last Sync Completed',
+    defaultMessage: 'Last Sync (UTC)',
   },
   lastStatus: {
     id: 'PipelineWise.container.TapControlCard.lastStatus',

@@ -35,7 +35,7 @@ function TapsTableBody(props) {
           : currentStatusObj.formattedMessage}
         </span>
       </td>
-      <td>{item.status.lastTimestamp ? <span><Moment fromNow>{item.status.lastTimestamp}</Moment></span>: '-'}</td>
+      <td>{item.status.lastTimestamp ? <span><Moment tz="UTC" fromNow>{`${item.status.lastTimestamp}-0000`}</Moment></span>: '-'}</td>
       <td className={`text-center ${lastStatusObj.className}`}>{lastStatusObj.formattedMessage}</td>
     </tr>
   );
