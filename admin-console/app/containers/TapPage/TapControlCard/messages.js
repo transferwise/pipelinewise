@@ -45,6 +45,14 @@ export default defineMessages({
     id: 'PipelineWise.container.TapControlCard.syncPeriod',
     defaultMessage: 'Sync Period',
   },
+  syncPeriodSuccess: {
+    id: 'PipelineWise.containers.TapControlCard.syncPeriodSuccess',
+    defaultMessage: 'Sync period updated.',
+  },
+  syncPeriodFailed: {
+    id: 'PipelineWise.containers.TapControlCard.syncPeriodFailed',
+    defaultMessage: 'Cannot set Sync Period. Check logs for details.',
+  },
   runTap: {
     id: 'PipelineWise.containers.TapControlCard.runTap',
     defaultMessage: 'Sync Data Now',

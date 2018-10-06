@@ -16,6 +16,15 @@ const makeSelectTapError = () =>
 const makeSelectTap = () =>
   createSelector(selectTapControlCard, TapControlCardState => TapControlCardState.get('tap'));
 
+const makeSelectSetTapSyncPeriodLoading = () =>
+  createSelector(selectTapControlCard, TapControlCardState => TapControlCardState.get('setTapSyncPeriodLoading'));
+
+const makeSelectSetTapSyncPeriodError = () =>
+  createSelector(selectTapControlCard, TapControlCardState => TapControlCardState.get('setTapSyncPeriodError'));
+
+const makeSelectSetTapSyncPeriodSuccess = () =>
+  createSelector(selectTapControlCard, TapControlCardState => TapControlCardState.get('setTapSyncPeriodSuccess'));
+
 const makeSelectRunTapLoading = () =>
   createSelector(selectTapControlCard, TapControlCardState => TapControlCardState.get('runTapLoading'));
 
@@ -31,12 +40,19 @@ const makeSelectConsoleOutput = () =>
 const makeSelectRunTapButtonEnabled = () =>
   createSelector(selectTapControlCard, TapControlCardState => TapControlCardState.get('runTapButtonEnabled'));
 
+const  makeSelectForceRefreshTapControlCard = () =>
+  createSelector(selectTapControlCard, TapControlCardState => TapControlCardState.get('forceRefreshTapControlCard'));
+
 export {
   selectTapControlCard,
 
   makeSelectTapLoading,
   makeSelectTapError,
   makeSelectTap,
+
+  makeSelectSetTapSyncPeriodLoading,
+  makeSelectSetTapSyncPeriodError,
+  makeSelectSetTapSyncPeriodSuccess,
   
   makeSelectRunTapLoading,
   makeSelectRunTapError,
@@ -44,4 +60,6 @@ export {
   makeSelectConsoleOutput,
 
   makeSelectRunTapButtonEnabled,
+
+  makeSelectForceRefreshTapControlCard
 };

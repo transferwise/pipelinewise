@@ -22,15 +22,20 @@ import {
   makeSelectTapLoading,
   makeSelectTapError,
   makeSelectTap,
+  makeSelectSetTapSyncPeriodLoading,
+  makeSelectSetTapSyncPeriodError,
+  makeSelectSetTapSyncPeriodSuccess,
   makeSelectRunTapLoading,
   makeSelectRunTapError,
   makeSelectRunTapSuccess,
   makeSelectRunTapButtonEnabled,
   makeSelectConsoleOutput,
+  makeSelectForceRefreshTapControlCard,
 } from './selectors';
 import {
   loadTap,
   setRunTapButtonState,
+  setTapSyncPeriod,
   runTap,
   resetConsoleOutput,
 } from './actions';
@@ -46,6 +51,13 @@ export class TapControlCard extends React.PureComponent {
       this.props.onLoadTap(targetId, tapId);
   }
 
+  componentDidUpdate(prevProps) {
+    const { forceRefreshTapControlCard } = this.props
+    if (forceRefreshTapControlCard) {
+      this.onRefresh();
+    }
+  }
+
   onRefresh() {
     const { targetId, tapId } = this.props
     this.props.onLoadTap(targetId, tapId);
@@ -56,6 +68,9 @@ export class TapControlCard extends React.PureComponent {
       tapLoading,
       tapError,
       tap,
+      setTapSyncPeriodLoading,
+      setTapSyncPeriodSuccess,
+      setTapSyncPeriodError,
       runTapLoading,
       runTapError,
       runTapSuccess,
@@ -79,11 +94,17 @@ export class TapControlCard extends React.PureComponent {
     let alert = <div />
     let consolePanel = <div />
 
-    if (tapLoading || runTapLoading) {
+    if (tapLoading || runTapLoading || setTapSyncPeriodLoading) {
       return <LoadingIndicator />;
     }
     else if (tapError !== false) {
       return <Alert bsStyle="danger" className="full-swidth"><strong>Error!</strong> {tapError.toString()}</Alert>;
+    }
+    else if (setTapSyncPeriodError !== false) {
+      alert = <Alert bsStyle="danger" className="full-swidth"><strong>Error!</strong> {setTapSyncPeriodError.toString()}</Alert>;
+    }
+    else if (setTapSyncPeriodSuccess) {
+      alert = <Alert bsStyle="success" className="full-width"><strong>Success!</strong> <FormattedMessage {...messages.syncPeriodSuccess} /></Alert>;
     }
     else if (runTapError !== false) {
       alert = <Alert bsStyle="danger" className="full-swidth"><strong>Error!</strong> {runTapError.toString()}</Alert>;
@@ -126,7 +147,8 @@ export class TapControlCard extends React.PureComponent {
         </Row>
         <br />
         <Row>
-          <Col md={6}><strong><FormattedMessage {...messages.syncPeriod} />:</strong></Col><Col md={6}><SyncPeriodDropdown value={tapSyncPeriod || -1} disabled={true} /></Col>
+          <Col md={6}><strong><FormattedMessage {...messages.syncPeriod} />:</strong></Col>
+          <Col md={6}><SyncPeriodDropdown value={tapSyncPeriod || -1} onChange={(value) => this.props.onChangeSyncPeriod(targetId, tapId, value)} /></Col>
         </Row>
         <br /><br />
         <Row className="text-center">
@@ -162,6 +184,7 @@ export function mapDispatchToProps(dispatch) {
   return {
     onLoadTap: (targetId, tapId) => dispatch(loadTap(targetId, tapId)),
     onSetRunTapButtonState: (enabled) => dispatch(setRunTapButtonState(enabled)),
+    onChangeSyncPeriod: (targetId, tapId, syncPeriod) => dispatch(setTapSyncPeriod(targetId, tapId, syncPeriod)),
     onRunTap: (targetId, tapId) => dispatch(runTap(targetId, tapId)),
     onCloseModal: () => dispatch(resetConsoleOutput())
   };
@@ -171,11 +194,15 @@ const mapStateToProps = createStructuredSelector({
   tapLoading: makeSelectTapLoading(),
   tapError: makeSelectTapError(),
   tap: makeSelectTap(),
+  setTapSyncPeriodLoading: makeSelectSetTapSyncPeriodLoading(),
+  setTapSyncPeriodError: makeSelectSetTapSyncPeriodError(),
+  setTapSyncPeriodSuccess: makeSelectSetTapSyncPeriodSuccess(),
   runTapLoading: makeSelectRunTapLoading(),
   runTapError: makeSelectRunTapError(),
   runTapSuccess: makeSelectRunTapSuccess(),
-  consoleOutput: makeSelectConsoleOutput(),
   runTapButtonEnabled: makeSelectRunTapButtonEnabled(),
+  consoleOutput: makeSelectConsoleOutput(),
+  forceRefreshTapControlCard: makeSelectForceRefreshTapControlCard(),
 });
 
 const withConnect = connect(

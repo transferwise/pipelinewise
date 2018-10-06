@@ -3,6 +3,10 @@ import {
   LOAD_TAP_SUCCESS,
   LOAD_TAP_ERROR,
 
+  SET_TAP_SYNC_PERIOD,
+  SET_TAP_SYNC_PERIOD_SUCCESS,
+  SET_TAP_SYNC_PERIOD_ERROR,
+
   RUN_TAP,
   RUN_TAP_SUCCESS,
   RUN_TAP_ERROR,
@@ -33,6 +37,30 @@ export function loadTapError(error) {
     error,
   }
 }
+
+export function setTapSyncPeriod(targetId, tapId, syncPeriod) {
+  return {
+    type: SET_TAP_SYNC_PERIOD,
+    targetId,
+    tapId,
+    syncPeriod,
+  }
+}
+
+export function setTapSyncPeriodDone(response) {
+  return {
+    type: SET_TAP_SYNC_PERIOD_SUCCESS,
+    response,
+  }
+}
+
+export function setTapSyncPeriodError(error) {
+  return {
+    type: SET_TAP_SYNC_PERIOD_ERROR,
+    error,
+  }
+}
+
 export function runTap(targetId, tapId) {
   return {
     type: RUN_TAP,
