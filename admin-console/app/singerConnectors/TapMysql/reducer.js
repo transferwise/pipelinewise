@@ -258,8 +258,10 @@ function tapMysqlReducer(state = initialState, action) {
     case DISCOVER_TAP_SUCCESS:
         result = action.response.result;
         consoleOutput = false;
-        if (result.returncode && result.returncode !== 0) {
+        if (result && result.returncode && result.returncode !== 0) {
           consoleOutput = `${result.stdout} - ${result.stderr}`;
+        } else if(action.response && action.response.message) {
+          consoleOutput = action.response.message;
         }
 
         return state
