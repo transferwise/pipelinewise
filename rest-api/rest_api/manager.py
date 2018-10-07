@@ -9,6 +9,7 @@ import json
 import re
 import glob
 from datetime import datetime
+from crontab import CronTab
 
 
 class Manager(object):
@@ -65,6 +66,31 @@ class Manager(object):
     def save_config(self):
         self.logger.info('Saving config at {}'.format(self.config_path))
         self.save_json(self.config, self.config_path)
+
+    def init_crontab(self):
+        self.logger.info('Initialising crontab')
+
+        # Remove every existing pipelinewise entry from crontab
+        cron = CronTab(user=True)
+        for j in cron.find_command('pipelinewise'):
+            cron.remove(j)
+
+        # Find tap schedules and add entries to crontab
+        for target in (x for x in self.config["targets"] if "targets" in self.config):
+            for tap in (x for x in target["taps"] if "taps" in target):
+
+                if "sync_period" in tap:
+                    target_id = target["id"]
+                    tap_id = tap["id"]
+                    command = ' '.join([
+                        "{} run_tap --target {} --tap {}".format(self.pipelinewise_bin, target_id, tap_id)
+                    ])
+
+                    job = cron.new(command=command)
+                    job.setall(tap["sync_period"])
+
+                    if job.is_valid():
+                        cron.write()
 
     def run_command(self, command, background=False):
         self.logger.debug('Running command [Background Mode: {}] : {}'.format(background, command))
@@ -380,6 +406,10 @@ class Manager(object):
 
                             self.config["targets"][target_idx]["taps"][tap_idx][update_key] = update_value
                             self.save_config()
+
+                            # Update cron schedule if required
+                            if update_key == "sync_period":
+                                self.init_crontab()
 
             return "Tap updated successfully"
         except Exception as exc:

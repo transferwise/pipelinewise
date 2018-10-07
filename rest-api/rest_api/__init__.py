@@ -31,8 +31,11 @@ app.config.from_envvar('PIPELINEWISE_SETTINGS_FILE', silent=True)
 CORS(app)
 
 
-config_dir = os.path.join(os.path.expanduser('~'), '.pipelinewise')
-venv_dir = os.path.join(os.getcwd(), '../.virtualenvs')
+user_home = os.path.expanduser('~')
+config_dir = os.path.join(user_home, '.pipelinewise')
+pipelinewise_default_home = os.path.join(user_home, 'pipelinewise')
+pipelinewise_home = os.path.abspath(os.environ.setdefault("PIPELINEWISE_HOME", pipelinewise_default_home))
+venv_dir = os.path.join(pipelinewise_home, '.virtualenvs')
 manager = Manager(config_dir, venv_dir, app.logger)
 
 class WebadminException(Exception):
