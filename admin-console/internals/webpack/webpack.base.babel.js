@@ -127,6 +127,9 @@ module.exports = options => ({
         NODE_ENV: JSON.stringify(process.env.NODE_ENV),
       },
     }),
+
+    // Workaround for PrettyCron.js detailed at https://github.com/bunkat/later/issues/155
+    new webpack.DefinePlugin({ 'process.env': { LATER_COV: false } }),
   ]),
   resolve: {
     modules: ['node_modules', 'app'],

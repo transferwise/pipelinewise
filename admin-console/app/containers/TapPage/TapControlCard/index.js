@@ -18,6 +18,8 @@ import IntervalTimer from 'react-interval-timer';
 import { Grid, Row, Col, Alert, Button } from 'react-bootstrap/lib';
 import ReactLoading from 'react-loading';
 
+const prettyCron = require('prettycron');
+
 import {
   makeSelectTapLoading,
   makeSelectTapError,
@@ -144,6 +146,7 @@ export class TapControlCard extends React.PureComponent {
           <Col md={12}><br /></Col>
           <Col md={6}><strong><FormattedMessage {...messages.lastTimestamp} />:</strong></Col><Col md={6}>{formatDate(lastTimestamp)}</Col>
           <Col md={6}><strong><FormattedMessage {...messages.lastStatus} />:</strong></Col><Col md={6} className={lastStatusObj.className}>{lastStatusObj.formattedMessage}</Col>
+          <Col md={6}><strong><FormattedMessage {...messages.nextSync} />:</strong></Col><Col md={6}>{tapSyncPeriod ? prettyCron.getNext(tapSyncPeriod) : 'Not Automated'}</Col>
         </Row>
         <br />
         <Row>

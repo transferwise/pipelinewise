@@ -21,6 +21,10 @@ export default defineMessages({
     id: 'PipelineWise.container.Taps.syncPeriod',
     defaultMessage: 'Sync Period',
   },
+  nextSync: {
+    id: 'PipelineWise.container.Taps.nextSync',
+    defaultMessage: 'Next Sync',
+  },
   status: {
     id: 'PipelineWise.container.Taps.status',
     defaultMessage: 'Status',

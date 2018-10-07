@@ -1,21 +1,33 @@
 import React from 'react';
 import PropTypes from 'prop-types';
+import messages from './messages';
 
 function SyncPeriodDropdown(props) {
   return (
     <select className="form-control" value={props.value} disabled={props.disabled} onChange={(event) => props.onChange(event.target.value)}>
-      <option key={`sync-period-0`} value="-1">Not automated</option>
-      <option key={`sync-period-5`} value="5">5 minutes</option>
-      <option key={`sync-period-10`} value="10">10 minutes</option>
-      <option key={`sync-period-15`} value="15">15 minutes</option>
-      <option key={`sync-period-30`} value="30">30 minutes</option>
-      <option key={`sync-period-60`} value="60">1 hour</option>
-      <option key={`sync-period-120`} value="120">2 hours</option>
-      <option key={`sync-period-180`} value="180">3 hours</option>
-      <option key={`sync-period-360`} value="360">6 hours</option>
-      <option key={`sync-period-720`} value="720">12 hours</option>
-      <option key={`sync-period-1440`} value="1440">1 day</option>
-      <option key={`sync-period-10080`} value="10080">7 days</option>
+      <option key={`sync-period-not-automated`} value="-1">{messages.syncPeriodNotAutomated.defaultMessage}</option>
+      <option key={`sync-period-cron-5-mins`} value="*/5 * * * *">{messages.syncPeriodCron5Mins.defaultMessage}</option>
+      <option key={`sync-period-cron-10-mins`} value="*/10 * * * *">{messages.syncPeriodCron10Mins.defaultMessage}</option>
+      <option key={`sync-period-cron-15-mins`} value="*/15 * * * *">{messages.syncPeriodCron15Mins.defaultMessage}</option>
+      <option key={`sync-period-cron-30-mins`} value="*/30 * * * *">{messages.syncPeriodCron30Mins.defaultMessage}</option>
+      <option key={`sync-period-cron-1-hour`} value="0 * * * *">{messages.syncPeriodCronHourly.defaultMessage}</option>
+      <option key={`sync-period-cron-2-hours`} value="0 */2 * * *">{messages.syncPeriodCron2Hours.defaultMessage}</option>
+      <option key={`sync-period-cron-3-hours`} value="0 */3 * * *">{messages.syncPeriodCron3Hours.defaultMessage}</option>
+      <option key={`sync-period-cron-6-hours`} value="0 */6 * * *">{messages.syncPeriodCron6Hours.defaultMessage}</option>
+      <option key={`sync-period-cron-12-hours`} value="0 */12 * * *">{messages.syncPeriodCron12Hours.defaultMessage}</option>
+      <option key={`sync-period-cron-daily`} value="0 0 * * *">{messages.syncPeriodCronDaily.defaultMessage}</option>
+      <option key={`sync-period-cron-mon`} value="0 0 * * MON">{messages.syncPeriodCronEveryMonday.defaultMessage}</option>
+      <option key={`sync-period-cron-tue`} value="0 0 * * TUE">{messages.syncPeriodCronEveryTuesday.defaultMessage}</option>
+      <option key={`sync-period-cron-wed`} value="0 0 * * WED">{messages.syncPeriodCronEveryWednesday.defaultMessage}</option>
+      <option key={`sync-period-cron-thu`} value="0 0 * * THU">{messages.syncPeriodCronEveryThursday.defaultMessage}</option>
+      <option key={`sync-period-cron-fri`} value="0 0 * * FRI">{messages.syncPeriodCronEveryFriday.defaultMessage}</option>
+      <option key={`sync-period-cron-sat`} value="0 0 * * SAT">{messages.syncPeriodCronEverySaturday.defaultMessage}</option>
+      <option key={`sync-period-cron-sun`} value="0 0 * * SUN">{messages.syncPeriodCronEverySunday.defaultMessage}</option>
+      <option key={`sync-period-cron-monthly-1-dom`} value="0 0 1 * *">{messages.syncPeriodCron1Mod.defaultMessage}</option>
+      <option key={`sync-period-cron-monthly-2-dom`} value="0 0 2 * *">{messages.syncPeriodCron2Mod.defaultMessage}</option>
+      <option key={`sync-period-cron-monthly-3-dom`} value="0 0 3 * *">{messages.syncPeriodCron3Mod.defaultMessage}</option>
+      <option key={`sync-period-cron-monthly-4-dom`} value="0 0 4 * *">{messages.syncPeriodCron4Mod.defaultMessage}</option>
+      <option key={`sync-period-cron-monthly-5-dom`} value="0 0 5 * *">{messages.syncPeriodCron5Mod.defaultMessage}</option>
     </select>
   )
 }
