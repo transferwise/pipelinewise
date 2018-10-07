@@ -217,6 +217,13 @@ def api_get_stream(target_id, tap_id, stream_id):
         'result': manager.get_stream(target_id, tap_id, stream_id)
     })
 
+@app.route("/targets/<target_id>/taps/<tap_id>/streams", methods = ['PATCH'])
+def api_update_streams(target_id, tap_id):
+    return jsonify({
+        'status': 200,
+        'result': manager.update_streams(target_id, tap_id, request.get_json())
+    })
+
 @app.route("/targets/<target_id>/taps/<tap_id>/streams/<stream_id>", methods = ['PATCH'])
 def api_update_stream(target_id, tap_id, stream_id):
     return jsonify({

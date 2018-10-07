@@ -577,7 +577,17 @@ class Manager(object):
             raise Exception("Cannot find {} stream in {} tap in {} target".format(stream_id, tap_id, target_id))
         
         return stream
-    
+
+    def update_streams(self, target_id, tap_id, params):
+        self.logger.info('Updating every stream in {} tap in {} target'.format(tap_id, target_id))
+        streams = self.get_streams(target_id, tap_id)
+
+        for stream in streams:
+            stream_id = stream["tap_stream_id"]
+            self.update_stream(target_id, tap_id, stream_id, params)
+
+        return "Every tap stream updated successfully"
+
     def update_stream(self, target_id, tap_id, stream_id, params):
         self.logger.info('Updating {} stream in {} tap in {} target'.format(stream_id, tap_id, target_id))
         stream = self.get_stream(target_id, tap_id, stream_id)
