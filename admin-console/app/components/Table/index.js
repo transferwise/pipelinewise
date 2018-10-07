@@ -4,7 +4,7 @@ import PropTypes from 'prop-types';
 function Table(props) {
   const HeaderComponentToRender = props.headerComponent;
   const BodyComponentToRender = props.bodyComponent;
-  const headerContent = <thead className="thead-light"><HeaderComponentToRender other={props.other}/></thead>
+  const headerContent = <thead className="thead-light"><HeaderComponentToRender delegatedProps={props.delegatedProps} /></thead>
   let bodyContent = <tbody />
 
   // If we have items, render them

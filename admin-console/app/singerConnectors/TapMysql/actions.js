@@ -36,6 +36,10 @@ import {
 
   SET_ACTIVE_STREAM_ID,
 
+  UPDATE_STREAMS,
+  UPDATE_STREAMS_SUCCESS,
+  UPDATE_STREAMS_ERROR,
+
   UPDATE_STREAM,
   UPDATE_STREAM_SUCCESS,
   UPDATE_STREAM_ERROR,
@@ -160,6 +164,29 @@ export function setActiveStreamId(stream, streamId) {
     type: SET_ACTIVE_STREAM_ID,
     stream,
     streamId,
+  };
+}
+
+export function updateStreams(targetId, tapId, params) {
+  return {
+    type: UPDATE_STREAMS,
+    targetId,
+    tapId,
+    params,
+  };
+}
+
+export function updateStreamsDone(response) {
+  return {
+    type: UPDATE_STREAMS_SUCCESS,
+    response,
+  };
+}
+
+export function updateStreamsError(error) {
+  return {
+    type: UPDATE_STREAMS_ERROR,
+    error,
   };
 }
 

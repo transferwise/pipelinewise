@@ -23,6 +23,7 @@ import {
   loadStreams,
   setActiveStreamId,
   discoverTap,
+  updateStreams,
   updateStream,
   setTransformation,
   resetConsoleOutput
@@ -43,12 +44,30 @@ import messages from './messages';
 
 /* eslint-disable react/prefer-stateless-function */
 export class TapMysqlProperties extends React.PureComponent {
-  static streamsTableHeader() {
+  static streamsTableHeader(props) {
+    const targetId = props.delegatedProps.targetId;
+    const tapId = props.delegatedProps.tapId;
+    const allStreamsSelected = props.delegatedProps.allStreamsSelected
     return (
       <tr>
-        <th></th>
+        <th>
+          <Toggle
+            key={`stream-toggle-all`}
+            defaultChecked={allStreamsSelected}
+            onChange={() => props.delegatedProps.onUpdateStreams(
+              targetId,
+              tapId,
+              {
+                tapType: "tap-mysql",
+                breadcrumb: [],
+                update: {
+                  key: "selected",
+                  value: !allStreamsSelected
+                }
+              })}
+          />
+        </th>
         <th><FormattedMessage {...messages.database} /></th>
-        <th><FormattedMessage {...messages.schema} /></th>
         <th><FormattedMessage {...messages.table} /></th>
         <th><FormattedMessage {...messages.isView} /></th>
         <th><FormattedMessage {...messages.rowCount} /></th>
@@ -56,30 +75,6 @@ export class TapMysqlProperties extends React.PureComponent {
         <th></th>
       </tr>
     )
-  }
-
-  static getColumnsFromStream(stream, props) {
-    const schema = stream.schema.properties;
-    const transformations = stream.transformations;
-
-    return Object.keys(schema).map(col => {
-      const mdataCols = stream.metadata.filter(m => m.breadcrumb.length > 0)
-      const mdata = mdataCols.find(m => m.breadcrumb[1] === col).metadata
-      const transformation = transformations.find(t => t['stream'] == props.activeStream && t['fieldId'] == col) || {}
-      return {
-        name: col,
-        format: schema[col].format,
-        type: Array.isArray(schema[col].type) ? (schema[col].type[1] || schema[col].type[0]) : schema[col].description,
-        isPrimaryKey: Array.isArray(props.tableKeys) && props.tableKeys.indexOf(col) > -1,
-        isReplicationKey: col === props.replicationKey,
-        inclusion: schema[col].inclusion,
-        selectedByDefault: mdata['selected-by-default'],
-        selected: mdata['selected'],
-        sqlDatatype: mdata['sql-datatype'],
-        isNew: mdata['is-new'],
-        isModified: mdata['is-modified'],
-        transformationType: transformation.type || 'STRAIGHT_COPY',
-      }})
   }
   
   static streamsTableBody(props) {
@@ -123,7 +118,6 @@ export class TapMysqlProperties extends React.PureComponent {
           />
         </td>
         <td>{tableMetadata['database-name']}</td>
-        <td>{tableMetadata['schema-name']}</td>
         <td>{item['table_name']}</td>
         <td>{item['is-view'] ? 'Yes' : ''}</td>
         <td>{tableMetadata['row-count']}</td>
@@ -227,7 +221,31 @@ export class TapMysqlProperties extends React.PureComponent {
       </tr>
     )
   }
-  
+
+  static getColumnsFromStream(stream, props) {
+    const schema = stream.schema.properties;
+    const transformations = stream.transformations;
+
+    return Object.keys(schema).map(col => {
+      const mdataCols = stream.metadata.filter(m => m.breadcrumb.length > 0)
+      const mdata = mdataCols.find(m => m.breadcrumb[1] === col).metadata
+      const transformation = transformations.find(t => t['stream'] == props.activeStream && t['fieldId'] == col) || {}
+      return {
+        name: col,
+        format: schema[col].format,
+        type: Array.isArray(schema[col].type) ? (schema[col].type[1] || schema[col].type[0]) : schema[col].description,
+        isPrimaryKey: Array.isArray(props.tableKeys) && props.tableKeys.indexOf(col) > -1,
+        isReplicationKey: col === props.replicationKey,
+        inclusion: schema[col].inclusion,
+        selectedByDefault: mdata['selected-by-default'],
+        selected: mdata['selected'],
+        sqlDatatype: mdata['sql-datatype'],
+        isNew: mdata['is-new'],
+        isModified: mdata['is-modified'],
+        transformationType: transformation.type || 'STRAIGHT_COPY',
+      }})
+  }
+
   componentDidMount() {
     const { targetId, tapId } = this.props
     this.props.onLoadStreams(targetId, tapId);
@@ -329,6 +347,7 @@ export class TapMysqlProperties extends React.PureComponent {
       activeStream,
       activeStreamId,
       onStreamSelect,
+      onUpdateStreams,
       onUpdateStream,
       onTransformationChange,
       onDiscoverTap,
@@ -363,6 +382,9 @@ export class TapMysqlProperties extends React.PureComponent {
           return tableMetadata.selected
         })
       }
+
+      // Used for select/deselect all
+      const allStreamsSelected = selectedStreams.length === streams.length;
 
       // Find selected columns
       let columns
@@ -405,7 +427,7 @@ export class TapMysqlProperties extends React.PureComponent {
                       headerComponent={TapMysqlProperties.streamsTableHeader}
                       bodyComponent={TapMysqlProperties.streamsTableBody}
                       onItemSelect={onStreamSelect}
-                      delegatedProps={{ targetId, tapId, onUpdateStream }}
+                      delegatedProps={{ targetId, tapId, onUpdateStreams, onUpdateStream, allStreamsSelected }}
                     />
                   </Grid>
                 </Col>
@@ -450,6 +472,7 @@ TapMysqlProperties.propTypes = {
   forceRefreshStreams: PropTypes.any,
   activeStreamId: PropTypes.any,
   onStreamSelect: PropTypes.func,
+  onUpdateStreams: PropTypes.func,
   onUpdateStream: PropTypes.func,
   onTransformationChange: PropTypes.func,
 }
@@ -458,6 +481,7 @@ export function mapDispatchToProps(dispatch) {
   return {
     onLoadStreams: (targetId, tapId) => dispatch(loadStreams(targetId, tapId)),
     onStreamSelect: (stream, streamId) => dispatch(setActiveStreamId(stream, streamId)),
+    onUpdateStreams: (targetId, tapId, params) => dispatch(updateStreams(targetId, tapId, params)),
     onUpdateStream: (targetId, tapId, streamId, params) => dispatch(updateStream(targetId, tapId, streamId, params)),
     onTransformationChange: (targetId, tapId, stream, fieldId, value) => dispatch(setTransformation(targetId, tapId, stream, fieldId, value)),
     onDiscoverTap: (targetId, tapId) => dispatch(discoverTap(targetId, tapId)),
