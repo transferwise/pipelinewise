@@ -392,7 +392,7 @@ export class TapMysqlProperties extends React.PureComponent {
       if (streams) {
         const stream = streams.find(s => s['tap_stream_id'] === activeStreamId);
         columns = stream ? TapMysqlProperties.getColumnsFromStream(stream, {}) : []
-        selectedColumns = columns.filter(c => c.selected || c.isPrimaryKey)
+        selectedColumns = columns.filter(c => (c.selected === undefined ? c.selectedByDefault : c.selected) || c.isAutomatic)
       }
 
       return (
