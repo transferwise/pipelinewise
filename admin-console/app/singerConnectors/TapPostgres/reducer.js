@@ -32,6 +32,10 @@ import {
 
   SET_ACTIVE_STREAM_ID,
 
+  UPDATE_STREAMS,
+  UPDATE_STREAMS_SUCCESS,
+  UPDATE_STREAMS_ERROR,
+
   UPDATE_STREAM,
   UPDATE_STREAM_SUCCESS,
   UPDATE_STREAM_ERROR,
@@ -191,6 +195,24 @@ function tapPostgresReducer(state = initialState, action) {
       return state
         .set('activeStream', action.stream)
         .set('activeStreamId', action.streamId);
+
+    case UPDATE_STREAMS:
+      return state
+        .set('loading', true)
+        .set('error', false)
+        .set('consoleOutput', false)
+    case UPDATE_STREAMS_SUCCESS:
+      return state
+        .set('loading', false)
+        .set('error', action.response.status !== 200 ? action.response.message : false)
+        .set('forceReloadConfig', action.response.status === 200)
+        .set('forceRefreshStreams', action.response.status === 200)
+        .set('consoleOutput', false)
+    case UPDATE_STREAMS_ERROR:
+      return state
+        .set('loading', false)
+        .set('error', action.error)
+        .set('consoleOutput', false)
 
     case UPDATE_STREAM:
       return state

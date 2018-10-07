@@ -23,6 +23,7 @@ import {
   loadStreams,
   setActiveStreamId,
   discoverTap,
+  updateStreams,
   updateStream,
   setTransformation,
   resetConsoleOutput
@@ -43,10 +44,29 @@ import messages from './messages';
 
 /* eslint-disable react/prefer-stateless-function */
 export class TapPostgresProperties extends React.PureComponent {
-  static streamsTableHeader() {
+  static streamsTableHeader(props) {
+    const targetId = props.delegatedProps.targetId;
+    const tapId = props.delegatedProps.tapId;
+    const allStreamsSelected = props.delegatedProps.allStreamsSelected
     return (
       <tr>
-        <th></th>
+        <th>
+          <Toggle
+            key={`stream-toggle-all`}
+            defaultChecked={allStreamsSelected}
+            onChange={() => props.delegatedProps.onUpdateStreams(
+              targetId,
+              tapId,
+              {
+                tapType: "tap-mysql",
+                breadcrumb: [],
+                update: {
+                  key: "selected",
+                  value: !allStreamsSelected
+                }
+              })}
+          />
+        </th>
         <th><FormattedMessage {...messages.database} /></th>
         <th><FormattedMessage {...messages.schema} /></th>
         <th><FormattedMessage {...messages.table} /></th>
@@ -56,30 +76,6 @@ export class TapPostgresProperties extends React.PureComponent {
         <th></th>
       </tr>
     )
-  }
-
-  static getColumnsFromStream(stream, props) {
-    const schema = stream.schema.properties;
-    const transformations = stream.transformations;
-
-    return Object.keys(schema).map(col => {
-      const mdataCols = stream.metadata.filter(m => m.breadcrumb.length > 0)
-      const mdata = mdataCols.find(m => m.breadcrumb[1] === col).metadata
-      const transformation = transformations.find(t => t['stream'] == props.activeStream && t['fieldId'] == col) || {}
-      return {
-        name: col,
-        format: schema[col].format,
-        type: schema[col].type[1] || schema[col].type[0],
-        isPrimaryKey: Array.isArray(props.tableKeys) && props.tableKeys.indexOf(col) > -1,
-        isReplicationKey: col === props.replicationKey,
-        inclusion: mdata.inclusion,
-        selectedByDefault: mdata['selected-by-default'],
-        selected: mdata['selected'],
-        sqlDatatype: mdata['sql-datatype'],
-        isNew: mdata['is-new'],
-        isModified: mdata['is-modified'],
-        transformationType: transformation.type || 'STRAIGHT_COPY',
-      }})
   }
   
   static streamsTableBody(props) {
@@ -226,6 +222,30 @@ export class TapPostgresProperties extends React.PureComponent {
       </tr>
     )
   }
+
+  static getColumnsFromStream(stream, props) {
+    const schema = stream.schema.properties;
+    const transformations = stream.transformations;
+
+    return Object.keys(schema).map(col => {
+      const mdataCols = stream.metadata.filter(m => m.breadcrumb.length > 0)
+      const mdata = mdataCols.find(m => m.breadcrumb[1] === col).metadata
+      const transformation = transformations.find(t => t['stream'] == props.activeStream && t['fieldId'] == col) || {}
+      return {
+        name: col,
+        format: schema[col].format,
+        type: schema[col].type[1] || schema[col].type[0],
+        isPrimaryKey: Array.isArray(props.tableKeys) && props.tableKeys.indexOf(col) > -1,
+        isReplicationKey: col === props.replicationKey,
+        inclusion: mdata.inclusion,
+        selectedByDefault: mdata['selected-by-default'],
+        selected: mdata['selected'],
+        sqlDatatype: mdata['sql-datatype'],
+        isNew: mdata['is-new'],
+        isModified: mdata['is-modified'],
+        transformationType: transformation.type || 'STRAIGHT_COPY',
+      }})
+  }
   
   componentDidMount() {
     const { targetId, tapId } = this.props
@@ -328,6 +348,7 @@ export class TapPostgresProperties extends React.PureComponent {
       activeStream,
       activeStreamId,
       onStreamSelect,
+      onUpdateStreams,
       onUpdateStream,
       onTransformationChange,
       onDiscoverTap,
@@ -362,6 +383,9 @@ export class TapPostgresProperties extends React.PureComponent {
           return tableMetadata.selected
         })
       }
+
+      // Used for select/deselect all
+      const allStreamsSelected = selectedStreams.length === streams.length;
 
       // Find selected columns
       let columns
@@ -404,7 +428,7 @@ export class TapPostgresProperties extends React.PureComponent {
                       headerComponent={TapPostgresProperties.streamsTableHeader}
                       bodyComponent={TapPostgresProperties.streamsTableBody}
                       onItemSelect={onStreamSelect}
-                      delegatedProps={{ targetId, tapId, onUpdateStream }}
+                      delegatedProps={{ targetId, tapId, onUpdateStreams, onUpdateStream, allStreamsSelected }}
                     />
                   </Grid>
                 </Col>
@@ -449,6 +473,7 @@ TapPostgresProperties.propTypes = {
   forceRefreshStreams: PropTypes.any,
   activeStreamId: PropTypes.any,
   onStreamSelect: PropTypes.func,
+  onUpdateStreams: PropTypes.func,
   onUpdateStream: PropTypes.func,
   onTransformationChange: PropTypes.func,
 }
@@ -457,6 +482,7 @@ export function mapDispatchToProps(dispatch) {
   return {
     onLoadStreams: (targetId, tapId) => dispatch(loadStreams(targetId, tapId)),
     onStreamSelect: (stream, streamId) => dispatch(setActiveStreamId(stream, streamId)),
+    onUpdateStreams: (targetId, tapId, params) => dispatch(updateStreams(targetId, tapId, params)),
     onUpdateStream: (targetId, tapId, streamId, params) => dispatch(updateStream(targetId, tapId, streamId, params)),
     onTransformationChange: (targetId, tapId, stream, fieldId, value) => dispatch(setTransformation(targetId, tapId, stream, fieldId, value)),
     onDiscoverTap: (targetId, tapId) => dispatch(discoverTap(targetId, tapId)),

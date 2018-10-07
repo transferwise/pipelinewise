@@ -4,6 +4,7 @@ import {
   LOAD_CONFIG,
   SAVE_CONFIG,
   TEST_CONNECTION,
+  UPDATE_STREAMS,
   UPDATE_STREAM,
   SET_TRANSFORMATION,
   DISCOVER_TAP
@@ -15,6 +16,8 @@ import {
   loadConfigError,
   saveConfigDone,
   saveConfigError,
+  updateStreamsDone,
+  updateStreamsError,
   updateStreamDone,
   updateStreamError,
   setTransformationDone,
@@ -75,6 +78,21 @@ export function* testConnection(action) {
   }
 }
 
+export function* updateStreams(action) {
+  const requestURL = `http://localhost:5000/targets/${action.targetId}/taps/${action.tapId}/streams`;
+
+  try {
+    const response = yield call(request, requestURL, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(action.params),
+    });
+    yield put(updateStreamsDone(response));
+  } catch (err) {
+    yield put(updateStreamsError(err));
+  }
+}
+
 export function* updateStream(action) {
   const requestURL = `http://localhost:5000/targets/${action.targetId}/taps/${action.tapId}/streams/${action.streamId}`;
 
@@ -123,6 +141,7 @@ export default function* tapPostgresData() {
   yield takeLatest(LOAD_CONFIG, loadConfig);
   yield takeLatest(SAVE_CONFIG, saveConfig);
   yield takeLatest(TEST_CONNECTION, testConnection);
+  yield takeLatest(UPDATE_STREAMS, updateStreams);
   yield takeLatest(UPDATE_STREAM, updateStream);
   yield takeLatest(SET_TRANSFORMATION, setTransformation)
   yield takeLatest(DISCOVER_TAP, discoverTap);
