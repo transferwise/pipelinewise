@@ -169,7 +169,8 @@ export class TapPostgresProperties extends React.PureComponent {
     const stream = props.delegatedProps.stream;
     const streamId = props.delegatedProps.streamId;
     const isAutomatic = item.inclusion === 'automatic';
-    const isSelected = item.selected || isAutomatic;
+    const selectedByDefault = item.selectedByDefault;
+    const isSelected = (item.selected === undefined ? selectedByDefault : item.selected) || isAutomatic;
     let method = <FormattedMessage {...messages.notSelected} />
     const transformationType = item.transformationType;
     let schemaChangeDescription;

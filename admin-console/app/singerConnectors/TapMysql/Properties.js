@@ -164,7 +164,7 @@ export class TapMysqlProperties extends React.PureComponent {
     const streamId = props.delegatedProps.streamId;
     const isAutomatic = item.inclusion === 'automatic';
     const selectedByDefault = item.selectedByDefault;
-    const isSelected = item.selected || selectedByDefault || isAutomatic;
+    const isSelected = (item.selected === undefined ? selectedByDefault : item.selected) || isAutomatic;
     const isUnsupported = item.inclusion === 'unsupported';
     let method = <FormattedMessage {...messages.notSelected} />
     const transformationType = item.transformationType;
