@@ -385,7 +385,7 @@ export class TapPostgresProperties extends React.PureComponent {
       }
 
       // Used for select/deselect all
-      const allStreamsSelected = selectedStreams.length === streams.length;
+      const allStreamsSelected = Array.isArray(streams) ? selectedStreams.length === streams.length : false;
 
       // Find selected columns
       let columns
