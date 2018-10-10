@@ -161,6 +161,7 @@ class PipelineWise(object):
             'properties': os.path.join(connector_dir, 'properties.json'),
             'state': os.path.join(connector_dir, 'state.json'),
             'transformation': os.path.join(connector_dir, 'transformation.json'),
+            'selection': os.path.join(connector_dir, 'selection.json'),
         }
         
     def get_targets(self):
