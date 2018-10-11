@@ -255,6 +255,10 @@ class DbSync:
             ', '.join(columns + primary_key)
         )
 
+    def grant_select_on_schema(self, schema_name, grantee):
+        self.query("GRANT USAGE ON SCHEMA {} TO GROUP {}".format(schema_name, grantee))
+        self.query("GRANT SELECT ON ALL TABLES IN SCHEMA {} TO GROUP {}".format(schema_name, grantee))
+
     def create_schema_if_not_exists(self):
         schema_name = self.connection_config['schema']
         schema_rows = self.query(
@@ -266,9 +270,13 @@ class DbSync:
             self.query("CREATE SCHEMA IF NOT EXISTS {}".format(schema_name))
 
         if 'grant_select_to' in self.connection_config:
-            for grantee in self.connection_config['grant_select_to']:
-                self.query("GRANT USAGE ON SCHEMA {} TO GROUP {}".format(schema_name, grantee))
-                self.query("GRANT SELECT ON ALL TABLES IN SCHEMA {} TO GROUP {}".format(schema_name, grantee))
+            grant_select_to = self.connection_config['grant_select_to']
+
+            if isinstance(grant_select_to, list):
+                for grantee in grant_select_to:
+                    self.grant_select_on_schema(schema_name, grantee)
+            else:
+                self.grant_select_on_schema(schema_name, grant_select_to)
 
     def get_tables(self):
         return self.query(
