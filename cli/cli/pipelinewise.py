@@ -430,9 +430,9 @@ class PipelineWise(object):
                     if table_sel:
                         self.logger.info("Mark {} table as selected with properties {}".format(table_name, table_sel))
                         schema["streams"][stream_idx]["metadata"][stream_table_mdata_idx]["metadata"]["selected"] = True
-                        if table_sel["replication_method"]:
+                        if "replication_method" in table_sel:
                             schema["streams"][stream_idx]["metadata"][stream_table_mdata_idx]["metadata"]["replication-method"] = table_sel["replication_method"]
-                        if table_sel["replication_key"]:
+                        if "replication_key" in table_sel:
                             schema["streams"][stream_idx]["metadata"][stream_table_mdata_idx]["metadata"]["replication-key"] = table_sel["replication_key"]
                     else:
                         self.logger.info("Mark {} table as not selected".format(table_name))
