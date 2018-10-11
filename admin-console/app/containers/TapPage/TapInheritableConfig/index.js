@@ -35,11 +35,13 @@ const schema = {
   type: "object",
   properties: {
     schema: { type: "string", title: messages.schema.defaultMessage },
+    "grant_select_to": { type: "string", title: messages.grantSelectTo.defaultMessage  },
     "batch_size": { type: "integer", title: messages.batchSize.defaultMessage },
   },
 }
 const uiSchema = {
   schema: { "ui:help": messages.schemaHelp.defaultMessage },
+  "grant_select_to": { "ui:help": messages.grantSelectToHelp.defaultMessage },
   "batch_size": { "ui:help": messages.batchSizeHelp.defaultMessage },
 };
 
