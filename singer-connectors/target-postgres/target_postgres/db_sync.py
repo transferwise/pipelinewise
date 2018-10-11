@@ -265,6 +265,11 @@ class DbSync:
         if len(schema_rows) == 0:
             self.query("CREATE SCHEMA IF NOT EXISTS {}".format(schema_name))
 
+        if 'grant_select_to' in self.connection_config:
+            for grantee in self.connection_config['grant_select_to']:
+                self.query("GRANT USAGE ON SCHEMA {} TO GROUP {}".format(schema_name, grantee))
+                self.query("GRANT SELECT ON ALL TABLES IN SCHEMA {} TO GROUP {}".format(schema_name, grantee))
+
     def get_tables(self):
         return self.query(
             'SELECT table_name FROM information_schema.tables WHERE table_schema = %s',
