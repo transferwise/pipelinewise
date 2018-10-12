@@ -117,7 +117,7 @@ class Manager(object):
             return { 'stdout': None, 'stderr': None, 'returncode': 0 }
 
     def gen_id_by_name(self, tap_name):
-        return ''.join(tap_name.strip().split()).lower()
+        return re.sub('\(|\)|\[|\]', '__', ''.join(tap_name.strip().split()).lower())
 
     def get_target_dir(self, target_id):
         return os.path.join(self.config_dir, target_id)
