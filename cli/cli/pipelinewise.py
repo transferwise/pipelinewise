@@ -438,7 +438,7 @@ class PipelineWise(object):
                         self.logger.info("Mark {} table as not selected".format(table_name))
                         schema["streams"][stream_idx]["metadata"][stream_table_mdata_idx]["metadata"]["selected"] = False
 
-                return schema
+            return schema
 
         except Exception as exc:
             self.logger.error("Cannot load selection JSON. {}".format(str(exc)))
