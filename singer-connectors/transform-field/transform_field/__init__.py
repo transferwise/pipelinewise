@@ -100,9 +100,23 @@ class TransformField(object):
 
                     # Do transformation on every column where it is required
                     for trans in trans_meta:
+
                         if trans.field_id in message.record:
                             orig_value = message.record[trans.field_id]
-                            message.record[trans.field_id] = transform.do_transform(orig_value, trans.type)
+                            transformed = transform.do_transform(orig_value, trans.type)
+
+                            # Truncate to transformed value to the max allowed length if required
+                            if transformed is not None:
+                                if trans.field_id in schema['properties']:
+                                    if 'maxLength' in schema['properties'][trans.field_id]:
+                                        max_length = schema['properties'][trans.field_id]['maxLength']
+
+                                if max_length:
+                                    message.record[trans.field_id] = transformed[:max_length]
+                                else:
+                                    message.record[trans.field_id] = transformed
+                            else:
+                                message.record[trans.field_id] = transformed
 
                     # Validate the transformed columns
                     data = float_to_decimal(message.record)
