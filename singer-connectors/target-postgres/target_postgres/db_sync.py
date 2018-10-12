@@ -267,7 +267,8 @@ class DbSync:
 
     def grant_privilege(self, schema, grantees, grant_method):
         if isinstance(grantees, list):
-            map(lambda grantee:grant_method(schema,grantee), grantees)
+            for grantee in grantees:
+                grant_method(schema, grantee)
         elif isinstance(grantees, str):
             grant_method(schema, grantees)
 
