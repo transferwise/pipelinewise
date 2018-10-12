@@ -255,9 +255,21 @@ class DbSync:
             ', '.join(columns + primary_key)
         )
 
-    def grant_select_on_schema(self, schema_name, grantee):
-        self.query("GRANT USAGE ON SCHEMA {} TO GROUP {}".format(schema_name, grantee))
-        self.query("GRANT SELECT ON ALL TABLES IN SCHEMA {} TO GROUP {}".format(schema_name, grantee))
+    def grant_usage_on_schema(self, schema_name, grantee):
+        query = "GRANT USAGE ON SCHEMA {} TO GROUP {}".format(schema_name, grantee)
+        logger.info("Granting USAGE privilegue on '{}' schema to '{}'... {}".format(schema_name, grantee, query))
+        self.query(query)
+
+    def grant_select_on_all_tables_in_schema(self, schema_name, grantee):
+        query = "GRANT SELECT ON ALL TABLES IN SCHEMA {} TO GROUP {}".format(schema_name, grantee)
+        logger.info("Granting SELECT ON ALL TABLES privilegue on '{}' schema to '{}'... {}".format(schema_name, grantee, query))
+        self.query(query)
+
+    def grant_privilege(self, schema, grantees, grant_method):
+        if isinstance(grantees, list):
+            map(lambda grantee:grant_method(schema,grantee), grantees)
+        elif isinstance(grantees, str):
+            grant_method(schema, grantees)
 
     def create_schema_if_not_exists(self):
         schema_name = self.connection_config['schema']
@@ -267,16 +279,13 @@ class DbSync:
         )
 
         if len(schema_rows) == 0:
-            self.query("CREATE SCHEMA IF NOT EXISTS {}".format(schema_name))
+            query = "CREATE SCHEMA IF NOT EXISTS {}".format(schema_name)
+            logger.info("Schema '{}' does not exist. Creating... {}".format(schema_name, query))
+            self.query(query)
 
-        if 'grant_select_to' in self.connection_config:
-            grant_select_to = self.connection_config['grant_select_to']
-
-            if isinstance(grant_select_to, list):
-                for grantee in grant_select_to:
-                    self.grant_select_on_schema(schema_name, grantee)
-            else:
-                self.grant_select_on_schema(schema_name, grant_select_to)
+            if 'grant_select_to' in self.connection_config:
+                grant_select_to = self.connection_config['grant_select_to']
+                self.grant_privilege(schema_name, grant_select_to, self.grant_usage_on_schema)
 
     def get_tables(self):
         return self.query(
@@ -339,6 +348,10 @@ class DbSync:
             query = self.create_table_query()
             logger.info("Table '{}' does not exist. Creating... {}".format(stream, query))
             self.query(query)
+
+            if 'grant_select_to' in self.connection_config:
+                grant_select_to = self.connection_config['grant_select_to']
+                self.grant_privilege(self.schema_name, grant_select_to, self.grant_select_on_all_tables_in_schema)
         else:
             logger.info("Table '{}' exists".format(stream))
             self.update_columns()
