@@ -103,6 +103,11 @@ def persist_lines(config, lines):
             if 'stream' not in o:
                 raise Exception("Line is missing required key 'stream': {}".format(line))
             stream = o['stream']
+
+            # Flush records if schema received again and have unpersisted rows
+            if stream in schemas and stream in stream_to_sync:
+                flush_records(o, csv_files_to_load, row_count, primary_key_exists, stream_to_sync[stream])
+
             schemas[stream] = o
             schema = float_to_decimal(o['schema'])
             validators[stream] = Draft4Validator(schema, format_checker=FormatChecker())

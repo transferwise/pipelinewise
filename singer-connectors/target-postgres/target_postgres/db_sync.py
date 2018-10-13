@@ -64,12 +64,13 @@ def flatten_schema(d, parent_key=[], sep='__'):
             else:
                 items.append((new_key, v))
         else:
-            if list(v.values())[0][0]['type'] == 'string':
-                list(v.values())[0][0]['type'] = ['null', 'string']
-                items.append((new_key, list(v.values())[0][0]))
-            elif list(v.values())[0][0]['type'] == 'array':
-                list(v.values())[0][0]['type'] = ['null', 'array']
-                items.append((new_key, list(v.values())[0][0]))
+            if len(v.values()) > 0:
+                if list(v.values())[0][0]['type'] == 'string':
+                    list(v.values())[0][0]['type'] = ['null', 'string']
+                    items.append((new_key, list(v.values())[0][0]))
+                elif list(v.values())[0][0]['type'] == 'array':
+                    list(v.values())[0][0]['type'] = ['null', 'array']
+                    items.append((new_key, list(v.values())[0][0]))
 
     key_func = lambda item: item[0]
     sorted_items = sorted(items, key=key_func)
