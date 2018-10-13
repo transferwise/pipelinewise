@@ -40,6 +40,7 @@ install_admin_console() {
 # Install Singer connectors
 install_connector tap-mysql
 install_connector tap-postgres
+install_connector tap-zendesk
 install_connector target-postgres
 install_connector transform-field
 

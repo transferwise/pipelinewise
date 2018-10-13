@@ -37,8 +37,8 @@ const schema = {
     type: {
       type: "string",
       title: "Data Source Type",
-      enum: ["tap-postgres", "tap-mysql"],
-      enumNames: ["PostgreSQL", "MySQL"],
+      enum: ["tap-postgres", "tap-mysql", "tap-zendesk"],
+      enumNames: ["PostgreSQL", "MySQL", "Zendesk"],
       default: "tap-postgres",
     },
     owner: { type: "string", title: "Owner" },

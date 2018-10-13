@@ -515,6 +515,7 @@ class PipelineWise(object):
 
     def run_tap(self):
         tap_id = self.tap["id"]
+        tap_type = self.tap["type"]
         target_id = self.target["id"]
 
         self.logger.info("Running {} tap in {} target".format(tap_id, target_id))
@@ -532,6 +533,18 @@ class PipelineWise(object):
         # We merge the two configs and use that with the target
         cons_target_config = self.create_consumable_target_config(target_config, tap_inheritable_config)
 
+        # Following the singer spec the catalog JSON file needs to be passed by the --catalog argument
+        # However some tap (i.e. tap-mysql and tap-postgres) requires it as --properties
+        # This is problably for historical reasons and need to clarify on Singer slack channels
+        if tap_type == 'tap-mysql':
+            tap_catalog_argument = '--properties'
+        elif tap_type == 'tap-postgres':
+            tap_catalog_argument = '--properties'
+        elif tap_type == 'tap-zendesk':
+            tap_catalog_argument = '--catalog'
+        else:
+            tap_catalog_argument = '--catalog'
+
         # Add state arugment if exists to extract data incrementally
         tap_state_arg = ""
         if os.path.isfile(tap_state):
@@ -541,7 +554,7 @@ class PipelineWise(object):
             # Run without transformation in the middle
             if not os.path.isfile(tap_transformation):
                 command = ' '.join((
-                    "  {} --config {} --properties {} {}".format(self.tap_bin, tap_config, tap_properties, tap_state_arg),
+                    "  {} --config {} {} {} {}".format(self.tap_bin, tap_config, tap_catalog_argument, tap_properties, tap_state_arg),
                     "| {} --config {}".format(self.target_bin, cons_target_config),
                     "> {}".format(new_tap_state)
                 ))
@@ -549,7 +562,7 @@ class PipelineWise(object):
             # Run with transformation in the middle
             else:
                 command = ' '.join((
-                    "  {} --config {} --properties {} {}".format(self.tap_bin, tap_config, tap_properties, tap_state_arg),
+                    "  {} --config {} {} {} {}".format(self.tap_bin, tap_config, tap_catalog_argument, tap_properties, tap_state_arg),
                     "| {} --config {}".format(self.tranform_field_bin, tap_transformation),
                     "| {} --config {}".format(self.target_bin, cons_target_config),
                     "> {}".format(new_tap_state)

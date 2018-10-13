@@ -425,7 +425,7 @@ class Manager(object):
             tap_owner = tap["owner"]
             tap_id = self.gen_id_by_name(tap["name"])
 
-            if tap_type in ["tap-postgres", "tap-mysql"]:
+            if tap_type in ["tap-postgres", "tap-mysql", "tap-zendesk"]:
 
                 tap_dir = self.get_tap_dir(target_id, tap_id)
                 if not os.path.isdir(tap_dir):
@@ -558,8 +558,10 @@ class Manager(object):
 
             # Add transformations
             for idx, stream in enumerate(streams):
-                transformations = self.get_transformations(target_id, tap_id, stream["table_name"])
-                streams[idx]["transformations"] = transformations
+                stream_id = stream.get("table_name") or stream.get("stream")
+                if stream_id:
+                    transformations = self.get_transformations(target_id, tap_id, stream_id)
+                    streams[idx]["transformations"] = transformations
 
         except Exception as exc:
             raise Exception("Cannot find streams for {} tap in {} target. {}".format(tap_id, target_id, exc))
@@ -598,7 +600,7 @@ class Manager(object):
             properties = self.load_json(properties_file)
             tap_type = params["tapType"]
 
-            if tap_type in ["tap-postgres", "tap-mysql"]:
+            if tap_type in ["tap-postgres", "tap-mysql", "tap-zendesk"]:
                 streams = properties["streams"]
                 
                 # Find the stream by stream_id

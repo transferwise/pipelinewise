@@ -1,5 +1,5 @@
 /*
- * TapMysqlReducer
+ * TapZendeskReducer
  *
  * The reducer takes care of our data. Using actions, we can change our
  * application state.
@@ -77,7 +77,7 @@ export const initialState = fromJS({
   forceRefreshStreams: false,
 });
 
-function tapMysqlReducer(state = initialState, action) {
+function tapZendeskReducer(state = initialState, action) {
   let result;
   let consoleOutput = false;
 
@@ -293,4 +293,4 @@ function tapMysqlReducer(state = initialState, action) {
   }
 }
 
-export default tapMysqlReducer;
+export default tapZendeskReducer;
