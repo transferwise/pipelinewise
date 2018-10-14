@@ -413,7 +413,7 @@ class PipelineWise(object):
 
                 streams = schema["streams"]
                 for stream_idx, stream in enumerate(streams):
-                    table_name = stream["table_name"]
+                    table_name = stream.get("table_name") or stream.get("stream")
                     table_sel = False
                     for sel in selection:
                          if 'table_name' in sel and table_name == sel['table_name']:
