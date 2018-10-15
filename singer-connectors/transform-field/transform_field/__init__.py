@@ -136,7 +136,7 @@ class TransformField(object):
                         raise TransformFieldException(
                             'Record does not pass schema validation {}',format(e))
 
-            LOGGER.info("Batch is valid with {} messages".format(len(messages)))
+            LOGGER.debug("Batch is valid with {} messages".format(len(messages)))
 
             # Update stats
             self.time_last_batch_sent = time.time()
