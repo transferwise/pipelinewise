@@ -678,7 +678,21 @@ class Manager(object):
             try:
                 transformation_type = params["type"]
 
-                if any(transformation_type in t for t in ["HASH", "SET-NULL", "MASK-DATE", "MASK-NUMBER"]):
+                if any(transformation_type in t for t in [
+                    "HASH",
+                    "HASH-SKIP-FIRST-1",
+                    "HASH-SKIP-FIRST-2",
+                    "HASH-SKIP-FIRST-3",
+                    "HASH-SKIP-FIRST-4",
+                    "HASH-SKIP-FIRST-5",
+                    "HASH-SKIP-FIRST-6",
+                    "HASH-SKIP-FIRST-7",
+                    "HASH-SKIP-FIRST-8",
+                    "HASH-SKIP-FIRST-9",
+                    "SET-NULL",
+                    "MASK-DATE",
+                    "MASK-NUMBER"
+                    ]):
                     # Delete the previous transformation on this field if exists
                     transformations = [t for t in transformations if not (t["targetId"] == target_id and t["tapId"] == tap_id and t["stream"] == stream and t["fieldId"] == field_id)]
 
