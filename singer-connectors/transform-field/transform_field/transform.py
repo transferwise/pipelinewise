@@ -12,6 +12,9 @@ def do_transform(value, trans_type):
       # Transfroms string input to hash
       elif trans_type == "HASH":
           return hashlib.sha256(value.encode('utf-8')).hexdigest()
+      # Transforms string input to hash skipping first n characters, e.g. HASH-SKIP-FIRST-2
+      elif 'HASH-SKIP-FIRST' in trans_type:
+          return value[:int(trans_type[-1])] + hashlib.sha256(value.encode('utf-8')[int(trans_type[-1]):]).hexdigest()
       # Transforms any date to stg
       elif trans_type == "MASK-DATE":
           return parser.parse(value).replace(month=1, day=1).isoformat()
