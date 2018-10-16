@@ -7,6 +7,7 @@ import SingerComponent from './SingerComponent';
 import TapPostgresProperties from './TapPostgres/LoadableProperties';
 import TapMysqlProperties from './TapMysql/LoadableProperties';
 import TapZendeskProperties from './TapZendesk/LoadableProperties';
+import TapKafkaProperties from './TapKafka/LoadableProperties';
 
 
 export class SingerTapProperties extends SingerComponent {
@@ -19,6 +20,7 @@ export class SingerTapProperties extends SingerComponent {
         case 'tap-postgres': return <TapPostgresProperties targetId={tap.target.id} tapId={tap.id} title={`${tap.name} Connection Details`}/>
         case 'tap-mysql': return <TapMysqlProperties targetId={tap.target.id} tapId={tap.id} title={`${tap.name} Connection Details`}/>
         case 'tap-zendesk': return <TapZendeskProperties targetId={tap.target.id} tapId={tap.id} title={`${tap.name} Connection Details`}/>
+        case 'tap-kafka': return <TapKafkaProperties targetId={tap.target.id} tapId={tap.id} title={`${tap.name} Connection Details`}/>
 
         default: return this.renderJson(tap.properties)
       }

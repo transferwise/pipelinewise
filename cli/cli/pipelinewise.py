@@ -542,6 +542,8 @@ class PipelineWise(object):
             tap_catalog_argument = '--properties'
         elif tap_type == 'tap-zendesk':
             tap_catalog_argument = '--catalog'
+        elif tap_type == 'tap-kafka':
+            tap_catalog_argument = '--properties'
         else:
             tap_catalog_argument = '--catalog'
 

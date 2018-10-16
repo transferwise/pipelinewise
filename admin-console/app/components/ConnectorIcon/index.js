@@ -9,6 +9,7 @@ import ReplicationKeyIcon from '../../images/replication-key-icon.png'
 import MysqlLogo from '../../images/mysql-logo.png';
 import PostgresLogo from '../../images/postgresql-logo.png';
 import ZendeskLogo from '../../images/zendesk-logo.png';
+import KafkaLogo from '../../images/kafka-logo.png';
 
 
 function decoratorsByName(name) {
@@ -23,6 +24,8 @@ function decoratorsByName(name) {
       return { logo: PostgresLogo, name: 'PostgreSQL' };
     } else if (name.match(/(tap|target)-zendesk/)) {
       return { logo: ZendeskLogo, name: 'Zendesk' };
+    } else if (name.match(/(tap|target)-kafka/)) {
+      return { logo: KafkaLogo, name: 'Kafka' };
     } else {
       return { logo: UnknownIcon, name }
     }
