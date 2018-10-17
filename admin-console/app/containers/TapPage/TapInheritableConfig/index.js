@@ -35,14 +35,30 @@ const schema = {
   type: "object",
   properties: {
     schema: { type: "string", title: messages.schema.defaultMessage },
-    "grant_select_to": { type: "string", title: messages.grantSelectTo.defaultMessage  },
     "batch_size": { type: "integer", title: messages.batchSize.defaultMessage },
+    "grant_select_to": {
+      type: "array",
+      title: messages.grantSelectTo.defaultMessage,
+      items: { type: "string", title: messages.role.defaultMessage  },
+    },
+    "create_indices": {
+      type: "array",
+      title: messages.createIndices.defaultMessage,
+      items: {
+        type: "object",
+        properties: {
+          table: { type: "string", title: messages.table.defaultMessage },
+          columns: { type: "string", title: messages.columns.defaultMessage }
+        }
+      }
+    },
   },
 }
 const uiSchema = {
   schema: { "ui:help": messages.schemaHelp.defaultMessage },
-  "grant_select_to": { "ui:help": messages.grantSelectToHelp.defaultMessage },
   "batch_size": { "ui:help": messages.batchSizeHelp.defaultMessage },
+  "grant_select_to": { "ui:help": messages.grantSelectToHelp.defaultMessage },
+  "create_indices": { "ui:help": messages.createIndicesHelp.defaultMessage },
 };
 
 export class TapInheritableConfig extends React.PureComponent {
