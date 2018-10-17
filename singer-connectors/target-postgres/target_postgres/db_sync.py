@@ -132,11 +132,15 @@ class DbSync:
             with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
                 cur.copy_from(file, table)
 
-    def table_name(self, table_name, is_temporary):
+    def table_name(self, table_name, is_temporary, without_schema = False):
+        pg_table_name = table_name.replace('.', '_').lower()
+
         if is_temporary:
-            return '{}_temp'.format(table_name)
+            return '{}_temp'.format(pg_table_name)
+        if without_schema:
+            return '{}'.format(pg_table_name)
         else:
-            return '{}.{}'.format(self.schema_name, table_name)
+            return '{}.{}'.format(self.schema_name, pg_table_name)
 
     def record_primary_key_string(self, record):
         if len(self.stream_schema_message['key_properties']) == 0:
@@ -316,7 +320,8 @@ class DbSync:
     def update_columns(self):
         stream_schema_message = self.stream_schema_message
         stream = stream_schema_message['stream']
-        columns = self.get_table_columns(stream)
+        table_name = self.table_name(stream, False, True)
+        columns = self.get_table_columns(table_name)
         columns_dict = {column['column_name'].lower(): column for column in columns}
 
         columns_to_add = [
@@ -358,16 +363,17 @@ class DbSync:
     def sync_table(self):
         stream_schema_message = self.stream_schema_message
         stream = stream_schema_message['stream']
-        found_tables = [table for table in (self.get_tables()) if table['table_name'].lower() == stream.lower()]
+        table_name = self.table_name(stream, False, True)
+        found_tables = [table for table in (self.get_tables()) if table['table_name'].lower() == table_name]
         if len(found_tables) == 0:
             query = self.create_table_query()
-            logger.info("Table '{}' does not exist. Creating... {}".format(stream, query))
+            logger.info("Table '{}' does not exist. Creating... {}".format(table_name, query))
             self.query(query)
 
             if 'grant_select_to' in self.connection_config:
                 grant_select_to = self.connection_config['grant_select_to']
                 self.grant_privilege(self.schema_name, grant_select_to, self.grant_select_on_all_tables_in_schema)
         else:
-            logger.info("Table '{}' exists".format(stream))
+            logger.info("Table '{}' exists".format(table_name))
             self.update_columns()
 
