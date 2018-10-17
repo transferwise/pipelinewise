@@ -82,7 +82,7 @@ def sync_stream(kafka_config, stream, state):
     time_extracted = utils.now()
     rows_saved = 0
     for message in consumer:
-        LOGGER.info("%s:%s:%s: key=%s value=%s" % (message.topic, message.partition,
+        LOGGER.debug("%s:%s:%s: key=%s value=%s" % (message.topic, message.partition,
                                                    message.offset, message.key,
                                                    message.value))
         # stream['schema']
@@ -96,7 +96,7 @@ def sync_stream(kafka_config, stream, state):
         elif kafka_config.get('reject_topic'):
             send_reject_message(kafka_config, record, error)
         else:
-            raise Exception("record failed validation and no reject_topic was specified")
+            raise Exception("record failed validation and no reject_topic was specified. ERROR: {}".format(error))
 
         state = singer.write_bookmark(state,
                                       stream['tap_stream_id'],
