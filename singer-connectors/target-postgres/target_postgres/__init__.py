@@ -118,8 +118,19 @@ def persist_lines(config, lines):
         if count > 0:
             flush_records(stream, records_to_load, row_count, stream_to_sync)
 
+    # Load finished, create the indices if required
+    create_indices(config, stream_to_sync)
+
     return state
 
+def create_indices(config, stream_to_sync):
+    indices = config['create_indices'] if 'create_indices' in config else None
+    stream_to_sync_keys = list(stream_to_sync.keys())
+
+    # Get the connection from the first synced stream
+    if indices and len(stream_to_sync_keys) > 0:
+        stream = stream_to_sync_keys[0]
+        stream_to_sync[stream].create_indices(stream, indices)
 
 def flush_records(stream, records_to_load, row_count, stream_to_sync):
     sync = stream_to_sync[stream]

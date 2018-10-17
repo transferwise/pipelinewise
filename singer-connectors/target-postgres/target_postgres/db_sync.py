@@ -273,6 +273,19 @@ class DbSync:
         elif isinstance(grantees, str):
             grant_method(schema, grantees)
 
+    def create_index(self, schema, index):
+        if 'table' in index and 'columns' in index:
+            table = self.table_name(index['table'], False)
+            index_name = 'idx_{}'.format(index['columns'].replace(',', '_'))
+            query = "CREATE INDEX IF NOT EXISTS {} ON {} ({})".format(index_name, table, index['columns'])
+            logger.info("Creating index on '{}' table on '{}' column(s)... {}".format(table, index['columns'], query))
+            self.query(query)
+
+    def create_indices(self, schema, indices):
+        if isinstance(indices, list):
+            for index in indices:
+                self.create_index(schema, index)
+
     def create_schema_if_not_exists(self):
         schema_name = self.connection_config['schema']
         schema_rows = self.query(
