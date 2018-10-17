@@ -49,6 +49,8 @@ const schema = {
     bootstrap_servers: { type: "string", title: "Bootstrap Servers" },
     topic: { type: "string", title: "Topic" },
     schema: { type: "string", title: "Schema" },
+    schema: { type: "string", title: "Schema" },
+    "consumer_timeout_ms": { type: "integer", title: "Consumer Timeout (milliseconds)" }
   },
   required: ["group_id", "bootstrap_servers", "topic"]
 }
