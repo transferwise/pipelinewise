@@ -5,6 +5,7 @@ import json
 import pdb
 import sys
 import tap_kafka.sync as sync
+import tap_kafka.common as common
 
 LOGGER = singer.get_logger()
 
@@ -22,10 +23,11 @@ def dump_catalog(all_streams):
 
 def do_discovery(config):
     try:
+
         consumer = KafkaConsumer(config['topic'],
                                  group_id=config['group_id'],
                                  enable_auto_commit=False,
-                                 consumer_timeout_ms=10000,
+                                 consumer_timeout_ms=config.get('consumer_timeout_ms', 10000),
                                  #value_deserializer=lambda m: json.loads(m.decode('ascii'))
                                  bootstrap_servers=config['bootstrap_servers'].split(','))
     except Exception as ex:
