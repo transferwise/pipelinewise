@@ -60,7 +60,7 @@ def sync_stream(kafka_config, stream, state):
     consumer = KafkaConsumer(kafka_config['topic'],
                              group_id=kafka_config['group_id'],
                              enable_auto_commit=False,
-                             consumer_timeout_ms=10000,
+                             consumer_timeout_ms=kafka_config.get('consumer_timeout_ms', 10000),
                              auto_offset_reset='earliest',
                              value_deserializer=lambda m: json.loads(m.decode('ascii')),
                              bootstrap_servers=kafka_config['bootstrap_servers'])
