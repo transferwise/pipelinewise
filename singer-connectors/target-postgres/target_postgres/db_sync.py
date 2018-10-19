@@ -280,7 +280,7 @@ class DbSync:
     def create_index(self, schema, index):
         if 'table' in index and 'columns' in index:
             table = self.table_name(index['table'], False)
-            index_name = 'idx_{}'.format(index['columns'].replace(',', '_'))
+            index_name = 'idx_{}_{}'.format(table[:15], index['columns'].replace(',', '_'))
             query = "CREATE INDEX IF NOT EXISTS {} ON {} ({})".format(index_name, table, index['columns'])
             logger.info("Creating index on '{}' table on '{}' column(s)... {}".format(table, index['columns'], query))
             self.query(query)
