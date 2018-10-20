@@ -6,7 +6,7 @@ import request from 'utils/request';
 import { updateTapToReplicateDone, updateTapToReplicateError } from '../App/actions';
 
 export function* getTap(action) {
-  const requestURL = `http://localhost:5000/targets/${action.targetId}/taps/${action.tapId}`;
+  const requestURL = `http://localhost:5001/targets/${action.targetId}/taps/${action.tapId}`;
 
   try {
     const tap = yield call(request, requestURL);
@@ -17,7 +17,7 @@ export function* getTap(action) {
 }
 
 export function* updateTapToReplicate(action) {
-  const requestURL = `http://localhost:5000/targets/${action.targetId}/taps/${action.tapId}`;
+  const requestURL = `http://localhost:5001/targets/${action.targetId}/taps/${action.tapId}`;
 
   try {
     const response = yield call(request, requestURL, {

@@ -15,7 +15,7 @@ import {
 import request from 'utils/request';
 
 export function* getTap(action) {
-  const requestURL = `http://localhost:5000/targets/${action.targetId}/taps/${action.tapId}`;
+  const requestURL = `http://localhost:5001/targets/${action.targetId}/taps/${action.tapId}`;
 
   try {
     const tap = yield call(request, requestURL);
@@ -26,7 +26,7 @@ export function* getTap(action) {
 }
 
 export function* setTapSyncPeriod(action) {
-  const requestURL = `http://localhost:5000/targets/${action.targetId}/taps/${action.tapId}`;
+  const requestURL = `http://localhost:5001/targets/${action.targetId}/taps/${action.tapId}`;
 
   try {
     const response = yield call(request, requestURL, {
@@ -41,7 +41,7 @@ export function* setTapSyncPeriod(action) {
 }
 
 export function* runTap(action) {
-  const requestURL = `http://localhost:5000/targets/${action.targetId}/taps/${action.tapId}/run`;
+  const requestURL = `http://localhost:5001/targets/${action.targetId}/taps/${action.tapId}/run`;
 
   try {
     const response = yield call(request, requestURL, {

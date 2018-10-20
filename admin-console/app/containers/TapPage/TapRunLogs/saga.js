@@ -13,7 +13,7 @@ import {
 import request from 'utils/request';
 
 export function* logTapRunLogs(action) {
-  const requestURL = `http://localhost:5000/targets/${action.targetId}/taps/${action.tapId}/logs`;
+  const requestURL = `http://localhost:5001/targets/${action.targetId}/taps/${action.tapId}/logs`;
 
   try {
     const logs = yield call(request, requestURL)
@@ -24,7 +24,7 @@ export function* logTapRunLogs(action) {
 }
 
 export function* logTapRunLog(action) {
-  const requestURL = `http://localhost:5000/targets/${action.targetId}/taps/${action.tapId}/logs/${action.logId}`;
+  const requestURL = `http://localhost:5001/targets/${action.targetId}/taps/${action.tapId}/logs/${action.logId}`;
 
   try {
     const logs = yield call(request, requestURL)

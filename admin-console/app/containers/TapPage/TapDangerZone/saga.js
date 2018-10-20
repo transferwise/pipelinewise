@@ -10,7 +10,7 @@ import request from 'utils/request';
 import messages from './messages';
 
 export function* deleteTap(action) {
-  const requestURL = `http://localhost:5000/targets/${action.targetId}/taps/${action.tapId}/delete`;
+  const requestURL = `http://localhost:5001/targets/${action.targetId}/taps/${action.tapId}/delete`;
 
   try {
     if (action.deleteTap.id === action.tapId) {

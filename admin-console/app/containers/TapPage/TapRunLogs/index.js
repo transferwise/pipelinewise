@@ -79,8 +79,8 @@ export class TapRunLogs extends React.PureComponent {
   renderLogViewer() {
     const { logs, activeLogId, viewerLoading, viewerError, log, logViewerVisible } = this.props
     const activeLog = findItemByKey(logs, 'filename', activeLogId)
-    const itemObj = statusToObj(activeLog.status);
-    const createdAt = formatDate(activeLog.timestamp);
+    const itemObj = statusToObj(activeLog && activeLog.status);
+    const createdAt = formatDate(activeLog && activeLog.timestamp);
     let alert = <div />
     let logContent = <div />
 
@@ -89,17 +89,11 @@ export class TapRunLogs extends React.PureComponent {
         <Row>
           <Col md={4}><FormattedMessage {...messages.createdAt} /></Col><Col md={8}>{createdAt}</Col>
           <Col md={4}><FormattedMessage {...messages.status} /></Col><Col md={8} className={itemObj.className}>
-            {activeLog.status === "running"
+            {activeLog && activeLog.status === "running"
             ? <span>
                 <ReactLoading type="bubbles" className="running-anim" />{itemObj.formattedMessage}
-                <IntervalTimer
-                    timeout={10000}
-                    callback={() => this.onRefresh()}
-                    enabled={true}
-                    repeat={true}
-                  />
               </span>
-            : itemObj.formattedMessage}
+            : itemObj && itemObj.formattedMessage}
           </Col>
         </Row>
       </Grid>
@@ -124,12 +118,21 @@ export class TapRunLogs extends React.PureComponent {
     }
 
     return (
-      <Modal
-        show={logViewerVisible}
-        title={<FormattedMessage {...messages.logViewerTitle} />}
-        body={<Grid>{viewerHeader}<br />{alert}{logContent}</Grid>}
-        onClose={() => this.props.onCloseLogViewer()} />
-      )
+      <div>
+        {activeLog
+        ? <Modal
+            show={logViewerVisible}
+            title={<FormattedMessage {...messages.logViewerTitle} />}
+            body={<Grid>{viewerHeader}<br />{alert}{logContent}</Grid>}
+            onClose={() => this.props.onCloseLogViewer()} />
+        : <div />}
+        <IntervalTimer
+          timeout={10000}
+          callback={() => this.onRefresh()}
+          enabled={true}
+          repeat={true}
+        />
+      </div>)
   }
 
   render() {

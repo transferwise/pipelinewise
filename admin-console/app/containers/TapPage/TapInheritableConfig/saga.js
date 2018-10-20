@@ -13,7 +13,7 @@ import {
 import request from 'utils/request';
 
 export function* getInheritableConfig(action) {
-  const requestURL = `http://localhost:5000/targets/${action.targetId}/taps/${action.tapId}/inheritableconfig`;
+  const requestURL = `http://localhost:5001/targets/${action.targetId}/taps/${action.tapId}/inheritableconfig`;
 
   try {
     const inheritableConfig = yield call(request, requestURL);
@@ -24,7 +24,7 @@ export function* getInheritableConfig(action) {
 }
 
 export function* saveInheritableConfig(action) {
-  const requestURL = `http://localhost:5000/targets/${action.targetId}/taps/${action.tapId}/inheritableconfig`
+  const requestURL = `http://localhost:5001/targets/${action.targetId}/taps/${action.tapId}/inheritableconfig`
 
   try {
     const response = yield call(request, requestURL, {
