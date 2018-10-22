@@ -520,6 +520,11 @@ class PipelineWise(object):
 
         self.logger.info("Running {} tap in {} target".format(tap_id, target_id))
 
+        # Run only if tap enabled
+        if not self.tap.get("enabled", False):
+            self.logger.info("Tap {} is not enabled. Do nothing and exit normally.".format(self.tap["name"]))
+            sys.exit(0)
+
         # Generate and run the command to run the tap directly
         tap_config = self.tap["files"]["config"]
         tap_inheritable_config = self.tap["files"]["inheritable_config"]
