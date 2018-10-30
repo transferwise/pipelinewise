@@ -38,8 +38,8 @@ const schema = {
     type: {
       type: "string",
       title: "Data Warehouse Type",
-      enum: ["target-postgres"],
-      enumNames: ["PostgreSQL"],
+      enum: ["target-postgres", "target-snowflake"],
+      enumNames: ["PostgreSQL", "Snowflake"],
       default: "target-postgres",
     },
   },
