@@ -38,17 +38,18 @@ const schema = {
     user: { type: "string", title: "User" },
     password: { type: "string", title: "Password" },
     dbname: { type: "string", title: "Database name" },
-    schema: { type: "string", title: "Schema to use" },
     warehouse: { type: "string", title: "Virtual Warehouse" },
-    s3_url: { type: "string", title: "URL to External Stage on S3" },
+    s3_bucket: { type: "string", title: "S3 Bucket to stage data to load" },
+    s3_key_prefix: { type: "string", title: "S3 key prefix" },
     aws_access_key_id: { type: "string", title: "AWS Access Key ID" },
     aws_secret_access_key: { type: "string", title: "AWS Secret Access Key" },
   },
-  required: ["account", "user", "password", "dbname", "schema", "warehouse", "s3_url", "aws_access_key_id", "aws_secret_access_key"]
+  required: ["account", "user", "password", "dbname", "warehouse", "s3_bucket", "s3_key_prefix", "aws_access_key_id", "aws_secret_access_key"]
 }
 
 const uiSchema = {
   password: { "ui:widget": "password" },
+  aws_secret_access_key: { "ui:widget": "password" },
 };
 
 

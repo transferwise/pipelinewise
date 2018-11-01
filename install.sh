@@ -43,6 +43,7 @@ install_connector tap-postgres
 install_connector tap-zendesk
 install_connector tap-kafka
 install_connector target-postgres
+install_connector target-snowflake
 install_connector transform-field
 
 # Install CLI
