@@ -1,6 +1,4 @@
 import json
-import psycopg2
-import psycopg2.extras
 import boto3
 import snowflake.connector
 import singer

@@ -11,7 +11,6 @@ setup(
     py_modules=["target_snowflake"],
     install_requires=[
         "singer-python==5.1.1",
-        "psycopg2==2.7.5",
         "snowflake-connector-python==1.6.12",
         "boto3==1.9.33",
         "inflection==0.3.1"
