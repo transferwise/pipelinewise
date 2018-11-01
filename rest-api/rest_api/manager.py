@@ -248,7 +248,7 @@ class Manager(object):
             target_type = target["type"]
             target_id = self.gen_id_by_name(target["name"])
 
-            if target_type in ["target-postgres"]:
+            if target_type in ["target-postgres", "target-snowflake"]:
                 target_dir = self.get_target_dir(target_id)
 
                 if not os.path.isdir(target_dir):
