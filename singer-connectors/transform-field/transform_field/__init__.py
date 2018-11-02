@@ -107,6 +107,7 @@ class TransformField(object):
 
                             # Truncate to transformed value to the max allowed length if required
                             if transformed is not None:
+                                max_length = False
                                 if trans.field_id in schema['properties']:
                                     if 'maxLength' in schema['properties'][trans.field_id]:
                                         max_length = schema['properties'][trans.field_id]['maxLength']
