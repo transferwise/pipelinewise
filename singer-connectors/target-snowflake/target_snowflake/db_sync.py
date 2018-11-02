@@ -185,12 +185,12 @@ class DbSync:
         with self.open_connection() as connection:
             with connection.cursor(snowflake.connector.DictCursor) as cur:
                 cur.execute(self.create_table_query(True))
-                copy_sql = """COPY INTO {}
-                    FROM 's3://{}/{}'
+                copy_sql = """COPY INTO {} ({}) FROM 's3://{}/{}'
                     CREDENTIALS = (aws_key_id='{}' aws_secret_key='{}') 
-                    FILE_FORMAT = (type='CSV', field_optionally_enclosed_by='\"')
+                    FILE_FORMAT = (type='CSV' escape='\\\\' field_optionally_enclosed_by='\"')
                 """.format(
                     self.table_name(stream, True),
+                    ', '.join(self.column_names()),
                     self.connection_config['s3_bucket'],
                     s3_key,
                     self.connection_config['aws_access_key_id'],
