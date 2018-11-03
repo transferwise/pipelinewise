@@ -134,8 +134,14 @@ class TransformField(object):
                         singer.write_message(message)
 
                     except Exception as e:
-                        raise TransformFieldException(
-                            'Record does not pass schema validation {}',format(e))
+                        if type(e).__name__ == "InvalidOperation":
+                            raise TransformFieldException(
+                                "Record does not pass schema validation. RECORD: {}\n'multipleOf' validations that allows long precisions are not supported (i.e. with 15 digits or more). Try removing 'multipleOf' methods from JSON schema.\n{}"
+                                .format(message.record, e)
+                            )
+                        else:
+                            raise TransformFieldException(
+                                "Record does not pass schema validation. RECORD: {}\n{}".format(message.record, e))
 
             LOGGER.debug("Batch is valid with {} messages".format(len(messages)))
 
