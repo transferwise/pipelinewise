@@ -18,11 +18,13 @@ PipelineWise is an ETL and Data Pipeline Framework using the singer.io specifica
 * **Target**: Consumes data from taps and do something with it, like load it into a file, API or database
 
 ### Supported Connectors
-* **tap-postgres**: Extract data from PostgreSQL databases. Supporting Log-Based Inremental, Key-Based Incremental and Full Table replications
-* **tap-mysql**: Extract data from MySQL databases. Supporting Log-Based Inremental, Key-Based Incremental and Full Table replications
-* **tap-zendesk**: Extract data from Zendesk using OAuth and Key-Based incremental replications
+* **tap-postgres**: Extracts data from PostgreSQL databases. Supporting Log-Based Inremental, Key-Based Incremental and Full Table replications
+* **tap-mysql**: Extracts data from MySQL databases. Supporting Log-Based Inremental, Key-Based Incremental and Full Table replications
+* **tap-kafka**: Extracts data from Kafka streams
+* **tap-zendesk**: Extracts data from Zendesk using OAuth and Key-Based incremental replications
 * **target-postgres**: Loads data from any tap into PostgreSQL database
 * **target-snowflake**: Loads data from any tap into Snowflake Data Warehouse
+* **transform-field**: Transforms fields from any tap and sends the results to any target. Recommended for data masking/ obfuscation
 
 ## Installation
 
