@@ -162,6 +162,7 @@
     "lodash": "4.17.10",
     "minimist": "1.2.0",
     "moment-timezone": "0.5.21",
+    "nice-try": "2.0.0",
     "pondjs": "0.8.9",
     "popper.js": "1.14.4",
     "prettycron": "0.10.0",
