@@ -127,7 +127,7 @@ class DbSync:
                     return []
 
     def table_name(self, table_name, is_temporary, without_schema = False):
-        pg_table_name = table_name.replace('.', '_').lower()
+        pg_table_name = table_name.replace('.', '_').replace('-', '_').lower()
 
         if is_temporary:
             pg_table_name =  '{}_temp'.format(pg_table_name)
