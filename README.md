@@ -41,7 +41,15 @@ Development mode detects code changes both in the python REST API and the Node.J
 
 #### REST-API (Dev Mode)
 
-1. `. .virtualenvs/rest-api/bin/activate && cd rest-api && export FLASK_APP=rest_api && export FLASK_DEBUG=1 && export PIPELINEWISE_SETTINGS=development && flask run` : Start REST API at `http://localhost:5000`
+1. Set some environment variables
+```
+  export PIPELINEWISE_SETTINGS=development
+  export PIPELINEWISE_HOME=<LOCAL_PATH_TO_THIS_GIT_REPO>
+  export FLASK_DEBUG=1
+  export FLASK_APP=rest_api
+```
+
+2. `. .virtualenvs/rest-api/bin/activate && cd rest-api && flask run` : Start REST API at `http://localhost:5000`
 
 #### User Interface (Dev Mode)
 
