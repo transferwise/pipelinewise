@@ -121,7 +121,7 @@ def persist_lines(config, lines):
             if stream not in records_to_load:
                 records_to_load[stream] = {}
 
-            if config.get('add_metadata_columns'):
+            if config.get('add_metadata_columns') or config.get('hard_delete'):
                 records_to_load[stream][primary_key_string] = add_metadata_values_to_record(o, stream_to_sync[stream])
             else:
                 records_to_load[stream][primary_key_string] = o['record']
@@ -147,7 +147,7 @@ def persist_lines(config, lines):
                 raise Exception("key_properties field is required")
             key_properties[stream] = o['key_properties']
 
-            if config.get('add_metadata_columns'):
+            if config.get('add_metadata_columns') or config.get('hard_delete'):
                 stream_to_sync[stream] = DbSync(config, add_metadata_columns_to_schema(o))
             else:
                 stream_to_sync[stream] = DbSync(config, o)
@@ -169,16 +169,36 @@ def persist_lines(config, lines):
     # Load finished, create the indices if required
     create_indices(config, stream_to_sync)
 
+    # Hard delete rows if enabled
+    if config.get('hard_delete'):
+        delete_rows(stream_to_sync)
+
     return state
 
 def create_indices(config, stream_to_sync):
     indices = config['create_indices'] if 'create_indices' in config else None
+
+    # Auto create index on _sdc_deleted_at when hard delete mode is enabled
+    if config.get('hard_delete'):
+        indices = [] if not indices else indices
+        for stream in stream_to_sync:
+            table_name = stream_to_sync[stream].table_name(stream, False, True)
+            indices.append({ 'table': table_name, 'columns': '_sdc_deleted_at' })
+
     stream_to_sync_keys = list(stream_to_sync.keys())
 
     # Get the connection from the first synced stream
     if indices and len(stream_to_sync_keys) > 0:
         stream = stream_to_sync_keys[0]
         stream_to_sync[stream].create_indices(stream, indices)
+
+def delete_rows(stream_to_sync):
+    stream_to_sync_keys = list(stream_to_sync.keys())
+
+    # Get the connection from the first synced stream
+    if len(stream_to_sync_keys) > 0:
+        stream = stream_to_sync_keys[0]
+        stream_to_sync[stream].delete_rows(stream)
 
 def flush_records(stream, records_to_load, row_count, stream_to_sync):
     sync = stream_to_sync[stream]

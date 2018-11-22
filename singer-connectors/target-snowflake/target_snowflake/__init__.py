@@ -121,7 +121,7 @@ def persist_lines(config, lines):
             if stream not in records_to_load:
                 records_to_load[stream] = {}
 
-            if config.get('add_metadata_columns'):
+            if config.get('add_metadata_columns') or config.get('hard_delete'):
                 records_to_load[stream][primary_key_string] = add_metadata_values_to_record(o, stream_to_sync[stream])
             else:
                 records_to_load[stream][primary_key_string] = o['record']
@@ -147,7 +147,7 @@ def persist_lines(config, lines):
                 raise Exception("key_properties field is required")
             key_properties[stream] = o['key_properties']
 
-            if config.get('add_metadata_columns'):
+            if config.get('add_metadata_columns') or config.get('hard_delete'):
                 stream_to_sync[stream] = DbSync(config, add_metadata_columns_to_schema(o))
             else:
                 stream_to_sync[stream] = DbSync(config, o)
@@ -166,7 +166,19 @@ def persist_lines(config, lines):
         if count > 0:
             flush_records(stream, records_to_load, row_count, stream_to_sync)
 
+    # Hard delete rows if enabled
+    if config.get('hard_delete'):
+        delete_rows(stream_to_sync)
+
     return state
+
+def delete_rows(stream_to_sync):
+    stream_to_sync_keys = list(stream_to_sync.keys())
+
+    # Get the connection from the first synced stream
+    if len(stream_to_sync_keys) > 0:
+        stream = stream_to_sync_keys[0]
+        stream_to_sync[stream].delete_rows(stream)
 
 def flush_records(stream, records_to_load, row_count, stream_to_sync):
     sync = stream_to_sync[stream]
