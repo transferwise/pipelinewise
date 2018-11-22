@@ -9,6 +9,7 @@ import threading
 import http.client
 import urllib
 from datetime import datetime
+import time
 import collections
 from tempfile import TemporaryFile
 from decimal import Decimal
@@ -30,6 +31,38 @@ def float_to_decimal(value):
     if isinstance(value, dict):
         return {k: float_to_decimal(v) for k, v in value.items()}
     return value
+
+def add_metadata_columns_to_schema(schema_message):
+    """Metadata _sdc columns according to the stitch documentation at
+    https://www.stitchdata.com/docs/data-structure/integration-schemas#sdc-columns
+
+    Metadata columns gives information about data injections
+    """
+    extended_schema_message = schema_message
+    extended_schema_message['schema']['properties']['_sdc_batched_at'] = { 'type': ['date-time'] }
+    extended_schema_message['schema']['properties']['_sdc_deleted_at'] = {'type': ['date-time'] }
+    extended_schema_message['schema']['properties']['_sdc_extracted_at'] = {'type': ['date-time'] }
+    extended_schema_message['schema']['properties']['_sdc_primary_key'] = {'type': ['string'] }
+    extended_schema_message['schema']['properties']['_sdc_received_at'] = {'type': ['date-time'] }
+    extended_schema_message['schema']['properties']['_sdc_sequence'] = {'type': ['number'] }
+    extended_schema_message['schema']['properties']['_sdc_table_version'] = {'type': ['date-time'] }
+
+    return extended_schema_message
+
+def add_metadata_values_to_record(record_message, stream_to_sync):
+    """Populate metadata _sdc columns from incoming record message
+    The location of the required attributes are fixed in the stream
+    """
+    extended_record = record_message['record']
+    extended_record['_sdc_batched_at'] = datetime.now().isoformat()
+    extended_record['_sdc_deleted_at'] = record_message.get('record', {}).get('_sdc_deleted_at')
+    extended_record['_sdc_extracted_at'] = record_message.get('time_extracted')
+    extended_record['_sdc_primary_key'] = stream_to_sync.stream_schema_message['key_properties']
+    extended_record['_sdc_received_at'] = datetime.now().isoformat()
+    extended_record['_sdc_sequence'] = int(round(time.time() * 1000))
+    extended_record['_sdc_table_version'] = record_message.get('version')
+
+    return extended_record
 
 def emit_state(state):
     if state is not None:
@@ -88,7 +121,11 @@ def persist_lines(config, lines):
             if stream not in records_to_load:
                 records_to_load[stream] = {}
 
-            records_to_load[stream][primary_key_string] = o['record']
+            if config.get('add_metadata_columns'):
+                records_to_load[stream][primary_key_string] = add_metadata_values_to_record(o, stream_to_sync[stream])
+            else:
+                records_to_load[stream][primary_key_string] = o['record']
+
             row_count[stream] = len(records_to_load[stream])
 
             if row_count[stream] >= batch_size:
@@ -109,7 +146,12 @@ def persist_lines(config, lines):
             if 'key_properties' not in o:
                 raise Exception("key_properties field is required")
             key_properties[stream] = o['key_properties']
-            stream_to_sync[stream] = DbSync(config, o)
+
+            if config.get('add_metadata_columns'):
+                stream_to_sync[stream] = DbSync(config, add_metadata_columns_to_schema(o))
+            else:
+                stream_to_sync[stream] = DbSync(config, o)
+
             stream_to_sync[stream].create_schema_if_not_exists()
             stream_to_sync[stream].sync_table()
             row_count[stream] = 0
