@@ -11,7 +11,8 @@ setup(name='cli',
     classifiers=['Programming Language :: Python :: 3 :: Only'],
     py_modules=['cli'],
     install_requires=[
-        'argparse==1.4.0'
+        'argparse==1.4.0',
+        'tabulate==0.8.2'
     ],
     entry_points='''
         [console_scripts]

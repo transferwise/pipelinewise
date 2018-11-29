@@ -10,7 +10,10 @@ import shlex
 import sys
 import logging
 import json
+import re
 import glob
+from datetime import datetime
+from tabulate import tabulate
 
 class RunCommandException(Exception):
     def __init__(self, *args, **kwargs):
@@ -50,12 +53,15 @@ class PipelineWise(object):
         self.config_path = os.path.join(self.config_dir, "config.json")
         self.load_config()
 
-        self.tap = self.get_tap(args.target, args.tap)
-        self.target = self.get_target(args.target)
-        
-        self.tap_bin = self.get_connector_bin(self.tap["type"])
+        if args.tap != '*':
+            self.tap = self.get_tap(args.target, args.tap)
+            self.tap_bin = self.get_connector_bin(self.tap["type"])
+
+        if args.target != '*':
+            self.target = self.get_target(args.target)
+            self.target_bin = self.get_connector_bin(self.target["type"])
+
         self.tranform_field_bin = self.get_connector_bin("transform-field")
-        self.target_bin = self.get_connector_bin(self.target["type"])
 
     def silentremove(self, file):
         self.logger.debug('Removing file at {}'.format(file))
@@ -198,6 +204,11 @@ class PipelineWise(object):
 
         try:
             taps = target['taps']
+
+            # Add tap status
+            for tap_idx, tap in enumerate(taps):
+                taps[tap_idx]['status'] = self.detect_tap_status(target_id, tap["id"])
+
         except Exception as exc:
             raise Exception("No taps defined for {} target".format(target_id))
         
@@ -219,8 +230,9 @@ class PipelineWise(object):
         else:
             raise Exception("Cannot find tap at {}".format(tap_dir))
         
-        # Add target details
+        # Add target and status details
         tap['target'] = self.get_target(target_id)
+        tap['status'] = self.detect_tap_status(target_id, tap_id)
 
         return tap
     
@@ -512,6 +524,89 @@ class PipelineWise(object):
         except Exception as exc:
             self.logger.error("Cannot save file. {}".format(str(exc)))
             sys.exit(1)
+
+    def detect_tap_status(self, target_id, tap_id):
+        self.logger.debug('Detecting {} tap status in {} target'.format(tap_id, target_id))
+        tap_dir = self.get_tap_dir(target_id, tap_id)
+        log_dir = self.get_tap_log_dir(target_id, tap_id)
+        connector_files = self.get_connector_files(tap_dir)
+        status = {
+            'currentStatus': 'unknown',
+            'lastStatus': 'unknown',
+            'lastTimestamp': None
+        }
+
+        # Tap exists but configuration not completed
+        if not os.path.isfile(connector_files["config"]):
+            status["currentStatus"] = "not-configured"
+
+        # Tap exists and has log in running status
+        elif os.path.isdir(log_dir) and len(self.search_files(log_dir, patterns=['*.log.running'])) > 0:
+            status["currentStatus"] = "running"
+
+        # Configured and not running
+        else:
+            status["currentStatus"] = 'ready'
+
+        # Get last run instance
+        if os.path.isdir(log_dir):
+            log_files = self.search_files(log_dir, patterns=['*.log.success','*.log.failed'], sort=True)
+            if len(log_files) > 0:
+                last_log_file = log_files[0]
+                log_attr = self.extract_log_attributes(last_log_file)
+                status["lastStatus"] = log_attr["status"]
+                status["lastTimestamp"] = log_attr["timestamp"]
+
+        return status
+
+    def extract_log_attributes(self, log_file):
+        self.logger.debug('Extracting attributes from log file {}'.format(log_file))
+        target_id = 'unknown'
+        tap_id = 'unknown'
+        timestamp = datetime.utcfromtimestamp(0).isoformat()
+        status = 'unknown'
+
+        try:
+            # Extract attributes from log file name
+            log_attr = re.search('(.*)-(.*)-(.*).log.(.*)', log_file)
+            target_id = log_attr.group(1)
+            tap_id = log_attr.group(2)
+            timestamp = datetime.strptime(log_attr.group(3), '%Y%m%d_%H%M%S').isoformat()
+            status = log_attr.group(4)
+
+        # Ignore exception when attributes cannot be extracted - Defaults will be used
+        except Exception:
+            pass
+
+        # Return as a dictionary
+        return {
+            'filename': log_file,
+            'target_id': target_id,
+            'tap_id': tap_id,
+            'timestamp': timestamp,
+            'status': status
+        }
+
+    def show_status(self):
+        targets = self.get_targets()
+
+        tab_headers = ['Warehouse ID', 'Source ID', 'Enabled', 'Type', 'Status', 'Last Sync', 'Last Sync Result']
+        tab_body = []
+        for target in targets:
+            taps = self.get_taps(target["id"])
+
+            for tap in taps:
+                tab_body.append([
+                    target.get('id', '<Unknown>'),
+                    tap.get('id', '<Unknown>'),
+                    tap.get('enabled', '<Unknown>'),
+                    tap.get('type', '<Unknown>'),
+                    tap.get('status', {}).get('currentStatus', '<Unknown>'),
+                    tap.get('status', {}).get('lastTimestamp', '<Unknown>'),
+                    tap.get('status', {}).get('lastStatus', '<Unknown>')
+                ])
+
+        print(tabulate(tab_body, headers=tab_headers, tablefmt="simple"))
 
     def run_tap(self):
         tap_id = self.tap["id"]
