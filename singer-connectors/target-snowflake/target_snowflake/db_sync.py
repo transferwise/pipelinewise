@@ -301,6 +301,12 @@ class DbSync:
         elif isinstance(grantees, str):
             grant_method(schema, grantees)
 
+    def delete_rows(self, stream):
+        table = self.table_name(stream, False)
+        query = "DELETE FROM {} WHERE _sdc_deleted_at IS NOT NULL RETURNING _sdc_deleted_at".format(table)
+        logger.info("Deleting rows from '{}' table... {}".format(table, query))
+        logger.info("DELETE {}".format(len(self.query(query))))
+
     def create_schema_if_not_exists(self):
         schema_name = self.connection_config['schema']
         schema_rows = self.query(
