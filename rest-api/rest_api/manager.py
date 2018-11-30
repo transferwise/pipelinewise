@@ -470,12 +470,6 @@ class Manager(object):
 
     def run_tap(self, target_id, tap_id):
         self.logger.info('Running {} tap in target {}'.format(tap_id, target_id))
-
-        # TODO: Move tap status detection to CLI
-        tap_status = self.detect_tap_status(target_id, tap_id)
-        if tap_status["currentStatus"] == "running":
-            return { 'stdout': "This data source is already syncing", 'stderr': "", 'returncode': 1 }
-
         command = "{} run_tap --target {} --tap {}".format(self.pipelinewise_bin, target_id, tap_id)
         result = self.run_command(command, background=True)
         return result
