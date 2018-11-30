@@ -14,6 +14,7 @@ setup(name='rest-api',
         'Flask==1.0.2',
         'Flask-Script==2.0.6',
         'flask-cors==3.0.6',
+        'uwsgi==2.0.17',
         'python-crontab==2.3.5'
     ],
     entry_points='''
