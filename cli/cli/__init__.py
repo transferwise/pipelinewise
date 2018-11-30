@@ -18,7 +18,9 @@ commands = [
   'run_tap',
   'discover_tap',
   'show_status',
-  'test_tap_connection'
+  'test_tap_connection',
+  'clear_crontab',
+  'init_crontab'
 ]
 
 command_help = """Available commands, """ + ','.join(commands)

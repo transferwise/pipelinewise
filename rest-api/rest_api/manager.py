@@ -69,28 +69,9 @@ class Manager(object):
 
     def init_crontab(self):
         self.logger.info('Initialising crontab')
-
-        # Remove every existing pipelinewise entry from crontab
-        cron = CronTab(user=True)
-        for j in cron.find_command('pipelinewise'):
-            cron.remove(j)
-
-        # Find tap schedules and add entries to crontab
-        for target in (x for x in self.config["targets"] if "targets" in self.config):
-            for tap in (x for x in target["taps"] if "taps" in target):
-
-                if "sync_period" in tap:
-                    target_id = target["id"]
-                    tap_id = tap["id"]
-                    command = ' '.join([
-                        "{} run_tap --target {} --tap {}".format(self.pipelinewise_bin, target_id, tap_id)
-                    ])
-
-                    job = cron.new(command=command)
-                    job.setall(tap["sync_period"])
-
-                    if job.is_valid():
-                        cron.write()
+        command = "{} init_crontab".format(self.pipelinewise_bin)
+        result = self.run_command(command)
+        return result
 
     def run_command(self, command, background=False):
         self.logger.debug('Running command [Background Mode: {}] : {}'.format(background, command))
