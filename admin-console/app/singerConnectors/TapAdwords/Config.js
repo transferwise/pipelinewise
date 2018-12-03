@@ -57,7 +57,8 @@ const schema = {
 }
 
 const uiSchema = {
-  access_token: { "ui:widget": "password" },
+  oauth_client_secret: { "ui:widget": "password" },
+  developer_token: { "ui:widget": "password" }
 };
 
 
