@@ -8,12 +8,13 @@ import TapPostgresProperties from './TapPostgres/LoadableProperties';
 import TapMysqlProperties from './TapMysql/LoadableProperties';
 import TapZendeskProperties from './TapZendesk/LoadableProperties';
 import TapKafkaProperties from './TapKafka/LoadableProperties';
+import TapAdwordsProperties from './TapAdwords/LoadableProperties';
 
 
 export class SingerTapProperties extends SingerComponent {
   render() {
     const { tap } = this.props;
-    
+
     if (tap) {
       // Try to find tap specific layout
       switch (tap.type) {
@@ -21,10 +22,11 @@ export class SingerTapProperties extends SingerComponent {
         case 'tap-mysql': return <TapMysqlProperties targetId={tap.target.id} tapId={tap.id} title={`${tap.name} Connection Details`}/>
         case 'tap-zendesk': return <TapZendeskProperties targetId={tap.target.id} tapId={tap.id} title={`${tap.name} Connection Details`}/>
         case 'tap-kafka': return <TapKafkaProperties targetId={tap.target.id} tapId={tap.id} title={`${tap.name} Connection Details`}/>
+        case 'tap-adwords': return <TapAdwordsProperties targetId={tap.target.id} tapId={tap.id} title={`${tap.name} Connection Details`}/>
 
         default: return this.renderJson(tap.properties)
       }
-    
+
       // Render standard tap properties layout only with the raw JSON
       try {
         return this.codeContent(this.valueToString(target.files.properties))
