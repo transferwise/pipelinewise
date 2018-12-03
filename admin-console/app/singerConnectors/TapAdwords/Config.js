@@ -45,11 +45,15 @@ const schema = {
   title: "Connection",
   type: "object",
   properties: {
-    access_token: { type: "string", title: "Access Token" },
-    subdomain: { type: "string", title: "Subdomain" },
-    start_date: { type: "string", title: "Start Date" }
+    developer_token: { type: "string", title: "Developer Token" },
+    oauth_client_id: { type: "string", title: "OAuth Client Id" },
+    oauth_client_secret: { type: "string", title: "OAuth Client Secret" },
+    refresh_token: { type: "string", title: "Refresh Token" },
+    start_date: { type: "string", title: "Start Date" },
+    user_agent: { type: "string", title: "User Agent" },
+    customer_ids: { type: "string", title: "Customer Ids" }
   },
-  required: ["access_token", "subdomain", "start_date"]
+  required: ["developer_token", "oauth_client_id", "oauth_client_secret", "refresh_token", "start_date", "user_agent", "customer_ids"]
 }
 
 const uiSchema = {
@@ -62,7 +66,7 @@ export class TapZendeskConfig extends React.PureComponent {
     super(props)
     this.state = { config: undefined }
   }
-  
+
   componentDidMount() {
     const { targetId, tapId } = this.props
     this.props.onLoadConfig(targetId, tapId);
@@ -136,11 +140,11 @@ export class TapZendeskConfig extends React.PureComponent {
     }
 
     if (consoleOutput !== false) {
-      consolePanel = 
+      consolePanel =
         <SyntaxHighlighter className="font-sssm" language='shsssell' style={light}
           showLineNumbers={false}>
             {consoleOutput}
-        </SyntaxHighlighter> 
+        </SyntaxHighlighter>
     }
 
     schema.title = title || "Connection Details";
