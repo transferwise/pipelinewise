@@ -22,6 +22,11 @@ install_connector() {
     make_virtualenv $1
 }
 
+install_fastsync() {
+    cd $DIR/fastsync/$1
+    make_virtualenv $1
+}
+
 install_cli() {
     cd $DIR/cli
     make_virtualenv cli
@@ -45,6 +50,9 @@ install_connector tap-kafka
 install_connector target-postgres
 install_connector target-snowflake
 install_connector transform-field
+
+# Install fastsyncs
+install_fastsync mysql-to-snowflake
 
 # Install CLI
 install_cli
