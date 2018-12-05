@@ -303,7 +303,7 @@ class DbSync:
 
     def delete_rows(self, stream):
         table = self.table_name(stream, False)
-        query = "DELETE FROM {} WHERE _sdc_deleted_at IS NOT NULL RETURNING _sdc_deleted_at".format(table)
+        query = "DELETE FROM {} WHERE _sdc_deleted_at IS NOT NULL".format(table)
         logger.info("Deleting rows from '{}' table... {}".format(table, query))
         logger.info("DELETE {}".format(len(self.query(query))))
 
