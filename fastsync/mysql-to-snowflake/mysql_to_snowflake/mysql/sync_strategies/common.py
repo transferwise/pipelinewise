@@ -248,7 +248,8 @@ def export_query(cursor, catalog_entry, state, select_sql, columns, stream_versi
     with gzip.open(path, 'wt') as gzfile:
         writer = csv.writer(gzfile,
                             delimiter=',',
-                            quotechar='"')
+                            quotechar='"',
+                            quoting=csv.QUOTE_ALL)
 
         while row:
             writer.writerow(row)
