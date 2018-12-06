@@ -249,7 +249,7 @@ def export_query(cursor, catalog_entry, state, select_sql, columns, stream_versi
         writer = csv.writer(gzfile,
                             delimiter=',',
                             quotechar='"',
-                            quoting=csv.QUOTE_MINIMAL
+                            quoting=csv.QUOTE_MINIMAL)
 
         while row:
             writer.writerow(row)
