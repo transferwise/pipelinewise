@@ -182,7 +182,7 @@ def delete_rows(stream_to_sync):
 
 def flush_records(stream, records_to_load, row_count, stream_to_sync):
     sync = stream_to_sync[stream]
-    csv_file = NamedTemporaryFile(mode='w+b', delete=False)
+    csv_file = NamedTemporaryFile(mode='w+b', delete=True)
 
     for record in records_to_load[stream].values():
         csv_line = sync.record_to_csv_line(record)
