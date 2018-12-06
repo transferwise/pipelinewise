@@ -37,8 +37,8 @@ const schema = {
     type: {
       type: "string",
       title: "Data Source Type",
-      enum: ["tap-postgres", "tap-mysql", "tap-zendesk", "tap-kafka"],
-      enumNames: ["PostgreSQL", "MySQL", "Zendesk", "Kafka"],
+      enum: ["tap-postgres", "tap-mysql", "tap-zendesk", "tap-kafka", "tap-adwords"],
+      enumNames: ["PostgreSQL", "MySQL", "Zendesk", "Kafka", "Google Ads"],
       default: "tap-postgres",
     },
     owner: { type: "string", title: "Owner" },
@@ -92,7 +92,7 @@ export class AddTap extends React.PureComponent {
       addTapButtonEnabled,
     } = this.props;
     let alert = <div />;
-  
+
     if (loading) {
       return <LoadingIndicator />;
     }
