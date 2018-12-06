@@ -186,27 +186,19 @@ class DbSync:
         with self.open_connection() as connection:
             with connection.cursor(snowflake.connector.DictCursor) as cur:
                 cur.execute(self.create_table_query(True))
-                copy_sql = """COPY INTO {} ({}) FROM 's3://{}/{}'
+                copy_sql = """COPY INTO {} FROM 's3://{}/snowflake-imports/{}'
                     CREDENTIALS = (aws_key_id='{}' aws_secret_key='{}') 
-                    FILE_FORMAT = (type='CSV' escape='\\\\' field_optionally_enclosed_by='\"')
+                    FILE_FORMAT = (type='CSV' escape='\\x1e' escape_unenclosed_field='\\x1e' field_optionally_enclosed_by='\"')
                 """.format(
-                    self.table_name(stream, True),
-                    ', '.join(self.column_names()),
+                    self.table_name(stream, False),
                     self.connection_config['s3_bucket'],
                     s3_key,
                     self.connection_config['aws_access_key_id'],
                     self.connection_config['aws_secret_access_key']
                 )
                 cur.execute(copy_sql)
-                
-                if len(self.stream_schema_message['key_properties']) > 0:
-                    cur.execute(self.update_from_temp_table())
-                    updated = cur._total_rowcount
-                cur.execute(self.insert_from_temp_table())
                 inserted = cur._total_rowcount
-
                 logger.info("INSERTED {} rows, UPDATED {} rows".format(inserted, updated))
-                cur.execute(self.drop_temp_table())
 
     def insert_from_temp_table(self):
         stream_schema_message = self.stream_schema_message
@@ -279,7 +271,7 @@ class DbSync:
         primary_key = ["PRIMARY KEY ({})".format(', '.join(primary_column_names(stream_schema_message)))] \
             if len(stream_schema_message['key_properties']) else []
 
-        return 'CREATE {}TABLE {} ({})'.format(
+        return 'CREATE OR REPLACE {}TABLE {} ({})'.format(
             'TEMP ' if is_temporary else '',
             self.table_name(stream_schema_message['stream'], is_temporary),
             ', '.join(columns + primary_key)
@@ -304,7 +296,7 @@ class DbSync:
 
     def delete_rows(self, stream):
         table = self.table_name(stream, False)
-        query = "DELETE FROM {} WHERE _sdc_deleted_at IS NOT NULL RETURNING _sdc_deleted_at".format(table)
+        query = "DELETE FROM {} WHERE _sdc_deleted_at IS NOT NULL".format(table)
         logger.info("Deleting rows from '{}' table... {}".format(table, query))
         logger.info("DELETE {}".format(len(self.query(query))))
 

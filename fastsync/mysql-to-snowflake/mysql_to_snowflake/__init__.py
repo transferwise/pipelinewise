@@ -580,16 +580,16 @@ def snowflake_load_csv(args, catalog_entry, columns):
     ).asdict()
 
     snowflake = DbSync(args.snowflake_config, schema_message, columns)
-    #snowflake_conn = snowflake.open_connection()
+    snowflake_conn = snowflake.open_connection()
 
     database_name = common.get_database_name(catalog_entry)
     table_name = catalog_entry.table
-    filename = "pipelinewise_{}_{}_{}.sql".format(database_name, table_name, time.strftime("%Y%m%d-%H%M%S"))
-    path = os.path.join(args.export_dir, filename)
-    with open(path, "w+") as sqlfile:
-        ddl = snowflake.create_table_query(True)
-        sqlfile.write(ddl)
+    ddl = snowflake.create_table_query(False)
+    snowflake.query(ddl)
 
+    database_name = common.get_database_name(catalog_entry)
+    table_name = catalog_entry.table
+    snowflake.load_csv("pipelinewise_{}_{}.csv.gz".format(database_name, table_name), 'lot of')
 
 def sync_streams(mysql_conn, args, catalog, state):
     for catalog_entry in catalog.streams:

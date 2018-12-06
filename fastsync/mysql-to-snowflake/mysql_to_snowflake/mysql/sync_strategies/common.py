@@ -92,7 +92,7 @@ def column_with_transformation(table, column, transforms):
                 skip_first_n = transform_type[-1]
                 return 'CONCAT(SUBSTRING({}, 1, {}), SHA2(SUBSTRING({}, {} + 1), 256))'.format(escaped_column, skip_first_n, escaped_column, skip_first_n)
             elif transform_type == 'MASK-DATE':
-                return "DATE_FORMAT({}, '%Y-01-01') AS {}".format(escaped_column, escaped_column)
+                return "DATE_FORMAT({}, '%%Y-01-01') AS {}".format(escaped_column, escaped_column)
             elif transform_type == 'MASK-NUMBER':
                 return '0 AS {}'.format(escaped_column)
     
@@ -241,7 +241,7 @@ def export_query(cursor, catalog_entry, state, select_sql, columns, stream_versi
 
     database_name = get_database_name(catalog_entry)
     table_name = catalog_entry.table
-    filename = "pipelinewise_{}_{}_{}.csv.gz".format(database_name, table_name, time.strftime("%Y%m%d-%H%M%S"))
+    filename = "pipelinewise_{}_{}.csv.gz".format(database_name, table_name)
     path = os.path.join(args.export_dir, filename)
     LOGGER.info('Exporting into {}'.format(path))
     
@@ -249,7 +249,7 @@ def export_query(cursor, catalog_entry, state, select_sql, columns, stream_versi
         writer = csv.writer(gzfile,
                             delimiter=',',
                             quotechar='"',
-                            quoting=csv.QUOTE_ALL)
+                            quoting=csv.QUOTE_MINIMAL
 
         while row:
             writer.writerow(row)
