@@ -190,6 +190,7 @@ def flush_records(stream, records_to_load, row_count, stream_to_sync):
 
     s3_key = sync.put_to_stage(csv_file, stream, row_count[stream])
     sync.load_csv(s3_key, row_count[stream])
+    csv_file.close()
     row_count[stream] = 0
     records_to_load[stream] = {}
 
