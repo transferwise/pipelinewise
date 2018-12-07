@@ -54,6 +54,7 @@ install_connector transform-field
 
 # Install fastsyncs
 install_fastsync mysql-to-snowflake
+install_fastsync postgres-to-snowflake
 
 # Install CLI
 install_cli
