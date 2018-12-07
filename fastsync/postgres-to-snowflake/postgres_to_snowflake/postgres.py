@@ -50,6 +50,7 @@ class Postgres:
         self.curr = self.conn.cursor()
 
     def query(self, query, params=None):
+        print("POSTGRES - Running query: {}".format(query))
         with self.conn as connection:
             with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
                 cur.execute(
@@ -62,6 +63,19 @@ class Postgres:
                 else:
                     return []
 
+    def get_primary_key(self, table):
+        sql = """SELECT pg_attribute.attname
+                    FROM pg_index, pg_class, pg_attribute, pg_namespace
+                    WHERE
+                        pg_class.oid = '{}'::regclass AND
+                        indrelid = pg_class.oid AND
+                        pg_class.relnamespace = pg_namespace.oid AND
+                        pg_attribute.attrelid = pg_class.oid AND
+                        pg_attribute.attnum = any(pg_index.indkey)
+                    AND indisprimary""".format(table)
+
+        return self.query(sql)[0][0]
+
     def get_table_columns(self, table):
         table_schema = table.split('.')[0]
         table_name = table.split('.')[1]
@@ -69,11 +83,15 @@ class Postgres:
         sql = "SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = '{}' and table_name = '{}' ORDER BY ordinal_position".format(table_schema, table_name)
         return self.query(sql)
 
-    def snowflake_ddl(self, table, target_schema):
+    def snowflake_ddl(self, table, target_schema, is_temporary):
         table_name = table.split('.')[1]
+        if is_temporary:
+            table_name += '_temp'
+
         postgres_columns = self.get_table_columns(table)
         snowflake_columns = ["{} {}".format(pc[0], self.postgres_type_to_snowflake(pc[1])) for pc in postgres_columns]
-        snowflake_ddl = "CREATE TABLE {}.{} ({})".format(target_schema, table_name, ', '.join(snowflake_columns))
+        primary_key = self.get_primary_key(table)
+        snowflake_ddl = "CREATE OR REPLACE TABLE {}.{} ({}, PRIMARY KEY ({}))".format(target_schema, table_name, ', '.join(snowflake_columns), primary_key)
         return(snowflake_ddl)
         
     def copy_table(self, table, path):
@@ -81,6 +99,6 @@ class Postgres:
         columns = [c[0] for c in table_columns]
 
         sql = "COPY {} ({}) TO STDOUT with CSV DELIMITER ','".format(table, ','.join(columns))
-        print(sql)
+        print("POSTGRES - Exporting data: {}".format(sql))
         with gzip.open(path, 'wt') as gzfile:
             self.curr.copy_expert(sql, gzfile)

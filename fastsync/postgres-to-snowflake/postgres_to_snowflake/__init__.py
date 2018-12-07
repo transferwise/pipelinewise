@@ -4,6 +4,7 @@ import os
 
 import postgres_to_snowflake.utils
 from postgres_to_snowflake.postgres import Postgres
+from postgres_to_snowflake.snowflake import Snowflake
 
 
 REQUIRED_CONFIG_KEYS = {
@@ -29,6 +30,7 @@ REQUIRED_CONFIG_KEYS = {
 def main_impl():
     args = utils.parse_args(REQUIRED_CONFIG_KEYS)
     postgres = Postgres(args.postgres_config)
+    snowflake = Snowflake(args.snowflake_config)
 
     postgres.open_connection()
 
@@ -38,9 +40,23 @@ def main_impl():
         print("Exporting {} into {}...".format(table, filepath))
         postgres.copy_table(table, filepath)
 
-        print("Genarating Snowflake DDL...")
-        snowflake_ddl = postgres.snowflake_ddl(table, args.target_schema)
-        print(snowflake_ddl)
+        print("Uploading to S3...")
+        s3_key = snowflake.upload_to_s3(filepath, table)
+        os.remove(filepath)
+
+        print("Creating target table in Snowflake...")
+        snowflake_ddl = postgres.snowflake_ddl(table, args.target_schema, False)
+        snowflake.query(snowflake_ddl)
+        snowflake_ddl = postgres.snowflake_ddl(table, args.target_schema, True)
+        snowflake.query(snowflake_ddl)
+
+        print("Load into Snowflake table...")
+        sql = snowflake.copy_to_table(s3_key, args.target_schema, table, True)
+        snowflake.query(sql)
+
+        print("Swap tables")
+        sql = snowflake.swap_tables(args.target_schema, table)
+        snowflake.query(sql)
 
 
 def main():
