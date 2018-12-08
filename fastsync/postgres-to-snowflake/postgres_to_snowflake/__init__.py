@@ -34,27 +34,28 @@ def main_impl():
 
     postgres.open_connection()
 
+    # Load tables one by one
     for table in args.tables:
         filename = '{}.csv.gz'.format(table)
         filepath = os.path.join(args.export_dir, filename)
 
-        print("Exporting {} into {}...".format(table, filepath))
+        # Exporting table data
         postgres.copy_table(table, filepath)
 
-        print("Uploading to S3...")
+        # Uploading to S3
         s3_key = snowflake.upload_to_s3(filepath, table)
         os.remove(filepath)
 
-        print("Creating target table in Snowflake...")
+        # Creating target table in Snowflake
         snowflake_ddl = postgres.snowflake_ddl(table, args.target_schema, False)
         snowflake.query(snowflake_ddl)
         snowflake_ddl = postgres.snowflake_ddl(table, args.target_schema, True)
         snowflake.query(snowflake_ddl)
 
-        print("Load into Snowflake table...")
+        # Load into Snowflake table
         snowflake.copy_to_table(s3_key, args.target_schema, table, True)
 
-        print("Swap tables")
+        # Swap tables
         snowflake.swap_tables(args.target_schema, table)
 
 
