@@ -7,6 +7,14 @@ def load_json(path):
     with open(path) as fil:
         return json.load(fil)
 
+def tablename_to_dict(table):
+    ts = dict(enumerate(table.split('.')))
+    return {
+        'schema': ts.get(0, None),
+        'name': ts.get(1, None),
+        'temp_name': "{}_temp".format(ts.get(1, None))
+    }
+
 
 def parse_args(required_config_keys):
     '''Parse standard command-line args.

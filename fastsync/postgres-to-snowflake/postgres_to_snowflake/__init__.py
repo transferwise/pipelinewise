@@ -30,7 +30,7 @@ REQUIRED_CONFIG_KEYS = {
 def main_impl():
     args = utils.parse_args(REQUIRED_CONFIG_KEYS)
     postgres = Postgres(args.postgres_config)
-    snowflake = Snowflake(args.snowflake_config)
+    snowflake = Snowflake(args.snowflake_config, args.transform_config)
 
     postgres.open_connection()
 
@@ -54,6 +54,9 @@ def main_impl():
 
         # Load into Snowflake table
         snowflake.copy_to_table(s3_key, args.target_schema, table, True)
+
+        # Obfuscate columns
+        snowflake.obfuscate_columns()
 
         # Swap tables
         snowflake.swap_tables(args.target_schema, table)
