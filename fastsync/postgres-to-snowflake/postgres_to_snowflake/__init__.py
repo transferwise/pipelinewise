@@ -37,6 +37,7 @@ def main_impl():
     for table in args.tables:
         filename = '{}.csv.gz'.format(table)
         filepath = os.path.join(args.export_dir, filename)
+
         print("Exporting {} into {}...".format(table, filepath))
         postgres.copy_table(table, filepath)
 
@@ -51,12 +52,10 @@ def main_impl():
         snowflake.query(snowflake_ddl)
 
         print("Load into Snowflake table...")
-        sql = snowflake.copy_to_table(s3_key, args.target_schema, table, True)
-        snowflake.query(sql)
+        snowflake.copy_to_table(s3_key, args.target_schema, table, True)
 
         print("Swap tables")
-        sql = snowflake.swap_tables(args.target_schema, table)
-        snowflake.query(sql)
+        snowflake.swap_tables(args.target_schema, table)
 
 
 def main():
