@@ -51,6 +51,10 @@ class Snowflake:
         return s3_key
 
 
+    def create_schema(self, schema):
+        sql = "CREATE SCHEMA IF NOT EXISTS {}".format(schema)
+        self.query(sql)
+
     def copy_to_table(self, s3_key, target_schema, table_name, is_temporary):
         utils.log("SNOWFLAKE - Loading {} into Snowflake...".format(s3_key))
         table_dict = utils.tablename_to_dict(table_name)

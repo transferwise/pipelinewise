@@ -47,6 +47,7 @@ def main_impl():
         os.remove(filepath)
 
         # Creating temp table in Snowflake
+        snowflake.create_schema(args.target_schema)
         snowflake.query(postgres.snowflake_ddl(table, args.target_schema, True))
 
         # Load into Snowflake table
