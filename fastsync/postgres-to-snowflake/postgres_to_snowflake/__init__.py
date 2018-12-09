@@ -46,11 +46,8 @@ def main_impl():
         s3_key = snowflake.upload_to_s3(filepath, table)
         os.remove(filepath)
 
-        # Creating target table in Snowflake
-        snowflake_ddl = postgres.snowflake_ddl(table, args.target_schema, False)
-        snowflake.query(snowflake_ddl)
-        snowflake_ddl = postgres.snowflake_ddl(table, args.target_schema, True)
-        snowflake.query(snowflake_ddl)
+        # Creating temp table in Snowflake
+        snowflake.query(postgres.snowflake_ddl(table, args.target_schema, True))
 
         # Load into Snowflake table
         snowflake.copy_to_table(s3_key, args.target_schema, table, True)
@@ -58,7 +55,8 @@ def main_impl():
         # Obfuscate columns
         snowflake.obfuscate_columns(args.target_schema, table)
 
-        # Swap tables
+        # Create target table in snowflake and swap with temp table
+        snowflake.query(postgres.snowflake_ddl(table, args.target_schema, False))
         snowflake.swap_tables(args.target_schema, table)
 
 
