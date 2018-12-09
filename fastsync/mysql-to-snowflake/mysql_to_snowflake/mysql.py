@@ -91,6 +91,8 @@ class MySql:
                                     THEN concat('cast(`', column_name, '` AS unsigned)')
                             WHEN data_type IN ('datetime', 'timestamp', 'date')
                                     THEN concat('nullif(`', column_name, '`,"0000-00-00 00:00:00")')
+                            WHEN column_name = 'raw_data_hash'
+                                    THEN concat('hex(', column_name, ')')
                             ELSE concat('cast(`', column_name, '` AS char CHARACTER SET utf8)')
                                 END AS safe_sql_value,
                             ordinal_position
