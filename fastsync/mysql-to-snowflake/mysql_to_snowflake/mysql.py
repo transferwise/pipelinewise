@@ -120,20 +120,26 @@ class MySql:
 
         sql = "SELECT CONCAT_WS(',', {}) AS csv_row FROM {}".format(','.join(column_safe_sql_values), table_name)
         cur = self.query(sql, return_as_cursor=True)
-        rows_exported = 0
+        export_batch_rows = self.connection_config['export_batch_rows']
+        exported_rows = 0
+
 
         # Write and zip exported rows in batches
-        with gzip.open(path, 'wb') as gzfile:            
+        with gzip.open(path, 'wb') as gzfile:
             while True:
-                sql_rows = cur.fetchmany(self.connection_config['export_batch_rows'])
-                rows_exported += cur.rowcount
+                # Calculate number of exported rows
+                sql_rows = cur.fetchmany(export_batch_rows)
+                if exported_rows + export_batch_rows < cur.rowcount:
+                    exported_rows += export_batch_rows
+                else:
+                    exported_rows = cur.rowcount
 
                 # No more rows to fetch, stop loop
                 if not sql_rows:
                     break
 
                 # Write exported rows to file
-                utils.log("{} rows exported from {}...".format(rows_exported, table_name))
+                utils.log("{}/{} rows exported from {}...".format(exported_rows, cur.rowcount, table_name))
                 gzfile.write('\n'.join([r.get('csv_row') for r in sql_rows]).encode('utf-8'))
             
                 # Add extra new line to the end of the file required by Snowflake
