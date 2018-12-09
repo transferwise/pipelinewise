@@ -56,7 +56,7 @@ def main_impl():
         snowflake.copy_to_table(s3_key, args.target_schema, table, True)
 
         # Obfuscate columns
-        snowflake.obfuscate_columns()
+        snowflake.obfuscate_columns(args.target_schema, table)
 
         # Swap tables
         snowflake.swap_tables(args.target_schema, table)
