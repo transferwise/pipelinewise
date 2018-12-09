@@ -1,17 +1,61 @@
-FastSync - Mysql to Snowflake
+FastSync - MySQL to Snowflake
 -----------------------------
 
-**This is very quick and very dirty**
+Sync mysql tables to snowflake with the most optimal steps:
 
-This takes snapshots of tables from a MySQL tap and loads into Snowflake tables efficiently:
-* Run a generated SELECT in MySQL with embedded obfuscations to extract full table
-* Export to CSV, split, zip and upload the results to S3
-* Create the destination tables in Snowflake
-* Load into snowflake temp tables from S3
-* Update the tap state file with updated incremental key or binlog positions 
+* Generate Snowflake compatible DDL to create destination table
+* Export to CSV
+* Zip (TODO: split to multiple files up to 100MB/file)
+* Upload to S3
+* CREATE OR REPLACE target and temp table in Snowflake
+* Load into Snowflake temp table with COPY
+* Obfuscate columns in Snowflake temp table with UPDATE
+* Swap temp to to final destination table in snowflake
 
-To run:
+`mysql-to-snowflake --mysql-config [MYSQL_TAP_CONFIG] --snowflake-config [SNOWFLAKE_TARGET_CONFIG] --transform-config [TRANSFORMATIONS_CONFIG] --state [MYSQL_TAP_STATE] --target-schema [SNOWFLAKE_SCHEMA] --tables [LIST_OF_TABLES] --export-dir [TEMP_PATH_DIR]`
 
-`mysql-to-snowflake --mysql-config [MYSQL_TAP_CONFIG] --snowflake-config [SNOWFLAKE_TARGET_CONFIG] --properties [MYSQL_CATALOG] --state [MYSQL_STATE] --transform-config [TRANSFORMATIONS_CONFIG] --export-dir [TEMP_PATH_DIR] --limit-tables [OPTIONAL_LIST_OF_TABLES]`
+**TODO: Save binlog position at start and at write singer state file at the end**
 
-The output is the updated state file (bookmark) that is valid for the next binlog or key-based incremental load.
+Sample config files
+
+## mysql-config.json
+
+  {
+    "host": "localhost",
+    "port": 5432,
+    "dbname": "my_database",
+    "user": "my_user",
+    "password": "<PASSWORD>",
+    "batch_size": 20000
+  }
+
+## snowflake-config.json
+
+  {
+      "account": "rt123456.eu-central-1",
+      "aws_access_key_id": "<ACCESS_KEY_ID>",
+      "aws_secret_access_key": "<SECRET_ACCESS_KEY>",
+      "dbname": "analytics_db",
+      "password": "<PASSWORD>",
+      "s3_bucket": "tw-analyticsdb-etl",
+      "s3_key_prefix": "snowflake-imports/",
+      "user": "analyticsdb_etl",
+      "warehouse": "LOAD_WH"
+  }
+
+## transformation.json
+
+  {
+    "transformations": [
+      {
+        "stream": "user_profile",
+        "fieldId": "last_name",
+        "type": "HASH"
+      },
+      {
+        "stream": "user_profile",
+        "fieldId": "registration_number",
+        "type": "SET_NULL"
+      }
+    }
+  }
