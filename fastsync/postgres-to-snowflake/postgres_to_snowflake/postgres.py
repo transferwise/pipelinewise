@@ -55,7 +55,7 @@ class Postgres:
 
 
     def query(self, query, params=None):
-        print("POSTGRES - Running query: {}".format(query))
+        utils.log("POSTGRES - Running query: {}".format(query))
         with self.conn as connection:
             with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
                 cur.execute(
@@ -85,7 +85,6 @@ class Postgres:
 
     def get_table_columns(self, table_name):
         table_dict = utils.tablename_to_dict(table_name)
-        print(table_dict)
         sql = "SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = '{}' and table_name = '{}' ORDER BY ordinal_position".format(table_dict.get('schema'), table_dict.get('name'))
         return self.query(sql)
 
@@ -106,7 +105,7 @@ class Postgres:
         columns = [c[0] for c in table_columns]
 
         sql = "COPY {} ({}) TO STDOUT with CSV DELIMITER ','".format(table_name, ','.join(columns))
-        print("POSTGRES - Exporting data: {}".format(sql))
+        utils.log("POSTGRES - Exporting data: {}".format(sql))
         with gzip.open(path, 'wt') as gzfile:
             self.curr.copy_expert(sql, gzfile)
 

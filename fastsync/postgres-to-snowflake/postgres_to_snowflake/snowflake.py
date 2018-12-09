@@ -27,7 +27,7 @@ class Snowflake:
 
 
     def query(self, query, params=None):
-        print("SNOWFLAKE - Running query: {}".format(query))
+        utils.log("SNOWFLAKE - Running query: {}".format(query))
         with self.open_connection() as connection:
             with connection.cursor(snowflake.connector.DictCursor) as cur:
                 cur.execute(
@@ -46,13 +46,13 @@ class Snowflake:
         s3_key_prefix = self.connection_config.get('s3_key_prefix', '')
         s3_key = "{}pipelinewise_{}_{}.csv.gz".format(s3_key_prefix, table, time.strftime("%Y%m%d-%H%M%S"))
 
-        print("SNOWFLAKE - Uploading to S3 bucket: {}, local file: {}, S3 key: {}".format(bucket, path, s3_key))
+        utils.log("SNOWFLAKE - Uploading to S3 bucket: {}, local file: {}, S3 key: {}".format(bucket, path, s3_key))
         self.s3.upload_file(path, bucket, s3_key)
         return s3_key
 
 
     def copy_to_table(self, s3_key, target_schema, table_name, is_temporary):
-        print("SNOWFLAKE - Loading {} into Snowflake...".format(s3_key))
+        utils.log("SNOWFLAKE - Loading {} into Snowflake...".format(s3_key))
         table_dict = utils.tablename_to_dict(table_name)
         target_table = table_dict.get('name') if not is_temporary else table_dict.get('temp_name')
 
@@ -64,12 +64,12 @@ class Snowflake:
         sql = "COPY INTO {}.{} FROM 's3://{}/{}' CREDENTIALS = (aws_key_id='{}' aws_secret_key='{}')".format(target_schema, target_table, bucket, s3_key, aws_access_key_id, aws_secret_access_key)
         self.query(sql)
 
-        print("SNOWFLAKE - Deleting {} from S3...".format(s3_key))
+        utils.log("SNOWFLAKE - Deleting {} from S3...".format(s3_key))
         self.s3.delete_object(Bucket=bucket, Key=s3_key)
 
 
     def obfuscate_columns(self, target_schema, table_name):
-        print("SNOWFLAKE - Applying obfuscation rules")
+        utils.log("SNOWFLAKE - Applying obfuscation rules")
         table_dict = utils.tablename_to_dict(table_name)
         target_table = table_dict.get('name')
         temp_table = table_dict.get('temp_name')

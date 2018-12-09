@@ -64,6 +64,6 @@ def main():
     try:
         main_impl()
     except Exception as exc:
-        print("CRITICAL: {}".format(exc))
+        utils.log("CRITICAL: {}".format(exc))
         raise exc
 

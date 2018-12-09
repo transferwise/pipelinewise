@@ -1,7 +1,13 @@
 import argparse
 import json
 import os
+import time
+import datetime
 
+
+def log(message):
+    st = datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')
+    print("{} - {}".format(st, message))
 
 def load_json(path):
     with open(path) as fil:
