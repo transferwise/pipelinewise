@@ -106,7 +106,10 @@ class Snowflake:
     def swap_tables(self, schema, table_name):
         table_dict = utils.tablename_to_dict(table_name)
         target_table = table_dict.get('name')
-        sql = "ALTER TABLE {}.{} SWAP WITH {}.{}".format(schema, table_dict.get('temp_name'), schema, target_table)
-        self.query(sql)
+        temp_table = table_dict.get('temp_name')
+
+        # Swap tables and drop the temp tamp
+        self.query("ALTER TABLE {}.{} SWAP WITH {}.{}".format(schema, temp_table, schema, target_table))
+        self.query("DROP TABLE IF EXISTS {}.{}".format(schema, temp_table))
         
 
