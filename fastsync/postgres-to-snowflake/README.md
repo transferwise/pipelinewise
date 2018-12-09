@@ -1,19 +1,16 @@
 FastSync - Postgres to Snowflake
 -----------------------------
 
-**This is very quick and very dirty**
+Sync postgres tables to snowflake with the most optimal steps:
 
-Done:
 * Generate Snowflake compatible DDL to create destination table. TODO: Add Primary Key
 * Export to CSV with Postgres COPY
-* Zip
+* Zip (TODO: split to multiple files up to 100MB/file)
 * Upload to S3
 * CREATE OR REPLACE target and temp table in Snowflake
 * Load into Snowflake temp table with COPY
-* Swap temp to to final destination table in snowflake
-
-TODO:
 * Obfuscate columns in Snowflake temp table with UPDATE
+* Swap temp to to final destination table in snowflake
 
 `postgres-to-snowflake --postgres-config [POSTGRES_TAP_CONFIG] --snowflake-config [SNOWFLAKE_TARGET_CONFIG] --transform-config [TRANSFORMATIONS_CONFIG] --target-schema [SNOWFLAKE_SCHEMA] --tables [LIST_OF_TABLES] --export-dir [TEMP_PATH_DIR]`
 
