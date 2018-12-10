@@ -1,5 +1,7 @@
 import pymysql
 import gzip
+import csv
+import os
 
 import mysql_to_snowflake.utils as utils
 
@@ -52,6 +54,14 @@ class MySql:
             charset = self.connection_config['charset'],
             cursorclass = pymysql.cursors.DictCursor
         )
+        self.conn_unbuffered = pymysql.connect(
+            host = self.connection_config['host'],
+            port = self.connection_config['port'],
+            user = self.connection_config['user'],
+            password = self.connection_config['password'],
+            charset = self.connection_config['charset'],
+            cursorclass = pymysql.cursors.SSCursor
+        )
 
 
     def query(self, query, params=None, return_as_cursor=False):
@@ -69,7 +79,6 @@ class MySql:
                 return cur.fetchall()
             else:
                 return []
-
 
 
     def fetch_current_log_file_and_pos(self):
@@ -90,7 +99,7 @@ class MySql:
         sql = """
                 SELECT column_name,
                     data_type,
-                    CONCAT("CASE WHEN ", column_name, " IS NULL THEN '' ELSE CONCAT('\\"', REPLACE(REPLACE(", safe_sql_value, ", '\\"', '\\"\\"'), '\n', ' '),'\\"') END") safe_sql_value
+                    CONCAT("REPLACE(", safe_sql_value, ", '\n', ' ')") safe_sql_value
                 FROM (SELECT column_name,
                             data_type,
                             CASE
@@ -129,30 +138,29 @@ class MySql:
         table_columns = self.get_table_columns(table_name)
         column_safe_sql_values = [c.get('safe_sql_value') for c in table_columns]
 
-        sql = "SELECT CONCAT_WS(',', {}) AS csv_row FROM {}".format(','.join(column_safe_sql_values), table_name)
-        cur = self.query(sql, return_as_cursor=True)
+        sql = "SELECT {} FROM {}".format(','.join(column_safe_sql_values), table_name)
         export_batch_rows = self.connection_config['export_batch_rows']
         exported_rows = 0
+        with self.conn_unbuffered as cur:
+            cur.execute(sql)
+            with gzip.open(path, 'wt') as gzfile:
+                writer = csv.writer(gzfile,
+                                    delimiter=',',
+                                    quotechar='"',
+                                    quoting=csv.QUOTE_MINIMAL)
 
+                while True:
+                    rows = cur.fetchmany(export_batch_rows)
 
-        # Write and zip exported rows in batches
-        with gzip.open(path, 'wb') as gzfile:
-            while True:
-                # Calculate number of exported rows
-                sql_rows = cur.fetchmany(export_batch_rows)
-                if exported_rows + export_batch_rows < cur.rowcount:
+                    # No more rows to fetch, stop loop
+                    if not rows:
+                        break
+
+                    # Log export status
                     exported_rows += export_batch_rows
-                else:
-                    exported_rows = cur.rowcount
+                    utils.log("Exported {} rows from {}...".format(exported_rows, table_name))
 
-                # No more rows to fetch, stop loop
-                if not sql_rows:
-                    break
+                    # Write rows to file
+                    for row in rows:
+                        writer.writerow(row)
 
-                # Write exported rows to file
-                utils.log("{}/{} rows exported from {}...".format(exported_rows, cur.rowcount, table_name))
-                gzfile.write('\n'.join([r.get('csv_row') for r in sql_rows]).encode('utf-8'))
-            
-                # Add extra new line to the end of the file required by Snowflake
-                gzfile.write('\n'.encode('utf-8'))
-        
