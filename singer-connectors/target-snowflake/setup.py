@@ -10,6 +10,7 @@ setup(
     classifiers=["Programming Language :: Python :: 3 :: Only"],
     py_modules=["target_snowflake"],
     install_requires=[
+        "idna==2.7",
         "singer-python==5.1.1",
         "snowflake-connector-python==1.6.12",
         "boto3==1.9.33",

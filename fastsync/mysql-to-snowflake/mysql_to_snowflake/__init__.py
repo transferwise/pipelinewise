@@ -32,18 +32,20 @@ def main_impl():
     mysql = MySql(args.mysql_config)
     snowflake = Snowflake(args.snowflake_config, args.transform_config)
 
-    mysql.open_connection()
+
 
     # Load tables one by one
     for table in args.tables:
         filename = '{}.csv.gz'.format(table)
         filepath = os.path.join(args.export_dir, filename)
 
-        # Get binlog file position
+        # Open connection and get binlog file position
+        mysql.open_connection()
         binlog_pos = mysql.fetch_current_log_file_and_pos()
 
-        # Exporting table data
+        # Exporting table data and close connection to avoid timeouts for huge tables
         mysql.copy_table(table, filepath)
+        mysql.close_connection()
 
         # Uploading to S3
         s3_key = snowflake.upload_to_s3(filepath, table)
@@ -51,6 +53,7 @@ def main_impl():
 
         # Creating temp table in Snowflake
         snowflake.create_schema(args.target_schema)
+        mysql.open_connection()
         snowflake.query(mysql.snowflake_ddl(table, args.target_schema, True))
 
         # Load into Snowflake table
@@ -65,6 +68,7 @@ def main_impl():
 
         # Save binlog to singer state file
         utils.save_state_file(args.state, binlog_pos, table)
+        mysql.close_connection()
 
 
 def main():
