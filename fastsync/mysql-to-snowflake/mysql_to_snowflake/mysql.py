@@ -71,6 +71,15 @@ class MySql:
                 return []
 
 
+
+    def fetch_current_log_file_and_pos(self):
+        result = self.query("SHOW MASTER STATUS")
+        if len(result) == 0:
+            raise Exception("MySQL binary logging is not enabled.")
+        else:
+            return result[0]
+
+
     def get_primary_key(self, table_name):
         sql = "SHOW KEYS FROM {} WHERE Key_name = 'PRIMARY'".format(table_name)
         return self.query(sql)[0].get('Column_name')

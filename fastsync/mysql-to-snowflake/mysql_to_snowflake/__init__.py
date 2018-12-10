@@ -39,6 +39,9 @@ def main_impl():
         filename = '{}.csv.gz'.format(table)
         filepath = os.path.join(args.export_dir, filename)
 
+        # Get binlog file position
+        binlog_pos = mysql.fetch_current_log_file_and_pos()
+
         # Exporting table data
         mysql.copy_table(table, filepath)
 
@@ -59,6 +62,9 @@ def main_impl():
         # Create target table in snowflake and swap with temp table
         snowflake.query(mysql.snowflake_ddl(table, args.target_schema, False))
         snowflake.swap_tables(args.target_schema, table)
+
+        # Save binlog to singer state file
+        utils.save_state_file(args.state, binlog_pos, table)
 
 
 def main():

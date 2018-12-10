@@ -15,6 +15,12 @@ def load_json(path):
         return json.load(fil)
 
 
+def save_dict_to_json(path, data):
+    log("Saving new state file to {}".format(path))
+    with open(path, "w") as fil:
+        fil.write(json.dumps(data))
+
+
 def tablename_to_dict(table):
     ts = dict(enumerate(table.split('.')))
     return {
@@ -22,6 +28,37 @@ def tablename_to_dict(table):
         'name': ts.get(1, None),
         'temp_name': "{}_temp".format(ts.get(1, None))
     }
+
+
+def save_state_file(path, binlog_pos, table):
+    table_dict = tablename_to_dict(table)
+    stream_id = "{}-{}".format(table_dict.get('schema'), table_dict.get('name'))
+
+    # Do nothing if state path not defined
+    if not path:
+        return
+
+    # Load the current state file
+    state = {}
+    if os.path.exists(path):
+        state = load_json(path)
+
+    # Find the current table position
+    bookmarks = state.get('bookmarks', {})
+    table_state = bookmarks.get(stream_id, {})
+
+    # Update to current entries
+    table_state['log_file'] = binlog_pos.get('File')
+    table_state['log_pos'] = binlog_pos.get('Position')
+    table_state['version'] = table_state.get('version', 1)
+
+    # Update the state file with the new values at the right place
+    state['currently_syncing'] = None
+    state['bookmarks'] = bookmarks
+    state['bookmarks'][stream_id] = table_state
+
+    # Save the new state file
+    save_dict_to_json(path, state)
 
 
 def parse_args(required_config_keys):
@@ -80,10 +117,6 @@ def parse_args(required_config_keys):
     args = parser.parse_args()
     if args.mysql_config:
         args.mysql_config = load_json(args.mysql_config)
-    if args.state:
-        args.state = load_json(args.state)
-    else:
-        args.state = {}
     if args.properties:
         args.properties = load_json(args.properties)
     if args.snowflake_config:
