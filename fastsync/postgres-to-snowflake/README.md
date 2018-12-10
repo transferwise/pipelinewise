@@ -19,6 +19,7 @@ Sample config files
 
 ## postgres-config.json
 
+```
   {
     "host": "localhost",
     "port": 5432,
@@ -28,9 +29,11 @@ Sample config files
     "password": "<PASSWORD>",
     "batch_size": 20000
   }
+```
 
 ## snowflake-config.json
 
+```
   {
       "account": "rt123456.eu-central-1",
       "aws_access_key_id": "<ACCESS_KEY_ID>",
@@ -42,9 +45,11 @@ Sample config files
       "user": "analyticsdb_etl",
       "warehouse": "LOAD_WH"
   }
+```
 
 ## transformation.json
 
+```
   {
     "transformations": [
       {
@@ -59,3 +64,4 @@ Sample config files
       }
     }
   }
+```
