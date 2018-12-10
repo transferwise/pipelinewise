@@ -64,6 +64,10 @@ class MySql:
         )
 
 
+    def close_connection(self):
+        self.conn.close()
+
+
     def query(self, query, params=None, return_as_cursor=False):
         utils.log("MYSQL - Running query: {}".format(query))
         with self.conn as cur:
