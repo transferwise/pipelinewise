@@ -285,12 +285,12 @@ class DbSync:
         )
 
     def grant_usage_on_schema(self, schema_name, grantee):
-        query = "GRANT USAGE ON SCHEMA {} TO GROUP {}".format(schema_name, grantee)
+        query = "GRANT USAGE ON SCHEMA {} TO ROLE {}".format(schema_name, grantee)
         logger.info("Granting USAGE privilegue on '{}' schema to '{}'... {}".format(schema_name, grantee, query))
         self.query(query)
 
     def grant_select_on_all_tables_in_schema(self, schema_name, grantee):
-        query = "GRANT SELECT ON ALL TABLES IN SCHEMA {} TO GROUP {}".format(schema_name, grantee)
+        query = "GRANT SELECT ON ALL TABLES IN SCHEMA {} TO ROLE {}".format(schema_name, grantee)
         logger.info("Granting SELECT ON ALL TABLES privilegue on '{}' schema to '{}'... {}".format(schema_name, grantee, query))
         self.query(query)
 
