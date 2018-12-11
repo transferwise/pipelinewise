@@ -95,7 +95,11 @@ class MySql:
 
     def get_primary_key(self, table_name):
         sql = "SHOW KEYS FROM {} WHERE Key_name = 'PRIMARY'".format(table_name)
-        return self.query(sql)[0].get('Column_name')
+        pk = self.query(sql)
+        if len(pk) > 0:
+            return pk[0].get('Column_name')
+        else:
+            return None
 
 
     def get_table_columns(self, table_name):
@@ -134,13 +138,20 @@ class MySql:
         mysql_columns = self.get_table_columns(table_name)
         snowflake_columns = ["{} {}".format(pc.get('column_name'), self.mysql_type_to_snowflake(pc.get('data_type'))) for pc in mysql_columns]
         primary_key = self.get_primary_key(table_name)
-        snowflake_ddl = "CREATE OR REPLACE TABLE {}.{} ({}, PRIMARY KEY ({}))".format(target_schema, target_table, ', '.join(snowflake_columns), primary_key)
+        if primary_key:
+            snowflake_ddl = "CREATE OR REPLACE TABLE {}.{} ({}, PRIMARY KEY ({}))".format(target_schema, target_table, ', '.join(snowflake_columns), primary_key)
+        else:
+            snowflake_ddl = "CREATE OR REPLACE TABLE {}.{} ({})".format(target_schema, target_table, ', '.join(snowflake_columns))
         return(snowflake_ddl)
 
 
     def copy_table(self, table_name, path):
         table_columns = self.get_table_columns(table_name)
         column_safe_sql_values = [c.get('safe_sql_value') for c in table_columns]
+
+        # If self.get_table_columns returns zero row then table not exist
+        if len(column_safe_sql_values) == 0:
+            raise Exception("{} table not found.".format(table_name))
 
         sql = "SELECT {} FROM {}".format(','.join(column_safe_sql_values), table_name)
         export_batch_rows = self.connection_config['export_batch_rows']

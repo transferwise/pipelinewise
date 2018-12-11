@@ -31,44 +31,62 @@ def main_impl():
     args = utils.parse_args(REQUIRED_CONFIG_KEYS)
     mysql = MySql(args.mysql_config)
     snowflake = Snowflake(args.snowflake_config, args.transform_config)
-
-
+    table_sync_excs = []
 
     # Load tables one by one
     for table in args.tables:
-        filename = '{}.csv.gz'.format(table)
-        filepath = os.path.join(args.export_dir, filename)
+        try:
+            filename = '{}.csv.gz'.format(table)
+            filepath = os.path.join(args.export_dir, filename)
 
-        # Open connection and get binlog file position
-        mysql.open_connection()
-        binlog_pos = mysql.fetch_current_log_file_and_pos()
+            # Open connection and get binlog file position
+            mysql.open_connection()
+            binlog_pos = mysql.fetch_current_log_file_and_pos()
 
-        # Exporting table data and close connection to avoid timeouts for huge tables
-        mysql.copy_table(table, filepath)
-        mysql.close_connection()
+            # Exporting table data and close connection to avoid timeouts for huge tables
+            mysql.copy_table(table, filepath)
+            mysql.close_connection()
 
-        # Uploading to S3
-        s3_key = snowflake.upload_to_s3(filepath, table)
-        os.remove(filepath)
+            # Uploading to S3
+            s3_key = snowflake.upload_to_s3(filepath, table)
+            os.remove(filepath)
 
-        # Creating temp table in Snowflake
-        snowflake.create_schema(args.target_schema)
-        mysql.open_connection()
-        snowflake.query(mysql.snowflake_ddl(table, args.target_schema, True))
+            # Creating temp table in Snowflake
+            snowflake.create_schema(args.target_schema)
+            mysql.open_connection()
+            snowflake.query(mysql.snowflake_ddl(table, args.target_schema, True))
 
-        # Load into Snowflake table
-        snowflake.copy_to_table(s3_key, args.target_schema, table, True)
+            # Load into Snowflake table
+            snowflake.copy_to_table(s3_key, args.target_schema, table, True)
 
-        # Obfuscate columns
-        snowflake.obfuscate_columns(args.target_schema, table)
+            # Obfuscate columns
+            snowflake.obfuscate_columns(args.target_schema, table)
 
-        # Create target table in snowflake and swap with temp table
-        snowflake.query(mysql.snowflake_ddl(table, args.target_schema, False))
-        snowflake.swap_tables(args.target_schema, table)
+            # Create target table in snowflake and swap with temp table
+            snowflake.query(mysql.snowflake_ddl(table, args.target_schema, False))
+            snowflake.swap_tables(args.target_schema, table)
 
-        # Save binlog to singer state file
-        utils.save_state_file(args.state, binlog_pos, table)
-        mysql.close_connection()
+            # Save binlog to singer state file
+            utils.save_state_file(args.state, binlog_pos, table)
+            mysql.close_connection()
+
+        except Exception as exc:
+            table_sync_excs.append(exc)
+
+    # Log summary
+    utils.log("""
+        -------------------------------------------------------
+        SYNC FINISHED - SUMMARY
+        -------------------------------------------------------
+            Total tables selected to sync  : {}
+            Tables loaded successfully     : {}
+            Exceptions during table sync   : {}
+        -------------------------------------------------------
+        """.format(
+            len(args.tables),
+            len(args.tables) - len(table_sync_excs),
+            str(table_sync_excs)
+        ))
 
 
 def main():
