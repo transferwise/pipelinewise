@@ -149,6 +149,10 @@ class MySql:
         table_columns = self.get_table_columns(table_name)
         column_safe_sql_values = [c.get('safe_sql_value') for c in table_columns]
 
+        # If self.get_table_columns returns zero row then table not exist
+        if len(column_safe_sql_values) == 0:
+            raise Exception("{} table not found.".format(table_name))
+
         sql = "SELECT {} FROM {}".format(','.join(column_safe_sql_values), table_name)
         export_batch_rows = self.connection_config['export_batch_rows']
         exported_rows = 0
