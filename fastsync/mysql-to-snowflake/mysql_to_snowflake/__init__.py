@@ -71,7 +71,7 @@ def main_impl():
             mysql.close_connection()
 
         except Exception as exc:
-            table_sync_errors.append(exc)
+            table_sync_excs.append(exc)
 
     # Log summary
     utils.log("""
