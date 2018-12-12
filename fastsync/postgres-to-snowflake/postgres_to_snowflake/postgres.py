@@ -54,6 +54,10 @@ class Postgres:
         self.curr = self.conn.cursor()
 
 
+    def close_connection(self):
+        self.conn.close()
+
+
     def query(self, query, params=None):
         utils.log("POSTGRES - Running query: {}".format(query))
         with self.conn as connection:
@@ -79,8 +83,11 @@ class Postgres:
                         pg_attribute.attrelid = pg_class.oid AND
                         pg_attribute.attnum = any(pg_index.indkey)
                     AND indisprimary""".format(table)
-
-        return self.query(sql)[0][0]
+        pk = self.query(sql)
+        if len(pk) > 0:
+            return pk[0][0]
+        else:
+            return None
 
 
     def get_table_columns(self, table_name):
@@ -96,13 +103,20 @@ class Postgres:
         postgres_columns = self.get_table_columns(table_name)
         snowflake_columns = ["{} {}".format(pc[0], self.postgres_type_to_snowflake(pc[1])) for pc in postgres_columns]
         primary_key = self.get_primary_key(table_name)
-        snowflake_ddl = "CREATE OR REPLACE TABLE {}.{} ({}, PRIMARY KEY ({}))".format(target_schema, target_table, ', '.join(snowflake_columns), primary_key)
+        if primary_key:
+            snowflake_ddl = "CREATE OR REPLACE TABLE {}.{} ({}, PRIMARY KEY ({}))".format(target_schema, target_table, ', '.join(snowflake_columns), primary_key)
+        else:
+            snowflake_ddl = "CREATE OR REPLACE TABLE {}.{} ({})".format(target_schema, target_table, ', '.join(snowflake_columns))
         return(snowflake_ddl)
 
 
     def copy_table(self, table_name, path):
         table_columns = self.get_table_columns(table_name)
         columns = [c[0] for c in table_columns]
+
+        # If self.get_table_columns returns zero row then table not exist
+        if len(columns) == 0:
+            raise Exception("{} table not found.".format(table_name))
 
         sql = "COPY {} ({}) TO STDOUT with CSV DELIMITER ','".format(table_name, ','.join(columns))
         utils.log("POSTGRES - Exporting data: {}".format(sql))

@@ -31,34 +31,59 @@ def main_impl():
     args = utils.parse_args(REQUIRED_CONFIG_KEYS)
     postgres = Postgres(args.postgres_config)
     snowflake = Snowflake(args.snowflake_config, args.transform_config)
-
-    postgres.open_connection()
+    table_sync_excs = []
 
     # Load tables one by one
     for table in args.tables:
-        filename = '{}.csv.gz'.format(table)
-        filepath = os.path.join(args.export_dir, filename)
+        try:
+            filename = '{}.csv.gz'.format(table)
+            filepath = os.path.join(args.export_dir, filename)
 
-        # Exporting table data
-        postgres.copy_table(table, filepath)
+            # Open connection
+            postgres.open_connection()
 
-        # Uploading to S3
-        s3_key = snowflake.upload_to_s3(filepath, table)
-        os.remove(filepath)
+            # Exporting table data and close connection to avoid timeouts for huge tables
+            postgres.copy_table(table, filepath)
+            postgres.close_connection()
 
-        # Creating temp table in Snowflake
-        snowflake.create_schema(args.target_schema)
-        snowflake.query(postgres.snowflake_ddl(table, args.target_schema, True))
+            # Uploading to S3
+            s3_key = snowflake.upload_to_s3(filepath, table)
+            os.remove(filepath)
 
-        # Load into Snowflake table
-        snowflake.copy_to_table(s3_key, args.target_schema, table, True)
+            # Creating temp table in Snowflake
+            snowflake.create_schema(args.target_schema)
+            postgres.open_connection()
+            snowflake.query(postgres.snowflake_ddl(table, args.target_schema, True))
 
-        # Obfuscate columns
-        snowflake.obfuscate_columns(args.target_schema, table)
+            # Load into Snowflake table
+            snowflake.copy_to_table(s3_key, args.target_schema, table, True)
 
-        # Create target table in snowflake and swap with temp table
-        snowflake.query(postgres.snowflake_ddl(table, args.target_schema, False))
-        snowflake.swap_tables(args.target_schema, table)
+            # Obfuscate columns
+            snowflake.obfuscate_columns(args.target_schema, table)
+
+            # Create target table in snowflake and swap with temp table
+            snowflake.query(postgres.snowflake_ddl(table, args.target_schema, False))
+            snowflake.swap_tables(args.target_schema, table)
+
+            postgres.close_connection()
+
+        except Exception as exc:
+            table_sync_excs.append(exc)
+
+    # Log summary
+    utils.log("""
+        -------------------------------------------------------
+        SYNC FINISHED - SUMMARY
+        -------------------------------------------------------
+            Total tables selected to sync  : {}
+            Tables loaded successfully     : {}
+            Exceptions during table sync   : {}
+        -------------------------------------------------------
+        """.format(
+            len(args.tables),
+            len(args.tables) - len(table_sync_excs),
+            str(table_sync_excs)
+        ))
 
 
 def main():
