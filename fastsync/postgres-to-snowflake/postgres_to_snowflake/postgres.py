@@ -104,6 +104,10 @@ class Postgres:
         table_columns = self.get_table_columns(table_name)
         columns = [c[0] for c in table_columns]
 
+        # If self.get_table_columns returns zero row then table not exist
+        if len(columns) == 0:
+            raise Exception("{} table not found.".format(table_name))
+
         sql = "COPY {} ({}) TO STDOUT with CSV DELIMITER ','".format(table_name, ','.join(columns))
         utils.log("POSTGRES - Exporting data: {}".format(sql))
         with gzip.open(path, 'wt') as gzfile:
