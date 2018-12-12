@@ -143,8 +143,23 @@ def persist_lines(config, lines):
             schemas[stream] = o
             schema = float_to_decimal(o['schema'])
             validators[stream] = Draft4Validator(schema, format_checker=FormatChecker())
+
+            # key_properties key must be available in the SCHEMA message.
             if 'key_properties' not in o:
                 raise Exception("key_properties field is required")
+
+            # Log based and Incremental replications on tables with no Primary Key
+            # cause duplicates when merging UPDATE events.
+            # Stop loading data by default if no Primary Key.
+            #
+            # If you want to load tables with no Primary Key:
+            #  1) Set ` 'primary_key_required': false ` in the target-postgres config.json
+            #  or
+            #  2) Use fastsync [postgres-to-snowflake, mysql-to-snowflake, etc.]
+            if config.get('primary_key_required', True) and len(o['key_properties']) == 0:
+                logger.critical("Primary key is set to mandatory but not defined in the [{}] stream".format(stream))
+                raise Exception("key_properties field is required")
+
             key_properties[stream] = o['key_properties']
 
             if config.get('add_metadata_columns') or config.get('hard_delete'):
