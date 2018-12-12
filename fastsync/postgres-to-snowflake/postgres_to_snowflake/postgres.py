@@ -54,6 +54,10 @@ class Postgres:
         self.curr = self.conn.cursor()
 
 
+    def close_connection(self):
+        self.conn.close()
+
+
     def query(self, query, params=None):
         utils.log("POSTGRES - Running query: {}".format(query))
         with self.conn as connection:

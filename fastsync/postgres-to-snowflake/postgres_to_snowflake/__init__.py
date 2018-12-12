@@ -33,16 +33,18 @@ def main_impl():
     snowflake = Snowflake(args.snowflake_config, args.transform_config)
     table_sync_excs = []
 
-    postgres.open_connection()
-
     # Load tables one by one
     for table in args.tables:
         try:
             filename = '{}.csv.gz'.format(table)
             filepath = os.path.join(args.export_dir, filename)
 
-            # Exporting table data
+            # Open connection
+            postgres.open_connection()
+
+            # Exporting table data and close connection to avoid timeouts for huge tables
             postgres.copy_table(table, filepath)
+            postgres.close_connection()
 
             # Uploading to S3
             s3_key = snowflake.upload_to_s3(filepath, table)
@@ -50,6 +52,7 @@ def main_impl():
 
             # Creating temp table in Snowflake
             snowflake.create_schema(args.target_schema)
+            postgres.open_connection()
             snowflake.query(postgres.snowflake_ddl(table, args.target_schema, True))
 
             # Load into Snowflake table
@@ -61,6 +64,8 @@ def main_impl():
             # Create target table in snowflake and swap with temp table
             snowflake.query(postgres.snowflake_ddl(table, args.target_schema, False))
             snowflake.swap_tables(args.target_schema, table)
+
+            postgres.close_connection()
 
         except Exception as exc:
             table_sync_excs.append(exc)
