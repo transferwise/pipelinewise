@@ -31,6 +31,8 @@ def parse_args(required_config_keys):
     --snowflake-config  Snowflake Config file
     --transform-config  Transformations Config file
     --tables            Tables to sync. (Separated by comma)
+    --target-schema     Target schema to load tables into
+    --grant-select-to   Grant select on all tables in target schema
     --export-dir        Directory to create temporary csv exports. Defaults to current work dir.
 
     Returns the parsed args object from argparse. For each argument that
@@ -70,6 +72,11 @@ def parse_args(required_config_keys):
         '--target-schema',
         help='Target schema in snowflake',
         required=True)
+
+    parser.add_argument(
+        '--grant-select-to',
+        help='Grant select on all tables in target schema'
+    )
 
     parser.add_argument(
         '--export-dir',

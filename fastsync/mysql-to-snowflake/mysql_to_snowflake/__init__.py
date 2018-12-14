@@ -55,6 +55,7 @@ def main_impl():
             snowflake.create_schema(args.target_schema)
             mysql.open_connection()
             snowflake.query(mysql.snowflake_ddl(table, args.target_schema, True))
+            snowflake.grant_select_on_table(args.target_schema, table, args.grant_select_to, True)
 
             # Load into Snowflake table
             snowflake.copy_to_table(s3_key, args.target_schema, table, True)
@@ -72,6 +73,13 @@ def main_impl():
 
         except Exception as exc:
             table_sync_excs.append(exc)
+
+    # Every table loaded, grant select on all tables in target schema
+    # Catch exception and (i.e. Role does not exist) and add into the exceptions array
+    try:
+        snowflake.grant_select_on_schema(args.target_schema, args.grant_select_to)
+    except Exception as exc:
+        table_sync_excs.append(exc)
 
     # Log summary
     utils.log("""
