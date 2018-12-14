@@ -55,6 +55,7 @@ class Snowflake:
         sql = "CREATE SCHEMA IF NOT EXISTS {}".format(schema)
         self.query(sql)
 
+
     def copy_to_table(self, s3_key, target_schema, table_name, is_temporary):
         utils.log("SNOWFLAKE - Loading {} into Snowflake...".format(s3_key))
         table_dict = utils.tablename_to_dict(table_name)
@@ -70,6 +71,22 @@ class Snowflake:
 
         utils.log("SNOWFLAKE - Deleting {} from S3...".format(s3_key))
         self.s3.delete_object(Bucket=bucket, Key=s3_key)
+
+
+    def grant_select_on_table(self, target_schema, table_name, role, is_temporary):
+        # Grant role is not mandatory parameter, do nothing if not specified
+        if role:
+            table_dict = utils.tablename_to_dict(table_name)
+            target_table = table_dict.get('name') if not is_temporary else table_dict.get('temp_name')
+            sql = "GRANT SELECT ON {}.{} TO ROLE {}".format(target_schema, target_table, role)
+            self.query(sql)
+
+
+    def grant_select_on_schema(self, target_schema, role):
+        # Grant role is not mandatory parameter, do nothing if not specified
+        if role:
+            sql = "GRANT SELECT ON ALL TABLES IN SCHEMA {} TO ROLE {}".format(target_schema,role)
+            self.query(sql)
 
 
     def obfuscate_columns(self, target_schema, table_name):
