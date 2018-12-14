@@ -35,7 +35,7 @@ class MySql:
             'bigint':'NUMBER',
             'bit':'NUMBER',
             'decimal':'NUMBER',
-            'double':'NUMBER(38,6)',
+            'double':'FLOAT',
             'float':'FLOAT',
             'bool':'BOOLEAN',
             'boolean':'BOOLEAN',

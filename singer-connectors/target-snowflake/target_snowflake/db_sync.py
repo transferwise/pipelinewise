@@ -19,7 +19,7 @@ def column_type(schema_property):
     elif property_format == 'date-time':
         return 'timestamp_ntz'
     elif 'number' in property_type:
-        return 'number(38,6)'
+        return 'float'
     elif 'integer' in property_type and 'string' in property_type:
         return 'text'
     elif 'integer' in property_type:
