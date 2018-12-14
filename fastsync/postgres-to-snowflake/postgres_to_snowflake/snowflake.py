@@ -64,9 +64,11 @@ class Snowflake:
         aws_access_key_id=self.connection_config['aws_access_key_id']
         aws_secret_access_key=self.connection_config['aws_secret_access_key']
         bucket = self.connection_config['s3_bucket']
-        s3_key_prefix = self.connection_config.get('s3_key_prefix', '')
 
-        sql = "COPY INTO {}.{} FROM 's3://{}/{}' CREDENTIALS = (aws_key_id='{}' aws_secret_key='{}')".format(target_schema, target_table, bucket, s3_key, aws_access_key_id, aws_secret_access_key)
+        sql = """COPY INTO {}.{} FROM 's3://{}/{}'
+            CREDENTIALS = (aws_key_id='{}' aws_secret_key='{}')
+            FILE_FORMAT = (type='CSV' escape='\\x1e' escape_unenclosed_field='\\x1e' field_optionally_enclosed_by='\"')
+        """.format(target_schema, target_table, bucket, s3_key, aws_access_key_id, aws_secret_access_key)
         self.query(sql)
 
         utils.log("SNOWFLAKE - Deleting {} from S3...".format(s3_key))
