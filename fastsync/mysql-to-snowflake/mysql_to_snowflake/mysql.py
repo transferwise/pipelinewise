@@ -39,7 +39,7 @@ class MySql:
             'float':'FLOAT',
             'bool':'BOOLEAN',
             'boolean':'BOOLEAN',
-            'date':'DATE',
+            'date':'TIMESTAMP_NTZ',
             'datetime':'TIMESTAMP_NTZ',
             'timestamp':'TIMESTAMP_NTZ',
         }.get(pg_type, 'VARCHAR')
