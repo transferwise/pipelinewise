@@ -39,13 +39,13 @@ def add_metadata_columns_to_schema(schema_message):
     Metadata columns gives information about data injections
     """
     extended_schema_message = schema_message
-    extended_schema_message['schema']['properties']['_sdc_batched_at'] = { 'type': ['date-time'] }
-    extended_schema_message['schema']['properties']['_sdc_deleted_at'] = {'type': ['date-time'] }
-    extended_schema_message['schema']['properties']['_sdc_extracted_at'] = {'type': ['date-time'] }
-    extended_schema_message['schema']['properties']['_sdc_primary_key'] = {'type': ['string'] }
-    extended_schema_message['schema']['properties']['_sdc_received_at'] = {'type': ['date-time'] }
-    extended_schema_message['schema']['properties']['_sdc_sequence'] = {'type': ['number'] }
-    extended_schema_message['schema']['properties']['_sdc_table_version'] = {'type': ['date-time'] }
+    extended_schema_message['schema']['properties']['_sdc_batched_at'] = { 'type': ['null', 'string'], 'format': 'date-time' }
+    extended_schema_message['schema']['properties']['_sdc_deleted_at'] = { 'type': ['null', 'string'], 'format': 'date-time' }
+    extended_schema_message['schema']['properties']['_sdc_extracted_at'] = { 'type': ['null', 'string'], 'format': 'date-time' }
+    extended_schema_message['schema']['properties']['_sdc_primary_key'] = {'type': ['null', 'string'] }
+    extended_schema_message['schema']['properties']['_sdc_received_at'] = { 'type': ['null', 'string'], 'format': 'date-time' }
+    extended_schema_message['schema']['properties']['_sdc_sequence'] = {'type': ['integer'] }
+    extended_schema_message['schema']['properties']['_sdc_table_version'] = {'type': ['null', 'string'] }
 
     return extended_schema_message
 
