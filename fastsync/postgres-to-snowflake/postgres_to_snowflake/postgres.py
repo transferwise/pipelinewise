@@ -17,7 +17,7 @@ class Postgres:
             'varchar':'VARCHAR',
             'character varying':'VARCHAR',
             'text':'TEXT',
-            'bit': 'NUMBER',
+            'bit': 'BOOLEAN',
             'varbit':'NUMBER',
             'bit varying':'NUMBER',
             'smallint':'NUMBER',

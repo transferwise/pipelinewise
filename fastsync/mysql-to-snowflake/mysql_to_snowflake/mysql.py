@@ -33,7 +33,7 @@ class MySql:
             'tinyint':'NUMBER',
             'smallint':'NUMBER',
             'bigint':'NUMBER',
-            'bit':'NUMBER',
+            'bit':'BOOLEAN',
             'decimal':'NUMBER',
             'double':'FLOAT',
             'float':'FLOAT',
