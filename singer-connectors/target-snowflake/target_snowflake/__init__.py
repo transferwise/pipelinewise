@@ -208,6 +208,8 @@ def flush_records(stream, records_to_load, row_count, stream_to_sync):
     csv_file.close()
     row_count[stream] = 0
     records_to_load[stream] = {}
+    sync.delete_from_stage(s3_key)
+
 
 def main():
     parser = argparse.ArgumentParser()

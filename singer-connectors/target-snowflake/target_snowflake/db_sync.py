@@ -103,6 +103,12 @@ class DbSync:
         self.schema_name = self.connection_config['schema']
         self.stream_schema_message = stream_schema_message
         self.flatten_schema = flatten_schema(stream_schema_message['schema'])
+        self.s3 = boto3.client(
+            's3',
+            aws_access_key_id=self.connection_config['aws_access_key_id'],
+            aws_secret_access_key=self.connection_config['aws_secret_access_key']
+        )
+
 
     def open_connection(self):
         return snowflake.connector.connect(
@@ -172,14 +178,15 @@ class DbSync:
         file.seek(0)
 
         # Connect and upload
-        s3 = boto3.client(
-            's3',
-            aws_access_key_id=self.connection_config['aws_access_key_id'],
-            aws_secret_access_key=self.connection_config['aws_secret_access_key']
-        )
-        s3.upload_fileobj(file, bucket, s3_key)
-
+        self.s3.upload_fileobj(file, bucket, s3_key)
         return s3_key
+
+
+    def delete_from_stage(self, s3_key):
+        logger.info("Deleting {} from external snowflake stage on S3".format(s3_key))
+        bucket = self.connection_config['s3_bucket']
+        self.s3.delete_object(Bucket=bucket, Key=s3_key)
+
 
     def load_csv(self, s3_key, count):
         inserted = 0
