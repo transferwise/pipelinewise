@@ -259,6 +259,11 @@ def api_get_tap_log(target_id, tap_id, log_id):
         'result': manager.get_tap_log(target_id, tap_id, log_id)
     })
 
+@app.route("/metrics", methods =['GET'])
+def metrics():
+    # Prometheus exporter compatible output
+    return '\n'.join(manager.get_tap_lags()) + '\n'
+
 def main():
     '''Main entry point'''
     app.run(host = app.config["HOST"], port = app.config["PORT"])

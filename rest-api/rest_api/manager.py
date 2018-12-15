@@ -696,13 +696,13 @@ class Manager(object):
         else:
             raise Exception("Cannot find tap at {}".format(tap_dir))
 
-    def get_tap_logs(self, target_id, tap_id):
+    def get_tap_logs(self, target_id, tap_id, patterns=['*.log.*']):
         self.logger.info('Getting {} tap logs from {} target'.format(tap_id, target_id))
         logs = []
 
         try:
             log_dir = self.get_tap_log_dir(target_id, tap_id)
-            log_files = self.search_files(log_dir, patterns=['*.log.*'])
+            log_files = self.search_files(log_dir, patterns=patterns)
             for log_file in log_files:
                 logs.append(self.extract_log_attributes(log_file))
 
@@ -724,3 +724,39 @@ class Manager(object):
     
         return log_content
 
+    def get_tap_lag(self, target_id, tap_id):
+        self.logger.info('Getting {} tap lag in {} target by finding when the last log file was modified'.format(tap_id, target_id))
+
+        try:
+            # Find the most recent not failed log file
+            tap_logs = self.get_tap_logs(target_id, tap_id, patterns=['*.log.success','*.log.running'])
+            last_log = max([x['filename'] for x in tap_logs])
+            last_log_file = os.path.join(self.get_tap_log_dir(target_id, tap_id), last_log)
+
+            # Get the time of last modification and calculate the difference to the current time
+            last_modif_time = os.stat(last_log_file).st_mtime
+            epoch = datetime.now().timestamp()
+            lag = epoch - last_modif_time
+
+            return lag
+        except Exception as exc:
+            return -1
+
+    def get_tap_lags(self):
+        self.logger.info('Getting metrics')
+        targets = self.get_targets()
+        metrics = []
+
+        for target in targets:
+            target_id = target.get('id', 'unknown')
+            for tap in target['taps']:
+                tap_id = tap.get('id', 'unknown')
+                lag = self.get_tap_lag(target_id, tap_id)
+
+                # Prometheus exporter compatible format
+                metric_name = "etl_{}_to_{}_lag_seconds".format(tap_id, target_id)
+                metric = "{} {}".format(metric_name, lag)
+
+                metrics.append(metric)
+
+        return metrics
