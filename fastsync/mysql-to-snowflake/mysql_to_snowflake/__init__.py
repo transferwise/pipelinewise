@@ -111,6 +111,7 @@ def main_impl():
     # Catch exception and (i.e. Role does not exist) and add into the exceptions array
     try:
         if args.grant_select_to:
+            snowflake = Snowflake(args.snowflake_config, args.transform_config)
             snowflake.grant_select_on_schema(args.target_schema, args.grant_select_to)
     except Exception as exc:
         table_sync_excs.append(exc)
