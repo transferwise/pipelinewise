@@ -13,7 +13,7 @@ class MySql:
         self.connection_config['export_batch_rows'] = connection_config.get('export_batch_rows', 20000)
 
 
-    def mysql_type_to_snowflake(self, pg_type):
+    def mysql_type_to_snowflake(self, data_type, column_type):
         return {
             'char':'VARCHAR',
             'varchar':'VARCHAR',
@@ -30,7 +30,7 @@ class MySql:
             'longtext':'VARCHAR',
             'enum':'VARCHAR',
             'int':'NUMBER',
-            'tinyint':'NUMBER',
+            'tinyint':'BOOLEAN' if column_type == 'tinyint(1)' else 'NUMBER',
             'smallint':'NUMBER',
             'bigint':'NUMBER',
             'bit':'BOOLEAN',
@@ -42,7 +42,7 @@ class MySql:
             'date':'TIMESTAMP_NTZ',
             'datetime':'TIMESTAMP_NTZ',
             'timestamp':'TIMESTAMP_NTZ',
-        }.get(pg_type, 'VARCHAR')
+        }.get(data_type, 'VARCHAR')
 
 
     def open_connection(self):
@@ -107,9 +107,11 @@ class MySql:
         sql = """
                 SELECT column_name,
                     data_type,
+                    column_type,
                     CONCAT("REPLACE(", safe_sql_value, ", '\n', ' ')") safe_sql_value
                 FROM (SELECT column_name,
                             data_type,
+                            column_type,
                             CASE
                             WHEN data_type IN ('blob', 'tinyblob', 'mediumblob', 'longblob', 'binary', 'varbinary', 'geometry')
                                     THEN concat('hex(', column_name, ')')
@@ -136,7 +138,7 @@ class MySql:
         target_table = table_dict.get('name') if not is_temporary else table_dict.get('temp_name')
 
         mysql_columns = self.get_table_columns(table_name)
-        snowflake_columns = ["{} {}".format(pc.get('column_name'), self.mysql_type_to_snowflake(pc.get('data_type'))) for pc in mysql_columns]
+        snowflake_columns = ["{} {}".format(pc.get('column_name'), self.mysql_type_to_snowflake(pc.get('data_type'), pc.get('column_type'))) for pc in mysql_columns]
         primary_key = self.get_primary_key(table_name)
         if primary_key:
             snowflake_ddl = "CREATE OR REPLACE TABLE {}.{} ({}, PRIMARY KEY ({}))".format(target_schema, target_table, ', '.join(snowflake_columns), primary_key)
