@@ -34,7 +34,7 @@ class MySql:
             'smallint':'NUMBER',
             'bigint':'NUMBER',
             'bit':'BOOLEAN',
-            'decimal':'NUMBER',
+            'decimal':'FLOAT',
             'double':'FLOAT',
             'float':'FLOAT',
             'bool':'BOOLEAN',
