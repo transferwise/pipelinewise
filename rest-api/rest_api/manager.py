@@ -200,6 +200,7 @@ class Manager(object):
             log_attr = re.search('(.*)-(.*)-(.*).log.(.*)', log_file)
             target_id = log_attr.group(1)
             tap_id = log_attr.group(2)
+            sync_engine = 'unknown'
 
             # Detect timestamp and engine
             # Singer log file format  : target-tap-20181217_150101.log.success
@@ -207,10 +208,10 @@ class Manager(object):
             x = log_attr.group(3).split('.')
             if len(x) == 2 and x[1] == 'fastsync':
                 timestamp = datetime.strptime(x[0], '%Y%m%d_%H%M%S').isoformat()
-                engine = x[1]
+                sync_engine = x[1]
             else:
                 timestamp = datetime.strptime(log_attr.group(3), '%Y%m%d_%H%M%S').isoformat()
-                engine = 'singer'
+                sync_engine = 'singer'
 
             status = log_attr.group(4)
 
@@ -224,6 +225,7 @@ class Manager(object):
             'target_id': target_id,
             'tap_id': tap_id,
             'timestamp': timestamp,
+            'sync_engine': sync_engine,
             'status': status
         }
 
@@ -743,15 +745,24 @@ class Manager(object):
             tap_logs = self.get_tap_logs(target_id, tap_id, patterns=['*.log.success','*.log.running'])
             last_log = max([x['filename'] for x in tap_logs])
             last_log_file = os.path.join(self.get_tap_log_dir(target_id, tap_id), last_log)
+            log_attrs = self.extract_log_attributes(last_log_file)
 
             # Get the time of last modification and calculate the difference to the current time
             last_modif_time = os.stat(last_log_file).st_mtime
             epoch = datetime.now().timestamp()
             lag = epoch - last_modif_time
+            sync_engine = self.extract_log_attributes(last_log_file).get('sync_engine', 'unknown')
 
-            return lag
+            return {
+                'lag': lag,
+                'sync_engine': sync_engine
+            }
         except Exception as exc:
-            return -1
+            return {
+                'lag': None,
+                'sync_engine': sync_engine
+            }
+
 
     def get_tap_lags(self):
         self.logger.info('Getting metrics')
@@ -762,12 +773,16 @@ class Manager(object):
             target_id = target.get('id', 'unknown')
             for tap in target['taps']:
                 tap_id = tap.get('id', 'unknown')
-                lag = self.get_tap_lag(target_id, tap_id)
+                tap_type = tap.get('type')
+                tap_lag = self.get_tap_lag(target_id, tap_id)
+                lag = tap_lag.get('lag')
+                sync_engine = tap_lag.get('sync_engine', 'unknown')
 
-                # Prometheus exporter compatible format
-                metric_name = "etl_{}_to_{}_lag_seconds".format(tap_id, target_id)
-                metric = "{} {}".format(metric_name, lag)
+                if lag:
+                    # Prometheus exporter compatible format
+                    metric_name = "etl_lag_seconds{{tap=\"{}\",target=\"{}\",type=\"{}\",engine=\"{}\"}}".format(tap_id.replace('-','_'), target_id.replace('-','_'), tap_type, sync_engine)
+                    metric = "{} {}".format(metric_name, lag)
 
-                metrics.append(metric)
+                    metrics.append(metric)
 
         return metrics
