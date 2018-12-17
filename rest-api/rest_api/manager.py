@@ -200,7 +200,18 @@ class Manager(object):
             log_attr = re.search('(.*)-(.*)-(.*).log.(.*)', log_file)
             target_id = log_attr.group(1)
             tap_id = log_attr.group(2)
-            timestamp = datetime.strptime(log_attr.group(3), '%Y%m%d_%H%M%S').isoformat()
+
+            # Detect timestamp and engine
+            # Singer log file format  : target-tap-20181217_150101.log.success
+            # Fastsync dump log format: target-tap-20181217_150101.fastsync.log.success
+            x = log_attr.group(3).split('.')
+            if len(x) == 2 and x[1] == 'fastsync':
+                timestamp = datetime.strptime(x[0], '%Y%m%d_%H%M%S').isoformat()
+                engine = x[1]
+            else:
+                timestamp = datetime.strptime(log_attr.group(3), '%Y%m%d_%H%M%S').isoformat()
+                engine = 'singer'
+
             status = log_attr.group(4)
 
         # Ignore exception when attributes cannot be extracted - Defaults will be used
