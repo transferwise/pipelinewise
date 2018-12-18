@@ -194,13 +194,13 @@ class Manager(object):
         tap_id = 'unknown'
         timestamp = datetime.utcfromtimestamp(0).isoformat()
         status = 'unkown'
+        sync_engine = 'unknown'
 
         try:
             # Extract attributes from log file name
             log_attr = re.search('(.*)-(.*)-(.*).log.(.*)', log_file)
             target_id = log_attr.group(1)
             tap_id = log_attr.group(2)
-            sync_engine = 'unknown'
 
             # Detect timestamp and engine
             # Singer log file format  : target-tap-20181217_150101.log.success
@@ -755,7 +755,7 @@ class Manager(object):
 
             return {
                 'lag': lag,
-                'sync_engine': sync_engine
+                'sync_engine': 'unknown'
             }
         except Exception as exc:
             return {
