@@ -784,13 +784,13 @@ class Manager(object):
 
                 # Add status metric in prometheus exporter compatible format
                 metric_name = "etl_state{{tap=\"{}\",target=\"{}\",type=\"{}\",engine=\"{}\",current=\"{}\",last=\"{}\"}}".format(tap_id.replace('-','_'), target_id.replace('-','_'), tap_type, sync_engine, tap_current_status, tap_last_status)
-                metric = "{} {}".format(metric_name, lag)
+                metric = "{} 1".format(metric_name)
                 metrics.append(metric)
 
                 # Add lag metric in prometheus exporter compatible format
                 if lag:
                     metric_name = "etl_lag_seconds{{tap=\"{}\",target=\"{}\",type=\"{}\",engine=\"{}\"}}".format(tap_id.replace('-','_'), target_id.replace('-','_'), tap_type, sync_engine)
-                    metric = "{} 1".format(metric_name)
+                    metric = "{} {}".format(metric_name, lag)
                     metrics.append(metric)
 
         return metrics
