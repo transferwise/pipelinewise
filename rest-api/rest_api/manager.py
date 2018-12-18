@@ -755,12 +755,12 @@ class Manager(object):
 
             return {
                 'lag': lag,
-                'sync_engine': 'unknown'
+                'sync_engine': sync_engine
             }
         except Exception as exc:
             return {
                 'lag': None,
-                'sync_engine': sync_engine
+                'sync_engine': 'unknown'
             }
 
 
