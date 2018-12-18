@@ -771,18 +771,26 @@ class Manager(object):
 
         for target in targets:
             target_id = target.get('id', 'unknown')
+            taps_detailed = self.get_taps(target_id)
             for tap in target['taps']:
                 tap_id = tap.get('id', 'unknown')
                 tap_type = tap.get('type')
                 tap_lag = self.get_tap_lag(target_id, tap_id)
                 lag = tap_lag.get('lag')
                 sync_engine = tap_lag.get('sync_engine', 'unknown')
+                tap_detailed = self.get_tap(target_id, tap_id)
+                tap_current_status = tap_detailed.get('status', {}).get('currentStatus', 'unknown')
+                tap_last_status = tap_detailed.get('status', {}).get('lastStatus', 'unknown')
 
+                # Add status metric in prometheus exporter compatible format
+                metric_name = "etl_state{{tap=\"{}\",target=\"{}\",type=\"{}\",engine=\"{}\",current=\"{}\",last=\"{}\"}}".format(tap_id.replace('-','_'), target_id.replace('-','_'), tap_type, sync_engine, tap_current_status, tap_last_status)
+                metric = "{} {}".format(metric_name, lag)
+                metrics.append(metric)
+
+                # Add lag metric in prometheus exporter compatible format
                 if lag:
-                    # Prometheus exporter compatible format
                     metric_name = "etl_lag_seconds{{tap=\"{}\",target=\"{}\",type=\"{}\",engine=\"{}\"}}".format(tap_id.replace('-','_'), target_id.replace('-','_'), tap_type, sync_engine)
-                    metric = "{} {}".format(metric_name, lag)
-
+                    metric = "{} 1".format(metric_name)
                     metrics.append(metric)
 
         return metrics
