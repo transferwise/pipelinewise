@@ -742,7 +742,7 @@ class Manager(object):
 
         try:
             # Find the most recent not failed log file
-            tap_logs = self.get_tap_logs(target_id, tap_id, patterns=['*.log.success','*.log.running'])
+            tap_logs = self.get_tap_logs(target_id, tap_id, patterns=['*.log.success'])
             last_log = max([x['filename'] for x in tap_logs])
             last_log_file = os.path.join(self.get_tap_log_dir(target_id, tap_id), last_log)
             log_attrs = self.extract_log_attributes(last_log_file)
