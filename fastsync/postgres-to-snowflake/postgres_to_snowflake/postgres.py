@@ -27,7 +27,7 @@ class Postgres:
             'smallserial':'NUMBER',
             'serial':'NUMBER',
             'bigserial':'NUMBER',
-            'numeric':'NUMBER',
+            'numeric':'FLOAT',
             'double precision':'FLOAT',
             'real':'FLOAT',
             'bool':'BOOLEAN',
