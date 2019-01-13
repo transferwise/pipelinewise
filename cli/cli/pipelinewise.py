@@ -62,6 +62,9 @@ class PipelineWise(object):
             self.target = self.get_target(args.target)
             self.target_bin = self.get_connector_bin(self.target["type"])
 
+        if args.tables != '*':
+            self.tables = args.tables
+
         self.tranform_field_bin = self.get_connector_bin("transform-field")
 
     def silentremove(self, file):
@@ -166,6 +169,13 @@ class PipelineWise(object):
             'transformation': os.path.join(connector_dir, 'transformation.json'),
             'selection': os.path.join(connector_dir, 'selection.json'),
         }
+
+    def get_fastsync_bin(self, tap_type, target_type):
+        source = tap_type.replace('tap-', '')
+        target = target_type.replace('target-', '')
+        fastsync_name = "{}-to-{}".format(source, target)
+
+        return os.path.join(self.venv_dir, fastsync_name, "bin", fastsync_name)
         
     def get_targets(self):
         self.logger.debug('Getting targets from {}'.format(self.config_path))
@@ -756,3 +766,79 @@ class PipelineWise(object):
         if self.is_json_file(new_tap_state):
             shutil.copyfile(new_tap_state, tap_state)
             os.remove(new_tap_state)
+
+    def sync_tables(self):
+        tap_id = self.tap["id"]
+        tap_type = self.tap["type"]
+        target_id = self.target["id"]
+        target_type = self.target['type']
+        fastsync_bin = self.get_fastsync_bin(tap_type, target_type)
+
+        self.logger.info("Syncing tables from {} ({}) to {} ({})...".format(tap_id, tap_type, target_id, target_type))
+
+        # Run only if tap enabled
+        if not self.tap.get("enabled", False):
+            self.logger.info("Tap {} is not enabled. Do nothing and exit normally.".format(self.tap["name"]))
+            sys.exit(0)
+
+        # Run only if tap not running
+        tap_status = self.detect_tap_status(target_id, tap_id)
+        if tap_status["currentStatus"] == "running":
+            self.logger.info("Tap {} is currently running and cannot sync. Stop the tap and try again.".format(self.tap["name"]))
+            sys.exit(1)
+
+        # Tap exists but configuration not completed
+        if not os.path.isfile(fastsync_bin):
+            self.logger.error("Table sync function is not implemented from {} datasources to {} type of targets".format(tap_type, target_type))
+            sys.exit(1)
+
+        # Generate and run the command to run the tap directly
+        tap_config = self.tap["files"]["config"]
+        tap_inheritable_config = self.tap["files"]["inheritable_config"]
+        tap_properties = self.tap["files"]["properties"]
+        tap_state = self.tap["files"]["state"]
+        tap_transformation = self.tap["files"]["transformation"]
+        target_config = self.target["files"]["config"]
+
+        # Some target attributes can be passed and override by tap (aka. inheritable config)
+        # We merge the two configs and use that with the target
+        cons_target_config = self.create_consumable_target_config(target_config, tap_inheritable_config)
+
+        # Add state arugment if exists to extract data incrementally
+        tap_transform_arg = ""
+        if os.path.isfile(tap_transformation):
+            tap_transform_arg = "--transform {}".format(tap_transformation)
+
+        try:
+            command = ' '.join((
+                "  {} ".format(fastsync_bin),
+                "--tap {}".format(tap_config),
+                "--target {}".format(cons_target_config),
+                "--state {}".format(tap_state),
+                "{}".format(tap_transform_arg),
+                "--tables {}".format(self.tables)
+            ))
+
+            # Output will be redirected into a log file
+            log_dir = self.get_tap_log_dir(target_id, tap_id)
+            current_time = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+            log_file = os.path.join(log_dir, "{}-{}-{}.log".format(target_id, tap_id, current_time))
+
+            # Do not run if another instance is already running
+            if os.path.isdir(log_dir) and len(self.search_files(log_dir, patterns=['*.log.running'])) > 0:
+                self.logger.info("Failed to run. Another instance of the same tap is already running. Log file detected in running status at {} ".format(log_dir))
+                sys.exit(1)
+
+            # Run command
+            result = self.run_command(command, log_file)
+
+        # Delete temp file if there is any
+        except RunCommandException as exc:
+            self.logger.error(exc)
+            self.silentremove(cons_target_config)
+            sys.exit(1)
+        except Exception as exc:
+            self.silentremove(cons_target_config)
+            raise exc
+
+        self.silentremove(cons_target_config)

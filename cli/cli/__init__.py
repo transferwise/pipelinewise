@@ -20,12 +20,14 @@ commands = [
   'show_status',
   'test_tap_connection',
   'clear_crontab',
-  'init_crontab'
+  'init_crontab',
+  'sync_tables'
 ]
 
 command_help = """Available commands, """ + ','.join(commands)
 target_help = """Name of the target"""
 tap_help = """Name of the tap"""
+tables_help = """List of tables to sync"""
 version_help = """Displays the installed versions"""
 debug_help = """Forces the debug mode with logging on stdout and log level debug."""
 
@@ -35,6 +37,7 @@ def main():
     parser.add_argument('command', type=str, help=command_help)
     parser.add_argument('--target', type=str, default='*', help=target_help)
     parser.add_argument('--tap', type=str, default='*', help=tap_help)
+    parser.add_argument('--tables', type=str, default='*', help=tables_help)
     parser.add_argument('--version', action="version", help=version_help, version='TransferData {} - Command Line Interface'.format(__version__))
     parser.add_argument('--debug', default=False, required=False, help=debug_help, action="store_true")
 
@@ -47,6 +50,17 @@ def main():
             sys.exit(1)
         if args.target == '*':
             print("You must specify a destination name using the argument --target")
+            sys.exit(1)
+
+    if args.command == 'sync_tables':
+        if args.tap == '*':
+            print("You must specify a source name using the argument --tap")
+            sys.exit(1)
+        if args.target == '*':
+            print("You must specify a destination name using the argument --target")
+            sys.exit(1)
+        if args.tables == '*':
+            print("You must specify the table(s) to sync using the argument --tables")
             sys.exit(1)
 
     pipelinewise = PipelineWise(args, config_dir, venv_dir)

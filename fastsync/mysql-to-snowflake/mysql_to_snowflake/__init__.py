@@ -11,13 +11,13 @@ from mysql_to_snowflake.snowflake import Snowflake
 
 
 REQUIRED_CONFIG_KEYS = {
-    'mysql': [
+    'tap': [
         'host',
         'port',
         'user',
         'password'
     ],
-    'snowflake': [
+    'target': [
         'account',
         'dbname',
         'warehouse',
@@ -38,14 +38,52 @@ def get_cpu_cores():
         return 1
 
 
+def table_to_dict(table, schema_name_postfix = None):
+    schema_name = None
+    table_name = table
+
+    # Schema and table name can be derived if it's in <schema_nama>.<table_name> format
+    s = table.split('.')
+    if len(s) > 1:
+        postfix = "" if schema_name_postfix is None else schema_name_postfix
+        schema_name = s[0] + postfix
+        table_name = s[1]
+
+    return {
+        'schema_name': schema_name,
+        'table_name': table_name
+    }
+
+
+def get_target_schema(target_config, table):
+    # Target schema name can be defined in multiple ways:
+    #
+    #   1: 'schema' key : Target schema name defined explicitly
+    #   2: 'dynamic_schema_name' key: Target schema name derived from the incoming stream id:
+    #                                 i.e.: <schema_nama>-<table_name>
+    if 'schema' in target_config and target_config['schema'].strip():
+        return target_config['schema']
+    elif 'dynamic_schema_name' in target_config and target_config['dynamic_schema_name']:
+        postfix = target_config['dynamic_schema_name_postfix'] if 'dynamic_schema_name_postfix' in target_config else None
+        table_dict = table_to_dict(table, postfix)
+
+        if table_dict['schema_name'] is None:
+            raise Exception("Cannot detect target schema name of table using '{}' format. Use it with schema names.".format(table))
+
+        return table_dict['schema_name']
+    else:
+        raise Exception("Target schema name not defined in config. Neither 'schema' (string) nor 'dynamic_schema_name' (boolean) keys set in config.")
+
+
 def sync_table(table):
     args = utils.parse_args(REQUIRED_CONFIG_KEYS)
-    mysql = MySql(args.mysql_config)
-    snowflake = Snowflake(args.snowflake_config, args.transform_config)
+    mysql = MySql(args.tap)
+    snowflake = Snowflake(args.target, args.transform)
 
     try:
         filename = '{}.csv.gz'.format(table)
         filepath = os.path.join(args.export_dir, filename)
+        target_schema = get_target_schema(args.target, table)
 
         # Open connection and get binlog file position
         mysql.open_connection()
@@ -60,24 +98,29 @@ def sync_table(table):
         os.remove(filepath)
 
         # Creating temp table in Snowflake
-        snowflake.create_schema(args.target_schema)
+        snowflake.create_schema(target_schema)
         mysql.open_connection()
-        snowflake.query(mysql.snowflake_ddl(table, args.target_schema, True))
-        snowflake.grant_select_on_table(args.target_schema, table, args.grant_select_to, True)
+        snowflake.query(mysql.snowflake_ddl(table, target_schema, True))
 
         # Load into Snowflake table
-        snowflake.copy_to_table(s3_key, args.target_schema, table, True)
+        snowflake.copy_to_table(s3_key, target_schema, table, True)
 
         # Obfuscate columns
-        snowflake.obfuscate_columns(args.target_schema, table)
+        snowflake.obfuscate_columns(target_schema, table)
 
         # Create target table in snowflake and swap with temp table
-        snowflake.query(mysql.snowflake_ddl(table, args.target_schema, False))
-        snowflake.swap_tables(args.target_schema, table)
+        snowflake.query(mysql.snowflake_ddl(table, target_schema, False))
+        snowflake.swap_tables(target_schema, table)
 
         # Save binlog to singer state file
         utils.save_state_file(args.state, binlog_pos, table)
         mysql.close_connection()
+
+        # Table loaded, grant select on all tables in target schema
+        grant_select_to = args.target['grant_select_to'] if 'grant_select_to' in args.target else []
+        for grantee in grant_select_to:
+            snowflake.grant_usage_on_schema(target_schema, grantee)
+            snowflake.grant_select_on_schema(target_schema, grantee)
 
     except Exception as exc:
         return exc
@@ -106,16 +149,6 @@ def main_impl():
     # utilising all available CPU cores
     with multiprocessing.Pool(cpu_cores) as p:
         table_sync_excs = list(filter(None, p.map(sync_table, args.tables)))
-
-    # Every table loaded, grant select on all tables in target schema
-    # Catch exception and (i.e. Role does not exist) and add into the exceptions array
-    try:
-        if args.grant_select_to:
-            snowflake = Snowflake(args.snowflake_config, args.transform_config)
-            snowflake.grant_usage_on_schema(args.target_schema, args.grant_select_to)
-            snowflake.grant_select_on_schema(args.target_schema, args.grant_select_to)
-    except Exception as exc:
-        table_sync_excs.append(exc)
 
     # Log summary
     end_time = datetime.now()
