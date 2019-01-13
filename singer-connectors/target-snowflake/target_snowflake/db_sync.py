@@ -426,16 +426,17 @@ class DbSync:
         stream_schema_message = self.stream_schema_message
         stream = stream_schema_message['stream']
         table_name = self.table_name(stream, False, True)
+        table_name_with_schema = self.table_name(stream, False)
         found_tables = [table for table in (self.get_tables()) if table['TABLE_NAME'].lower() == table_name]
         if len(found_tables) == 0:
             query = self.create_table_query()
-            logger.info("Table '{}' does not exist. Creating...".format(table_name))
+            logger.info("Table '{}' does not exist. Creating...".format(table_name_with_schema))
             self.query(query)
 
             if 'grant_select_to' in self.connection_config:
                 grant_select_to = self.connection_config['grant_select_to']
                 self.grant_privilege(self.schema_name, grant_select_to, self.grant_select_on_all_tables_in_schema)
         else:
-            logger.info("Table '{}' exists".format(table_name))
+            logger.info("Table '{}' exists".format(table_name_with_schema))
             self.update_columns()
 
