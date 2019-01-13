@@ -102,7 +102,7 @@ def stream_name_to_dict(stream_name, schema_name_postfix = None):
 
     # Schema and table name can be derived from stream if it's in <schema_nama>-<table_name> format
     s = stream_name.split('-')
-    if len(s) > 0:
+    if len(s) > 1:
         postfix = "" if schema_name_postfix is None else schema_name_postfix
         schema_name = s[0] + postfix
         table_name = '_'.join(s[1:])
