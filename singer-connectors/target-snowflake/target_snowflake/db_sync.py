@@ -96,11 +96,41 @@ def flatten_record(d, parent_key=[], sep='__'):
 def primary_column_names(stream_schema_message):
     return [safe_column_name(inflect_column_name(p)) for p in stream_schema_message['key_properties']]
 
+def stream_name_to_dict(stream_name, schema_name_postfix = None):
+    schema_name = None
+    table_name = stream_name
+
+    # Schema and table name can be derived from stream if it's in <schema_nama>-<table_name> format
+    s = stream_name.split('-')
+    if len(s) > 0:
+        postfix = "" if schema_name_postfix is None else schema_name_postfix
+        schema_name = s[0] + postfix
+        table_name = '_'.join(s[1:])
+
+    return {
+        'schema_name': schema_name,
+        'table_name': table_name
+    }
 
 class DbSync:
     def __init__(self, connection_config, stream_schema_message):
         self.connection_config = connection_config
-        self.schema_name = self.connection_config['schema']
+
+        # Target schema name can be defined in multiple ways:
+        #
+        #   1: 'schema' key : Target schema name defined explicitly
+        #   2: 'dynamic_schema_name' key: Target schema name derived from the incoming stream id:
+        #                                 i.e.: <schema_nama>-<table_name>
+        if 'schema' in self.connection_config and self.connection_config['schema'].strip():
+            self.schema_name = self.connection_config['schema']
+        elif 'dynamic_schema_name' in self.connection_config and self.connection_config['dynamic_schema_name']:
+            stream_name = stream_schema_message['stream']
+            postfix = self.connection_config['dynamic_schema_name_postfix'] if 'dynamic_schema_name_postfix' in self.connection_config else None
+
+            self.schema_name = stream_name_to_dict(stream_name, postfix)['schema_name']
+        else:
+            raise Exception("Target schema name not defined in config. Neither 'schema' (string) nor 'dynamic_schema_name' (boolean) keys set in config.")
+
         self.stream_schema_message = stream_schema_message
         self.flatten_schema = flatten_schema(stream_schema_message['schema'])
         self.s3 = boto3.client(
@@ -138,16 +168,18 @@ class DbSync:
                 else:
                     return []
 
-    def table_name(self, table_name, is_temporary, without_schema = False):
-        pg_table_name = table_name.replace('.', '_').replace('-', '_').lower()
+    def table_name(self, stream_name, is_temporary, without_schema = False):
+        stream_dict = stream_name_to_dict(stream_name)
+        table_name = stream_dict['table_name']
+        sf_table_name = table_name.replace('.', '_').replace('-', '_').lower()
 
         if is_temporary:
-            pg_table_name =  '{}_temp'.format(pg_table_name)
+            sf_table_name =  '{}_temp'.format(sf_table_name)
 
         if without_schema:
-            return '{}'.format(pg_table_name)
+            return '{}'.format(sf_table_name)
         else:
-            return '{}.{}'.format(self.schema_name, pg_table_name)
+            return '{}.{}'.format(self.schema_name, sf_table_name)
 
     def record_primary_key_string(self, record):
         if len(self.stream_schema_message['key_properties']) == 0:
@@ -193,7 +225,7 @@ class DbSync:
         updated = 0
         stream_schema_message = self.stream_schema_message
         stream = stream_schema_message['stream']
-        logger.info("Loading {} rows into '{}'".format(count, stream))
+        logger.info("Loading {} rows into '{}'".format(count, self.table_name(stream, False)))
 
         with self.open_connection() as connection:
             with connection.cursor(snowflake.connector.DictCursor) as cur:
@@ -321,7 +353,7 @@ class DbSync:
         logger.info("DELETE {}".format(len(self.query(query))))
 
     def create_schema_if_not_exists(self):
-        schema_name = self.connection_config['schema']
+        schema_name = self.schema_name
         schema_rows = self.query(
             'SELECT LOWER(schema_name) schema_name FROM information_schema.schemata WHERE LOWER(schema_name) = %s',
             (schema_name.lower(),)
