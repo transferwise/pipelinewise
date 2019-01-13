@@ -133,10 +133,6 @@ class PipelineWise(object):
             # Copy everything from dictB into dictA - Not a real merge
             dictA.update(dictB)
 
-            # Add public as a default target schema if not defined any specific
-            if 'schema' not in dictA or not dictA['schema']:
-                dictA['schema'] = 'public'
-
             # Save the new dict as JSON into a temp file
             tempfile_path = tempfile.mkstemp()[1]
             self.save_json(dictA, tempfile_path)
