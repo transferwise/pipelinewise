@@ -704,8 +704,15 @@ class PipelineWise(object):
             tap_state_arg = "--state {}".format(tap_state)
 
         try:
+            # Detect if transformation is needed
+            has_transformation = False
+            if os.path.isfile(tap_transformation):
+                tr = self.load_json(tap_transformation)
+                if 'transformations' in tr and len(tr['transformations']) > 0:
+                    has_transformation = True
+
             # Run without transformation in the middle
-            if not os.path.isfile(tap_transformation):
+            if not has_transformation:
                 command = ' '.join((
                     "  {} --config {} {} {} {}".format(self.tap_bin, tap_config, tap_catalog_argument, tap_properties, tap_state_arg),
                     "| {} --config {}".format(self.target_bin, cons_target_config),
