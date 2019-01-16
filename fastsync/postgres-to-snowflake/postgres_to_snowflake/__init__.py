@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os
+import sys
 
 import postgres_to_snowflake.utils
 import multiprocessing
@@ -134,6 +135,8 @@ def main_impl():
             cpu_cores,
             end_time  - start_time
         ))
+    if len(table_sync_excs) > 0:
+        sys.exit(1)
 
 
 def main():
