@@ -381,7 +381,6 @@ class DbSync:
                 self.grant_privilege(schema_name, grant_select_to, self.grant_usage_on_schema)
 
     def get_tables(self, table_schema=None):
-        print("ABCD")
         return self.query("""SELECT LOWER(table_schema) table_schema, LOWER(table_name) table_name
             FROM information_schema.tables
             WHERE LOWER(table_schema) = {}""".format(
