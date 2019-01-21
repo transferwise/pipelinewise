@@ -113,7 +113,7 @@ def stream_name_to_dict(stream_name, schema_name_postfix = None):
     }
 
 class DbSync:
-    def __init__(self, connection_config, stream_schema_message):
+    def __init__(self, connection_config, stream_schema_message=None):
         self.connection_config = connection_config
 
         # Target schema name can be defined in multiple ways:
@@ -121,7 +121,9 @@ class DbSync:
         #   1: 'schema' key : Target schema name defined explicitly
         #   2: 'dynamic_schema_name' key: Target schema name derived from the incoming stream id:
         #                                 i.e.: <schema_nama>-<table_name>
-        if 'schema' in self.connection_config and self.connection_config['schema'].strip():
+        if stream_schema_message is None:
+            self.schema_name = None
+        elif 'schema' in self.connection_config and self.connection_config['schema'].strip():
             self.schema_name = self.connection_config['schema']
         elif 'dynamic_schema_name' in self.connection_config and self.connection_config['dynamic_schema_name']:
             stream_name = stream_schema_message['stream']
@@ -132,7 +134,10 @@ class DbSync:
             raise Exception("Target schema name not defined in config. Neither 'schema' (string) nor 'dynamic_schema_name' (boolean) keys set in config.")
 
         self.stream_schema_message = stream_schema_message
-        self.flatten_schema = flatten_schema(stream_schema_message['schema'])
+
+        if stream_schema_message is not None:
+            self.flatten_schema = flatten_schema(stream_schema_message['schema'])
+
         self.s3 = boto3.client(
             's3',
             aws_access_key_id=self.connection_config['aws_access_key_id'],
@@ -352,12 +357,19 @@ class DbSync:
         logger.info("Deleting rows from '{}' table... {}".format(table, query))
         logger.info("DELETE {}".format(len(self.query(query))))
 
-    def create_schema_if_not_exists(self):
+    def create_schema_if_not_exists(self, table_columns_cache=None):
         schema_name = self.schema_name
-        schema_rows = self.query(
-            'SELECT LOWER(schema_name) schema_name FROM information_schema.schemata WHERE LOWER(schema_name) = %s',
-            (schema_name.lower(),)
-        )
+        schema_rows = 0
+
+        # table_columns_cache is an optional pre-collected list of available objects in snowflake
+        if table_columns_cache:
+            schema_rows = list(filter(lambda x: x['TABLE_SCHEMA'] == schema_name, table_columns_cache))
+        # Query realtime if not pre-collected
+        else:
+            schema_rows = self.query(
+                'SELECT LOWER(schema_name) schema_name FROM information_schema.schemata WHERE LOWER(schema_name) = %s',
+                (schema_name.lower(),)
+            )
 
         if len(schema_rows) == 0:
             query = "CREATE SCHEMA IF NOT EXISTS {}".format(schema_name)
@@ -368,22 +380,32 @@ class DbSync:
                 grant_select_to = self.connection_config['grant_select_to']
                 self.grant_privilege(schema_name, grant_select_to, self.grant_usage_on_schema)
 
-    def get_tables(self):
-        return self.query(
-            'SELECT LOWER(table_name) table_name FROM information_schema.tables WHERE LOWER(table_schema) = %s',
-            (self.schema_name.lower(),)
-        )
+    def get_tables(self, table_schema=None):
+        print("ABCD")
+        return self.query("""SELECT LOWER(table_schema) table_schema, LOWER(table_name) table_name
+            FROM information_schema.tables
+            WHERE LOWER(table_schema) = {}""".format(
+                "LOWER(table_schema)" if table_schema is None else "'{}'".format(table_schema.lower())
+        ))
 
-    def get_table_columns(self, table_name):
-        return self.query("""SELECT column_name, data_type
-      FROM information_schema.columns
-      WHERE LOWER(table_name) = %s AND LOWER(table_schema) = %s""", (table_name.lower(), self.schema_name.lower()))
+    def get_table_columns(self, table_schema=None, table_name=None):
+        return self.query("""SELECT LOWER(table_schema) table_schema, LOWER(table_name) table_name, column_name, data_type
+            FROM information_schema.columns
+            WHERE LOWER(table_schema) = {} AND LOWER(table_name) = {}""".format(
+                "LOWER(table_schema)" if table_schema is None else "'{}'".format(table_schema.lower()),
+                "LOWER(table_name)" if table_name is None else "'{}'".format(table_name.lower())
+        ))
 
-    def update_columns(self):
+    def update_columns(self, table_columns_cache=None):
         stream_schema_message = self.stream_schema_message
         stream = stream_schema_message['stream']
         table_name = self.table_name(stream, False, True)
-        columns = self.get_table_columns(table_name)
+        schema_name = self.schema_name
+        columns = {}
+        if table_columns_cache:
+            columns = list(filter(lambda x: x['TABLE_SCHEMA'] == self.schema_name.lower() and x['TABLE_NAME'].lower() == table_name, table_columns_cache))
+        else:
+            columns = self.get_table_columns(schema_name, table_name)
         columns_dict = {column['COLUMN_NAME'].lower(): column for column in columns}
 
         columns_to_add = [
@@ -422,12 +444,18 @@ class DbSync:
         logger.info('Dropping column: {}'.format(drop_column))
         self.query(drop_column)
 
-    def sync_table(self):
+    def sync_table(self, table_columns_cache=None):
         stream_schema_message = self.stream_schema_message
         stream = stream_schema_message['stream']
         table_name = self.table_name(stream, False, True)
         table_name_with_schema = self.table_name(stream, False)
-        found_tables = [table for table in (self.get_tables()) if table['TABLE_NAME'].lower() == table_name]
+        found_tables = []
+
+        if table_columns_cache:
+            found_tables = list(filter(lambda x: x['TABLE_SCHEMA'] == self.schema_name.lower() and x['TABLE_NAME'].lower() == table_name, table_columns_cache))
+        else:
+            found_tables = [table for table in (self.get_tables(self.schema_name.lower())) if table['TABLE_NAME'].lower() == table_name]
+
         if len(found_tables) == 0:
             query = self.create_table_query()
             logger.info("Table '{}' does not exist. Creating...".format(table_name_with_schema))
@@ -438,5 +466,5 @@ class DbSync:
                 self.grant_privilege(self.schema_name, grant_select_to, self.grant_select_on_all_tables_in_schema)
         else:
             logger.info("Table '{}' exists".format(table_name_with_schema))
-            self.update_columns()
+            self.update_columns(table_columns_cache)
 

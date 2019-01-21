@@ -82,6 +82,13 @@ def persist_lines(config, lines):
     row_count = {}
     stream_to_sync = {}
     batch_size = config['batch_size'] if 'batch_size' in config else 100000
+    table_columns_cache = None
+
+    # Cache the available schemas, tables and columns from snowflake if not disabled in config
+    # The cache will be used later use to avoid lot of small queries hitting snowflake
+    if not ('disable_table_cache' in config and config['disable_table_cache'] == True):
+        logger.info("Caching available catalog objects in snowflake...")
+        table_columns_cache = DbSync(config).get_table_columns()
 
     # Loop over lines from stdin
     for line in lines:
@@ -167,8 +174,8 @@ def persist_lines(config, lines):
             else:
                 stream_to_sync[stream] = DbSync(config, o)
 
-            stream_to_sync[stream].create_schema_if_not_exists()
-            stream_to_sync[stream].sync_table()
+            stream_to_sync[stream].create_schema_if_not_exists(table_columns_cache)
+            stream_to_sync[stream].sync_table(table_columns_cache)
             row_count[stream] = 0
             csv_files_to_load[stream] = NamedTemporaryFile(mode='w+b')
         elif t == 'ACTIVATE_VERSION':
