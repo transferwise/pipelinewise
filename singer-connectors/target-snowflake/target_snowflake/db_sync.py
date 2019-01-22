@@ -418,7 +418,7 @@ class DbSync:
         stream = stream_schema_message['stream']
         table_name = self.table_name(stream, False, True)
         schema_name = self.schema_name
-        columns = {}
+        columns = []
         if table_columns_cache:
             columns = list(filter(lambda x: x['TABLE_SCHEMA'] == self.schema_name.lower() and x['TABLE_NAME'].lower() == table_name, table_columns_cache))
         else:
