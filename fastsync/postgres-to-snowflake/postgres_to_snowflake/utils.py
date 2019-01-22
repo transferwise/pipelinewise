@@ -25,24 +25,22 @@ def tablename_to_dict(table):
 def parse_args(required_config_keys):
     '''Parse standard command-line args.
 
-    --postgres-config   Config file
+    --tap               Postgres config file
     --state             State file
     --properties        Properties file
-    --snowflake-config  Snowflake Config file
-    --transform-config  Transformations Config file
+    --target            Snowflake Config file
+    --transform         Transformations Config file
     --tables            Tables to sync. (Separated by comma)
-    --target-schema     Target schema to load tables into
-    --grant-select-to   Grant select on all tables in target schema
     --export-dir        Directory to create temporary csv exports. Defaults to current work dir.
 
     Returns the parsed args object from argparse. For each argument that
-    point to JSON files (postgres-config, state, properties, snowflake-config,
-    transform-config), we will automatically load and parse the JSON file.
+    point to JSON files (tap, state, properties, target, transform),
+    we will automatically load and parse the JSON file.
     '''
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
-        '--postgres-config',
+        '--tap',
         help='PostgreSQL Config file',
         required=True)
 
@@ -55,13 +53,13 @@ def parse_args(required_config_keys):
         help='Properties file')
 
     parser.add_argument(
-        '--snowflake-config',
-        help='Snowflake Config discovery',
+        '--target',
+        help='Snowflake Config file',
         required=True)
 
     parser.add_argument(
-        '--transform-config',
-        help='Transformations Config discovery')
+        '--transform',
+        help='Transformations Config file')
 
     parser.add_argument(
         '--tables',
@@ -69,34 +67,20 @@ def parse_args(required_config_keys):
         required=True)
 
     parser.add_argument(
-        '--target-schema',
-        help='Target schema in snowflake',
-        required=True)
-
-    parser.add_argument(
-        '--grant-select-to',
-        help='Grant select on all tables in target schema'
-    )
-
-    parser.add_argument(
         '--export-dir',
         help='Temporary directory required for CSV exports')
 
     args = parser.parse_args()
-    if args.postgres_config:
-        args.postgres_config = load_json(args.postgres_config)
-    if args.state:
-        args.state = load_json(args.state)
-    else:
-        args.state = {}
+    if args.tap:
+        args.tap = load_json(args.tap)
     if args.properties:
         args.properties = load_json(args.properties)
-    if args.snowflake_config:
-        args.snowflake_config = load_json(args.snowflake_config)
-    if args.transform_config:
-        args.transform_config = load_json(args.transform_config)
+    if args.target:
+        args.target = load_json(args.target)
+    if args.transform:
+        args.transform = load_json(args.transform)
     else:
-        args.transform_config = {}
+        args.transform = {}
     if args.tables:
         args.tables = args.tables.split(',')
     if args.export_dir:
@@ -104,8 +88,8 @@ def parse_args(required_config_keys):
     else:
         args.export_dir = os.path.realpath('.')
 
-    check_config(args.postgres_config, required_config_keys['postgres'])
-    check_config(args.snowflake_config, required_config_keys['snowflake'])
+    check_config(args.tap, required_config_keys['tap'])
+    check_config(args.target, required_config_keys['target'])
 
     return args
 
