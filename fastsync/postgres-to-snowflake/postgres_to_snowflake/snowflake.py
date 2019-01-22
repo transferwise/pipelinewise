@@ -6,7 +6,7 @@ import os
 import postgres_to_snowflake.utils as utils
 
 class Snowflake:
-    def __init__(self, connection_config, transformation_config):
+    def __init__(self, connection_config, transformation_config = None):
         self.connection_config = connection_config
         self.transformation_config = transformation_config
         self.s3 = boto3.client(
