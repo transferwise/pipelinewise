@@ -32,12 +32,12 @@ class Postgres:
             'real':'FLOAT',
             'bool':'BOOLEAN',
             'boolean':'BOOLEAN',
-            'date':'TIMESTAMP_NTZ',
-            'timestamp':'TIMESTAMP',
-            'timestamp without time zone':'TIMESTAMP_NTZ',
+            'date':'TIMESTAMP_NTZ(3)',
+            'timestamp':'TIMESTAMP(3)',
+            'timestamp without time zone':'TIMESTAMP_NTZ(3)',
             'timestamp with time zone':'TIMESTAMP_TZ',
             'time':'TIME',
-            'time without time zone':'TIMESTAMP_NTZ',
+            'time without time zone':'TIMESTAMP_NTZ(3)',
             'time with time zone':'TIMESTAMP_TZ'
         }.get(pg_type, 'VARCHAR')
 

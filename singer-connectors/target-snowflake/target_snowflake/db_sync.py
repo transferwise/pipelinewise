@@ -17,7 +17,7 @@ def column_type(schema_property):
     if 'object' in property_type or 'array' in property_type:
         return 'object'
     elif property_format == 'date-time':
-        return 'timestamp_ntz'
+        return 'timestamp_ntz(3)'
     elif 'number' in property_type:
         return 'float'
     elif 'integer' in property_type and 'string' in property_type:
