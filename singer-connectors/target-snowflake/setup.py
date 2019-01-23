@@ -12,7 +12,7 @@ setup(
     install_requires=[
         "idna==2.7",
         "singer-python==5.1.1",
-        "snowflake-connector-python==1.6.12",
+        "snowflake-connector-python==1.7.4",
         "boto3==1.9.33",
         "inflection==0.3.1"
     ],
