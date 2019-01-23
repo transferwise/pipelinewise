@@ -114,24 +114,24 @@ def stream_name_to_dict(stream_name, schema_name_postfix = None):
 
 class DbSync:
     def __init__(self, connection_config, stream_schema_message=None):
-    """
-        connection_config:      Snowflake connection details
+        """
+            connection_config:      Snowflake connection details
 
-        stream_schema_message:  An instance of the DbSync class is typically used to load
-                                data only from a certain singer tap stream.
+            stream_schema_message:  An instance of the DbSync class is typically used to load
+                                    data only from a certain singer tap stream.
 
-                                The stream_schema_message holds the destination schema
-                                name and the JSON schema that will be used to
-                                validate every RECORDS messages that comes from the stream.
-                                Schema validation happening before creating CSV and before
-                                uploading data into Snowflake.
+                                    The stream_schema_message holds the destination schema
+                                    name and the JSON schema that will be used to
+                                    validate every RECORDS messages that comes from the stream.
+                                    Schema validation happening before creating CSV and before
+                                    uploading data into Snowflake.
 
-                                If stream_schema_message is not defined that we can use
-                                the DbSync instance as a generic purpose connection to
-                                Snowflake and can run individual queries. For example
-                                collecting catalog informations from Snowflake for caching
-                                purposes.
-    """
+                                    If stream_schema_message is not defined that we can use
+                                    the DbSync instance as a generic purpose connection to
+                                    Snowflake and can run individual queries. For example
+                                    collecting catalog informations from Snowflake for caching
+                                    purposes.
+        """
         self.connection_config = connection_config
 
         # Target schema name can be defined in multiple ways:
