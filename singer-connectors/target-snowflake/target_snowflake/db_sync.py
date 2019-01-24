@@ -15,7 +15,7 @@ def column_type(schema_property):
     property_type = schema_property['type']
     property_format = schema_property['format'] if 'format' in schema_property else None
     if 'object' in property_type or 'array' in property_type:
-        return 'object'
+        return 'variant'
     elif property_format == 'date-time':
         return 'timestamp_ntz'
     elif 'number' in property_type:
