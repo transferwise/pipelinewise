@@ -1,1 +1,1 @@
-tap-zendesk==1.3.0
+tap-zendesk==1.4.2
