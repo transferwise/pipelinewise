@@ -199,8 +199,8 @@ def delete_rows(stream_to_sync):
 
     # Get the connection from the first synced stream
     if len(stream_to_sync_keys) > 0:
-        stream = stream_to_sync_keys[0]
-        stream_to_sync[stream].delete_rows(stream)
+        for stream in stream_to_sync_keys:
+            stream_to_sync[stream].delete_rows(stream)
 
 def flush_records(stream, records_to_load, row_count, stream_to_sync):
     sync = stream_to_sync[stream]
