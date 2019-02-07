@@ -28,6 +28,7 @@ jobs:
       - run:
           name: 'Integration Tests'
           command: |
+            cd singer-connectors/target-snowflake
             . venv/bin/activate
 
 workflows:
