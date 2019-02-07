@@ -2,7 +2,7 @@ version: 2
 jobs:
   build:
     docker:
-      - image: arti.tw.ee/library/python:3.6.0
+      - image: circleci/python:3.6.2
     steps:
       - checkout
 
