@@ -1,0 +1,36 @@
+version: 2
+jobs:
+  build:
+    docker:
+      - image: arti.tw.ee/library/python:3.6.0
+    steps:
+      - checkout
+
+      # target-snowflake
+      - run:
+          name: install dependencies
+          command: |
+            cd ~/pipelinewise/singer-connectors/target-snowflake
+            python3 -m venv venv
+            . venv/bin/activate
+            pip install .
+            pip install pylint
+        
+      - run:
+          name: 'Unit Tests'
+          command: |
+            . venv/bin/activate
+            pip install nose
+            nosetests
+
+      - run:
+          name: 'Integration Tests'
+          command: |
+            . venv/bin/activate
+            # TODO
+
+workflows:
+  version: 2
+  build:
+    jobs:
+      - build
