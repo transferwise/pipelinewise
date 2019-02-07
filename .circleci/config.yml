@@ -10,7 +10,7 @@ jobs:
       - run:
           name: install dependencies
           command: |
-            cd ~/pipelinewise/singer-connectors/target-snowflake
+            cd ~/project/pipelinewise/singer-connectors/target-snowflake
             python3 -m venv venv
             . venv/bin/activate
             pip install .
