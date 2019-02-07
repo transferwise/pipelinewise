@@ -29,7 +29,6 @@ jobs:
           name: 'Integration Tests'
           command: |
             . venv/bin/activate
-            # TODO
 
 workflows:
   version: 2
