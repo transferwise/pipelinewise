@@ -1,8 +1,6 @@
 # PipelineWise
 PipelineWise is an ETL and Data Pipeline Framework using the singer.io specification to load data from various sources to various destinations
 
-[![CircleCI](https://circle.tw.ee/gh/transferwise/pipelinewise.svg?style=svg)](https://circle.tw.ee/gh/transferwise/pipelinewise)
-
 ## Links
 
 * [Singer ETL specification](https://github.com/singer-io/getting-started/blob/master/docs/SPEC.md)
