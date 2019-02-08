@@ -113,6 +113,7 @@ def stream_name_to_dict(stream_name, schema_name_postfix = None):
         'table_name': table_name
     }
 
+# pylint: disable=too-many-public-methods
 class DbSync:
     def __init__(self, connection_config, stream_schema_message=None):
         """
