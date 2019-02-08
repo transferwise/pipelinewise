@@ -18,6 +18,10 @@
   export TARGET_SNOWFLAKE_USER=<snowflake-user>
   export TARGET_SNOWFLAKE_PASSWORD=<snowfale-password>
   export TARGET_SNOWFLAKE_WAREHOUSE=<snowflake-warehouse>
+  export TARGET_SNOWFLAKE_S3_BUCKET=<s3-external-bucket>
+  export TARGET_SNOWFLAKE_S3_KEY_PREFIX=<bucket-directory>
+  export TARGET_SNOWFLAKE_AWS_ACCESS_KEY=<aws-access-key-id>
+  export TARGET_SNOWFLAKE_AWS_SECRET_ACCESS_KEY=<aws-access-secret-access-key>
 ```
 
 2. Install python dependencies in a virtual env and run nose tests
