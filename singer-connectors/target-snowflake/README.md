@@ -8,12 +8,35 @@
 
 ## Usage
 
-TODO
+### To run tests:
 
-## Install
+1. Define environment variables that requires running the tests
+```
+  export TARGET_SNOWFLAKE_ACCOUNT=<snowflake-account-name>
+  export TARGET_SNOWFLAKE_DBNAME=<snowflake-database-name>
+  export TARGET_SNOWFLAKE_SCHEMA=<snowflake-schema>
+  export TARGET_SNOWFLAKE_USER=<snowflake-user>
+  export TARGET_SNOWFLAKE_PASSWORD=<snowfale-password>
+  export TARGET_SNOWFLAKE_WAREHOUSE=<snowflake-warehouse>
 
-TODO
+2. Install python dependencies in a virtual env and run nose tests
+```
+  python3 -m venv venv
+  . venv/bin/activate
+  pip install --upgrade pip
+  pip install .
+  pip install nose
+  nosetests
+```
 
-## Optional configuration
+### To run pylint:
 
-TODO
+1. Install python dependencies and run python linter
+```
+  python3 -m venv venv
+  . venv/bin/activate
+  pip install --upgrade pip
+  pip install .
+  pip install pylint
+  pylint target_snowflake -d C,W,unexpected-keyword-arg,duplicate-code
+```
