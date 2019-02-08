@@ -16,6 +16,7 @@ jobs:
             pip install --upgrade pip
             pip install .
             pip install pylint
+            pylint target_snowflake -d C,W,unexpected-keyword-arg,duplicate-code
         
       - run:
           name: 'Unit Tests'
