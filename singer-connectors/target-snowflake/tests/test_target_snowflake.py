@@ -24,12 +24,21 @@ class TestLoad(unittest.TestCase):
 
 
     def test_invalid_json(self):
+        """Receiving invalid JSONs should raise an exception"""
         tap_lines = test_utils.get_test_tap_lines('invalid-json.json')
         with assert_raises(json.decoder.JSONDecodeError):
             target_snowflake.persist_lines(self.config, tap_lines)
 
 
+    def test_message_order(self):
+        """RECORD message without a previously received SCHEMA message should raise an exception"""
+        tap_lines = test_utils.get_test_tap_lines('invalid-message-order.json')
+        with assert_raises(Exception):
+            target_snowflake.persist_lines(self.config, tap_lines)
+
+
     def test_loading_tables(self):
+        """Loading multiple tables from the same input tap with various columns types"""
         tap_lines = test_utils.get_test_tap_lines('messages-with-three-streams.json')
         target_snowflake.persist_lines(self.config, tap_lines)
 
