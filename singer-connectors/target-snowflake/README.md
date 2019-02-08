@@ -18,6 +18,7 @@
   export TARGET_SNOWFLAKE_USER=<snowflake-user>
   export TARGET_SNOWFLAKE_PASSWORD=<snowfale-password>
   export TARGET_SNOWFLAKE_WAREHOUSE=<snowflake-warehouse>
+```
 
 2. Install python dependencies in a virtual env and run nose tests
 ```
