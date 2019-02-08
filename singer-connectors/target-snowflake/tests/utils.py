@@ -6,7 +6,7 @@ def get_db_config():
     config = {}
     config['account'] = os.environ.get('TARGET_SNOWFLAKE_ACCOUNT')
     config['aws_access_key_id'] = os.environ.get('TARGET_SNOWFLAKE_AWS_ACCESS_KEY')
-    config['aws_secret_access_key'] = os.environ.get('TARGET_SNOWFLAKE_SECRET_ACCESS_KEY')
+    config['aws_secret_access_key'] = os.environ.get('TARGET_SNOWFLAKE_AWS_SECRET_ACCESS_KEY')
     config['dbname'] = os.environ.get('TARGET_SNOWFLAKE_DBNAME')
     config['password'] = os.environ.get('TARGET_SNOWFLAKE_PASSWORD')
     config['s3_bucket'] = os.environ.get('TARGET_SNOWFLAKE_S3_BUCKET')
