@@ -14,20 +14,21 @@ logger = singer.get_logger()
 def column_type(schema_property):
     property_type = schema_property['type']
     property_format = schema_property['format'] if 'format' in schema_property else None
+    column_type = 'text'
     if 'object' in property_type or 'array' in property_type:
-        return 'variant'
+        column_type = 'variant'
     elif property_format == 'date-time':
-        return 'timestamp_ntz'
+        column_type = 'timestamp_ntz'
     elif 'number' in property_type:
-        return 'float'
+        column_type = 'float'
     elif 'integer' in property_type and 'string' in property_type:
-        return 'text'
+        column_type = 'text'
     elif 'integer' in property_type:
-        return 'number'
+        column_type = 'number'
     elif 'boolean' in property_type:
-        return 'boolean'
-    else:
-        return 'text'
+        column_type = 'boolean'
+
+    return column_type
 
 
 def inflect_column_name(name):
@@ -112,6 +113,7 @@ def stream_name_to_dict(stream_name, schema_name_postfix = None):
         'table_name': table_name
     }
 
+# pylint: disable=too-many-public-methods
 class DbSync:
     def __init__(self, connection_config, stream_schema_message=None):
         """
@@ -188,8 +190,8 @@ class DbSync:
 
                 if cur.rowcount > 0:
                     return cur.fetchall()
-                else:
-                    return []
+
+                return []
 
     def table_name(self, stream_name, is_temporary, without_schema = False):
         stream_dict = stream_name_to_dict(stream_name)
@@ -201,8 +203,8 @@ class DbSync:
 
         if without_schema:
             return '{}'.format(sf_table_name)
-        else:
-            return '{}.{}'.format(self.schema_name, sf_table_name)
+
+        return '{}.{}'.format(self.schema_name, sf_table_name)
 
     def record_primary_key_string(self, record):
         if len(self.stream_schema_message['key_properties']) == 0:
@@ -362,6 +364,7 @@ class DbSync:
         logger.info("Granting SELECT ON ALL TABLES privilegue on '{}' schema to '{}'... {}".format(schema_name, grantee, query))
         self.query(query)
 
+    @classmethod
     def grant_privilege(self, schema, grantees, grant_method):
         if isinstance(grantees, list):
             for grantee in grantees:
