@@ -24,14 +24,23 @@
   export TARGET_SNOWFLAKE_AWS_SECRET_ACCESS_KEY=<aws-access-secret-access-key>
 ```
 
-2. Install python dependencies in a virtual env and run nose tests
+2. Install python dependencies in a virtual env and run nose unit and integration tests
 ```
   python3 -m venv venv
   . venv/bin/activate
   pip install --upgrade pip
   pip install .
   pip install nose
-  nosetests
+```
+
+3. To run unit tests:
+```
+  nosetests --where=tests/unit
+```
+
+4. To run integration tests:
+```
+  nosetests --where=tests/integration
 ```
 
 ### To run pylint:
