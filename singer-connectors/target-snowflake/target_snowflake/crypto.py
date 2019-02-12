@@ -9,9 +9,24 @@ from Crypto import Random
 logger = singer.get_logger()
 
 
-class Crypto(object):
+class Crypto:
     """
+    Cryptography library for target-snowflake to do Client Side Encryption and to
+    achieve End-to-End encryption.
 
+    End-to-end encryption is a form of communication where only the end users can
+    read the data, but nobody else. For the Snowflake data warehouse service it means
+    that only the customer and runtime components of the Snowflake service can read
+    the data. No third parties, including Amazon AWS and any ISPs, can see data in
+    the clear. This makes end-to-end encryption the most secure way to communicate
+    with the Snowflake data warehouse service.
+
+    :type master_key: string
+    :param master_key: Master Key
+    :type mode: string
+    :param mode: Encryption mode, use AES.MODE_CDB by default
+    :type chunk_size: int
+    :param chunk_size: Size of chunks to encrypt/decrypt in one go
     """
     def __init__(self, master_key, mode = AES.MODE_CBC, chunk_size = 16 * 1024):
         self._master_key = master_key.encode("utf8")
