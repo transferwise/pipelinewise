@@ -7,6 +7,10 @@ import inflection
 import re
 import itertools
 import time
+import base64
+from tempfile import NamedTemporaryFile
+
+from target_snowflake.crypto import Crypto
 
 logger = singer.get_logger()
 
@@ -229,13 +233,31 @@ class DbSync:
         bucket = self.connection_config['s3_bucket']
         s3_key_prefix = self.connection_config.get('s3_key_prefix', '')
         s3_key = "{}pipelinewise_{}_{}.csv".format(s3_key_prefix, stream, time.strftime("%Y%m%d-%H%M%S"))
+
         logger.info("Target S3 bucket: {}, local file: {}, S3 key: {}".format(bucket, file.name, s3_key))
 
-        # Seek to the beginning of the file to upload everything
-        file.seek(0)
+        # Encrypt csv if client side encryption enabled
+        master_key = self.connection_config.get('client_side_encryption_master_key', '')
+        if master_key != '':
+            with NamedTemporaryFile(mode='w+b', delete=True) as file_enc:
+                crypto = Crypto(master_key)
 
-        # Connect and upload
-        self.s3.upload_fileobj(file, bucket, s3_key)
+                # Save key and iv, that will be required to decrypt and upload the encrypted file
+                encrypt_metadata = crypto.encrypt_file(file.name, file_enc.name)
+                metadata = {
+                    'x-amz-key': encrypt_metadata.key,
+                    'x-amz-iv': encrypt_metadata.iv
+                }
+                self.s3.upload_file(file_enc.name, bucket, s3_key, ExtraArgs={'Metadata': metadata})
+
+        # Upload to S3 without encrypting
+        else:
+            # Seek to the beginning of the file to upload everything
+            file.seek(0)
+
+            # Connect and upload
+            #self.s3.upload_fileobj(file, bucket, s3_key)
+
         return s3_key
 
 
@@ -252,22 +274,48 @@ class DbSync:
         stream = stream_schema_message['stream']
         logger.info("Loading {} rows into '{}'".format(count, self.table_name(stream, False)))
 
+        # Loading steps:
+        #   1. Load every row from s3 into a temporary table
+        #   2. Merge rows from temp table to destination table:
+        #       INSERT new rows and UPDATE the existing ones
         with self.open_connection() as connection:
             with connection.cursor(snowflake.connector.DictCursor) as cur:
+                # Create temporary table to load into
                 cur.execute(self.create_table_query(True))
-                copy_sql = """COPY INTO {} ({}) FROM 's3://{}/{}'
-                    CREDENTIALS = (aws_key_id='{}' aws_secret_key='{}') 
-                    FILE_FORMAT = (type='CSV' escape='\\\\' field_optionally_enclosed_by='\"')
-                """.format(
-                    self.table_name(stream, True),
-                    ', '.join(self.column_names()),
-                    self.connection_config['s3_bucket'],
-                    s3_key,
-                    self.connection_config['aws_access_key_id'],
-                    self.connection_config['aws_secret_access_key']
-                )
-                cur.execute(copy_sql)
-                
+
+                # Ingesting Client Side Encrypted data with COPY and named stage object
+                # The master key had to be embedded in the exteral stage when it was
+                # created and should never be sent at load time
+                master_key = self.connection_config.get('client_side_encryption_master_key', '')
+                if master_key != '':
+                    copy_sql = "COPY INTO {} ({}) FROM @{}/{}".format(
+                        self.table_name(stream, True),
+                        ', '.join(self.column_names()),
+                        self.connection_config['client_side_encryption_stage_object'],
+                        s3_key
+                    )
+                    cur.execute(copy_sql)
+
+                # Ingesting with COPY by passing the same S3 credential that we used to upload
+                else:
+                    copy_sql = """COPY INTO {} ({}) FROM 's3://{}/{}'
+                        CREDENTIALS = (aws_key_id='{}' aws_secret_key='{}') 
+                        FILE_FORMAT = (type='CSV' escape='\\\\' field_optionally_enclosed_by='\"')
+                    """.format(
+                        self.table_name(stream, True),
+                        ', '.join(self.column_names()),
+                        self.connection_config['s3_bucket'],
+                        s3_key,
+                        self.connection_config['aws_access_key_id'],
+                        self.connection_config['aws_secret_access_key']
+                    )
+                    cur.execute(copy_sql)
+
+                # Data is now loaded into temp table, time to merge into the destination table
+                #
+                # Merge is done by two steps:
+                #   1. Update existing rows - where primary key exists
+                #   2. Insert new rows - where primary key not exists
                 if len(self.stream_schema_message['key_properties']) > 0:
                     cur.execute(self.update_from_temp_table())
                     updated = cur._total_rowcount

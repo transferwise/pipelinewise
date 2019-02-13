@@ -3,6 +3,7 @@ import os
 import json
 import datetime
 import binascii
+import base64
 from nose.tools import assert_raises
 
 import target_snowflake
@@ -15,6 +16,7 @@ class TestUnit(unittest.TestCase):
     @classmethod
     def setUp(self):
         self.config = {}
+        self.client_side_encryption_master_key = "NVdhT241c2FMVTFsZ0tZaDRaNndlUGgzaUNoeU1LUVA=" # 256-bit length, base64 encoded
 
     @staticmethod
     def slurp_as_hex(file):
@@ -62,15 +64,14 @@ class TestUnit(unittest.TestCase):
         plain_filename = "sample-padded.csv"
         encrypted_filename = "sample-padded-encrypted.csv"
         decrypted_filename = "sample-padded-decrypted.csv"
-        master_key = "0123456789abcdef"
 
         try:
             # Create an unencrypted input file
             self.spit(plain_filename, content_padded)
 
-            crypto = Crypto(master_key)
-            iv = crypto.encrypt_file(plain_filename, encrypted_filename)
-            crypto.decrypt_file(encrypted_filename, iv, decrypted_filename)
+            crypto = Crypto(self.client_side_encryption_master_key)
+            metadata = crypto.encrypt_file(plain_filename, encrypted_filename)
+            crypto.decrypt_file(encrypted_filename, metadata, decrypted_filename)
 
             # Hex decoded original and decrypted file should match
             self.assertEquals(
@@ -96,15 +97,14 @@ class TestUnit(unittest.TestCase):
         plain_filename = "sample-no-padding.csv"
         encrypted_filename = "sample-no-padding-encrypted.csv"
         decrypted_filename = "sample-no-padding-decrypted.csv"
-        master_key = "0123456789abcdef"
 
         try:
             # Create an unencrypted input file
             self.spit(plain_filename, content_no_padding)
 
-            crypto = Crypto(master_key)
-            iv = crypto.encrypt_file(plain_filename, encrypted_filename)
-            crypto.decrypt_file(encrypted_filename, iv, decrypted_filename)
+            crypto = Crypto(self.client_side_encryption_master_key)
+            metadata = crypto.encrypt_file(plain_filename, encrypted_filename)
+            crypto.decrypt_file(encrypted_filename, metadata, decrypted_filename)
 
             # Hex decoded original and decrypted file should match
             self.assertEquals(

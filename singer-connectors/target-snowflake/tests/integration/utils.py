@@ -17,6 +17,8 @@ def get_db_config():
     config['dynamic_schema_name'] = os.environ.get('TARGET_SNOWFLAKE_DYNAMIC_SCHEMA_NAME')
     config['dynamic_schema_name_postfix'] = os.environ.get('TARGET_SNOWFLAKE_DYNAMIC_SCHEMA_NAME_PREFIX')
     config['disable_table_cache'] = os.environ.get('DISABLE_TABLE_CACHE')
+    config['client_side_encryption_master_key'] = os.environ.get('CLIENT_SIDE_ENCRYPTION_MASTER_KEY')
+    config['client_side_encryption_stage_object'] = os.environ.get('CLIENT_SIDE_ENCRYPTION_STAGE_OBJECT')
 
     return config
 
