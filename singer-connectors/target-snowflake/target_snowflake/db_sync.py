@@ -256,7 +256,7 @@ class DbSync:
             file.seek(0)
 
             # Connect and upload
-            #self.s3.upload_fileobj(file, bucket, s3_key)
+            self.s3.upload_fileobj(file, bucket, s3_key)
 
         return s3_key
 
