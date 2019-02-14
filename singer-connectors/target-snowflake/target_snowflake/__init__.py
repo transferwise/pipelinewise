@@ -13,6 +13,7 @@ import time
 import collections
 from tempfile import NamedTemporaryFile
 from decimal import Decimal
+import tempfile
 
 import pkg_resources
 from jsonschema import ValidationError, Draft4Validator, FormatChecker
@@ -205,15 +206,15 @@ def delete_rows(stream_to_sync):
 
 def flush_records(stream, records_to_load, row_count, stream_to_sync):
     sync = stream_to_sync[stream]
-    csv_file = NamedTemporaryFile(mode='w+b', delete=True)
-
-    for record in records_to_load[stream].values():
-        csv_line = sync.record_to_csv_line(record)
-        csv_file.write(bytes(csv_line + '\n', 'UTF-8'))
+    csv_fd, csv_file = tempfile.mkstemp()
+    with open(csv_fd, 'w+b') as f:
+        for record in records_to_load[stream].values():
+            csv_line = sync.record_to_csv_line(record)
+            f.write(bytes(csv_line + '\n', 'UTF-8'))
 
     s3_key = sync.put_to_stage(csv_file, stream, row_count[stream])
     sync.load_csv(s3_key, row_count[stream])
-    csv_file.close()
+    os.remove(csv_file)
     row_count[stream] = 0
     records_to_load[stream] = {}
     sync.delete_from_stage(s3_key)

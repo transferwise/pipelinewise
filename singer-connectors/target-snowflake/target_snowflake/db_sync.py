@@ -1,3 +1,4 @@
+import os
 import json
 import boto3
 import snowflake.connector
@@ -7,10 +8,9 @@ import inflection
 import re
 import itertools
 import time
-import base64
-from tempfile import NamedTemporaryFile
 
-from target_snowflake.crypto import Crypto
+from snowflake.connector.encryption_util import SnowflakeEncryptionUtil
+from snowflake.connector.remote_storage_util import SnowflakeFileEncryptionMaterial
 
 logger = singer.get_logger()
 
@@ -145,15 +145,16 @@ class DbSync:
         #   1: 'schema' key : Target schema name defined explicitly
         #   2: 'dynamic_schema_name' key: Target schema name derived from the incoming stream id:
         #                                 i.e.: <schema_nama>-<table_name>
+        config_schema = self.connection_config.get('schema', '')
+        config_dynamic_schema_name = self.connection_config.get('dynamic_schema_name', '')
+        config_dynamic_schema_name_postfix = self.connection_config.get('dynamic_schema_name_postfix', '')
         if stream_schema_message is None:
             self.schema_name = None
-        elif 'schema' in self.connection_config and self.connection_config['schema'].strip():
+        elif config_schema is not None and config_schema.strip():
             self.schema_name = self.connection_config['schema']
-        elif 'dynamic_schema_name' in self.connection_config and self.connection_config['dynamic_schema_name']:
+        elif config_dynamic_schema_name:
             stream_name = stream_schema_message['stream']
-            postfix = self.connection_config['dynamic_schema_name_postfix'] if 'dynamic_schema_name_postfix' in self.connection_config else None
-
-            self.schema_name = stream_name_to_dict(stream_name, postfix)['schema_name']
+            self.schema_name = stream_name_to_dict(stream_name, config_dynamic_schema_name_postfix)['schema_name']
         else:
             raise Exception("Target schema name not defined in config. Neither 'schema' (string) nor 'dynamic_schema_name' (boolean) keys set in config.")
 
@@ -234,29 +235,36 @@ class DbSync:
         s3_key_prefix = self.connection_config.get('s3_key_prefix', '')
         s3_key = "{}pipelinewise_{}_{}.csv".format(s3_key_prefix, stream, time.strftime("%Y%m%d-%H%M%S"))
 
-        logger.info("Target S3 bucket: {}, local file: {}, S3 key: {}".format(bucket, file.name, s3_key))
+        logger.info("Target S3 bucket: {}, local file: {}, S3 key: {}".format(bucket, file, s3_key))
 
         # Encrypt csv if client side encryption enabled
         master_key = self.connection_config.get('client_side_encryption_master_key', '')
         if master_key != '':
-            with NamedTemporaryFile(mode='w+b', delete=True) as file_enc:
-                crypto = Crypto(master_key)
+            # Encrypt the file
+            encryption_material = SnowflakeFileEncryptionMaterial(
+                query_stage_master_key=master_key,
+                query_id='',
+                smk_id=0
+            )
+            encryption_metadata, encrypted_file = SnowflakeEncryptionUtil.encrypt_file(
+                encryption_material,
+                file
+            )
 
-                # Save key and iv, that will be required to decrypt and upload the encrypted file
-                encrypt_metadata = crypto.encrypt_file(file.name, file_enc.name)
-                metadata = {
-                    'x-amz-key': encrypt_metadata.key,
-                    'x-amz-iv': encrypt_metadata.iv
-                }
-                self.s3.upload_file(file_enc.name, bucket, s3_key, ExtraArgs={'Metadata': metadata})
+            # Upload to s3
+            # Send key and iv in the metadata, that will be required to decrypt and upload the encrypted file
+            metadata = {
+                'x-amz-key': encryption_metadata.key,
+                'x-amz-iv': encryption_metadata.iv
+            }
+            self.s3.upload_file(encrypted_file, bucket, s3_key, ExtraArgs={'Metadata': metadata})
+
+            # Remove the uploaded encrypted file
+            os.remove(encrypted_file)
 
         # Upload to S3 without encrypting
         else:
-            # Seek to the beginning of the file to upload everything
-            file.seek(0)
-
-            # Connect and upload
-            self.s3.upload_fileobj(file, bucket, s3_key)
+            self.s3.upload_file(file, bucket, s3_key)
 
         return s3_key
 
@@ -288,7 +296,9 @@ class DbSync:
                 # created and should never be sent at load time
                 master_key = self.connection_config.get('client_side_encryption_master_key', '')
                 if master_key != '':
-                    copy_sql = "COPY INTO {} ({}) FROM @{}/{}".format(
+                    copy_sql = """COPY INTO {} ({}) FROM @{}/{}
+                        FILE_FORMAT = (type='CSV' escape='\\\\' field_optionally_enclosed_by='\"')
+                    """.format(
                         self.table_name(stream, True),
                         ', '.join(self.column_names()),
                         self.connection_config['client_side_encryption_stage_object'],
