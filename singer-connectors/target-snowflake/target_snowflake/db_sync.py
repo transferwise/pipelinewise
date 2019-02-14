@@ -15,6 +15,39 @@ from snowflake.connector.remote_storage_util import SnowflakeFileEncryptionMater
 logger = singer.get_logger()
 
 
+def validate_config(config):
+    errors = []
+    required_config_keys = [
+        'account',
+        'dbname',
+        'user',
+        'password',
+        'warehouse',
+        'aws_access_key_id',
+        'aws_secret_access_key',
+        's3_bucket'
+    ]
+
+    # Check if mandatory keys exist
+    for k in required_config_keys:
+        if not config.get(k, None):
+            errors.append("Required key is missing from config: [{}]".format(k))
+
+    # Check target schema config
+    config_schema = config.get('schema', None)
+    config_dynamic_schema_name = config.get('dynamic_schema_name', None)
+    if not config_schema and not config_dynamic_schema_name:
+        errors.append("Neither 'schema' (string) nor 'dynamic_schema_name' (boolean) keys set in config.")
+
+    # Check client-side encryption config
+    config_cse_key = config.get('client_side_encryption_master_key', None)
+    config_cse_stage = config.get('client_side_encryption_stage_object', None)
+    if config_cse_key and not config_cse_stage:
+        errors.append("Client-Side Encryption is enabled, master key found but 'client_side_encryption_stage_object' key is missing.")
+
+    return errors
+
+
 def column_type(schema_property):
     property_type = schema_property['type']
     property_format = schema_property['format'] if 'format' in schema_property else None
@@ -139,6 +172,13 @@ class DbSync:
                                     purposes.
         """
         self.connection_config = connection_config
+        config_errors = validate_config(connection_config)
+        if len(config_errors) == 0:
+            self.connection_config = connection_config
+        else:
+            logger.error("Invalid configuration:\n   * {}".format('\n   * '.join(config_errors)))
+            exit(1)
+
 
         # Target schema name can be defined in multiple ways:
         #
