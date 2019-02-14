@@ -44,21 +44,23 @@ Settings are stored in a `config.json` JSON and in a map
 ```
   export TARGET_SNOWFLAKE_ACCOUNT=<snowflake-account-name>
   export TARGET_SNOWFLAKE_DBNAME=<snowflake-database-name>
-  export TARGET_SNOWFLAKE_SCHEMA=<snowflake-schema>
   export TARGET_SNOWFLAKE_USER=<snowflake-user>
   export TARGET_SNOWFLAKE_PASSWORD=<snowfale-password>
   export TARGET_SNOWFLAKE_WAREHOUSE=<snowflake-warehouse>
-  export TARGET_SNOWFLAKE_S3_BUCKET=<s3-external-bucket>
-  export TARGET_SNOWFLAKE_S3_KEY_PREFIX=<bucket-directory>
   export TARGET_SNOWFLAKE_AWS_ACCESS_KEY=<aws-access-key-id>
   export TARGET_SNOWFLAKE_AWS_SECRET_ACCESS_KEY=<aws-access-secret-access-key>
+  export TARGET_SNOWFLAKE_S3_BUCKET=<s3-external-bucket>
+  export TARGET_SNOWFLAKE_S3_KEY_PREFIX=<bucket-directory>
+  export TARGET_SNOWFLAKE_SCHEMA=<snowflake-schema>
+  export TARGET_SNOWFLAKE_DYNAMIC_SCHEMA_NAME=<True|False>
+  export TARGET_SNOWFLAKE_DYNAMIC_SCHEMA_NAME_POSTFIX=<schema_name_postfix>
   export CLIENT_SIDE_ENCRYPTION_MASTER_KEY=<client_side_encryption_master_key>
   export CLIENT_SIDE_ENCRYPTION_STAGE_OBJECT=<client_side_encryption_stage_object>
 ```
 
 2. Install python dependencies in a virtual env and run nose unit and integration tests
 ```
-  singer-connectors/target-snowflake
+  cd singer-connectors/target-snowflake
   python3 -m venv venv
   . venv/bin/activate
   pip install --upgrade pip
@@ -80,7 +82,7 @@ Settings are stored in a `config.json` JSON and in a map
 
 1. Install python dependencies and run python linter
 ```
-  singer-connectors/target-snowflake
+  cd singer-connectors/target-snowflake
   python3 -m venv venv
   . venv/bin/activate
   pip install --upgrade pip
