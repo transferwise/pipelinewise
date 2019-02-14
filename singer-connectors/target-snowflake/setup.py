@@ -14,7 +14,6 @@ setup(
         "singer-python==5.1.1",
         "snowflake-connector-python==1.7.4",
         "boto3==1.9.33",
-        "pycryptodome==3.7.3",
         "inflection==0.3.1"
     ],
     entry_points="""
