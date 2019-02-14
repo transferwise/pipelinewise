@@ -24,13 +24,15 @@ jobs:
             cd singer-connectors/target-snowflake
             . venv/bin/activate
             pip install nose
-            nosetests
+            nosetests --where=tests/unit
 
       - run:
           name: 'Integration Tests'
           command: |
             cd singer-connectors/target-snowflake
             . venv/bin/activate
+            pip install nose
+            nosetests --where=tests/integration/
 
 workflows:
   version: 2

@@ -1,3 +1,4 @@
+import os
 import json
 import boto3
 import snowflake.connector
@@ -8,7 +9,43 @@ import re
 import itertools
 import time
 
+from snowflake.connector.encryption_util import SnowflakeEncryptionUtil
+from snowflake.connector.remote_storage_util import SnowflakeFileEncryptionMaterial
+
 logger = singer.get_logger()
+
+
+def validate_config(config):
+    errors = []
+    required_config_keys = [
+        'account',
+        'dbname',
+        'user',
+        'password',
+        'warehouse',
+        'aws_access_key_id',
+        'aws_secret_access_key',
+        's3_bucket'
+    ]
+
+    # Check if mandatory keys exist
+    for k in required_config_keys:
+        if not config.get(k, None):
+            errors.append("Required key is missing from config: [{}]".format(k))
+
+    # Check target schema config
+    config_schema = config.get('schema', None)
+    config_dynamic_schema_name = config.get('dynamic_schema_name', None)
+    if not config_schema and not config_dynamic_schema_name:
+        errors.append("Neither 'schema' (string) nor 'dynamic_schema_name' (boolean) keys set in config.")
+
+    # Check client-side encryption config
+    config_cse_key = config.get('client_side_encryption_master_key', None)
+    config_cse_stage = config.get('client_side_encryption_stage_object', None)
+    if config_cse_key and not config_cse_stage:
+        errors.append("Client-Side Encryption is enabled, master key found but 'client_side_encryption_stage_object' key is missing.")
+
+    return errors
 
 
 def column_type(schema_property):
@@ -135,21 +172,29 @@ class DbSync:
                                     purposes.
         """
         self.connection_config = connection_config
+        config_errors = validate_config(connection_config)
+        if len(config_errors) == 0:
+            self.connection_config = connection_config
+        else:
+            logger.error("Invalid configuration:\n   * {}".format('\n   * '.join(config_errors)))
+            exit(1)
+
 
         # Target schema name can be defined in multiple ways:
         #
         #   1: 'schema' key : Target schema name defined explicitly
         #   2: 'dynamic_schema_name' key: Target schema name derived from the incoming stream id:
         #                                 i.e.: <schema_nama>-<table_name>
+        config_schema = self.connection_config.get('schema', '')
+        config_dynamic_schema_name = self.connection_config.get('dynamic_schema_name', '')
+        config_dynamic_schema_name_postfix = self.connection_config.get('dynamic_schema_name_postfix', '')
         if stream_schema_message is None:
             self.schema_name = None
-        elif 'schema' in self.connection_config and self.connection_config['schema'].strip():
+        elif config_schema is not None and config_schema.strip():
             self.schema_name = self.connection_config['schema']
-        elif 'dynamic_schema_name' in self.connection_config and self.connection_config['dynamic_schema_name']:
+        elif config_dynamic_schema_name:
             stream_name = stream_schema_message['stream']
-            postfix = self.connection_config['dynamic_schema_name_postfix'] if 'dynamic_schema_name_postfix' in self.connection_config else None
-
-            self.schema_name = stream_name_to_dict(stream_name, postfix)['schema_name']
+            self.schema_name = stream_name_to_dict(stream_name, config_dynamic_schema_name_postfix)['schema_name']
         else:
             raise Exception("Target schema name not defined in config. Neither 'schema' (string) nor 'dynamic_schema_name' (boolean) keys set in config.")
 
@@ -229,13 +274,38 @@ class DbSync:
         bucket = self.connection_config['s3_bucket']
         s3_key_prefix = self.connection_config.get('s3_key_prefix', '')
         s3_key = "{}pipelinewise_{}_{}.csv".format(s3_key_prefix, stream, time.strftime("%Y%m%d-%H%M%S"))
-        logger.info("Target S3 bucket: {}, local file: {}, S3 key: {}".format(bucket, file.name, s3_key))
 
-        # Seek to the beginning of the file to upload everything
-        file.seek(0)
+        logger.info("Target S3 bucket: {}, local file: {}, S3 key: {}".format(bucket, file, s3_key))
 
-        # Connect and upload
-        self.s3.upload_fileobj(file, bucket, s3_key)
+        # Encrypt csv if client side encryption enabled
+        master_key = self.connection_config.get('client_side_encryption_master_key', '')
+        if master_key != '':
+            # Encrypt the file
+            encryption_material = SnowflakeFileEncryptionMaterial(
+                query_stage_master_key=master_key,
+                query_id='',
+                smk_id=0
+            )
+            encryption_metadata, encrypted_file = SnowflakeEncryptionUtil.encrypt_file(
+                encryption_material,
+                file
+            )
+
+            # Upload to s3
+            # Send key and iv in the metadata, that will be required to decrypt and upload the encrypted file
+            metadata = {
+                'x-amz-key': encryption_metadata.key,
+                'x-amz-iv': encryption_metadata.iv
+            }
+            self.s3.upload_file(encrypted_file, bucket, s3_key, ExtraArgs={'Metadata': metadata})
+
+            # Remove the uploaded encrypted file
+            os.remove(encrypted_file)
+
+        # Upload to S3 without encrypting
+        else:
+            self.s3.upload_file(file, bucket, s3_key)
+
         return s3_key
 
 
@@ -252,22 +322,50 @@ class DbSync:
         stream = stream_schema_message['stream']
         logger.info("Loading {} rows into '{}'".format(count, self.table_name(stream, False)))
 
+        # Loading steps:
+        #   1. Load every row from s3 into a temporary table
+        #   2. Merge rows from temp table to destination table:
+        #       INSERT new rows and UPDATE the existing ones
         with self.open_connection() as connection:
             with connection.cursor(snowflake.connector.DictCursor) as cur:
+                # Create temporary table to load into
                 cur.execute(self.create_table_query(True))
-                copy_sql = """COPY INTO {} ({}) FROM 's3://{}/{}'
-                    CREDENTIALS = (aws_key_id='{}' aws_secret_key='{}') 
-                    FILE_FORMAT = (type='CSV' escape='\\\\' field_optionally_enclosed_by='\"')
-                """.format(
-                    self.table_name(stream, True),
-                    ', '.join(self.column_names()),
-                    self.connection_config['s3_bucket'],
-                    s3_key,
-                    self.connection_config['aws_access_key_id'],
-                    self.connection_config['aws_secret_access_key']
-                )
-                cur.execute(copy_sql)
-                
+
+                # Ingesting Client Side Encrypted data with COPY and named stage object
+                # The master key had to be embedded in the exteral stage when it was
+                # created and should never be sent at load time
+                master_key = self.connection_config.get('client_side_encryption_master_key', '')
+                if master_key != '':
+                    copy_sql = """COPY INTO {} ({}) FROM @{}/{}
+                        FILE_FORMAT = (type='CSV' escape='\\\\' field_optionally_enclosed_by='\"')
+                    """.format(
+                        self.table_name(stream, True),
+                        ', '.join(self.column_names()),
+                        self.connection_config['client_side_encryption_stage_object'],
+                        s3_key
+                    )
+                    cur.execute(copy_sql)
+
+                # Ingesting with COPY by passing the same S3 credential that we used to upload
+                else:
+                    copy_sql = """COPY INTO {} ({}) FROM 's3://{}/{}'
+                        CREDENTIALS = (aws_key_id='{}' aws_secret_key='{}') 
+                        FILE_FORMAT = (type='CSV' escape='\\\\' field_optionally_enclosed_by='\"')
+                    """.format(
+                        self.table_name(stream, True),
+                        ', '.join(self.column_names()),
+                        self.connection_config['s3_bucket'],
+                        s3_key,
+                        self.connection_config['aws_access_key_id'],
+                        self.connection_config['aws_secret_access_key']
+                    )
+                    cur.execute(copy_sql)
+
+                # Data is now loaded into temp table, time to merge into the destination table
+                #
+                # Merge is done by two steps:
+                #   1. Update existing rows - where primary key exists
+                #   2. Insert new rows - where primary key not exists
                 if len(self.stream_schema_message['key_properties']) > 0:
                     cur.execute(self.update_from_temp_table())
                     updated = cur._total_rowcount
