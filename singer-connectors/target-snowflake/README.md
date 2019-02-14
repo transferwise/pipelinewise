@@ -58,6 +58,7 @@ Settings are stored in a `config.json` JSON and in a map
 
 2. Install python dependencies in a virtual env and run nose unit and integration tests
 ```
+  singer-connectors/target-snowflake
   python3 -m venv venv
   . venv/bin/activate
   pip install --upgrade pip
@@ -79,6 +80,7 @@ Settings are stored in a `config.json` JSON and in a map
 
 1. Install python dependencies and run python linter
 ```
+  singer-connectors/target-snowflake
   python3 -m venv venv
   . venv/bin/activate
   pip install --upgrade pip
