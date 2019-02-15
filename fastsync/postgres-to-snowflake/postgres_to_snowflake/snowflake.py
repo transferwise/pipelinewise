@@ -5,6 +5,10 @@ import os
 
 import postgres_to_snowflake.utils as utils
 
+from snowflake.connector.encryption_util import SnowflakeEncryptionUtil
+from snowflake.connector.remote_storage_util import SnowflakeFileEncryptionMaterial
+
+
 class Snowflake:
     def __init__(self, connection_config, transformation_config = None):
         self.connection_config = connection_config
@@ -41,13 +45,43 @@ class Snowflake:
                     return []
 
 
-    def upload_to_s3(self, path, table):
+    def upload_to_s3(self, file, table):
         bucket = self.connection_config['s3_bucket']
         s3_key_prefix = self.connection_config.get('s3_key_prefix', '')
         s3_key = "{}pipelinewise_{}_{}.csv.gz".format(s3_key_prefix, table, time.strftime("%Y%m%d-%H%M%S"))
 
-        utils.log("SNOWFLAKE - Uploading to S3 bucket: {}, local file: {}, S3 key: {}".format(bucket, path, s3_key))
-        self.s3.upload_file(path, bucket, s3_key)
+        utils.log("SNOWFLAKE - Uploading to S3 bucket: {}, local file: {}, S3 key: {}".format(bucket, file, s3_key))
+
+        # Encrypt csv if client side encryption enabled
+        master_key = self.connection_config.get('client_side_encryption_master_key', '')
+        if master_key != '':
+            # Encrypt the file
+            utils.log("Encrypting file {}...".format(file))
+            encryption_material = SnowflakeFileEncryptionMaterial(
+                query_stage_master_key=master_key,
+                query_id='',
+                smk_id=0
+            )
+            encryption_metadata, encrypted_file = SnowflakeEncryptionUtil.encrypt_file(
+                encryption_material,
+                file
+            )
+
+            # Upload to s3
+            # Send key and iv in the metadata, that will be required to decrypt and upload the encrypted file
+            metadata = {
+                'x-amz-key': encryption_metadata.key,
+                'x-amz-iv': encryption_metadata.iv
+            }
+            self.s3.upload_file(encrypted_file, bucket, s3_key, ExtraArgs={'Metadata': metadata})
+
+            # Remove the uploaded encrypted file
+            os.remove(encrypted_file)
+
+        # Upload to S3 without encrypting
+        else:
+            self.s3.upload_file(file, bucket, s3_key)
+
         return s3_key
 
 
@@ -65,11 +99,24 @@ class Snowflake:
         aws_secret_access_key=self.connection_config['aws_secret_access_key']
         bucket = self.connection_config['s3_bucket']
 
-        sql = """COPY INTO {}.{} FROM 's3://{}/{}'
-            CREDENTIALS = (aws_key_id='{}' aws_secret_key='{}')
-            FILE_FORMAT = (type='CSV' escape='\\x1e' escape_unenclosed_field='\\x1e' field_optionally_enclosed_by='\"')
-        """.format(target_schema, target_table, bucket, s3_key, aws_access_key_id, aws_secret_access_key)
-        self.query(sql)
+        master_key = self.connection_config.get('client_side_encryption_master_key', '')
+        if master_key != '':
+            sql = """COPY INTO {}.{} FROM @{}/{}
+                FILE_FORMAT = (type='CSV' escape='\\x1e' escape_unenclosed_field='\\x1e' field_optionally_enclosed_by='\"')
+            """.format(
+                target_schema,
+                target_table,
+                self.connection_config['client_side_encryption_stage_object'],
+                s3_key
+            )
+            self.query(sql)
+
+        else:
+            sql = """COPY INTO {}.{} FROM 's3://{}/{}'
+                CREDENTIALS = (aws_key_id='{}' aws_secret_key='{}')
+                FILE_FORMAT = (type='CSV' escape='\\x1e' escape_unenclosed_field='\\x1e' field_optionally_enclosed_by='\"')
+            """.format(target_schema, target_table, bucket, s3_key, aws_access_key_id, aws_secret_access_key)
+            self.query(sql)
 
         utils.log("SNOWFLAKE - Deleting {} from S3...".format(s3_key))
         self.s3.delete_object(Bucket=bucket, Key=s3_key)
