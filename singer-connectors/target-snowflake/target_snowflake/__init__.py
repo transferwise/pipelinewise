@@ -186,23 +186,21 @@ def persist_lines(config, lines):
             raise Exception("Unknown message type {} in message {}"
                             .format(o['type'], o))
 
+    # No more input from tap, flush records
     for (stream, count) in row_count.items():
+        # Load into snowflake
         if count > 0:
             flush_records(stream, records_to_load, row_count, stream_to_sync)
 
-    # Hard delete rows if enabled
-    if config.get('hard_delete'):
-        delete_rows(stream_to_sync)
+        # Hard delete rows if enabled
+        if config.get('hard_delete'):
+            delete_rows(stream, stream_to_sync)
 
     return state
 
-def delete_rows(stream_to_sync):
-    stream_to_sync_keys = list(stream_to_sync.keys())
-
-    # Get the connection from the first synced stream
-    if len(stream_to_sync_keys) > 0:
-        stream = stream_to_sync_keys[0]
-        stream_to_sync[stream].delete_rows(stream)
+def delete_rows(stream, stream_to_sync):
+    sync = stream_to_sync[stream]
+    sync.delete_rows(stream)
 
 def flush_records(stream, records_to_load, row_count, stream_to_sync):
     sync = stream_to_sync[stream]

@@ -16,6 +16,17 @@ except ImportError:
     import utils as test_utils
 
 
+METADATA_COLUMNS = [
+    '_SDC_BATCHED_AT',
+    '_SDC_DELETED_AT',
+    '_SDC_EXTRACTED_AT',
+    '_SDC_PRIMARY_KEY',
+    '_SDC_RECEIVED_AT',
+    '_SDC_SEQUENCE',
+    '_SDC_TABLE_VERSION'
+]
+
+
 class TestIntegration(unittest.TestCase):
     """
     Integration Tests
@@ -28,7 +39,37 @@ class TestIntegration(unittest.TestCase):
             snowflake.query("DROP SCHEMA IF EXISTS {}".format(self.config['schema']))
 
 
-    def assert_three_streams_are_into_snowflake(self):
+    def remove_metadata_columns_from_rows(self, rows):
+        """Removes metadata columns from a list of rows"""
+        d_rows = []
+        for r in rows:
+            # Copy the original row to a new dict to keep the original dict
+            # and remove metadata columns
+            d_row = r.copy()
+            for md_c in METADATA_COLUMNS:
+                d_row.pop(md_c, None)
+
+            # Add new row without metadata columns to the new list
+            d_rows.append(d_row)
+
+        return d_rows
+
+
+    def assert_metadata_columns_exist(self, rows):
+        """This is a helper assertion that checks if every row in a list has metadata columns"""
+        for r in rows:
+            for md_c in METADATA_COLUMNS:
+                self.assertTrue(md_c in r)
+
+
+    def assert_metadata_columns_not_exist(self, rows):
+        """This is a helper assertion that checks metadata columns don't exist in any row"""
+        for r in rows:
+            for md_c in METADATA_COLUMNS:
+                self.assertFalse(md_c in r)
+
+
+    def assert_three_streams_are_into_snowflake(self, should_metadata_columns_exist=False, should_hard_deleted_rows=False):
         """
         This is a helper assertion that checks if every data from the message-with-three-streams.json
         file is available in Snowflake tables correctly.
@@ -49,30 +90,69 @@ class TestIntegration(unittest.TestCase):
             if config_dynamic_schema_name_postfix:
                 target_schema = "{}{}".format(target_schema, config_dynamic_schema_name_postfix)
 
+        # Get loaded rows from tables
         table_one = snowflake.query("SELECT * FROM {}.test_table_one".format(target_schema))
         table_two = snowflake.query("SELECT * FROM {}.test_table_two".format(target_schema))
         table_three = snowflake.query("SELECT * FROM {}.test_table_three".format(target_schema))
 
-        self.assertEqual(
-            table_one,
-            [
-                {'C_INT': 1, 'C_PK': 1, 'C_VARCHAR': '1'}
-            ])
+
+        # ----------------------------------------------------------------------
+        # Check rows in table_one
+        # ----------------------------------------------------------------------
+        expected_table_one = [
+            {'C_INT': 1, 'C_PK': 1, 'C_VARCHAR': '1'}
+        ]
 
         self.assertEqual(
-            table_two,
-            [
+            self.remove_metadata_columns_from_rows(table_one), expected_table_one)
+
+        # ----------------------------------------------------------------------
+        # Check rows in table_tow
+        # ----------------------------------------------------------------------
+        expected_table_two = []
+        if not should_hard_deleted_rows:
+            expected_table_two = [
                 {'C_INT': 1, 'C_PK': 1, 'C_VARCHAR': '1', 'C_DATE': datetime.datetime(2019, 2, 1, 15, 12, 45)},
                 {'C_INT': 2, 'C_PK': 2, 'C_VARCHAR': '2', 'C_DATE': datetime.datetime(2019, 2, 10, 2, 0, 0)}
-            ])
+            ]
+        else:
+            expected_table_two = [
+                {'C_INT': 2, 'C_PK': 2, 'C_VARCHAR': '2', 'C_DATE': datetime.datetime(2019, 2, 10, 2, 0, 0)}
+            ]
 
         self.assertEqual(
-            table_three,
-            [
+            self.remove_metadata_columns_from_rows(table_two), expected_table_two)
+
+        # ----------------------------------------------------------------------
+        # Check rows in table_three
+        # ----------------------------------------------------------------------
+        expected_table_three = []
+        if not should_hard_deleted_rows:
+            expected_table_three = [
+                    {'C_INT': 1, 'C_PK': 1, 'C_VARCHAR': '1'},
+                    {'C_INT': 2, 'C_PK': 2, 'C_VARCHAR': '2'},
+                    {'C_INT': 3, 'C_PK': 3, 'C_VARCHAR': '3'}
+            ]
+        else:
+            expected_table_three = [
                 {'C_INT': 1, 'C_PK': 1, 'C_VARCHAR': '1'},
-                {'C_INT': 2, 'C_PK': 2, 'C_VARCHAR': '2'},
-                {'C_INT': 3, 'C_PK': 3, 'C_VARCHAR': '3'}
-            ])
+                {'C_INT': 2, 'C_PK': 2, 'C_VARCHAR': '2'}
+            ]
+
+        self.assertEqual(
+            self.remove_metadata_columns_from_rows(table_three), expected_table_three)
+
+        # ----------------------------------------------------------------------
+        # Check if metadata columns exist or not
+        # ----------------------------------------------------------------------
+        if should_metadata_columns_exist:
+            self.assert_metadata_columns_exist(table_one)
+            self.assert_metadata_columns_exist(table_two)
+            self.assert_metadata_columns_exist(table_three)
+        else:
+            self.assert_metadata_columns_not_exist(table_one)
+            self.assert_metadata_columns_not_exist(table_two)
+            self.assert_metadata_columns_not_exist(table_three)
 
 
     def test_invalid_json(self):
@@ -120,3 +200,29 @@ class TestIntegration(unittest.TestCase):
         with assert_raises(snowflake.connector.errors.ProgrammingError):
             target_snowflake.persist_lines(self.config, tap_lines)
 
+
+    def test_loading_tables_with_metadata_columns(self):
+        """Loading multiple tables from the same input tap with various columns types"""
+        tap_lines = test_utils.get_test_tap_lines('messages-with-three-streams.json')
+
+        # Turning on adding metadata columns
+        self.config['add_metadata_columns'] = True
+        target_snowflake.persist_lines(self.config, tap_lines)
+
+        # Check if data loaded correctly and metadata columns exist
+        self.assert_three_streams_are_into_snowflake(should_metadata_columns_exist=True)
+
+
+    def test_loading_tables_with_hard_delete(self):
+        """Loading multiple tables from the same input tap with deleted rows"""
+        tap_lines = test_utils.get_test_tap_lines('messages-with-three-streams.json')
+
+        # Turning on hard delete mode
+        self.config['hard_delete'] = True
+        target_snowflake.persist_lines(self.config, tap_lines)
+
+        # Check if data loaded correctly and metadata columns exist
+        self.assert_three_streams_are_into_snowflake(
+            should_metadata_columns_exist=True,
+            should_hard_deleted_rows=True
+        )

@@ -4,21 +4,42 @@ import json
 
 def get_db_config():
     config = {}
+
+    # --------------------------------------------------------------------------
+    # Default configuration settings for integration tests.
+    # --------------------------------------------------------------------------
+    # The following values needs to be defined in environment variables with
+    # valid details to a Snowflake instace, AWS IAM role and an S3 bucket
+    # --------------------------------------------------------------------------
+    # Snowflake instance
     config['account'] = os.environ.get('TARGET_SNOWFLAKE_ACCOUNT')
-    config['aws_access_key_id'] = os.environ.get('TARGET_SNOWFLAKE_AWS_ACCESS_KEY')
-    config['aws_secret_access_key'] = os.environ.get('TARGET_SNOWFLAKE_AWS_SECRET_ACCESS_KEY')
     config['dbname'] = os.environ.get('TARGET_SNOWFLAKE_DBNAME')
-    config['password'] = os.environ.get('TARGET_SNOWFLAKE_PASSWORD')
-    config['s3_bucket'] = os.environ.get('TARGET_SNOWFLAKE_S3_BUCKET')
-    config['s3_key_prefix'] = os.environ.get('TARGET_SNOWFLAKE_S3_KEY_PREFIX')
     config['user'] = os.environ.get('TARGET_SNOWFLAKE_USER')
+    config['password'] = os.environ.get('TARGET_SNOWFLAKE_PASSWORD')
     config['warehouse'] = os.environ.get('TARGET_SNOWFLAKE_WAREHOUSE')
     config['schema'] = os.environ.get("TARGET_SNOWFLAKE_SCHEMA")
-    config['dynamic_schema_name'] = os.environ.get('TARGET_SNOWFLAKE_DYNAMIC_SCHEMA_NAME')
-    config['dynamic_schema_name_postfix'] = os.environ.get('TARGET_SNOWFLAKE_DYNAMIC_SCHEMA_NAME_POSTFIX')
-    config['disable_table_cache'] = os.environ.get('DISABLE_TABLE_CACHE')
+
+    # AWS IAT and S3 bucket
+    config['aws_access_key_id'] = os.environ.get('TARGET_SNOWFLAKE_AWS_ACCESS_KEY')
+    config['aws_secret_access_key'] = os.environ.get('TARGET_SNOWFLAKE_AWS_SECRET_ACCESS_KEY')
+    config['s3_bucket'] = os.environ.get('TARGET_SNOWFLAKE_S3_BUCKET')
+    config['s3_key_prefix'] = os.environ.get('TARGET_SNOWFLAKE_S3_KEY_PREFIX')
+
+    # External stage in snowflake with client side encryption details
     config['client_side_encryption_master_key'] = os.environ.get('CLIENT_SIDE_ENCRYPTION_MASTER_KEY')
     config['client_side_encryption_stage_object'] = os.environ.get('CLIENT_SIDE_ENCRYPTION_STAGE_OBJECT')
+
+
+    # --------------------------------------------------------------------------
+    # The following variables needs to be empty.
+    # The tests cases will set them automatically whenever it's needed
+    # --------------------------------------------------------------------------
+    config['disable_table_cache'] = None
+    config['dynamic_schema_name'] = None
+    config['dynamic_schema_name_postfix'] = None
+    config['add_metadata_columns'] = None
+    config['hard_delete'] = None
+
 
     return config
 
