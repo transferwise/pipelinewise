@@ -19,7 +19,7 @@ def get_db_config():
     config['warehouse'] = os.environ.get('TARGET_SNOWFLAKE_WAREHOUSE')
     config['schema'] = os.environ.get("TARGET_SNOWFLAKE_SCHEMA")
 
-    # AWS IAT and S3 bucket
+    # AWS IAM and S3 bucket
     config['aws_access_key_id'] = os.environ.get('TARGET_SNOWFLAKE_AWS_ACCESS_KEY')
     config['aws_secret_access_key'] = os.environ.get('TARGET_SNOWFLAKE_AWS_SECRET_ACCESS_KEY')
     config['s3_bucket'] = os.environ.get('TARGET_SNOWFLAKE_S3_BUCKET')
