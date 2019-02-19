@@ -29,6 +29,7 @@ Settings are stored in a `config.json` JSON and in a map
 | aws_secret_access_key               | String  | Yes        | S3 Secret Access Key                                          |
 | s3_bucket                           | String  | Yes        | S3 Bucket name                                                |
 | s3_key_prefix                       | String  |            | A static prefix before the generated S3 key names. Using prefixes you can upload files into specific directories in the S3 bucket. |
+| batch_size                          | Integer |            | Maximum number of rows in each batch. At the end of each batch, the rows in the batch are loaded into Snowflake. Defaults to 10000 rows |
 | schema                              | String  |            | Name of the schema where the tables will be created           |
 | dynamic_schema_name                 | Boolean |            | When it's true, the schema names will be created automatically derived from the incoming stream name |
 | dynamic_schema_name_postfix         | String  |            | Can be use together with the `dynamic_schema_name` option to add an optional postfix to the end of the generated schema name |
