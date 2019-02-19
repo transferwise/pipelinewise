@@ -13,6 +13,7 @@ import time
 import collections
 from tempfile import NamedTemporaryFile
 from decimal import Decimal
+from joblib import Parallel, delayed, parallel_backend
 import tempfile
 
 import pkg_resources
@@ -138,7 +139,9 @@ def persist_lines(config, lines):
             row_count[stream] = len(records_to_load[stream])
 
             if row_count[stream] >= batch_size:
-                flush_records(stream, records_to_load, row_count, stream_to_sync)
+                flush_records(stream, records_to_load[stream], row_count[stream], stream_to_sync[stream])
+                row_count[stream] = 0
+                records_to_load[stream] = {}
 
             state = None
         elif t == 'STATE':
@@ -186,38 +189,41 @@ def persist_lines(config, lines):
             raise Exception("Unknown message type {} in message {}"
                             .format(o['type'], o))
 
-    for (stream, count) in row_count.items():
-        if count > 0:
-            flush_records(stream, records_to_load, row_count, stream_to_sync)
 
-    # Hard delete rows if enabled
-    if config.get('hard_delete'):
-        delete_rows(stream_to_sync)
+    # Single-host, thread-based parallelism
+    with parallel_backend('threading', n_jobs=-1):
+        Parallel()(delayed(load_stream_batch)(
+            stream=stream,
+            records_to_load=records_to_load[stream],
+            row_count=row_count[stream],
+            db_sync=stream_to_sync[stream],
+            delete_rows=config.get('hard_delete')
+        ) for (stream) in records_to_load.keys())
 
     return state
 
-def delete_rows(stream_to_sync):
-    stream_to_sync_keys = list(stream_to_sync.keys())
 
-    # Get the connection from the first synced stream
-    if len(stream_to_sync_keys) > 0:
-        stream = stream_to_sync_keys[0]
-        stream_to_sync[stream].delete_rows(stream)
+def load_stream_batch(stream, records_to_load, row_count, db_sync, delete_rows=False):
+    #Load into snowflake
+    if row_count > 0:
+        flush_records(stream, records_to_load, row_count, db_sync)
 
-def flush_records(stream, records_to_load, row_count, stream_to_sync):
-    sync = stream_to_sync[stream]
+    # Delete soft-deleted, flagged rows - where _sdc_deleted at is not null
+    if delete_rows:
+        db_sync.delete_rows(stream)
+
+
+def flush_records(stream, records_to_load, row_count, db_sync):
     csv_fd, csv_file = tempfile.mkstemp()
     with open(csv_fd, 'w+b') as f:
-        for record in records_to_load[stream].values():
-            csv_line = sync.record_to_csv_line(record)
+        for record in records_to_load.values():
+            csv_line = db_sync.record_to_csv_line(record)
             f.write(bytes(csv_line + '\n', 'UTF-8'))
 
-    s3_key = sync.put_to_stage(csv_file, stream, row_count[stream])
-    sync.load_csv(s3_key, row_count[stream])
+    s3_key = db_sync.put_to_stage(csv_file, stream, row_count)
+    db_sync.load_csv(s3_key, row_count)
     os.remove(csv_file)
-    row_count[stream] = 0
-    records_to_load[stream] = {}
-    sync.delete_from_stage(s3_key)
+    db_sync.delete_from_stage(s3_key)
 
 
 def main():
