@@ -1,1 +1,1 @@
-tap-mysql-koszti==1.0.3
+tap-mysql-koszti==1.0.4
