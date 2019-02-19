@@ -62,9 +62,9 @@ Settings are stored in a `config.json` JSON and in a map
 
 2. Install python dependencies in a virtual env and run nose unit and integration tests
 ```
-  cd singer-connectors/target-snowflake
   python3 -m venv venv
   . venv/bin/activate
+  cd singer-connectors/target-snowflake
   pip install --upgrade pip
   pip install .
   pip install nose
@@ -84,9 +84,9 @@ Settings are stored in a `config.json` JSON and in a map
 
 1. Install python dependencies and run python linter
 ```
-  cd singer-connectors/target-snowflake
   python3 -m venv venv
   . venv/bin/activate
+  cd singer-connectors/target-snowflake
   pip install --upgrade pip
   pip install .
   pip install pylint
