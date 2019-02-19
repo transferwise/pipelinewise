@@ -14,7 +14,8 @@ setup(
         "singer-python==5.1.1",
         "snowflake-connector-python==1.7.4",
         "boto3==1.9.33",
-        "inflection==0.3.1"
+        "inflection==0.3.1",
+        "joblib==0.13.2"
     ],
     entry_points="""
     [console_scripts]
