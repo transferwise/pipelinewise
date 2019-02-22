@@ -1,1 +1,1 @@
-tap-postgres==0.0.38
+tap-postgres-koszti==1.0.0
