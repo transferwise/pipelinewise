@@ -54,6 +54,11 @@ def column_type(schema_property):
     column_type = 'text'
     if 'object' in property_type or 'array' in property_type:
         column_type = 'variant'
+
+    # Every date-time JSON value is currently mapped to TIMESTAMP_NTZ
+    #
+    # TODO: Detect if timezone postfix exists in the JSON and find if TIMESTAMP_TZ or
+    # TIMSTAMP_NTZ is the better column type
     elif property_format == 'date-time':
         column_type = 'timestamp_ntz'
     elif 'number' in property_type:
@@ -545,7 +550,19 @@ class DbSync:
             ))
             for (name, properties_schema) in self.flatten_schema.items()
             if name.lower() in columns_dict and
-               columns_dict[name.lower()]['DATA_TYPE'].lower() != column_type(properties_schema).lower()
+               columns_dict[name.lower()]['DATA_TYPE'].lower() != column_type(properties_schema).lower() and
+
+               # Don't alter table if TIMESTAMP_NTZ detected as the new required column type
+               #
+               # Target-snowflake maps every data-time JSON types to TIMESTAMP_NTZ but sometimes
+               # a TIMESTAMP_TZ column is alrady available in the target table (i.e. created by fastsync initial load)
+               # We need to exclude this conversion otherwise we loose the data that is already populated
+               # in the column
+               #
+               # TODO: Support both TIMESTAMP_TZ and TIMESTAMP_NTZ in target-snowflake
+               # when extracting data-time values from JSON
+               # (Check the column_type function for further details)
+               column_type(properties_schema).lower() != 'timestamp_ntz'
         ]
 
         for (column_name, column) in columns_to_replace:
