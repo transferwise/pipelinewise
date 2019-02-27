@@ -226,3 +226,17 @@ class TestIntegration(unittest.TestCase):
             should_metadata_columns_exist=True,
             should_hard_deleted_rows=True
         )
+
+
+    def test_loading_with_multiple_schema(self):
+        """Loading table with multiple SCHEMA messages"""
+        tap_lines = test_utils.get_test_tap_lines('messages-with-multi-schemas.json')
+
+        # Load with default settings
+        target_snowflake.persist_lines(self.config, tap_lines)
+
+        # Check if data loaded correctly
+        self.assert_three_streams_are_into_snowflake(
+            should_metadata_columns_exist=False,
+            should_hard_deleted_rows=False
+        )
