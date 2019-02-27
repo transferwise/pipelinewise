@@ -156,6 +156,10 @@ def persist_lines(config, lines):
             schema = float_to_decimal(o['schema'])
             validators[stream] = Draft4Validator(schema, format_checker=FormatChecker())
 
+            # flush records from previous stream SCHEMA
+            if row_count.get(stream, 0) > 0:
+                flush_records(stream, records_to_load[stream], row_count[stream], stream_to_sync[stream])
+
             # key_properties key must be available in the SCHEMA message.
             if 'key_properties' not in o:
                 raise Exception("key_properties field is required")
