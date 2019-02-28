@@ -118,7 +118,7 @@ def sync_table(table):
             snowflake.grant_select_on_schema(target_schema, grantee)
 
     except Exception as exc:
-        return exc
+        return "{}: {}".format(table, exc)
 
 
 def main_impl():
