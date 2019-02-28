@@ -240,3 +240,27 @@ class TestIntegration(unittest.TestCase):
             should_metadata_columns_exist=False,
             should_hard_deleted_rows=False
         )
+
+
+    def test_loading_unicode_characters(self):
+        """Loading unicode encoded characters"""
+        tap_lines = test_utils.get_test_tap_lines('messages-with-unicode-characters.json')
+
+        # Load with default settings
+        target_snowflake.persist_lines(self.config, tap_lines)
+
+        # Get loaded rows from tables
+        snowflake = DbSync(self.config)
+        target_schema = self.config.get('schema', '')
+        table_unicode = snowflake.query("SELECT * FROM {}.test_table_unicode".format(target_schema))
+
+        self.assertEqual(
+            table_unicode,
+            [
+                    {'C_INT': 1, 'C_PK': 1, 'C_VARCHAR': 'Hello world, Καλημέρα κόσμε, コンニチハ'},
+                    {'C_INT': 2, 'C_PK': 2, 'C_VARCHAR': 'Chinese: 和毛泽东 <<重上井冈山>>. 严永欣, 一九八八年.'},
+                    {'C_INT': 3, 'C_PK': 3, 'C_VARCHAR': 'Russian: Зарегистрируйтесь сейчас на Десятую Международную Конференцию по'},
+                    {'C_INT': 4, 'C_PK': 4, 'C_VARCHAR': 'Thai: แผ่นดินฮั่นเสื่อมโทรมแสนสังเวช'},
+                    {'C_INT': 5, 'C_PK': 5, 'C_VARCHAR': 'Arabic: لقد لعبت أنت وأصدقاؤك لمدة وحصلتم علي من إجمالي النقاط'},
+                    {'C_INT': 6, 'C_PK': 6, 'C_VARCHAR': 'Special Characters: [",\'!@£$%^&*()]'}
+            ])
