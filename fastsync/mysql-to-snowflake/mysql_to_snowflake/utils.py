@@ -30,6 +30,26 @@ def tablename_to_dict(table):
     }
 
 
+def get_tables_from_properties(properties):
+    """Get list of enabled tables with schema names from properties json
+    The outhput is useful to generate list of tables to sync
+    """
+    tables = []
+
+    for stream in properties.get("streams", tables):
+        metadata = stream.get("metadata", [])
+        table_name = stream.get("table_name")
+
+        table_meta = next((i for i in metadata if type(i) == dict and len(i.get("breadcrumb", [])) == 0), {}).get("metadata")
+        db_name = table_meta.get("database-name")
+        selected = table_meta.get("selected")
+
+        if table_name and db_name and selected:
+            tables.append("{}.{}".format(db_name, table_name))
+
+    return tables
+
+
 def save_state_file(path, binlog_pos, table):
     table_dict = tablename_to_dict(table)
     stream_id = "{}-{}".format(table_dict.get('schema'), table_dict.get('name'))
@@ -102,8 +122,7 @@ def parse_args(required_config_keys):
 
     parser.add_argument(
         '--tables',
-        help='Sync only specific tables',
-        required=True)
+        help='Sync only specific tables')
 
     parser.add_argument(
         '--export-dir',
@@ -122,6 +141,8 @@ def parse_args(required_config_keys):
         args.transform = {}
     if args.tables:
         args.tables = args.tables.split(',')
+    else:
+        args.tables = get_tables_from_properties(args.properties)
     if args.export_dir:
         args.export_dir = args.export_dir
     else:

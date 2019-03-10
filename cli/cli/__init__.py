@@ -37,7 +37,7 @@ def main():
     parser.add_argument('command', type=str, help=command_help)
     parser.add_argument('--target', type=str, default='*', help=target_help)
     parser.add_argument('--tap', type=str, default='*', help=tap_help)
-    parser.add_argument('--tables', type=str, default='*', help=tables_help)
+    parser.add_argument('--tables', type=str, help=tables_help)
     parser.add_argument('--version', action="version", help=version_help, version='TransferData {} - Command Line Interface'.format(__version__))
     parser.add_argument('--debug', default=False, required=False, help=debug_help, action="store_true")
 
@@ -58,9 +58,6 @@ def main():
             sys.exit(1)
         if args.target == '*':
             print("You must specify a destination name using the argument --target")
-            sys.exit(1)
-        if args.tables == '*':
-            print("You must specify the table(s) to sync using the argument --tables")
             sys.exit(1)
 
     pipelinewise = PipelineWise(args, config_dir, venv_dir)

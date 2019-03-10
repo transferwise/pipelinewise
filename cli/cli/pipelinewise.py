@@ -62,9 +62,6 @@ class PipelineWise(object):
             self.target = self.get_target(args.target)
             self.target_bin = self.get_connector_bin(self.target["type"])
 
-        if args.tables != '*':
-            self.tables = args.tables
-
         self.tranform_field_bin = self.get_connector_bin("transform-field")
 
     def silentremove(self, file):
@@ -813,10 +810,11 @@ class PipelineWise(object):
             command = ' '.join((
                 "  {} ".format(fastsync_bin),
                 "--tap {}".format(tap_config),
-                "--target {}".format(cons_target_config),
+                "--properties {}".format(tap_properties),
                 "--state {}".format(tap_state),
+                "--target {}".format(cons_target_config),
                 "{}".format(tap_transform_arg),
-                "--tables {}".format(self.tables)
+                "{}".format("--tables {}".format(self.args.tables) if self.args.tables else "")
             ))
 
             # Output will be redirected into a log file
