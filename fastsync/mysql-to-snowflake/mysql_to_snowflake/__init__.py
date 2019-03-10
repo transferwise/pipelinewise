@@ -2,6 +2,7 @@
 
 import os
 import sys
+import time
 
 import mysql_to_snowflake.utils
 import multiprocessing
@@ -82,7 +83,7 @@ def sync_table(table):
     snowflake = Snowflake(args.target, args.transform)
 
     try:
-        filename = '{}.csv.gz'.format(table)
+        filename = "pipelinewise_fastsync_{}_{}.csv.gz".format(table, time.strftime("%Y%m%d-%H%M%S"))
         filepath = os.path.join(args.export_dir, filename)
         target_schema = get_target_schema(args.target, table)
 

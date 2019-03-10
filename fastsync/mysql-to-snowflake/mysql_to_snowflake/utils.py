@@ -182,7 +182,7 @@ def parse_args(required_config_keys):
     if args.export_dir:
         args.export_dir = args.export_dir
     else:
-        args.export_dir = os.path.realpath('.')
+        args.export_dir = os.path.realpath('/tmp')
 
     check_config(args.tap, required_config_keys['tap'])
     check_config(args.target, required_config_keys['target'])
