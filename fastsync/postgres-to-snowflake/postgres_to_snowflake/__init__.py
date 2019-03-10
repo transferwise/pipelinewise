@@ -84,9 +84,13 @@ def sync_table(table):
         filename = '{}.csv.gz'.format(table)
         filepath = os.path.join(args.export_dir, filename)
         target_schema = get_target_schema(args.target, table)
+        dbname = args.tap.get("dbname")
 
         # Open connection
         postgres.open_connection()
+
+        # Get bookmark - Binlog position or Incremental Key value
+        bookmark = utils.get_bookmark_for_table(dbname, table, args.properties, postgres)
 
         # Exporting table data and close connection to avoid timeouts for huge tables
         postgres.copy_table(table, filepath)
@@ -110,6 +114,10 @@ def sync_table(table):
         # Create target table in snowflake and swap with temp table
         snowflake.query(postgres.snowflake_ddl(table, target_schema, False))
         snowflake.swap_tables(target_schema, table)
+
+        # Save bookmark to singer state file
+        utils.save_state_file(args.state, dbname, table, bookmark)
+        postgres.close_connection()
 
         # Table loaded, grant select on all tables in target schema
         grant_select_to = args.target['grant_select_to'] if 'grant_select_to' in args.target else []

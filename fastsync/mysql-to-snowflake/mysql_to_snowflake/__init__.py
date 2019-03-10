@@ -88,7 +88,9 @@ def sync_table(table):
 
         # Open connection and get binlog file position
         mysql.open_connection()
-        binlog_pos = mysql.fetch_current_log_file_and_pos()
+
+        # Get bookmark - Binlog position or Incremental Key value
+        bookmark = utils.get_bookmark_for_table(table, args.properties, mysql)
 
         # Exporting table data and close connection to avoid timeouts for huge tables
         mysql.copy_table(table, filepath)
@@ -113,8 +115,8 @@ def sync_table(table):
         snowflake.query(mysql.snowflake_ddl(table, target_schema, False))
         snowflake.swap_tables(target_schema, table)
 
-        # Save binlog to singer state file
-        utils.save_state_file(args.state, binlog_pos, table)
+        # Save bookmark to singer state file
+        utils.save_state_file(args.state, table, bookmark)
         mysql.close_connection()
 
         # Table loaded, grant select on all tables in target schema

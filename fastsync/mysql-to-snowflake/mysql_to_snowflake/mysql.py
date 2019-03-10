@@ -2,6 +2,7 @@ import pymysql
 import gzip
 import csv
 import os
+import datetime
 
 import mysql_to_snowflake.utils as utils
 
@@ -91,6 +92,27 @@ class MySql:
             raise Exception("MySQL binary logging is not enabled.")
         else:
             return result[0]
+
+
+    def fetch_current_incremental_key_pos(self, table, replication_key):
+        result = self.query("SELECT MAX({}) AS key_value FROM {}".format(replication_key, table))
+        if len(result) == 0:
+            raise Exception("Cannot get replication key value for table: {}".format(table))
+        else:
+            mysql_key_value = result[0].get("key_value")
+            key_value = mysql_key_value
+
+            # Convert msyql data/datetime format to JSON friendly values
+            if isinstance(mysql_key_value, datetime.datetime):
+                key_value = mysql_key_value.isoformat() + '+00:00'
+
+            elif isinstance(mysql_key_value, datetime.date):
+                key_value = mysql_key_value.isoformat() + 'T00:00:00+00:00'
+
+            return {
+                "key": replication_key,
+                "key_value": key_value
+            }
 
 
     def get_primary_key(self, table_name):

@@ -50,7 +50,49 @@ def get_tables_from_properties(properties):
     return tables
 
 
-def save_state_file(path, binlog_pos, table):
+def get_bookmark_for_table(table, properties, mysql):
+    """Get actual bookmark for a specific table used for LOG_BASED or INCREMENTAL
+    replications
+    """
+    bookmark = {}
+
+    # Find table from properties and get bookmark based on replication method
+    for stream in properties.get("streams", []):
+        metadata = stream.get("metadata", [])
+        table_name = stream.get("table_name")
+
+        # Get table specific metadata i.e. replication method, replication key, etc.
+        table_meta = next((i for i in metadata if type(i) == dict and len(i.get("breadcrumb", [])) == 0), {}).get("metadata")
+        db_name = table_meta.get("database-name")
+        replication_method = table_meta.get("replication-method")
+        replication_key = table_meta.get("replication-key")
+
+        fully_qualified_table_name = "{}.{}".format(db_name, table_name)
+        if fully_qualified_table_name == table:
+            # Log based replication: get mysql binlog position
+            if replication_method == "LOG_BASED":
+                binlog_pos = mysql.fetch_current_log_file_and_pos()
+                bookmark = {
+                    "log_file": binlog_pos.get('File'),
+                    "log_pos": binlog_pos.get('Position'),
+                    "version": binlog_pos.get('version', 1)
+                }
+
+            # Key based incremental replication: Get max replication key from source
+            elif replication_method == "INCREMENTAL":
+                incremental_pos = mysql.fetch_current_incremental_key_pos(fully_qualified_table_name, replication_key)
+                bookmark = {
+                    "replication_key": replication_key,
+                    "replication_key_value": incremental_pos.get('key_value'),
+                    "version": incremental_pos.get('version', 1)
+                }
+
+            break
+
+    return bookmark
+
+
+def save_state_file(path, table, bookmark):
     table_dict = tablename_to_dict(table)
     stream_id = "{}-{}".format(table_dict.get('schema'), table_dict.get('name'))
 
@@ -65,17 +107,11 @@ def save_state_file(path, binlog_pos, table):
 
     # Find the current table position
     bookmarks = state.get('bookmarks', {})
-    table_state = bookmarks.get(stream_id, {})
-
-    # Update to current entries
-    table_state['log_file'] = binlog_pos.get('File')
-    table_state['log_pos'] = binlog_pos.get('Position')
-    table_state['version'] = table_state.get('version', 1)
 
     # Update the state file with the new values at the right place
     state['currently_syncing'] = None
     state['bookmarks'] = bookmarks
-    state['bookmarks'][stream_id] = table_state
+    state['bookmarks'][stream_id] = bookmark
 
     # Save the new state file
     save_dict_to_json(path, state)
