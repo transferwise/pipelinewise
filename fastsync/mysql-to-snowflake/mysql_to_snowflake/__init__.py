@@ -2,6 +2,7 @@
 
 import os
 import sys
+import time
 
 import mysql_to_snowflake.utils
 import multiprocessing
@@ -82,13 +83,15 @@ def sync_table(table):
     snowflake = Snowflake(args.target, args.transform)
 
     try:
-        filename = '{}.csv.gz'.format(table)
+        filename = "pipelinewise_fastsync_{}_{}.csv.gz".format(table, time.strftime("%Y%m%d-%H%M%S"))
         filepath = os.path.join(args.export_dir, filename)
         target_schema = get_target_schema(args.target, table)
 
         # Open connection and get binlog file position
         mysql.open_connection()
-        binlog_pos = mysql.fetch_current_log_file_and_pos()
+
+        # Get bookmark - Binlog position or Incremental Key value
+        bookmark = utils.get_bookmark_for_table(table, args.properties, mysql)
 
         # Exporting table data and close connection to avoid timeouts for huge tables
         mysql.copy_table(table, filepath)
@@ -113,8 +116,8 @@ def sync_table(table):
         snowflake.query(mysql.snowflake_ddl(table, target_schema, False))
         snowflake.swap_tables(target_schema, table)
 
-        # Save binlog to singer state file
-        utils.save_state_file(args.state, binlog_pos, table)
+        # Save bookmark to singer state file
+        utils.save_state_file(args.state, table, bookmark)
         mysql.close_connection()
 
         # Table loaded, grant select on all tables in target schema

@@ -1,6 +1,7 @@
 import psycopg2
 from psycopg2 import extras
 import gzip
+import datetime
 
 import postgres_to_snowflake.utils as utils
 
@@ -43,12 +44,17 @@ class Postgres:
 
 
     def open_connection(self):
-        conn_string = "host='{}' dbname='{}' user='{}' password='{}' port='{}'".format(
-            self.connection_config['host'],
-            self.connection_config['dbname'],
-            self.connection_config['user'],
-            self.connection_config['password'],
-            self.connection_config['port']
+        conn_string = "host='{}' port='{}' user='{}' password='{}' dbname='{}'".format(
+            # Fastsync is using bulk_sync_{host|port|user|password} values from the config by default
+            # to avoid making heavy load on the primary source database when syncing large tables
+            #
+            # If bulk_sync_{host|port|user|password} values are not defined in the config then it's
+            # using the normal credentials to connect
+            self.connection_config.get('bulk_sync_host', self.connection_config['host']),
+            self.connection_config.get('bulk_sync_port', self.connection_config['port']),
+            self.connection_config.get('bulk_sync_user', self.connection_config['user']),
+            self.connection_config.get('bulk_sync_password', self.connection_config['password']),
+            self.connection_config['dbname']
         )
         self.conn = psycopg2.connect(conn_string)
         self.curr = self.conn.cursor()
@@ -71,6 +77,27 @@ class Postgres:
                     return cur.fetchall()
                 else:
                     return []
+
+
+    def fetch_current_incremental_key_pos(self, table, replication_key):
+        result = self.query("SELECT MAX({}) AS key_value FROM {}".format(replication_key, table))
+        if len(result) == 0:
+            raise Exception("Cannot get replication key value for table: {}".format(table))
+        else:
+            mysql_key_value = result[0].get("key_value")
+            key_value = mysql_key_value
+
+            # Convert msyql data/datetime format to JSON friendly values
+            if isinstance(mysql_key_value, datetime.datetime):
+                key_value = mysql_key_value.isoformat() + '+00:00'
+
+            elif isinstance(mysql_key_value, datetime.date):
+                key_value = mysql_key_value.isoformat() + 'T00:00:00+00:00'
+
+            return {
+                "key": replication_key,
+                "key_value": key_value
+            }
 
 
     def get_primary_key(self, table):
