@@ -48,28 +48,28 @@ class MySql:
 
     def open_connection(self):
         self.conn = pymysql.connect(
-            # Fastsync is using secondary_host and secondary_port from the config by default
-            # to avoid to make heavy load on the primary source database when syncing large tables
+            # Fastsync is using bulk_sync_{host|port|user|password} values from the config by default
+            # to avoid making heavy load on the primary source database when syncing large tables
             #
-            # If secondary_host and secondary_port are not defined in the config then it's
-            #  using the normal host and port properties
-            host = self.connection_config.get('secondary_host', self.connection_config['host']),
-            port = self.connection_config.get('secondary_port', self.connection_config['port']),
-            user = self.connection_config['user'],
-            password = self.connection_config['password'],
+            # If bulk_sync_{host|port|user|password} values are not defined in the config then it's
+            # using the normal credentials to connect
+            host = self.connection_config.get('bulk_sync_host', self.connection_config['host']),
+            port = self.connection_config.get('bulk_sync_port', self.connection_config['port']),
+            port = self.connection_config.get('bulk_sync_user', self.connection_config['user']),
+            port = self.connection_config.get('bulk_sync_password', self.connection_config['password']),
             charset = self.connection_config['charset'],
             cursorclass = pymysql.cursors.DictCursor
         )
         self.conn_unbuffered = pymysql.connect(
-            # Fastsync is using secondary_host and secondary_port from the config by default
-            # to avoid to make heavy load on the primary source database when syncing large tables
+            # Fastsync is using bulk_sync_{host|port|user|password} values from the config by default
+            # to avoid making heavy load on the primary source database when syncing large tables
             #
-            # If secondary_host and secondary_port are not defined in the config then it's
-            #  using the normal host and port properties
-            host = self.connection_config.get('secondary_host', self.connection_config['host']),
-            port = self.connection_config.get('secondary_port', self.connection_config['port']),
-            user = self.connection_config['user'],
-            password = self.connection_config['password'],
+            # If bulk_sync_{host|port|user|password} values are not defined in the config then it's
+            # using the normal credentials to connect
+            host = self.connection_config.get('bulk_sync_host', self.connection_config['host']),
+            port = self.connection_config.get('bulk_sync_port', self.connection_config['port']),
+            port = self.connection_config.get('bulk_sync_user', self.connection_config['user']),
+            port = self.connection_config.get('bulk_sync_password', self.connection_config['password']),
             charset = self.connection_config['charset'],
             cursorclass = pymysql.cursors.SSCursor
         )
