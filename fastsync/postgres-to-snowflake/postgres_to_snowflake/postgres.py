@@ -44,12 +44,17 @@ class Postgres:
 
 
     def open_connection(self):
-        conn_string = "host='{}' dbname='{}' user='{}' password='{}' port='{}'".format(
-            self.connection_config['host'],
+        conn_string = "host='{}' port='{}' dbname='{}' user='{}' password='{}'".format(
+            # Fastsync is using secondary_host and secondary_port from the config by default
+            # to avoid to make heavy load on the primary source database when syncing large tables
+            #
+            # If secondary_host and secondary_port are not defined in the config then it's
+            #  using the normal host and port properties
+            self.connection_config.get('secondary_host', self.connection_config['host']),
+            self.connection_config.get('secondary_port', self.connection_config['port']),
             self.connection_config['dbname'],
             self.connection_config['user'],
-            self.connection_config['password'],
-            self.connection_config['port']
+            self.connection_config['password']
         )
         self.conn = psycopg2.connect(conn_string)
         self.curr = self.conn.cursor()

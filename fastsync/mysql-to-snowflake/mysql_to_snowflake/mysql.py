@@ -48,16 +48,26 @@ class MySql:
 
     def open_connection(self):
         self.conn = pymysql.connect(
-            host = self.connection_config['host'],
-            port = self.connection_config['port'],
+            # Fastsync is using secondary_host and secondary_port from the config by default
+            # to avoid to make heavy load on the primary source database when syncing large tables
+            #
+            # If secondary_host and secondary_port are not defined in the config then it's
+            #  using the normal host and port properties
+            host = self.connection_config.get('secondary_host', self.connection_config['host']),
+            port = self.connection_config.get('secondary_port', self.connection_config['port']),
             user = self.connection_config['user'],
             password = self.connection_config['password'],
             charset = self.connection_config['charset'],
             cursorclass = pymysql.cursors.DictCursor
         )
         self.conn_unbuffered = pymysql.connect(
-            host = self.connection_config['host'],
-            port = self.connection_config['port'],
+            # Fastsync is using secondary_host and secondary_port from the config by default
+            # to avoid to make heavy load on the primary source database when syncing large tables
+            #
+            # If secondary_host and secondary_port are not defined in the config then it's
+            #  using the normal host and port properties
+            host = self.connection_config.get('secondary_host', self.connection_config['host']),
+            port = self.connection_config.get('secondary_port', self.connection_config['port']),
             user = self.connection_config['user'],
             password = self.connection_config['password'],
             charset = self.connection_config['charset'],
