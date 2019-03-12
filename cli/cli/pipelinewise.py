@@ -250,8 +250,9 @@ class PipelineWise(object):
                     # Filter condition didn't match: mark table as not selected to sync
                     properties["streams"][stream_idx]["metadata"][meta_idx]["metadata"]["selected"] = False
 
-                    # Filter ocndition didn't match: mark table as selected to sync in the fallback properties
-                    if create_fallback:
+                    # Filter condition didn't match: mark table as selected to sync in the fallback properties
+                    # Fallback only if the table is selected in the original properties
+                    if create_fallback and selected == True:
                         fallback_properties["streams"][stream_idx]["metadata"][meta_idx]["metadata"]["selected"] = True
                         fallback_filtered_tap_stream_ids.append(tap_stream_id)
 
@@ -264,7 +265,7 @@ class PipelineWise(object):
                 self.save_json(properties, temp_properties_path)
 
                 temp_fallback_properties_path = tempfile.mkstemp()[1]
-                self.save_json(properties, temp_fallback_properties_path)
+                self.save_json(fallback_properties, temp_fallback_properties_path)
 
                 return temp_properties_path, filtered_tap_stream_ids, temp_fallback_properties_path, fallback_filtered_tap_stream_ids
 
