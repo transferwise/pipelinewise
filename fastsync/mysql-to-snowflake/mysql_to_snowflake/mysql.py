@@ -114,10 +114,10 @@ class MySql:
 
             # Convert msyql data/datetime format to JSON friendly values
             if isinstance(mysql_key_value, datetime.datetime):
-                key_value = mysql_key_value.isoformat() + '+00:00'
+                key_value = mysql_key_value.isoformat()
 
             elif isinstance(mysql_key_value, datetime.date):
-                key_value = mysql_key_value.isoformat() + 'T00:00:00+00:00'
+                key_value = mysql_key_value.isoformat() + 'T00:00:00'
 
             return {
                 "key": replication_key,
