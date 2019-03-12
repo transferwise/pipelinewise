@@ -31,6 +31,7 @@ REQUIRED_CONFIG_KEYS = {
     ]
 }
 
+lock = multiprocessing.Lock()
 
 def get_cpu_cores():
     try:
@@ -117,7 +118,13 @@ def sync_table(table):
         snowflake.swap_tables(target_schema, table)
 
         # Save bookmark to singer state file
-        utils.save_state_file(args.state, dbname, table, bookmark)
+        # Lock to ensure that only one process writes the same state file at a time
+        lock.acquire()
+        try:
+            utils.save_state_file(args.state, dbname, table, bookmark)
+        finally:
+            lock.release()
+
         postgres.close_connection()
 
         # Table loaded, grant select on all tables in target schema
