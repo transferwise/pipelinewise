@@ -141,10 +141,12 @@ def main_impl():
         -------------------------------------------------------
         STARTING SYNC
         -------------------------------------------------------
+            Tables selected to sync        : {}
             Total tables selected to sync  : {}
             CPU cores                      : {}
         -------------------------------------------------------
         """.format(
+            args.tables,
             len(args.tables),
             cpu_cores
         ))
