@@ -11,6 +11,7 @@ import logging
 import json
 import re
 import glob
+import copy
 from datetime import datetime
 from crontab import CronTab, CronSlices
 from tabulate import tabulate
@@ -142,29 +143,39 @@ class PipelineWise(object):
             raise Exception("Cannot merge JSON files {} {} - {}".format(dictA, dictB, exc))
 
 
-    def create_filtered_tap_properties(self, tap_properties, tap_state, filters):
+    def create_filtered_tap_properties(self, tap_type, tap_properties, tap_state, filters, create_fallback=False):
         """
         Create a filtered version of tap properties file based on specific filter conditions.
 
         Return values:
             1) A temporary JSON file where only those tables are selected to
                 sync which meet the filter criterias
-            2) List of tap_stream_ids where condition(s) matched
+            2) List of tap_stream_ids where filter criterias matched
+            3) OPTIONAL when create_fallback is True:
+                Temporary JSON file with table that don't meet the
+                filter criterias
+            4) OPTIONAL when create_fallback is True:
+                List of tap_stream_ids where filter criteries don't match
         """
         # Get filer conditions with default values from input dictionary
         # Nothing selected by default
         f_selected = filters.get("selected", None)
+        f_tap_type = filters.get("tap_type", None)
         f_replication_method = filters.get("replication_method", None)
         f_initial_sync_required = filters.get("initial_sync_required", None)
 
-        # Number of filtered tables
+        # Lists of tables that meet and don't meet the filter criterias
         filtered_tap_stream_ids = []
+        fallback_filtered_tap_stream_ids = []
 
         self.logger.debug("Filtering properties JSON by conditions: {}".format(filters))
         try:
             # Load JSON files
             properties = self.load_json(tap_properties)
             state = self.load_json(tap_state)
+
+            # Create a dictionary for tables that don't meet filter criterias
+            fallback_properties = copy.deepcopy(properties) if create_fallback else None
 
             # Foreach every stream (table) in the original properties
             for stream_idx, stream in enumerate(properties.get("streams", tap_properties)):
@@ -216,6 +227,7 @@ class PipelineWise(object):
                 # Set the "selected" key to False if the actual values don't meet the filter criterias
                 if (
                     (f_selected == None or selected == f_selected) and
+                    (f_tap_type == None or tap_type in f_tap_type) and
                     (f_replication_method == None or replication_method in f_replication_method) and
                     (f_initial_sync_required == None or initial_sync_required == f_initial_sync_required)
                    ):
@@ -230,16 +242,40 @@ class PipelineWise(object):
                     # Filter condition matched: mark table as selected to sync
                     properties["streams"][stream_idx]["metadata"][meta_idx]["metadata"]["selected"] = True
                     filtered_tap_stream_ids.append(tap_stream_id)
+
+                    # Filter ocndition matched: mark table as not selected to sync in the fallback properties
+                    if create_fallback:
+                        fallback_properties["streams"][stream_idx]["metadata"][meta_idx]["metadata"]["selected"] = False
                 else:
                     # Filter condition didn't match: mark table as not selected to sync
                     properties["streams"][stream_idx]["metadata"][meta_idx]["metadata"]["selected"] = False
 
+                    # Filter ocndition didn't match: mark table as selected to sync in the fallback properties
+                    if create_fallback:
+                        fallback_properties["streams"][stream_idx]["metadata"][meta_idx]["metadata"]["selected"] = True
+                        fallback_filtered_tap_stream_ids.append(tap_stream_id)
 
-            # Save the new filtered properties JSON into a temp file and return with the path
-            tempfile_path = tempfile.mkstemp()[1]
-            self.save_json(properties, tempfile_path)
 
-            return tempfile_path, filtered_tap_stream_ids
+            # Save the generated properties file(s) and return
+            # Fallback required: Save filtered and fallback properties JSON
+            if create_fallback:
+                # Save to files: filtered and fallback properties
+                temp_properties_path = tempfile.mkstemp()[1]
+                self.save_json(properties, temp_properties_path)
+
+                temp_fallback_properties_path = tempfile.mkstemp()[1]
+                self.save_json(properties, temp_fallback_properties_path)
+
+                return temp_properties_path, filtered_tap_stream_ids, temp_fallback_properties_path, fallback_filtered_tap_stream_ids
+
+            # Fallback not required: Save only the filtered properties JSON
+            else:
+                # Save eed to save
+                temp_properties_path = tempfile.mkstemp()[1]
+                self.save_json(properties, temp_properties_path)
+
+                return temp_properties_path, filtered_tap_stream_ids
+
         except Exception as exc:
             raise Exception("Cannot create JSON file - {}".format(exc))
 
@@ -914,10 +950,21 @@ class PipelineWise(object):
 
         # Create fastsync and singer specific filtered tap properties that contains only
         # the the tables that needs to be synced by the specific command
-        tap_properties_fastsync, fastsync_stream_ids = self.create_filtered_tap_properties(tap_properties, tap_state,
-                { "selected": True, "initial_sync_required": True  })
-        tap_properties_singer, singer_stream_ids = self.create_filtered_tap_properties(tap_properties, tap_state,
-                { "selected": True, "replication_method": ["INCREMENTAL", "LOG_BASED"], "initial_sync_required": False })
+        (
+            tap_properties_fastsync,
+            fastsync_stream_ids,
+            tap_properties_singer,
+            singer_stream_ids
+        ) = self.create_filtered_tap_properties(
+            tap_type,
+            tap_properties,
+            tap_state,
+            {
+                "selected": True,
+                "tap_type": ["tap-mysql", "tap-postgres"],
+                "initial_sync_required": True
+            },
+            create_fallback = True)
 
         log_file_fastsync = os.path.join(log_dir, "{}-{}-{}.fastsync.log".format(target_id, tap_id, current_time))
         log_file_singer = os.path.join(log_dir, "{}-{}-{}.singer.log".format(target_id, tap_id, current_time))
