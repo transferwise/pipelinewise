@@ -11,6 +11,7 @@ import logging
 import json
 import re
 import glob
+import copy
 from datetime import datetime
 from crontab import CronTab, CronSlices
 from tabulate import tabulate
@@ -139,7 +140,146 @@ class PipelineWise(object):
 
             return tempfile_path
         except Exception as exc:
-            raise Exception("Cannot merge JSON files {} {} - {}".format(fileA, fileB, exc))
+            raise Exception("Cannot merge JSON files {} {} - {}".format(dictA, dictB, exc))
+
+
+    def create_filtered_tap_properties(self, tap_type, tap_properties, tap_state, filters, create_fallback=False):
+        """
+        Create a filtered version of tap properties file based on specific filter conditions.
+
+        Return values:
+            1) A temporary JSON file where only those tables are selected to
+                sync which meet the filter criterias
+            2) List of tap_stream_ids where filter criterias matched
+            3) OPTIONAL when create_fallback is True:
+                Temporary JSON file with table that don't meet the
+                filter criterias
+            4) OPTIONAL when create_fallback is True:
+                List of tap_stream_ids where filter criteries don't match
+        """
+        # Get filer conditions with default values from input dictionary
+        # Nothing selected by default
+        f_selected = filters.get("selected", None)
+        f_tap_type = filters.get("tap_type", None)
+        f_replication_method = filters.get("replication_method", None)
+        f_initial_sync_required = filters.get("initial_sync_required", None)
+
+        # Lists of tables that meet and don't meet the filter criterias
+        filtered_tap_stream_ids = []
+        fallback_filtered_tap_stream_ids = []
+
+        self.logger.debug("Filtering properties JSON by conditions: {}".format(filters))
+        try:
+            # Load JSON files
+            properties = self.load_json(tap_properties)
+            state = self.load_json(tap_state)
+
+            # Create a dictionary for tables that don't meet filter criterias
+            fallback_properties = copy.deepcopy(properties) if create_fallback else None
+
+            # Foreach every stream (table) in the original properties
+            for stream_idx, stream in enumerate(properties.get("streams", tap_properties)):
+                selected = False
+                replication_method = None
+                initial_sync_required = False
+
+                # Collect required properties from the properties file
+                tap_stream_id = stream.get("tap_stream_id")
+                table_name = stream.get("table_name")
+                metadata = stream.get("metadata", [])
+
+                # Collect further properties from the properties file under the metadata key
+                table_meta = {}
+                for meta_idx, meta in enumerate(metadata):
+                    if type(meta) == dict and len(meta.get("breadcrumb", [])) == 0:
+                        table_meta = meta.get("metadata")
+                        break
+
+                #table_meta = next((i for i in metadata if type(i) == dict and len(i.get("breadcrumb", [])) == 0), {}).get("metadata")
+                selected = table_meta.get("selected")
+                replication_method = table_meta.get("replication-method")
+
+                # Detect if initial sync is required. Look into the state file, get the bookmark
+                # for the current stream (table) and if valid bookmark doesn't exist then
+                # initial sync is required
+                bookmarks = state.get("bookmarks", {}) if type(state) == dict else {}
+                stream_bookmark = bookmarks.get(tap_stream_id, {})
+                if (
+                    # Initial sync is required for INCREMENTAL and LOG_BASED tables
+                    # where the state file has no valid bookmark.
+                    #
+                    # Valid bookmark keys:
+                    #   'replication_key_value' key created for INCREMENTAL tables
+                    #   'log_pos' key created by MySQL LOG_BASED tables
+                    #    TODO: Add key for Postgres logical replication
+                    #
+                    # FULL_TABLE replication method is taken as initial sync required
+                    replication_method == 'FULL_TABLE' or
+                    (
+                        (replication_method in ['INCREMENTAL', 'LOG_BASED']) and
+                        (not ('replication_key_value' in stream_bookmark or 'log_pos' in stream_bookmark))
+                    )
+                   ):
+                    initial_sync_required = True
+
+                # Compare actual values to the filter conditions.
+                # Set the "selected" key to True if actual values meet the filter criterias
+                # Set the "selected" key to False if the actual values don't meet the filter criterias
+                if (
+                    (f_selected == None or selected == f_selected) and
+                    (f_tap_type == None or tap_type in f_tap_type) and
+                    (f_replication_method == None or replication_method in f_replication_method) and
+                    (f_initial_sync_required == None or initial_sync_required == f_initial_sync_required)
+                   ):
+                    self.logger.debug("""Filter condition(s) matched:
+                        Table              : {}
+                        Tap Stream ID      : {}
+                        Selected           : {}
+                        Replication Method : {}
+                        Init Sync Required : {}
+                    """.format(table_name, tap_stream_id, initial_sync_required, selected, replication_method))
+
+                    # Filter condition matched: mark table as selected to sync
+                    properties["streams"][stream_idx]["metadata"][meta_idx]["metadata"]["selected"] = True
+                    filtered_tap_stream_ids.append(tap_stream_id)
+
+                    # Filter ocndition matched: mark table as not selected to sync in the fallback properties
+                    if create_fallback:
+                        fallback_properties["streams"][stream_idx]["metadata"][meta_idx]["metadata"]["selected"] = False
+                else:
+                    # Filter condition didn't match: mark table as not selected to sync
+                    properties["streams"][stream_idx]["metadata"][meta_idx]["metadata"]["selected"] = False
+
+                    # Filter condition didn't match: mark table as selected to sync in the fallback properties
+                    # Fallback only if the table is selected in the original properties
+                    if create_fallback and selected == True:
+                        fallback_properties["streams"][stream_idx]["metadata"][meta_idx]["metadata"]["selected"] = True
+                        fallback_filtered_tap_stream_ids.append(tap_stream_id)
+
+
+            # Save the generated properties file(s) and return
+            # Fallback required: Save filtered and fallback properties JSON
+            if create_fallback:
+                # Save to files: filtered and fallback properties
+                temp_properties_path = tempfile.mkstemp()[1]
+                self.save_json(properties, temp_properties_path)
+
+                temp_fallback_properties_path = tempfile.mkstemp()[1]
+                self.save_json(fallback_properties, temp_fallback_properties_path)
+
+                return temp_properties_path, filtered_tap_stream_ids, temp_fallback_properties_path, fallback_filtered_tap_stream_ids
+
+            # Fallback not required: Save only the filtered properties JSON
+            else:
+                # Save eed to save
+                temp_properties_path = tempfile.mkstemp()[1]
+                self.save_json(properties, temp_properties_path)
+
+                return temp_properties_path, filtered_tap_stream_ids
+
+        except Exception as exc:
+            raise Exception("Cannot create JSON file - {}".format(exc))
+
 
     def load_config(self):
         self.logger.debug('Loading config at {}'.format(self.config_path))
@@ -259,7 +399,7 @@ class PipelineWise(object):
 
             # Start command
             proc = Popen(shlex.split(piped_command), stdout=PIPE, stderr=STDOUT)
-            f = open("{}".format(log_file_running), "w")
+            f = open("{}".format(log_file_running), "w+")
             stdout = ''
             while True:
                 line = proc.stdout.readline()
@@ -658,36 +798,12 @@ class PipelineWise(object):
         cron.write()
         self.logger.info("Jobs written to crontab")
 
-    def run_tap(self):
-        tap_id = self.tap["id"]
-        tap_type = self.tap["type"]
-        target_id = self.target["id"]
 
-        self.logger.info("Running {} tap in {} target".format(tap_id, target_id))
-
-        # Run only if tap enabled
-        if not self.tap.get("enabled", False):
-            self.logger.info("Tap {} is not enabled. Do nothing and exit normally.".format(self.tap["name"]))
-            sys.exit(0)
-
-        # Run only if not running
-        tap_status = self.detect_tap_status(target_id, tap_id)
-        if tap_status["currentStatus"] == "running":
-            self.logger.info("Tap {} is currently running. Do nothing and exit normally.".format(self.tap["name"]))
-            sys.exit(0)
-
-        # Generate and run the command to run the tap directly
-        tap_config = self.tap["files"]["config"]
-        tap_inheritable_config = self.tap["files"]["inheritable_config"]
-        tap_properties = self.tap["files"]["properties"]
-        tap_state = self.tap["files"]["state"]
-        tap_transformation = self.tap["files"]["transformation"]
-        target_config = self.target["files"]["config"]
+    def run_tap_singer(self, tap_type, tap_config, tap_properties, tap_state, tap_transformation, target_config, log_file):
+        """
+        Generating and running piped shell command to sync tables using singer taps and targets
+        """
         new_tap_state = tempfile.mkstemp()[1]
-
-        # Some target attributes can be passed and override by tap (aka. inheritable config)
-        # We merge the two configs and use that with the target
-        cons_target_config = self.create_consumable_target_config(target_config, tap_inheritable_config)
 
         # Following the singer spec the catalog JSON file needs to be passed by the --catalog argument
         # However some tap (i.e. tap-mysql and tap-postgres) requires it as --properties
@@ -710,61 +826,208 @@ class PipelineWise(object):
         if os.path.isfile(tap_state):
             tap_state_arg = "--state {}".format(tap_state)
 
-        try:
-            # Detect if transformation is needed
-            has_transformation = False
-            if os.path.isfile(tap_transformation):
-                tr = self.load_json(tap_transformation)
-                if 'transformations' in tr and len(tr['transformations']) > 0:
-                    has_transformation = True
+        # Detect if transformation is needed
+        has_transformation = False
+        if os.path.isfile(tap_transformation):
+            tr = self.load_json(tap_transformation)
+            if 'transformations' in tr and len(tr['transformations']) > 0:
+                has_transformation = True
 
-            # Run without transformation in the middle
-            if not has_transformation:
-                command = ' '.join((
-                    "  {} --config {} {} {} {}".format(self.tap_bin, tap_config, tap_catalog_argument, tap_properties, tap_state_arg),
-                    "| {} --config {}".format(self.target_bin, cons_target_config),
-                    "> {}".format(new_tap_state)
-                ))
+        # Run without transformation in the middle
+        if not has_transformation:
+            command = ' '.join((
+                "  {} --config {} {} {} {}".format(self.tap_bin, tap_config, tap_catalog_argument, tap_properties, tap_state_arg),
+                "| {} --config {}".format(self.target_bin, target_config),
+                "> {}".format(new_tap_state)
+            ))
 
-            # Run with transformation in the middle
-            else:
-                command = ' '.join((
-                    "  {} --config {} {} {} {}".format(self.tap_bin, tap_config, tap_catalog_argument, tap_properties, tap_state_arg),
-                    "| {} --config {}".format(self.tranform_field_bin, tap_transformation),
-                    "| {} --config {}".format(self.target_bin, cons_target_config),
-                    "> {}".format(new_tap_state)
-                ))
+        # Run with transformation in the middle
+        else:
+            command = ' '.join((
+                "  {} --config {} {} {} {}".format(self.tap_bin, tap_config, tap_catalog_argument, tap_properties, tap_state_arg),
+                "| {} --config {}".format(self.tranform_field_bin, tap_transformation),
+                "| {} --config {}".format(self.target_bin, target_config),
+                "> {}".format(new_tap_state)
+            ))
 
-            # Output will be redirected into a log file
-            log_dir = self.get_tap_log_dir(target_id, tap_id)
-            current_time = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-            log_file = os.path.join(log_dir, "{}-{}-{}.log".format(target_id, tap_id, current_time))
-
-            # Do not run if another instance is already running
-            if os.path.isdir(log_dir) and len(self.search_files(log_dir, patterns=['*.log.running'])) > 0:
-                self.logger.info("Failed to run. Another instance of the same tap is already running. Log file detected in running status at {} ".format(log_dir))
-                sys.exit(1)
-
-            # Run command
-            result = self.run_command(command, log_file)
-
-        # Delete temp file if there is any
-        except RunCommandException as exc:
-            self.logger.error(exc)
-            self.silentremove(cons_target_config)
+        # Do not run if another instance is already running
+        log_dir = os.path.dirname(log_file)
+        if os.path.isdir(log_dir) and len(self.search_files(log_dir, patterns=['*.log.running'])) > 0:
+            self.logger.info("Failed to run. Another instance of the same tap is already running. Log file detected in running status at {} ".format(log_dir))
             sys.exit(1)
-        except Exception as exc:
-            self.silentremove(cons_target_config)
-            raise exc
 
-        self.silentremove(cons_target_config)
+        # Run command
+        result = self.run_command(command, log_file)
 
         # Save the new state file if created correctly
         if self.is_json_file(new_tap_state):
             shutil.copyfile(new_tap_state, tap_state)
             os.remove(new_tap_state)
 
+
+    def run_tap_fastsync(self, tap_type, target_type, tap_config, tap_properties, tap_state, tap_transformation, target_config, log_file):
+        """
+        Generating and running shell command to sync tables using the native fastsync components
+        """
+        fastsync_bin = self.get_fastsync_bin(tap_type, target_type)
+
+        # Add state arugment if exists to extract data incrementally
+        tap_transform_arg = ""
+        if os.path.isfile(tap_transformation):
+            tap_transform_arg = "--transform {}".format(tap_transformation)
+
+        command = ' '.join((
+            "  {} ".format(fastsync_bin),
+            "--tap {}".format(tap_config),
+            "--properties {}".format(tap_properties),
+            "--state {}".format(tap_state),
+            "--target {}".format(target_config),
+            "{}".format(tap_transform_arg),
+            "{}".format("--tables {}".format(self.args.tables) if self.args.tables else "")
+        ))
+
+        # Do not run if another instance is already running
+        log_dir = os.path.dirname(log_file)
+        if os.path.isdir(log_dir) and len(self.search_files(log_dir, patterns=['*.log.running'])) > 0:
+            self.logger.info("Failed to run. Another instance of the same tap is already running. Log file detected in running status at {} ".format(log_dir))
+            sys.exit(1)
+
+        # Run command
+        result = self.run_command(command, log_file)
+
+
+    def run_tap(self):
+        """
+        Generating command(s) to run tap to sync data from source to target
+
+        The generated commands can use one or multiple commands of:
+            1. Fastsync:
+                    Native and optimised component to sync table from a
+                    specific type of tap into a specific type of target.
+                    This command will be used automatically when FULL_TABLE
+                    replication method selected or when initial sync is required.
+
+            2. Singer Taps and Targets:
+                    Dynamic components following the singer specification to
+                    sync tables from multiple sources to multiple targets.
+                    This command will be used automatically when INCREMENTAL
+                    and LOG_BASED replication method selected. FULL_TABLE
+                    replication are not using the singer components because
+                    they are too slow to sync large tables.
+        """
+        tap_id = self.tap["id"]
+        tap_type = self.tap["type"]
+        target_id = self.target["id"]
+        target_type = self.target['type']
+
+        self.logger.info("Running {} tap in {} target".format(tap_id, target_id))
+
+        # Run only if tap enabled
+        if not self.tap.get("enabled", False):
+            self.logger.info("Tap {} is not enabled. Do nothing and exit normally.".format(self.tap["name"]))
+            sys.exit(0)
+
+        # Run only if not running
+        tap_status = self.detect_tap_status(target_id, tap_id)
+        if tap_status["currentStatus"] == "running":
+            self.logger.info("Tap {} is currently running. Do nothing and exit normally.".format(self.tap["name"]))
+            sys.exit(0)
+
+        # Generate and run the command to run the tap directly
+        tap_config = self.tap["files"]["config"]
+        tap_inheritable_config = self.tap["files"]["inheritable_config"]
+        tap_properties = self.tap["files"]["properties"]
+        tap_state = self.tap["files"]["state"]
+        tap_transformation = self.tap["files"]["transformation"]
+        target_config = self.target["files"]["config"]
+
+        # Some target attributes can be passed and override by tap (aka. inheritable config)
+        # We merge the two configs and use that with the target
+        cons_target_config = self.create_consumable_target_config(target_config, tap_inheritable_config)
+
+        # Output will be redirected into target and tap specific log directory
+        log_dir = self.get_tap_log_dir(target_id, tap_id)
+        current_time = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+
+        # Create fastsync and singer specific filtered tap properties that contains only
+        # the the tables that needs to be synced by the specific command
+        (
+            tap_properties_fastsync,
+            fastsync_stream_ids,
+            tap_properties_singer,
+            singer_stream_ids
+        ) = self.create_filtered_tap_properties(
+            tap_type,
+            tap_properties,
+            tap_state,
+            {
+                "selected": True,
+                "tap_type": ["tap-mysql", "tap-postgres"],
+                "initial_sync_required": True
+            },
+            create_fallback = True)
+
+        log_file_fastsync = os.path.join(log_dir, "{}-{}-{}.fastsync.log".format(target_id, tap_id, current_time))
+        log_file_singer = os.path.join(log_dir, "{}-{}-{}.singer.log".format(target_id, tap_id, current_time))
+
+        try:
+            # Run fastsync for FULL_TABLE replication method
+            if len(fastsync_stream_ids) > 0:
+                self.logger.info("Table(s) selected to sync by fastsync: {}".format(fastsync_stream_ids))
+                self.run_tap_fastsync(
+                    tap_type,
+                    target_type,
+                    tap_config,
+                    tap_properties_fastsync,
+                    tap_state,
+                    tap_transformation,
+                    cons_target_config,
+                    log_file_fastsync
+                )
+            else:
+                self.logger.info("No table available that needs to be sync by fastsync")
+
+            # Run singer tap for INCREMENTAL and LOG_BASED replication methods
+            if len(singer_stream_ids) > 0:
+                self.logger.info("Table(s) selected to sync by singer: {}".format(singer_stream_ids))
+                self.run_tap_singer(
+                    tap_type,
+                    tap_config,
+                    tap_properties_singer,
+                    tap_state,
+                    tap_transformation,
+                    cons_target_config,
+                    log_file_singer
+                )
+            else:
+                self.logger.info("No table available that needs to be sync by singer")
+
+        # Delete temp files if there is any
+        except RunCommandException as exc:
+            self.logger.error(exc)
+            self.silentremove(cons_target_config)
+            self.silentremove(tap_properties_fastsync)
+            self.silentremove(tap_properties_singer)
+            sys.exit(1)
+        except Exception as exc:
+            self.silentremove(cons_target_config)
+            self.silentremove(tap_properties_fastsync)
+            self.silentremove(tap_properties_singer)
+            raise exc
+
+        self.silentremove(cons_target_config)
+        self.silentremove(tap_properties_fastsync)
+        self.silentremove(tap_properties_singer)
+
+
     def sync_tables(self):
+        """
+        Sync every or a list of selected tables from a specific tap.
+
+        The function is using the fastsync components hence it's only
+        available for taps and targets where the native and optimised
+        fastsync component is implemented.
+        """
         tap_id = self.tap["id"]
         tap_type = self.tap["type"]
         target_id = self.target["id"]
@@ -801,34 +1064,23 @@ class PipelineWise(object):
         # We merge the two configs and use that with the target
         cons_target_config = self.create_consumable_target_config(target_config, tap_inheritable_config)
 
-        # Add state arugment if exists to extract data incrementally
-        tap_transform_arg = ""
-        if os.path.isfile(tap_transformation):
-            tap_transform_arg = "--transform {}".format(tap_transformation)
+        # Output will be redirected into target and tap specific log directory
+        log_dir = self.get_tap_log_dir(target_id, tap_id)
+        current_time = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        log_file = os.path.join(log_dir, "{}-{}-{}.fastsync.log".format(target_id, tap_id, current_time))
 
+        # sync_tables command always using fastsync
         try:
-            command = ' '.join((
-                "  {} ".format(fastsync_bin),
-                "--tap {}".format(tap_config),
-                "--properties {}".format(tap_properties),
-                "--state {}".format(tap_state),
-                "--target {}".format(cons_target_config),
-                "{}".format(tap_transform_arg),
-                "{}".format("--tables {}".format(self.args.tables) if self.args.tables else "")
-            ))
-
-            # Output will be redirected into a log file
-            log_dir = self.get_tap_log_dir(target_id, tap_id)
-            current_time = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-            log_file = os.path.join(log_dir, "{}-{}-{}.log".format(target_id, tap_id, current_time))
-
-            # Do not run if another instance is already running
-            if os.path.isdir(log_dir) and len(self.search_files(log_dir, patterns=['*.log.running'])) > 0:
-                self.logger.info("Failed to run. Another instance of the same tap is already running. Log file detected in running status at {} ".format(log_dir))
-                sys.exit(1)
-
-            # Run command
-            result = self.run_command(command, log_file)
+            self.run_tap_fastsync(
+                tap_type,
+                target_type,
+                tap_config,
+                tap_properties,
+                tap_state,
+                tap_transformation,
+                cons_target_config,
+                log_file
+            )
 
         # Delete temp file if there is any
         except RunCommandException as exc:
