@@ -55,8 +55,8 @@ class MySql:
             # using the normal credentials to connect
             host = self.connection_config.get('bulk_sync_host', self.connection_config['host']),
             port = self.connection_config.get('bulk_sync_port', self.connection_config['port']),
-            port = self.connection_config.get('bulk_sync_user', self.connection_config['user']),
-            port = self.connection_config.get('bulk_sync_password', self.connection_config['password']),
+            user = self.connection_config.get('bulk_sync_user', self.connection_config['user']),
+            password = self.connection_config.get('bulk_sync_password', self.connection_config['password']),
             charset = self.connection_config['charset'],
             cursorclass = pymysql.cursors.DictCursor
         )
@@ -68,8 +68,8 @@ class MySql:
             # using the normal credentials to connect
             host = self.connection_config.get('bulk_sync_host', self.connection_config['host']),
             port = self.connection_config.get('bulk_sync_port', self.connection_config['port']),
-            port = self.connection_config.get('bulk_sync_user', self.connection_config['user']),
-            port = self.connection_config.get('bulk_sync_password', self.connection_config['password']),
+            user = self.connection_config.get('bulk_sync_user', self.connection_config['user']),
+            password = self.connection_config.get('bulk_sync_password', self.connection_config['password']),
             charset = self.connection_config['charset'],
             cursorclass = pymysql.cursors.SSCursor
         )
