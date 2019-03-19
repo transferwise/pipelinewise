@@ -451,10 +451,11 @@ class DbSync:
         primary_key = ["PRIMARY KEY ({})".format(', '.join(primary_column_names(stream_schema_message)))] \
             if len(stream_schema_message['key_properties']) else []
 
-        return 'CREATE {}TABLE IF NOT EXISTS {} ({})'.format(
+        return 'CREATE {}TABLE IF NOT EXISTS {} ({}) {}'.format(
             'TEMP ' if is_temporary else '',
             self.table_name(stream_schema_message['stream'], is_temporary),
-            ', '.join(columns + primary_key)
+            ', '.join(columns + primary_key),
+            'data_retention_time_in_days = 0 ' if is_temporary else 'data_retention_time_in_days = 1 '
         )
 
     def grant_usage_on_schema(self, schema_name, grantee):
