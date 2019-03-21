@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
 import hashlib
+from socket import inet_ntoa
+from struct import pack
 from datetime import datetime
 from dateutil import parser
 
@@ -21,11 +23,18 @@ def do_transform(value, trans_type):
       # Transforms any number to zero
       elif trans_type == "MASK-NUMBER":
           return 0
+      # Transform IP from integer to dot-decimal notation
+      elif trans_type == "LONG-TO-IP":
+          if value < 0:
+              ip = 2**32 + value
+          else:
+              ip = value
+          return inet_ntoa(pack('!L', ip))
+
       # Return the original value if cannot find transformation type
       else:
           return value
-  
+
   # Return the original value if cannot transform
   except Exception:
       return value
-    
