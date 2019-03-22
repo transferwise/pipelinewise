@@ -91,9 +91,9 @@ class TestIntegration(unittest.TestCase):
                 target_schema = "{}{}".format(target_schema, config_dynamic_schema_name_postfix)
 
         # Get loaded rows from tables
-        table_one = snowflake.query("SELECT * FROM {}.test_table_one".format(target_schema))
-        table_two = snowflake.query("SELECT * FROM {}.test_table_two".format(target_schema))
-        table_three = snowflake.query("SELECT * FROM {}.test_table_three".format(target_schema))
+        table_one = snowflake.query("SELECT * FROM {}.test_table_one ORDER BY c_pk".format(target_schema))
+        table_two = snowflake.query("SELECT * FROM {}.test_table_two ORDER BY c_pk".format(target_schema))
+        table_three = snowflake.query("SELECT * FROM {}.test_table_three ORDER BY c_pk".format(target_schema))
 
 
         # ----------------------------------------------------------------------
