@@ -361,7 +361,7 @@ class DbSync:
                     copy_sql = """COPY INTO {} ({}) FROM @{}/{}
                         FILE_FORMAT = (format_name='{}')
                     """.format(
-                        self.table_name(stream, True),
+                        self.table_name(stream, False),
                         ', '.join(self.column_names()),
                         self.connection_config['stage'],
                         s3_key,
@@ -369,6 +369,8 @@ class DbSync:
                     )
                     logger.info("SNOWFLAKE - {}".format(copy_sql))
                     cur.execute(copy_sql)
+
+                logger.info("SNOWFLAKE - Merge into {}: {}".format(self.table_name(stream, False), cur.fetchall()))
 
     def primary_key_merge_condition(self):
         stream_schema_message = self.stream_schema_message
