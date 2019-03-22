@@ -370,6 +370,8 @@ class DbSync:
                     logger.info("SNOWFLAKE - {}".format(copy_sql))
                     cur.execute(copy_sql)
 
+                logger.info("SNOWFLAKE - Merge into {}: {}".format(self.table_name(stream, False), cur.fetchall()))
+
     def primary_key_merge_condition(self):
         stream_schema_message = self.stream_schema_message
         names = primary_column_names(stream_schema_message)
