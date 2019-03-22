@@ -25,7 +25,9 @@ def validate_config(config):
         'warehouse',
         'aws_access_key_id',
         'aws_secret_access_key',
-        's3_bucket'
+        's3_bucket',
+        'stage',
+        'file_format'
     ]
 
     # Check if mandatory keys exist
@@ -41,9 +43,6 @@ def validate_config(config):
 
     # Check client-side encryption config
     config_cse_key = config.get('client_side_encryption_master_key', None)
-    config_cse_stage = config.get('client_side_encryption_stage_object', None)
-    if config_cse_key and not config_cse_stage:
-        errors.append("Client-Side Encryption is enabled, master key found but 'client_side_encryption_stage_object' key is missing.")
 
     return errors
 
@@ -327,113 +326,54 @@ class DbSync:
         stream = stream_schema_message['stream']
         logger.info("Loading {} rows into '{}'".format(count, self.table_name(stream, False)))
 
-        # Loading steps:
-        #   1. Load every row from s3 into a temporary table
-        #   2. Merge rows from temp table to destination table:
-        #       INSERT new rows and UPDATE the existing ones
         with self.open_connection() as connection:
             with connection.cursor(snowflake.connector.DictCursor) as cur:
-                # Create temporary table to load into
-                cur.execute(self.create_table_query(True))
 
-                # Ingesting Client Side Encrypted data with COPY and named stage object
-                # The master key had to be embedded in the exteral stage when it was
-                # created and should never be sent at load time
-                master_key = self.connection_config.get('client_side_encryption_master_key', '')
-                if master_key != '':
-                    copy_sql = """COPY INTO {} ({}) FROM @{}/{}
-                        FILE_FORMAT = (type='CSV' escape='\\\\' field_optionally_enclosed_by='\"')
-                    """.format(
-                        self.table_name(stream, True),
-                        ', '.join(self.column_names()),
-                        self.connection_config['client_side_encryption_stage_object'],
-                        s3_key
-                    )
-                    cur.execute(copy_sql)
-
-                # Ingesting with COPY by passing the same S3 credential that we used to upload
-                else:
-                    copy_sql = """COPY INTO {} ({}) FROM 's3://{}/{}'
-                        CREDENTIALS = (aws_key_id='{}' aws_secret_key='{}') 
-                        FILE_FORMAT = (type='CSV' escape='\\\\' field_optionally_enclosed_by='\"')
-                    """.format(
-                        self.table_name(stream, True),
-                        ', '.join(self.column_names()),
-                        self.connection_config['s3_bucket'],
-                        s3_key,
-                        self.connection_config['aws_access_key_id'],
-                        self.connection_config['aws_secret_access_key']
-                    )
-                    cur.execute(copy_sql)
-
-                # Data is now loaded into temp table, time to merge into the destination table
-                #
-                # Merge is done by two steps:
-                #   1. Update existing rows - where primary key exists
-                #   2. Insert new rows - where primary key not exists
+                # Insert or Update with MERGE command if primary key defined
                 if len(self.stream_schema_message['key_properties']) > 0:
-                    cur.execute(self.update_from_temp_table())
-                    updated = cur._total_rowcount
-                cur.execute(self.insert_from_temp_table())
-                inserted = cur._total_rowcount
-
-                logger.info("INSERTED {} rows, UPDATED {} rows".format(inserted, updated))
-                cur.execute(self.drop_temp_table())
-
-    def insert_from_temp_table(self):
-        stream_schema_message = self.stream_schema_message
-        columns = self.column_names()
-        table = self.table_name(stream_schema_message['stream'], False)
-        temp_table = self.table_name(stream_schema_message['stream'], True)
-
-        if len(stream_schema_message['key_properties']) == 0:
-            return """INSERT INTO {} ({})
-                    (SELECT s.* FROM {} s)
+                    merge_sql = """MERGE INTO {} t
+                        USING (
+                            SELECT {}
+                              FROM @{}/{}
+                              (FILE_FORMAT => '{}')) s
+                        ON {}
+                        WHEN MATCHED THEN
+                            UPDATE SET {}
+                        WHEN NOT MATCHED THEN
+                            INSERT ({})
+                            VALUES ({})
                     """.format(
-                table,
-                ', '.join(columns),
-                temp_table
-            )
+                        self.table_name(stream, False),
+                        ', '.join(["${} {}".format(i + 1, c) for i, c in enumerate(self.column_names())]),
+                        self.connection_config['stage'],
+                        s3_key,
+                        self.connection_config['file_format'],
+                        self.primary_key_merge_condition(),
+                        ', '.join(['{}=s.{}'.format(c, c) for c in self.column_names()]),
+                        ', '.join(self.column_names()),
+                        ', '.join(['s.{}'.format(c) for c in self.column_names()])
+                    )
+                    logger.info("SNOWFLAKE - {}".format(merge_sql))
+                    cur.execute(merge_sql)
 
-        return """INSERT INTO {} ({})
-        (SELECT s.* FROM {} s LEFT OUTER JOIN {} t ON {} WHERE {})
-        """.format(
-            table,
-            ', '.join(columns),
-            temp_table,
-            table,
-            self.primary_key_condition('t'),
-            self.primary_key_null_condition('t')
-        )
+                # Insert only with COPY command if no primary key
+                else:
+                    copy_sql = """COPY INTO {} ({}) FROM @{}/{}
+                        FILE_FORMAT = (format_name='{}')
+                    """.format(
+                        self.table_name(stream, True),
+                        ', '.join(self.column_names()),
+                        self.connection_config['stage'],
+                        s3_key,
+                        self.connection_config['file_format'],
+                    )
+                    logger.info("SNOWFLAKE - {}".format(copy_sql))
+                    cur.execute(copy_sql)
 
-    def update_from_temp_table(self):
-        stream_schema_message = self.stream_schema_message
-        columns = self.column_names()
-        table = self.table_name(stream_schema_message['stream'], False)
-        temp_table = self.table_name(stream_schema_message['stream'], True)
-        return """UPDATE {} SET {} FROM {} s
-        WHERE {}
-        """.format(
-            table,
-            ', '.join(['{}=s.{}'.format(c, c) for c in columns]),
-            temp_table,
-            self.primary_key_condition(table)
-        )
-
-    def primary_key_condition(self, right_table):
+    def primary_key_merge_condition(self):
         stream_schema_message = self.stream_schema_message
         names = primary_column_names(stream_schema_message)
-        return ' AND '.join(['s.{} = {}.{}'.format(c, right_table, c) for c in names])
-
-    def primary_key_null_condition(self, right_table):
-        stream_schema_message = self.stream_schema_message
-        names = primary_column_names(stream_schema_message)
-        return ' AND '.join(['{}.{} is null'.format(right_table, c) for c in names])
-
-    def drop_temp_table(self):
-        stream_schema_message = self.stream_schema_message
-        temp_table = self.table_name(stream_schema_message['stream'], True)
-        return "DROP TABLE {}".format(temp_table)
+        return ' AND '.join(['s.{} = t.{}'.format(c, c) for c in names])
 
     def column_names(self):
         return [safe_column_name(name) for name in self.flatten_schema]

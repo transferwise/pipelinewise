@@ -18,6 +18,8 @@ def get_db_config():
     config['password'] = os.environ.get('TARGET_SNOWFLAKE_PASSWORD')
     config['warehouse'] = os.environ.get('TARGET_SNOWFLAKE_WAREHOUSE')
     config['schema'] = os.environ.get("TARGET_SNOWFLAKE_SCHEMA")
+    config['stage'] = os.environ.get("TARGET_SNOWFLAKE_STAGE")
+    config['file_format'] = os.environ.get("TARGET_SNOWFLAKE_FILE_FORMAT")
 
     # AWS IAM and S3 bucket
     config['aws_access_key_id'] = os.environ.get('TARGET_SNOWFLAKE_AWS_ACCESS_KEY')
@@ -27,7 +29,6 @@ def get_db_config():
 
     # External stage in snowflake with client side encryption details
     config['client_side_encryption_master_key'] = os.environ.get('CLIENT_SIDE_ENCRYPTION_MASTER_KEY')
-    config['client_side_encryption_stage_object'] = os.environ.get('CLIENT_SIDE_ENCRYPTION_STAGE_OBJECT')
 
 
     # --------------------------------------------------------------------------

@@ -14,6 +14,27 @@ Like any other target that's following the singer specificiation:
 
 It's reading incoming messages from STDIN and using the properites in `config.json` to upload data into Snowflake
 
+### Pre-requirements
+
+You need to create two objects in snowflake in one schema before start using this target.
+
+1. A named external stage object on S3. This will be used to upload the CSV files to S3 and to MERGE data into snowflake tables.
+
+```
+CREATE STAGE {schema}.{stage_name}
+url='s3://{s3_bucket}'
+credentials=(AWS_KEY_ID='{aws_key_id}' AWS_SECRET_KEY='{aws_secret_key}')
+encryption=(MASTER_KEY='{client_side_encryption_master_key}');
+```
+
+The `encryption` option is optional and used for client side encryption. If you want client side encryption enabled you'll need
+to define the same master key in the target `config.json`. Furhter details below in the Configuration settings section.
+
+2. A named file format. This will be used by the MERGE/COPY commands to parse the CSV files correctly from S3:
+
+`CREATE file format IF NOT EXISTS {schema}.{file_format_name} type = 'CSV' escape='\\' field_optionally_enclosed_by='"';`
+
+
 ### Configuration settings
 
 Settings are stored in a `config.json` JSON and in a map 
@@ -29,6 +50,8 @@ Settings are stored in a `config.json` JSON and in a map
 | aws_secret_access_key               | String  | Yes        | S3 Secret Access Key                                          |
 | s3_bucket                           | String  | Yes        | S3 Bucket name                                                |
 | s3_key_prefix                       | String  |            | (Default: None) A static prefix before the generated S3 key names. Using prefixes you can upload files into specific directories in the S3 bucket. |
+| stage                               | String  | Yes        | Named external stage name created at pre-requirements section. Has to be a fully qualified name including the schema name |
+| file_format                         | String  | Yes        | Named file format name created at pre-requirements section. Has to be a fully qualified name including the schema name. |
 | batch_size                          | Integer |            | (Default: 100000) Maximum number of rows in each batch. At the end of each batch, the rows in the batch are loaded into Snowflake. |
 | schema                              | String  |            | Name of the schema where the tables will be created           |
 | dynamic_schema_name                 | Boolean |            | (Default: False) When it's true, the schema names will be created automatically derived from the incoming stream name |
@@ -56,6 +79,8 @@ Settings are stored in a `config.json` JSON and in a map
   export TARGET_SNOWFLAKE_AWS_SECRET_ACCESS_KEY=<aws-access-secret-access-key>
   export TARGET_SNOWFLAKE_S3_BUCKET=<s3-external-bucket>
   export TARGET_SNOWFLAKE_S3_KEY_PREFIX=<bucket-directory>
+  export TARGET_SNOWFLAKE_STAGE=<stage-object-with-schema-name>
+  export TARGET_SNOWFLAKE_FILE_FORMAT=<file-format-object-with-schema-name>
   export CLIENT_SIDE_ENCRYPTION_MASTER_KEY=<client_side_encryption_master_key>
   export CLIENT_SIDE_ENCRYPTION_STAGE_OBJECT=<client_side_encryption_stage_object>
 ```
