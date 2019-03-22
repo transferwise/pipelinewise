@@ -361,7 +361,7 @@ class DbSync:
                     copy_sql = """COPY INTO {} ({}) FROM @{}/{}
                         FILE_FORMAT = (format_name='{}')
                     """.format(
-                        self.table_name(stream, True),
+                        self.table_name(stream, False),
                         ', '.join(self.column_names()),
                         self.connection_config['stage'],
                         s3_key,
