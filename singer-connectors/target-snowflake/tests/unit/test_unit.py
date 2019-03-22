@@ -26,7 +26,9 @@ class TestUnit(unittest.TestCase):
             'aws_access_key_id':        "dummy-value",
             'aws_secret_access_key':    "dummy-value",
             's3_bucket':                "dummy-value",
-            'schema':                   "dummy-value"
+            'schema':                   "dummy-value",
+            'stage':                    "dummy-value",
+            'file_format':              "dummy-value"
         }
 
         # Config validator returns a list of errors
@@ -53,17 +55,6 @@ class TestUnit(unittest.TestCase):
         config_with_dynamic_schema_name.pop('schema')
         config_with_dynamic_schema_name['dynamic_schema_name'] = True
         self.assertEqual(len(validator(config_with_dynamic_schema_name)), 0)
-
-        # Configuration with client-side encryption with no stage object  - (nr_of_errors >= 0)
-        config_with_cse_no_stage_object = minimal_config.copy()
-        config_with_cse_no_stage_object['client_side_encryption_master_key'] = "dummy-value"
-        self.assertGreater(len(validator(config_with_cse_no_stage_object)), 0)
-
-        # Configuration with client-side encryption  - (nr_of_errors >= 0)
-        config_with_cse_no_stage_object = minimal_config.copy()
-        config_with_cse_no_stage_object['client_side_encryption_master_key'] = "dummy-value"
-        config_with_cse_no_stage_object['client_side_encryption_stage_object'] = "dummy-value"
-        self.assertEqual(len(validator(config_with_cse_no_stage_object)), 0)
 
 
     def test_column_type_mapping(self):
