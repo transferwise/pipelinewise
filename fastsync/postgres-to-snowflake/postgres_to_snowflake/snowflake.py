@@ -106,7 +106,7 @@ class Snowflake:
             """.format(
                 target_schema,
                 target_table,
-                self.connection_config['client_side_encryption_stage_object'],
+                self.connection_config['stage'],
                 s3_key
             )
             self.query(sql)
