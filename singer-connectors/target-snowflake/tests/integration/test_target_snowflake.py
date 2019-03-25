@@ -281,9 +281,9 @@ class TestIntegration(unittest.TestCase):
         self.assertEqual(
             table_non_db_friendly_columns,
             [
-                    {'C_PK': 1, 'CAMELCASECOLUMN': 'Dummy row 1'},
-                    {'C_PK': 2, 'CAMELCASECOLUMN': 'Dummy row 2'},
-                    {'C_PK': 3, 'CAMELCASECOLUMN': 'Dummy row 3'},
-                    {'C_PK': 4, 'CAMELCASECOLUMN': 'Dummy row 4'},
-                    {'C_PK': 5, 'CAMELCASECOLUMN': 'Dummy row 5'},
+                    {'C_PK': 1, 'CAMELCASECOLUMN': 'Dummy row 1', 'MINUS-COLUMN': 'Dummy row 1'},
+                    {'C_PK': 2, 'CAMELCASECOLUMN': 'Dummy row 2', 'MINUS-COLUMN': 'Dummy row 2'},
+                    {'C_PK': 3, 'CAMELCASECOLUMN': 'Dummy row 3', 'MINUS-COLUMN': 'Dummy row 3'},
+                    {'C_PK': 4, 'CAMELCASECOLUMN': 'Dummy row 4', 'MINUS-COLUMN': 'Dummy row 4'},
+                    {'C_PK': 5, 'CAMELCASECOLUMN': 'Dummy row 5', 'MINUS-COLUMN': 'Dummy row 5'},
             ])
