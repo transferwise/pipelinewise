@@ -264,3 +264,26 @@ class TestIntegration(unittest.TestCase):
                     {'C_INT': 5, 'C_PK': 5, 'C_VARCHAR': 'Arabic: لقد لعبت أنت وأصدقاؤك لمدة وحصلتم علي من إجمالي النقاط'},
                     {'C_INT': 6, 'C_PK': 6, 'C_VARCHAR': 'Special Characters: [",\'!@£$%^&*()]'}
             ])
+
+
+    def test_non_db_friendly_columns(self):
+        """Loading non-db friendly columns like, camelcase, minus signs, etc."""
+        tap_lines = test_utils.get_test_tap_lines('messages-with-non-db-friendly-columns.json')
+
+        # Load with default settings
+        target_snowflake.persist_lines(self.config, tap_lines)
+
+        # Get loaded rows from tables
+        snowflake = DbSync(self.config)
+        target_schema = self.config.get('schema', '')
+        table_non_db_friendly_columns = snowflake.query("SELECT * FROM {}.test_table_non_db_friendly_columns ORDER BY c_pk".format(target_schema))
+
+        self.assertEqual(
+            table_non_db_friendly_columns,
+            [
+                    {'C_PK': 1, 'CAMELCASECOLUMN': 'Dummy row 1'},
+                    {'C_PK': 2, 'CAMELCASECOLUMN': 'Dummy row 2'},
+                    {'C_PK': 3, 'CAMELCASECOLUMN': 'Dummy row 3'},
+                    {'C_PK': 4, 'CAMELCASECOLUMN': 'Dummy row 4'},
+                    {'C_PK': 5, 'CAMELCASECOLUMN': 'Dummy row 5'},
+            ])
