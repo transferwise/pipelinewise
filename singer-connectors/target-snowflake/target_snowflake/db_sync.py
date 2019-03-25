@@ -72,6 +72,15 @@ def column_type(schema_property):
     return column_type
 
 
+def column_trans(schema_property):
+    property_type = schema_property['type']
+    column_trans = ''
+    if 'object' in property_type or 'array' in property_type:
+        column_trans = 'parse_json'
+
+    return column_trans
+
+
 def inflect_column_name(name):
     return inflection.underscore(name)
 
@@ -320,11 +329,18 @@ class DbSync:
 
 
     def load_csv(self, s3_key, count):
-        inserted = 0
-        updated = 0
         stream_schema_message = self.stream_schema_message
         stream = stream_schema_message['stream']
         logger.info("Loading {} rows into '{}'".format(count, self.table_name(stream, False)))
+
+        # Get list if columns with types
+        columns_with_trans = [
+            {
+                "name": safe_column_name(name),
+                "trans": column_trans(schema)
+            }
+            for (name, schema) in self.flatten_schema.items()
+        ]
 
         with self.open_connection() as connection:
             with connection.cursor(snowflake.connector.DictCursor) as cur:
@@ -344,14 +360,14 @@ class DbSync:
                             VALUES ({})
                     """.format(
                         self.table_name(stream, False),
-                        ', '.join(["${} {}".format(i + 1, c) for i, c in enumerate(self.column_names())]),
+                        ', '.join(["{}(${}) {}".format(c['trans'], i + 1, c['name']) for i, c in enumerate(columns_with_trans)]),
                         self.connection_config['stage'],
                         s3_key,
                         self.connection_config['file_format'],
                         self.primary_key_merge_condition(),
-                        ', '.join(['{}=s.{}'.format(c, c) for c in self.column_names()]),
-                        ', '.join(self.column_names()),
-                        ', '.join(['s.{}'.format(c) for c in self.column_names()])
+                        ', '.join(['{}=s.{}'.format(c['name'], c['name']) for c in columns_with_trans]),
+                        ', '.join([c['name'] for c in columns_with_trans]),
+                        ', '.join(['s.{}'.format(c['name']) for c in columns_with_trans])
                     )
                     logger.info("SNOWFLAKE - {}".format(merge_sql))
                     cur.execute(merge_sql)
@@ -362,7 +378,7 @@ class DbSync:
                         FILE_FORMAT = (format_name='{}')
                     """.format(
                         self.table_name(stream, False),
-                        ', '.join(self.column_names()),
+                        ', '.join([c['name'] for c in columns_with_trans]),
                         self.connection_config['stage'],
                         s3_key,
                         self.connection_config['file_format'],
