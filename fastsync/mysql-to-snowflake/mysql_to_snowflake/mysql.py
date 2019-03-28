@@ -151,6 +151,8 @@ class MySql:
                                     THEN concat('cast(`', column_name, '` AS unsigned)')
                             WHEN data_type IN ('datetime', 'timestamp', 'date')
                                     THEN concat('nullif(`', column_name, '`,"0000-00-00 00:00:00")')
+                            WHEN column_type IN ('tinyint(1)')
+                                    THEN concat('CASE WHEN ' , column_name , ' is null THEN null WHEN ' , column_name , ' = 0 THEN 0 ELSE 1 END)')
                             WHEN column_name = 'raw_data_hash'
                                     THEN concat('hex(', column_name, ')')
                             ELSE concat('cast(`', column_name, '` AS char CHARACTER SET utf8)')
