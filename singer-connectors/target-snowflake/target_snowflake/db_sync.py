@@ -81,10 +81,6 @@ def column_trans(schema_property):
     return column_trans
 
 
-def inflect_column_name(name):
-    return inflection.underscore(name)
-
-
 def safe_column_name(name):
     return '"{}"'.format(name).upper()
 
@@ -95,7 +91,7 @@ def column_clause(name, schema_property):
 
 def flatten_key(k, parent_key, sep):
     full_key = parent_key + [k]
-    inflected_key = [inflect_column_name(n) for n in full_key]
+    inflected_key = [n for n in full_key]
     reducer_index = 0
     while len(sep.join(inflected_key)) >= 63 and reducer_index < len(inflected_key):
         reduced_key = re.sub(r'[a-z]', '', inflection.camelize(inflected_key[reducer_index]))
@@ -145,7 +141,7 @@ def flatten_record(d, parent_key=[], sep='__'):
 
 
 def primary_column_names(stream_schema_message):
-    return [safe_column_name(inflect_column_name(p)) for p in stream_schema_message['key_properties']]
+    return [safe_column_name(p) for p in stream_schema_message['key_properties']]
 
 def stream_name_to_dict(stream_name, schema_name_postfix = None):
     schema_name = None
@@ -268,7 +264,7 @@ class DbSync:
         if len(self.stream_schema_message['key_properties']) == 0:
             return None
         flatten = flatten_record(record)
-        key_props = [str(flatten[inflect_column_name(p)]) for p in self.stream_schema_message['key_properties']]
+        key_props = [str(flatten[p]) for p in self.stream_schema_message['key_properties']]
         return ','.join(key_props)
 
     def record_to_csv_line(self, record):
