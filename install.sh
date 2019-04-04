@@ -60,10 +60,10 @@ install_fastsync postgres-to-snowflake
 install_cli
 
 # Install REST API
-install_rest_api 
+#install_rest_api
 
 # Install web frontent
-install_admin_console
+#install_admin_console
 
 echo "--------------------------------------------------------------------------"
 echo "PipelineWise installed successfully"
