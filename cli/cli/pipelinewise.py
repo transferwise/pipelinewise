@@ -3,7 +3,6 @@
 import os
 import shutil
 import tempfile
-import errno
 from subprocess import Popen, PIPE, STDOUT
 import shlex
 import sys
@@ -70,16 +69,7 @@ class PipelineWise(object):
 
         self.tranform_field_bin = self.get_connector_bin("transform-field")
 
-    def silentremove(self, file):
-        self.logger.debug('Removing file at {}'.format(file))
 
-        try:
-            os.remove(file)
-        except OSError as e:
-
-            # errno.ENOENT = no such file or directory
-            if e.errno != errno.ENOENT:
-                raise
     def search_files(self, search_dir, patterns=['*'], sort=False):
         files = []
         if os.path.isdir(search_dir):
@@ -1009,19 +999,19 @@ class PipelineWise(object):
         # Delete temp files if there is any
         except RunCommandException as exc:
             self.logger.error(exc)
-            self.silentremove(cons_target_config)
-            self.silentremove(tap_properties_fastsync)
-            self.silentremove(tap_properties_singer)
+            utils.silentremove(cons_target_config)
+            utils.silentremove(tap_properties_fastsync)
+            utils.silentremove(tap_properties_singer)
             sys.exit(1)
         except Exception as exc:
-            self.silentremove(cons_target_config)
-            self.silentremove(tap_properties_fastsync)
-            self.silentremove(tap_properties_singer)
+            utils.silentremove(cons_target_config)
+            utils.silentremove(tap_properties_fastsync)
+            utils.silentremove(tap_properties_singer)
             raise exc
 
-        self.silentremove(cons_target_config)
-        self.silentremove(tap_properties_fastsync)
-        self.silentremove(tap_properties_singer)
+        utils.silentremove(cons_target_config)
+        utils.silentremove(tap_properties_fastsync)
+        utils.silentremove(tap_properties_singer)
 
 
     def sync_tables(self):
@@ -1089,13 +1079,13 @@ class PipelineWise(object):
         # Delete temp file if there is any
         except RunCommandException as exc:
             self.logger.error(exc)
-            self.silentremove(cons_target_config)
+            utils.silentremove(cons_target_config)
             sys.exit(1)
         except Exception as exc:
             self.silentremove(cons_target_config)
             raise exc
 
-        self.silentremove(cons_target_config)
+        utils.silentremove(cons_target_config)
 
 
     def import_config(self):

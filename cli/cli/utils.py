@@ -2,6 +2,7 @@ import os
 import sys
 import json
 import yaml
+import errno
 import logging
 
 from datetime import date, datetime
@@ -41,6 +42,9 @@ class AnsibleJSONEncoder(json.JSONEncoder):
 
 
 def load_json(path):
+    '''
+    Deserialise JSON file to python object
+    '''
     try:
         logger.debug('Parsing file at {}'.format(path))
         if os.path.isfile(path):
@@ -106,3 +110,18 @@ def delete_empty_keys(d):
     Deleting every key from a dictionary where the values are empty
     '''
     return {k: v for k, v in d.items() if v is not None}
+
+
+
+def silentremove(path):
+    '''
+    Deleting file with no error message if the file not exists
+    '''
+    logger.debug('Removing file at {}'.format(path))
+    try:
+        os.remove(path)
+    except OSError as e:
+
+        # errno.ENOENT = no such file or directory
+        if e.errno != errno.ENOENT:
+            raise
