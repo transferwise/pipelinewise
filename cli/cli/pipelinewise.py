@@ -550,6 +550,14 @@ class PipelineWise(object):
         # Make selection from selectection.json if exists
         try:
             schema_with_diff = self.make_default_selection(schema_with_diff, tap_selection_file)
+            schema_with_diff = utils.delete_keys_from_dict(
+                self.make_default_selection(schema_with_diff, tap_selection_file),
+
+                # Removing multipleOf json schema validations from properties.json,
+                # that's causing run time issues
+                ['multipleOf']
+            )
+
         except Exception as exc:
             return "Cannot load selection JSON at {}. {}".format(tap_selection_file, str(exc))
 

@@ -5,11 +5,14 @@ import yaml
 import errno
 import glob
 import shlex
+import copy
 import re
 import logging
 
 from subprocess import Popen, PIPE, STDOUT
 from datetime import date, datetime
+from collections import MutableMapping
+from contextlib import suppress
 
 from ansible.parsing.vault import VaultLib, get_file_vault_secret, is_encrypted_file
 from ansible.parsing.yaml.loader import AnsibleLoader
@@ -147,6 +150,16 @@ def delete_empty_keys(d):
     '''
     return {k: v for k, v in d.items() if v is not None}
 
+
+def delete_keys_from_dict(d, keys):
+    '''
+    Delete specific keys from a nested dictionary
+    '''
+    if not isinstance(d, (dict, list)):
+        return d
+    if isinstance(d, list):
+        return [v for v in (delete_keys_from_dict(v, keys) for v in d) if v]
+    return {k: v for k, v in ((k, delete_keys_from_dict(v, keys)) for k, v in d.items()) if k not in keys}
 
 
 def silentremove(path):

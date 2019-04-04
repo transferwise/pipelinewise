@@ -118,6 +118,7 @@ class Config(object):
             # Save every tap JSON files
             for i, tap in enumerate(target['taps']):
                 # Add unique server_id to db_conn when tap type is mysql
+                extra_config_keys = {}
                 if tap.get('type') == 'tap-mysql':
                     extra_config_keys = {'server_id': 900000000 + i}
 
