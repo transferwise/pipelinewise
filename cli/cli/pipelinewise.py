@@ -16,6 +16,10 @@ from datetime import datetime
 from crontab import CronTab, CronSlices
 from tabulate import tabulate
 
+from joblib import Parallel, delayed, parallel_backend
+
+from .config import Config
+
 class RunCommandException(Exception):
     def __init__(self, *args, **kwargs):
         Exception.__init__(self, *args, **kwargs)
@@ -47,7 +51,7 @@ class PipelineWise(object):
 
     def __init__(self, args, config_dir, venv_dir):
         self.args = args
-        self.__init_logger('TransferData CLI')
+        self.__init_logger('Pipelinewise CLI')
 
         self.config_dir = config_dir
         self.venv_dir = venv_dir
@@ -382,7 +386,7 @@ class PipelineWise(object):
     
     def run_command(self, command, log_file=False):
         piped_command = "/bin/bash -o pipefail -c '{}'".format(command)
-        self.logger.info('Running command: {}'.format(piped_command))
+        self.logger.debug('Running command: {}'.format(piped_command))
 
         # Logfile is needed: Continuously polling STDOUT and STDERR and writing into a log file
         # Once the command finished STDERR redirects to STDOUT and returns _only_ STDOUT
@@ -423,7 +427,7 @@ class PipelineWise(object):
                 # Add success status to the log file name
                 os.rename(log_file_running, log_file_success)
             
-            return [stdout, None]     
+            return [rc, stdout, None]
         
         # No logfile needed: STDOUT and STDERR returns in an array once the command finished
         else:
@@ -435,9 +439,8 @@ class PipelineWise(object):
 
             if rc != 0:
               self.logger.error(stderr)
-              sys.exit(rc)
             
-            return [stdout, stderr]
+            return [rc, stdout, stderr]
 
     def merge_schemas(self, old_schema, new_schema):
         schema_with_diff = new_schema
@@ -615,7 +618,7 @@ class PipelineWise(object):
         result = self.run_command(command)
 
         # Get output and errors from tap
-        new_schema, tap_output = result
+        rc, new_schema, tap_output = result
         self.logger.info("Tap output: {}".format(tap_output))
 
         # If the connection success then the response needs to be a valid JSON string
@@ -625,33 +628,50 @@ class PipelineWise(object):
             self.logger.error("Schema discovered by {} ({}) is not a valid JSON.".format(tap_id, tap_type))
             sys.exit(1)
 
-    def discover_tap(self):
-        tap_id = self.tap["id"]
-        tap_type = self.tap["type"]
-        target_id = self.target["id"]
-        target_type = self.target["type"]
-        old_schema_path = self.tap["files"]["properties"]
+    def discover_tap(self, tap=None, target=None):
+        # Define tap props
+        if tap is None:
+            tap_id = self.tap.get('id')
+            tap_type = self.tap.get('type')
+            tap_config_file = self.tap.get('files', {}).get('config')
+            tap_properties_file = self.tap.get('files', {}).get('properties')
+            tap_bin = self.tap_bin
 
-        self.logger.info("Discovering {} ({}) tap in {} ({}) target".format(tap_id, tap_type, target_id, target_type))
+        else:
+            tap_id = tap.get('id')
+            tap_type = tap.get('type')
+            tap_config_file = tap.get('files', {}).get('config')
+            tap_properties_file = tap.get('files', {}).get('properties')
+            tap_bin = self.get_connector_bin(tap_type)
+
+        # Define target props
+        if target is None:
+            target_id = self.target.get('id')
+            target_type = self.target.get('type')
+        else:
+            target_id = target.get('id')
+            target_type = target.get('type')
+
+        self.logger.info("Discovering {} ({}) tap in {} ({}) target...".format(tap_id, tap_type, target_id, target_type))
 
         # Generate and run the command to run the tap directly
-        tap_config = self.tap["files"]["config"]
-        command = "{} --config {} --discover".format(self.tap_bin, tap_config)
+        command = "{} --config {} --discover".format(tap_bin, tap_config_file)
         result = self.run_command(command)
 
         # Get output and errors from tap
-        new_schema, tap_output = result
-        self.logger.info("Tap output: {}".format(tap_output))
+        rc, new_schema, output = result
+
+        if rc != 0:
+            return "{} - {}".format(target_id, tap_id)
 
         # Convert JSON string to object
         try:
             new_schema = json.loads(new_schema)
         except Exception as exc:
-            self.logger.error("Schema discovered by {} ({}) is not a valid JSON.".format(tap_id, tap_type))
-            sys.exit(1)
+            return "Schema discovered by {} ({}) is not a valid JSON.".format(tap_id, tap_type)
 
         # Merge the old and new schemas and diff changes
-        old_schema = self.load_json(old_schema_path)
+        old_schema = self.load_json(tap_properties_file)
         if old_schema:
             schema_with_diff = self.merge_schemas(old_schema, new_schema)
         else :
@@ -662,12 +682,11 @@ class PipelineWise(object):
 
         # Save the new catalog into the tap
         try:
-            tap_properties_path = self.tap["files"]["properties"]
-            self.logger.info("Writing new properties file with changes into {}".format(tap_properties_path))
-            self.save_json(schema_with_diff, tap_properties_path)
+            self.logger.info("Writing new properties file with changes into {}".format(tap_properties_file))
+            self.save_json(schema_with_diff, tap_properties_file)
         except Exception as exc:
-            self.logger.error("Cannot save file. {}".format(str(exc)))
-            sys.exit(1)
+            return "Cannot save file. {}".format(str(exc))
+
 
     def detect_tap_status(self, target_id, tap_id):
         self.logger.debug('Detecting {} tap status in {} target'.format(tap_id, target_id))
@@ -1092,3 +1111,57 @@ class PipelineWise(object):
             raise exc
 
         self.silentremove(cons_target_config)
+
+
+    def import_config(self):
+        """
+        Take a list of YAML files from a directory and use it as the source to build
+        singer compatible json files and organise them into pipeline directory structure
+        """
+        # Read the YAML config files and transform/save into singer compatible
+        # JSON files in a common directory structure
+        config = Config.from_yamls(self.config_dir, self.args.dir, self.args.secret)
+        config.save()
+
+        # Activating tap stream selections
+        #
+        # Run every tap in discovery mode to generate the singer specific
+        # properties.json files for the taps. The properties file than
+        # updated to replicate only the tables that is defined in the YAML
+        # files and to use the required replication methods
+        #
+        # The tap Discovery mode needs to connect to each source databases and
+        # doing that sequentially is slow. For a better performance we do it
+        # in parallel.
+        self.logger.info("ACTIVATING TAP STREAM SELECTIONS...")
+        for tk in config.targets.keys():
+            target = config.targets.get(tk)
+            start_time = datetime.now()
+            with parallel_backend('threading', n_jobs=-1):
+                discover_excs = Parallel(verbose=100)(delayed(self.discover_tap)(
+                    tap=tap,
+                    target=target
+                ) for (tap) in target.get('taps'))
+
+            # Log summary
+            end_time = datetime.now()
+            self.logger.info("""
+                -------------------------------------------------------
+                IMPORTING YAML CONFIGS FINISHED - TARGET: [{}]
+                -------------------------------------------------------
+                    Total taps to import           : {}
+                    Tables loaded successfully     : {}
+                    Taps failed imported           : {}
+
+                    Runtime                        : {}
+                -------------------------------------------------------
+                """.format(
+                    tk,
+                    len(target.get('taps')),
+                    len(target.get('taps')) - len(discover_excs),
+                    str(discover_excs),
+                    end_time  - start_time
+                ))
+            if len(discover_excs) > 0:
+                sys.exit(1)
+

@@ -21,13 +21,16 @@ commands = [
   'test_tap_connection',
   'clear_crontab',
   'init_crontab',
-  'sync_tables'
+  'sync_tables',
+  'import_config'
 ]
 
 command_help = """Available commands, """ + ','.join(commands)
 target_help = """Name of the target"""
 tap_help = """Name of the tap"""
 tables_help = """List of tables to sync"""
+dir_help = """Path to directory with config"""
+secret_help = """Path to vault password file"""
 version_help = """Displays the installed versions"""
 debug_help = """Forces the debug mode with logging on stdout and log level debug."""
 
@@ -38,6 +41,8 @@ def main():
     parser.add_argument('--target', type=str, default='*', help=target_help)
     parser.add_argument('--tap', type=str, default='*', help=tap_help)
     parser.add_argument('--tables', type=str, help=tables_help)
+    parser.add_argument('--dir', type=str, default='*', help=dir_help)
+    parser.add_argument('--secret', type=str, default='*', help=secret_help)
     parser.add_argument('--version', action="version", help=version_help, version='TransferData {} - Command Line Interface'.format(__version__))
     parser.add_argument('--debug', default=False, required=False, help=debug_help, action="store_true")
 
@@ -58,6 +63,14 @@ def main():
             sys.exit(1)
         if args.target == '*':
             print("You must specify a destination name using the argument --target")
+            sys.exit(1)
+
+    if args.command == 'import_config':
+        if args.dir == '*':
+            print("You must specify a directory path with config YAML files using the argumant --dir")
+            sys.exit(1)
+        if args.secret == '*':
+            print("You must specify a path to the vault secret file using the argument --secret")
             sys.exit(1)
 
     pipelinewise = PipelineWise(args, config_dir, venv_dir)

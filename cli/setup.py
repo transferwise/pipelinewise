@@ -13,7 +13,10 @@ setup(name='cli',
     install_requires=[
         'argparse==1.4.0',
         'python-crontab==2.3.5',
-        'tabulate==0.8.2'
+        'tabulate==0.8.2',
+        'PyYAML==5.1.0',
+        'ansible-vault==1.2.0',
+        'joblib==0.13.2'
     ],
     entry_points='''
         [console_scripts]
