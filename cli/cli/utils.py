@@ -1,6 +1,7 @@
+import os
+import sys
 import json
 import yaml
-import sys
 import logging
 
 from datetime import date, datetime
@@ -37,6 +38,18 @@ class AnsibleJSONEncoder(json.JSONEncoder):
             # use default encoder
             value = super(AnsibleJSONEncoder, self).default(o)
         return value
+
+
+def load_json(path):
+    try:
+        logger.debug('Parsing file at {}'.format(path))
+        if os.path.isfile(path):
+            with open(path) as f:
+                return json.load(f)
+        else:
+            return None
+    except Exception as exc:
+        raise Exception("Error parsing {} {}".format(path, exc))
 
 
 def save_json(data, path):

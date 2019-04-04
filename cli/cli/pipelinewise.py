@@ -18,6 +18,7 @@ from tabulate import tabulate
 
 from joblib import Parallel, delayed, parallel_backend
 
+from . import utils
 from .config import Config
 
 class RunCommandException(Exception):
@@ -111,36 +112,18 @@ class PipelineWise(object):
         except Exception as exc:
             return False
 
-    def load_json(self, file):
-        try:
-            self.logger.debug('Parsing file at {}'.format(file))
-            if os.path.isfile(file):
-                with open(file) as f:
-                    return json.load(f)
-            else:
-                return None
-        except Exception as exc:
-            raise Exception("Error parsing {} {}".format(file, exc))
-
-    def save_json(self, data, file):
-        try:
-            self.logger.info("Saving JSON {}".format(file))
-            with open(file, 'w') as f:
-                return json.dump(data, f, indent=2, sort_keys=True)
-        except Exception as exc:
-            raise Exception("Cannot save JSON {} {}".format(file, exc))
 
     def create_consumable_target_config(self, target_config, tap_inheritable_config):
         try:
-            dictA = self.load_json(target_config)
-            dictB = self.load_json(tap_inheritable_config)
+            dictA = utils.load_json(target_config)
+            dictB = utils.load_json(tap_inheritable_config)
 
             # Copy everything from dictB into dictA - Not a real merge
             dictA.update(dictB)
 
             # Save the new dict as JSON into a temp file
             tempfile_path = tempfile.mkstemp()[1]
-            self.save_json(dictA, tempfile_path)
+            utils.save_json(dictA, tempfile_path)
 
             return tempfile_path
         except Exception as exc:
@@ -175,8 +158,8 @@ class PipelineWise(object):
         self.logger.debug("Filtering properties JSON by conditions: {}".format(filters))
         try:
             # Load JSON files
-            properties = self.load_json(tap_properties)
-            state = self.load_json(tap_state)
+            properties = utils.load_json(tap_properties)
+            state = utils.load_json(tap_state)
 
             # Create a dictionary for tables that don't meet filter criterias
             fallback_properties = copy.deepcopy(properties) if create_fallback else None
@@ -266,10 +249,10 @@ class PipelineWise(object):
             if create_fallback:
                 # Save to files: filtered and fallback properties
                 temp_properties_path = tempfile.mkstemp()[1]
-                self.save_json(properties, temp_properties_path)
+                utils.save_json(properties, temp_properties_path)
 
                 temp_fallback_properties_path = tempfile.mkstemp()[1]
-                self.save_json(fallback_properties, temp_fallback_properties_path)
+                utils.save_json(fallback_properties, temp_fallback_properties_path)
 
                 return temp_properties_path, filtered_tap_stream_ids, temp_fallback_properties_path, fallback_filtered_tap_stream_ids
 
@@ -277,7 +260,7 @@ class PipelineWise(object):
             else:
                 # Save eed to save
                 temp_properties_path = tempfile.mkstemp()[1]
-                self.save_json(properties, temp_properties_path)
+                utils.save_json(properties, temp_properties_path)
 
                 return temp_properties_path, filtered_tap_stream_ids
 
@@ -287,7 +270,7 @@ class PipelineWise(object):
 
     def load_config(self):
         self.logger.debug('Loading config at {}'.format(self.config_path))
-        self.config = self.load_json(self.config_path)
+        self.config = utils.load_json(self.config_path)
 
     def get_tap_dir(self, target_id, tap_id):
         return os.path.join(self.config_dir, target_id, tap_id)
@@ -566,7 +549,7 @@ class PipelineWise(object):
     def make_default_selection(self, schema, selection_file):
         if os.path.isfile(selection_file):
             self.logger.info("Loading pre defined selection from {}".format(selection_file))
-            tap_selection = self.load_json(selection_file)
+            tap_selection = utils.load_json(selection_file)
             selection = tap_selection["selection"]
 
             streams = schema["streams"]
@@ -669,7 +652,7 @@ class PipelineWise(object):
             return "Schema discovered by {} ({}) is not a valid JSON.".format(tap_id, tap_type)
 
         # Merge the old and new schemas and diff changes
-        old_schema = self.load_json(tap_properties_file)
+        old_schema = utils.load_json(tap_properties_file)
         if old_schema:
             schema_with_diff = self.merge_schemas(old_schema, new_schema)
         else :
@@ -685,7 +668,7 @@ class PipelineWise(object):
         # Save the new catalog into the tap
         try:
             self.logger.info("Writing new properties file with changes into {}".format(tap_properties_file))
-            self.save_json(schema_with_diff, tap_properties_file)
+            utils.save_json(schema_with_diff, tap_properties_file)
         except Exception as exc:
             return "Cannot save file. {}".format(str(exc))
 
@@ -850,7 +833,7 @@ class PipelineWise(object):
         # Detect if transformation is needed
         has_transformation = False
         if os.path.isfile(tap_transformation):
-            tr = self.load_json(tap_transformation)
+            tr = utils.load_json(tap_transformation)
             if 'transformations' in tr and len(tr['transformations']) > 0:
                 has_transformation = True
 
