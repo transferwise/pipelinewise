@@ -3,26 +3,19 @@
 import os
 import shutil
 import tempfile
-from subprocess import Popen, PIPE, STDOUT
-import shlex
 import sys
 import logging
 import json
-import re
-import glob
 import copy
+
 from datetime import datetime
 from crontab import CronTab, CronSlices
 from tabulate import tabulate
-
 from joblib import Parallel, delayed, parallel_backend
 
 from . import utils
 from .config import Config
 
-class RunCommandException(Exception):
-    def __init__(self, *args, **kwargs):
-        Exception.__init__(self, *args, **kwargs)
 
 class PipelineWise(object):
     '''...'''
@@ -68,39 +61,6 @@ class PipelineWise(object):
             self.target_bin = self.get_connector_bin(self.target["type"])
 
         self.tranform_field_bin = self.get_connector_bin("transform-field")
-
-
-    def search_files(self, search_dir, patterns=['*'], sort=False):
-        files = []
-        if os.path.isdir(search_dir):
-            # Search files and sort if required
-            p_files = []
-            for pattern in patterns:
-                p_files.extend(filter(os.path.isfile, glob.glob(os.path.join(search_dir, pattern))))
-            if sort:
-                p_files.sort(key=lambda x: os.path.getmtime(x), reverse=True)
-
-            # Cut the whole paths, we only need the filenames
-            files = list(map(lambda x: os.path.basename(x), p_files))
-
-        return files
-
-    def is_json(self, string):
-        try:
-            json_object = json.loads(string)
-        except Exception as exc:
-            return False
-        return True
-
-    def is_json_file(self, file):
-        try:
-            if os.path.isfile(file):
-                with open(file) as f:
-                    if json.load(f):
-                        return True
-            return False
-        except Exception as exc:
-            return False
 
 
     def create_consumable_target_config(self, target_config, tap_inheritable_config):
@@ -283,13 +243,6 @@ class PipelineWise(object):
             'transformation': os.path.join(connector_dir, 'transformation.json'),
             'selection': os.path.join(connector_dir, 'selection.json'),
         }
-
-    def get_fastsync_bin(self, tap_type, target_type):
-        source = tap_type.replace('tap-', '')
-        target = target_type.replace('target-', '')
-        fastsync_name = "{}-to-{}".format(source, target)
-
-        return os.path.join(self.venv_dir, fastsync_name, "bin", fastsync_name)
         
     def get_targets(self):
         self.logger.debug('Getting targets from {}'.format(self.config_path))
@@ -357,63 +310,6 @@ class PipelineWise(object):
 
         return tap
     
-    def run_command(self, command, log_file=False):
-        piped_command = "/bin/bash -o pipefail -c '{}'".format(command)
-        self.logger.debug('Running command: {}'.format(piped_command))
-
-        # Logfile is needed: Continuously polling STDOUT and STDERR and writing into a log file
-        # Once the command finished STDERR redirects to STDOUT and returns _only_ STDOUT
-        if log_file:
-            self.logger.info('Writing output into {}'.format(log_file))
-
-            # Create log dir if not exists
-            os.makedirs(os.path.dirname(log_file), exist_ok=True)
-
-            # Status embedded in the log file name
-            log_file_running = "{}.running".format(log_file)
-            log_file_failed = "{}.failed".format(log_file)
-            log_file_success = "{}.success".format(log_file)
-
-            # Start command
-            proc = Popen(shlex.split(piped_command), stdout=PIPE, stderr=STDOUT)
-            f = open("{}".format(log_file_running), "w+")
-            stdout = ''
-            while True:
-                line = proc.stdout.readline()
-                if proc.poll() is not None:
-                    break
-                if line:
-                    decoded_line = line.decode('utf-8')
-                    stdout += decoded_line
-                    f.write(decoded_line)
-                    f.flush()
-            
-            f.close()
-            rc = proc.poll()
-            if rc != 0:
-                # Add failed status to the log file name
-                os.rename(log_file_running, log_file_failed)
-
-                # Raise run command exception
-                raise RunCommandException("Command failed. Return code: {}".format(rc))
-            else:
-                # Add success status to the log file name
-                os.rename(log_file_running, log_file_success)
-            
-            return [rc, stdout, None]
-        
-        # No logfile needed: STDOUT and STDERR returns in an array once the command finished
-        else:
-            proc = Popen(shlex.split(piped_command), stdout=PIPE, stderr=PIPE)
-            x = proc.communicate()
-            rc = proc.returncode
-            stdout = x[0].decode('utf-8')
-            stderr = x[1].decode('utf-8')
-
-            if rc != 0:
-              self.logger.error(stderr)
-            
-            return [rc, stdout, stderr]
 
     def merge_schemas(self, old_schema, new_schema):
         schema_with_diff = new_schema
@@ -584,7 +480,7 @@ class PipelineWise(object):
         # We will use the discover option to test connection
         tap_config = self.tap["files"]["config"]
         command = "{} --config {} --discover".format(self.tap_bin, tap_config)
-        result = self.run_command(command)
+        result = utils.run_command(command)
 
         # Get output and errors from tap
         rc, new_schema, tap_output = result
@@ -627,7 +523,7 @@ class PipelineWise(object):
 
         # Generate and run the command to run the tap directly
         command = "{} --config {} --discover".format(tap_bin, tap_config_file)
-        result = self.run_command(command)
+        result = utils.run_command(command)
 
         # Get output and errors from tap
         rc, new_schema, output = result
@@ -679,7 +575,7 @@ class PipelineWise(object):
             status["currentStatus"] = "not-configured"
 
         # Tap exists and has log in running status
-        elif os.path.isdir(log_dir) and len(self.search_files(log_dir, patterns=['*.log.running'])) > 0:
+        elif os.path.isdir(log_dir) and len(utils.search_files(log_dir, patterns=['*.log.running'])) > 0:
             status["currentStatus"] = "running"
 
         # Configured and not running
@@ -688,42 +584,14 @@ class PipelineWise(object):
 
         # Get last run instance
         if os.path.isdir(log_dir):
-            log_files = self.search_files(log_dir, patterns=['*.log.success','*.log.failed'], sort=True)
+            log_files = utils.search_files(log_dir, patterns=['*.log.success','*.log.failed'], sort=True)
             if len(log_files) > 0:
                 last_log_file = log_files[0]
-                log_attr = self.extract_log_attributes(last_log_file)
+                log_attr = utils.extract_log_attributes(last_log_file)
                 status["lastStatus"] = log_attr["status"]
                 status["lastTimestamp"] = log_attr["timestamp"]
 
         return status
-
-    def extract_log_attributes(self, log_file):
-        self.logger.debug('Extracting attributes from log file {}'.format(log_file))
-        target_id = 'unknown'
-        tap_id = 'unknown'
-        timestamp = datetime.utcfromtimestamp(0).isoformat()
-        status = 'unknown'
-
-        try:
-            # Extract attributes from log file name
-            log_attr = re.search('(.*)-(.*)-(.*).log.(.*)', log_file)
-            target_id = log_attr.group(1)
-            tap_id = log_attr.group(2)
-            timestamp = datetime.strptime(log_attr.group(3), '%Y%m%d_%H%M%S').isoformat()
-            status = log_attr.group(4)
-
-        # Ignore exception when attributes cannot be extracted - Defaults will be used
-        except Exception:
-            pass
-
-        # Return as a dictionary
-        return {
-            'filename': log_file,
-            'target_id': target_id,
-            'tap_id': tap_id,
-            'timestamp': timestamp,
-            'status': status
-        }
 
     def show_status(self):
         targets = self.get_targets()
@@ -846,15 +714,15 @@ class PipelineWise(object):
 
         # Do not run if another instance is already running
         log_dir = os.path.dirname(log_file)
-        if os.path.isdir(log_dir) and len(self.search_files(log_dir, patterns=['*.log.running'])) > 0:
+        if os.path.isdir(log_dir) and len(utils.search_files(log_dir, patterns=['*.log.running'])) > 0:
             self.logger.info("Failed to run. Another instance of the same tap is already running. Log file detected in running status at {} ".format(log_dir))
             sys.exit(1)
 
         # Run command
-        result = self.run_command(command, log_file)
+        result = utils.run_command(command, log_file)
 
         # Save the new state file if created correctly
-        if self.is_json_file(new_tap_state):
+        if utils.is_json_file(new_tap_state):
             shutil.copyfile(new_tap_state, tap_state)
             os.remove(new_tap_state)
 
@@ -863,7 +731,7 @@ class PipelineWise(object):
         """
         Generating and running shell command to sync tables using the native fastsync components
         """
-        fastsync_bin = self.get_fastsync_bin(tap_type, target_type)
+        fastsync_bin = utils.get_fastsync_bin(self.venv_dir, tap_type, target_type)
 
         # Add state arugment if exists to extract data incrementally
         tap_transform_arg = ""
@@ -882,12 +750,12 @@ class PipelineWise(object):
 
         # Do not run if another instance is already running
         log_dir = os.path.dirname(log_file)
-        if os.path.isdir(log_dir) and len(self.search_files(log_dir, patterns=['*.log.running'])) > 0:
+        if os.path.isdir(log_dir) and len(utils.search_files(log_dir, patterns=['*.log.running'])) > 0:
             self.logger.info("Failed to run. Another instance of the same tap is already running. Log file detected in running status at {} ".format(log_dir))
             sys.exit(1)
 
         # Run command
-        result = self.run_command(command, log_file)
+        result = utils.run_command(command, log_file)
 
 
     def run_tap(self):
@@ -997,7 +865,7 @@ class PipelineWise(object):
                 self.logger.info("No table available that needs to be sync by singer")
 
         # Delete temp files if there is any
-        except RunCommandException as exc:
+        except utils.RunCommandException as exc:
             self.logger.error(exc)
             utils.silentremove(cons_target_config)
             utils.silentremove(tap_properties_fastsync)
@@ -1026,7 +894,7 @@ class PipelineWise(object):
         tap_type = self.tap["type"]
         target_id = self.target["id"]
         target_type = self.target['type']
-        fastsync_bin = self.get_fastsync_bin(tap_type, target_type)
+        fastsync_bin = utils.get_fastsync_bin(self.venv_dir, tap_type, target_type)
 
         self.logger.info("Syncing tables from {} ({}) to {} ({})...".format(tap_id, tap_type, target_id, target_type))
 
@@ -1077,12 +945,12 @@ class PipelineWise(object):
             )
 
         # Delete temp file if there is any
-        except RunCommandException as exc:
+        except utils.RunCommandException as exc:
             self.logger.error(exc)
             utils.silentremove(cons_target_config)
             sys.exit(1)
         except Exception as exc:
-            self.silentremove(cons_target_config)
+            utils.silentremove(cons_target_config)
             raise exc
 
         utils.silentremove(cons_target_config)
