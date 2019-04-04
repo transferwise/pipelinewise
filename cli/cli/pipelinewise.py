@@ -564,44 +564,40 @@ class PipelineWise(object):
         return schema_with_diff
 
     def make_default_selection(self, schema, selection_file):
-        try:
-            if os.path.isfile(selection_file):
-                self.logger.info("Loading pre defined selection from {}".format(selection_file))
-                tap_selection = self.load_json(selection_file)
-                selection = tap_selection["selection"]
+        if os.path.isfile(selection_file):
+            self.logger.info("Loading pre defined selection from {}".format(selection_file))
+            tap_selection = self.load_json(selection_file)
+            selection = tap_selection["selection"]
 
-                streams = schema["streams"]
-                for stream_idx, stream in enumerate(streams):
-                    table_name = stream.get("table_name") or stream.get("stream")
-                    table_sel = False
-                    for sel in selection:
-                         if 'table_name' in sel and table_name == sel['table_name']:
-                             table_sel = sel
+            streams = schema["streams"]
+            for stream_idx, stream in enumerate(streams):
+                table_name = stream.get("table_name") or stream.get("stream")
+                table_sel = False
+                for sel in selection:
+                        if 'table_name' in sel and table_name == sel['table_name']:
+                            table_sel = sel
 
-                    # Find table specific metadata entries in the old and new streams
-                    new_stream_table_mdata_idx = 0
-                    old_stream_table_mdata_idx = 0
-                    try:
-                        stream_table_mdata_idx = [i for i, md in enumerate(stream["metadata"]) if md["breadcrumb"] == []][0]
-                    except Exception:
-                        False
+                # Find table specific metadata entries in the old and new streams
+                new_stream_table_mdata_idx = 0
+                old_stream_table_mdata_idx = 0
+                try:
+                    stream_table_mdata_idx = [i for i, md in enumerate(stream["metadata"]) if md["breadcrumb"] == []][0]
+                except Exception:
+                    False
 
-                    if table_sel:
-                        self.logger.info("Mark {} table as selected with properties {}".format(table_name, table_sel))
-                        schema["streams"][stream_idx]["metadata"][stream_table_mdata_idx]["metadata"]["selected"] = True
-                        if "replication_method" in table_sel:
-                            schema["streams"][stream_idx]["metadata"][stream_table_mdata_idx]["metadata"]["replication-method"] = table_sel["replication_method"]
-                        if "replication_key" in table_sel:
-                            schema["streams"][stream_idx]["metadata"][stream_table_mdata_idx]["metadata"]["replication-key"] = table_sel["replication_key"]
-                    else:
-                        self.logger.info("Mark {} table as not selected".format(table_name))
-                        schema["streams"][stream_idx]["metadata"][stream_table_mdata_idx]["metadata"]["selected"] = False
+                if table_sel:
+                    self.logger.info("Mark {} table as selected with properties {}".format(table_name, table_sel))
+                    schema["streams"][stream_idx]["metadata"][stream_table_mdata_idx]["metadata"]["selected"] = True
+                    if "replication_method" in table_sel:
+                        schema["streams"][stream_idx]["metadata"][stream_table_mdata_idx]["metadata"]["replication-method"] = table_sel["replication_method"]
+                    if "replication_key" in table_sel:
+                        schema["streams"][stream_idx]["metadata"][stream_table_mdata_idx]["metadata"]["replication-key"] = table_sel["replication_key"]
+                else:
+                    self.logger.info("Mark {} table as not selected".format(table_name))
+                    schema["streams"][stream_idx]["metadata"][stream_table_mdata_idx]["metadata"]["selected"] = False
 
-            return schema
+        return schema
 
-        except Exception as exc:
-            self.logger.error("Cannot load selection JSON. {}".format(str(exc)))
-            sys.exit(1)
 
     def test_tap_connection(self):
         tap_id = self.tap["id"]
@@ -635,6 +631,7 @@ class PipelineWise(object):
             tap_type = self.tap.get('type')
             tap_config_file = self.tap.get('files', {}).get('config')
             tap_properties_file = self.tap.get('files', {}).get('properties')
+            tap_selection_file = self.tap.get('files', {}).get('selection')
             tap_bin = self.tap_bin
 
         else:
@@ -642,6 +639,7 @@ class PipelineWise(object):
             tap_type = tap.get('type')
             tap_config_file = tap.get('files', {}).get('config')
             tap_properties_file = tap.get('files', {}).get('properties')
+            tap_selection_file = tap.get('files', {}).get('selection')
             tap_bin = self.get_connector_bin(tap_type)
 
         # Define target props
@@ -678,7 +676,11 @@ class PipelineWise(object):
             schema_with_diff = new_schema
 
         # Make selection from selectection.json if exists
-        schema_with_diff = self.make_default_selection(schema_with_diff, self.tap["files"]["selection"])
+        try:
+            schema_with_diff = self.make_default_selection(schema_with_diff, tap_selection_file)
+        except Exception as exc:
+            return "Cannot load selection JSON at {}. {}".format(tap_selection_file, str(exc))
+
 
         # Save the new catalog into the tap
         try:
@@ -1138,10 +1140,13 @@ class PipelineWise(object):
             target = config.targets.get(tk)
             start_time = datetime.now()
             with parallel_backend('threading', n_jobs=-1):
-                discover_excs = Parallel(verbose=100)(delayed(self.discover_tap)(
-                    tap=tap,
-                    target=target
-                ) for (tap) in target.get('taps'))
+                # Discover taps in parallel and return the list
+                # of exception of the failed ones
+                discover_excs = list(filter(None,
+                    Parallel(verbose=100)(delayed(self.discover_tap)(
+                        tap=tap,
+                        target=target
+                    ) for (tap) in target.get('taps'))))
 
             # Log summary
             end_time = datetime.now()

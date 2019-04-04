@@ -235,9 +235,9 @@ class Config(object):
         }
 
         # Generate tap selection
-        tap_selection = []
+        selection = []
         for table in tap.get('tables', []):
-            tap_selection.append(utils.delete_empty_keys({
+            selection.append(utils.delete_empty_keys({
                 "table_name": table.get('table_name'),
 
                 # Default replication_method is LOG_BASED
@@ -246,6 +246,9 @@ class Config(object):
                 # Add replication_key only if replication_method is INCREMENTAL
                 "replication_key": table.get('replication_key') if table.get('replication_method') == 'INCREMENTAL' else None
             }))
+        tap_selection = {
+            "selection": selection
+        }
 
         # Save the generated JSON files
         utils.save_json(tap_config, tap_config_path)
