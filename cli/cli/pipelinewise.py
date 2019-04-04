@@ -1007,7 +1007,7 @@ class PipelineWise(object):
                 IMPORTING YAML CONFIGS FINISHED - TARGET: [{}]
                 -------------------------------------------------------
                     Total taps to import           : {}
-                    Tables loaded successfully     : {}
+                    Taps imported successfully     : {}
                     Taps failed imported           : {}
 
                     Runtime                        : {}
