@@ -484,14 +484,17 @@ class PipelineWise(object):
 
         # Get output and errors from tap
         rc, new_schema, tap_output = result
-        self.logger.info("Tap output: {}".format(tap_output))
+
+        if rc != 0:
+            self.logger.error("Testing tap connection ({} - {}) FAILED".format(target_id, tap_id))
+            sys.exit(1)
 
         # If the connection success then the response needs to be a valid JSON string
-        try:
-            new_schema = json.loads(new_schema)
-        except Exception as exc:
+        if not utils.is_json(new_schema):
             self.logger.error("Schema discovered by {} ({}) is not a valid JSON.".format(tap_id, tap_type))
             sys.exit(1)
+        else:
+            self.logger.info("Testing tap connection ({} - {}) PASSED".format(target_id, tap_id))
 
     def discover_tap(self, tap=None, target=None):
         # Define tap props
