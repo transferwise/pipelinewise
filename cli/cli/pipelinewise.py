@@ -33,7 +33,7 @@ class PipelineWise(object):
         if level == logging.DEBUG:
             str_format = "%(asctime)s %(processName)s %(levelname)s %(filename)s (%(lineno)s): %(message)s"
         else:
-            str_format = "%(asctime)s %(processName)s %(levelname)s: %(message)s"
+            str_format = "%(asctime)s %(levelname)s: %(message)s"
         formatter = logging.Formatter(str_format, "%Y-%m-%d %H:%M:%S")
 
         # Init stdout handler
