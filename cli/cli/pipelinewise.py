@@ -20,31 +20,43 @@ from .config import Config
 class PipelineWise(object):
     '''...'''
 
-    def __init_logger(self, logger_name, level=logging.INFO):
+    def __init_logger(self, logger_name, log_file=None, level=logging.INFO):
         self.logger = logging.getLogger(logger_name)
+
+        # Default log level is less verbose
         level = logging.INFO
 
+        # Increase log level if debug mode needed
         if self.args.debug:
             level = logging.DEBUG
 
+        # Set the log level
         self.logger.setLevel(level)
 
-        # Add file and line number in case of DEBUG level
+        # Set log formatter and add file and line number in case of DEBUG level
         if level == logging.DEBUG:
             str_format = "%(asctime)s %(processName)s %(levelname)s %(filename)s (%(lineno)s): %(message)s"
         else:
             str_format = "%(asctime)s %(levelname)s: %(message)s"
         formatter = logging.Formatter(str_format, "%Y-%m-%d %H:%M:%S")
 
-        # Init stdout handler
+        # Create console handler
         fh = logging.StreamHandler(sys.stdout)
+        fh.setLevel(level)
         fh.setFormatter(formatter)
-
         self.logger.addHandler(fh)
+
+        # Create log file handler if required
+        if log_file and log_file != '*':
+            fh = logging.FileHandler(log_file)
+            fh.setLevel(level)
+            fh.setFormatter(formatter)
+            self.logger.addHandler(fh)
+
 
     def __init__(self, args, config_dir, venv_dir):
         self.args = args
-        self.__init_logger('Pipelinewise CLI')
+        self.__init_logger('Pipelinewise CLI', log_file=args.log)
 
         self.config_dir = config_dir
         self.venv_dir = venv_dir

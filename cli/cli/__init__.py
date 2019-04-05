@@ -32,6 +32,7 @@ tables_help = """List of tables to sync"""
 dir_help = """Path to directory with config"""
 secret_help = """Path to vault password file"""
 version_help = """Displays the installed versions"""
+log_help = """File to log into"""
 debug_help = """Forces the debug mode with logging on stdout and log level debug."""
 
 def main():
@@ -44,6 +45,7 @@ def main():
     parser.add_argument('--dir', type=str, default='*', help=dir_help)
     parser.add_argument('--secret', type=str, default='*', help=secret_help)
     parser.add_argument('--version', action="version", help=version_help, version='TransferData {} - Command Line Interface'.format(__version__))
+    parser.add_argument('--log', type=str, default='*', help=log_help)
     parser.add_argument('--debug', default=False, required=False, help=debug_help, action="store_true")
 
     args = parser.parse_args()
