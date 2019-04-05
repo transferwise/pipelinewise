@@ -1020,7 +1020,7 @@ class PipelineWise(object):
                 -------------------------------------------------------
                     Total taps to import           : {}
                     Taps imported successfully     : {}
-                    Taps failed imported           : {}
+                    Taps failed to import          : {}
 
                     Runtime                        : {}
                 -------------------------------------------------------
