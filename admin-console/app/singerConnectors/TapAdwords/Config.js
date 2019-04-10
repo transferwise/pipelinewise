@@ -53,7 +53,7 @@ const schema = {
     user_agent: { type: "string", title: "User Agent" },
     customer_ids: { type: "string", title: "Customer Ids" }
   },
-  required: ["developer_token", "oauth_client_id", "oauth_client_secret", "refresh_token", "user_agent", "customer_ids"]
+  required: ["developer_token", "oauth_client_id", "oauth_client_secret", "refresh_token", "start_date", "user_agent", "customer_ids"]
 }
 
 const uiSchema = {
