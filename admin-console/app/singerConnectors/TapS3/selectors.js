@@ -1,66 +1,66 @@
 /**
- * TapZendesk selectors
+ * TapS3 selectors
  */
 
 import { createSelector } from 'reselect';
 import { initialState } from './reducer';
 
-const selectTapZendesk = state => state.get('tapZendesk', initialState);
+const selectTapS3 = state => state.get('tapS3', initialState);
 
 const makeSelectStreams = () =>
-  createSelector(selectTapZendesk, tapZendeskState => tapZendeskState.get('streams'));
+  createSelector(selectTapS3, tapS3State => tapS3State.get('streams'));
 
 const makeSelectConfig = () =>
-  createSelector(selectTapZendesk, tapZendeskState => tapZendeskState.get('config'));
+  createSelector(selectTapS3, tapS3State => tapS3State.get('config'));
 
 const makeSelectForceReloadConfig = () =>
-  createSelector(selectTapZendesk, tapZendeskState => tapZendeskState.get('forceReloadConfig'))
+  createSelector(selectTapS3, tapS3State => tapS3State.get('forceReloadConfig'))
 
 const makeSelectForceRefreshStreams = () =>
-  createSelector(selectTapZendesk, tapZendeskState => tapZendeskState.get('forceRefreshStreams'))
+  createSelector(selectTapS3, tapS3State => tapS3State.get('forceRefreshStreams'))
 
 const makeSelectActiveStream = () =>
-  createSelector(selectTapZendesk, tapZendeskState => tapZendeskState.get('activeStream'));
+  createSelector(selectTapS3, tapS3State => tapS3State.get('activeStream'));
 
 const makeSelectActiveStreamId = () =>
-  createSelector(selectTapZendesk, tapZendeskState => tapZendeskState.get('activeStreamId'));
+  createSelector(selectTapS3, tapS3State => tapS3State.get('activeStreamId'));
 
 const makeSelectLoading = () =>
-  createSelector(selectTapZendesk, tapZendeskState => tapZendeskState.get('loading'));
+  createSelector(selectTapS3, tapS3State => tapS3State.get('loading'));
 
 const makeSelectError = () =>
-  createSelector(selectTapZendesk, tapZendeskState => tapZendeskState.get('error'));
+  createSelector(selectTapS3, tapS3State => tapS3State.get('error'));
 
 const makeSelectSaving = () =>
-  createSelector(selectTapZendesk, tapZendeskState => tapZendeskState.get('saving'));
+  createSelector(selectTapS3, tapS3State => tapS3State.get('saving'));
 
 const makeSelectSavingError = () =>
-    createSelector(selectTapZendesk, tapZendeskState => tapZendeskState.get('savingError'));
+    createSelector(selectTapS3, tapS3State => tapS3State.get('savingError'));
 
 const makeSelectSavingSuccess = () =>
-    createSelector(selectTapZendesk, tapZendeskState => tapZendeskState.get('savingSuccess'));
+    createSelector(selectTapS3, tapS3State => tapS3State.get('savingSuccess'));
 
 const makeSelectSaveConfigButtonEnabled = () =>
-    createSelector(selectTapZendesk, tapZendeskState => tapZendeskState.get('saveConfigButtonEnabled'));
+    createSelector(selectTapS3, tapS3State => tapS3State.get('saveConfigButtonEnabled'));
 
 const makeSelectTestingConnection = () =>
-    createSelector(selectTapZendesk, tapZendeskState => tapZendeskState.get('testingConnection'));
+    createSelector(selectTapS3, tapS3State => tapS3State.get('testingConnection'));
 
 const makeSelectTestingConnectionError = () =>
-    createSelector(selectTapZendesk, tapZendeskState => tapZendeskState.get('testingConnectionError'));
+    createSelector(selectTapS3, tapS3State => tapS3State.get('testingConnectionError'));
 
 const makeSelectTestingConnectionSuccess = () =>
-    createSelector(selectTapZendesk, tapZendeskState => tapZendeskState.get('testingConnectionSuccess'));
+    createSelector(selectTapS3, tapS3State => tapS3State.get('testingConnectionSuccess'));
 
 const makeSelectTestConnectionButtonEnabled = () =>
-    createSelector(selectTapZendesk, tapZendeskState => tapZendeskState.get('testConnectionButtonEnabled'));
+    createSelector(selectTapS3, tapS3State => tapS3State.get('testConnectionButtonEnabled'));
 
 const makeSelectConsoleOutput = () =>
-  createSelector(selectTapZendesk, tapZendeskState => tapZendeskState.get('consoleOutput'));
+  createSelector(selectTapS3, tapS3State => tapS3State.get('consoleOutput'));
 
 export {
-  selectTapZendesk,
-  
+  selectTapS3,
+
   makeSelectStreams,
   makeSelectConfig,
   makeSelectForceReloadConfig,

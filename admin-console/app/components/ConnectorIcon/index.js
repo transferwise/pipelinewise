@@ -29,7 +29,7 @@ function decoratorsByName(name) {
       return { logo: ZendeskLogo, name: 'Zendesk' };
     } else if (name.match(/(tap|target)-adwords/)) {
       return { logo: AdwordsLogo, name: 'Adwords' };
-    } else if (name.match(/(tap|target)-tap-s3-csv/)) {
+    } else if (name.match(/(tap|target)-s3-csv/)) {
       return { logo: S3Logo, name: 'AWS S3' };
     } else if (name.match(/(tap|target)-kafka/)) {
       return { logo: KafkaLogo, name: 'Kafka' };

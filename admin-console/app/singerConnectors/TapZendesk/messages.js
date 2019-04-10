@@ -34,7 +34,7 @@ export default defineMessages({
     defaultMessage: 'Tables to Replicate',
   },
   columnsToReplicate: {
-    id: 'PipelineWise.TapPTapZendeskostgres.columnsToReplicate',
+    id: 'PipelineWise.TapZendesk.columnsToReplicate',
     defaultMessage: 'Fields to Replicate',
   },
   database: {

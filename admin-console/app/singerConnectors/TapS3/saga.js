@@ -136,7 +136,7 @@ export function* discoverTap(action) {
   }
 }
 
-export default function* tapZendeskData() {
+export default function* tapS3Data() {
   yield takeLatest(LOAD_STREAMS, getStreams);
   yield takeLatest(LOAD_CONFIG, loadConfig);
   yield takeLatest(SAVE_CONFIG, saveConfig);

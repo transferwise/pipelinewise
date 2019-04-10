@@ -43,7 +43,7 @@ import messages from './messages';
 
 
 /* eslint-disable react/prefer-stateless-function */
-export class TapZendeskProperties extends React.PureComponent {
+export class TapS3Properties extends React.PureComponent {
   static streamsTableHeader(props) {
     const targetId = props.delegatedProps.targetId;
     const tapId = props.delegatedProps.tapId;
@@ -241,7 +241,7 @@ export class TapZendeskProperties extends React.PureComponent {
         const replicationMethod = mdataStream['forced-replication-method']
         const replicationKeys = mdataStream['valid-replication-keys']
         const tableKeys = mdataStream['table-key-properties']
-        const columns = TapZendeskProperties.getColumnsFromStream(stream, { activeStream, replicationKeys, tableKeys })
+        const columns = TapS3Properties.getColumnsFromStream(stream, { activeStream, replicationKeys, tableKeys })
         const availableKeyColumns = columns.filter(c => c.type === 'integer' || c.format === 'date-time')
 
         // Show key dropdown only for Key-Based incremental replication
@@ -278,13 +278,13 @@ export class TapZendeskProperties extends React.PureComponent {
         const mdataStream = stream.metadata.find(m => m.breadcrumb.length === 0).metadata || {}
         const replicationKey = mdataStream['replication-key']
         const tableKeys = mdataStream['table-key-properties']
-        const columns = TapZendeskProperties.getColumnsFromStream(stream, { activeStream, replicationKey, tableKeys })
+        const columns = TapS3Properties.getColumnsFromStream(stream, { activeStream, replicationKey, tableKeys })
         return (
           <Grid>
             <Table
               items={columns}
-              headerComponent={TapZendeskProperties.columnsTableHeader}
-              bodyComponent={TapZendeskProperties.columnsTableBody}
+              headerComponent={TapS3Properties.columnsTableHeader}
+              bodyComponent={TapS3Properties.columnsTableBody}
               delegatedProps={delegatedProps}
             />
           </Grid>
@@ -352,7 +352,7 @@ export class TapZendeskProperties extends React.PureComponent {
       let selectedColumns = []
       if (streams) {
         const stream = streams.find(s => s['tap_stream_id'] === activeStreamId);
-        columns = stream ? TapZendeskProperties.getColumnsFromStream(stream, {}) : []
+        columns = stream ? TapS3Properties.getColumnsFromStream(stream, {}) : []
         selectedColumns = columns.filter(c => (c.selected === undefined ? c.selectedByDefault : c.selected) || c.isAutomatic)
       }
 
@@ -385,8 +385,8 @@ export class TapZendeskProperties extends React.PureComponent {
                     <Table
                       items={streams}
                       selectedItem={activeStreamId}
-                      headerComponent={TapZendeskProperties.streamsTableHeader}
-                      bodyComponent={TapZendeskProperties.streamsTableBody}
+                      headerComponent={TapS3Properties.streamsTableHeader}
+                      bodyComponent={TapS3Properties.streamsTableBody}
                       onItemSelect={onStreamSelect}
                       delegatedProps={{ targetId, tapId, onUpdateStreams, onUpdateStream, allStreamsSelected }}
                     />
@@ -424,7 +424,7 @@ export class TapZendeskProperties extends React.PureComponent {
   }
 }
 
-TapZendeskProperties.propTypes = {
+TapS3Properties.propTypes = {
   loading: PropTypes.bool,
   error: PropTypes.any,
   targetId: PropTypes.any,
@@ -472,4 +472,4 @@ export default compose(
   withReducer,
   withSaga,
   withConnect,
-)(TapZendeskProperties);
+)(TapS3Properties);

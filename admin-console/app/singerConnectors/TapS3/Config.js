@@ -45,15 +45,14 @@ const schema = {
   title: "Connection",
   type: "object",
   properties: {
-    developer_token: { type: "string", title: "Developer Token" },
-    oauth_client_id: { type: "string", title: "OAuth Client Id" },
-    oauth_client_secret: { type: "string", title: "OAuth Client Secret" },
-    refresh_token: { type: "string", title: "Refresh Token" },
-    start_date: { type: "string", title: "Start Date" },
-    user_agent: { type: "string", title: "User Agent" },
-    customer_ids: { type: "string", title: "Customer Ids" }
+    search_prefix: { type: "string", title: "Search Prefix" },
+    search_pattern: { type: "string", title: "Search Pattern" },
+    table_name: { type: "string", title: "Table Name" },
+    key_properties: { type: "string", title: "Key Properties" },
+    date_overrides: { type: "string", title: "Date Overrides" },
+    delimiter: { type: "string", title: "Delimitert" }
   },
-  required: ["developer_token", "oauth_client_id", "oauth_client_secret", "refresh_token", "user_agent", "customer_ids"]
+  required: ["search_prefix", "search_pattern", "table_name", "key_properties", "date_overrides", "delimiter"]
 }
 
 const uiSchema = {
@@ -62,7 +61,7 @@ const uiSchema = {
 };
 
 
-export class TapZendeskConfig extends React.PureComponent {
+export class TapS3Config extends React.PureComponent {
   constructor(props) {
     super(props)
     this.state = { config: undefined }
@@ -177,7 +176,7 @@ export class TapZendeskConfig extends React.PureComponent {
   }
 }
 
-TapZendeskConfig.propTypes = {
+TapS3Config.propTypes = {
   loading: PropTypes.any,
   error: PropTypes.any,
   title: PropTypes.any,
@@ -226,4 +225,4 @@ export default compose(
   withReducer,
   withSaga,
   withConnect,
-)(TapZendeskConfig);
+)(TapS3Config);

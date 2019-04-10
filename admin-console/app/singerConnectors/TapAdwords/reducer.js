@@ -1,5 +1,5 @@
 /*
- * TapZendeskReducer
+ * TapAdwordsReducer
  *
  * The reducer takes care of our data. Using actions, we can change our
  * application state.
@@ -77,7 +77,7 @@ export const initialState = fromJS({
   forceRefreshStreams: false,
 });
 
-function tapZendeskReducer(state = initialState, action) {
+function tapAdwordsReducer(state = initialState, action) {
   let result;
   let consoleOutput = false;
 
@@ -252,7 +252,7 @@ function tapZendeskReducer(state = initialState, action) {
         .set('loading', false)
         .set('error', action.error)
         .set('consoleOutput', false)
-    
+
     case DISCOVER_TAP:
         return state
           .set('loading', true)
@@ -278,7 +278,7 @@ function tapZendeskReducer(state = initialState, action) {
           .set('loading', false)
           .set('error', action.error)
           .set('consoleOutput', false)
-    
+
     case RESET_CONSOLE_OUTPUT:
         return state
           .set('error', false)
@@ -293,4 +293,4 @@ function tapZendeskReducer(state = initialState, action) {
   }
 }
 
-export default tapZendeskReducer;
+export default tapAdwordsReducer;

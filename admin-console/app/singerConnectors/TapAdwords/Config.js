@@ -62,7 +62,7 @@ const uiSchema = {
 };
 
 
-export class TapZendeskConfig extends React.PureComponent {
+export class TapAdwordsConfig extends React.PureComponent {
   constructor(props) {
     super(props)
     this.state = { config: undefined }
@@ -177,7 +177,7 @@ export class TapZendeskConfig extends React.PureComponent {
   }
 }
 
-TapZendeskConfig.propTypes = {
+TapAdwordsConfig.propTypes = {
   loading: PropTypes.any,
   error: PropTypes.any,
   title: PropTypes.any,
@@ -226,4 +226,4 @@ export default compose(
   withReducer,
   withSaga,
   withConnect,
-)(TapZendeskConfig);
+)(TapAdwordsConfig);
