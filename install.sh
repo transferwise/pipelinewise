@@ -48,9 +48,11 @@ install_connector tap-postgres
 install_connector tap-zendesk
 install_connector tap-kafka
 install_connector tap-adwords
+install_connector tap-s3-csv
 install_connector target-postgres
 install_connector target-snowflake
 install_connector transform-field
+
 
 # Install fastsyncs
 install_fastsync mysql-to-snowflake
