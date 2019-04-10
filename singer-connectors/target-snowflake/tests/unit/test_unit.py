@@ -66,6 +66,8 @@ class TestUnit(unittest.TestCase):
         json_str_or_null =  {"type": ["string", "null"]     }
         json_dt =           {"type": ["string"]             , "format": "date-time"}
         json_dt_or_null =   {"type": ["string", "null"]     , "format": "date-time"}
+        json_t =            {"type": ["string"]             , "format": "time"}
+        json_t_or_null =    {"type": ["string", "null"]     , "format": "time"}
         json_num =          {"type": ["number"]             }
         json_int =          {"type": ["integer"]            }
         json_int_or_str =   {"type": ["integer", "string"]  }
@@ -78,6 +80,8 @@ class TestUnit(unittest.TestCase):
         self.assertEquals(mapper(json_str_or_null)  , 'text')
         self.assertEquals(mapper(json_dt)           , 'timestamp_ntz')
         self.assertEquals(mapper(json_dt_or_null)   , 'timestamp_ntz')
+        self.assertEquals(mapper(json_t)            , 'time')
+        self.assertEquals(mapper(json_t_or_null)    , 'time')
         self.assertEquals(mapper(json_num)          , 'float')
         self.assertEquals(mapper(json_int)          , 'number')
         self.assertEquals(mapper(json_int_or_str)   , 'text')
