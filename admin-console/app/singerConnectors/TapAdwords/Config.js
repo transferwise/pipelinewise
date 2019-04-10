@@ -219,8 +219,8 @@ const withConnect = connect(
   mapDispatchToProps,
 );
 
-const withReducer = injectReducer({ key: 'tapZendesk', reducer });
-const withSaga = injectSaga({ key: 'tapZendesk', saga });
+const withReducer = injectReducer({ key: 'tapAdwords', reducer });
+const withSaga = injectSaga({ key: 'tapAdwords', saga });
 
 export default compose(
   withReducer,

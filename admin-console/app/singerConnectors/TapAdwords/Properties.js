@@ -419,7 +419,7 @@ export class TapAdwordsProperties extends React.PureComponent {
       )
     }
     catch(e) {
-      return <Alert bsStyle="danger" className="full-swidth"><strong>Error!</strong> Doesn't look like valid Zendesk tap properties: {e.toString()}</Alert>
+      return <Alert bsStyle="danger" className="full-swidth"><strong>Error!</strong> Doesn't look like valid Adwords tap properties: {e.toString()}</Alert>
     }
   }
 }
@@ -465,8 +465,8 @@ const withConnect = connect(
   mapDispatchToProps,
 );
 
-const withReducer = injectReducer({ key: 'tapZendesk', reducer });
-const withSaga = injectSaga({ key: 'tapZendesk', saga });
+const withReducer = injectReducer({ key: 'tapAdwords', reducer });
+const withSaga = injectSaga({ key: 'tapAdwords', saga });
 
 export default compose(
   withReducer,
