@@ -45,14 +45,14 @@ const schema = {
   title: "Connection",
   type: "object",
   properties: {
-    search_prefix: { type: "string", title: "Search Prefix" },
-    search_pattern: { type: "string", title: "Search Pattern" },
-    table_name: { type: "string", title: "Table Name" },
-    key_properties: { type: "string", title: "Key Properties" },
-    date_overrides: { type: "string", title: "Date Overrides" },
-    delimiter: { type: "string", title: "Delimitert" }
+    start_date: { type: "string", title: "Start Date" },
+    account_id: { type: "string", title: "AWS Account Id" },
+    external_id: { type: "string", title: "AWS Secret Id" },
+    role_name: { type: "string", title: "AWS Role Name" },
+    bucket: { type: "string", title: "S3 Bucket" },
+    tables: { type: "string", title: "Tables" }
   },
-  required: ["search_prefix", "search_pattern", "table_name", "key_properties", "date_overrides", "delimiter"]
+  required: ["start_date", "account_id", "external_id", "role_name", "bucket", "tables"]
 }
 
 const uiSchema = {
