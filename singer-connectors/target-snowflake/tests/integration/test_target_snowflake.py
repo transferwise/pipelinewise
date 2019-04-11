@@ -129,14 +129,14 @@ class TestIntegration(unittest.TestCase):
         expected_table_three = []
         if not should_hard_deleted_rows:
             expected_table_three = [
-                    {'C_INT': 1, 'C_PK': 1, 'C_VARCHAR': '1'},
-                    {'C_INT': 2, 'C_PK': 2, 'C_VARCHAR': '2'},
-                    {'C_INT': 3, 'C_PK': 3, 'C_VARCHAR': '3'}
+                    {'C_INT': 1, 'C_PK': 1, 'C_VARCHAR': '1', 'C_TIME': datetime.time(4, 0, 0)},
+                    {'C_INT': 2, 'C_PK': 2, 'C_VARCHAR': '2', 'C_TIME': datetime.time(7, 15, 0)},
+                    {'C_INT': 3, 'C_PK': 3, 'C_VARCHAR': '3', 'C_TIME': datetime.time(23, 0, 3)}
             ]
         else:
             expected_table_three = [
-                {'C_INT': 1, 'C_PK': 1, 'C_VARCHAR': '1'},
-                {'C_INT': 2, 'C_PK': 2, 'C_VARCHAR': '2'}
+                {'C_INT': 1, 'C_PK': 1, 'C_VARCHAR': '1', 'C_TIME': datetime.time(4, 0, 0)},
+                {'C_INT': 2, 'C_PK': 2, 'C_VARCHAR': '2', 'C_TIME': datetime.time(7, 15, 0)}
             ]
 
         self.assertEqual(

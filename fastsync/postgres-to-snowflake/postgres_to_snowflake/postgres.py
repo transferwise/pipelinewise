@@ -38,8 +38,8 @@ class Postgres:
             'timestamp without time zone':'TIMESTAMP_NTZ',
             'timestamp with time zone':'TIMESTAMP_TZ',
             'time':'TIME',
-            'time without time zone':'TIMESTAMP_NTZ',
-            'time with time zone':'TIMESTAMP_TZ'
+            'time without time zone':'TIME',
+            'time with time zone':'TIME'
         }.get(pg_type, 'VARCHAR')
 
 
