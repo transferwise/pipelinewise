@@ -419,7 +419,7 @@ class Manager(object):
             tap_owner = tap["owner"]
             tap_id = self.gen_id_by_name(tap["name"])
 
-            if tap_type in ["tap-postgres", "tap-mysql", "tap-zendesk", "tap-kafka", "tap-adwords", "tap-s3-csv"]:
+            if tap_type in ["tap-postgres", "tap-mysql", "tap-zendesk", "tap-kafka", "tap-adwords"]:
 
                 tap_dir = self.get_tap_dir(target_id, tap_id)
                 if not os.path.isdir(tap_dir):
@@ -588,7 +588,7 @@ class Manager(object):
             properties = self.load_json(properties_file)
             tap_type = params["tapType"]
 
-            if tap_type in ["tap-postgres", "tap-mysql", "tap-zendesk", "tap-kafka", "tap-adwords", "tap-s3-csv"]:
+            if tap_type in ["tap-postgres", "tap-mysql", "tap-zendesk", "tap-kafka", "tap-adwords"]:
                 streams = properties["streams"]
                 
                 # Find the stream by stream_id

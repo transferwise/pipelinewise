@@ -9,7 +9,6 @@ import TapMysqlProperties from './TapMysql/LoadableProperties';
 import TapZendeskProperties from './TapZendesk/LoadableProperties';
 import TapKafkaProperties from './TapKafka/LoadableProperties';
 import TapAdwordsProperties from './TapAdwords/LoadableProperties';
-import TapS3Properties from './TapS3/LoadableProperties';
 
 
 export class SingerTapProperties extends SingerComponent {
@@ -24,7 +23,6 @@ export class SingerTapProperties extends SingerComponent {
         case 'tap-zendesk': return <TapZendeskProperties targetId={tap.target.id} tapId={tap.id} title={`${tap.name} Connection Details`}/>
         case 'tap-kafka': return <TapKafkaProperties targetId={tap.target.id} tapId={tap.id} title={`${tap.name} Connection Details`}/>
         case 'tap-adwords': return <TapAdwordsProperties targetId={tap.target.id} tapId={tap.id} title={`${tap.name} Connection Details`}/>
-        case 'tap-s3-csv': return <TapS3Properties targetId={tap.target.id} tapId={tap.id} title={`${tap.name} Connection Details`}/>
 
         default: return this.renderJson(tap.properties)
       }
