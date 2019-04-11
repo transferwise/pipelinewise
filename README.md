@@ -32,8 +32,10 @@ PipelineWise is an ETL and Data Pipeline Framework using the singer.io specifica
 ### Requirements
 * Python 3.x
 * Node 8.x
+* npm
 * libsnappy-dev
 * python3-dev
+* python3-venv
 
 ### Build from source:
 1. `./intall.sh` : Install singer connectors in separated virtual environments, CLI, REST API and Web Frontend

@@ -1,66 +1,66 @@
 /**
- * TapZendesk selectors
+ * TapAdwords selectors
  */
 
 import { createSelector } from 'reselect';
 import { initialState } from './reducer';
 
-const selectTapZendesk = state => state.get('tapZendesk', initialState);
+const selectTapAdwords = state => state.get('tapAdwords', initialState);
 
 const makeSelectStreams = () =>
-  createSelector(selectTapZendesk, tapZendeskState => tapZendeskState.get('streams'));
+  createSelector(selectTapAdwords, tapAdwordsState => tapAdwordsState.get('streams'));
 
 const makeSelectConfig = () =>
-  createSelector(selectTapZendesk, tapZendeskState => tapZendeskState.get('config'));
+  createSelector(selectTapAdwords, tapAdwordsState => tapAdwordsState.get('config'));
 
 const makeSelectForceReloadConfig = () =>
-  createSelector(selectTapZendesk, tapZendeskState => tapZendeskState.get('forceReloadConfig'))
+  createSelector(selectTapAdwords, tapAdwordsState => tapAdwordsState.get('forceReloadConfig'))
 
 const makeSelectForceRefreshStreams = () =>
-  createSelector(selectTapZendesk, tapZendeskState => tapZendeskState.get('forceRefreshStreams'))
+  createSelector(selectTapAdwords, tapAdwordsState => tapAdwordsState.get('forceRefreshStreams'))
 
 const makeSelectActiveStream = () =>
-  createSelector(selectTapZendesk, tapZendeskState => tapZendeskState.get('activeStream'));
+  createSelector(selectTapAdwords, tapAdwordsState => tapAdwordsState.get('activeStream'));
 
 const makeSelectActiveStreamId = () =>
-  createSelector(selectTapZendesk, tapZendeskState => tapZendeskState.get('activeStreamId'));
+  createSelector(selectTapAdwords, tapAdwordsState => tapAdwordsState.get('activeStreamId'));
 
 const makeSelectLoading = () =>
-  createSelector(selectTapZendesk, tapZendeskState => tapZendeskState.get('loading'));
+  createSelector(selectTapAdwords, tapAdwordsState => tapAdwordsState.get('loading'));
 
 const makeSelectError = () =>
-  createSelector(selectTapZendesk, tapZendeskState => tapZendeskState.get('error'));
+  createSelector(selectTapAdwords, tapAdwordsState => tapAdwordsState.get('error'));
 
 const makeSelectSaving = () =>
-  createSelector(selectTapZendesk, tapZendeskState => tapZendeskState.get('saving'));
+  createSelector(selectTapAdwords, tapAdwordsState => tapAdwordsState.get('saving'));
 
 const makeSelectSavingError = () =>
-    createSelector(selectTapZendesk, tapZendeskState => tapZendeskState.get('savingError'));
+    createSelector(selectTapAdwords, tapAdwordsState => tapAdwordsState.get('savingError'));
 
 const makeSelectSavingSuccess = () =>
-    createSelector(selectTapZendesk, tapZendeskState => tapZendeskState.get('savingSuccess'));
+    createSelector(selectTapAdwords, tapAdwordsState => tapAdwordsState.get('savingSuccess'));
 
 const makeSelectSaveConfigButtonEnabled = () =>
-    createSelector(selectTapZendesk, tapZendeskState => tapZendeskState.get('saveConfigButtonEnabled'));
+    createSelector(selectTapAdwords, tapAdwordsState => tapAdwordsState.get('saveConfigButtonEnabled'));
 
 const makeSelectTestingConnection = () =>
-    createSelector(selectTapZendesk, tapZendeskState => tapZendeskState.get('testingConnection'));
+    createSelector(selectTapAdwords, tapAdwordsState => tapAdwordsState.get('testingConnection'));
 
 const makeSelectTestingConnectionError = () =>
-    createSelector(selectTapZendesk, tapZendeskState => tapZendeskState.get('testingConnectionError'));
+    createSelector(selectTapAdwords, tapAdwordsState => tapAdwordsState.get('testingConnectionError'));
 
 const makeSelectTestingConnectionSuccess = () =>
-    createSelector(selectTapZendesk, tapZendeskState => tapZendeskState.get('testingConnectionSuccess'));
+    createSelector(selectTapAdwords, tapAdwordsState => tapAdwordsState.get('testingConnectionSuccess'));
 
 const makeSelectTestConnectionButtonEnabled = () =>
-    createSelector(selectTapZendesk, tapZendeskState => tapZendeskState.get('testConnectionButtonEnabled'));
+    createSelector(selectTapAdwords, tapAdwordsState => tapAdwordsState.get('testConnectionButtonEnabled'));
 
 const makeSelectConsoleOutput = () =>
-  createSelector(selectTapZendesk, tapZendeskState => tapZendeskState.get('consoleOutput'));
+  createSelector(selectTapAdwords, tapAdwordsState => tapAdwordsState.get('consoleOutput'));
 
 export {
-  selectTapZendesk,
-  
+  selectTapAdwords,
+
   makeSelectStreams,
   makeSelectConfig,
   makeSelectForceReloadConfig,

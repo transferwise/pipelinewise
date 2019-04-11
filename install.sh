@@ -52,6 +52,7 @@ install_connector target-postgres
 install_connector target-snowflake
 install_connector transform-field
 
+
 # Install fastsyncs
 install_fastsync mysql-to-snowflake
 install_fastsync postgres-to-snowflake

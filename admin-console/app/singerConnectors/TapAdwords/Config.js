@@ -53,7 +53,7 @@ const schema = {
     user_agent: { type: "string", title: "User Agent" },
     customer_ids: { type: "string", title: "Customer Ids" }
   },
-  required: ["developer_token", "oauth_client_id", "oauth_client_secret", "refresh_token", "user_agent", "customer_ids"]
+  required: ["developer_token", "oauth_client_id", "oauth_client_secret", "refresh_token", "start_date", "user_agent", "customer_ids"]
 }
 
 const uiSchema = {
@@ -62,7 +62,7 @@ const uiSchema = {
 };
 
 
-export class TapZendeskConfig extends React.PureComponent {
+export class TapAdwordsConfig extends React.PureComponent {
   constructor(props) {
     super(props)
     this.state = { config: undefined }
@@ -177,7 +177,7 @@ export class TapZendeskConfig extends React.PureComponent {
   }
 }
 
-TapZendeskConfig.propTypes = {
+TapAdwordsConfig.propTypes = {
   loading: PropTypes.any,
   error: PropTypes.any,
   title: PropTypes.any,
@@ -219,11 +219,11 @@ const withConnect = connect(
   mapDispatchToProps,
 );
 
-const withReducer = injectReducer({ key: 'tapZendesk', reducer });
-const withSaga = injectSaga({ key: 'tapZendesk', saga });
+const withReducer = injectReducer({ key: 'tapAdwords', reducer });
+const withSaga = injectSaga({ key: 'tapAdwords', saga });
 
 export default compose(
   withReducer,
   withSaga,
   withConnect,
-)(TapZendeskConfig);
+)(TapAdwordsConfig);

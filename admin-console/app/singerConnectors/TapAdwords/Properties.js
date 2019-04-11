@@ -43,7 +43,7 @@ import messages from './messages';
 
 
 /* eslint-disable react/prefer-stateless-function */
-export class TapZendeskProperties extends React.PureComponent {
+export class TapAdwordsProperties extends React.PureComponent {
   static streamsTableHeader(props) {
     const targetId = props.delegatedProps.targetId;
     const tapId = props.delegatedProps.tapId;
@@ -241,7 +241,7 @@ export class TapZendeskProperties extends React.PureComponent {
         const replicationMethod = mdataStream['forced-replication-method']
         const replicationKeys = mdataStream['valid-replication-keys']
         const tableKeys = mdataStream['table-key-properties']
-        const columns = TapZendeskProperties.getColumnsFromStream(stream, { activeStream, replicationKeys, tableKeys })
+        const columns = TapAdwordsProperties.getColumnsFromStream(stream, { activeStream, replicationKeys, tableKeys })
         const availableKeyColumns = columns.filter(c => c.type === 'integer' || c.format === 'date-time')
 
         // Show key dropdown only for Key-Based incremental replication
@@ -278,13 +278,13 @@ export class TapZendeskProperties extends React.PureComponent {
         const mdataStream = stream.metadata.find(m => m.breadcrumb.length === 0).metadata || {}
         const replicationKey = mdataStream['replication-key']
         const tableKeys = mdataStream['table-key-properties']
-        const columns = TapZendeskProperties.getColumnsFromStream(stream, { activeStream, replicationKey, tableKeys })
+        const columns = TapAdwordsProperties.getColumnsFromStream(stream, { activeStream, replicationKey, tableKeys })
         return (
           <Grid>
             <Table
               items={columns}
-              headerComponent={TapZendeskProperties.columnsTableHeader}
-              bodyComponent={TapZendeskProperties.columnsTableBody}
+              headerComponent={TapAdwordsProperties.columnsTableHeader}
+              bodyComponent={TapAdwordsProperties.columnsTableBody}
               delegatedProps={delegatedProps}
             />
           </Grid>
@@ -352,7 +352,7 @@ export class TapZendeskProperties extends React.PureComponent {
       let selectedColumns = []
       if (streams) {
         const stream = streams.find(s => s['tap_stream_id'] === activeStreamId);
-        columns = stream ? TapZendeskProperties.getColumnsFromStream(stream, {}) : []
+        columns = stream ? TapAdwordsProperties.getColumnsFromStream(stream, {}) : []
         selectedColumns = columns.filter(c => (c.selected === undefined ? c.selectedByDefault : c.selected) || c.isAutomatic)
       }
 
@@ -385,8 +385,8 @@ export class TapZendeskProperties extends React.PureComponent {
                     <Table
                       items={streams}
                       selectedItem={activeStreamId}
-                      headerComponent={TapZendeskProperties.streamsTableHeader}
-                      bodyComponent={TapZendeskProperties.streamsTableBody}
+                      headerComponent={TapAdwordsProperties.streamsTableHeader}
+                      bodyComponent={TapAdwordsProperties.streamsTableBody}
                       onItemSelect={onStreamSelect}
                       delegatedProps={{ targetId, tapId, onUpdateStreams, onUpdateStream, allStreamsSelected }}
                     />
@@ -419,12 +419,12 @@ export class TapZendeskProperties extends React.PureComponent {
       )
     }
     catch(e) {
-      return <Alert bsStyle="danger" className="full-swidth"><strong>Error!</strong> Doesn't look like valid Zendesk tap properties: {e.toString()}</Alert>
+      return <Alert bsStyle="danger" className="full-swidth"><strong>Error!</strong> Doesn't look like valid Adwords tap properties: {e.toString()}</Alert>
     }
   }
 }
 
-TapZendeskProperties.propTypes = {
+TapAdwordsProperties.propTypes = {
   loading: PropTypes.bool,
   error: PropTypes.any,
   targetId: PropTypes.any,
@@ -465,11 +465,11 @@ const withConnect = connect(
   mapDispatchToProps,
 );
 
-const withReducer = injectReducer({ key: 'tapZendesk', reducer });
-const withSaga = injectSaga({ key: 'tapZendesk', saga });
+const withReducer = injectReducer({ key: 'tapAdwords', reducer });
+const withSaga = injectSaga({ key: 'tapAdwords', saga });
 
 export default compose(
   withReducer,
   withSaga,
   withConnect,
-)(TapZendeskProperties);
+)(TapAdwordsProperties);
