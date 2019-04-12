@@ -8,6 +8,7 @@ import inflection
 import re
 import itertools
 import time
+import datetime
 
 from snowflake.connector.encryption_util import SnowflakeEncryptionUtil
 from snowflake.connector.remote_storage_util import SnowflakeFileEncryptionMaterial
@@ -288,7 +289,7 @@ class DbSync:
         # Generating key in S3 bucket 
         bucket = self.connection_config['s3_bucket']
         s3_key_prefix = self.connection_config.get('s3_key_prefix', '')
-        s3_key = "{}pipelinewise_{}_{}.csv".format(s3_key_prefix, stream, time.strftime("%Y%m%d-%H%M%S-%f"))
+        s3_key = "{}pipelinewise_{}_{}.csv".format(s3_key_prefix, stream, datetime.datetime.now().strftime("%Y%m%d-%H%M%S-%f"))
 
         logger.info("Target S3 bucket: {}, local file: {}, S3 key: {}".format(bucket, file, s3_key))
 
