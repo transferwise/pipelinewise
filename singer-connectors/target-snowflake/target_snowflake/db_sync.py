@@ -95,7 +95,7 @@ def flatten_key(k, parent_key, sep):
     full_key = parent_key + [k]
     inflected_key = [n for n in full_key]
     reducer_index = 0
-    while len(sep.join(inflected_key)) >= 63 and reducer_index < len(inflected_key):
+    while len(sep.join(inflected_key)) >= 255 and reducer_index < len(inflected_key):
         reduced_key = re.sub(r'[a-z]', '', inflection.camelize(inflected_key[reducer_index]))
         inflected_key[reducer_index] = \
             (reduced_key if len(reduced_key) > 1 else inflected_key[reducer_index][0:3]).lower()
