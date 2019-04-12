@@ -266,7 +266,11 @@ class DbSync:
         if len(self.stream_schema_message['key_properties']) == 0:
             return None
         flatten = flatten_record(record)
-        key_props = [str(flatten[p]) for p in self.stream_schema_message['key_properties']]
+        try:
+            key_props = [str(flatten[p]) for p in self.stream_schema_message['key_properties']]
+        except Exception as exc:
+            logger.info("Cannot find {} primary key(s) in record: {}".format(self.stream_schema_message['key_properties'], flatten))
+            raise exc
         return ','.join(key_props)
 
     def record_to_csv_line(self, record):
