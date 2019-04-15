@@ -22,7 +22,7 @@ PipelineWise is an ETL and Data Pipeline Framework using the singer.io specifica
 * **tap-mysql**: Extracts data from MySQL databases. Supporting Log-Based Inremental, Key-Based Incremental and Full Table replications
 * **tap-kafka**: Extracts data from Kafka streams
 * **tap-adwords**: Extracts data Google Ads API (former Google Adwords) using OAuth and support incremental loading based on input state
-* **tap-s3**: Extracts data from S3 csv files (currently a fork of tap-s3-csv because we wanted to use our own auth method)
+* **tap-s3-csv**: Extracts data from S3 csv files (currently a fork of tap-s3-csv because we wanted to use our own auth method)
 * **tap-zendesk**: Extracts data from Zendesk using OAuth and Key-Based incremental replications
 * **target-postgres**: Loads data from any tap into PostgreSQL database
 * **target-snowflake**: Loads data from any tap into Snowflake Data Warehouse

@@ -58,7 +58,7 @@ export class TapS3Properties extends React.PureComponent {
               targetId,
               tapId,
               {
-                tapType: "tap-s3",
+                tapType: "tap-s3-csv",
                 breadcrumb: [],
                 update: {
                   key: "selected",
@@ -105,7 +105,7 @@ export class TapS3Properties extends React.PureComponent {
               tapId,
               streamId,
               {
-                tapType: "tap-s3",
+                tapType: "tap-s3-csv",
                 breadcrumb: [],
                 update: {
                   key: "selected",
