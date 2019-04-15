@@ -214,7 +214,7 @@ class Config(object):
 
         # Generate tap inheritable_config dict
         tap_inheritable_config = utils.delete_empty_keys({
-            "batch_size": tap.get('batch_size'),
+            "batch_size_rows": tap.get('batch_size_rows'),
             "schema": tap.get('target_schema'),
             "dynamic_schema_name": tap.get('dynamic_schema_name'),
             "dynamic_schema_name_postfix": tap.get('dynamic_schema_name_postfix'),

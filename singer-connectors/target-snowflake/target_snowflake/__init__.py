@@ -84,7 +84,7 @@ def persist_lines(config, lines):
     csv_files_to_load = {}
     row_count = {}
     stream_to_sync = {}
-    batch_size = config['batch_size'] if 'batch_size' in config else 100000
+    batch_size_rows = config['batch_size_rows'] if 'batch_size_rows' in config else 100000
     table_columns_cache = None
 
     # Cache the available schemas, tables and columns from snowflake if not disabled in config
@@ -138,7 +138,7 @@ def persist_lines(config, lines):
 
             row_count[stream] = len(records_to_load[stream])
 
-            if row_count[stream] >= batch_size:
+            if row_count[stream] >= batch_size_rows:
                 flush_records(stream, records_to_load[stream], row_count[stream], stream_to_sync[stream])
                 row_count[stream] = 0
                 records_to_load[stream] = {}
