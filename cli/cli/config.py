@@ -219,7 +219,8 @@ class Config(object):
             "dynamic_schema_name": tap.get('dynamic_schema_name'),
             "dynamic_schema_name_postfix": tap.get('dynamic_schema_name_postfix'),
             "hard_delete": tap.get('hard_delete', True),
-            "grant_select_to": tap.get('grant_select_to')
+            "grant_select_to": tap.get('grant_select_to'),
+            "primary_key_required": tap.get('primary_key_required', True)
         })
 
         # Generate tap transformation
