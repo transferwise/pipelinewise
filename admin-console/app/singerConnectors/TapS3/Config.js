@@ -45,15 +45,16 @@ const schema = {
   title: "Connection",
   type: "object",
   properties: {
-    access_token: { type: "string", title: "Access Token" },
-    subdomain: { type: "string", title: "Subdomain" },
-    start_date: { type: "string", title: "Start Date" }
+    start_date: { type: "string", title: "Start Date" },
+    aws_access_key_id: { type: "string", title: "AWS Access Key Id" },
+    aws_secret_access_key: { type: "string", title: "AWS Secret Access Key" },
+    bucket: { type: "string", title: "S3 Bucket" }
   },
-  required: ["access_token", "subdomain", "start_date"]
+  required: ["start_date", "aws_access_key_id", "aws_secret_access_key", "bucket"]
 }
 
 const uiSchema = {
-  access_token: { "ui:widget": "password" },
+  aws_secret_access_key: { "ui:widget": "password" },
 };
 
 
