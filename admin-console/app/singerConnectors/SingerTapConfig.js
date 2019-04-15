@@ -9,6 +9,7 @@ import TapMysqlConfig from './TapMysql/LoadableConfig';
 import TapZendeskConfig from './TapZendesk/LoadableConfig';
 import TapKafkaConfig from './TapKafka/LoadableConfig';
 import TapAdwordsConfig from './TapAdwords/LoadableConfig';
+import TapS3Config from './TapS3/LoadableConfig';
 
 
 export class SingerTapConfig extends SingerComponent {
@@ -23,6 +24,7 @@ export class SingerTapConfig extends SingerComponent {
         case 'tap-zendesk': return <TapZendeskConfig targetId={tap.target.id} tapId={tap.id} title={`${tap.name} Connection Details`}/>
         case 'tap-kafka': return <TapKafkaConfig targetId={tap.target.id} tapId={tap.id} title={`${tap.name} Connection Details`}/>
         case 'tap-adwords': return <TapAdwordsConfig targetId={tap.target.id} tapId={tap.id} title={`${tap.name} Connection Details`}/>
+        case 'tap-s3': return <TapS3Config targetId={tap.target.id} tapId={tap.id} title={`${tap.name} Connection Details`}/>
 
         default: return this.renderJson(tap.config)
       }
