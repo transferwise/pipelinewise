@@ -54,7 +54,7 @@ const schema = {
 }
 
 const uiSchema = {
-  aws_secret_access_key: { "ui:widget": "password" },
+  aws_secret_access_key: { "ui:widget": "password" }
 };
 
 
