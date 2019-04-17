@@ -65,20 +65,20 @@ Development mode detects code changes both in the python REST API and the Node.J
 
 1. Clone [analytics-platform-config](https://github.com/transferwise/analytics-platform-config) repo.
 
-For convenience, create a new branch in your local environment, and remove all taps and targets but `target_snowflake_test.yml` (Otherwise when you load config, Singer will try to connect to each production database that has been configured in the taps).
+    For convenience, create a new branch in your local environment, and remove all taps and targets but `target_snowflake_test.yml` (Otherwise when you load config, Singer will try to connect to each production database that has been configured in the taps).
 snowflake_test tap has been configured to use Snowflake test database, AWS staging buckets, etc.
 
 2. Activate CLI virtualenv: `. .virtualenvs/cli/bin/activate`
 
-You can activate singer-connectors virtual envs (all taps have their own virtualenv) with `. .virtualenvs/tap-mysql/bin/activate` (just substitute your own tap)
+    You can activate singer-connectors virtual envs (all taps have their own virtualenv) with `. .virtualenvs/tap-mysql/bin/activate` (just substitute your own tap)
 
 3. Import configurations:  `pipelinewise import_config --dir ~/analytics-platform-config/pipelinewise/ --secret ~/ap-secret.txt`
-- --dir argument points to analytics-platform-config repo
-- --secret points to vault encryption key
+    - --dir argument points to analytics-platform-config repo
+    - --secret points to vault encryption key
 
 4. Run your tap: `pipelinewise run_tap --target snowflake_test --tap adwords`
 
-Logs for tap outputs are stored in `~/.pipelinewise/snowflake_test/`
+    Logs for tap outputs are stored in `~/.pipelinewise/snowflake_test/`
 
 
 #### User Interface (Dev Mode) - Note: will be deprecated soon.
