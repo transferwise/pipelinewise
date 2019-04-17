@@ -83,6 +83,8 @@ snowflake_test tap has been configured to use Snowflake test database, AWS stagi
 
 #### User Interface (Dev Mode) - Note: will be deprecated soon.
 
+Setting and managing configurations from UI is no longer compatible with the changes made to pipelinewise. Resort to using CLI (instruction in previous step).
+
 1. Start the web user interface listening on `http://localhost:3000`
 ```
   cd admin-console
