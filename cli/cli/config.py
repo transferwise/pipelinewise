@@ -43,21 +43,32 @@ class Config(object):
         # Load every target yaml into targets dictionary        
         for yaml_file in target_yamls:
             config.logger.info("LOADING TARGET: {}".format(yaml_file))
-            yaml_data = utils.load_yaml(os.path.join(yaml_dir, yaml_file), vault_secret)
-            for t in yaml_data.keys():
-                # Add generated extra keys that not available in the YAML
-                yaml_data[t]['files'] = config.get_connector_files(config.get_target_dir(t))
-                yaml_data[t]['taps'] = []
-                targets[t] = yaml_data[t]
+            target_data = utils.load_yaml(os.path.join(yaml_dir, yaml_file), vault_secret)
+            utils.validate(instance=target_data, schema=utils.load_schema("target"))
+
+            # Add generated extra keys that not available in the YAML
+            target_id = target_data['id']
+
+            target_data['files'] = config.get_connector_files(config.get_target_dir(target_id))
+            target_data['taps'] = []
+
+            # Add target to list
+            targets[target_id] = target_data
 
         # Load every tap yaml into targets dictionary
         for yaml_file in tap_yamls:
             config.logger.info("LOADING TAP: {}".format(yaml_file))
-            yaml_data = utils.load_yaml(os.path.join(yaml_dir, yaml_file), vault_secret)
-            for t in yaml_data.keys():
-                # Add generated extra keys that not available directly in YAML
-                yaml_data[t]['files'] = config.get_connector_files(config.get_tap_dir(yaml_data[t].get('target'), yaml_data[t].get('id')))
-                taps[t] = yaml_data[t]
+            tap_data = utils.load_yaml(os.path.join(yaml_dir, yaml_file), vault_secret)
+            utils.validate(instance=tap_data, schema=utils.load_schema("tap"))
+
+            # Add generated extra keys that not available in the YAML
+            tap_id = tap_data['id']
+            target_id = tap_data['target']
+
+            tap_data['files'] = config.get_connector_files(config.get_tap_dir(target_id, tap_id))
+
+            # Add tap to list
+            taps[tap_id] = tap_data
 
         # Link taps to targets
         for target_key in targets.keys():
@@ -223,31 +234,41 @@ class Config(object):
             "primary_key_required": tap.get('primary_key_required', True)
         })
 
+        # Get additional properties will be needed later to generate tap_stream_id
+        tap_type = tap.get('type')
+        tap_dbname = tap_config.get('dbname')
+
         # Generate tap transformation
         transformations = []
-        for table in tap.get('tables', []):
-            for trans in table.get('transformations', []):
-                transformations.append({
-                    "stream": table.get('table_name'),
-                    "fieldId": trans.get('column'),
-                    "type": trans.get('type')
-                })
+        for schema in tap.get('source_schemas', []):
+            schema_name = schema.get('schema')
+            for table in schema.get('tables', []):
+                table_name = table.get('table_name')
+                for trans in table.get('transformations', []):
+                    transformations.append({
+                        "tap_stream_id": utils.get_tap_stream_id(tap_type, tap_dbname, schema_name, table_name),
+                        "fieldId": trans.get('column'),
+                        "type": trans.get('type')
+                    })
         tap_transformation = {
             "transformations": transformations
         }
 
         # Generate tap selection
         selection = []
-        for table in tap.get('tables', []):
-            selection.append(utils.delete_empty_keys({
-                "table_name": table.get('table_name'),
+        for schema in tap.get('source_schemas', []):
+            schema_name = schema.get('schema')
+            for table in schema.get('tables', []):
+                table_name = table.get('table_name')
+                selection.append(utils.delete_empty_keys({
+                    "tap_stream_id": utils.get_tap_stream_id(tap_type, tap_dbname, schema_name, table_name),
 
-                # Default replication_method is LOG_BASED
-                "replication_method": table.get('replication_method', 'LOG_BASED'),
+                    # Default replication_method is LOG_BASED
+                    "replication_method": table.get('replication_method', 'LOG_BASED'),
 
-                # Add replication_key only if replication_method is INCREMENTAL
-                "replication_key": table.get('replication_key') if table.get('replication_method') == 'INCREMENTAL' else None
-            }))
+                    # Add replication_key only if replication_method is INCREMENTAL
+                    "replication_key": table.get('replication_key') if table.get('replication_method') == 'INCREMENTAL' else None
+                }))
         tap_selection = {
             "selection": selection
         }

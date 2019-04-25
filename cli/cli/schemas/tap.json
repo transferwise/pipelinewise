@@ -1,0 +1,82 @@
+{
+  "definitions": {
+    "schema": {
+      "type": "object",
+      "properties": {
+        "schema": { "type": "string" },
+        "tables": {
+          "type": "array",
+          "items":{ "$ref": "#/definitions/table" }
+        }
+      },
+      "required": [ "schema" ]
+    },
+
+    "table": {
+      "type": "object",
+      "properties": {
+        "table_name": { "type": "string" },
+        "replication_method": { "type": "string", "enum": [
+          "FULL_TABLE",
+          "INCREMENTAL",
+          "LOG_BASED"
+          ] },
+        "transformations": {
+          "type": "array",
+          "items":{ "$ref": "#/definitions/transformation" }
+        }
+      },
+      "required": [ "table_name" ]
+    },
+
+    "transformation": {
+      "type": "object",
+      "properties": {
+        "column": { "type": "string" },
+        "type": { "type": "string", "enum": [
+          "SET-NULL",
+          "HASH",
+          "HASH-SKIP-FIRST-1",
+          "HASH-SKIP-FIRST-2",
+          "HASH-SKIP-FIRST-3",
+          "HASH-SKIP-FIRST-4",
+          "HASH-SKIP-FIRST-5",
+          "HASH-SKIP-FIRST-6",
+          "HASH-SKIP-FIRST-7",
+          "HASH-SKIP-FIRST-8",
+          "HASH-SKIP-FIRST-9",
+          "MASK-DATE",
+          "MASK-NUMBER"
+          ] }
+      },
+      "required": [ "column", "type" ]
+    }
+  },
+  
+  "type": "object",
+  "properties": {  
+    "id": { "type": "string" },
+    "name": { "type": "string" },
+    "type": { "type": "string", "enum": [
+      "tap-postgres",
+      "tap-mysql",
+      "tap-adwords",
+      "tap-zendesk",
+      "tap-kafka"
+      ] },
+    "db_conn":{ "type": "object" },
+    "target": { "type": "string" },
+    "source_schemas": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/schema" }
+    }   
+  },
+  "required":[  
+     "id",
+     "name",
+     "type",
+     "db_conn",
+     "target",
+     "source_schemas"
+  ]
+}
