@@ -1,9 +1,12 @@
 
-# Taps are implementing some common things differently and naming
-# are not always in sync.
+# Taps are implemented by different persons and teams without
+# common naming convention and structures in the tap specific
+# properties.json.
 #
-# Since PipelineWise is configured with common YAML files accross
-# every supported tap we need to identify
+# Since PipelineWise is using common YAML configuration files across
+# every supported tap we need to normalise the naming differences to
+# implement common functions that work smootly with every tap.
+# i.e. stream selection, transformations, etc.
 tap_properties = {
     'tap-mysql': {
         'tap_stream_id_pattern': '{{schema_name}}-{{table_name}}',
