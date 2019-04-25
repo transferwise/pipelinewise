@@ -691,18 +691,7 @@ class PipelineWise(object):
         # Following the singer spec the catalog JSON file needs to be passed by the --catalog argument
         # However some tap (i.e. tap-mysql and tap-postgres) requires it as --properties
         # This is problably for historical reasons and need to clarify on Singer slack channels
-        if tap_type == 'tap-mysql':
-            tap_catalog_argument = '--properties'
-        elif tap_type == 'tap-postgres':
-            tap_catalog_argument = '--properties'
-        elif tap_type == 'tap-zendesk':
-            tap_catalog_argument = '--catalog'
-        elif tap_type == 'tap-kafka':
-            tap_catalog_argument = '--properties'
-        elif tap_type == 'tap-adwords':
-            tap_catalog_argument = '--properties'
-        else:
-            tap_catalog_argument = '--catalog'
+        tap_catalog_argument = utils.get_tap_property_value(tap_type, 'tap_catalog_argument')
 
         # Add state arugment if exists to extract data incrementally
         tap_state_arg = ""
