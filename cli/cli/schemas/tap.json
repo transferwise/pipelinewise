@@ -3,13 +3,14 @@
     "schema": {
       "type": "object",
       "properties": {
-        "schema": { "type": "string" },
+        "source_schema": { "type": "string" },
+        "target_schema": { "type": "string" },
         "tables": {
           "type": "array",
           "items":{ "$ref": "#/definitions/table" }
         }
       },
-      "required": [ "schema" ]
+      "required": [ "source_schema", "target_schema" ]
     },
 
     "table": {
@@ -66,7 +67,8 @@
       ] },
     "db_conn":{ "type": "object" },
     "target": { "type": "string" },
-    "source_schemas": {
+    "batch_size_rows": { "type": "integer", "minimum": 1000, "maximum": 500000 },
+    "schemas": {
       "type": "array",
       "items": { "$ref": "#/definitions/schema" }
     }   
@@ -77,6 +79,6 @@
      "type",
      "db_conn",
      "target",
-     "source_schemas"
+     "schemas"
   ]
 }
