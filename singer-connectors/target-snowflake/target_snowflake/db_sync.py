@@ -474,11 +474,14 @@ class DbSync:
         ))
 
     def get_table_columns(self, table_schema=None, table_name=None):
-        return self.query("""SELECT LOWER(table_schema) table_schema, LOWER(table_name) table_name, column_name, data_type
-            FROM information_schema.columns
-            WHERE LOWER(table_schema) = {} AND LOWER(table_name) = {}""".format(
-                "LOWER(table_schema)" if table_schema is None else "'{}'".format(table_schema.lower()),
-                "LOWER(table_name)" if table_name is None else "'{}'".format(table_name.lower())
+        return self.query("""SELECT LOWER(t.table_schema) table_schema, LOWER(t.table_name) table_name, c.column_name, c.data_type
+            FROM information_schema.tables t,
+                 information_schema.columns c
+            WHERE t.table_type = 'BASE TABLE'
+            AND LOWER(c.table_schema) NOT IN ('analyst_sandbox', 'reports')
+            AND LOWER(c.table_schema) = {} AND LOWER(c.table_name) = {}""".format(
+                "LOWER(t.table_schema)" if table_schema is None else "'{}'".format(table_schema.lower()),
+                "LOWER(t.table_name)" if table_name is None else "'{}'".format(table_name.lower())
         ))
 
     def update_columns(self, table_columns_cache=None):
