@@ -26,7 +26,7 @@ class TestUnit(unittest.TestCase):
             'aws_access_key_id':        "dummy-value",
             'aws_secret_access_key':    "dummy-value",
             's3_bucket':                "dummy-value",
-            'schema':                   "dummy-value",
+            'default_target_schema':    "dummy-value",
             'stage':                    "dummy-value",
             'file_format':              "dummy-value"
         }
@@ -42,19 +42,18 @@ class TestUnit(unittest.TestCase):
 
         # Configuration without schema references - (nr_of_errors >= 0)
         config_with_no_schema = minimal_config.copy()
-        config_with_no_schema.pop('schema')
+        config_with_no_schema.pop('default_target_schema')
         self.assertGreater(len(validator(config_with_no_schema)), 0)
 
-        # Configuration without schema references - (nr_of_errors >= 0)
-        config_with_no_schema = minimal_config.copy()
-        config_with_no_schema.pop('schema')
-        self.assertGreater(len(validator(config_with_no_schema)), 0)
-
-        # Configuration with dynamic schema name - (nr_of_errors >= 0)
-        config_with_dynamic_schema_name = minimal_config.copy()
-        config_with_dynamic_schema_name.pop('schema')
-        config_with_dynamic_schema_name['dynamic_schema_name'] = True
-        self.assertEqual(len(validator(config_with_dynamic_schema_name)), 0)
+        # Configuration with schema mapping - (nr_of_errors >= 0)
+        config_with_schema_mapping = minimal_config.copy()
+        config_with_schema_mapping.pop('default_target_schema')
+        config_with_schema_mapping['schema_mapping'] = {
+            "dummy_stream": {
+                "target_schema": "dummy_schema"
+            }
+        }
+        self.assertEqual(len(validator(config_with_schema_mapping)), 0)
 
 
     def test_column_type_mapping(self):

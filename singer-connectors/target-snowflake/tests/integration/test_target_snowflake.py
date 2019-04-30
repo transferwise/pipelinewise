@@ -35,8 +35,8 @@ class TestIntegration(unittest.TestCase):
     def setUp(self):
         self.config = test_utils.get_test_config()
         snowflake = DbSync(self.config)
-        if self.config['schema']:
-            snowflake.query("DROP SCHEMA IF EXISTS {}".format(self.config['schema']))
+        if self.config['default_target_schema']:
+            snowflake.query("DROP SCHEMA IF EXISTS {}".format(self.config['default_target_schema']))
 
 
     def remove_metadata_columns_from_rows(self, rows):
@@ -77,18 +77,15 @@ class TestIntegration(unittest.TestCase):
         without duplicating assertions
         """
         snowflake = DbSync(self.config)
-        config_schema = self.config.get('schema', '')
-        config_dynamic_schema_name = self.config.get('dynamic_schema_name', '')
-        config_dynamic_schema_name_postfix = self.config.get('dynamic_schema_name_postfix', '')
+        default_target_schema = self.config.get('default_target_schema', '')
+        schema_mapping = self.config.get('schema_mapping', {})
 
         # Identify target schema name
         target_schema = None
-        if config_schema is not None and config_schema.strip():
-            target_schema = config_schema
-        elif config_dynamic_schema_name:
+        if default_target_schema is not None and default_target_schema.strip():
+            target_schema = default_target_schema
+        elif schema_mapping:
             target_schema = "tap_mysql_test"
-            if config_dynamic_schema_name_postfix:
-                target_schema = "{}{}".format(target_schema, config_dynamic_schema_name_postfix)
 
         # Get loaded rows from tables
         table_one = snowflake.query("SELECT * FROM {}.test_table_one ORDER BY c_pk".format(target_schema))
@@ -251,7 +248,7 @@ class TestIntegration(unittest.TestCase):
 
         # Get loaded rows from tables
         snowflake = DbSync(self.config)
-        target_schema = self.config.get('schema', '')
+        target_schema = self.config.get('default_target_schema', '')
         table_unicode = snowflake.query("SELECT * FROM {}.test_table_unicode".format(target_schema))
 
         self.assertEqual(
@@ -275,7 +272,7 @@ class TestIntegration(unittest.TestCase):
 
         # Get loaded rows from tables
         snowflake = DbSync(self.config)
-        target_schema = self.config.get('schema', '')
+        target_schema = self.config.get('default_target_schema', '')
         table_non_db_friendly_columns = snowflake.query("SELECT * FROM {}.test_table_non_db_friendly_columns ORDER BY c_pk".format(target_schema))
 
         self.assertEqual(
