@@ -38,12 +38,12 @@ def setup_aws_client(config):
                                 aws_secret_access_key=aws_secret_access_key)
 
 
-def get_sampled_schema_for_table(config, table_spec):
-    LOGGER.info('Sampling records to determine table schema.')
+def get_sampled_schema_for_table(config, table_name):
+    LOGGER.info('Sampling records to determine schema for table {}.'.format(table_name))
 
-    s3_files_gen = get_input_files_for_table(config)
+    s3_files_gen = get_input_files_for_table(config, table_name)
 
-    samples = [sample for sample in sample_files(config, table_spec, s3_files_gen)]
+    samples = [sample for sample in sample_files(config, s3_files_gen)]
 
     if not samples:
         return {}
@@ -55,7 +55,7 @@ def get_sampled_schema_for_table(config, table_spec):
         csv.SDC_EXTRA_COLUMN: {'type': 'array', 'items': {'type': 'string'}},
     }
 
-    data_schema = conversion.generate_schema(samples, table_spec)
+    data_schema = conversion.generate_schema(samples)
 
     return {
         'type': 'object',
@@ -79,9 +79,9 @@ def merge_dicts(first, second):
     return to_return
 
 
-def sample_file(config, table_spec, s3_path, sample_rate):
+def sample_file(config, s3_path, sample_rate):
     file_handle = get_file_handle(config, s3_path)
-    iterator = csv.get_row_iterator(file_handle._raw_stream, table_spec) #pylint:disable=protected-access
+    iterator = csv.get_row_iterator(file_handle._raw_stream)  #pylint:disable=protected-access
 
     current_row = 0
 
@@ -105,46 +105,63 @@ def sample_file(config, table_spec, s3_path, sample_rate):
 
 
 # pylint: disable=too-many-arguments
-def sample_files(config, table_spec, s3_files,
-                 sample_rate=5, max_records=1000, max_files=5):
+def sample_files(config, s3_files,
+                 sample_rate=5, max_records=10, max_files=5):
     LOGGER.info("Sampling files (max files: %s)", max_files)
     for s3_file in itertools.islice(s3_files, max_files):
         LOGGER.info('Sampling %s (max records: %s, sample rate: %s)',
                     s3_file['key'],
                     max_records,
                     sample_rate)
-        yield from itertools.islice(sample_file(config, table_spec, s3_file['key'], sample_rate), max_records)
+        yield from itertools.islice(sample_file(config, s3_file['key'], sample_rate), max_records)
 
 
-def get_input_files_for_table(config, modified_since=None):
-    # TODO! rename this to be more accurate
+def get_input_files(config):
+    """ Finds files with .csv extension from bucket for given file name. If no filename given, gets all files """
+    files = []
 
     bucket = config['bucket']
-    to_return = []
+    file_pattern = '.csv'
 
-    pattern = config['file_extension']
-    try:
-        matcher = re.compile(pattern)
-    except re.error as e:
-        raise ValueError(
-            ("File extension `{}` for bucket `{}` is not a valid regular "
-             "expression. See "
-             "https://docs.python.org/3.5/library/re.html#regular-expression-syntax").format(config['file_extension'], config['bucket']),
-            pattern) from e
-
-    LOGGER.info(
-        'Checking bucket "%s" for keys matching "%s"', bucket, pattern)
+    matcher = re.compile(file_pattern)
+    LOGGER.info('Checking bucket "%s" for keys matching "%s"', bucket, file_pattern)
 
     matched_files_count = 0
-    unmatched_files_count = 0
-    max_files_before_log = 30000
+    for s3_object in list_files_in_bucket(bucket, config.get('search_prefix')):
+        key = s3_object['Key']
+        if matcher.search(key):
+            matched_files_count += 1
+            files.append(key)
+
+    if 0 == matched_files_count:
+        raise Exception("No files found matching pattern {}".format(file_pattern))
+
+    return files
+
+
+def get_input_files_for_table(config, table_name=None, modified_since=None):
+    """ Finds files with .csv extension from bucket for given file name. If no filename given, gets all files """
+
+    bucket = config['bucket']
+    file_extension = config['file_extension']
+
+    pattern = table_name
+
+    matcher = re.compile(pattern)
+    LOGGER.info('Checking bucket "%s" for keys matching pattern "%s"', bucket, pattern)
+
+    matched_files_count = 0
     for s3_object in list_files_in_bucket(bucket, config.get('search_prefix')):
         key = s3_object['Key']
         last_modified = s3_object['LastModified']
 
+        # Skip files that don't have our provided file extension
+        if file_extension not in key[-5:]:
+            LOGGER.info('Skipping matched file "{}" as it is not with extension {}'.format(key, file_extension))
+            continue
+
         if s3_object['Size'] == 0:
             LOGGER.info('Skipping matched file "%s" as it is empty', key)
-            unmatched_files_count += 1
             continue
 
         if matcher.search(key):
@@ -153,28 +170,14 @@ def get_input_files_for_table(config, modified_since=None):
                 LOGGER.info('Will download key "%s" as it was last modified %s',
                             key,
                             last_modified)
-                yield {'key': key, 'last_modified': last_modified, 'key_properties': ''}
-                # TODO! fix key_properties, get it from config
-        else:
-            unmatched_files_count += 1
-
-        if (unmatched_files_count + matched_files_count) % max_files_before_log == 0:
-            # Are we skipping greater than 50% of the files?
-            if 0.5 < (unmatched_files_count / (matched_files_count + unmatched_files_count)):
-                LOGGER.warn(("Found %s matching files and %s non-matching files. "
-                             "You should consider adding a `search_prefix` to the config "
-                             "or removing non-matching files from the bucket."),
-                            matched_files_count, unmatched_files_count)
-            else:
-                LOGGER.info("Found %s matching files and %s non-matching files",
-                            matched_files_count, unmatched_files_count)
+                yield {'key': key, 'last_modified': last_modified}
 
     if 0 == matched_files_count:
-        raise Exception("No files found matching pattern {}".format(pattern))
+        raise Exception("No files found matching pattern {} and with extension {}".format(pattern, file_extension))
 
 
 @retry_pattern()
-def list_files_in_bucket(bucket, search_prefix=None):
+def list_files_in_bucket(bucket, search_prefix=None, file_extension='.csv'):
     s3_client = boto3.client('s3')
 
     s3_object_count = 0

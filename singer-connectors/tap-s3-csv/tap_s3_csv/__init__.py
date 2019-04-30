@@ -9,7 +9,7 @@ from tap_s3_csv.sync import sync_stream
 
 LOGGER = singer.get_logger()
 
-REQUIRED_CONFIG_KEYS = ["start_date", "aws_access_key_id", "aws_secret_access_key", "bucket", "file_extension", "search_prefix"]
+REQUIRED_CONFIG_KEYS = ["aws_access_key_id", "aws_secret_access_key", "bucket", "search_prefix", "file_extension"]
 
 
 def do_discover(config):
@@ -23,7 +23,7 @@ def do_discover(config):
 
 
 def stream_is_selected(mdata):
-    return mdata.get((), {}).get('selected', False)
+    return mdata.get((), {}).get('selected', True)
 
 
 def do_sync(config, catalog, state):
@@ -32,7 +32,7 @@ def do_sync(config, catalog, state):
     for stream in catalog['streams']:
         stream_name = stream['tap_stream_id']
         mdata = metadata.to_map(stream['metadata'])
-        table_spec = next(s for s in config['properties']['tables'] if s['table_name'] == stream_name)  # TODO! i want to access tables
+        table_name = stream['table_name']
         if not stream_is_selected(mdata):
             LOGGER.info("%s: Skipping - not selected", stream_name)
             continue
@@ -42,7 +42,7 @@ def do_sync(config, catalog, state):
         singer.write_schema(stream_name, stream['schema'], key_properties)
 
         LOGGER.info("%s: Starting sync", stream_name)
-        counter_value = sync_stream(config, state, table_spec, stream)
+        counter_value = sync_stream(config, state, table_name, stream)
         LOGGER.info("%s: Completed sync (%s rows)", stream_name, counter_value)
 
     LOGGER.info('Done syncing.')

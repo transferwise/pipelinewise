@@ -9,16 +9,15 @@ from tap_s3_csv import s3
 LOGGER = singer.get_logger()
 
 
-def sync_stream(config, state, table_spec, stream):
-    table_name = table_spec['table_name']
+def sync_stream(config, state, table_name, stream):
     modified_since = utils.strptime_with_tz(singer.get_bookmark(state, table_name, 'modified_since') or
-                                            config['start_date'])
+                                            "2000-01-01")
 
     LOGGER.info('Syncing table "%s".', table_name)
     LOGGER.info('Getting files modified since %s.', modified_since)
 
     s3_files = s3.get_input_files_for_table(
-        config, table_spec, modified_since)
+        config, table_name, modified_since)
 
     records_streamed = 0
 
@@ -28,7 +27,7 @@ def sync_stream(config, state, table_spec, stream):
     # based on anything else then we could just sync files as we see them.
     for s3_file in sorted(s3_files, key=lambda item: item['last_modified']):
         records_streamed += sync_table_file(
-            config, s3_file['key'], table_spec, stream)
+            config, s3_file['key'], table_name, stream)
 
         state = singer.write_bookmark(state, table_name, 'modified_since', s3_file['last_modified'].isoformat())
         singer.write_state(state)
@@ -38,14 +37,13 @@ def sync_stream(config, state, table_spec, stream):
     return records_streamed
 
 
-def sync_table_file(config, s3_path, table_spec, stream):
+def sync_table_file(config, s3_path, table_name, stream):
     LOGGER.info('Syncing file "%s".', s3_path)
 
     bucket = config['bucket']
-    table_name = table_spec['table_name']
 
     s3_file_handle = s3.get_file_handle(config, s3_path)
-    iterator = csv.get_row_iterator(s3_file_handle._raw_stream, table_spec) #pylint:disable=protected-access
+    iterator = csv.get_row_iterator(s3_file_handle._raw_stream) #pylint:disable=protected-access
 
     records_synced = 0
 

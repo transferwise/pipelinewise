@@ -26,16 +26,12 @@ def infer(datum):
     return 'string'
 
 
-def count_sample(sample, counts, table_spec):
+def count_sample(sample, counts):
     for key, value in sample.items():
         if key not in counts:
             counts[key] = {}
 
-        date_overrides = table_spec.get('date_overrides', [])
-        if key in date_overrides:
-            datatype = "date-time"
-        else:
-            datatype = infer(value)
+        datatype = infer(value)
 
         if datatype is not None:
             counts[key][datatype] = counts[key].get(datatype, 0) + 1
@@ -72,11 +68,11 @@ def pick_datatype(counts):
     return to_return
 
 
-def generate_schema(samples, table_spec):
+def generate_schema(samples):
     counts = {}
     for sample in samples:
         # {'name' : { 'string' : 45}}
-        counts = count_sample(sample, counts, table_spec)
+        counts = count_sample(sample, counts)
 
     for key, value in counts.items():
         datatype = pick_datatype(value)
