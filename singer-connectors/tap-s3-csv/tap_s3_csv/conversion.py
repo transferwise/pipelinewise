@@ -1,42 +1,84 @@
-import singer
+import dateutil
+import pytz
 
-LOGGER = singer.get_logger()
+from tap_s3_csv.logger import LOGGER as logger
 
 
-def infer(datum):
+def convert_row(row, schema):
+    to_return = {}
+
+    for key, value in row.items():
+        field_schema = schema['properties'][key]
+        datatype = field_schema.get('_conversion_type', 'string')
+
+        logger.debug('Converting {} value {} to {}'.format(
+            key, value, datatype))
+        converted, _ = convert(value, datatype)
+
+        to_return[key] = converted
+
+    return to_return
+
+
+def convert(datum, override_type=None):
     """
-    Returns the inferred data type
+    Returns tuple of (converted_data_point, json_schema_type,).
     """
     if datum is None or datum == '':
-        return None
+        return (None, None,)
 
-    try:
-        int(datum)
-        return 'integer'
-    except (ValueError, TypeError):
-        pass
+    if override_type in (None, 'integer'):
+        try:
+            to_return = int(datum)
+            return (to_return, 'integer',)
+        except (ValueError, TypeError):
+            pass
 
-    try:
-        #numbers are NOT floats, they are DECIMALS
-        float(datum)
-        return 'number'
-    except (ValueError, TypeError):
-        pass
+    if override_type in (None, 'number'):
+        try:
+            to_return = float(datum)
+            return (to_return, 'number',)
+        except (ValueError, TypeError):
+            pass
 
-    return 'string'
+    if override_type == 'date-time':
+        try:
+            to_return = dateutil.parser.parse(datum)
+
+            if(to_return.tzinfo is None or
+               to_return.tzinfo.utcoffset(to_return) is None):
+                to_return = to_return.replace(tzinfo=pytz.utc)
+
+            return (to_return.isoformat(), 'date-time',)
+        except (ValueError, TypeError):
+            pass
+
+    return (str(datum), 'string',)
 
 
-def count_sample(sample, counts):
+def count_sample(sample, start=None):
+    if start is None:
+        start = {}
+
     for key, value in sample.items():
-        if key not in counts:
-            counts[key] = {}
+        if key not in start:
+            start[key] = {}
 
-        datatype = infer(value)
+        (_, datatype) = convert(value)
 
         if datatype is not None:
-            counts[key][datatype] = counts[key].get(datatype, 0) + 1
+            start[key][datatype] = start[key].get(datatype, 0) + 1
 
-    return counts
+    return start
+
+
+def count_samples(samples):
+    to_return = None
+
+    for sample in samples:
+        to_return = count_sample(sample, to_return)
+
+    return to_return
 
 
 def pick_datatype(counts):
@@ -50,9 +92,6 @@ def pick_datatype(counts):
     Otherwise return `string`.
     """
     to_return = 'string'
-
-    if counts.get('date-time', 0) > 0:
-        return 'date-time'
 
     if len(counts) == 1:
         if counts.get('integer', 0) > 0:
@@ -69,27 +108,22 @@ def pick_datatype(counts):
 
 
 def generate_schema(samples):
-    counts = {}
-    for sample in samples:
-        # {'name' : { 'string' : 45}}
-        counts = count_sample(sample, counts)
+    to_return = {}
+    counts = count_samples(samples)
 
     for key, value in counts.items():
         datatype = pick_datatype(value)
 
         if datatype == 'date-time':
-            counts[key] = {
-                'anyOf': [
-                    {'type': ['null', 'string'], 'format': 'date-time'},
-                    {'type': ['null', 'string']}
-                ]
+            to_return[key] = {
+                'type': ['null', 'string'],
+                'format': 'date-time',
+                '_conversion_type': 'date-time',
             }
         else:
-            types = ['null', datatype]
-            if datatype != 'string':
-                types.append('string')
-            counts[key] = {
-                'type': types,
+            to_return[key] = {
+                'type': ['null', datatype],
+                '_conversion_type': datatype,
             }
 
-    return counts
+    return to_return
