@@ -92,28 +92,28 @@ def get_grantees(target_config, table):
     """
     Grantees can be defined in multiple ways:
 
-    1: 'default_target_schema_select_permission' key  : USAGE and SELECT privileges will be granted on every table to a given role
+    1: 'default_target_schema_select_permissions' key  : USAGE and SELECT privileges will be granted on every table to a given role
                                                         for every incoming stream if not specified explicitly
                                                         in the `schema_mapping` object
-    2: 'target_schema_select_permission' key          : Roles to grant USAGE and SELECT privileges defined explicitly
+    2: 'target_schema_select_permissions' key          : Roles to grant USAGE and SELECT privileges defined explicitly
                                                         for a given stream.
                                                         Example config.json:
                                                             "schema_mapping": {
                                                                 "my_tap_stream_id": {
-                                                                    "target_schema_select_permission": [ "role_with_select_privs" ]
+                                                                    "target_schema_select_permissions": [ "role_with_select_privs" ]
                                                                 }
                                                             }
     """
     grantees = []
-    config_default_target_schema_select_permission = target_config.get('default_target_schema_select_permission', [])
+    config_default_target_schema_select_permissions = target_config.get('default_target_schema_select_permissions', [])
     config_schema_mapping = target_config.get('schema_mapping', {})
 
     table_dict = table_to_dict(table)
     table_schema = table_dict['schema_name']
     if config_schema_mapping and table_schema in config_schema_mapping:
-        grantees = config_schema_mapping[table_schema].get('target_schema_select_permission', [])
-    elif config_default_target_schema_select_permission:
-        grantees = config_default_target_schema_select_permission
+        grantees = config_schema_mapping[table_schema].get('target_schema_select_permissions', [])
+    elif config_default_target_schema_select_permissions:
+        grantees = config_default_target_schema_select_permissions
 
     return grantees
 

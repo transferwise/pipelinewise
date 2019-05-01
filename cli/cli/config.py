@@ -267,11 +267,11 @@ class Config(object):
         for schema in tap.get('schemas', []):
             source_schema = schema.get('source_schema')
             target_schema = schema.get('target_schema')
-            target_schema_select_permission = schema.get('target_schema_select_permission')
+            target_schema_select_permissions = schema.get('target_schema_select_permissions')
 
             schema_mapping[source_schema] = {
                 "target_schema": target_schema,
-                "target_schema_select_permission": target_schema_select_permission
+                "target_schema_select_permissions": target_schema_select_permissions
             }
         tap_schema_mapping = {
             "schema_mapping": schema_mapping
@@ -283,7 +283,7 @@ class Config(object):
             "hard_delete": tap.get('hard_delete', True),
             "primary_key_required": tap.get('primary_key_required', True),
             "default_target_schema": tap.get('default_target_schema'),
-            "default_target_schema_select_permission": tap.get('default_target_schema_select_permission'),
+            "default_target_schema_select_permissions": tap.get('default_target_schema_select_permissions'),
             "schema_mapping": schema_mapping
         })
 

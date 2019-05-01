@@ -205,7 +205,7 @@ class DbSync:
             #                                           "schema_mapping": {
             #                                               "my_tap_stream_id": {
             #                                                   "target_schema": "my_snowflake_schema",
-            #                                                   "target_schema_select_permission": [ "role_with_select_privs" ]
+            #                                                   "target_schema_select_permissions": [ "role_with_select_privs" ]
             #                                               }
             #                                           }
             config_default_target_schema = self.connection_config.get('default_target_schema', '').strip()
@@ -225,21 +225,21 @@ class DbSync:
             #  ---------------
             #  Grantees can be defined in multiple ways:
             #
-            #   1: 'default_target_schema_select_permission' key  : USAGE and SELECT privileges will be granted on every table to a given role
+            #   1: 'default_target_schema_select_permissions' key  : USAGE and SELECT privileges will be granted on every table to a given role
             #                                                       for every incoming stream if not specified explicitly
             #                                                       in the `schema_mapping` object
-            #   2: 'target_schema_select_permission' key          : Roles to grant USAGE and SELECT privileges defined explicitly
+            #   2: 'target_schema_select_permissions' key          : Roles to grant USAGE and SELECT privileges defined explicitly
             #                                                       for a given stream.
             #                                                       Example config.json:
             #                                                           "schema_mapping": {
             #                                                               "my_tap_stream_id": {
             #                                                                   "target_schema": "my_snowflake_schema",
-            #                                                                   "target_schema_select_permission": [ "role_with_select_privs" ]
+            #                                                                   "target_schema_select_permissions": [ "role_with_select_privs" ]
             #                                                               }
             #                                                           }
-            self.grantees = self.connection_config.get('default_target_schema_select_permission')
+            self.grantees = self.connection_config.get('default_target_schema_select_permissions')
             if config_schema_mapping and stream_schema_name in config_schema_mapping:
-                self.grantees = config_schema_mapping[stream_schema_name].get('target_schema_select_permission', self.grantees)
+                self.grantees = config_schema_mapping[stream_schema_name].get('target_schema_select_permissions', self.grantees)
 
         self.stream_schema_message = stream_schema_message
 
