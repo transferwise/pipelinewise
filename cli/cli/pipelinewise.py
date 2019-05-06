@@ -703,6 +703,8 @@ class PipelineWise(object):
             tap_catalog_argument = '--properties'
         elif tap_type == 'tap-adwords':
             tap_catalog_argument = '--properties'
+        elif tap_type == 'tap-jira':
+            tap_catalog_argument = '--properties'
         else:
             tap_catalog_argument = '--catalog'
 

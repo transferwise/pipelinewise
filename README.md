@@ -23,6 +23,7 @@ PipelineWise is an ETL and Data Pipeline Framework using the singer.io specifica
 * **tap-kafka**: Extracts data from Kafka streams
 * **tap-adwords**: Extracts data Google Ads API (former Google Adwords) using OAuth and support incremental loading based on input state
 * **tap-zendesk**: Extracts data from Zendesk using OAuth and Key-Based incremental replications
+* **tap-jira**: Extracts data from Atlassian Jira using basic auth (user & password)
 * **target-postgres**: Loads data from any tap into PostgreSQL database
 * **target-snowflake**: Loads data from any tap into Snowflake Data Warehouse
 * **transform-field**: Transforms fields from any tap and sends the results to any target. Recommended for data masking/ obfuscation
@@ -75,6 +76,8 @@ snowflake_test tap has been configured to use Snowflake test database, AWS stagi
 3. Import configurations:  `pipelinewise import_config --dir ~/analytics-platform-config/pipelinewise/ --secret ~/ap-secret.txt`
     - --dir argument points to analytics-platform-config repo
     - --secret points to vault encryption key
+    
+    If it says ~/.pipelinewise directory doesn't exist, simply create that dir. TODO! create through install. 
 
 4. Run your tap: `pipelinewise run_tap --target snowflake_test --tap adwords`
 
