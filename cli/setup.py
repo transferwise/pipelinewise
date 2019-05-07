@@ -23,5 +23,9 @@ setup(name='cli',
         [console_scripts]
         pipelinewise=cli:main
     ''',
-    packages=['cli']
+    packages=['cli'],
+    package_data = {
+        "schemas": ["cli/schemas/*.json"]
+    },
+    include_package_data=True
 )

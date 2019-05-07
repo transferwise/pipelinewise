@@ -152,7 +152,7 @@ def load_schema(name):
     '''
     Load a json schema
     '''
-    path = "cli/schemas/{}.json".format(name)
+    path = "{}/schemas/{}.json".format(os.path.dirname(__file__), name)
     schema = load_json(path)
 
     if not schema:
