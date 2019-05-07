@@ -70,7 +70,10 @@ class TransformField(object):
         # Mapping from transformation stream to {'stream': [ 'field_id': ..., 'type': ... ] ... }
         self.trans_meta = {}
         for trans in trans_config["transformations"]:
-            stream = trans["stream"]
+            # Naming differences in stream ids:
+            #  1. properties.json and transformation_json using 'tap_stream_id'
+            #  2. taps send in the 'stream' key in singer messages
+            stream = trans["tap_stream_id"]
             if stream not in self.trans_meta:
                 self.trans_meta[stream] = []
             
