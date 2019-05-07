@@ -248,8 +248,8 @@ class Config(object):
 
         # Generate tap transformation
         transformations = []
-        for schema in tap.get('source_schemas', []):
-            schema_name = schema.get('schema')
+        for schema in tap.get('schemas', []):
+            schema_name = schema.get('source_schema')
             for table in schema.get('tables', []):
                 table_name = table.get('table_name')
                 for trans in table.get('transformations', []):
