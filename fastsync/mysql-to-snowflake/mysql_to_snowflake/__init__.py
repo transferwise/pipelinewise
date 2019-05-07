@@ -48,8 +48,7 @@ def table_to_dict(table, schema_name_postfix = None):
     # Schema and table name can be derived if it's in <schema_nama>.<table_name> format
     s = table.split('.')
     if len(s) > 1:
-        postfix = "" if schema_name_postfix is None else schema_name_postfix
-        schema_name = s[0] + postfix
+        schema_name = s[0]
         table_name = s[1]
 
     return {
@@ -59,23 +58,65 @@ def table_to_dict(table, schema_name_postfix = None):
 
 
 def get_target_schema(target_config, table):
-    # Target schema name can be defined in multiple ways:
-    #
-    #   1: 'schema' key : Target schema name defined explicitly
-    #   2: 'dynamic_schema_name' key: Target schema name derived from the incoming stream id:
-    #                                 i.e.: <schema_nama>-<table_name>
-    if 'schema' in target_config and target_config['schema'].strip():
-        return target_config['schema']
-    elif 'dynamic_schema_name' in target_config and target_config['dynamic_schema_name']:
-        postfix = target_config['dynamic_schema_name_postfix'] if 'dynamic_schema_name_postfix' in target_config else None
-        table_dict = table_to_dict(table, postfix)
+    """
+    Target schema name can be defined in multiple ways:
 
-        if table_dict['schema_name'] is None:
-            raise Exception("Cannot detect target schema name of table using '{}' format. Use it with schema names.".format(table))
+    1: 'default_target_schema' key  : Target schema is the same for every incoming stream if
+                                      not specified explicitly for a given stream in
+                                      the `schema_mapping` object
+    2: 'schema_mapping' key         : Target schema defined explicitly for a given stream.
+                                      Example config.json:
+                                            "schema_mapping": {
+                                                "my_tap_stream_id": {
+                                                    "target_schema": "my_snowflake_schema",
+                                                }
+                                            }
+    """
+    target_schema = None
+    config_default_target_schema = target_config.get('default_target_schema', '').strip()
+    config_schema_mapping = target_config.get('schema_mapping', {})
 
-        return table_dict['schema_name']
-    else:
-        raise Exception("Target schema name not defined in config. Neither 'schema' (string) nor 'dynamic_schema_name' (boolean) keys set in config.")
+    table_dict = table_to_dict(table)
+    table_schema = table_dict['schema_name']
+    if config_schema_mapping and table_schema in config_schema_mapping:
+        target_schema = config_schema_mapping[table_schema].get('target_schema')
+    elif config_default_target_schema:
+        target_schema = config_default_target_schema
+
+    if not target_schema:
+        raise Exception("Target schema name not defined in config. Neither 'default_target_schema' (string) nor 'schema_mapping' (object) defines target schema for {} stream.".format(stream_schema_name))
+
+    return target_schema
+
+
+def get_grantees(target_config, table):
+    """
+    Grantees can be defined in multiple ways:
+
+    1: 'default_target_schema_select_permissions' key  : USAGE and SELECT privileges will be granted on every table to a given role
+                                                        for every incoming stream if not specified explicitly
+                                                        in the `schema_mapping` object
+    2: 'target_schema_select_permissions' key          : Roles to grant USAGE and SELECT privileges defined explicitly
+                                                        for a given stream.
+                                                        Example config.json:
+                                                            "schema_mapping": {
+                                                                "my_tap_stream_id": {
+                                                                    "target_schema_select_permissions": [ "role_with_select_privs" ]
+                                                                }
+                                                            }
+    """
+    grantees = []
+    config_default_target_schema_select_permissions = target_config.get('default_target_schema_select_permissions', [])
+    config_schema_mapping = target_config.get('schema_mapping', {})
+
+    table_dict = table_to_dict(table)
+    table_schema = table_dict['schema_name']
+    if config_schema_mapping and table_schema in config_schema_mapping:
+        grantees = config_schema_mapping[table_schema].get('target_schema_select_permissions', [])
+    elif config_default_target_schema_select_permissions:
+        grantees = config_default_target_schema_select_permissions
+
+    return grantees
 
 
 def sync_table(table):
@@ -128,8 +169,7 @@ def sync_table(table):
         mysql.close_connection()
 
         # Table loaded, grant select on all tables in target schema
-        grant_select_to = args.target['grant_select_to'] if 'grant_select_to' in args.target else []
-        for grantee in grant_select_to:
+        for grantee in get_grantees(args.target, table):
             snowflake.grant_usage_on_schema(target_schema, grantee)
             snowflake.grant_select_on_schema(target_schema, grantee)
 
