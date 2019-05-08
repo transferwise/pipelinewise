@@ -39,7 +39,8 @@ class Postgres:
             'timestamp with time zone':'TIMESTAMP_TZ',
             'time':'TIME',
             'time without time zone':'TIME',
-            'time with time zone':'TIME'
+            'time with time zone':'TIME',
+            'bigint[]':'VARIANT'
         }.get(pg_type, 'VARCHAR')
 
 
