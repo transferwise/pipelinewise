@@ -8,6 +8,7 @@ import shlex
 import copy
 import re
 import logging
+import jsonschema
 
 from subprocess import Popen, PIPE, STDOUT
 from datetime import date, datetime
@@ -21,6 +22,8 @@ from ansible.parsing.yaml.objects import AnsibleVaultEncryptedUnicode
 from ansible.utils.unsafe_proxy import AnsibleUnsafe
 from ansible.module_utils._text import to_text
 from ansible.module_utils.common._collections_compat import Mapping
+
+from . import tap_properties
 
 logger = logging.getLogger('Pipelinewise CLI')
 
@@ -90,6 +93,7 @@ def load_json(path):
             with open(path) as f:
                 return json.load(f)
         else:
+            logger.debug("No file at {}".format(path))
             return None
     except Exception as exc:
         raise Exception("Error parsing {} {}".format(path, exc))
@@ -142,6 +146,33 @@ def load_yaml(yaml_file, vault_secret=None):
             sys.exit(1)
 
     return data
+
+
+def load_schema(name):
+    '''
+    Load a json schema
+    '''
+    path = "{}/schemas/{}.json".format(os.path.dirname(__file__), name)
+    schema = load_json(path)
+
+    if not schema:
+        logger.critical("Cannot load schema at {}".format(path))
+        sys.exit(1)
+
+    return schema
+
+
+def validate(instance, schema):
+    '''
+    Validate an instance under a given json schema
+    '''
+    try:
+        # Serialise vault encrypted objects to string
+        schema_safe_inst = json.loads(json.dumps(instance, cls=AnsibleJSONEncoder))
+        jsonschema.validate(instance=schema_safe_inst, schema=schema)
+    except Exception as exc:
+        logger.critical("Invalid object. {}".format(exc))
+        sys.exit(1)
 
 
 def delete_empty_keys(d):
@@ -225,6 +256,29 @@ def extract_log_attributes(log_file):
         'timestamp': timestamp,
         'status': status
     }
+
+
+def get_tap_property_value(tap_type, property_key):
+    '''
+    Get a tap specific property value
+    '''
+    tap_props = tap_properties.tap_properties
+    tap = tap_props.get(tap_type, tap_props.get('DEFAULT', {}))
+
+    return tap.get(property_key)
+
+
+def get_tap_stream_id(tap_type, database_name, schema_name, table_name):
+    '''
+    Generate tap_stream_id in the same format as a specific
+    tap generating it. They are not consistent.
+    '''
+    pattern = get_tap_property_value(tap_type, 'tap_stream_id_pattern')
+
+    return pattern \
+        .replace("{{database_name}}", "{}".format(database_name)) \
+        .replace("{{schema_name}}", "{}".format(schema_name)) \
+        .replace("{{table_name}}", "{}".format(table_name))
 
 
 def get_fastsync_bin(venv_dir, tap_type, target_type):

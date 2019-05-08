@@ -37,10 +37,10 @@ def validate_config(config):
             errors.append("Required key is missing from config: [{}]".format(k))
 
     # Check target schema config
-    config_schema = config.get('schema', None)
-    config_dynamic_schema_name = config.get('dynamic_schema_name', None)
-    if not config_schema and not config_dynamic_schema_name:
-        errors.append("Neither 'schema' (string) nor 'dynamic_schema_name' (boolean) keys set in config.")
+    config_default_target_schema = config.get('default_target_schema', None)
+    config_schema_mapping = config.get('schema_mapping', None)
+    if not config_default_target_schema and not config_schema_mapping:
+        errors.append("Neither 'default_target_schema' (string) nor 'schema_mapping' (object) keys set in config.")
 
     # Check client-side encryption config
     config_cse_key = config.get('client_side_encryption_master_key', None)
@@ -146,15 +146,14 @@ def flatten_record(d, parent_key=[], sep='__'):
 def primary_column_names(stream_schema_message):
     return [safe_column_name(p) for p in stream_schema_message['key_properties']]
 
-def stream_name_to_dict(stream_name, schema_name_postfix = None):
+def stream_name_to_dict(stream_name):
     schema_name = None
     table_name = stream_name
 
     # Schema and table name can be derived from stream if it's in <schema_nama>-<table_name> format
     s = stream_name.split('-')
     if len(s) > 1:
-        postfix = "" if schema_name_postfix is None else schema_name_postfix
-        schema_name = s[0] + postfix
+        schema_name = s[0]
         table_name = '_'.join(s[1:])
 
     return {
@@ -191,24 +190,56 @@ class DbSync:
             logger.error("Invalid configuration:\n   * {}".format('\n   * '.join(config_errors)))
             exit(1)
 
+        self.schema_name = None
+        self.grantees = None
+        if stream_schema_message is not None:
+            #  Define target schema name.
+            #  --------------------------
+            #  Target schema name can be defined in multiple ways:
+            #
+            #   1: 'default_target_schema' key  : Target schema is the same for every incoming stream if
+            #                                     not specified explicitly for a given stream in
+            #                                     the `schema_mapping` object
+            #   2: 'schema_mapping' key         : Target schema defined explicitly for a given stream.
+            #                                     Example config.json:
+            #                                           "schema_mapping": {
+            #                                               "my_tap_stream_id": {
+            #                                                   "target_schema": "my_snowflake_schema",
+            #                                                   "target_schema_select_permissions": [ "role_with_select_privs" ]
+            #                                               }
+            #                                           }
+            config_default_target_schema = self.connection_config.get('default_target_schema', '').strip()
+            config_schema_mapping = self.connection_config.get('schema_mapping', {})
 
-        # Target schema name can be defined in multiple ways:
-        #
-        #   1: 'schema' key : Target schema name defined explicitly
-        #   2: 'dynamic_schema_name' key: Target schema name derived from the incoming stream id:
-        #                                 i.e.: <schema_nama>-<table_name>
-        config_schema = self.connection_config.get('schema', '')
-        config_dynamic_schema_name = self.connection_config.get('dynamic_schema_name', '')
-        config_dynamic_schema_name_postfix = self.connection_config.get('dynamic_schema_name_postfix', '')
-        if stream_schema_message is None:
-            self.schema_name = None
-        elif config_schema is not None and config_schema.strip():
-            self.schema_name = self.connection_config['schema']
-        elif config_dynamic_schema_name:
             stream_name = stream_schema_message['stream']
-            self.schema_name = stream_name_to_dict(stream_name, config_dynamic_schema_name_postfix)['schema_name']
-        else:
-            raise Exception("Target schema name not defined in config. Neither 'schema' (string) nor 'dynamic_schema_name' (boolean) keys set in config.")
+            stream_schema_name = stream_name_to_dict(stream_name)['schema_name']
+            if config_schema_mapping and stream_schema_name in config_schema_mapping:
+                self.schema_name = config_schema_mapping[stream_schema_name].get('target_schema')
+            elif config_default_target_schema:
+                self.schema_name = config_default_target_schema
+
+            if not self.schema_name:
+                raise Exception("Target schema name not defined in config. Neither 'default_target_schema' (string) nor 'schema_mapping' (object) defines target schema for {} stream.".format(stream_schema_name))
+
+            #  Define grantees
+            #  ---------------
+            #  Grantees can be defined in multiple ways:
+            #
+            #   1: 'default_target_schema_select_permissions' key  : USAGE and SELECT privileges will be granted on every table to a given role
+            #                                                       for every incoming stream if not specified explicitly
+            #                                                       in the `schema_mapping` object
+            #   2: 'target_schema_select_permissions' key          : Roles to grant USAGE and SELECT privileges defined explicitly
+            #                                                       for a given stream.
+            #                                                       Example config.json:
+            #                                                           "schema_mapping": {
+            #                                                               "my_tap_stream_id": {
+            #                                                                   "target_schema": "my_snowflake_schema",
+            #                                                                   "target_schema_select_permissions": [ "role_with_select_privs" ]
+            #                                                               }
+            #                                                           }
+            self.grantees = self.connection_config.get('default_target_schema_select_permissions')
+            if config_schema_mapping and stream_schema_name in config_schema_mapping:
+                self.grantees = config_schema_mapping[stream_schema_name].get('target_schema_select_permissions', self.grantees)
 
         self.stream_schema_message = stream_schema_message
 
@@ -462,9 +493,7 @@ class DbSync:
             logger.info("Schema '{}' does not exist. Creating... {}".format(schema_name, query))
             self.query(query)
 
-            if 'grant_select_to' in self.connection_config:
-                grant_select_to = self.connection_config['grant_select_to']
-                self.grant_privilege(schema_name, grant_select_to, self.grant_usage_on_schema)
+            self.grant_privilege(schema_name, self.grantees, self.grant_usage_on_schema)
 
     def get_tables(self, table_schema=None):
         return self.query("""SELECT LOWER(table_schema) table_schema, LOWER(table_name) table_name
@@ -474,11 +503,14 @@ class DbSync:
         ))
 
     def get_table_columns(self, table_schema=None, table_name=None):
-        return self.query("""SELECT LOWER(table_schema) table_schema, LOWER(table_name) table_name, column_name, data_type
-            FROM information_schema.columns
-            WHERE LOWER(table_schema) = {} AND LOWER(table_name) = {}""".format(
-                "LOWER(table_schema)" if table_schema is None else "'{}'".format(table_schema.lower()),
-                "LOWER(table_name)" if table_name is None else "'{}'".format(table_name.lower())
+        return self.query("""SELECT LOWER(t.table_schema) table_schema, LOWER(t.table_name) table_name, c.column_name, c.data_type
+            FROM information_schema.tables t,
+                 information_schema.columns c
+            WHERE t.table_type = 'BASE TABLE'
+            AND LOWER(c.table_schema) NOT IN ('analyst_sandbox', 'reports')
+            AND LOWER(c.table_schema) = {} AND LOWER(c.table_name) = {}""".format(
+                "LOWER(t.table_schema)" if table_schema is None else "'{}'".format(table_schema.lower()),
+                "LOWER(t.table_name)" if table_name is None else "'{}'".format(table_name.lower())
         ))
 
     def update_columns(self, table_columns_cache=None):
@@ -558,9 +590,7 @@ class DbSync:
             logger.info("Table '{}' does not exist. Creating...".format(table_name_with_schema))
             self.query(query)
 
-            if 'grant_select_to' in self.connection_config:
-                grant_select_to = self.connection_config['grant_select_to']
-                self.grant_privilege(self.schema_name, grant_select_to, self.grant_select_on_all_tables_in_schema)
+            self.grant_privilege(self.schema_name, self.grantees, self.grant_select_on_all_tables_in_schema)
         else:
             logger.info("Table '{}' exists".format(table_name_with_schema))
             self.update_columns(table_columns_cache)

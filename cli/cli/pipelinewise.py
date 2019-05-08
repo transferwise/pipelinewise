@@ -452,29 +452,27 @@ class PipelineWise(object):
 
             streams = schema["streams"]
             for stream_idx, stream in enumerate(streams):
-                table_name = stream.get("table_name") or stream.get("stream")
-                table_sel = False
+                tap_stream_id = stream.get("tap_stream_id")
+                tap_stream_sel = False
                 for sel in selection:
-                        if 'table_name' in sel and table_name == sel['table_name']:
-                            table_sel = sel
+                        if 'tap_stream_id' in sel and tap_stream_id == sel['tap_stream_id']:
+                            tap_stream_sel = sel
 
                 # Find table specific metadata entries in the old and new streams
-                new_stream_table_mdata_idx = 0
-                old_stream_table_mdata_idx = 0
                 try:
                     stream_table_mdata_idx = [i for i, md in enumerate(stream["metadata"]) if md["breadcrumb"] == []][0]
                 except Exception:
                     False
 
-                if table_sel:
-                    self.logger.info("Mark {} table as selected with properties {}".format(table_name, table_sel))
+                if tap_stream_sel:
+                    self.logger.info("Mark {} tap_stream_id as selected with properties {}".format(tap_stream_id, tap_stream_sel))
                     schema["streams"][stream_idx]["metadata"][stream_table_mdata_idx]["metadata"]["selected"] = True
-                    if "replication_method" in table_sel:
-                        schema["streams"][stream_idx]["metadata"][stream_table_mdata_idx]["metadata"]["replication-method"] = table_sel["replication_method"]
-                    if "replication_key" in table_sel:
-                        schema["streams"][stream_idx]["metadata"][stream_table_mdata_idx]["metadata"]["replication-key"] = table_sel["replication_key"]
+                    if "replication_method" in tap_stream_sel:
+                        schema["streams"][stream_idx]["metadata"][stream_table_mdata_idx]["metadata"]["replication-method"] = tap_stream_sel["replication_method"]
+                    if "replication_key" in tap_stream_sel:
+                        schema["streams"][stream_idx]["metadata"][stream_table_mdata_idx]["metadata"]["replication-key"] = tap_stream_sel["replication_key"]
                 else:
-                    self.logger.info("Mark {} table as not selected".format(table_name))
+                    self.logger.info("Mark {} tap_stream_id as not selected".format(tap_stream_id))
                     schema["streams"][stream_idx]["metadata"][stream_table_mdata_idx]["metadata"]["selected"] = False
 
         return schema
@@ -693,20 +691,7 @@ class PipelineWise(object):
         # Following the singer spec the catalog JSON file needs to be passed by the --catalog argument
         # However some tap (i.e. tap-mysql and tap-postgres) requires it as --properties
         # This is problably for historical reasons and need to clarify on Singer slack channels
-        if tap_type == 'tap-mysql':
-            tap_catalog_argument = '--properties'
-        elif tap_type == 'tap-postgres':
-            tap_catalog_argument = '--properties'
-        elif tap_type == 'tap-zendesk':
-            tap_catalog_argument = '--catalog'
-        elif tap_type == 'tap-kafka':
-            tap_catalog_argument = '--properties'
-        elif tap_type == 'tap-adwords':
-            tap_catalog_argument = '--properties'
-        elif tap_type == 'tap-s3-csv':
-            tap_catalog_argument = '--catalog'
-        else:
-            tap_catalog_argument = '--catalog'
+        tap_catalog_argument = utils.get_tap_property_value(tap_type, 'tap_catalog_argument')
 
         # Add state arugment if exists to extract data incrementally
         tap_state_arg = ""

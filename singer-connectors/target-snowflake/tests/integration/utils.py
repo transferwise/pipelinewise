@@ -17,7 +17,7 @@ def get_db_config():
     config['user'] = os.environ.get('TARGET_SNOWFLAKE_USER')
     config['password'] = os.environ.get('TARGET_SNOWFLAKE_PASSWORD')
     config['warehouse'] = os.environ.get('TARGET_SNOWFLAKE_WAREHOUSE')
-    config['schema'] = os.environ.get("TARGET_SNOWFLAKE_SCHEMA")
+    config['default_target_schema'] = os.environ.get("TARGET_SNOWFLAKE_SCHEMA")
     config['stage'] = os.environ.get("TARGET_SNOWFLAKE_STAGE")
     config['file_format'] = os.environ.get("TARGET_SNOWFLAKE_FILE_FORMAT")
 
@@ -36,8 +36,7 @@ def get_db_config():
     # The tests cases will set them automatically whenever it's needed
     # --------------------------------------------------------------------------
     config['disable_table_cache'] = None
-    config['dynamic_schema_name'] = None
-    config['dynamic_schema_name_postfix'] = None
+    config['schema_mapping'] = None
     config['add_metadata_columns'] = None
     config['hard_delete'] = None
 

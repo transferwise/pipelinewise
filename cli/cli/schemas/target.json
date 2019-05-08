@@ -1,0 +1,46 @@
+{
+  "definitions": {
+    "db_conn": {
+      "type": "object",
+      "properties": {
+        "account": { "type": "string" },
+        "dbname": { "type": "string" },
+        "user": { "type": "string" },
+        "password": { "type": "string" },
+        "warehouse": { "type": "string" },
+        "s3_bucket": { "type": "string" },
+        "s3_key_prefix": { "type": "string" },
+        "stage": { "type": "string" },
+        "file_format:": { "type": "string" },
+        "aws_access_key_id": { "type": "string" },
+        "aws_secret_access_key": { "type": "string" },
+        "client_side_encryption_master_key": { "type": "string" }
+      },
+      "required": [
+        "account",
+        "dbname",
+        "user",
+        "password",
+        "warehouse",
+        "s3_bucket",
+        "s3_key_prefix",
+        "stage",
+        "file_format"
+      ]
+    }
+  },
+
+  "type": "object",
+  "properties":{  
+    "id": { "type": "string" },
+    "name": { "type": "string" },
+    "type": { "type": "string", "enum": ["target-snowflake"] },
+    "db_conn": { "$ref": "#/definitions/db_conn" }
+  },
+  "required":[  
+    "id",
+    "name",
+    "type",
+    "db_conn"
+  ]
+}
