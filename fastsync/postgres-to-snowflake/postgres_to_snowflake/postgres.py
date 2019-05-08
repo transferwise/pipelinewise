@@ -40,7 +40,7 @@ class Postgres:
             'time':'TIME',
             'time without time zone':'TIME',
             'time with time zone':'TIME',
-            'bigint[]':'VARIANT'
+            'ARRAY':'VARIANT'
         }.get(pg_type, 'VARCHAR')
 
 
