@@ -10,6 +10,7 @@ import MysqlLogo from '../../images/mysql-logo.png';
 import PostgresLogo from '../../images/postgresql-logo.png';
 import ZendeskLogo from '../../images/zendesk-logo.png';
 import AdwordsLogo from '../../images/adwords-logo.png';
+import S3Logo from '../../images/s3-logo.png';
 import KafkaLogo from '../../images/kafka-logo.png';
 import SnowflakeLogo from '../../images/snowflake-logo.png';
 
@@ -28,6 +29,8 @@ function decoratorsByName(name) {
       return { logo: ZendeskLogo, name: 'Zendesk' };
     } else if (name.match(/(tap|target)-adwords/)) {
       return { logo: AdwordsLogo, name: 'Adwords' };
+    } else if (name.match(/(tap|target)-s3/)) {
+      return { logo: S3Logo, name: 'S3' };
     } else if (name.match(/(tap|target)-kafka/)) {
       return { logo: KafkaLogo, name: 'Kafka' };
     } else if (name.match(/(tap|target)-snowflake/)) {

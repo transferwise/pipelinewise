@@ -128,11 +128,7 @@ class Config(object):
 
             # Save every tap JSON files
             for i, tap in enumerate(target['taps']):
-                # Add unique server_id to db_conn when tap type is mysql
-                extra_config_keys = {}
-                if tap.get('type') == 'tap-mysql':
-                    extra_config_keys = {'server_id': 900000000 + i}
-
+                extra_config_keys = utils.get_tap_extra_config_keys(tap)
                 self.save_tap_jsons(target, tap, extra_config_keys)
 
 
@@ -224,7 +220,6 @@ class Config(object):
         tap_config = {**tap.get('db_conn'), **extra_config_keys}
 
         # Get additional properties will be needed later to generate tap_stream_id
-        tap_type = tap.get('type')
         tap_dbname = tap_config.get('dbname')
 
         # Generate tap selection
@@ -234,7 +229,7 @@ class Config(object):
             for table in schema.get('tables', []):
                 table_name = table.get('table_name')
                 selection.append(utils.delete_empty_keys({
-                    "tap_stream_id": utils.get_tap_stream_id(tap_type, tap_dbname, schema_name, table_name),
+                    "tap_stream_id": utils.get_tap_stream_id(tap, tap_dbname, schema_name, table_name),
 
                     # Default replication_method is LOG_BASED
                     "replication_method": table.get('replication_method', 'LOG_BASED'),
@@ -254,7 +249,7 @@ class Config(object):
                 table_name = table.get('table_name')
                 for trans in table.get('transformations', []):
                     transformations.append({
-                        "tap_stream_id": utils.get_tap_stream_id(tap_type, tap_dbname, schema_name, table_name),
+                        "tap_stream_id": utils.get_tap_stream_id(tap, tap_dbname, schema_name, table_name),
                         "fieldId": trans.get('column'),
                         "type": trans.get('type')
                     })
