@@ -249,8 +249,8 @@ class Config(object):
                 table_name = table.get('table_name')
                 for trans in table.get('transformations', []):
                     transformations.append({
-                        "tap_stream_id": utils.get_tap_stream_id(tap, tap_dbname, schema_name, table_name),
-                        "fieldId": trans.get('column'),
+                        "tap_stream_name": utils.get_tap_stream_name(tap, tap_dbname, schema_name, table_name),
+                        "field_id": trans.get('column'),
                         "type": trans.get('type')
                     })
         tap_transformation = {
