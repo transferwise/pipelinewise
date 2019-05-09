@@ -60,30 +60,35 @@ def get_tap_properties(tap=None):
             'server_id': generate_tap_mysql_server_id()
         },
         'tap_stream_id_pattern': '{{schema_name}}-{{table_name}}',
+        'tap_stream_name_pattern': '{{schema_name}}-{{table_name}}',
         'tap_catalog_argument': '--properties',
     },
 
     'tap-postgres': {
         'tap_config_extras': {},
         'tap_stream_id_pattern': '{{database_name}}-{{schema_name}}-{{table_name}}',
+        'tap_stream_name_pattern': '{{schema_name}}-{{table_name}}',
         'tap_catalog_argument': '--properties',
     },
 
     'tap-kafka': {
         'tap_config_extras': {},
         'tap_stream_id_pattern': '{{table_name}}',
+        'tap_stream_name_pattern': '{{table_name}}',
         'tap_catalog_argument': '--properties',
     },
 
     'tap-zendesk': {
         'tap_config_extras': {},
         'tap_stream_id_pattern': '{{table_name}}',
+        'tap_stream_name_pattern': '{{table_name}}',
         'tap_catalog_argument': '--catalog',
     },
 
     'tap-adwords': {
         'tap_config_extras': {},
         'tap_stream_id_pattern': '{{table_name}}',
+        'tap_stream_name_pattern': '{{table_name}}',
         'tap_catalog_argument': '--catalog',
     },
 
@@ -92,6 +97,7 @@ def get_tap_properties(tap=None):
             'tables': generate_tap_s3_csv_to_table_mappings(tap)
         },
         'tap_stream_id_pattern': '{{table_name}}',
+        'tap_stream_name_pattern': '{{table_name}}',
         'tap_catalog_argument': '--properties',
     },
 
@@ -99,6 +105,7 @@ def get_tap_properties(tap=None):
     'DEFAULT': {
         'tap_config_extras': {},
         'tap_stream_id_pattern': '{{schema_name}}-{{table_name}}',
+        'tap_stream_name_pattern': '{{schema_name}}-{{table_name}}',
         'tap_catalog_argument': '--catalog',
     },
 }

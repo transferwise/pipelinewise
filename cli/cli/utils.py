@@ -291,8 +291,27 @@ def get_tap_stream_id(tap, database_name, schema_name, table_name):
     '''
     Generate tap_stream_id in the same format as a specific
     tap generating it. They are not consistent.
+
+    Stream id is the string that tha tap's discovery mode puts
+    into the properties.json file
     '''
     pattern = get_tap_property(tap, 'tap_stream_id_pattern')
+
+    return pattern \
+        .replace("{{database_name}}", "{}".format(database_name)) \
+        .replace("{{schema_name}}", "{}".format(schema_name)) \
+        .replace("{{table_name}}", "{}".format(table_name))
+
+
+def get_tap_stream_name(tap, database_name, schema_name, table_name):
+    '''
+    Generate tap_stream_name in the same format as a specific
+    tap generating it. They are not consistent.
+
+    Stream name is the string that the tap puts into the output
+    singer messages
+    '''
+    pattern = get_tap_property(tap, 'tap_stream_name_pattern')
 
     return pattern \
         .replace("{{database_name}}", "{}".format(database_name)) \

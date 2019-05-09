@@ -84,7 +84,7 @@ def get_target_schema(target_config, table):
         target_schema = config_default_target_schema
 
     if not target_schema:
-        raise Exception("Target schema name not defined in config. Neither 'default_target_schema' (string) nor 'schema_mapping' (object) defines target schema for {} stream.".format(stream_schema_name))
+        raise Exception("Target schema name not defined in config. Neither 'default_target_schema' (string) nor 'schema_mapping' (object) defines target schema for {} stream.".format(table))
 
     return target_schema
 

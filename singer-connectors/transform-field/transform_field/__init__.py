@@ -73,12 +73,12 @@ class TransformField(object):
             # Naming differences in stream ids:
             #  1. properties.json and transformation_json using 'tap_stream_id'
             #  2. taps send in the 'stream' key in singer messages
-            stream = trans["tap_stream_id"]
+            stream = trans["tap_stream_name"]
             if stream not in self.trans_meta:
                 self.trans_meta[stream] = []
             
             self.trans_meta[stream].append(TransMeta(
-                trans["fieldId"],
+                trans["field_id"],
                 trans["type"]
             ))
 
