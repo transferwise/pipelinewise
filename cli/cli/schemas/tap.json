@@ -25,7 +25,8 @@
         "transformations": {
           "type": "array",
           "items":{ "$ref": "#/definitions/transformation" }
-        }
+        },
+        "s3_csv_mapping:":{ "$ref": "#/definitions/s3_csv_mapping" }
       },
       "required": [ "table_name" ]
     },
@@ -51,6 +52,20 @@
           ] }
       },
       "required": [ "column", "type" ]
+    },
+
+    "s3_csv_mapping": {
+      "type": "object",
+      "properties": {
+        "search_prefix": { "type": "string" },
+        "search_pattern": { "type": "string" },
+        "key_properties": {
+          "type": "array",
+          "items":{ "type": "string" }
+        },
+        "delimiter": { "type": "string" }
+      },
+      "required": [ "search_pattern" ]
     }
   },
   
@@ -63,7 +78,8 @@
       "tap-mysql",
       "tap-adwords",
       "tap-zendesk",
-      "tap-kafka"
+      "tap-kafka",
+      "tap-s3-csv"
       ] },
     "db_conn":{ "type": "object" },
     "target": { "type": "string" },

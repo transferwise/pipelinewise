@@ -258,22 +258,41 @@ def extract_log_attributes(log_file):
     }
 
 
-def get_tap_property_value(tap_type, property_key):
+def get_tap_property(tap, property_key):
     '''
     Get a tap specific property value
     '''
-    tap_props = tap_properties.tap_properties
-    tap = tap_props.get(tap_type, tap_props.get('DEFAULT', {}))
+    tap_props_inst = tap_properties.get_tap_properties(tap)
+    tap_props = tap_props_inst.get(tap.get('type'), tap_props_inst.get('DEFAULT', {}))
 
-    return tap.get(property_key)
+    return tap_props.get(property_key)
 
 
-def get_tap_stream_id(tap_type, database_name, schema_name, table_name):
+def get_tap_property_by_tap_type(tap_type, property_key):
+    '''
+    Get a tap specific property value by a tap type.
+
+    Some attributes cannot derived only by tap type. These
+    properties might not be returned as expected.
+    '''
+    tap_props_inst = tap_properties.get_tap_properties()
+    tap_props = tap_props_inst.get(tap_type, tap_props_inst.get('DEFAULT', {}))
+
+    return tap_props.get(property_key)
+
+
+def get_tap_extra_config_keys(tap):
+    '''
+    '''
+    return get_tap_property(tap, 'tap_config_extras')
+
+
+def get_tap_stream_id(tap, database_name, schema_name, table_name):
     '''
     Generate tap_stream_id in the same format as a specific
     tap generating it. They are not consistent.
     '''
-    pattern = get_tap_property_value(tap_type, 'tap_stream_id_pattern')
+    pattern = get_tap_property(tap, 'tap_stream_id_pattern')
 
     return pattern \
         .replace("{{database_name}}", "{}".format(database_name)) \
