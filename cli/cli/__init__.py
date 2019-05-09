@@ -17,7 +17,7 @@ venv_dir = os.path.join(pipelinewise_home, '.virtualenvs')
 commands = [
   'run_tap',
   'discover_tap',
-  'show_status',
+  'status',
   'test_tap_connection',
   'clear_crontab',
   'init_crontab',

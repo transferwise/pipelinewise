@@ -614,7 +614,7 @@ class PipelineWise(object):
 
         return status
 
-    def show_status(self):
+    def status(self):
         targets = self.get_targets()
 
         tab_headers = ['Warehouse ID', 'Source ID', 'Enabled', 'Type', 'Status', 'Last Sync', 'Last Sync Result']
