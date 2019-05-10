@@ -20,3 +20,8 @@ blog_old.md
 node_modules
 *.pyc
 tmp
+
+# Docs
+docs/_build/
+docs/_static/
+docs/_templates/
