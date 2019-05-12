@@ -8,33 +8,39 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Welcome to PipelineWise’s documentation! &mdash; PipelineWise  documentation</title>
+  <title>Documentation &mdash; PipelineWise  documentation</title>
   
 
   
   
+    <link rel="shortcut icon" href="_static/pipelinewise.png"/>
   
+  
+  
+    <link rel="canonical" href="https://docs.ansible.com/ansible/latest/index.html"/>
   
 
   
-  <script type="text/javascript" src="static/js/modernizr.min.js"></script>
+  <script type="text/javascript" src="_static/js/modernizr.min.js"></script>
   
     
-      <script type="text/javascript" id="documentation_options" data-url_root="./" src="static/documentation_options.js"></script>
-        <script type="text/javascript" src="static/jquery.js"></script>
-        <script type="text/javascript" src="static/underscore.js"></script>
-        <script type="text/javascript" src="static/doctools.js"></script>
-        <script type="text/javascript" src="static/language_data.js"></script>
+      <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+        <script type="text/javascript" src="_static/jquery.js"></script>
+        <script type="text/javascript" src="_static/underscore.js"></script>
+        <script type="text/javascript" src="_static/doctools.js"></script>
+        <script type="text/javascript" src="_static/language_data.js"></script>
     
-    <script type="text/javascript" src="static/js/theme.js"></script>
+    <script type="text/javascript" src="_static/js/theme.js"></script>
 
     
 
   
-  <link rel="stylesheet" href="static/css/theme.css" type="text/css" />
-  <link rel="stylesheet" href="static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="_static/css/custom.css" type="text/css" />
     <link rel="index" title="Index" href="genindex.html" />
-    <link rel="search" title="Search" href="search.html" /> 
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Installation" href="installation_guide/installation.html" /> 
 </head>
 
 <body class="wy-body-for-nav">
@@ -57,6 +63,10 @@
           
             
             
+              <div class="version">
+                1.0.0
+              </div>
+            
           
 
           
@@ -78,12 +88,36 @@
               
             
             
-              <!-- Local TOC -->
-              <div class="local-toc"><ul>
-<li><a class="reference internal" href="#">Welcome to PipelineWise’s documentation!</a></li>
-<li><a class="reference internal" href="#indices-and-tables">Indices and tables</a></li>
+              <p class="caption"><span class="caption-text">Installation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="installation_guide/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="installation_guide/start.html">Quick Start</a></li>
 </ul>
-</div>
+<p class="caption"><span class="caption-text">Concept</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="concept/singer.html">Singer.io</a></li>
+<li class="toctree-l1"><a class="reference internal" href="concept/replication_strategies.html">Replication Strategies</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Using PipelineWise</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/yaml_config.html">YAML configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/command_line_tools.html">Command Line Tools</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/fastsync.html">Fast Sync</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/scheduling.html">Scheduling</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/integration.html">Integration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/scaling.html">Scaling</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/transformations.html">Transformations</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Connectors</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="connectors/taps.html">Taps (Data Sources)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="connectors/targets.html">Targets (Destinations)</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Project</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="project/about.html">Project</a></li>
+</ul>
+
             
           
         </div>
@@ -127,7 +161,7 @@
     
       <li><a href="#">Docs</a> &raquo;</li>
         
-      <li>Welcome to PipelineWise’s documentation!</li>
+      <li>Documentation</li>
     
     
       <li class="wy-breadcrumbs-aside">
@@ -146,9 +180,109 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
             
-  <div class="section" id="welcome-to-pipelinewise-s-documentation">
-<h1>Welcome to PipelineWise’s documentation!<a class="headerlink" href="#welcome-to-pipelinewise-s-documentation" title="Permalink to this headline">¶</a></h1>
+  <a class="reference internal image-reference" href="_images/pipelinewise-with-text.png"><img alt="_images/pipelinewise-with-text.png" src="_images/pipelinewise-with-text.png" style="width: 300px;" /></a>
+<div class="section" id="documentation">
+<h1>Documentation<a class="headerlink" href="#documentation" title="Permalink to this headline">¶</a></h1>
+<p>PipelineWise is a Data Pipeline Framework using the <a class="reference external" href="https://www.singer.io/">Singer.io</a>
+specification to replicate data from various sources to various destinations.</p>
+<img alt="_images/pipelinewise-diagram-circle-bold.png" src="_images/pipelinewise-diagram-circle-bold.png" />
+<hr class="docutils" />
+<div class="section" id="principles">
+<h2>Principles<a class="headerlink" href="#principles" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li><p><strong>Managed Schema Changes</strong>: When source data changes, PipelineWise alters the schema in your Data Warehouse automatically</p></li>
+<li><p><strong>sdf</strong>: PipelineWise are defined as YAML files and Python codes. This allows version control.</p></li>
+<li><p><strong>Extensible</strong>: PipelineWise source and target connectors are independent.</p></li>
+</ul>
+</div>
+<div class="section" id="beyond-the-horizon">
+<h2>Beyond the Horizon<a class="headerlink" href="#beyond-the-horizon" title="Permalink to this headline">¶</a></h2>
+<p>Airflow <strong>is not</strong> a data streaming solution. Tasks do not move data from
+one to the other (though tasks can exchange metadata!). Airflow is not
+in the <a class="reference external" href="http://spark.apache.org/streaming/">Spark Streaming</a>
+or <a class="reference external" href="https://storm.apache.org/">Storm</a> space, it is more comparable to
+<a class="reference external" href="http://oozie.apache.org/">Oozie</a> or
+<a class="reference external" href="http://data.linkedin.com/opensource/azkaban">Azkaban</a>.</p>
+<p>Workflows are expected to be mostly static or slowly changing. You can think
+of the structure of the tasks in your workflow as slightly more dynamic
+than a database structure would be. Airflow workflows are expected to look
+similar from a run to the next, this allows for clarity around
+unit of work and continuity.</p>
+</div>
+<div class="section" id="content">
+<h2>Content<a class="headerlink" href="#content" title="Permalink to this headline">¶</a></h2>
 <div class="toctree-wrapper compound">
+<p class="caption"><span class="caption-text">Installation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="installation_guide/installation.html">Installation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="installation_guide/installation.html#getting-pipelinewise">Getting PipelineWise</a></li>
+<li class="toctree-l2"><a class="reference internal" href="installation_guide/installation.html#installing-from-source">Installing from source</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="installation_guide/start.html">Quick Start</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="installation_guide/start.html#what-s-next">What’s Next?</a></li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="toctree-wrapper compound">
+<p class="caption"><span class="caption-text">Concept</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="concept/singer.html">Singer.io</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="concept/singer.html#core-ideas">Core Ideas</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="concept/replication_strategies.html">Replication Strategies</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="concept/replication_strategies.html#incremental">Incremental</a></li>
+<li class="toctree-l2"><a class="reference internal" href="concept/replication_strategies.html#full-table">Full Table</a></li>
+<li class="toctree-l2"><a class="reference internal" href="concept/replication_strategies.html#log-based">Log Based</a></li>
+<li class="toctree-l2"><a class="reference internal" href="concept/replication_strategies.html#fast-sync">Fast Sync</a></li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="toctree-wrapper compound">
+<p class="caption"><span class="caption-text">Using PipelineWise</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/yaml_config.html">YAML configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/command_line_tools.html">Command Line Tools</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/fastsync.html">Fast Sync</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/scheduling.html">Scheduling</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/integration.html">Integration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/scaling.html">Scaling</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/transformations.html">Transformations</a></li>
+</ul>
+</div>
+<div class="toctree-wrapper compound">
+<p class="caption"><span class="caption-text">Connectors</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="connectors/taps.html">Taps (Data Sources)</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="connectors/taps.html#mysql-mariadb">MySQL/ MariaDB</a></li>
+<li class="toctree-l2"><a class="reference internal" href="connectors/taps.html#postgresql">PostgreSQL</a></li>
+<li class="toctree-l2"><a class="reference internal" href="connectors/taps.html#zendesk">Zendesk</a></li>
+<li class="toctree-l2"><a class="reference internal" href="connectors/taps.html#kafka">Kafka</a></li>
+<li class="toctree-l2"><a class="reference internal" href="connectors/taps.html#csv-files-on-s3">CSV files on S3</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="connectors/targets.html">Targets (Destinations)</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="connectors/targets.html#snowflake">Snowflake</a></li>
+<li class="toctree-l2"><a class="reference internal" href="connectors/targets.html#postgresql">PostgreSQL</a></li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="toctree-wrapper compound">
+<p class="caption"><span class="caption-text">Project</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="project/about.html">Project</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="project/about.html#history">History</a></li>
+<li class="toctree-l2"><a class="reference internal" href="project/about.html#committers">Committers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="project/about.html#singer-community">Singer Community</a></li>
+<li class="toctree-l2"><a class="reference internal" href="project/about.html#resources-links">Resources &amp; links</a></li>
+</ul>
+</li>
+</ul>
+</div>
 </div>
 </div>
 <div class="section" id="indices-and-tables">
@@ -166,12 +300,19 @@
           </div>
           <footer>
   
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="installation_guide/installation.html" class="btn btn-neutral float-right" title="Installation" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+    </div>
+  
 
   <hr/>
 
   <div role="contentinfo">
     <p>
-        &copy; Copyright 2019, Peter Kosztolanyi
+        &copy; Copyright 2019, TransferWise Ltd.
 
     </p>
   </div>

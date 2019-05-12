@@ -1,0 +1,60 @@
+/* Content fonts */
+@import "https://fonts.googleapis.com/css?family=Comfortaa";
+h1, h2, .rst-content .toctree-wrapper p.caption, h3, h4, h5, h6, legend {
+  margin-top: 0;
+  font-weight: 700;
+  font-family: "Comfortaa","ff-tisa-web-pro","Georgia",Arial,sans-serif;
+}
+
+/* Navbar colors */
+.wy-side-nav-search {
+  background-color: #00a4de;
+}
+
+div.leftside {
+  width: 414px;
+  padding: 0px 3px 0px 0px;
+  float: left;
+}
+
+div.rightside {
+  margin-left: 425px;
+}
+
+/*
+.wy-nav-side {
+  background: #073642;
+}
+
+
+.wy-menu-vertical li.current {
+  background: #eee8d5;
+}
+*/
+
+/* Solarised code highligth */
+.rst-content pre.literal-block, .rst-content div[class^='highlight'] {
+  background-color: #073642;
+  color: #fdf6e3;
+}
+
+.wy-menu-vertical header, .wy-menu-vertical p.caption {
+  color: #839496;
+}
+
+.highlight .c1 {
+  color: #93a1a1;
+}
+
+.highlight .nb {
+  color: #859900;
+}
+
+.highlight .nv {
+  color: #6c71c4;
+}
+
+.highlight .m {
+  color: #eee8d5;
+}
+
