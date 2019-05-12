@@ -14,12 +14,16 @@
 # import sys
 # sys.path.insert(0, os.path.abspath('.'))
 
+def setup(app):
+    app.add_stylesheet('css/custom.css')
+
 
 # -- Project information -----------------------------------------------------
 
 project = 'PipelineWise'
-copyright = '2019, Peter Kosztolanyi'
+copyright = '2019, TransferWise Ltd.'
 author = 'Peter Kosztolanyi'
+version = '1.0.0'
 
 
 # -- General configuration ---------------------------------------------------
@@ -50,3 +54,10 @@ html_theme = 'sphinx_rtd_theme'
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
+
+html_favicon = 'img/pipelinewise.png'
+
+html_theme_options = {
+    'canonical_url': "https://docs.ansible.com/ansible/latest/",
+    'collapse_navigation': "True"
+}
