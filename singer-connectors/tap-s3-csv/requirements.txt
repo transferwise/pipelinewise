@@ -1,1 +1,1 @@
-tap-s3-csv-koszti==1.0.2
+tap-s3-csv-koszti==1.0.3
