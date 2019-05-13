@@ -624,6 +624,7 @@ class PipelineWise(object):
 
         tab_headers = ['Warehouse ID', 'Source ID', 'Enabled', 'Type', 'Status', 'Last Sync', 'Last Sync Result']
         tab_body = []
+        pipelines = 0
         for target in targets:
             taps = self.get_taps(target["id"])
 
@@ -637,8 +638,10 @@ class PipelineWise(object):
                     tap.get('status', {}).get('lastTimestamp', '<Unknown>'),
                     tap.get('status', {}).get('lastStatus', '<Unknown>')
                 ])
+                pipelines += 1
 
         print(tabulate(tab_body, headers=tab_headers, tablefmt="simple"))
+        print("{} pipeline(s)".format(pipelines))
 
     def clear_crontab(self):
         self.logger.info("Removing jobs from crontab")
