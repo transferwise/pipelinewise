@@ -12,30 +12,31 @@ specification to replicate data from various sources to various destinations.
 
 ------------
 
-Principles
-----------
+Features
+--------
 
-
-- **Managed Schema Changes**: When source data changes, PipelineWise alters the schema in your Data Warehouse automatically
-- **sdf**: PipelineWise are defined as YAML files and Python codes. This allows version control.
-- **Extensible**: PipelineWise source and target connectors are independent.
+- **Built with ELT in mind**: PipelineWise fits into the ELT landscape and not doing traditional ETL. ELT ingests data first into DWH in the original format and the "transformation" shifting to the end of the data pipeline. Load time transformations are still supported but complex mapping and joins have to be done once the data is replicated into the Data Warehouse. 
+- **Lightweight**: No daemons or database setup are required
+- **Replication Methods**: CDC (Log Based), Key-Based Incremental and Full Table snapshots
+- **Managed Schema Changes**: When source data changes, PipelineWise detects the change and alters the schema in your DWH automatically
+- **Load time transformations**: Ideal to obfuscate, mask or filter sensitive data that should never been replicated in the Data Warehouse
+- **YAML based configuration**: Data pipelines are defined in YAML files that makes ideal to keep everything under version control
+- **Integration with external tools**: With built-in event handlers you can trigger external scripts automatically when a certain even occurred
+- **Extensible**: PipelineWise is using `Singer.io <https://www.singer.io/>`_  compatible taps and target connectors and new connectors can be added to the system with relatively small effort
 
 
 Beyond the Horizon
 ------------------
 
-Airflow **is not** a data streaming solution. Tasks do not move data from
-one to the other (though tasks can exchange metadata!). Airflow is not
-in the `Spark Streaming <http://spark.apache.org/streaming/>`_
-or `Storm <https://storm.apache.org/>`_ space, it is more comparable to
-`Oozie <http://oozie.apache.org/>`_ or
-`Azkaban <http://data.linkedin.com/opensource/azkaban>`_.
+PipelineWise is built on top of several `Singer.io <https://www.singer.io/>`_ components but the singer.io components
+are responsible only to do certain tasks like extracting data from a specific data source or loading data into a
+specific destination. To replicate data end to end you'll need have an extra layer on top these components to
+run the jobs, make configurations, select streams to replicate, do logging and more.
 
-Workflows are expected to be mostly static or slowly changing. You can think
-of the structure of the tasks in your workflow as slightly more dynamic
-than a database structure would be. Airflow workflows are expected to look
-similar from a run to the next, this allows for clarity around
-unit of work and continuity.
+This is where PipelineWise comes in place. PipelineWise is a collection of pre-selected singer taps and
+targets and adds the required functionalities to create, run and maintain data pipelines in a production Data Warehouse
+environment without the extra hassle.
+
 
 Content
 -------
