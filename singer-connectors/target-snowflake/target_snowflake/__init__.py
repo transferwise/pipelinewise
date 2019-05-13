@@ -74,8 +74,12 @@ def emit_state(state):
         sys.stdout.flush()
 
 def get_schema_names_from_config(config):
+    default_target_schema = config.get('default_target_schema')
     schema_mapping = config.get('schema_mapping', {})
     schema_names = []
+
+    if default_target_schema:
+        schema_names.append(default_target_schema)
 
     for source_schema, target in schema_mapping.items():
         schema_names.append(target.get('target_schema'))
