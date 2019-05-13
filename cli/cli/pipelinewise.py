@@ -232,7 +232,12 @@ class PipelineWise(object):
 
     def load_config(self):
         self.logger.debug('Loading config at {}'.format(self.config_path))
-        self.config = utils.load_json(self.config_path)
+        config = utils.load_json(self.config_path)
+
+        if config:
+            self.config = config
+        else:
+            self.config = {}
 
     def get_tap_dir(self, target_id, tap_id):
         return os.path.join(self.config_dir, target_id, tap_id)
@@ -260,7 +265,7 @@ class PipelineWise(object):
         self.logger.debug('Getting targets from {}'.format(self.config_path))
         self.load_config()
         try:
-            targets = self.config['targets']
+            targets = self.config.get('targets', [])
         except Exception as exc:
             raise Exception("Targets not defined")
 
