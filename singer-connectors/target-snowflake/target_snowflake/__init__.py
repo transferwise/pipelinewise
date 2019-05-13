@@ -81,8 +81,9 @@ def get_schema_names_from_config(config):
     if default_target_schema:
         schema_names.append(default_target_schema)
 
-    for source_schema, target in schema_mapping.items():
-        schema_names.append(target.get('target_schema'))
+    if schema_mapping:
+        for source_schema, target in schema_mapping.items():
+            schema_names.append(target.get('target_schema'))
 
     return schema_names
 
