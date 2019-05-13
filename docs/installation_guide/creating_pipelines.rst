@@ -1,6 +1,8 @@
 
-Quick Start
-===========
+.. _creating_pipelines:
+
+Creating Pipelines
+==================
 
 The installation is quick and straightforward.
 

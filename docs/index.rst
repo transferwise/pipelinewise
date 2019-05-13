@@ -44,7 +44,7 @@ Content
    :caption: Installation
 
    installation_guide/installation
-   installation_guide/start
+   installation_guide/creating_pipelines
 
 .. toctree::
    :maxdepth: 2
