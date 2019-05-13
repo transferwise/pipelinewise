@@ -166,6 +166,10 @@ class Config(object):
             "targets": targets
         }
 
+        # Create config dir if not exists
+        if not os.path.exists(self.config_dir):
+            os.mkdir(self.config_dir)
+
         # Save to JSON
         utils.save_json(main_config, self.config_path)
 
