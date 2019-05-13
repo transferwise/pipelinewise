@@ -232,7 +232,12 @@ class PipelineWise(object):
 
     def load_config(self):
         self.logger.debug('Loading config at {}'.format(self.config_path))
-        self.config = utils.load_json(self.config_path)
+        config = utils.load_json(self.config_path)
+
+        if config:
+            self.config = config
+        else:
+            self.config = {}
 
     def get_tap_dir(self, target_id, tap_id):
         return os.path.join(self.config_dir, target_id, tap_id)
@@ -260,7 +265,7 @@ class PipelineWise(object):
         self.logger.debug('Getting targets from {}'.format(self.config_path))
         self.load_config()
         try:
-            targets = self.config['targets']
+            targets = self.config.get('targets', [])
         except Exception as exc:
             raise Exception("Targets not defined")
 
@@ -614,11 +619,12 @@ class PipelineWise(object):
 
         return status
 
-    def show_status(self):
+    def status(self):
         targets = self.get_targets()
 
         tab_headers = ['Warehouse ID', 'Source ID', 'Enabled', 'Type', 'Status', 'Last Sync', 'Last Sync Result']
         tab_body = []
+        pipelines = 0
         for target in targets:
             taps = self.get_taps(target["id"])
 
@@ -632,8 +638,10 @@ class PipelineWise(object):
                     tap.get('status', {}).get('lastTimestamp', '<Unknown>'),
                     tap.get('status', {}).get('lastStatus', '<Unknown>')
                 ])
+                pipelines += 1
 
         print(tabulate(tab_body, headers=tab_headers, tablefmt="simple"))
+        print("{} pipeline(s)".format(pipelines))
 
     def clear_crontab(self):
         self.logger.info("Removing jobs from crontab")
