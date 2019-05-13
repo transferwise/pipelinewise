@@ -19,8 +19,8 @@ Features
 - **Lightweight**: No daemons or database setup are required
 - **Replication Methods**: CDC (Log Based), Key-Based Incremental and Full Table snapshots
 - **Managed Schema Changes**: When source data changes, PipelineWise detects the change and alters the schema in your DWH automatically
-- **Load time transformations**: Ideal to obfuscate, mask or filter sensitive data that should never been replicated in the Data Warehouse
-- **YAML based configuration**: Data pipelines are defined in YAML files that makes ideal to keep everything under version control
+- **Load time transformations**: Ideal place to obfuscate, mask or filter sensitive data that should never been replicated in the Data Warehouse
+- **YAML based configuration**: Data pipelines are defined as YAML files, which ensures that the entire configuration is kept under version control
 - **Integration with external tools**: With built-in event handlers you can trigger external scripts automatically when a certain even occurred
 - **Extensible**: PipelineWise is using `Singer.io <https://www.singer.io/>`_  compatible taps and target connectors and new connectors can be added to the system with relatively small effort
 
@@ -28,9 +28,9 @@ Features
 Beyond the Horizon
 ------------------
 
-PipelineWise is built on top of several `Singer.io <https://www.singer.io/>`_ components but the singer.io components
-are responsible only to do certain tasks like extracting data from a specific data source or loading data into a
-specific destination. To replicate data end to end you'll need have an extra layer on top these components to
+PipelineWise is built on top of several `Singer.io <https://www.singer.io/>`_ components. Singer.io components
+are responsible to do certain tasks like extracting data from a specific data source or loading data into a
+specific destination but to replicate data end to end you'll need have an extra layer on top these components to
 run the jobs, make configurations, select streams to replicate, do logging and more.
 
 This is where PipelineWise comes in place. PipelineWise is a collection of pre-selected singer taps and
@@ -46,6 +46,8 @@ Content
 
    installation_guide/installation
    installation_guide/creating_pipelines
+   installation_guide/running_pipelines
+   installation_guide/encrypting_passwords
 
 .. toctree::
    :maxdepth: 2
