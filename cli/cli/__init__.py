@@ -38,7 +38,7 @@ debug_help = """Forces the debug mode with logging on stdout and log level debug
 def main():
     '''Main entry point'''
     parser = argparse.ArgumentParser(description='TransferData {} - Command Line Interface'.format(__version__), add_help=True)
-    parser.add_argument('command', type=str, help=command_help)
+    parser.add_argument('command', type=str, choices=commands, help=command_help)
     parser.add_argument('--target', type=str, default='*', help=target_help)
     parser.add_argument('--tap', type=str, default='*', help=tap_help)
     parser.add_argument('--tables', type=str, help=tables_help)
