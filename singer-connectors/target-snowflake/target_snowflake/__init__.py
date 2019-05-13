@@ -73,6 +73,14 @@ def emit_state(state):
         sys.stdout.write("{}\n".format(line))
         sys.stdout.flush()
 
+def get_schema_names_from_config(config):
+    schema_mapping = config.get('schema_mapping', {})
+    schema_names = []
+
+    for source_schema, target in schema_mapping.items():
+        schema_names.append(target.get('target_schema'))
+
+    return schema_names
 
 # pylint: disable=too-many-locals,too-many-branches,too-many-statements
 def persist_lines(config, lines):
@@ -91,7 +99,8 @@ def persist_lines(config, lines):
     # The cache will be used later use to avoid lot of small queries hitting snowflake
     if not ('disable_table_cache' in config and config['disable_table_cache'] == True):
         logger.info("Caching available catalog objects in snowflake...")
-        table_columns_cache = DbSync(config).get_table_columns()
+        filter_schemas = get_schema_names_from_config(config)
+        table_columns_cache = DbSync(config).get_table_columns(filter_schemas=filter_schemas)
 
     # Loop over lines from stdin
     for line in lines:
