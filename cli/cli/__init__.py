@@ -15,6 +15,7 @@ pipelinewise_home = os.path.abspath(os.environ.setdefault("PIPELINEWISE_HOME", p
 venv_dir = os.path.join(pipelinewise_home, '.virtualenvs')
 
 commands = [
+  'init',
   'run_tap',
   'discover_tap',
   'status',
@@ -42,7 +43,7 @@ def main():
     parser.add_argument('--tap', type=str, default='*', help=tap_help)
     parser.add_argument('--tables', type=str, help=tables_help)
     parser.add_argument('--dir', type=str, default='*', help=dir_help)
-    parser.add_argument('--secret', type=str, default='*', help=secret_help)
+    parser.add_argument('--secret', type=str, help=secret_help)
     parser.add_argument('--version', action="version", help=version_help, version='PipelineWise {} - Command Line Interface'.format(__version__))
     parser.add_argument('--log', type=str, default='*', help=log_help)
     parser.add_argument('--debug', default=False, required=False, help=debug_help, action="store_true")
@@ -50,6 +51,11 @@ def main():
     args = parser.parse_args()
 
     # Command specific argument validations
+    if args.command == 'init':
+        if args.dir == '*':
+            print("You must specify a directory path for the sample project using the argumant --dir")
+            sys.exit(1)
+
     if args.command == 'discover_tap' or args.command == 'test_tap_connection' or args.command == 'run_tap':
         if args.tap == '*':
             print("You must specify a source name using the argument --tap")
@@ -69,9 +75,6 @@ def main():
     if args.command == 'import_config':
         if args.dir == '*':
             print("You must specify a directory path with config YAML files using the argumant --dir")
-            sys.exit(1)
-        if args.secret == '*':
-            print("You must specify a path to the vault secret file using the argument --secret")
             sys.exit(1)
 
     pipelinewise = PipelineWise(args, config_dir, venv_dir)
