@@ -14,7 +14,7 @@ owner: "somebody@foo.com"              # Data owner to contact
 # ------------------------------------------------------------------------------
 db_conn:
   host: "<HOST>"                       # MySQL/ MariaDB host
-  port: 5432                           # MySQL/ MariaDB port
+  port: 3306                           # MySQL/ MariaDB port
   user: "<USER>"                       # MySQL/ MariaDB user
   password: "<PASSWORD>"               # Plain string or vault encrypted
   dbname: "<DB_NAME>"                  # MySQL/ MariaDB database name
