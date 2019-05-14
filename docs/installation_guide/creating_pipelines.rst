@@ -6,16 +6,17 @@ Creating Pipelines
 
 Pipelines defines how the data should flow from source sytem to target. It defines the data source
 credentials, the data that needs to be captures, replication methods, load time transformations,
-destination database credentials, sourt to target mapping, grants etc.
+destination database credentials, source to target mapping, grants etc.
 
 Pipelines are expressed in YAML format and have a minimum of syntax, which intentionally tries
 to not be a programming language or script, but rather a model of a configuration or a process.
 PipelineWise using these YAML files as the main input to generate every required JSON files
 for the underlying singer.io componets.
 
-Under the hood Singer.io components needs several JSON files to operate correctly but you will
-never need to edit these JSON config files directly. PipelineWise will generate it from the
-YAML files and install into a correct place automatically whenever it's needed.
+Under the hood `Singer.io <https://www.singer.io/>`_  components needs several JSON files to
+operate correctly but you will never need to edit these JSON config files directly.
+PipelineWise will generate it from the YAML files and install into a correct place automatically
+whenever it's needed.
 
 
 Generating Sample Pipelines
@@ -25,17 +26,18 @@ The easiest way to understand these pipeline YAML files is to generate the sampl
 of the supported connectors and you can adjust them for your own purpose.
 
 Once you completed the :ref:`installation_guide` section you should be able to create a new
-project with the sample pipelines:
+project with the PipelineWise  :ref:`cli_init` command:
 
 .. code-block:: bash
 
-    $ pipelinewise create_samples --dir pipelinewise_samples
+    $ pipelinewise init --dir pipelinewise_samples
 
-This will create a ``pipelinewise_samples`` directory with a samples for each supported component:
+This will create a ``pipelinewise_samples`` directory with samples for each supported component:
 
 .. code-block:: bash
 
     └── pipelinewise_samples
+        ├── README.md
         ├── tap_mysql_mariadb.yml.sample
         ├── tap_postgres.yml.sample
         ├── tap_s3_csv.yml.sample
@@ -125,7 +127,7 @@ You can edit with your favourite text editor:
 Activating the Pipelines from the YAML files
 --------------------------------------------
 
-When you are happy with the configuration you need to import it into PipelineWise:
+When you are happy with the configuration you need to import it with the :ref:`cli_import_config` command:
 
 .. code-block:: bash
 
@@ -138,15 +140,15 @@ tracking the state files for :ref:`incremental` and :ref:`log_based` replication
 Normally you will need to go into ``~/.pipelinewise`` only when you want to access the
 log files.
 
-Once the config YAML files imported you can see the new pipelines with the ``status`` command:
+Once the config YAML files imported you can see the new pipelines with the :ref:`cli_status` command:
 
 .. code-block:: bash
 
     $ pipelinewise status
-
-    Warehouse ID    Source ID    Enabled    Type          Status    Last Sync    Last Sync Result
-    --------------  -----------  ---------  ------------  --------  -----------  ------------------
-    0 pipeline(s)
+    Warehouse ID    Source ID     Enabled    Type       Status    Last Sync    Last Sync Result
+    --------------  ------------  ---------  ---------  --------  -----------  ------------------
+    snowflake       mysql_sample  True       tap-mysql  ready                  unknown
+    1 pipeline(s)
 
 
 Congratulations, at this point you have successfuly çreated your first pipeline in PipelineWise and it's now

@@ -61,7 +61,7 @@ Content
    :caption: Using PipelineWise
 
    user_guide/yaml_config
-   user_guide/command_line_tools
+   user_guide/cli
    user_guide/fastsync
    user_guide/scheduling
    user_guide/integration
