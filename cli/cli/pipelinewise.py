@@ -483,6 +483,27 @@ class PipelineWise(object):
         return schema
 
 
+    def init(self):
+        self.logger.info("Initialising new project in {}...".format(self.args.dir))
+        project_dir = os.path.abspath(self.args.dir)
+
+        # Create project dir if not exists
+        if os.path.exists(project_dir):
+            self.logger.error("Directory exists and cannot create new project: {}".format(project_dir))
+            sys.exit(1)
+        else:
+            os.mkdir(project_dir)
+
+        for yaml in utils.get_sample_file_paths():
+            yaml_basename = os.path.basename(yaml)
+            dst = os.path.join(project_dir, yaml_basename)
+
+            self.logger.info("  - Creating {}...".format(yaml_basename))
+            shutil.copyfile(yaml, dst)
+
+        self.logger.info("New project with sample tap(s) and target(s) has been created in {}.".format(self.args.dir))
+
+
     def test_tap_connection(self):
         tap_id = self.tap["id"]
         tap_type = self.tap["type"]

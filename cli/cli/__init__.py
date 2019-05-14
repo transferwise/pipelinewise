@@ -15,6 +15,7 @@ pipelinewise_home = os.path.abspath(os.environ.setdefault("PIPELINEWISE_HOME", p
 venv_dir = os.path.join(pipelinewise_home, '.virtualenvs')
 
 commands = [
+  'init',
   'run_tap',
   'discover_tap',
   'status',
@@ -50,6 +51,11 @@ def main():
     args = parser.parse_args()
 
     # Command specific argument validations
+    if args.command == 'init':
+        if args.dir == '*':
+            print("You must specify a directory path for the sample project using the argumant --dir")
+            sys.exit(1)
+
     if args.command == 'discover_tap' or args.command == 'test_tap_connection' or args.command == 'run_tap':
         if args.tap == '*':
             print("You must specify a source name using the argument --tap")
