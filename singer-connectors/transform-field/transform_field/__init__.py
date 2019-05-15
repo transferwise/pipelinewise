@@ -23,7 +23,7 @@ DEFAULT_MAX_BATCH_RECORDS = 20000
 DEFAULT_BATCH_DELAY_SECONDS = 300.0
 
 StreamMeta = namedtuple('StreamMeta', ['schema', 'key_properties', 'bookmark_properties'])
-TransMeta = namedtuple('TransMeta', ['field_id', 'type'])
+TransMeta = namedtuple('TransMeta', ['field_id', 'type', 'when'])
 
 REQUIRED_CONFIG_KEYS = [
     "transformations"
@@ -79,7 +79,8 @@ class TransformField(object):
             
             self.trans_meta[stream].append(TransMeta(
                 trans["field_id"],
-                trans["type"]
+                trans["type"],
+                trans.get('when')
             ))
 
     def flush(self):
@@ -105,8 +106,7 @@ class TransformField(object):
                     for trans in trans_meta:
 
                         if trans.field_id in message.record:
-                            orig_value = message.record[trans.field_id]
-                            transformed = transform.do_transform(orig_value, trans.type)
+                            transformed = transform.do_transform(message.record, trans.field_id, trans.type, trans.when)
 
                             # Truncate to transformed value to the max allowed length if required
                             if transformed is not None:

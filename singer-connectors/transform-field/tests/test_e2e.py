@@ -12,8 +12,7 @@ class Base(unittest.TestCase):
     def setUp(self):
         self.maxDiff = None
 
-        sys.stdout = self._stdout = tempfile.NamedTemporaryFile('w+', delete=False)
-        #sys.stdout = self._stdout = sys.__stdout__
+        sys.stdout = self._stdout = tempfile.NamedTemporaryFile('w+', delete=True)
         sys.stderr.write(self._stdout.name + ' ')
 
 
@@ -70,6 +69,13 @@ class TestEndToEnd(Base):
           { 'tap_stream_name': 'dummy_stream', 'field_id': 'column_5', 'type': 'MASK-DATE' },
           { 'tap_stream_name': 'dummy_stream', 'field_id': 'column_6', 'type': 'MASK-NUMBER' },
           { 'tap_stream_name': 'dummy_stream', 'field_id': 'column_7', 'type': 'NOT-EXISTING-TRANSFORMATION-TYPE' },
+          { 'tap_stream_name': 'dummy_stream', 'field_id': 'column_11', 'type': 'SET-NULL',
+              'when': [
+                {'column': 'column_7', 'equals': "Dummy row 2" },
+                {'column': 'column_9', 'equals': 200 },
+                {'column': 'column_10', 'regex_match': 'sensitive' },
+              ]
+          }
         ]}
 
         transform_field = TransformField(trans_config)
@@ -104,7 +110,8 @@ class TestEndToEnd(Base):
                   'column_7': {'inclusion':'available', 'maxLength': 16, 'type': ['null', 'string']},
                   'column_8': {'inclusion':'available', 'format':'date-time', 'type': ['null', 'string']},
                   'column_9': {'inclusion':'available', 'type': ['null', 'integer']},
-                  'column_10': {'inclusion':'available', 'maxLength': 16, 'type': ['null', 'string']},
+                  'column_10': {'inclusion':'available', 'maxLength': 64, 'type': ['null', 'string']},
+                  'column_11': {'inclusion':'available', 'maxLength': 64, 'type': ['null', 'string']},
                 },
                 'type': 'object'
               },
@@ -129,7 +136,10 @@ class TestEndToEnd(Base):
                 'column_7': 'Dummy row 1',          # Should be the originl value - Unknown transformation type
                 'column_8': '2019-12-21T12:12:45',  # Should be the original date-time value
                 'column_9': 100,                    # Should be the original number value
-                'column_10': 'Dummy row 1',         # Should be the original string value
+
+                # Conditional transformation
+                'column_10': 'column_11 is safe to keep',
+                'column_11': 'My name is John',
               },
               'version': 1,
               'time_extracted': '2019-01-31T15:51:50.215998Z'
@@ -153,7 +163,10 @@ class TestEndToEnd(Base):
                 'column_7': 'Dummy row 2',          # Should be the origian value - Unknown transformation type
                 'column_8': '2019-12-21T13:12:45',  # Should be the original date-time value
                 'column_9': 200,                    # Should be the original number value
-                'column_10': 'Dummy row 1',         # Should be the original string value
+
+                # Conditional transformation
+                'column_10': 'column_11 has sensitive data. Needs to transform to NULL',
+                'column_11': None,                  # Should be SET-NULL transformed
               },
               'version': 1,
               'time_extracted': '2019-01-31T15:51:50.215998Z'
