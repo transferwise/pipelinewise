@@ -111,4 +111,5 @@ components and uses it whenever it's possible.
 
 .. warning::
 
-  **Fast Sync** is not a generic component and **available only from some specific data sources to some specific targets**
+  **Fast Sync** is not a generic component and **available only from some specific data sources to some specific targets**.
+  Check :ref:`fast_sync` section for the supported components.
