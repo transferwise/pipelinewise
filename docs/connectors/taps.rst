@@ -1,4 +1,6 @@
 
+.. _taps_list:
+
 Taps (Data Sources)
 -------------------
 

@@ -49,7 +49,7 @@ to records - including inserts, updates, and deletes - using a database’s bina
 Key Based Incremental
 '''''''''''''''''''''
 
-Key-based Incremental Replication is a replication method in which the :ref:`taps` identify new and updated
+Key-based Incremental Replication is a replication method in which the :ref:`taps_list` identify new and updated
 data using a column called a Replication Key. It uses a column called a Replication Key to identify new
 and updated data in a table for replication. A Replication Key is a ``timestamp``, ``date-time``, or ``integer``
 column that exists in a source table.
@@ -57,7 +57,7 @@ column that exists in a source table.
 When it replicates a table using Key-based Incremental Replication, a few things will happen:
 
 1. During a replication job, PipelineWise stores the maximum value of a table’s Replication Key column.
-2. During the next replication job, :ref:`Taps` will compare saved value from the previous job to Replication Key column values in the source.
+2. During the next replication job, :ref:`taps_list` will compare saved value from the previous job to Replication Key column values in the source.
 3. Any rows in the table with a Replication Key greater than or equal to the stored value are replicated.
 4. PipelineWise stores the new maximum value from the table’s Replication Key column.
 5. Repeat.

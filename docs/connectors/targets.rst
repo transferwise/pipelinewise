@@ -1,4 +1,6 @@
 
+.. _targets_list:
+
 Targets (Destinations)
 ----------------------
 
