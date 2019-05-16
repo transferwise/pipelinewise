@@ -54,7 +54,7 @@ Content
    :caption: Concept
 
    concept/singer
-   concept/replication_strategies
+   concept/replication_methods
 
 .. toctree::
    :maxdepth: 2
