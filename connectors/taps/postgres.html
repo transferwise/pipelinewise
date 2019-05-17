@@ -1,0 +1,341 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Tap PostgreSQL &mdash; PipelineWise  documentation</title>
+  
+
+  
+  
+    <link rel="shortcut icon" href="../../_static/pipelinewise.png"/>
+  
+  
+  
+    <link rel="canonical" href="https://docs.ansible.com/ansible/latest/connectors/taps/postgres.html"/>
+  
+
+  
+  <script type="text/javascript" src="../../_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+        <script type="text/javascript" src="../../_static/jquery.js"></script>
+        <script type="text/javascript" src="../../_static/underscore.js"></script>
+        <script type="text/javascript" src="../../_static/doctools.js"></script>
+        <script type="text/javascript" src="../../_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/css/custom.css" type="text/css" />
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Tap Zendesk" href="zendesk.html" />
+    <link rel="prev" title="Tap MySQL" href="mysql.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> PipelineWise
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.0.0
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Installation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../installation_guide/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../installation_guide/creating_pipelines.html">Creating Pipelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../installation_guide/running_pipelines.html">Running Pipelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../installation_guide/encrypting_passwords.html">Encrypting Passwords</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Concept</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../concept/singer.html">Singer.io</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../concept/replication_methods.html">Replication Methods</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Using PipelineWise</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/yaml_config.html">YAML configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/cli.html">Command Line Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/fastsync.html">Fast Sync</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/scheduling.html">Scheduling</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/integration.html">Integration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/scaling.html">Scaling</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/transformations.html">Transformations</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Connectors</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../taps.html">Taps (Data Sources)</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../taps.html#configuring-the-taps">Configuring the taps</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="mysql.html">Tap MySQL</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Tap PostgreSQL</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#connecting-to-postgresql">Connecting to PostgreSQL</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#configuring-what-to-replicate">Configuring what to replicate</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="zendesk.html">Tap Zendesk</a></li>
+<li class="toctree-l2"><a class="reference internal" href="s3_csv.html">Tap S3 CSV</a></li>
+<li class="toctree-l2"><a class="reference internal" href="kafka.html">Tap Kafka</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../targets.html">Targets (Destinations)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../targets.html#configuring-the-targets">Configuring the targets</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Project</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../project/about.html">Project</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">PipelineWise</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../index.html">Docs</a> &raquo;</li>
+        
+          <li><a href="../taps.html">Taps (Data Sources)</a> &raquo;</li>
+        
+      <li>Tap PostgreSQL</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="../../_sources/connectors/taps/postgres.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="tap-postgresql">
+<span id="tap-postgres"></span><h1>Tap PostgreSQL<a class="headerlink" href="#tap-postgresql" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="connecting-to-postgresql">
+<h2>Connecting to PostgreSQL<a class="headerlink" href="#connecting-to-postgresql" title="Permalink to this headline">¶</a></h2>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p><a class="reference internal" href="../../concept/replication_methods.html#log-based"><span class="std std-ref">Log Based Incremental</span></a> for PostgreSQL-based databases requires:</p>
+<ul>
+<li><p><strong>PostgreSQL databases running PostgreSQL versions 9.4.x or greater.</strong> Earlier versions of PostgreSQL do not include logical replication functionality, which is required for Log-based Replication.</p></li>
+<li><p><strong>A connection to the master instance.</strong> Log-based replication will only work on master instances due to a feature gap in PostgreSQL 10. Based on their forums, PostgreSQL is working on adding support for using logical replication on a read replica to a future version.</p>
+<p>Until this feature is released, you can connect Stitch to the master instance and use Log-based Replication, or connect to a read replica and use Key-based Incremental Replication.</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="section" id="configuring-what-to-replicate">
+<h2>Configuring what to replicate<a class="headerlink" href="#configuring-what-to-replicate" title="Permalink to this headline">¶</a></h2>
+<p>PipelineWise configures every tap with a common structured YAML file format.
+A sample YAML for Postgres replication can be generated into a project directory by
+following the steps in the <a class="reference internal" href="../../installation_guide/creating_pipelines.html#generating-pipelines"><span class="std std-ref">Generating Sample Pipelines</span></a> section.</p>
+<p>Example YAML for tap-postgres:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nn">---</span>
+
+<span class="c1"># ------------------------------------------------------------------------------</span>
+<span class="c1"># General Properties</span>
+<span class="c1"># ------------------------------------------------------------------------------</span>
+<span class="nt">id</span><span class="p">:</span> <span class="s">&quot;postgres_sample&quot;</span>                  <span class="c1"># Unique identifier of the tap</span>
+<span class="nt">name</span><span class="p">:</span> <span class="s">&quot;Sample</span><span class="nv"> </span><span class="s">Postgres</span><span class="nv"> </span><span class="s">Database&quot;</span>       <span class="c1"># Name of the tap</span>
+<span class="nt">type</span><span class="p">:</span> <span class="s">&quot;tap-postgres&quot;</span>                   <span class="c1"># !! THIS SHOULD NOT CHANGE !!</span>
+<span class="nt">owner</span><span class="p">:</span> <span class="s">&quot;somebody@foo.com&quot;</span>              <span class="c1"># Data owner to contact</span>
+
+
+<span class="c1"># ------------------------------------------------------------------------------</span>
+<span class="c1"># Source (Tap) - PostgreSQL connection details</span>
+<span class="c1"># ------------------------------------------------------------------------------</span>
+<span class="nt">db_conn</span><span class="p">:</span>
+  <span class="nt">host</span><span class="p">:</span> <span class="s">&quot;&lt;HOST&gt;&quot;</span>                       <span class="c1"># PostgreSQL host</span>
+  <span class="nt">port</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">5432</span>                           <span class="c1"># PostgreSQL port</span>
+  <span class="nt">user</span><span class="p">:</span> <span class="s">&quot;&lt;USER&gt;&quot;</span>                       <span class="c1"># PostfreSQL user</span>
+  <span class="nt">password</span><span class="p">:</span> <span class="s">&quot;&lt;PASSWORD&gt;&quot;</span>               <span class="c1"># Plain string or vault encrypted</span>
+  <span class="nt">dbname</span><span class="p">:</span> <span class="s">&quot;&lt;DB_NAME&gt;&quot;</span>                  <span class="c1"># PostgreSQL database name</span>
+  <span class="c1">#filter_schemas: &quot;schema1,schema2&quot;   # Optional: Scan only the required schemas</span>
+                                       <span class="c1">#           to improve the performance of</span>
+                                       <span class="c1">#           data extraction</span>
+
+
+<span class="c1"># ------------------------------------------------------------------------------</span>
+<span class="c1"># Destination (Target) - Target properties</span>
+<span class="c1"># Connection details should be in the relevant target YAML file</span>
+<span class="c1"># ------------------------------------------------------------------------------</span>
+<span class="nt">target</span><span class="p">:</span> <span class="s">&quot;snowflake&quot;</span>                    <span class="c1"># ID of the target connector where the data will be loaded</span>
+<span class="nt">batch_size_rows</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">20000</span>                 <span class="c1"># Batch size for the stream to optimise load performance</span>
+
+
+<span class="c1"># ------------------------------------------------------------------------------</span>
+<span class="c1"># Source to target Schema mapping</span>
+<span class="c1"># ------------------------------------------------------------------------------</span>
+<span class="nt">schemas</span><span class="p">:</span>
+
+  <span class="p p-Indicator">-</span> <span class="nt">source_schema</span><span class="p">:</span> <span class="s">&quot;public&quot;</span>            <span class="c1"># Source schema in postgres with tables</span>
+    <span class="nt">target_schema</span><span class="p">:</span> <span class="s">&quot;repl_pg_public&quot;</span>    <span class="c1"># Target schema in the destination Data Warehouse</span>
+    <span class="nt">target_schema_select_permissions</span><span class="p">:</span>  <span class="c1"># Optional: Grant SELECT on schema and tables that created</span>
+      <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">grp_stats</span>
+
+    <span class="c1"># List of tables to replicate from Postgres to destination Data Warehouse</span>
+    <span class="c1">#</span>
+    <span class="c1"># Please check the Replication Strategies section in the documentation to understand the differences.</span>
+    <span class="c1"># For LOG_BASED replication method you might need to adjust the source mysql/ mariadb configuration.</span>
+    <span class="nt">tables</span><span class="p">:</span>
+      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;table_one&quot;</span>
+        <span class="nt">replication_method</span><span class="p">:</span> <span class="s">&quot;INCREMENTAL&quot;</span>   <span class="c1"># One of INCREMENTAL, LOG_BASED and FULL_TABLE</span>
+        <span class="nt">replication_key</span><span class="p">:</span> <span class="s">&quot;last_update&quot;</span>      <span class="c1"># Important: Incremental load always needs replication key</span>
+
+        <span class="c1"># OPTIONAL: Load time transformations</span>
+        <span class="c1">#transformations:</span>
+        <span class="c1">#  - column: &quot;last_name&quot;            # Column to transform</span>
+        <span class="c1">#    type: &quot;SET-NULL&quot;               # Transformation type</span>
+
+      <span class="c1"># You can add as many tables as you need...</span>
+      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;table_tow&quot;</span>
+        <span class="nt">replication_method</span><span class="p">:</span> <span class="s">&quot;INCREMENTAL&quot;</span>   <span class="c1"># Important! Log based must be enabled in MySQL</span>
+
+  <span class="c1"># You can add as many schemas as you need...</span>
+  <span class="c1"># Uncommend this if you want replicate tables from multiple schemas</span>
+  <span class="c1">#- source_schema: &quot;another_schema_in_postgres&quot;</span>
+  <span class="c1">#  target_schema: &quot;another</span>
+</pre></div>
+</div>
+</div>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="zendesk.html" class="btn btn-neutral float-right" title="Tap Zendesk" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="mysql.html" class="btn btn-neutral float-left" title="Tap MySQL" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2019, TransferWise Ltd.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

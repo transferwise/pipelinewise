@@ -1,0 +1,282 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Singer.io &mdash; PipelineWise  documentation</title>
+  
+
+  
+  
+    <link rel="shortcut icon" href="../_static/pipelinewise.png"/>
+  
+  
+  
+    <link rel="canonical" href="https://docs.ansible.com/ansible/latest/concept/singer.html"/>
+  
+
+  
+  <script type="text/javascript" src="../_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+        <script type="text/javascript" src="../_static/jquery.js"></script>
+        <script type="text/javascript" src="../_static/underscore.js"></script>
+        <script type="text/javascript" src="../_static/doctools.js"></script>
+        <script type="text/javascript" src="../_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/css/custom.css" type="text/css" />
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Replication Methods" href="replication_methods.html" />
+    <link rel="prev" title="Encrypting Passwords" href="../installation_guide/encrypting_passwords.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../index.html" class="icon icon-home"> PipelineWise
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.0.0
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Installation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../installation_guide/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../installation_guide/creating_pipelines.html">Creating Pipelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../installation_guide/running_pipelines.html">Running Pipelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../installation_guide/encrypting_passwords.html">Encrypting Passwords</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Concept</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Singer.io</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#core-concepts">Core Concepts</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#taps">Taps</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#targets">Targets</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="replication_methods.html">Replication Methods</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Using PipelineWise</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/yaml_config.html">YAML configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/cli.html">Command Line Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/fastsync.html">Fast Sync</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/scheduling.html">Scheduling</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/integration.html">Integration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/scaling.html">Scaling</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/transformations.html">Transformations</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Connectors</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../connectors/taps.html">Taps (Data Sources)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../connectors/taps.html#configuring-the-taps">Configuring the taps</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../connectors/targets.html">Targets (Destinations)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../connectors/targets.html#configuring-the-targets">Configuring the targets</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Project</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../project/about.html">Project</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">PipelineWise</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../index.html">Docs</a> &raquo;</li>
+        
+      <li>Singer.io</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="../_sources/concept/singer.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="singer-io">
+<h1>Singer.io<a class="headerlink" href="#singer-io" title="Permalink to this headline">¶</a></h1>
+<p>PipelineWise is using the <a class="reference external" href="https://www.singer.io/">Singer.io</a>
+specification to replicate data from various sources to various destinations.</p>
+<p>Singer is an <a class="reference external" href="https://github.com/singer-io/getting-started/blob/master/docs/SPEC.md">Open Source Standard</a>
+for moving data between databases, web APIs, files, queues, and just about anything else
+you can think of. The Singer spec describes how data extraction scripts — called <a class="reference internal" href="#taps"><span class="std std-ref">Taps</span></a>
+— and data loading scripts — called <a class="reference internal" href="#targets"><span class="std std-ref">Targets</span></a> — should communicate using a standard
+JSON-based data format over stdout. By conforming to this spec, Taps and Targets can be
+used in any combination to move data from any source to any destination.</p>
+<p>Original article and further details at <a class="reference external" href="https://github.com/singer-io/getting-started">https://github.com/singer-io/getting-started</a></p>
+<div class="section" id="core-concepts">
+<h2>Core Concepts<a class="headerlink" href="#core-concepts" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="taps">
+<span id="id2"></span><h3>Taps<a class="headerlink" href="#taps" title="Permalink to this headline">¶</a></h3>
+<p>Taps are designed to produce a stream of data from sources like databases and web service APIs
+for use in a data integration or ETL pipeline.</p>
+<p>A Tap is an application that takes a configuration file and an optional state file as input
+and produces an ordered stream of record, state and schema messages as output.
+A <strong>record</strong> is json-encoded data of any kind. A <strong>state message</strong> is used to persist information
+between invocations of a Tap. A <strong>schema message</strong> describes the datatypes of the records in the stream.</p>
+<p>Using PipelineWise you don’t need to know these singer messages in details but if you’re
+interested you can find more details in the official <a class="reference external" href="https://github.com/singer-io/getting-started/blob/master/docs/SPEC.md">Singer Specification</a>.
+Lot of taps developed by Singer.io or by other members of the community is open
+sourced and can be added to PipelineWise relatively easily.</p>
+<p>List of the currently supported and built-in taps in PipelineWise is in the <a class="reference internal" href="../connectors/taps.html#taps-list"><span class="std std-ref">Taps (Data Sources)</span></a> section.</p>
+</div>
+<div class="section" id="targets">
+<span id="id3"></span><h3>Targets<a class="headerlink" href="#targets" title="Permalink to this headline">¶</a></h3>
+<p>Targets are designed to consume streams that generated by a Tap like loading data into a Postgres
+or Snowflake database.</p>
+<p>Following the singer specification every Target can consume messages from every Tap making
+possible of replicating data from various sources to various destinations.</p>
+<p>List of the supported targets and built-in taps in PipelineWise is in the <a class="reference internal" href="../connectors/targets.html#targets-list"><span class="std std-ref">Targets (Destinations)</span></a> section.</p>
+</div>
+</div>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="replication_methods.html" class="btn btn-neutral float-right" title="Replication Methods" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="../installation_guide/encrypting_passwords.html" class="btn btn-neutral float-left" title="Encrypting Passwords" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2019, TransferWise Ltd.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

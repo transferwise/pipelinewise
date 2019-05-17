@@ -1,0 +1,354 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Command Line Interface &mdash; PipelineWise  documentation</title>
+  
+
+  
+  
+    <link rel="shortcut icon" href="../_static/pipelinewise.png"/>
+  
+  
+  
+    <link rel="canonical" href="https://docs.ansible.com/ansible/latest/user_guide/cli.html"/>
+  
+
+  
+  <script type="text/javascript" src="../_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+        <script type="text/javascript" src="../_static/jquery.js"></script>
+        <script type="text/javascript" src="../_static/underscore.js"></script>
+        <script type="text/javascript" src="../_static/doctools.js"></script>
+        <script type="text/javascript" src="../_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/css/custom.css" type="text/css" />
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Fast Sync" href="fastsync.html" />
+    <link rel="prev" title="YAML configuration" href="yaml_config.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../index.html" class="icon icon-home"> PipelineWise
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.0.0
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Installation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../installation_guide/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../installation_guide/creating_pipelines.html">Creating Pipelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../installation_guide/running_pipelines.html">Running Pipelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../installation_guide/encrypting_passwords.html">Encrypting Passwords</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Concept</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../concept/singer.html">Singer.io</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concept/replication_methods.html">Replication Methods</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Using PipelineWise</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="yaml_config.html">YAML configuration</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Command Line Interface</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#positional-arguments">Positional Arguments</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#sub-commands">Sub-commands:</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#init">init</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#id2">Positional Arguments</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#run-tap">run_tap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#discover-tap">discover_tap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#status">status</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#test-tap-connection">test_tap_connection</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#sync-tables">sync_tables</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#import-config">import_config</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="fastsync.html">Fast Sync</a></li>
+<li class="toctree-l1"><a class="reference internal" href="scheduling.html">Scheduling</a></li>
+<li class="toctree-l1"><a class="reference internal" href="integration.html">Integration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="scaling.html">Scaling</a></li>
+<li class="toctree-l1"><a class="reference internal" href="transformations.html">Transformations</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Connectors</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../connectors/taps.html">Taps (Data Sources)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../connectors/taps.html#configuring-the-taps">Configuring the taps</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../connectors/targets.html">Targets (Destinations)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../connectors/targets.html#configuring-the-targets">Configuring the targets</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Project</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../project/about.html">Project</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">PipelineWise</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../index.html">Docs</a> &raquo;</li>
+        
+      <li>Command Line Interface</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="../_sources/user_guide/cli.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="command-line-interface">
+<span id="id1"></span><h1>Command Line Interface<a class="headerlink" href="#command-line-interface" title="Permalink to this headline">¶</a></h1>
+<p>PipelineWise’s command line interface allows for many types of operation on a pipeline.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>usage: pipelinewise <span class="o">[</span>-h<span class="o">]</span>
+                    <span class="o">{</span>init,run_tap,discover_tap,status,test_tap_connection,clear_crontab,init_crontab,sync_tables,import_config<span class="o">}</span>
+</pre></div>
+</div>
+<div class="section" id="positional-arguments">
+<h2>Positional Arguments<a class="headerlink" href="#positional-arguments" title="Permalink to this headline">¶</a></h2>
+<dl class="field-list simple">
+<dt class="field-odd">subcommand</dt>
+<dd class="field-odd"><p>Possible choices: init, run_tap, discover_tap, status, test_tap_connection, clear_crontab, init_crontab, sync_tables, import_config</p>
+</dd>
+</dl>
+</div>
+<div class="section" id="sub-commands">
+<h2>Sub-commands:<a class="headerlink" href="#sub-commands" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="init">
+<span id="cli-init"></span><h3>init<a class="headerlink" href="#init" title="Permalink to this headline">¶</a></h3>
+<p>Initialise and create a sample project. The project will contain sample YAML
+configuration for every supported tap and target connects.</p>
+<div class="section" id="id2">
+<h4>Positional Arguments<a class="headerlink" href="#id2" title="Permalink to this headline">¶</a></h4>
+<dl class="field-list simple">
+<dt class="field-odd">–dir</dt>
+<dd class="field-odd"><p>relative path to the project directory</p>
+</dd>
+</dl>
+</div>
+</div>
+<div class="section" id="run-tap">
+<span id="cli-run-tap"></span><h3>run_tap<a class="headerlink" href="#run-tap" title="Permalink to this headline">¶</a></h3>
+<p>Run a specific pipeline</p>
+<dl class="field-list simple">
+<dt class="field-odd">–target</dt>
+<dd class="field-odd"><p>Target connector id</p>
+</dd>
+<dt class="field-even">–tap</dt>
+<dd class="field-even"><p>Tap connector id</p>
+</dd>
+</dl>
+</div>
+<div class="section" id="discover-tap">
+<span id="cli-discover-tap"></span><h3>discover_tap<a class="headerlink" href="#discover-tap" title="Permalink to this headline">¶</a></h3>
+<p>Run a specific tap in discovery mode. Discovery mode is connecting to the data source
+and collecting information that is required for running the tap.</p>
+<dl class="field-list simple">
+<dt class="field-odd">–target</dt>
+<dd class="field-odd"><p>Target connector id</p>
+</dd>
+<dt class="field-even">–tap</dt>
+<dd class="field-even"><p>Tap connector id</p>
+</dd>
+</dl>
+</div>
+<div class="section" id="status">
+<span id="cli-status"></span><h3>status<a class="headerlink" href="#status" title="Permalink to this headline">¶</a></h3>
+<p>Prints a status summary table of every imported pipeline with their tap and target.</p>
+</div>
+<div class="section" id="test-tap-connection">
+<span id="cli-test-tap-connection"></span><h3>test_tap_connection<a class="headerlink" href="#test-tap-connection" title="Permalink to this headline">¶</a></h3>
+<p>Test the tap connection. It will connect to the data source that is defined in the tap
+and will return success if it’s available.</p>
+<dl class="field-list simple">
+<dt class="field-odd">–target</dt>
+<dd class="field-odd"><p>Target connector id</p>
+</dd>
+<dt class="field-even">–tap</dt>
+<dd class="field-even"><p>Tap connector id</p>
+</dd>
+</dl>
+</div>
+<div class="section" id="sync-tables">
+<span id="cli-sync-tables"></span><h3>sync_tables<a class="headerlink" href="#sync-tables" title="Permalink to this headline">¶</a></h3>
+<p>Sync or resync one or more tables from a specific datasource. It performs an initial
+sync and reset the table bookmarks to their new location.</p>
+<dl class="field-list simple">
+<dt class="field-odd">–target</dt>
+<dd class="field-odd"><p>Target connector id</p>
+</dd>
+<dt class="field-even">–tap</dt>
+<dd class="field-even"><p>Tap connector id</p>
+</dd>
+<dt class="field-odd">–tables</dt>
+<dd class="field-odd"><p>Optional: Comma separated list of tables to sync from the data source.</p>
+</dd>
+</dl>
+</div>
+<div class="section" id="import-config">
+<span id="cli-import-config"></span><h3>import_config<a class="headerlink" href="#import-config" title="Permalink to this headline">¶</a></h3>
+<p>Import a project directory into PipelineWise. It will create every required JSON file for
+the tap and target connectors into <code class="docutils literal notranslate"><span class="pre">~/.pipelinewise</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">–dir</dt>
+<dd class="field-odd"><p>relative path to the project directory to import</p>
+</dd>
+</dl>
+</div>
+</div>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="fastsync.html" class="btn btn-neutral float-right" title="Fast Sync" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="yaml_config.html" class="btn btn-neutral float-left" title="YAML configuration" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2019, TransferWise Ltd.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

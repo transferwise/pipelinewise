@@ -1,0 +1,325 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Tap Zendesk &mdash; PipelineWise  documentation</title>
+  
+
+  
+  
+    <link rel="shortcut icon" href="../../_static/pipelinewise.png"/>
+  
+  
+  
+    <link rel="canonical" href="https://docs.ansible.com/ansible/latest/connectors/taps/zendesk.html"/>
+  
+
+  
+  <script type="text/javascript" src="../../_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+        <script type="text/javascript" src="../../_static/jquery.js"></script>
+        <script type="text/javascript" src="../../_static/underscore.js"></script>
+        <script type="text/javascript" src="../../_static/doctools.js"></script>
+        <script type="text/javascript" src="../../_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/css/custom.css" type="text/css" />
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Tap S3 CSV" href="s3_csv.html" />
+    <link rel="prev" title="Tap PostgreSQL" href="postgres.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> PipelineWise
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.0.0
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Installation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../installation_guide/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../installation_guide/creating_pipelines.html">Creating Pipelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../installation_guide/running_pipelines.html">Running Pipelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../installation_guide/encrypting_passwords.html">Encrypting Passwords</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Concept</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../concept/singer.html">Singer.io</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../concept/replication_methods.html">Replication Methods</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Using PipelineWise</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/yaml_config.html">YAML configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/cli.html">Command Line Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/fastsync.html">Fast Sync</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/scheduling.html">Scheduling</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/integration.html">Integration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/scaling.html">Scaling</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/transformations.html">Transformations</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Connectors</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../taps.html">Taps (Data Sources)</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../taps.html#configuring-the-taps">Configuring the taps</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="mysql.html">Tap MySQL</a></li>
+<li class="toctree-l2"><a class="reference internal" href="postgres.html">Tap PostgreSQL</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Tap Zendesk</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#connecting-to-zendesk">Connecting to Zendesk</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#configuring-what-to-replicate">Configuring what to replicate</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="s3_csv.html">Tap S3 CSV</a></li>
+<li class="toctree-l2"><a class="reference internal" href="kafka.html">Tap Kafka</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../targets.html">Targets (Destinations)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../targets.html#configuring-the-targets">Configuring the targets</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Project</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../project/about.html">Project</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">PipelineWise</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../index.html">Docs</a> &raquo;</li>
+        
+          <li><a href="../taps.html">Taps (Data Sources)</a> &raquo;</li>
+        
+      <li>Tap Zendesk</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="../../_sources/connectors/taps/zendesk.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="tap-zendesk">
+<span id="id1"></span><h1>Tap Zendesk<a class="headerlink" href="#tap-zendesk" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="connecting-to-zendesk">
+<h2>Connecting to Zendesk<a class="headerlink" href="#connecting-to-zendesk" title="Permalink to this headline">¶</a></h2>
+<p>** :: TODO :: **</p>
+</div>
+<div class="section" id="configuring-what-to-replicate">
+<h2>Configuring what to replicate<a class="headerlink" href="#configuring-what-to-replicate" title="Permalink to this headline">¶</a></h2>
+<p>PipelineWise configures every tap with a common structured YAML file format.
+A sample YAML for Zendesk replication can be generated into a project directory by
+following the steps in the <a class="reference internal" href="../../installation_guide/creating_pipelines.html#generating-pipelines"><span class="std std-ref">Generating Sample Pipelines</span></a> section.</p>
+<p>Example YAML for tap-zendesk:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nn">---</span>
+
+<span class="c1"># ------------------------------------------------------------------------------</span>
+<span class="c1"># General Properties</span>
+<span class="c1"># ------------------------------------------------------------------------------</span>
+<span class="nt">id</span><span class="p">:</span> <span class="s">&quot;zendesk&quot;</span>                          <span class="c1"># Unique identifier of the tap</span>
+<span class="nt">name</span><span class="p">:</span> <span class="s">&quot;Sampe</span><span class="nv"> </span><span class="s">data</span><span class="nv"> </span><span class="s">on</span><span class="nv"> </span><span class="s">Zendesk&quot;</span>          <span class="c1"># Name of the tap</span>
+<span class="nt">type</span><span class="p">:</span> <span class="s">&quot;tap-zendesk&quot;</span>                    <span class="c1"># !! THIS SHOULD NOT CHANGE !!</span>
+<span class="nt">owner</span><span class="p">:</span> <span class="s">&quot;somebody@foo.com&quot;</span>              <span class="c1"># Data owner to contact</span>
+
+
+<span class="c1"># ------------------------------------------------------------------------------</span>
+<span class="c1"># Source (Tap) - Zendesk connection details</span>
+<span class="c1"># ------------------------------------------------------------------------------</span>
+<span class="nt">db_conn</span><span class="p">:</span>
+  <span class="nt">access_token</span><span class="p">:</span> <span class="s">&quot;&lt;ACCESS_TOKEN&gt;&quot;</span>       <span class="c1"># Plain string or vault encrypted</span>
+  <span class="nt">subdomain</span><span class="p">:</span> <span class="s">&quot;zendesk_subdomain&quot;</span>       <span class="c1">#</span>
+  <span class="nt">start_date</span><span class="p">:</span> <span class="s">&quot;2000-01-01T00:00:00Z&quot;</span>   <span class="c1"># Data before this date will be ignored</span>
+
+
+<span class="c1"># ------------------------------------------------------------------------------</span>
+<span class="c1"># Destination (Target) - Target properties</span>
+<span class="c1"># Connection details should be in the relevant target YAML file</span>
+<span class="c1"># ------------------------------------------------------------------------------</span>
+<span class="nt">target</span><span class="p">:</span> <span class="s">&quot;snowflake&quot;</span>                       <span class="c1"># ID of the target connector where the data will be loaded</span>
+<span class="nt">batch_size_rows</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">20000</span>                    <span class="c1"># Batch size for the stream to optimise load performance</span>
+<span class="nt">default_target_schema</span><span class="p">:</span> <span class="s">&quot;zendesk&quot;</span>          <span class="c1"># Target schema where the data will be loaded</span>
+<span class="nt">default_target_schema_select_permission</span><span class="p">:</span>  <span class="c1"># Optional: Grant SELECT on schema and tables that created</span>
+  <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">grp_power</span>
+
+
+<span class="c1"># ------------------------------------------------------------------------------</span>
+<span class="c1"># Source to target Schema mapping</span>
+<span class="c1"># ------------------------------------------------------------------------------</span>
+<span class="nt">schemas</span><span class="p">:</span>
+  <span class="p p-Indicator">-</span> <span class="nt">source_schema</span><span class="p">:</span> <span class="s">&quot;zendesk&quot;</span>           <span class="c1"># This is mandatory, but can be anything in this tap type</span>
+    <span class="nt">target_schema</span><span class="p">:</span> <span class="s">&quot;zendesk&quot;</span>           <span class="c1"># Target schema in the destination Data Warehouse</span>
+
+    <span class="c1"># List of Zendesk tables to replicate into destination Data Warehouse</span>
+    <span class="c1"># Tap-Zendesk will use the best incremental strategies automatically to replicate data</span>
+    <span class="nt">tables</span><span class="p">:</span>
+      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;group_memberships&quot;</span>
+      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;groups&quot;</span>
+      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;macros&quot;</span>
+      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;organizations&quot;</span>
+      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;satisfaction_ratings&quot;</span>
+      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;tags&quot;</span>
+      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;tickets&quot;</span>
+      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;ticket_audits&quot;</span>
+      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;ticket_comments&quot;</span>
+      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;ticket_fields&quot;</span>
+      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;ticket_metrics&quot;</span>
+      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;users&quot;</span>
+
+        <span class="c1"># OPTIONAL: Load time transformations</span>
+        <span class="c1">#transformations:</span>
+        <span class="c1">#  - column: &quot;last_name&quot;            # Column to transform</span>
+        <span class="c1">#    type: &quot;SET-NULL&quot;               # Transformation type</span>
+</pre></div>
+</div>
+</div>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="s3_csv.html" class="btn btn-neutral float-right" title="Tap S3 CSV" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="postgres.html" class="btn btn-neutral float-left" title="Tap PostgreSQL" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2019, TransferWise Ltd.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

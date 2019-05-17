@@ -1,0 +1,289 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Taps (Data Sources) &mdash; PipelineWise  documentation</title>
+  
+
+  
+  
+    <link rel="shortcut icon" href="../_static/pipelinewise.png"/>
+  
+  
+  
+    <link rel="canonical" href="https://docs.ansible.com/ansible/latest/connectors/taps.html"/>
+  
+
+  
+  <script type="text/javascript" src="../_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+        <script type="text/javascript" src="../_static/jquery.js"></script>
+        <script type="text/javascript" src="../_static/underscore.js"></script>
+        <script type="text/javascript" src="../_static/doctools.js"></script>
+        <script type="text/javascript" src="../_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/css/custom.css" type="text/css" />
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Tap MySQL" href="taps/mysql.html" />
+    <link rel="prev" title="Transformations" href="../user_guide/transformations.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../index.html" class="icon icon-home"> PipelineWise
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.0.0
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Installation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../installation_guide/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../installation_guide/creating_pipelines.html">Creating Pipelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../installation_guide/running_pipelines.html">Running Pipelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../installation_guide/encrypting_passwords.html">Encrypting Passwords</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Concept</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../concept/singer.html">Singer.io</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concept/replication_methods.html">Replication Methods</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Using PipelineWise</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/yaml_config.html">YAML configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/cli.html">Command Line Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/fastsync.html">Fast Sync</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/scheduling.html">Scheduling</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/integration.html">Integration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/scaling.html">Scaling</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/transformations.html">Transformations</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Connectors</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Taps (Data Sources)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="#configuring-the-taps">Configuring the taps</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="taps/mysql.html">Tap MySQL</a></li>
+<li class="toctree-l2"><a class="reference internal" href="taps/postgres.html">Tap PostgreSQL</a></li>
+<li class="toctree-l2"><a class="reference internal" href="taps/zendesk.html">Tap Zendesk</a></li>
+<li class="toctree-l2"><a class="reference internal" href="taps/s3_csv.html">Tap S3 CSV</a></li>
+<li class="toctree-l2"><a class="reference internal" href="taps/kafka.html">Tap Kafka</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="targets.html">Targets (Destinations)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="targets.html#configuring-the-targets">Configuring the targets</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Project</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../project/about.html">Project</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">PipelineWise</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../index.html">Docs</a> &raquo;</li>
+        
+      <li>Taps (Data Sources)</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="../_sources/connectors/taps.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="taps-data-sources">
+<span id="taps-list"></span><h1>Taps (Data Sources)<a class="headerlink" href="#taps-data-sources" title="Permalink to this headline">¶</a></h1>
+<p>PipelineWise can replicate data from the following data sources:</p>
+<ul class="simple">
+<li><p>MySQL (<a class="reference internal" href="taps/mysql.html#tap-mysql"><span class="std std-ref">Tap MySQL</span></a>)</p></li>
+<li><p>MariaDB (<a class="reference internal" href="taps/mysql.html#tap-mysql"><span class="std std-ref">Tap MySQL</span></a>)</p></li>
+<li><p>PostgreSQL (<a class="reference internal" href="taps/postgres.html#tap-postgres"><span class="std std-ref">Tap PostgreSQL</span></a>)</p></li>
+<li><p>Zendesk (<a class="reference internal" href="taps/zendesk.html#tap-zendesk"><span class="std std-ref">Tap Zendesk</span></a>)</p></li>
+<li><p>Kafka stream (<a class="reference internal" href="taps/kafka.html#tap-kafka"><span class="std std-ref">Tap Kafka</span></a>)</p></li>
+<li><p>CSV file on S3 (<a class="reference internal" href="targets/s3_csv.html#target-s3-csv"><span class="std std-ref">Target S3 CSV</span></a>)</p></li>
+</ul>
+</div>
+<div class="section" id="configuring-the-taps">
+<h1>Configuring the taps<a class="headerlink" href="#configuring-the-taps" title="Permalink to this headline">¶</a></h1>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="taps/mysql.html">Tap MySQL</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="taps/mysql.html#mysql-setup-requirements">MySQL setup requirements</a></li>
+<li class="toctree-l2"><a class="reference internal" href="taps/mysql.html#configuring-what-to-replicate">Configuring what to replicate</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="taps/postgres.html">Tap PostgreSQL</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="taps/postgres.html#connecting-to-postgresql">Connecting to PostgreSQL</a></li>
+<li class="toctree-l2"><a class="reference internal" href="taps/postgres.html#configuring-what-to-replicate">Configuring what to replicate</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="taps/zendesk.html">Tap Zendesk</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="taps/zendesk.html#connecting-to-zendesk">Connecting to Zendesk</a></li>
+<li class="toctree-l2"><a class="reference internal" href="taps/zendesk.html#configuring-what-to-replicate">Configuring what to replicate</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="taps/s3_csv.html">Tap S3 CSV</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="taps/s3_csv.html#connecting-to-s3">Connecting to S3</a></li>
+<li class="toctree-l2"><a class="reference internal" href="taps/s3_csv.html#configuring-what-to-replicate">Configuring what to replicate</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="taps/kafka.html">Tap Kafka</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="taps/kafka.html#connecting-to-kafka">Connecting to Kafka</a></li>
+<li class="toctree-l2"><a class="reference internal" href="taps/kafka.html#configuring-what-to-replicate">Configuring what to replicate</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="taps/mysql.html" class="btn btn-neutral float-right" title="Tap MySQL" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="../user_guide/transformations.html" class="btn btn-neutral float-left" title="Transformations" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2019, TransferWise Ltd.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

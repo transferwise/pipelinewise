@@ -1,0 +1,377 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Creating Pipelines &mdash; PipelineWise  documentation</title>
+  
+
+  
+  
+    <link rel="shortcut icon" href="../_static/pipelinewise.png"/>
+  
+  
+  
+    <link rel="canonical" href="https://docs.ansible.com/ansible/latest/installation_guide/creating_pipelines.html"/>
+  
+
+  
+  <script type="text/javascript" src="../_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+        <script type="text/javascript" src="../_static/jquery.js"></script>
+        <script type="text/javascript" src="../_static/underscore.js"></script>
+        <script type="text/javascript" src="../_static/doctools.js"></script>
+        <script type="text/javascript" src="../_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/css/custom.css" type="text/css" />
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Running Pipelines" href="running_pipelines.html" />
+    <link rel="prev" title="Installation" href="installation.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../index.html" class="icon icon-home"> PipelineWise
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.0.0
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Installation</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Creating Pipelines</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#generating-sample-pipelines">Generating Sample Pipelines</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#customising-the-pipelines">Customising the Pipelines</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#activating-the-pipelines-from-the-yaml-files">Activating the Pipelines from the YAML files</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="running_pipelines.html">Running Pipelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="encrypting_passwords.html">Encrypting Passwords</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Concept</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../concept/singer.html">Singer.io</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concept/replication_methods.html">Replication Methods</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Using PipelineWise</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/yaml_config.html">YAML configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/cli.html">Command Line Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/fastsync.html">Fast Sync</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/scheduling.html">Scheduling</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/integration.html">Integration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/scaling.html">Scaling</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/transformations.html">Transformations</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Connectors</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../connectors/taps.html">Taps (Data Sources)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../connectors/taps.html#configuring-the-taps">Configuring the taps</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../connectors/targets.html">Targets (Destinations)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../connectors/targets.html#configuring-the-targets">Configuring the targets</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Project</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../project/about.html">Project</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">PipelineWise</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../index.html">Docs</a> &raquo;</li>
+        
+      <li>Creating Pipelines</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="../_sources/installation_guide/creating_pipelines.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="creating-pipelines">
+<span id="id1"></span><h1>Creating Pipelines<a class="headerlink" href="#creating-pipelines" title="Permalink to this headline">¶</a></h1>
+<p>Pipelines defines how the data should flow from source sytem to target. It defines the data source
+credentials, the data that needs to be captures, replication methods, load time transformations,
+destination database credentials, source to target mapping, grants etc.</p>
+<p>Pipelines are expressed in YAML format and have a minimum of syntax, which intentionally tries
+to not be a programming language or script, but rather a model of a configuration or a process.
+PipelineWise using these YAML files as the main input to generate every required JSON files
+for the underlying singer.io componets.</p>
+<p>Under the hood <a class="reference external" href="https://www.singer.io/">Singer.io</a>  components needs several JSON files to
+operate correctly but you will never need to edit these JSON config files directly.
+PipelineWise will generate it from the YAML files and install into a correct place automatically
+whenever it’s needed.</p>
+<div class="section" id="generating-sample-pipelines">
+<span id="generating-pipelines"></span><h2>Generating Sample Pipelines<a class="headerlink" href="#generating-sample-pipelines" title="Permalink to this headline">¶</a></h2>
+<p>The easiest way to understand these pipeline YAML files is to generate the sample set for each
+of the supported connectors and you can adjust them for your own purpose.</p>
+<p>Once you completed the <a class="reference internal" href="installation.html#installation-guide"><span class="std std-ref">Installation</span></a> section you should be able to create a new
+project with the PipelineWise  <a class="reference internal" href="../user_guide/cli.html#cli-init"><span class="std std-ref">init</span></a> command:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ pipelinewise init --dir pipelinewise_samples
+</pre></div>
+</div>
+<p>This will create a <code class="docutils literal notranslate"><span class="pre">pipelinewise_samples</span></code> directory with samples for each supported component:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>└── pipelinewise_samples
+    ├── README.md
+    ├── tap_mysql_mariadb.yml.sample
+    ├── tap_postgres.yml.sample
+    ├── tap_s3_csv.yml.sample
+    ├── tap_zendesk.yml.sample
+    ├── tap_kafka.yml.sample
+    └── target_snowflake.yml.sample
+</pre></div>
+</div>
+</div>
+<div class="section" id="customising-the-pipelines">
+<h2>Customising the Pipelines<a class="headerlink" href="#customising-the-pipelines" title="Permalink to this headline">¶</a></h2>
+<p>In this example we will replicate three tables from a MySQL database into a Snowflake Data Warehouse,
+using a mix of <a class="reference internal" href="../concept/replication_methods.html#full-table"><span class="std std-ref">Full Table</span></a>, <a class="reference internal" href="../concept/replication_methods.html#incremental"><span class="std std-ref">Key Based Incremental</span></a> and <a class="reference internal" href="../concept/replication_methods.html#log-based"><span class="std std-ref">Log Based Incremental</span></a> replication methods.
+We will need the <code class="docutils literal notranslate"><span class="pre">tap_mysql_mariadb.yml</span></code> and <code class="docutils literal notranslate"><span class="pre">target_snowflake.yml</span></code>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ <span class="nb">cd</span> pipelinewise_samples
+$ mv tap_mysql_mariadb.yml.sample tap_my_mysql_db_one.yml
+$ mv target_snowflake.yml.sample  target_snowflake.yml
+</pre></div>
+</div>
+<p>1)  Edit <code class="docutils literal notranslate"><span class="pre">target_snowflake.yml</span></code>, this will be the destination of one ore many  sources.
+You can edit with your favourite text editor:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>---
+id: <span class="s2">&quot;snowflake_test&quot;</span>
+name: <span class="s2">&quot;Snowflake Test&quot;</span>
+type: <span class="s2">&quot;target-snowflake&quot;</span>
+db_conn:
+  account: <span class="s2">&quot;rt27428.eu-central-1&quot;</span>
+  dbname: <span class="s2">&quot;analytics_db_test&quot;</span>
+  user: <span class="s2">&quot;circleci&quot;</span>
+  password: <span class="s2">&quot;PASSWORD&quot;</span>                                   <span class="c1"># Plain string or Vault Encrypted password</span>
+  warehouse: <span class="s2">&quot;LOAD_WH&quot;</span>
+  s3_bucket: <span class="s2">&quot;tw-staging-analyticsdb-etl&quot;</span>
+  s3_key_prefix: <span class="s2">&quot;snowflake-imports-test/&quot;</span>
+  aws_access_key_id: <span class="s2">&quot;ACCESS_KEY_ID&quot;</span>                     <span class="c1"># Plain string or Vault Encrypted password</span>
+  <span class="c1"># stage and file_format are pre-created objects in Snowflake that requires to load and</span>
+  <span class="c1"># merge data correctly from S3 to tables in one step without using temp tables</span>
+  <span class="c1">#  stage      : External stage object pointing to an S3 bucket</span>
+  <span class="c1">#  file_format: Named file format object used for bulk loading data from S3 into</span>
+  <span class="c1">#               snowflake tables.</span>
+  stage: <span class="s2">&quot;pipelinewise.encrypted_etl_stage_test&quot;</span>
+  file_format: <span class="s2">&quot;pipelinewise.etl_stage_file_format&quot;</span>
+  aws_secret_access_key: <span class="s2">&quot;&lt;SECRET_ASCCESS_KEY&gt;&quot;</span>          <span class="c1"># Plain string or Vault Encrypted password</span>
+  <span class="c1"># The same master key has to be added to the external stage object created in snowflake</span>
+  client_side_encryption_master_key: <span class="s2">&quot;&lt;CSE_MASTER_KEY&gt;&quot;</span>  <span class="c1"># Plain string or Vault Encrypted password</span>
+</pre></div>
+</div>
+<ol class="arabic simple" start="2">
+<li><p>Edit <code class="docutils literal notranslate"><span class="pre">tap_mysql_mariadb.yml</span></code>:</p></li>
+</ol>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>---
+id: <span class="s2">&quot;fx&quot;</span>
+name: <span class="s2">&quot;FX (Monolith)&quot;</span>
+type: <span class="s2">&quot;tap-mysql&quot;</span>
+owner: <span class="s2">&quot;somebody@transferwise.com&quot;</span>
+sync_period: <span class="s2">&quot;*/15 * * * *&quot;</span>
+
+<span class="c1"># Source connection details</span>
+db_conn:
+  host: <span class="s2">&quot;localhost&quot;</span>
+  port: <span class="m">10602</span>
+  user: <span class="s2">&quot;pgninja_replica&quot;</span>
+  password: <span class="s2">&quot;&lt;PASSWORD&gt;&quot;</span>                  <span class="c1"># Plain string or Vault Encrypted password</span>
+
+target: <span class="s2">&quot;snowflake_test&quot;</span>                  <span class="c1"># Target ID, should match the id from target_snowflake.yml</span>
+batch_size_rows: <span class="m">100000</span>                   <span class="c1"># Batch size for the stream to optimise load performance</span>
+
+<span class="c1"># Source to Destination Schema mapping</span>
+schemas:
+  - source_schema: <span class="s2">&quot;fx&quot;</span>                   <span class="c1"># You can replicate from multiple schemas</span>
+      target_schema: <span class="s2">&quot;fx_clear&quot;</span>           <span class="c1"># Target schema in snowflake</span>
+      target_schema_select_permissions:   <span class="c1"># Grant permission once the table created</span>
+        - grp_power
+      tables:                             <span class="c1"># List Tables to replicate</span>
+        - table_name: <span class="s2">&quot;table_one&quot;</span>
+          replication_method: FULL_TABLE  <span class="c1"># 1) FULL_TABLE replication</span>
+        - table_name: <span class="s2">&quot;table_two&quot;</span>         <span class="c1">#</span>
+          replication_method: LOG_BASED   <span class="c1"># 2) LOG_BASED replication</span>
+        - table_name: <span class="s2">&quot;table_three&quot;</span>       <span class="c1">#</span>
+          replication_method: INCREMENTAL <span class="c1"># 3) INCREMENTAL replication</span>
+          replication_key: <span class="s2">&quot;updated_at&quot;</span>   <span class="c1">#    Incremental load needs replication key</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="activating-the-pipelines-from-the-yaml-files">
+<h2>Activating the Pipelines from the YAML files<a class="headerlink" href="#activating-the-pipelines-from-the-yaml-files" title="Permalink to this headline">¶</a></h2>
+<p>When you are happy with the configuration you need to import it with the <a class="reference internal" href="../user_guide/cli.html#cli-import-config"><span class="std std-ref">import_config</span></a> command:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ pipelinewise import_config --dir pipelinewise_samples
+</pre></div>
+</div>
+<p>At this point PipelineWise will generate the required JSON files for the singer taps and
+targets into <code class="docutils literal notranslate"><span class="pre">~/.pipelinewise</span></code>. PipelineWise will use this directory internally to keep
+tracking the state files for <a class="reference internal" href="../concept/replication_methods.html#incremental"><span class="std std-ref">Key Based Incremental</span></a> and <a class="reference internal" href="../concept/replication_methods.html#log-based"><span class="std std-ref">Log Based Incremental</span></a> replications
+(aka. bookmarks) and this will be the directory where the log files will be created.
+Normally you will need to go into <code class="docutils literal notranslate"><span class="pre">~/.pipelinewise</span></code> only when you want to access the
+log files.</p>
+<p>Once the config YAML files imported you can see the new pipelines with the <a class="reference internal" href="../user_guide/cli.html#cli-status"><span class="std std-ref">status</span></a> command:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ pipelinewise status
+Warehouse ID    Source ID     Enabled    Type       Status    Last Sync    Last Sync Result
+--------------  ------------  ---------  ---------  --------  -----------  ------------------
+snowflake       mysql_sample  True       tap-mysql  ready                  unknown
+<span class="m">1</span> pipeline<span class="o">(</span>s<span class="o">)</span>
+</pre></div>
+</div>
+<p>Congratulations, at this point you have successfuly çreated your first pipeline in PipelineWise and it’s now
+ready to run. If you want you can create a new git repository and push the <code class="docutils literal notranslate"><span class="pre">pipelinewise_samples</span></code>
+directory into it to keep everything under version control.</p>
+<p>Now you can head to the <a class="reference internal" href="running_pipelines.html#running-pipelines"><span class="std std-ref">Running Pipelines</span></a> section to run the pipelines and to start replicating data.</p>
+</div>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="running_pipelines.html" class="btn btn-neutral float-right" title="Running Pipelines" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="installation.html" class="btn btn-neutral float-left" title="Installation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2019, TransferWise Ltd.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

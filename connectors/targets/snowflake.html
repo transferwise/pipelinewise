@@ -1,0 +1,320 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Target Snowflake &mdash; PipelineWise  documentation</title>
+  
+
+  
+  
+    <link rel="shortcut icon" href="../../_static/pipelinewise.png"/>
+  
+  
+  
+    <link rel="canonical" href="https://docs.ansible.com/ansible/latest/connectors/targets/snowflake.html"/>
+  
+
+  
+  <script type="text/javascript" src="../../_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+        <script type="text/javascript" src="../../_static/jquery.js"></script>
+        <script type="text/javascript" src="../../_static/underscore.js"></script>
+        <script type="text/javascript" src="../../_static/doctools.js"></script>
+        <script type="text/javascript" src="../../_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/css/custom.css" type="text/css" />
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Target Postgres" href="postgres.html" />
+    <link rel="prev" title="Targets (Destinations)" href="../targets.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> PipelineWise
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.0.0
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Installation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../installation_guide/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../installation_guide/creating_pipelines.html">Creating Pipelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../installation_guide/running_pipelines.html">Running Pipelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../installation_guide/encrypting_passwords.html">Encrypting Passwords</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Concept</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../concept/singer.html">Singer.io</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../concept/replication_methods.html">Replication Methods</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Using PipelineWise</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/yaml_config.html">YAML configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/cli.html">Command Line Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/fastsync.html">Fast Sync</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/scheduling.html">Scheduling</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/integration.html">Integration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/scaling.html">Scaling</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/transformations.html">Transformations</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Connectors</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../taps.html">Taps (Data Sources)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../taps.html#configuring-the-taps">Configuring the taps</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../targets.html">Targets (Destinations)</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../targets.html#configuring-the-targets">Configuring the targets</a><ul class="current">
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Target Snowflake</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#snowflake-setup-requirements">Snowflake setup requirements</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#configuring-where-to-replicate-data">Configuring where to replicate data</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="postgres.html">Target Postgres</a></li>
+<li class="toctree-l2"><a class="reference internal" href="s3_csv.html">Target S3 CSV</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption"><span class="caption-text">Project</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../project/about.html">Project</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">PipelineWise</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../index.html">Docs</a> &raquo;</li>
+        
+          <li><a href="../targets.html">Targets (Destinations)</a> &raquo;</li>
+        
+      <li>Target Snowflake</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="../../_sources/connectors/targets/snowflake.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="target-snowflake">
+<span id="id1"></span><h1>Target Snowflake<a class="headerlink" href="#target-snowflake" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="snowflake-setup-requirements">
+<h2>Snowflake setup requirements<a class="headerlink" href="#snowflake-setup-requirements" title="Permalink to this headline">¶</a></h2>
+<p>You need to create two objects in Snowflake in a schema before start replicating data:</p>
+<ol class="arabic simple">
+<li><p>A named external stage object on S3. This will be used to upload the CSV files to S3 and to MERGE data into snowflake tables.</p></li>
+</ol>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">CREATE</span> <span class="n">STAGE</span> <span class="p">{</span><span class="n">schema</span><span class="p">}</span><span class="o">.</span><span class="p">{</span><span class="n">stage_name</span><span class="p">}</span>
+<span class="n">url</span><span class="o">=</span><span class="s1">&#39;s3://</span><span class="si">{s3_bucket}</span><span class="s1">&#39;</span>
+<span class="n">credentials</span><span class="o">=</span><span class="p">(</span><span class="n">AWS_KEY_ID</span><span class="o">=</span><span class="s1">&#39;</span><span class="si">{aws_key_id}</span><span class="s1">&#39;</span> <span class="n">AWS_SECRET_KEY</span><span class="o">=</span><span class="s1">&#39;</span><span class="si">{aws_secret_key}</span><span class="s1">&#39;</span><span class="p">)</span>
+<span class="n">encryption</span><span class="o">=</span><span class="p">(</span><span class="n">MASTER_KEY</span><span class="o">=</span><span class="s1">&#39;</span><span class="si">{client_side_encryption_master_key}</span><span class="s1">&#39;</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>The encryption option is optional and used for client side encryption.
+If you want client side encryption  you’ll need to define the same master key in the <cite>target-snowflake</cite> YAML. See the example below.</p>
+<ol class="arabic simple" start="2">
+<li><p>A named file format. This will be used by the MERGE/COPY commands to parse the CSV files correctly from S3:</p></li>
+</ol>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">CREATE</span> <span class="n">file</span> <span class="nb">format</span> <span class="n">IF</span> <span class="n">NOT</span> <span class="n">EXISTS</span> <span class="p">{</span><span class="n">schema</span><span class="p">}</span><span class="o">.</span><span class="p">{</span><span class="n">file_format_name</span><span class="p">}</span>
+<span class="nb">type</span> <span class="o">=</span> <span class="s1">&#39;CSV&#39;</span> <span class="n">escape</span><span class="o">=</span><span class="s1">&#39;</span><span class="se">\\</span><span class="s1">&#39;</span> <span class="n">field_optionally_enclosed_by</span><span class="o">=</span><span class="s1">&#39;&quot;&#39;</span><span class="p">;</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="configuring-where-to-replicate-data">
+<h2>Configuring where to replicate data<a class="headerlink" href="#configuring-where-to-replicate-data" title="Permalink to this headline">¶</a></h2>
+<p>PipelineWise configures every target with a common structured YAML file format.
+A sample YAML for Snowflake target can be generated into a project directory by
+following the steps in the <a class="reference internal" href="../../installation_guide/creating_pipelines.html#generating-pipelines"><span class="std std-ref">Generating Sample Pipelines</span></a> section.</p>
+<p>Example YAML for target-snowflake:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nn">---</span>
+
+<span class="c1"># ------------------------------------------------------------------------------</span>
+<span class="c1"># General Properties</span>
+<span class="c1"># ------------------------------------------------------------------------------</span>
+<span class="nt">id</span><span class="p">:</span> <span class="s">&quot;snowflake&quot;</span>                        <span class="c1"># Unique identifier of the target</span>
+<span class="nt">name</span><span class="p">:</span> <span class="s">&quot;Snowflake&quot;</span>                      <span class="c1"># Name of the target</span>
+<span class="nt">type</span><span class="p">:</span> <span class="s">&quot;target-snowflake&quot;</span>               <span class="c1"># !! THIS SHOULD NOT CHANGE !!</span>
+
+
+<span class="c1"># ------------------------------------------------------------------------------</span>
+<span class="c1"># Target - Data Warehouse connection details</span>
+<span class="c1"># ------------------------------------------------------------------------------</span>
+<span class="nt">db_conn</span><span class="p">:</span>
+  <span class="nt">account</span><span class="p">:</span> <span class="s">&quot;rtxxxxx.eu-central-1&quot;</span>               <span class="c1"># Snowflake account</span>
+  <span class="nt">dbname</span><span class="p">:</span> <span class="s">&quot;&lt;DB_NAME&gt;&quot;</span>                           <span class="c1"># Snowflake database name</span>
+  <span class="nt">user</span><span class="p">:</span> <span class="s">&quot;&lt;USER&gt;&quot;</span>                                <span class="c1"># Snowflake user</span>
+  <span class="nt">password</span><span class="p">:</span> <span class="s">&quot;&lt;PASSWORD&gt;&quot;</span>                        <span class="c1"># Plain string or vault encrypted</span>
+  <span class="nt">warehouse</span><span class="p">:</span> <span class="s">&quot;&lt;WAREHOUSE&gt;&quot;</span>                      <span class="c1"># Snowflake virtual warehouse</span>
+
+  <span class="c1"># We use an intermediate external stage on S3 to load data into Snowflake</span>
+  <span class="nt">aws_access_key_id</span><span class="p">:</span> <span class="s">&quot;&lt;ACCESS_KEY&gt;&quot;</span>             <span class="c1"># S3 - Plain string or vault encrypted</span>
+  <span class="nt">aws_secret_access_key</span><span class="p">:</span> <span class="s">&quot;&lt;SECRET_ACCESS_KEY&gt;&quot;</span>  <span class="c1"># S3 - Plain string or vault encrypted</span>
+  <span class="nt">s3_bucket</span><span class="p">:</span> <span class="s">&quot;&lt;BUCKET_NAME&gt;&quot;</span>                    <span class="c1"># S3 external stbucket name</span>
+  <span class="nt">s3_key_prefix</span><span class="p">:</span> <span class="s">&quot;snowflake-imports/&quot;</span>           <span class="c1"># Optional: S3 key prefix</span>
+
+  <span class="c1"># stage and file_format are pre-created objects in Snowflake that requires to load and</span>
+  <span class="c1"># merge data correctly from S3 to tables in one step without using temp tables</span>
+  <span class="c1">#  stage      : External stage object pointing to an S3 bucket</span>
+  <span class="c1">#  file_format: Named file format object used for bulk loading data from S3 into</span>
+  <span class="c1">#               snowflake tables.</span>
+  <span class="nt">stage</span><span class="p">:</span> <span class="s">&quot;pipelinewise.encrypted_etl_stage&quot;</span>
+  <span class="nt">file_format</span><span class="p">:</span> <span class="s">&quot;pipelinewise.etl_stage_file_format&quot;</span>
+
+  <span class="c1"># Optional: Client Side Encryption</span>
+  <span class="c1"># The same master key has to be added to the external stage object created in snowflake</span>
+  <span class="c1">#client_side_encryption_master_key: &quot;&lt;MASTER_KEY&quot;&gt; # Plain string or vault encrypted</span>
+</pre></div>
+</div>
+</div>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="postgres.html" class="btn btn-neutral float-right" title="Target Postgres" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="../targets.html" class="btn btn-neutral float-left" title="Targets (Destinations)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2019, TransferWise Ltd.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

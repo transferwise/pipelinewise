@@ -1,0 +1,313 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Transformations &mdash; PipelineWise  documentation</title>
+  
+
+  
+  
+    <link rel="shortcut icon" href="../_static/pipelinewise.png"/>
+  
+  
+  
+    <link rel="canonical" href="https://docs.ansible.com/ansible/latest/user_guide/transformations.html"/>
+  
+
+  
+  <script type="text/javascript" src="../_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+        <script type="text/javascript" src="../_static/jquery.js"></script>
+        <script type="text/javascript" src="../_static/underscore.js"></script>
+        <script type="text/javascript" src="../_static/doctools.js"></script>
+        <script type="text/javascript" src="../_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/css/custom.css" type="text/css" />
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Taps (Data Sources)" href="../connectors/taps.html" />
+    <link rel="prev" title="Scaling" href="scaling.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../index.html" class="icon icon-home"> PipelineWise
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.0.0
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Installation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../installation_guide/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../installation_guide/creating_pipelines.html">Creating Pipelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../installation_guide/running_pipelines.html">Running Pipelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../installation_guide/encrypting_passwords.html">Encrypting Passwords</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Concept</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../concept/singer.html">Singer.io</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concept/replication_methods.html">Replication Methods</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Using PipelineWise</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="yaml_config.html">YAML configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cli.html">Command Line Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="fastsync.html">Fast Sync</a></li>
+<li class="toctree-l1"><a class="reference internal" href="scheduling.html">Scheduling</a></li>
+<li class="toctree-l1"><a class="reference internal" href="integration.html">Integration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="scaling.html">Scaling</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Transformations</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#transformation-methods">Transformation Methods</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#conditional-transformations">Conditional Transformations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#example">Example</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption"><span class="caption-text">Connectors</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../connectors/taps.html">Taps (Data Sources)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../connectors/taps.html#configuring-the-taps">Configuring the taps</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../connectors/targets.html">Targets (Destinations)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../connectors/targets.html#configuring-the-targets">Configuring the targets</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Project</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../project/about.html">Project</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">PipelineWise</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../index.html">Docs</a> &raquo;</li>
+        
+      <li>Transformations</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="../_sources/user_guide/transformations.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="transformations">
+<span id="id1"></span><h1>Transformations<a class="headerlink" href="#transformations" title="Permalink to this headline">¶</a></h1>
+<p>PipelineWise can perform row level load time transformations between tap and target components
+and makes and ideal place to obfuscate, mask or filter sensitive data that should never been
+replicated in the Data Warehouse.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p><strong>Important</strong>: Load Time Transformations are not designed for complex transformations, mapping,
+joins or aggregations. It was designed primarily to meet certain data security requirements
+and making sure that PII and other sensitive data are not landing at external service providers
+like AWS, MS Azure or similar.</p>
+<p>If you want to apply complex transformations you’ll need to do it at a later stage once the
+data is ingested into the Data Warehouse. PipelineWise fits into the ELT landscape and not
+doing traditional ETL. ELT ingests data first into DWH in the original format and the
+“transformation” shifting to the end of the data pipeline.</p>
+</div>
+<div class="section" id="transformation-methods">
+<span id="id2"></span><h2>Transformation Methods<a class="headerlink" href="#transformation-methods" title="Permalink to this headline">¶</a></h2>
+<p>The following transformations can be added optionally into the <a class="reference internal" href="yaml_config.html#yaml-configuration"><span class="std std-ref">YAML configuration</span></a>:</p>
+<ul class="simple">
+<li><p><strong>SET-NULL</strong>: Transforms any column to NULL</p></li>
+<li><p><strong>HASH</strong>: Transfroms string columns to hash</p></li>
+<li><p><strong>HASH-SKIP-FIRST-n</strong>: Transforms string columns to hash skipping first n characters, e.g. HASH-SKIP-FIRST-2</p></li>
+<li><p><strong>MASK-DATA</strong>: Replaces the months and day parts of date columns to be always 1st of Jan</p></li>
+<li><p><strong>MASK-NUMBER</strong>: Transforms any numeric column to zero</p></li>
+</ul>
+</div>
+<div class="section" id="conditional-transformations">
+<span id="id3"></span><h2>Conditional Transformations<a class="headerlink" href="#conditional-transformations" title="Permalink to this headline">¶</a></h2>
+<p>Using the optional <code class="docutils literal notranslate"><span class="pre">when</span></code> keyword you can specify conditions when
+the transformation has to be applied. If the condition matches
+PipelineWise performs the transformation, otherwise it keeps
+the original value.</p>
+</div>
+<div class="section" id="example">
+<span id="transformations-example"></span><h2>Example<a class="headerlink" href="#example" title="Permalink to this headline">¶</a></h2>
+<p>Load Time transformations needs to be defined in the tables section
+in the <a class="reference internal" href="yaml_config.html#yaml-configuration"><span class="std std-ref">YAML configuration</span></a>:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nn">...</span>
+<span class="nn">...</span>
+<span class="nt">tables</span><span class="p">:</span>
+  <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;audit_log&quot;</span>
+    <span class="nt">replication_method</span><span class="p">:</span> <span class="s">&quot;INCREMENTAL&quot;</span>
+    <span class="nt">replication_key</span><span class="p">:</span> <span class="s">&quot;id&quot;</span>
+    <span class="nt">transformations</span><span class="p">:</span>
+      <span class="p p-Indicator">-</span> <span class="nt">column</span><span class="p">:</span> <span class="s">&quot;column_1&quot;</span>
+        <span class="nt">type</span><span class="p">:</span> <span class="s">&quot;SET-NULL&quot;</span>
+        <span class="nt">when</span><span class="p">:</span>
+          <span class="p p-Indicator">-</span> <span class="nt">column</span><span class="p">:</span> <span class="s">&quot;class_name&quot;</span>
+            <span class="nt">equals</span><span class="p">:</span> <span class="s">&#39;com.transferwise.fx.user.User&#39;</span>
+          <span class="p p-Indicator">-</span> <span class="nt">column</span><span class="p">:</span> <span class="s">&quot;property_name&quot;</span>
+            <span class="nt">equals</span><span class="p">:</span> <span class="s">&#39;passwordHash&#39;</span>
+
+            <span class="c1"># Tip: Use &#39;regex_match&#39; instead of &#39;equal&#39; if you need</span>
+            <span class="c1"># more complex matching criterias. For example:</span>
+            <span class="c1"># regex_match: &#39;password|salt|passwordHash&#39;</span>
+
+      <span class="p p-Indicator">-</span> <span class="nt">column</span><span class="p">:</span> <span class="s">&quot;column_2&quot;</span>
+        <span class="nt">type</span><span class="p">:</span> <span class="s">&quot;HASH&quot;</span>
+        <span class="nt">when</span><span class="p">:</span>
+          <span class="p p-Indicator">-</span> <span class="nt">column</span><span class="p">:</span> <span class="s">&quot;class_name&quot;</span>
+            <span class="nt">equals</span><span class="p">:</span> <span class="s">&#39;com.transferwise.fx.user.User&#39;</span>
+          <span class="p p-Indicator">-</span> <span class="nt">column</span><span class="p">:</span> <span class="s">&quot;property_name&quot;</span>
+            <span class="nt">equals</span><span class="p">:</span> <span class="s">&#39;passwordHash&#39;</span>
+<span class="nn">...</span>
+<span class="nn">...</span>
+</pre></div>
+</div>
+</div>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="../connectors/taps.html" class="btn btn-neutral float-right" title="Taps (Data Sources)" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="scaling.html" class="btn btn-neutral float-left" title="Scaling" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2019, TransferWise Ltd.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

@@ -91,17 +91,19 @@
               <p class="caption"><span class="caption-text">Installation</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="installation_guide/installation.html">Installation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="installation_guide/start.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="installation_guide/creating_pipelines.html">Creating Pipelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="installation_guide/running_pipelines.html">Running Pipelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="installation_guide/encrypting_passwords.html">Encrypting Passwords</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Concept</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="concept/singer.html">Singer.io</a></li>
-<li class="toctree-l1"><a class="reference internal" href="concept/replication_strategies.html">Replication Strategies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="concept/replication_methods.html">Replication Methods</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Using PipelineWise</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="user_guide/yaml_config.html">YAML configuration</a></li>
-<li class="toctree-l1"><a class="reference internal" href="user_guide/command_line_tools.html">Command Line Tools</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/cli.html">Command Line Interface</a></li>
 <li class="toctree-l1"><a class="reference internal" href="user_guide/fastsync.html">Fast Sync</a></li>
 <li class="toctree-l1"><a class="reference internal" href="user_guide/scheduling.html">Scheduling</a></li>
 <li class="toctree-l1"><a class="reference internal" href="user_guide/integration.html">Integration</a></li>
@@ -111,7 +113,9 @@
 <p class="caption"><span class="caption-text">Connectors</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="connectors/taps.html">Taps (Data Sources)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="connectors/taps.html#configuring-the-taps">Configuring the taps</a></li>
 <li class="toctree-l1"><a class="reference internal" href="connectors/targets.html">Targets (Destinations)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="connectors/targets.html#configuring-the-targets">Configuring the targets</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Project</span></p>
 <ul>
@@ -184,30 +188,31 @@
 <div class="section" id="documentation">
 <h1>Documentation<a class="headerlink" href="#documentation" title="Permalink to this headline">¶</a></h1>
 <p>PipelineWise is a Data Pipeline Framework using the <a class="reference external" href="https://www.singer.io/">Singer.io</a>
-specification to replicate data from various sources to various destinations.</p>
+specification to ingest and replicate data from various sources to various destinations.</p>
 <img alt="_images/pipelinewise-diagram-circle-bold.png" src="_images/pipelinewise-diagram-circle-bold.png" />
 <hr class="docutils" />
-<div class="section" id="principles">
-<h2>Principles<a class="headerlink" href="#principles" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="features">
+<h2>Features<a class="headerlink" href="#features" title="Permalink to this headline">¶</a></h2>
 <ul class="simple">
-<li><p><strong>Managed Schema Changes</strong>: When source data changes, PipelineWise alters the schema in your Data Warehouse automatically</p></li>
-<li><p><strong>sdf</strong>: PipelineWise are defined as YAML files and Python codes. This allows version control.</p></li>
-<li><p><strong>Extensible</strong>: PipelineWise source and target connectors are independent.</p></li>
+<li><p><strong>Built with ELT in mind</strong>: PipelineWise fits into the ELT landscape and not doing traditional ETL. PipelineWise ingests data first into DWH in the original format and the “transformation” shifting to the end of the data pipeline. Load time transformations are still supported but complex mapping and joins have to be done once the data is replicated into the Data Warehouse.</p></li>
+<li><p><strong>Lightweight</strong>: No daemons or database setup are required</p></li>
+<li><p><strong>Replication Methods</strong>: CDC (Log Based), Key-Based Incremental and Full Table snapshots</p></li>
+<li><p><strong>Managed Schema Changes</strong>: When source data changes, PipelineWise detects the change and alters the schema in your DWH automatically</p></li>
+<li><p><strong>Load time transformations</strong>: Ideal place to obfuscate, mask or filter sensitive data that should never been replicated in the Data Warehouse</p></li>
+<li><p><strong>YAML based configuration</strong>: Data pipelines are defined as YAML files, which ensures that the entire configuration is kept under version control</p></li>
+<li><p><strong>Integration with external tools</strong>: With built-in event handlers you can trigger external scripts automatically when a certain even occurred</p></li>
+<li><p><strong>Extensible</strong>: PipelineWise is using <a class="reference external" href="https://www.singer.io/">Singer.io</a>  compatible taps and target connectors and new connectors can be added to PipelineWise with relatively small effort</p></li>
 </ul>
 </div>
 <div class="section" id="beyond-the-horizon">
 <h2>Beyond the Horizon<a class="headerlink" href="#beyond-the-horizon" title="Permalink to this headline">¶</a></h2>
-<p>Airflow <strong>is not</strong> a data streaming solution. Tasks do not move data from
-one to the other (though tasks can exchange metadata!). Airflow is not
-in the <a class="reference external" href="http://spark.apache.org/streaming/">Spark Streaming</a>
-or <a class="reference external" href="https://storm.apache.org/">Storm</a> space, it is more comparable to
-<a class="reference external" href="http://oozie.apache.org/">Oozie</a> or
-<a class="reference external" href="http://data.linkedin.com/opensource/azkaban">Azkaban</a>.</p>
-<p>Workflows are expected to be mostly static or slowly changing. You can think
-of the structure of the tasks in your workflow as slightly more dynamic
-than a database structure would be. Airflow workflows are expected to look
-similar from a run to the next, this allows for clarity around
-unit of work and continuity.</p>
+<p>PipelineWise is built on top of several <a class="reference external" href="https://www.singer.io/">Singer.io</a> components. Singer.io components
+are responsible to do certain tasks like extracting data from a specific data source or loading data into a
+specific destination but to replicate data end to end you’ll need have an extra layer on top these components to
+run the jobs, make configurations, select streams to replicate, do logging and more.</p>
+<p>This is where PipelineWise comes in place. PipelineWise is a collection of pre-selected singer taps and
+targets and adds the required functionalities to create, run and maintain data pipelines in a production Data Warehouse
+environment without the extra hassle.</p>
 </div>
 <div class="section" id="content">
 <h2>Content<a class="headerlink" href="#content" title="Permalink to this headline">¶</a></h2>
@@ -216,27 +221,32 @@ unit of work and continuity.</p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="installation_guide/installation.html">Installation</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="installation_guide/installation.html#getting-pipelinewise">Getting PipelineWise</a></li>
-<li class="toctree-l2"><a class="reference internal" href="installation_guide/installation.html#installing-from-source">Installing from source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="installation_guide/installation.html#running-from-source">Running from source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="installation_guide/installation.html#cool-what-s-next">Cool, what’s Next?</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="installation_guide/start.html">Quick Start</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="installation_guide/start.html#what-s-next">What’s Next?</a></li>
+<li class="toctree-l1"><a class="reference internal" href="installation_guide/creating_pipelines.html">Creating Pipelines</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="installation_guide/creating_pipelines.html#generating-sample-pipelines">Generating Sample Pipelines</a></li>
+<li class="toctree-l2"><a class="reference internal" href="installation_guide/creating_pipelines.html#customising-the-pipelines">Customising the Pipelines</a></li>
+<li class="toctree-l2"><a class="reference internal" href="installation_guide/creating_pipelines.html#activating-the-pipelines-from-the-yaml-files">Activating the Pipelines from the YAML files</a></li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="installation_guide/running_pipelines.html">Running Pipelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="installation_guide/encrypting_passwords.html">Encrypting Passwords</a></li>
 </ul>
 </div>
 <div class="toctree-wrapper compound">
 <p class="caption"><span class="caption-text">Concept</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="concept/singer.html">Singer.io</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="concept/singer.html#core-ideas">Core Ideas</a></li>
+<li class="toctree-l2"><a class="reference internal" href="concept/singer.html#core-concepts">Core Concepts</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="concept/replication_strategies.html">Replication Strategies</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="concept/replication_strategies.html#incremental">Incremental</a></li>
-<li class="toctree-l2"><a class="reference internal" href="concept/replication_strategies.html#full-table">Full Table</a></li>
-<li class="toctree-l2"><a class="reference internal" href="concept/replication_strategies.html#log-based">Log Based</a></li>
-<li class="toctree-l2"><a class="reference internal" href="concept/replication_strategies.html#fast-sync">Fast Sync</a></li>
+<li class="toctree-l1"><a class="reference internal" href="concept/replication_methods.html">Replication Methods</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="concept/replication_methods.html#log-based-incremental">Log Based Incremental</a></li>
+<li class="toctree-l2"><a class="reference internal" href="concept/replication_methods.html#key-based-incremental">Key Based Incremental</a></li>
+<li class="toctree-l2"><a class="reference internal" href="concept/replication_methods.html#full-table">Full Table</a></li>
+<li class="toctree-l2"><a class="reference internal" href="concept/replication_methods.html#fast-sync">Fast Sync</a></li>
 </ul>
 </li>
 </ul>
@@ -245,28 +255,40 @@ unit of work and continuity.</p>
 <p class="caption"><span class="caption-text">Using PipelineWise</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="user_guide/yaml_config.html">YAML configuration</a></li>
-<li class="toctree-l1"><a class="reference internal" href="user_guide/command_line_tools.html">Command Line Tools</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/cli.html">Command Line Interface</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="user_guide/cli.html#positional-arguments">Positional Arguments</a></li>
+<li class="toctree-l2"><a class="reference internal" href="user_guide/cli.html#sub-commands">Sub-commands:</a></li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="user_guide/fastsync.html">Fast Sync</a></li>
 <li class="toctree-l1"><a class="reference internal" href="user_guide/scheduling.html">Scheduling</a></li>
 <li class="toctree-l1"><a class="reference internal" href="user_guide/integration.html">Integration</a></li>
 <li class="toctree-l1"><a class="reference internal" href="user_guide/scaling.html">Scaling</a></li>
-<li class="toctree-l1"><a class="reference internal" href="user_guide/transformations.html">Transformations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/transformations.html">Transformations</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="user_guide/transformations.html#transformation-methods">Transformation Methods</a></li>
+<li class="toctree-l2"><a class="reference internal" href="user_guide/transformations.html#conditional-transformations">Conditional Transformations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="user_guide/transformations.html#example">Example</a></li>
+</ul>
+</li>
 </ul>
 </div>
 <div class="toctree-wrapper compound">
 <p class="caption"><span class="caption-text">Connectors</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="connectors/taps.html">Taps (Data Sources)</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="connectors/taps.html#mysql-mariadb">MySQL/ MariaDB</a></li>
-<li class="toctree-l2"><a class="reference internal" href="connectors/taps.html#postgresql">PostgreSQL</a></li>
-<li class="toctree-l2"><a class="reference internal" href="connectors/taps.html#zendesk">Zendesk</a></li>
-<li class="toctree-l2"><a class="reference internal" href="connectors/taps.html#kafka">Kafka</a></li>
-<li class="toctree-l2"><a class="reference internal" href="connectors/taps.html#csv-files-on-s3">CSV files on S3</a></li>
+<li class="toctree-l1"><a class="reference internal" href="connectors/taps.html">Taps (Data Sources)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="connectors/taps.html#configuring-the-taps">Configuring the taps</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="connectors/taps/mysql.html">Tap MySQL</a></li>
+<li class="toctree-l2"><a class="reference internal" href="connectors/taps/postgres.html">Tap PostgreSQL</a></li>
+<li class="toctree-l2"><a class="reference internal" href="connectors/taps/zendesk.html">Tap Zendesk</a></li>
+<li class="toctree-l2"><a class="reference internal" href="connectors/taps/s3_csv.html">Tap S3 CSV</a></li>
+<li class="toctree-l2"><a class="reference internal" href="connectors/taps/kafka.html">Tap Kafka</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="connectors/targets.html">Targets (Destinations)</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="connectors/targets.html#snowflake">Snowflake</a></li>
-<li class="toctree-l2"><a class="reference internal" href="connectors/targets.html#postgresql">PostgreSQL</a></li>
+<li class="toctree-l1"><a class="reference internal" href="connectors/targets.html">Targets (Destinations)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="connectors/targets.html#configuring-the-targets">Configuring the targets</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="connectors/targets/snowflake.html">Target Snowflake</a></li>
+<li class="toctree-l2"><a class="reference internal" href="connectors/targets/postgres.html">Target Postgres</a></li>
+<li class="toctree-l2"><a class="reference internal" href="connectors/targets/s3_csv.html">Target S3 CSV</a></li>
 </ul>
 </li>
 </ul>
