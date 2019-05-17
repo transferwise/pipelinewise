@@ -4,62 +4,24 @@
 Taps (Data Sources)
 -------------------
 
-PipelineWise can replicate data from the following data sources.
+PipelineWise can replicate data from the following data sources:
 
-+---------------------------------+---------------------------------------------------------------------+
-|                                 | **Replication Strategies**                                          |
-+---------------------------------+-----------------+----------------+----------------+-----------------+
-| **Tap (Data Source)**           | **Incremental** | **Full Table** |  **Log Based** |  **Fast Sync**  |
-+---------------------------------+-----------------+----------------+----------------+-----------------+
-| :ref:`tap-mysql`                |      Yes        |      Yes       |      Yes       |       Yes       |
-+---------------------------------+-----------------+----------------+----------------+-----------------+
-| :ref:`tap-postgresql`           |      Yes        |      Yes       |      Yes       |       Yes       |
-+---------------------------------+-----------------+----------------+----------------+-----------------+
-| :ref:`tap-zendesk`              |      Yes        |                |                |                 |
-+---------------------------------+-----------------+----------------+----------------+-----------------+
-| :ref:`tap-kafka`                |      Yes        |                |                |                 |
-+---------------------------------+-----------------+----------------+----------------+-----------------+
-| :ref:`tap-s3-csv`               |      Yes        |                |                |                 |
-+---------------------------------+-----------------+----------------+----------------+-----------------+
+* MySQL (:ref:`tap-mysql`)
+* MariaDB (:ref:`tap-mysql`)
+* PostgreSQL (:ref:`tap-postgres`)
+* Zendesk (:ref:`tap-zendesk`)
+* Kafka stream (:ref:`tap-kafka`)
+* CSV file on S3 (:ref:`target-s3-csv`)
 
 
+Configuring the taps
+--------------------
+.. toctree::
+   :maxdepth: 2
 
+   taps/mysql
+   taps/postgres
+   taps/zendesk
+   taps/s3_csv
+   taps/kafka
 
-.. _tap-mysql:
-
-MySQL/ MariaDB
-''''''''''''''
-
-...
-
-
-.. _tap-postgresql:
-
-PostgreSQL
-''''''''''
-
-...
-
-
-.. _tap-zendesk:
-
-Zendesk
-'''''''
-
-...
-
-
-.. _tap-kafka:
-
-Kafka
-'''''
-
-...
-
-
-.. _tap-s3-csv:
-
-CSV files on S3
-'''''''''''''''
-
-...

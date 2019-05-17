@@ -18,10 +18,6 @@ sometimes for days.
 
 Fast Sync exists only between the following tap and target components:
 
-==================== ==================
-Tap                  Target
-==================== ==================
-tap-mysql            target-snowflake
-tap-postgres         target-snowflake
-==================== ==================
+* :ref:`tap-mysql` to :ref:`target-snowflake`
+* :ref:`tap-postgres` to :ref:`target-snowflake`
 

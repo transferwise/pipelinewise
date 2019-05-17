@@ -11,6 +11,10 @@ h1, h2, .rst-content .toctree-wrapper p.caption, h3, h4, h5, h6, legend {
   background-color: #00a4de;
 }
 
+.wy-nav-content {
+  max-width: 850px;
+}
+
 div.leftside {
   width: 414px;
   padding: 0px 3px 0px 0px;

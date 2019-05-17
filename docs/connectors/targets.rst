@@ -4,28 +4,19 @@
 Targets (Destinations)
 ----------------------
 
-PipelineWise can replicate data into the following destinations.
+PipelineWise can replicate data from every supported :ref:`taps_list` into the following destinations:
 
-=================================   ====================================
-Target (Destination)                Description
-=================================   ====================================
-:ref:`target-snowflake`                    
-:ref:`target-postgres`                   
-=================================   ====================================
+* Snowflake - :ref:`target-snowflake`                    
+* PostgreSQL - :ref:`target-postgres`              
+* S3 in CSV format - :ref:`target-s3-csv`     
 
 
-.. _target-snowflake:
+Configuring the targets
+-----------------------
+.. toctree::
+   :maxdepth: 2
 
-Snowflake
-''''''''''''''
-
-...
-
-
-.. _target-postgres:
-
-PostgreSQL
-''''''''''
-
-...
+   targets/snowflake
+   targets/postgres
+   targets/s3_csv
 

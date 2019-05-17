@@ -15,14 +15,14 @@ specification to replicate data from various sources to various destinations.
 Features
 --------
 
-- **Built with ELT in mind**: PipelineWise fits into the ELT landscape and not doing traditional ETL. ELT ingests data first into DWH in the original format and the "transformation" shifting to the end of the data pipeline. Load time transformations are still supported but complex mapping and joins have to be done once the data is replicated into the Data Warehouse. 
+- **Built with ELT in mind**: PipelineWise fits into the ELT landscape and not doing traditional ETL. PipelineWise ingests data first into DWH in the original format and the "transformation" shifting to the end of the data pipeline. Load time transformations are still supported but complex mapping and joins have to be done once the data is replicated into the Data Warehouse. 
 - **Lightweight**: No daemons or database setup are required
 - **Replication Methods**: CDC (Log Based), Key-Based Incremental and Full Table snapshots
 - **Managed Schema Changes**: When source data changes, PipelineWise detects the change and alters the schema in your DWH automatically
 - **Load time transformations**: Ideal place to obfuscate, mask or filter sensitive data that should never been replicated in the Data Warehouse
 - **YAML based configuration**: Data pipelines are defined as YAML files, which ensures that the entire configuration is kept under version control
 - **Integration with external tools**: With built-in event handlers you can trigger external scripts automatically when a certain even occurred
-- **Extensible**: PipelineWise is using `Singer.io <https://www.singer.io/>`_  compatible taps and target connectors and new connectors can be added to the system with relatively small effort
+- **Extensible**: PipelineWise is using `Singer.io <https://www.singer.io/>`_  compatible taps and target connectors and new connectors can be added to PipelineWise with relatively small effort
 
 
 Beyond the Horizon

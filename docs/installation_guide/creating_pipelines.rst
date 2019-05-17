@@ -19,6 +19,8 @@ PipelineWise will generate it from the YAML files and install into a correct pla
 whenever it's needed.
 
 
+.. _generating_pipelines:
+
 Generating Sample Pipelines
 ---------------------------
 
