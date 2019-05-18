@@ -14,7 +14,7 @@ The documentation is using [Sphinx](http://www.sphinx-doc.org) and the the popul
   make html
 ```
 
-The document generating into `_build/html`. Open `index.html` by your web browser.
+The document generating into `_build/html`. Open `index.html` in your web browser.
 
  ## Auto Deployment
 
