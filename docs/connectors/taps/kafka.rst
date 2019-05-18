@@ -8,7 +8,9 @@ Tap Kafka
 Connecting to Kafka
 '''''''''''''''''''
 
-** :: TODO :: **
+.. warning::
+
+  This section of the documentation is work in progress.
 
 
 Configuring what to replicate
