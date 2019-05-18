@@ -13,17 +13,17 @@ if [[ ! -f .circleci/config.yml ]]; then
 fi
 
 # Check if every environment variable set
-if [ -z $GH_NAME ]; then
+if [ -z "$GH_NAME" ]; then
     echo "GH_NAME environment variable must be set. This is required to commit and push the generated doc to github. Tip: generate a Personal GitHub Access Token."
     exit 1
 fi
 
-if [ -z $GH_EMAIL ]; then
+if [ -z "$GH_EMAIL" ]; then
     echo "GH_EMAIL environment variable must be set. This is required to commit and push the generated doc to github. Tip: generate a Personal GitHub Access Token."
     exit 1
 fi
 
-if [ -z $GH_TOKEN ]; then
+if [ -z "$GH_TOKEN" ]; then
     echo "GH_TOKEN environment variable must be set. This is required to commit and push the generated doc to github. Tip: generate a Personal GitHub Access Token."
     exit 1
 fi
@@ -34,7 +34,6 @@ cd docs
 make clean html
 cd ..
 
-exit 4
 # Move the docs to the top-level directory, stash for checkout
 mv docs/_build/html ./
 
@@ -47,8 +46,8 @@ git pull origin gh-pages
 
 # Make sure to set the credentials! You'll need these environment vars
 # set in the "Environment Variables" section in Circle CI
-git config --global user.email "$GH_EMAIL" > /dev/null 2>&1
-git config --global user.name "$GH_NAME" > /dev/null 2>&1
+git config user.email "$GH_EMAIL" > /dev/null 2>&1
+git config user.name "$GH_NAME" > /dev/null 2>&1
 
 # Remove all files that are not in the .git dir
 find . -not -name ".git/*" -type f -maxdepth 1 -delete
