@@ -70,13 +70,13 @@ declare -a leftover=(".cache/"
 # not there.
 for left in "${leftover[@]}"
 do
-    rm -r "$left" || echo "$left does not exist; will not remove"
+    rm -rf "$left"
 done
 
 # We need this empty file for git not to try to build a jekyll project.
 # If your project *is* Jekyll, then this doesn't apply to you...
 touch .nojekyll
-mv html/* ./
+cp -R html/* ./
 rm -r html/
 
 # Add everything, get ready for commit. But only do it if we're on
