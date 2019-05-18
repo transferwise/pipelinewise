@@ -6,7 +6,6 @@ specification to ingest and replicate data from various sources to various desti
 The documentation is using [Sphinx](http://www.sphinx-doc.org) and the the popular
 [Read the Docs Theme](https://sphinx-rtd-theme.readthedocs.io).
 
-
 ## To build the documentation
 
 1. Install python dependencies and run python linter
@@ -16,4 +15,8 @@ The documentation is using [Sphinx](http://www.sphinx-doc.org) and the the popul
 ```
 
 The document generating into `_build/html`. Open `index.html` by your web browser.
- 
+
+ ## Auto Deployment
+
+CircleCI automatically generating and publishing the documentation on every merged
+commit to the PipelineWise GitHub Pages at http://transferwise.github.io/pipelinewise.
