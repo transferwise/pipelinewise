@@ -15,9 +15,10 @@ pipelinewise_home = os.path.abspath(os.environ.setdefault("PIPELINEWISE_HOME", p
 venv_dir = os.path.join(pipelinewise_home, '.virtualenvs')
 
 commands = [
+  'init',
   'run_tap',
   'discover_tap',
-  'show_status',
+  'status',
   'test_tap_connection',
   'clear_crontab',
   'init_crontab',
@@ -25,7 +26,6 @@ commands = [
   'import_config'
 ]
 
-command_help = """Available commands, """ + ','.join(commands)
 target_help = """Name of the target"""
 tap_help = """Name of the tap"""
 tables_help = """List of tables to sync"""
@@ -37,20 +37,25 @@ debug_help = """Forces the debug mode with logging on stdout and log level debug
 
 def main():
     '''Main entry point'''
-    parser = argparse.ArgumentParser(description='TransferData {} - Command Line Interface'.format(__version__), add_help=True)
-    parser.add_argument('command', type=str, help=command_help)
+    parser = argparse.ArgumentParser(description='PipelineWise {} - Command Line Interface'.format(__version__), add_help=True)
+    parser.add_argument('command', type=str, choices=commands)
     parser.add_argument('--target', type=str, default='*', help=target_help)
     parser.add_argument('--tap', type=str, default='*', help=tap_help)
     parser.add_argument('--tables', type=str, help=tables_help)
     parser.add_argument('--dir', type=str, default='*', help=dir_help)
-    parser.add_argument('--secret', type=str, default='*', help=secret_help)
-    parser.add_argument('--version', action="version", help=version_help, version='TransferData {} - Command Line Interface'.format(__version__))
+    parser.add_argument('--secret', type=str, help=secret_help)
+    parser.add_argument('--version', action="version", help=version_help, version='PipelineWise {} - Command Line Interface'.format(__version__))
     parser.add_argument('--log', type=str, default='*', help=log_help)
     parser.add_argument('--debug', default=False, required=False, help=debug_help, action="store_true")
 
     args = parser.parse_args()
 
     # Command specific argument validations
+    if args.command == 'init':
+        if args.dir == '*':
+            print("You must specify a directory path for the sample project using the argumant --dir")
+            sys.exit(1)
+
     if args.command == 'discover_tap' or args.command == 'test_tap_connection' or args.command == 'run_tap':
         if args.tap == '*':
             print("You must specify a source name using the argument --tap")
@@ -70,9 +75,6 @@ def main():
     if args.command == 'import_config':
         if args.dir == '*':
             print("You must specify a directory path with config YAML files using the argumant --dir")
-            sys.exit(1)
-        if args.secret == '*':
-            print("You must specify a path to the vault secret file using the argument --secret")
             sys.exit(1)
 
     pipelinewise = PipelineWise(args, config_dir, venv_dir)

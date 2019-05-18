@@ -120,11 +120,12 @@ def load_yaml(yaml_file, vault_secret=None):
     encryption is ideal to store passwords or encrypt the entire file
     with sensitive data if required.
     '''
-    secret_file = get_file_vault_secret(filename=vault_secret, loader=DataLoader())
-    secret_file.load()
-
     vault = VaultLib()
-    vault.secrets = [('default', secret_file)]
+
+    if vault_secret:
+        secret_file = get_file_vault_secret(filename=vault_secret, loader=DataLoader())
+        secret_file.load()
+        vault.secrets = [('default', secret_file)]
 
     data = None
     with open(yaml_file, 'r') as stream:
@@ -160,6 +161,14 @@ def load_schema(name):
         sys.exit(1)
 
     return schema
+
+
+def get_sample_file_paths():
+    '''
+    Get list of every available sample files (YAML, etc.) with absolute paths
+    '''
+    samples_dir = os.path.join(os.path.dirname(__file__), "samples")
+    return search_files(samples_dir, patterns=['*.yml.sample', 'README.md'], abs_path=True)
 
 
 def validate(instance, schema):
@@ -207,7 +216,7 @@ def silentremove(path):
             raise
 
 
-def search_files(search_dir, patterns=['*'], sort=False):
+def search_files(search_dir, patterns=['*'], sort=False, abs_path=False):
     '''
     Searching files in a specific directory that match a pattern
     '''
@@ -221,7 +230,7 @@ def search_files(search_dir, patterns=['*'], sort=False):
             p_files.sort(key=lambda x: os.path.getmtime(x), reverse=True)
 
         # Cut the whole paths, we only need the filenames
-        files = list(map(lambda x: os.path.basename(x), p_files))
+        files = list(map(lambda x: os.path.basename(x) if not abs_path else x, p_files))
 
     return files
 
