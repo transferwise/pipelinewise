@@ -50,7 +50,7 @@ jobs:
       - run:
           name: install dependencies
           command: |
-            pip install sphinx sphinx-rdt-theme
+            pip install sphinx sphinx-rtd-theme
       - run: .circleci/publish_docs.sh
 
 workflows:
