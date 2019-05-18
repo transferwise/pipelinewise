@@ -1,4 +1,8 @@
 #!/bin/bash
+#
+# Auto generate and deploy documentation to github pages at http://transferwise.github.io/pipelinewise
+#
+# Script is using the idea of a blog post at https://www.alkaline-ml.com/2018-12-23-automate-gh-builds/
 
 # Fail out on an error
 set -e
@@ -84,7 +88,8 @@ rm -r html/
 # this.
 if [[ "$CIRCLE_BRANCH" =~ ^master$|^[0-9]+\.[0-9]+\.X$ ]]; then
     git add --all
-    git commit -m "[ci skip] publishing updated documentation..."
+    # Make sure "|| echo" is at the end to avoid error codes when no changes to commit
+    git commit -m "[ci skip] publishing updated documentation..." || echo 
 
     # We have to re-add the origin with the GH_TOKEN credentials. You
     # will need this SSH key in your environment variables on Circle.
