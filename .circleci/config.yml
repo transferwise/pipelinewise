@@ -50,6 +50,9 @@ jobs:
       - run:
           name: install dependencies
           command: |
+            python3 -m venv ~/venv-doc
+            . ~/venv-doc/bin/activate
+            pip install --upgrade pip
             pip install sphinx sphinx-rtd-theme
       - run: .circleci/publish_docs.sh
 
