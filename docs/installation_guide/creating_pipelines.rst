@@ -60,7 +60,7 @@ We will need the ``tap_mysql_mariadb.yml`` and ``target_snowflake.yml``:
     $ mv tap_mysql_mariadb.yml.sample tap_my_mysql_db_one.yml
     $ mv target_snowflake.yml.sample  target_snowflake.yml
 
-1)  Edit ``target_snowflake.yml``, this will be the destination of one ore many  sources.
+1.  Edit ``target_snowflake.yml``, this will be the destination of one ore many  sources.
 You can edit with your favourite text editor:
 
 .. code-block:: bash
@@ -88,6 +88,14 @@ You can edit with your favourite text editor:
       aws_secret_access_key: "<SECRET_ASCCESS_KEY>"          # Plain string or Vault Encrypted password
       # The same master key has to be added to the external stage object created in snowflake
       client_side_encryption_master_key: "<CSE_MASTER_KEY>"  # Plain string or Vault Encrypted password
+
+
+.. note::
+
+  **PipelineWise can encrypt sensitive data** in the YAML files (like database password or other credentials)
+  making them safe to distribute or place in source control. Further details check the
+  :ref:`encrypting_passwords` section.
+
 
 2) Edit ``tap_mysql_mariadb.yml``:
 
