@@ -54,12 +54,12 @@ the original value.
 .. _transformations_example:
 
 Example
-''''''''''''''''''''''
+'''''''
 
 Load Time transformations needs to be defined in the tables section
 in the :ref:`yaml_configuration`: 
 
-.. code-block:: yaml
+.. code-block:: bash
 
     ...
     ...
