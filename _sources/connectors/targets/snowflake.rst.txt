@@ -12,7 +12,7 @@ You need to create two objects in Snowflake in a schema before start replicating
 
 1. A named external stage object on S3. This will be used to upload the CSV files to S3 and to MERGE data into snowflake tables.
 
-.. code-block::
+.. code-block:: bash
 
     CREATE STAGE {schema}.{stage_name}
     url='s3://{s3_bucket}'
@@ -25,7 +25,7 @@ If you want client side encryption  you'll need to define the same master key in
 
 2. A named file format. This will be used by the MERGE/COPY commands to parse the CSV files correctly from S3:
 
-.. code-block::
+.. code-block:: bash
 
     CREATE file format IF NOT EXISTS {schema}.{file_format_name}
     type = 'CSV' escape='\\' field_optionally_enclosed_by='"';

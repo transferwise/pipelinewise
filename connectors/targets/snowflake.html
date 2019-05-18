@@ -204,10 +204,10 @@
 <ol class="arabic simple">
 <li><p>A named external stage object on S3. This will be used to upload the CSV files to S3 and to MERGE data into snowflake tables.</p></li>
 </ol>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">CREATE</span> <span class="n">STAGE</span> <span class="p">{</span><span class="n">schema</span><span class="p">}</span><span class="o">.</span><span class="p">{</span><span class="n">stage_name</span><span class="p">}</span>
-<span class="n">url</span><span class="o">=</span><span class="s1">&#39;s3://</span><span class="si">{s3_bucket}</span><span class="s1">&#39;</span>
-<span class="n">credentials</span><span class="o">=</span><span class="p">(</span><span class="n">AWS_KEY_ID</span><span class="o">=</span><span class="s1">&#39;</span><span class="si">{aws_key_id}</span><span class="s1">&#39;</span> <span class="n">AWS_SECRET_KEY</span><span class="o">=</span><span class="s1">&#39;</span><span class="si">{aws_secret_key}</span><span class="s1">&#39;</span><span class="p">)</span>
-<span class="n">encryption</span><span class="o">=</span><span class="p">(</span><span class="n">MASTER_KEY</span><span class="o">=</span><span class="s1">&#39;</span><span class="si">{client_side_encryption_master_key}</span><span class="s1">&#39;</span><span class="p">);</span>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>CREATE STAGE <span class="o">{</span>schema<span class="o">}</span>.<span class="o">{</span>stage_name<span class="o">}</span>
+<span class="nv">url</span><span class="o">=</span><span class="s1">&#39;s3://{s3_bucket}&#39;</span>
+<span class="nv">credentials</span><span class="o">=(</span><span class="nv">AWS_KEY_ID</span><span class="o">=</span><span class="s1">&#39;{aws_key_id}&#39;</span> <span class="nv">AWS_SECRET_KEY</span><span class="o">=</span><span class="s1">&#39;{aws_secret_key}&#39;</span><span class="o">)</span>
+<span class="nv">encryption</span><span class="o">=(</span><span class="nv">MASTER_KEY</span><span class="o">=</span><span class="s1">&#39;{client_side_encryption_master_key}&#39;</span><span class="o">)</span><span class="p">;</span>
 </pre></div>
 </div>
 <p>The encryption option is optional and used for client side encryption.
@@ -215,8 +215,8 @@ If you want client side encryption  you’ll need to define the same master key 
 <ol class="arabic simple" start="2">
 <li><p>A named file format. This will be used by the MERGE/COPY commands to parse the CSV files correctly from S3:</p></li>
 </ol>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">CREATE</span> <span class="n">file</span> <span class="nb">format</span> <span class="n">IF</span> <span class="n">NOT</span> <span class="n">EXISTS</span> <span class="p">{</span><span class="n">schema</span><span class="p">}</span><span class="o">.</span><span class="p">{</span><span class="n">file_format_name</span><span class="p">}</span>
-<span class="nb">type</span> <span class="o">=</span> <span class="s1">&#39;CSV&#39;</span> <span class="n">escape</span><span class="o">=</span><span class="s1">&#39;</span><span class="se">\\</span><span class="s1">&#39;</span> <span class="n">field_optionally_enclosed_by</span><span class="o">=</span><span class="s1">&#39;&quot;&#39;</span><span class="p">;</span>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>CREATE file format IF NOT EXISTS <span class="o">{</span>schema<span class="o">}</span>.<span class="o">{</span>file_format_name<span class="o">}</span>
+<span class="nb">type</span> <span class="o">=</span> <span class="s1">&#39;CSV&#39;</span> <span class="nv">escape</span><span class="o">=</span><span class="s1">&#39;\\&#39;</span> <span class="nv">field_optionally_enclosed_by</span><span class="o">=</span><span class="s1">&#39;&quot;&#39;</span><span class="p">;</span>
 </pre></div>
 </div>
 </div>
