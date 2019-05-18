@@ -101,7 +101,7 @@ if [[ "$CIRCLE_BRANCH" =~ ^master$|^[0-9]+\.[0-9]+\.X$ ]]; then
     # will need this SSH key in your environment variables on Circle.
     # Make sure you change the <project>.git pattern at the end!
     git remote rm origin
-    git remote add origin https://"$GH_NAME":"$GH_TOKEN"@github.com/"$GH_NAME"/pipelinewise.git
+    git remote add origin https://"$GH_NAME":"$GH_TOKEN"@github.com/transferwise/pipelinewise.git
 
     # NOW we should be able to push it
     git push origin gh-pages
