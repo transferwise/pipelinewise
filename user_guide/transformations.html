@@ -228,34 +228,34 @@ the original value.</p>
 <span id="transformations-example"></span><h2>Example<a class="headerlink" href="#example" title="Permalink to this headline">¶</a></h2>
 <p>Load Time transformations needs to be defined in the tables section
 in the <a class="reference internal" href="yaml_config.html#yaml-configuration"><span class="std std-ref">YAML configuration</span></a>:</p>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nn">...</span>
-<span class="nn">...</span>
-<span class="nt">tables</span><span class="p">:</span>
-  <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;audit_log&quot;</span>
-    <span class="nt">replication_method</span><span class="p">:</span> <span class="s">&quot;INCREMENTAL&quot;</span>
-    <span class="nt">replication_key</span><span class="p">:</span> <span class="s">&quot;id&quot;</span>
-    <span class="nt">transformations</span><span class="p">:</span>
-      <span class="p p-Indicator">-</span> <span class="nt">column</span><span class="p">:</span> <span class="s">&quot;column_1&quot;</span>
-        <span class="nt">type</span><span class="p">:</span> <span class="s">&quot;SET-NULL&quot;</span>
-        <span class="nt">when</span><span class="p">:</span>
-          <span class="p p-Indicator">-</span> <span class="nt">column</span><span class="p">:</span> <span class="s">&quot;class_name&quot;</span>
-            <span class="nt">equals</span><span class="p">:</span> <span class="s">&#39;com.transferwise.fx.user.User&#39;</span>
-          <span class="p p-Indicator">-</span> <span class="nt">column</span><span class="p">:</span> <span class="s">&quot;property_name&quot;</span>
-            <span class="nt">equals</span><span class="p">:</span> <span class="s">&#39;passwordHash&#39;</span>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>...
+...
+tables:
+  - table_name: <span class="s2">&quot;audit_log&quot;</span>
+    replication_method: <span class="s2">&quot;INCREMENTAL&quot;</span>
+    replication_key: <span class="s2">&quot;id&quot;</span>
+    transformations:
+      - column: <span class="s2">&quot;column_1&quot;</span>
+        type: <span class="s2">&quot;SET-NULL&quot;</span>
+        when:
+          - column: <span class="s2">&quot;class_name&quot;</span>
+            equals: <span class="s1">&#39;com.transferwise.fx.user.User&#39;</span>
+          - column: <span class="s2">&quot;property_name&quot;</span>
+            equals: <span class="s1">&#39;passwordHash&#39;</span>
 
             <span class="c1"># Tip: Use &#39;regex_match&#39; instead of &#39;equal&#39; if you need</span>
             <span class="c1"># more complex matching criterias. For example:</span>
             <span class="c1"># regex_match: &#39;password|salt|passwordHash&#39;</span>
 
-      <span class="p p-Indicator">-</span> <span class="nt">column</span><span class="p">:</span> <span class="s">&quot;column_2&quot;</span>
-        <span class="nt">type</span><span class="p">:</span> <span class="s">&quot;HASH&quot;</span>
-        <span class="nt">when</span><span class="p">:</span>
-          <span class="p p-Indicator">-</span> <span class="nt">column</span><span class="p">:</span> <span class="s">&quot;class_name&quot;</span>
-            <span class="nt">equals</span><span class="p">:</span> <span class="s">&#39;com.transferwise.fx.user.User&#39;</span>
-          <span class="p p-Indicator">-</span> <span class="nt">column</span><span class="p">:</span> <span class="s">&quot;property_name&quot;</span>
-            <span class="nt">equals</span><span class="p">:</span> <span class="s">&#39;passwordHash&#39;</span>
-<span class="nn">...</span>
-<span class="nn">...</span>
+      - column: <span class="s2">&quot;column_2&quot;</span>
+        type: <span class="s2">&quot;HASH&quot;</span>
+        when:
+          - column: <span class="s2">&quot;class_name&quot;</span>
+            equals: <span class="s1">&#39;com.transferwise.fx.user.User&#39;</span>
+          - column: <span class="s2">&quot;property_name&quot;</span>
+            equals: <span class="s1">&#39;passwordHash&#39;</span>
+...
+...
 </pre></div>
 </div>
 </div>

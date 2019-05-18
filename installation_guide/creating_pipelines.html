@@ -234,7 +234,7 @@ $ mv tap_mysql_mariadb.yml.sample tap_my_mysql_db_one.yml
 $ mv target_snowflake.yml.sample  target_snowflake.yml
 </pre></div>
 </div>
-<p>1)  Edit <code class="docutils literal notranslate"><span class="pre">target_snowflake.yml</span></code>, this will be the destination of one ore many  sources.
+<p>1.  Edit <code class="docutils literal notranslate"><span class="pre">target_snowflake.yml</span></code>, this will be the destination of one ore many  sources.
 You can edit with your favourite text editor:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>---
 id: <span class="s2">&quot;snowflake_test&quot;</span>
@@ -260,6 +260,12 @@ db_conn:
   <span class="c1"># The same master key has to be added to the external stage object created in snowflake</span>
   client_side_encryption_master_key: <span class="s2">&quot;&lt;CSE_MASTER_KEY&gt;&quot;</span>  <span class="c1"># Plain string or Vault Encrypted password</span>
 </pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><strong>PipelineWise can encrypt sensitive data</strong> in the YAML files (like database password or other credentials)
+making them safe to distribute or place in source control. Further details check the
+<a class="reference internal" href="encrypting_passwords.html#encrypting-passwords"><span class="std std-ref">Encrypting Passwords</span></a> section.</p>
 </div>
 <ol class="arabic simple" start="2">
 <li><p>Edit <code class="docutils literal notranslate"><span class="pre">tap_mysql_mariadb.yml</span></code>:</p></li>
