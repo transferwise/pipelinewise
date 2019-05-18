@@ -1055,10 +1055,9 @@ class PipelineWise(object):
         """
         Encrypt the supplied string using the provided vault secret
         """
-        self.logger.info("{} - {}".format(self.args.secret, self.args.string))
         b_ciphertext = utils.vault_encrypt(self.args.string, self.args.secret)
-
         yaml_text = utils.vault_format_ciphertext_yaml(b_ciphertext)
+
         print(yaml_text)
         print("Encryption successful")
 
