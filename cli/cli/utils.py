@@ -22,6 +22,7 @@ from ansible.parsing.yaml.objects import AnsibleVaultEncryptedUnicode
 from ansible.utils.unsafe_proxy import AnsibleUnsafe
 from ansible.module_utils._text import to_text
 from ansible.module_utils.common._collections_compat import Mapping
+from ansible.errors import AnsibleError
 
 from . import tap_properties
 
@@ -147,6 +148,44 @@ def load_yaml(yaml_file, vault_secret=None):
             sys.exit(1)
 
     return data
+
+
+def vault_encrypt(plaintext, secret):
+    '''
+    Vault encrypt a piece of data.
+    '''
+    try:
+        vault = VaultLib()
+        secret_file = get_file_vault_secret(filename=secret, loader=DataLoader())
+        secret_file.load()
+        vault.secrets = [('default', secret_file)]
+
+        return vault.encrypt(plaintext)
+    except AnsibleError as e:
+        logger.critical("Cannot encrypt string: {}".format(e))
+        sys.exit(1)
+
+
+def vault_format_ciphertext_yaml(b_ciphertext, indent=None, name=None):
+    '''
+    Format a ciphertext to YAML compatible string
+    '''
+    indent = indent or 10
+
+    block_format_var_name = ""
+    if name:
+        block_format_var_name = "%s: " % name
+
+    block_format_header = "%s!vault |" % block_format_var_name
+    lines = []
+    vault_ciphertext = to_text(b_ciphertext)
+
+    lines.append(block_format_header)
+    for line in vault_ciphertext.splitlines():
+        lines.append('%s%s' % (' ' * indent, line))
+
+    yaml_ciphertext = '\n'.join(lines)
+    return yaml_ciphertext
 
 
 def load_schema(name):
