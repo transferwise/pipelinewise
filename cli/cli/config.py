@@ -259,7 +259,8 @@ class Config(object):
                     transformations.append({
                         "tap_stream_name": utils.get_tap_stream_name(tap, tap_dbname, schema_name, table_name),
                         "field_id": trans.get('column'),
-                        "type": trans.get('type')
+                        "type": trans.get('type'),
+                        "when": trans.get('when')
                     })
         tap_transformation = {
             "transformations": transformations

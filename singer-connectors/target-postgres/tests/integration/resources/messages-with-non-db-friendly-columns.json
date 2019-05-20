@@ -1,0 +1,11 @@
+{"type": "STATE", "value": {"currently_syncing": "tap_mysql_test-test_table_non_db_friendly_columns"}}
+{"type": "SCHEMA", "stream": "tap_mysql_test-test_table_non_db_friendly_columns", "schema": {"properties": {"c_pk": {"inclusion": "automatic", "minimum": -2147483648, "maximum": 2147483647, "type": ["null", "integer"]}, "camelcaseColumn": {"inclusion": "available", "maxLength": 16, "type": ["null", "string"]}, "minus-column": {"inclusion": "available", "maxLength": 16, "type": ["null", "string"]}}, "type": "object"}, "key_properties": ["c_pk"]}
+{"type": "ACTIVATE_VERSION", "stream": "tap_mysql_test-test_table_non_db_friendly_columns", "version": 1}
+{"type": "RECORD", "stream": "tap_mysql_test-test_table_non_db_friendly_columns", "record": {"c_pk": 1, "camelcaseColumn": "Dummy row 1", "minus-column": "Dummy row 1"}, "version": 1, "time_extracted": "2019-01-31T15:51:50.215998Z"}
+{"type": "RECORD", "stream": "tap_mysql_test-test_table_non_db_friendly_columns", "record": {"c_pk": 2, "camelcaseColumn": "Dummy row 2", "minus-column": "Dummy row 2"}, "version": 1, "time_extracted": "2019-01-31T15:51:50.215998Z"}
+{"type": "RECORD", "stream": "tap_mysql_test-test_table_non_db_friendly_columns", "record": {"c_pk": 3, "camelcaseColumn": "Dummy row 3", "minus-column": "Dummy row 3"}, "version": 1, "time_extracted": "2019-01-31T15:51:50.215998Z"}
+{"type": "RECORD", "stream": "tap_mysql_test-test_table_non_db_friendly_columns", "record": {"c_pk": 4, "camelcaseColumn": "Dummy row 4", "minus-column": "Dummy row 4"}, "version": 1, "time_extracted": "2019-01-31T15:51:50.215998Z"}
+{"type": "RECORD", "stream": "tap_mysql_test-test_table_non_db_friendly_columns", "record": {"c_pk": 5, "camelcaseColumn": "Dummy row 5", "minus-column": "Dummy row 5"}, "version": 1, "time_extracted": "2019-01-31T15:51:50.215998Z"}
+{"type": "STATE", "value": {"currently_syncing": "tap_mysql_test-test_table_non_db_friendly_columns", "bookmarks": {"tap_mysql_test-test_table_one": {"initial_full_table_complete": true}, "tap_mysql_test-test_table_two": {"initial_full_table_complete": true}}}}
+{"type": "ACTIVATE_VERSION", "stream": "tap_mysql_test-test_table_non_db_friendly_columns", "version": 1}
+{"type": "STATE", "value": {"currently_syncing": null, "bookmarks": {"tap_mysql_test-test_table_non_db_friendly_columns": {"initial_full_table_complete": true}}}}

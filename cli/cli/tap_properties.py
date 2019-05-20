@@ -57,6 +57,8 @@ def get_tap_properties(tap=None):
     return {
     'tap-mysql': {
         'tap_config_extras': {
+            # Generate unique server id's to avoid broken connection
+            # when multiple taps reading from the same mysql server
             'server_id': generate_tap_mysql_server_id()
         },
         'tap_stream_id_pattern': '{{schema_name}}-{{table_name}}',
@@ -65,7 +67,15 @@ def get_tap_properties(tap=None):
     },
 
     'tap-postgres': {
-        'tap_config_extras': {},
+        'tap_config_extras': {
+            # PipelineWise doesn't support replicating from multiple
+            # databases by one tap but tap-postgres does.
+            #
+            # To avoid problems of loading two tables with the same name
+            # but from differnet dbs we force tap-postgres to filter only
+            # the db that's in scope
+            'filter_dbs': tap.get('db_conn', {}).get('dbname') if tap else None
+        },
         'tap_stream_id_pattern': '{{database_name}}-{{schema_name}}-{{table_name}}',
         'tap_stream_name_pattern': '{{schema_name}}-{{table_name}}',
         'tap_catalog_argument': '--properties',

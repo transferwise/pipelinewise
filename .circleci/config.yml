@@ -34,8 +34,27 @@ jobs:
             pip install nose
             nosetests --where=tests/integration/
 
+
+  # For documentation deployment. You'll need the following environment vars
+  # in your Circle CI settings, otherwise this will not work.
+  #
+  # GH_NAME (your git username)
+  # GH_EMAIL (your git email)
+  # GH_TOKEN (the personal Git token with pushes enabled)
+  deploy-doc:
+    docker:
+      - image: circleci/python:3.6.2
+    working_directory: ~/gh_doc_automation
+    steps:
+      - checkout
+      - run: .circleci/publish_docs.sh
+
 workflows:
   version: 2
   build:
     jobs:
       - build
+
+  deploy:
+    jobs:
+      - deploy-doc
