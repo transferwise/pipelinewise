@@ -276,6 +276,21 @@ class Config(object):
                 "target_schema": target_schema,
                 "target_schema_select_permissions": target_schema_select_permissions
             }
+
+            # Schema mapping can include list of indices to create. Some target components
+            # like target-postgres create indices automatically
+            indices = {}
+            for table in schema.get('tables', []):
+                table_name = table.get('table_name')
+                table_indices = table.get('indices')
+                if table_indices:
+                    indices[table_name] = table_indices
+
+            # Add indices map to schema mapping
+            if indices:
+                schema_mapping[source_schema]['indices'] = indices
+
+        # Schema mapping is ready
         tap_schema_mapping = {
             "schema_mapping": schema_mapping
         }
