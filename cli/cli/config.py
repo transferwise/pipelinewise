@@ -1,4 +1,5 @@
 import os
+import sys
 import logging
 
 from . import utils
@@ -61,10 +62,13 @@ class Config(object):
             tap_data = utils.load_yaml(os.path.join(yaml_dir, yaml_file), vault_secret)
             utils.validate(instance=tap_data, schema=utils.load_schema("tap"))
 
-            # Add generated extra keys that not available in the YAML
             tap_id = tap_data['id']
             target_id = tap_data['target']
+            if target_id not in targets:
+                config.logger.error("Can't find the target with the ID \"{}\" but it's referenced in {}".format(target_id, yaml_file))
+                sys.exit(1)
 
+            # Add generated extra keys that not available in the YAML
             tap_data['files'] = config.get_connector_files(config.get_tap_dir(target_id, tap_id))
 
             # Add tap to list
@@ -273,6 +277,21 @@ class Config(object):
                 "target_schema": target_schema,
                 "target_schema_select_permissions": target_schema_select_permissions
             }
+
+            # Schema mapping can include list of indices to create. Some target components
+            # like target-postgres create indices automatically
+            indices = {}
+            for table in schema.get('tables', []):
+                table_name = table.get('table_name')
+                table_indices = table.get('indices')
+                if table_indices:
+                    indices[table_name] = table_indices
+
+            # Add indices map to schema mapping
+            if indices:
+                schema_mapping[source_schema]['indices'] = indices
+
+        # Schema mapping is ready
         tap_schema_mapping = {
             "schema_mapping": schema_mapping
         }

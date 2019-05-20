@@ -11,8 +11,10 @@ import urllib
 from datetime import datetime
 import time
 import collections
-from tempfile import TemporaryFile
+from tempfile import NamedTemporaryFile
 from decimal import Decimal
+from joblib import Parallel, delayed, parallel_backend
+import tempfile
 
 import pkg_resources
 from jsonschema import ValidationError, Draft4Validator, FormatChecker
@@ -71,7 +73,7 @@ def emit_state(state):
         sys.stdout.write("{}\n".format(line))
         sys.stdout.flush()
 
-
+# pylint: disable=too-many-locals,too-many-branches,too-many-statements
 def persist_lines(config, lines):
     state = None
     schemas = {}
@@ -129,7 +131,9 @@ def persist_lines(config, lines):
             row_count[stream] = len(records_to_load[stream])
 
             if row_count[stream] >= batch_size:
-                flush_records(stream, records_to_load, row_count, stream_to_sync)
+                flush_records(stream, records_to_load[stream], row_count[stream], stream_to_sync[stream])
+                row_count[stream] = 0
+                records_to_load[stream] = {}
 
             state = None
         elif t == 'STATE':
@@ -143,6 +147,10 @@ def persist_lines(config, lines):
             schemas[stream] = o
             schema = float_to_decimal(o['schema'])
             validators[stream] = Draft4Validator(schema, format_checker=FormatChecker())
+
+            # flush records from previous stream SCHEMA
+            if row_count.get(stream, 0) > 0:
+                flush_records(stream, records_to_load[stream], row_count[stream], stream_to_sync[stream])
 
             # key_properties key must be available in the SCHEMA message.
             if 'key_properties' not in o:
@@ -170,62 +178,57 @@ def persist_lines(config, lines):
             stream_to_sync[stream].create_schema_if_not_exists()
             stream_to_sync[stream].sync_table()
             row_count[stream] = 0
-            csv_files_to_load[stream] = TemporaryFile(mode='w+b')
+            csv_files_to_load[stream] = NamedTemporaryFile(mode='w+b')
         elif t == 'ACTIVATE_VERSION':
             logger.debug('ACTIVATE_VERSION message')
         else:
             raise Exception("Unknown message type {} in message {}"
                             .format(o['type'], o))
 
-    for (stream, count) in row_count.items():
-        if count > 0:
-            flush_records(stream, records_to_load, row_count, stream_to_sync)
 
-    # Load finished, create the indices if required
-    create_indices(config, stream_to_sync)
-
-    # Hard delete rows if enabled
-    if config.get('hard_delete'):
-        delete_rows(stream_to_sync)
+    # Single-host, thread-based parallelism
+    with parallel_backend('threading', n_jobs=-1):
+        Parallel()(delayed(load_stream_batch)(
+            stream=stream,
+            records_to_load=records_to_load[stream],
+            row_count=row_count[stream],
+            db_sync=stream_to_sync[stream],
+            delete_rows=config.get('hard_delete')
+        ) for (stream) in records_to_load.keys())
 
     return state
 
-def create_indices(config, stream_to_sync):
-    indices = config['create_indices'] if 'create_indices' in config else None
 
-    # Auto create index on _sdc_deleted_at when hard delete mode is enabled
-    if config.get('hard_delete'):
-        indices = [] if not indices else indices
-        for stream in stream_to_sync:
-            table_name = stream_to_sync[stream].table_name(stream, False, True)
-            indices.append({ 'table': table_name, 'columns': '_sdc_deleted_at' })
+def load_stream_batch(stream, records_to_load, row_count, db_sync, delete_rows=False):
+    #Load into snowflake
+    if row_count > 0:
+        flush_records(stream, records_to_load, row_count, db_sync)
 
-    stream_to_sync_keys = list(stream_to_sync.keys())
+    # Load finished, create indices if required
+    db_sync.create_indices(stream)
 
-    # Get the connection from the first synced stream
-    if indices and len(stream_to_sync_keys) > 0:
-        stream = stream_to_sync_keys[0]
-        stream_to_sync[stream].create_indices(stream, indices)
+    # Delete soft-deleted, flagged rows - where _sdc_deleted at is not null
+    if delete_rows:
+        db_sync.delete_rows(stream)
 
-def delete_rows(stream_to_sync):
-    stream_to_sync_keys = list(stream_to_sync.keys())
 
-    # Get the connection from the first synced stream
-    if len(stream_to_sync_keys) > 0:
-        stream = stream_to_sync_keys[0]
-        stream_to_sync[stream].delete_rows(stream)
+def flush_records(stream, records_to_load, row_count, db_sync):
+    csv_fd, csv_file = tempfile.mkstemp()
+    logger.info("Creating temporary file with data at {}".format(csv_file))
 
-def flush_records(stream, records_to_load, row_count, stream_to_sync):
-    sync = stream_to_sync[stream]
-    csv_file = TemporaryFile(mode='w+b')
+    with open(csv_fd, 'w+b') as f:
+        # Write csv file with data
+        for record in records_to_load.values():
+            csv_line = db_sync.record_to_csv_line(record)
+            f.write(bytes(csv_line + '\n', 'UTF-8'))
 
-    for record in records_to_load[stream].values():
-        csv_line = sync.record_to_csv_line(record)
-        csv_file.write(bytes(csv_line + '\n', 'UTF-8'))
+        # Seek to the beginning of the file and load
+        f.seek(0)
+        db_sync.load_csv(f, row_count)
 
-    sync.load_csv(csv_file, row_count[stream])
-    row_count[stream] = 0
-    records_to_load[stream] = {}
+    # Delete temp file
+    os.remove(csv_file)
+
 
 def main():
     parser = argparse.ArgumentParser()

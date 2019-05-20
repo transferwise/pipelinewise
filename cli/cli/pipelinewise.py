@@ -1050,3 +1050,14 @@ class PipelineWise(object):
             if len(discover_excs) > 0:
                 sys.exit(1)
 
+
+    def encrypt_string(self):
+        """
+        Encrypt the supplied string using the provided vault secret
+        """
+        b_ciphertext = utils.vault_encrypt(self.args.string, self.args.secret)
+        yaml_text = utils.vault_format_ciphertext_yaml(b_ciphertext)
+
+        print(yaml_text)
+        print("Encryption successful")
+

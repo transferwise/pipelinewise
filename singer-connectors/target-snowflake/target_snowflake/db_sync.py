@@ -219,7 +219,7 @@ class DbSync:
                 self.schema_name = config_default_target_schema
 
             if not self.schema_name:
-                raise Exception("Target schema name not defined in config. Neither 'default_target_schema' (string) nor 'schema_mapping' (object) defines target schema for {} stream.".format(stream_schema_name))
+                raise Exception("Target schema name not defined in config. Neither 'default_target_schema' (string) nor 'schema_mapping' (object) defines target schema for {} stream.".format(stream_name))
 
             #  Define grantees
             #  ---------------

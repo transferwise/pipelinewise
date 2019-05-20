@@ -3,16 +3,17 @@ from setuptools import setup
 
 setup(
     name="target-postgres",
-    version="1.1.3",
+    version="0.0.1",
     description="Singer.io target for Postgres",
-    author="Statsbot",
-    url="https://statsbot.co",
+    author="TransferWise",
+    url="https://transferwise.com",
     classifiers=["Programming Language :: Python :: 3 :: Only"],
     py_modules=["target_postgres"],
     install_requires=[
         "singer-python==5.1.1",
         "psycopg2==2.7.5",
-        "inflection==0.3.1"
+        "inflection==0.3.1",
+        "joblib==0.13.2"
     ],
     entry_points="""
     [console_scripts]

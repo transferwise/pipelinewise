@@ -5,7 +5,7 @@
 # ------------------------------------------------------------------------------
 id: "kafka"                            # Unique identifier of the tap
 name: "Kafka Topic with sample data"   # Name of the tap
-type: "tap-zendesk"                    # !! THIS SHOULD NOT CHANGE !!
+type: "tap-kafka"                      # !! THIS SHOULD NOT CHANGE !!
 owner: "somebody@foo.com"              # Data owner to contact
 
 
