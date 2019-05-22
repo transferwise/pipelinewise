@@ -92,7 +92,7 @@ class PipelineWise(object):
             raise Exception("Cannot merge JSON files {} {} - {}".format(dictA, dictB, exc))
 
 
-    def create_filtered_tap_properties(self, tap_type, tap_properties, tap_state, filters, create_fallback=False):
+    def create_filtered_tap_properties(self, target_type, tap_type, tap_properties, tap_state, filters, create_fallback=False):
         """
         Create a filtered version of tap properties file based on specific filter conditions.
 
@@ -109,6 +109,7 @@ class PipelineWise(object):
         # Get filer conditions with default values from input dictionary
         # Nothing selected by default
         f_selected = filters.get("selected", None)
+        f_target_type = filters.get("target_type", None)
         f_tap_type = filters.get("tap_type", None)
         f_replication_method = filters.get("replication_method", None)
         f_initial_sync_required = filters.get("initial_sync_required", None)
@@ -176,6 +177,7 @@ class PipelineWise(object):
                 # Set the "selected" key to False if the actual values don't meet the filter criterias
                 if (
                     (f_selected == None or selected == f_selected) and
+                    (f_target_type == None or target_type in f_target_type) and
                     (f_tap_type == None or tap_type in f_tap_type) and
                     (f_replication_method == None or replication_method in f_replication_method) and
                     (f_initial_sync_required == None or initial_sync_required == f_initial_sync_required)
@@ -186,7 +188,7 @@ class PipelineWise(object):
                         Selected           : {}
                         Replication Method : {}
                         Init Sync Required : {}
-                    """.format(table_name, tap_stream_id, initial_sync_required, selected, replication_method))
+                    """.format(table_name, tap_stream_id, selected, replication_method, initial_sync_required))
 
                     # Filter condition matched: mark table as selected to sync
                     properties["streams"][stream_idx]["metadata"][meta_idx]["metadata"]["selected"] = True
@@ -643,7 +645,7 @@ class PipelineWise(object):
     def status(self):
         targets = self.get_targets()
 
-        tab_headers = ['Warehouse ID', 'Source ID', 'Enabled', 'Type', 'Status', 'Last Sync', 'Last Sync Result']
+        tab_headers = ['Warehouse ID', 'Warehouse Type', 'Source ID', 'Enabled', 'Source Type', 'Status', 'Last Sync', 'Last Sync Result']
         tab_body = []
         pipelines = 0
         for target in targets:
@@ -652,6 +654,7 @@ class PipelineWise(object):
             for tap in taps:
                 tab_body.append([
                     target.get('id', '<Unknown>'),
+                    target.get('type', '<Unknown>'),
                     tap.get('id', '<Unknown>'),
                     tap.get('enabled', '<Unknown>'),
                     tap.get('type', '<Unknown>'),
@@ -858,11 +861,13 @@ class PipelineWise(object):
             tap_properties_singer,
             singer_stream_ids
         ) = self.create_filtered_tap_properties(
+            target_type,
             tap_type,
             tap_properties,
             tap_state,
             {
                 "selected": True,
+                "target_type": ["target-snowflake"],
                 "tap_type": ["tap-mysql", "tap-postgres"],
                 "initial_sync_required": True
             },
