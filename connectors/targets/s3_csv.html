@@ -1,5 +1,6 @@
 
 
+
 <!DOCTYPE html>
 <!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
 <!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
@@ -119,7 +120,10 @@
 <li class="toctree-l1 current"><a class="reference internal" href="../targets.html#configuring-the-targets">Configuring the targets</a><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="snowflake.html">Target Snowflake</a></li>
 <li class="toctree-l2"><a class="reference internal" href="postgres.html">Target Postgres</a></li>
-<li class="toctree-l2 current"><a class="current reference internal" href="#">Target S3 CSV</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Target S3 CSV</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#configuring">Configuring</a></li>
+</ul>
+</li>
 </ul>
 </li>
 </ul>
@@ -194,9 +198,35 @@
             
   <div class="section" id="target-s3-csv">
 <span id="id1"></span><h1>Target S3 CSV<a class="headerlink" href="#target-s3-csv" title="Permalink to this headline">¶</a></h1>
-<div class="admonition warning">
-<p class="admonition-title">Warning</p>
-<p><strong>S3 CSV target connector is currently in active development and will arrive soon.</strong></p>
+<div class="section" id="configuring">
+<h2>Configuring<a class="headerlink" href="#configuring" title="Permalink to this headline">¶</a></h2>
+<p>PipelineWise configures every target with a common structured YAML file format.
+A sample YAML for Snowflake target can be generated into a project directory by
+following the steps in the <a class="reference internal" href="../../installation_guide/creating_pipelines.html#generating-pipelines"><span class="std std-ref">Generating Sample Pipelines</span></a> section.</p>
+<p>Example YAML for target-s3-csv:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nn">---</span>
+
+<span class="c1"># ------------------------------------------------------------------------------</span>
+<span class="c1"># General Properties</span>
+<span class="c1"># ------------------------------------------------------------------------------</span>
+<span class="l l-Scalar l-Scalar-Plain">id</span><span class="p p-Indicator">:</span> <span class="s">&quot;csv_to_s3&quot;</span>                        <span class="c1"># Unique identifier of the target</span>
+<span class="l l-Scalar l-Scalar-Plain">name</span><span class="p p-Indicator">:</span> <span class="s">&quot;CSV</span><span class="nv"> </span><span class="s">exports</span><span class="nv"> </span><span class="s">to</span><span class="nv"> </span><span class="s">S3&quot;</span>              <span class="c1"># Name of the target</span>
+<span class="l l-Scalar l-Scalar-Plain">type</span><span class="p p-Indicator">:</span> <span class="s">&quot;target-s3-csv&quot;</span>                  <span class="c1"># !! THIS SHOULD NOT CHANGE !!</span>
+
+
+<span class="c1"># ------------------------------------------------------------------------------</span>
+<span class="c1"># Target - S3 details</span>
+<span class="c1"># ------------------------------------------------------------------------------</span>
+<span class="l l-Scalar l-Scalar-Plain">db_conn</span><span class="p p-Indicator">:</span>
+  <span class="l l-Scalar l-Scalar-Plain">aws_access_key_id</span><span class="p p-Indicator">:</span> <span class="s">&quot;&lt;ACCESS_KEY&gt;&quot;</span>             <span class="c1"># S3 - Plain string or vault encrypted</span>
+  <span class="l l-Scalar l-Scalar-Plain">aws_secret_access_key</span><span class="p p-Indicator">:</span> <span class="s">&quot;&lt;SECRET_ACCESS_KEY&gt;&quot;</span>  <span class="c1"># S3 - Plain string or vault encrypted</span>
+  <span class="l l-Scalar l-Scalar-Plain">s3_bucket</span><span class="p p-Indicator">:</span> <span class="s">&quot;&lt;BUCKET_NAME&gt;&quot;</span>                    <span class="c1"># S3 external stbucket name</span>
+
+  <span class="l l-Scalar l-Scalar-Plain">s3_key_prefix</span><span class="p p-Indicator">:</span> <span class="s">&quot;pipelinewise-exports/&quot;</span>        <span class="c1"># Optional S3 key prefix. Defaults to None</span>
+  <span class="l l-Scalar l-Scalar-Plain">delimiter</span><span class="p p-Indicator">:</span> <span class="s">&quot;,&quot;</span>                                <span class="c1"># Optional. Defaults to &#39;,&#39;</span>
+  <span class="l l-Scalar l-Scalar-Plain">quotechar</span><span class="p p-Indicator">:</span> <span class="s">&quot;\&quot;&quot;</span>                               <span class="c1"># Optional. Defaults to &#39;&quot;&#39;</span>
+</pre></div>
+</div>
 </div>
 </div>
 
