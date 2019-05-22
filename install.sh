@@ -9,10 +9,10 @@ create_virtualenv() {
 make_virtualenv() {
     create_virtualenv $1
     source $VENV_DIR/$1/bin/activate
-    pip install --upgrade pip
-    pip install -r requirements.txt
+    pip3 install --upgrade pip
+    pip3 install -r requirements.txt
     if [ -f "setup.py" ]; then
-        pip install .
+        pip3 install .
     fi
     deactivate
 }
