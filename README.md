@@ -1,5 +1,7 @@
 # PipelineWise
-PipelineWise is an ETL and Data Pipeline Framework using the singer.io specification to load data from various sources to various destinations
+PipelineWise is a Data Pipeline Framework using the singer.io specification to ingest and replicate data from various sources to various destinations.
+
+Documentation is available at https://transferwise.github.io/pipelinewise/index.html
 
 ## Links
 
@@ -26,6 +28,7 @@ PipelineWise is an ETL and Data Pipeline Framework using the singer.io specifica
 * **tap-zendesk**: Extracts data from Zendesk using OAuth and Key-Based incremental replications
 * **target-postgres**: Loads data from any tap into PostgreSQL database
 * **target-snowflake**: Loads data from any tap into Snowflake Data Warehouse
+* **target-s3-csv**: Uploads data from any tap to S3 in CSV format
 * **transform-field**: Transforms fields from any tap and sends the results to any target. Recommended for data masking/ obfuscation
 
 ## Installation
