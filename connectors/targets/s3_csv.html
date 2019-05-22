@@ -1,6 +1,5 @@
 
 
-
 <!DOCTYPE html>
 <!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
 <!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
@@ -209,22 +208,22 @@ following the steps in the <a class="reference internal" href="../../installatio
 <span class="c1"># ------------------------------------------------------------------------------</span>
 <span class="c1"># General Properties</span>
 <span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="l l-Scalar l-Scalar-Plain">id</span><span class="p p-Indicator">:</span> <span class="s">&quot;csv_to_s3&quot;</span>                        <span class="c1"># Unique identifier of the target</span>
-<span class="l l-Scalar l-Scalar-Plain">name</span><span class="p p-Indicator">:</span> <span class="s">&quot;CSV</span><span class="nv"> </span><span class="s">exports</span><span class="nv"> </span><span class="s">to</span><span class="nv"> </span><span class="s">S3&quot;</span>              <span class="c1"># Name of the target</span>
-<span class="l l-Scalar l-Scalar-Plain">type</span><span class="p p-Indicator">:</span> <span class="s">&quot;target-s3-csv&quot;</span>                  <span class="c1"># !! THIS SHOULD NOT CHANGE !!</span>
+<span class="nt">id</span><span class="p">:</span> <span class="s">&quot;csv_to_s3&quot;</span>                        <span class="c1"># Unique identifier of the target</span>
+<span class="nt">name</span><span class="p">:</span> <span class="s">&quot;CSV</span><span class="nv"> </span><span class="s">exports</span><span class="nv"> </span><span class="s">to</span><span class="nv"> </span><span class="s">S3&quot;</span>              <span class="c1"># Name of the target</span>
+<span class="nt">type</span><span class="p">:</span> <span class="s">&quot;target-s3-csv&quot;</span>                  <span class="c1"># !! THIS SHOULD NOT CHANGE !!</span>
 
 
 <span class="c1"># ------------------------------------------------------------------------------</span>
 <span class="c1"># Target - S3 details</span>
 <span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="l l-Scalar l-Scalar-Plain">db_conn</span><span class="p p-Indicator">:</span>
-  <span class="l l-Scalar l-Scalar-Plain">aws_access_key_id</span><span class="p p-Indicator">:</span> <span class="s">&quot;&lt;ACCESS_KEY&gt;&quot;</span>             <span class="c1"># S3 - Plain string or vault encrypted</span>
-  <span class="l l-Scalar l-Scalar-Plain">aws_secret_access_key</span><span class="p p-Indicator">:</span> <span class="s">&quot;&lt;SECRET_ACCESS_KEY&gt;&quot;</span>  <span class="c1"># S3 - Plain string or vault encrypted</span>
-  <span class="l l-Scalar l-Scalar-Plain">s3_bucket</span><span class="p p-Indicator">:</span> <span class="s">&quot;&lt;BUCKET_NAME&gt;&quot;</span>                    <span class="c1"># S3 external stbucket name</span>
+<span class="nt">db_conn</span><span class="p">:</span>
+  <span class="nt">aws_access_key_id</span><span class="p">:</span> <span class="s">&quot;&lt;ACCESS_KEY&gt;&quot;</span>             <span class="c1"># S3 - Plain string or vault encrypted</span>
+  <span class="nt">aws_secret_access_key</span><span class="p">:</span> <span class="s">&quot;&lt;SECRET_ACCESS_KEY&gt;&quot;</span>  <span class="c1"># S3 - Plain string or vault encrypted</span>
+  <span class="nt">s3_bucket</span><span class="p">:</span> <span class="s">&quot;&lt;BUCKET_NAME&gt;&quot;</span>                    <span class="c1"># S3 external stbucket name</span>
 
-  <span class="l l-Scalar l-Scalar-Plain">s3_key_prefix</span><span class="p p-Indicator">:</span> <span class="s">&quot;pipelinewise-exports/&quot;</span>        <span class="c1"># Optional S3 key prefix. Defaults to None</span>
-  <span class="l l-Scalar l-Scalar-Plain">delimiter</span><span class="p p-Indicator">:</span> <span class="s">&quot;,&quot;</span>                                <span class="c1"># Optional. Defaults to &#39;,&#39;</span>
-  <span class="l l-Scalar l-Scalar-Plain">quotechar</span><span class="p p-Indicator">:</span> <span class="s">&quot;\&quot;&quot;</span>                               <span class="c1"># Optional. Defaults to &#39;&quot;&#39;</span>
+  <span class="nt">s3_key_prefix</span><span class="p">:</span> <span class="s">&quot;pipelinewise-exports/&quot;</span>        <span class="c1"># Optional S3 key prefix. Defaults to None</span>
+  <span class="nt">delimiter</span><span class="p">:</span> <span class="s">&quot;,&quot;</span>                                <span class="c1"># Optional. Defaults to &#39;,&#39;</span>
+  <span class="nt">quotechar</span><span class="p">:</span> <span class="s">&quot;\&quot;&quot;</span>                               <span class="c1"># Optional. Defaults to &#39;&quot;&#39;</span>
 </pre></div>
 </div>
 </div>
