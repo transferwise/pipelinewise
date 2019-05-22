@@ -1,6 +1,6 @@
 {
   "definitions": {
-    "db_conn": {
+    "db_conn_target_snowflake": {
       "type": "object",
       "properties": {
         "account": { "type": "string" },
@@ -27,6 +27,22 @@
         "stage",
         "file_format"
       ]
+    },
+    "db_conn_target_s3_csv": {
+      "type": "object",
+      "properties": {
+        "aws_access_key_id": { "type": "string" },
+        "aws_secret_access_key": { "type": "string" },
+        "s3_bucket": { "type": "string" },
+        "s3_key_prefix": { "type": "string" },
+        "delimiter": { "type": "string" },
+        "quotechar:": { "type": "string" }
+      },
+      "required": [
+        "aws_access_key_id",
+        "aws_secret_access_key",
+        "s3_bucket"
+      ]
     }
   },
 
@@ -34,8 +50,13 @@
   "properties":{  
     "id": { "type": "string" },
     "name": { "type": "string" },
-    "type": { "type": "string", "enum": ["target-snowflake"] },
-    "db_conn": { "$ref": "#/definitions/db_conn" }
+    "type": { "type": "string", "enum": ["target-snowflake", "target-postgres", "target-s3-csv"] },
+    "db_conn": {
+      "anyOf": [
+        { "$ref": "#/definitions/db_conn_target_snowflake" },
+        { "$ref": "#/definitions/db_conn_target_s3_csv" }
+      ]
+    }
   },
   "required":[  
     "id",
