@@ -63,7 +63,7 @@ def persist_messages(messages, config):
                     raise ex
 
             record_to_load = o['record']
-            if config.get('add_metadata_columns') or config.get('hard_delete'):
+            if config.get('add_metadata_columns'):
                 record_to_load = utils.add_metadata_values_to_record(o, {})
             else:
                 record_to_load = utils.remove_metadata_values_from_record(o)
@@ -105,7 +105,7 @@ def persist_messages(messages, config):
         elif message_type == 'SCHEMA':
             stream = o['stream']
             schemas[stream] = o['schema']
-            if config.get('add_metadata_columns') or config.get('hard_delete'):
+            if config.get('add_metadata_columns'):
                 schemas[stream] = utils.add_metadata_columns_to_schema(o)
 
             schema = utils.float_to_decimal(o['schema'])
