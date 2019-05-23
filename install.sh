@@ -1,7 +1,15 @@
+#!/usr/bin/bash
 
+# Ubuntu prerequisites
+# apt install python3 python3-pip python3-venv libpq-dev libsnappy-dev -y
+
+# Source directory defined as location of install.sh
 SRC_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
+# Install pipelinewise venvs in the present working directory
 VENV_DIR=$(pwd)/.virtualenvs
+
+python3 -m pip install --upgrade pip
 
 create_virtualenv() {
     python3 -m venv $VENV_DIR/$1
