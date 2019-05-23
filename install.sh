@@ -48,6 +48,7 @@ install_rest_api() {
 
 install_admin_console() {
     cd $SRC_DIR/admin-console
+    npm cache clean --force
     npm run setup
 }
 
