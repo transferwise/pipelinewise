@@ -11,16 +11,12 @@ VENV_DIR=$(pwd)/.virtualenvs
 
 python3 -m pip install --upgrade pip
 
-create_virtualenv() {
-    python3 -m venv $VENV_DIR/$1
-}
-
 make_virtualenv() {
     echo ""
     echo "--------------------------------------------------------------------------"
     echo "Making Virtual Environment for $1"
     echo "--------------------------------------------------------------------------"
-    create_virtualenv $1
+    python3 -m venv $VENV_DIR/$1
     source $VENV_DIR/$1/bin/activate
     python3 -m pip install --upgrade pip
     python3 -m pip install -r requirements.txt
