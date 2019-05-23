@@ -1,44 +1,49 @@
 
-DIR=$(pwd)
-VENV_DIR=$DIR/.virtualenvs
+SRC_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+
+VENV_DIR=$(pwd)/.virtualenvs
 
 create_virtualenv() {
     python3 -m venv $VENV_DIR/$1
 }
 
 make_virtualenv() {
+    echo ""
+    echo "--------------------------------------------------------------------------"
+    echo "Making Virtual Environment for $1"
+    echo "--------------------------------------------------------------------------"
     create_virtualenv $1
     source $VENV_DIR/$1/bin/activate
-    pip3 install --upgrade pip
-    pip3 install -r requirements.txt
+    python3 -m pip install --upgrade pip
+    python3 -m pip install -r requirements.txt
     if [ -f "setup.py" ]; then
-        pip3 install .
+        python3 -m pip install .
     fi
     deactivate
 }
 
 install_connector() {
-    cd $DIR/singer-connectors/$1
+    cd $SRC_DIR/singer-connectors/$1
     make_virtualenv $1
 }
 
 install_fastsync() {
-    cd $DIR/fastsync/$1
+    cd $SRC_DIR/fastsync/$1
     make_virtualenv $1
 }
 
 install_cli() {
-    cd $DIR/cli
+    cd $SRC_DIR/cli
     make_virtualenv cli
 }
 
 install_rest_api() {
-    cd $DIR/rest-api
+    cd $SRC_DIR/rest-api
     make_virtualenv rest-api
 }
 
 install_admin_console() {
-    cd $DIR/admin-console
+    cd $SRC_DIR/admin-console
     npm run setup
 }
 
