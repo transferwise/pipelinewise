@@ -5,12 +5,6 @@ Tap S3 CSV
 -----------
 
 
-Connecting to S3
-''''''''''''''''
-
-** :: TODO :: **
-
-
 Configuring what to replicate
 '''''''''''''''''''''''''''''
 

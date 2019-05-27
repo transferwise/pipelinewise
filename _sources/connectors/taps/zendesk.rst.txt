@@ -5,12 +5,6 @@ Tap Zendesk
 -----------
 
 
-Connecting to Zendesk
-'''''''''''''''''''''
-
-** :: TODO :: **
-
-
 Configuring what to replicate
 '''''''''''''''''''''''''''''
 
