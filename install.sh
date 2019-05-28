@@ -69,6 +69,9 @@ echo "PipelineWise installed successfully"
 echo "--------------------------------------------------------------------------"
 echo
 echo "To start CLI:"
-echo "> source .virtualenvs/cli/bin/activate"
+echo " $ source $VENV_DIR/cli/bin/activate"
+echo " $ export PIPELINEWISE_HOME=$VENV_DIR"
+
+echo " $ pipelinewise status"
 echo
 echo "--------------------------------------------------------------------------"
