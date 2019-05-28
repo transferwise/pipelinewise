@@ -8,6 +8,8 @@ Tap MySQL
 MySQL setup requirements
 ''''''''''''''''''''''''
 
+*(Section based on Stitch documentation)*
+
 **Step 1: Check if you have all the required credentials for replicating data from MySQL**
 
 * The ``CREATE USER`` or ``INSERT`` privilege (for the mysql database). The ``CREATE USER`` privilege is required to create a database user for PipelineWise.
@@ -20,7 +22,7 @@ MySQL setup requirements
 
 .. note::
 
-  This step is only required if you use :ref:`log_based`
+  This step is only required if you use :ref:`log_based` replication method.
 
 
 .. warning::
@@ -78,7 +80,7 @@ PipelineWise configures every tap with a common structured YAML file format.
 A sample YAML for MySQL replication can be generated into a project directory by
 following the steps in the :ref:`generating_pipelines` section.
 
-Example YAML for tap-mysql:
+Example YAML for ``tap-mysql``:
 
 .. code-block:: bash
 

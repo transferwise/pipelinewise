@@ -12,7 +12,7 @@ PipelineWise configures every tap with a common structured YAML file format.
 A sample YAML for S3 CSV replication can be generated into a project directory by
 following the steps in the :ref:`generating_pipelines` section.
 
-Example YAML for tap-s3-csv:
+Example YAML for ``tap-s3-csv``:
 
 .. code-block:: bash
 
