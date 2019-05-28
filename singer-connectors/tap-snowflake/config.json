@@ -1,9 +1,0 @@
-{
-    "account": "rt27428.eu-central-1",
-    "dbname": "analytics_db_test",
-    "user": "circleci",
-    "password": "Circleci1",
-    "filter_dbs": "analytics_db_test",
-    "filter_schemas": "xero,s3",
-    "warehouse": "LOAD_WH"
-}
