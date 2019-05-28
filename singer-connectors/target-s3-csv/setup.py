@@ -13,7 +13,8 @@ setup(
         "jsonschema==2.6.0",
         "singer-python==2.1.4",
         "inflection==0.3.1",
-        "boto3==1.9.57"
+        "boto3==1.9.57",
+        "backoff==1.3.2"
     ],
     entry_points="""
     [console_scripts]
