@@ -79,7 +79,8 @@
       "tap-adwords",
       "tap-zendesk",
       "tap-kafka",
-      "tap-s3-csv"
+      "tap-s3-csv",
+      "tap-snowflake"
       ] },
     "db_conn":{ "type": "object" },
     "target": { "type": "string" },

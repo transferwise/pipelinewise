@@ -111,6 +111,21 @@ def get_tap_properties(tap=None):
         'tap_catalog_argument': '--properties',
     },
 
+    'tap-snowflake': {
+        'tap_config_extras': {
+            # PipelineWise doesn't support replicating from multiple
+            # databases by one tap but tap-postgres does.
+            #
+            # To avoid problems of loading two tables with the same name
+            # but from differnet dbs we force tap-postgres to filter only
+            # the db that's in scope
+            'filter_dbs': tap.get('db_conn', {}).get('dbname') if tap else None
+        },
+        'tap_stream_id_pattern': '{{database_name}}-{{schema_name}}-{{table_name}}',
+        'tap_stream_name_pattern': '{{schema_name}}-{{table_name}}',
+        'tap_catalog_argument': '--properties',
+    },
+
     # Default values to use as a fallback method
     'DEFAULT': {
         'tap_config_extras': {},
