@@ -5,8 +5,34 @@ Tap PostgreSQL
 --------------
 
 
-Connecting to PostgreSQL
-''''''''''''''''''''''''
+PostgreSQL setup requirements
+'''''''''''''''''''''''''''''
+
+*(Section based on Stitch documentation)*
+
+**Step 1: Check if you have all the required credentials for replicating data from PostgreSQL**
+
+* The ``CREATEROLE`` or ``SUPERUSER`` privilege. Either permission is required to create a database user for PipelineWise.
+
+* The ``GRANT OPTION`` privilege in MySQL. The ``GRANT OPTION`` privilege is required to grant the necessary privileges to the PipelineWise database user.
+
+* The ``SUPER`` privilege in MySQL. If using :ref:`log_based`, the ``SUPER`` privilege is required to define the appropriate server settings.
+
+**Step 2. Create a PipelineWise database user**
+
+Next, you’ll create a dedicated database user for PipelineWise. Create a new user and grant the required permissions
+on the database, schema and tables that you want to replicate:
+
+    * ``CREATE USER pipelinewise WITH ENCRYPTED PASSWORD '<password>'``
+    * ``GRANT CONNECT ON DATABASE <database_name> TO pipelinewise``
+    * ``GRANT USAGE ON SCHEMA <schema_name> TO pipelinewise``
+    * ``GRANT SELECT ON ALL TABLES IN SCHEMA <schema_name> TO pipelinewise``
+
+**Step 3: Configure Log-based Incremental Replication**
+
+.. note::
+
+  This step is only required if you use :ref:`log_based` replication method.
 
 .. warning::
 
@@ -16,7 +42,65 @@ Connecting to PostgreSQL
 
   * **A connection to the master instance.** Log-based replication will only work on master instances due to a feature gap in PostgreSQL 10. Based on their forums, PostgreSQL is working on adding support for using logical replication on a read replica to a future version.
 
-    Until this feature is released, you can connect Stitch to the master instance and use Log-based Replication, or connect to a read replica and use Key-based Incremental Replication.
+    Until this feature is released, you can connect PipelineWise to the master instance and use Log-based Replication, or connect to a read replica and use Key-based Incremental Replication.
+
+**Step 3.1: Install the wal2json plugin**
+
+To use :ref:`log_based` for your PostgreSQL integration, you must install the `wal2json <https://github.com/eulerto/wal2json>`_ plugin. The wal2json plugin outputs JSON objects for logical decoding, which Stitch then uses to perform Log-based Replication.
+
+Steps for installing the plugin vary depending on your operating system. Instructions for each operating system type are in the wal2json’s GitHub repository:
+
+* `Unix-based operating systems <https://github.com/eulerto/wal2json#unix-based-operating-systems>`_
+
+* `Windows <https://github.com/eulerto/wal2json#windows>`_
+
+After you’ve installed the plugin, you can move onto the next step.
+
+**Step 3.2: Edit the database configuration file**
+
+Locate the database configuration file (usually ``postgresql.conf``) and define the parameters as follows:
+
+.. code-block:: bash
+
+    wal_level=logical
+    max_replication_slots=5
+    max_wal_senders=5
+
+**Note**: For ``max_replication_slots`` and ``max_wal_senders``, we’re defaulting to a value of 5.
+This should be sufficient unless you have a large number of read replicas connected to the master instance.
+
+**Step 3.3: Restart the PostgreSQL service**
+
+Restart your PostgreSQL service to ensure the changes take effect.
+
+**Step 3.4: Create a replication slot**
+
+Next, you’ll create a dedicated logical replication slot for Stitch. In PostgreSQL, a logical replication
+slot represents a stream of database changes that can then be replayed to a client in the order they were
+made on the original server. Each slot streams a sequence of changes from a single database.
+
+**Note**: Replication slots are specific to a given database in a cluster. If you want to connect
+multiple databases - whether in one integration or several - you’ll need to create a replication slot
+for each database.
+
+1. Log into the master database as a superuser.
+
+2. Using the ``wal2json`` plugin, create a logical replication slot:
+
+.. code-block:: bash
+
+    SELECT *
+    FROM pg_create_logical_replication_slot('pipelinewise_<raw_database_name>', 'wal2json');
+
+3. Log in as the PipelineWise user and verify you can read from the replication slot,
+replacing ``<replication_slot_name>`` with the name of the replication slot:
+
+.. code-block:: bash
+
+    SELECT COUNT(*)
+    FROM pg_logical_slot_peek_changes('<replication_slot_name>', null, null);
+
+**Note**: ``wal2json`` is required to use :ref:`log_based` in Stitch for PostgreSQL-backed databases.
 
 
 Configuring what to replicate
@@ -26,7 +110,7 @@ PipelineWise configures every tap with a common structured YAML file format.
 A sample YAML for Postgres replication can be generated into a project directory by
 following the steps in the :ref:`generating_pipelines` section.
 
-Example YAML for tap-postgres:
+Example YAML for ``tap-postgres``:
 
 .. code-block:: bash
 
