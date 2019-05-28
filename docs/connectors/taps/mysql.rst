@@ -80,7 +80,7 @@ following the steps in the :ref:`generating_pipelines` section.
 
 Example YAML for tap-mysql:
 
-.. code-block:: yaml
+.. code-block:: bash
 
   ---
 

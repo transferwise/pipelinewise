@@ -22,7 +22,7 @@ following the steps in the :ref:`generating_pipelines` section.
 
 Example YAML for target-postgres:
 
-.. code-block:: yaml
+.. code-block:: bash
 
     ---
 
