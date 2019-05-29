@@ -1,1 +1,1 @@
-tap-s3-csv-koszti==1.0.3
+pipelinewise-tap-s3-csv==1.0.3
