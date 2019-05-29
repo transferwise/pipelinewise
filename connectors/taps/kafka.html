@@ -106,6 +106,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/yaml_config.html">YAML configuration</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/cli.html">Command Line Interface</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/fastsync.html">Fast Sync</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/logging.html">Logging</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/scheduling.html">Scheduling</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/integration.html">Integration</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/scaling.html">Scaling</a></li>
@@ -212,25 +213,25 @@
 <p>PipelineWise configures every tap with a common structured YAML file format.
 A sample YAML for Kafka replication can be generated into a project directory by
 following the steps in the <a class="reference internal" href="../../installation_guide/creating_pipelines.html#generating-pipelines"><span class="std std-ref">Generating Sample Pipelines</span></a> section.</p>
-<p>Example YAML for tap-kafka:</p>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nn">---</span>
+<p>Example YAML for <code class="docutils literal notranslate"><span class="pre">tap-kafka</span></code>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>---
 
 <span class="c1"># ------------------------------------------------------------------------------</span>
 <span class="c1"># General Properties</span>
 <span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="nt">id</span><span class="p">:</span> <span class="s">&quot;kafka&quot;</span>                            <span class="c1"># Unique identifier of the tap</span>
-<span class="nt">name</span><span class="p">:</span> <span class="s">&quot;Kafka</span><span class="nv"> </span><span class="s">Topic</span><span class="nv"> </span><span class="s">with</span><span class="nv"> </span><span class="s">sample</span><span class="nv"> </span><span class="s">data&quot;</span>   <span class="c1"># Name of the tap</span>
-<span class="nt">type</span><span class="p">:</span> <span class="s">&quot;tap-kafka&quot;</span>                      <span class="c1"># !! THIS SHOULD NOT CHANGE !!</span>
-<span class="nt">owner</span><span class="p">:</span> <span class="s">&quot;somebody@foo.com&quot;</span>              <span class="c1"># Data owner to contact</span>
+id: <span class="s2">&quot;kafka&quot;</span>                            <span class="c1"># Unique identifier of the tap</span>
+name: <span class="s2">&quot;Kafka Topic with sample data&quot;</span>   <span class="c1"># Name of the tap</span>
+type: <span class="s2">&quot;tap-kafka&quot;</span>                      <span class="c1"># !! THIS SHOULD NOT CHANGE !!</span>
+owner: <span class="s2">&quot;somebody@foo.com&quot;</span>              <span class="c1"># Data owner to contact</span>
 
 
 <span class="c1"># ------------------------------------------------------------------------------</span>
 <span class="c1"># Source (Tap) - Kafka connection details</span>
 <span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="nt">db_conn</span><span class="p">:</span>
-  <span class="nt">group_id</span><span class="p">:</span> <span class="s">&quot;myGroupId&quot;</span>
-  <span class="nt">bootstrap_servers</span><span class="p">:</span> <span class="s">&quot;kafka1.foo.com:9092,kafka2.foo.com:9092,kafka3.foo.com:9092&quot;</span>
-  <span class="nt">topic</span><span class="p">:</span> <span class="s">&quot;StreamingEngine.out.profileLtvUpdateEvent&quot;</span>
+db_conn:
+  group_id: <span class="s2">&quot;myGroupId&quot;</span>
+  bootstrap_servers: <span class="s2">&quot;kafka1.foo.com:9092,kafka2.foo.com:9092,kafka3.foo.com:9092&quot;</span>
+  topic: <span class="s2">&quot;StreamingEngine.out.profileLtvUpdateEvent&quot;</span>
 
   <span class="c1"># --------------------------------------------------------------------------</span>
   <span class="c1"># SCHEMA is a standard JSON Schema document that used for multiple purposes:</span>
@@ -264,63 +265,63 @@ following the steps in the <a class="reference internal" href="../../installatio
   <span class="c1">#   }</span>
   <span class="c1">#  }</span>
   <span class="c1"># --------------------------------------------------------------------------</span>
-  <span class="nt">schema</span><span class="p">:</span> <span class="s">&#39;</span>
-      <span class="s">{</span>
-        <span class="s">&quot;properties&quot;:</span><span class="nv"> </span><span class="s">{</span>
-          <span class="s">&quot;eventTime&quot;:</span><span class="nv"> </span><span class="s">{&quot;type&quot;:</span><span class="nv"> </span><span class="s">[&quot;number&quot;,</span><span class="nv"> </span><span class="s">&quot;null&quot;]},</span>
-          <span class="s">&quot;startingState&quot;:</span><span class="nv"> </span><span class="s">{&quot;type&quot;:</span><span class="nv"> </span><span class="s">[&quot;string&quot;,</span><span class="nv"> </span><span class="s">&quot;null&quot;]},</span>
-          <span class="s">&quot;ltvValueInGbp&quot;:</span><span class="nv"> </span><span class="s">{&quot;type&quot;:</span><span class="nv"> </span><span class="s">[&quot;number&quot;,</span><span class="nv"> </span><span class="s">&quot;null&quot;]},</span>
-          <span class="s">&quot;ltvValueInEur&quot;:</span><span class="nv"> </span><span class="s">{&quot;type&quot;:</span><span class="nv"> </span><span class="s">[&quot;number&quot;,</span><span class="nv"> </span><span class="s">&quot;null&quot;]},</span>
-          <span class="s">&quot;transferMetadata&quot;:</span><span class="nv"> </span><span class="s">{</span>
-            <span class="s">&quot;type&quot;:</span><span class="nv"> </span><span class="s">&quot;object&quot;,</span>
-            <span class="s">&quot;properties&quot;:</span><span class="nv"> </span><span class="s">{</span>
-              <span class="s">&quot;transferId&quot;:</span><span class="nv"> </span><span class="s">{&quot;type&quot;:</span><span class="nv"> </span><span class="s">&quot;integer&quot;},</span>
-              <span class="s">&quot;profileId&quot;:</span><span class="nv"> </span><span class="s">{&quot;type&quot;:</span><span class="nv"> </span><span class="s">[&quot;integer&quot;,</span><span class="nv"> </span><span class="s">&quot;null&quot;]},</span>
-              <span class="s">&quot;userId&quot;:</span><span class="nv"> </span><span class="s">{&quot;type&quot;:</span><span class="nv"> </span><span class="s">[&quot;integer&quot;,</span><span class="nv"> </span><span class="s">&quot;null&quot;]},</span>
-              <span class="s">&quot;currentState&quot;:</span><span class="nv"> </span><span class="s">{&quot;type&quot;:</span><span class="nv"> </span><span class="s">[&quot;string&quot;,</span><span class="nv"> </span><span class="s">&quot;null&quot;]},</span>
-              <span class="s">&quot;sourceCurrency&quot;:</span><span class="nv"> </span><span class="s">{&quot;type&quot;:</span><span class="nv"> </span><span class="s">[&quot;string&quot;,</span><span class="nv"> </span><span class="s">&quot;null&quot;]},</span>
-              <span class="s">&quot;targetCurrency&quot;:</span><span class="nv"> </span><span class="s">{&quot;type&quot;:</span><span class="nv"> </span><span class="s">[&quot;string&quot;,</span><span class="nv"> </span><span class="s">&quot;null&quot;]},</span>
-              <span class="s">&quot;invoiceValue&quot;:</span><span class="nv"> </span><span class="s">{&quot;type&quot;:</span><span class="nv"> </span><span class="s">[&quot;number&quot;,</span><span class="nv"> </span><span class="s">&quot;null&quot;]},</span>
-              <span class="s">&quot;invoiceValueInGbp&quot;:</span><span class="nv"> </span><span class="s">{&quot;type&quot;:</span><span class="nv"> </span><span class="s">[&quot;number&quot;,</span><span class="nv"> </span><span class="s">&quot;null&quot;]},</span>
-              <span class="s">&quot;invoiceValueInEur&quot;:</span><span class="nv"> </span><span class="s">{&quot;type&quot;:</span><span class="nv"> </span><span class="s">[&quot;number&quot;,</span><span class="nv"> </span><span class="s">&quot;null&quot;]},</span>
-              <span class="s">&quot;submitTime&quot;:</span><span class="nv"> </span><span class="s">{&quot;type&quot;:</span><span class="nv"> </span><span class="s">[&quot;integer&quot;,</span><span class="nv"> </span><span class="s">&quot;null&quot;]}</span>
-            <span class="s">}</span>
-          <span class="s">}</span>
-        <span class="s">}</span>
-      <span class="s">}&#39;</span>
+  schema: <span class="s1">&#39;</span>
+<span class="s1">      {</span>
+<span class="s1">        &quot;properties&quot;: {</span>
+<span class="s1">          &quot;eventTime&quot;: {&quot;type&quot;: [&quot;number&quot;, &quot;null&quot;]},</span>
+<span class="s1">          &quot;startingState&quot;: {&quot;type&quot;: [&quot;string&quot;, &quot;null&quot;]},</span>
+<span class="s1">          &quot;ltvValueInGbp&quot;: {&quot;type&quot;: [&quot;number&quot;, &quot;null&quot;]},</span>
+<span class="s1">          &quot;ltvValueInEur&quot;: {&quot;type&quot;: [&quot;number&quot;, &quot;null&quot;]},</span>
+<span class="s1">          &quot;transferMetadata&quot;: {</span>
+<span class="s1">            &quot;type&quot;: &quot;object&quot;,</span>
+<span class="s1">            &quot;properties&quot;: {</span>
+<span class="s1">              &quot;transferId&quot;: {&quot;type&quot;: &quot;integer&quot;},</span>
+<span class="s1">              &quot;profileId&quot;: {&quot;type&quot;: [&quot;integer&quot;, &quot;null&quot;]},</span>
+<span class="s1">              &quot;userId&quot;: {&quot;type&quot;: [&quot;integer&quot;, &quot;null&quot;]},</span>
+<span class="s1">              &quot;currentState&quot;: {&quot;type&quot;: [&quot;string&quot;, &quot;null&quot;]},</span>
+<span class="s1">              &quot;sourceCurrency&quot;: {&quot;type&quot;: [&quot;string&quot;, &quot;null&quot;]},</span>
+<span class="s1">              &quot;targetCurrency&quot;: {&quot;type&quot;: [&quot;string&quot;, &quot;null&quot;]},</span>
+<span class="s1">              &quot;invoiceValue&quot;: {&quot;type&quot;: [&quot;number&quot;, &quot;null&quot;]},</span>
+<span class="s1">              &quot;invoiceValueInGbp&quot;: {&quot;type&quot;: [&quot;number&quot;, &quot;null&quot;]},</span>
+<span class="s1">              &quot;invoiceValueInEur&quot;: {&quot;type&quot;: [&quot;number&quot;, &quot;null&quot;]},</span>
+<span class="s1">              &quot;submitTime&quot;: {&quot;type&quot;: [&quot;integer&quot;, &quot;null&quot;]}</span>
+<span class="s1">            }</span>
+<span class="s1">          }</span>
+<span class="s1">        }</span>
+<span class="s1">      }&#39;</span>
 
   <span class="c1"># --------------------------------------------------------------------------</span>
   <span class="c1"># One field from the kafka message will be the Primary Key of the target</span>
   <span class="c1"># table. Selecting primary key is mandatory</span>
   <span class="c1"># --------------------------------------------------------------------------</span>
-  <span class="nt">primary_keys</span><span class="p">:</span> <span class="s">&#39;[&quot;transferMetadata__transferId&quot;]&#39;</span>
+  primary_keys: <span class="s1">&#39;[&quot;transferMetadata__transferId&quot;]&#39;</span>
 
-  <span class="nt">consumer_timeout_ms</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">5000</span>
+  consumer_timeout_ms: <span class="m">5000</span>
 
 
 <span class="c1"># ------------------------------------------------------------------------------</span>
 <span class="c1"># Destination (Target) - Target properties</span>
 <span class="c1"># Connection details should be in the relevant target YAML file</span>
 <span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="nt">target</span><span class="p">:</span> <span class="s">&quot;snowflake&quot;</span>                       <span class="c1"># ID of the target connector where the data will be loaded</span>
-<span class="nt">batch_size_rows</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">20000</span>                    <span class="c1"># Batch size for the stream to optimise load performance</span>
-<span class="nt">default_target_schema</span><span class="p">:</span> <span class="s">&quot;kafka&quot;</span>            <span class="c1"># Target schema where the data will be loaded</span>
-<span class="nt">default_target_schema_select_permission</span><span class="p">:</span>  <span class="c1"># Optional: Grant SELECT on schema and tables that created</span>
-  <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">grp_stats</span>
+target: <span class="s2">&quot;snowflake&quot;</span>                       <span class="c1"># ID of the target connector where the data will be loaded</span>
+batch_size_rows: <span class="m">20000</span>                    <span class="c1"># Batch size for the stream to optimise load performance</span>
+default_target_schema: <span class="s2">&quot;kafka&quot;</span>            <span class="c1"># Target schema where the data will be loaded</span>
+default_target_schema_select_permission:  <span class="c1"># Optional: Grant SELECT on schema and tables that created</span>
+  - grp_stats
 
 
 <span class="c1"># ------------------------------------------------------------------------------</span>
 <span class="c1"># Source to target Schema mapping</span>
 <span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="nt">schemas</span><span class="p">:</span>
-  <span class="p p-Indicator">-</span> <span class="nt">source_schema</span><span class="p">:</span> <span class="s">&quot;kafka&quot;</span>             <span class="c1"># This is mandatory, but can be anything in this tap type</span>
-    <span class="nt">target_schema</span><span class="p">:</span> <span class="s">&quot;kafka&quot;</span>             <span class="c1"># Target schema in the destination Data Warehouse</span>
+schemas:
+  - source_schema: <span class="s2">&quot;kafka&quot;</span>             <span class="c1"># This is mandatory, but can be anything in this tap type</span>
+    target_schema: <span class="s2">&quot;kafka&quot;</span>             <span class="c1"># Target schema in the destination Data Warehouse</span>
 
     <span class="c1"># Kafka topic to replicate into destination Data Warehouse</span>
     <span class="c1"># You can load data only from one kafka topic in one YAML file.</span>
     <span class="c1"># If you want load from multiple kafka topics, create another tap YAML similar to this file</span>
-    <span class="nt">tables</span><span class="p">:</span>
-      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;kafka_topic&quot;</span>
+    tables:
+      - table_name: <span class="s2">&quot;kafka_topic&quot;</span>
 
         <span class="c1"># OPTIONAL: Load time transformations</span>
         <span class="c1">#transformations:</span>

@@ -40,7 +40,7 @@ following the steps in the :ref:`generating_pipelines` section.
 
 Example YAML for target-snowflake:
 
-.. code-block:: yaml
+.. code-block:: bash
 
     ---
 

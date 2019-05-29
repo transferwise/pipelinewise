@@ -93,7 +93,7 @@
 <ul class="current">
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Installation</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#getting-pipelinewise">Getting PipelineWise</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#running-from-source">Running from source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#installing-from-source">Installing from source</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#cool-what-s-next">Cool, what’s Next?</a></li>
 </ul>
 </li>
@@ -111,6 +111,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/yaml_config.html">YAML configuration</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/cli.html">Command Line Interface</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/fastsync.html">Fast Sync</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/logging.html">Logging</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/scheduling.html">Scheduling</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/integration.html">Integration</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/scaling.html">Scaling</a></li>
@@ -194,35 +195,30 @@
 <span id="intro-installation-guide"></span><span id="installation-guide"></span><h1>Installation<a class="headerlink" href="#installation" title="Permalink to this headline">¶</a></h1>
 <div class="section" id="getting-pipelinewise">
 <h2>Getting PipelineWise<a class="headerlink" href="#getting-pipelinewise" title="Permalink to this headline">¶</a></h2>
-<p>The easiest way to install the latest stable version of PipelineWise is with <code class="docutils literal notranslate"><span class="pre">pip</span></code>.
-If <code class="docutils literal notranslate"><span class="pre">pip</span></code> isn’t already available in your version of Python, you can get pip by:</p>
+<p>PipelineWise installs <a class="reference external" href="https://www.singer.io/">Singer.io</a>  <a class="reference internal" href="../concept/singer.html#taps"><span class="std std-ref">Taps</span></a> and <a class="reference internal" href="../concept/singer.html#targets"><span class="std std-ref">Targets</span></a>
+components into separate and multiple separate virtual environments to avoid conflicting
+dependencies between any of the components. It is common that multiple Singer components
+use the same python library with different versions.</p>
+<p>This also means PipelineWise is not distributed on <a class="reference external" href="https://pypi.org//">PyPI</a> as a pyton package
+and cannot be installed by <code class="docutils literal notranslate"><span class="pre">pip</span></code>. PipelineWise has to be installed from source and the built-in
+install script will create every virtual environment required at the right place in the right format
+and will take care of finding the required components at run time.</p>
+</div>
+<div class="section" id="installing-from-source">
+<span id="source"></span><h2>Installing from source<a class="headerlink" href="#installing-from-source" title="Permalink to this headline">¶</a></h2>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
-<p><strong>Installing with pip is not available as of May 2019.</strong>
+<p><strong>PipelineWise is not publicly available as of May 2019.</strong>
 TransferWise has not open sourced the project by that time and
-it’s not available as a public package on PyPI.</p>
-<p>For the time being you need to install PipelineWise from source.
-Check <a class="reference internal" href="#source"><span class="std std-ref">Running from source</span></a> section for further details.</p>
+it’s not available as a public GitHub repository.</p>
+<dl class="simple">
+<dt><strong>Required OS Packages</strong>:</dt><dd><ul class="simple">
+<li><p>Ubuntu: <code class="docutils literal notranslate"><span class="pre">apt-get</span> <span class="pre">install</span> <span class="pre">python3-dev</span> <span class="pre">python3-pip</span> <span class="pre">python3-venv</span> <span class="pre">libpq-dev</span> <span class="pre">libsnappy-dev</span></code></p></li>
+<li><p>Mac: <code class="docutils literal notranslate"><span class="pre">brew</span> <span class="pre">install</span> <span class="pre">python</span></code></p></li>
+</ul>
+</dd>
+</dl>
 </div>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ sudo easy_install pip
-</pre></div>
-</div>
-<p>Then install PipelineWise with</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ sudo pip install pipelinewise
-</pre></div>
-</div>
-<p>Once PipelineWise installed test things with a status command:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ pipelinewise status
-
-Warehouse ID    Source ID    Enabled    Type          Status    Last Sync    Last Sync Result
---------------  -----------  ---------  ------------  --------  -----------  ------------------
-<span class="m">0</span> pipeline<span class="o">(</span>s<span class="o">)</span>
-</pre></div>
-</div>
-<p>Cool, from this point, you can head to the <a class="reference internal" href="creating_pipelines.html#creating-pipelines"><span class="std std-ref">Creating Pipelines</span></a> section to create pipelines and to start replicating data.</p>
-</div>
-<div class="section" id="running-from-source">
-<span id="source"></span><h2>Running from source<a class="headerlink" href="#running-from-source" title="Permalink to this headline">¶</a></h2>
 <p>PipelineWise is easy to run from a checkout - root permissions are not required to use
 it and there is no software to actually install. No daemons or database setup are required.</p>
 <p>To install from source, clone the PipelineWise git repository:</p>
@@ -235,16 +231,26 @@ PipelineWise components are running in multiple python virtual environments and 
 dependencies. The <code class="docutils literal notranslate"><span class="pre">install.sh</span></code> creates the required virtual environments, installs python dependencies
 and makes everything ready to use.</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ ./install.sh
+
+<span class="o">(</span>...installing usually takes a couple of minutes...<span class="o">)</span>
+
+--------------------------------------------------------------------------
+PipelineWise installed successfully
+--------------------------------------------------------------------------
+
+To start CLI:
+  $ <span class="nb">source</span> /Users/jack/pipelinewise/.virtualenvs/cli/bin/activate
+  $ <span class="nb">export</span> <span class="nv">PIPELINEWISE_HOME</span><span class="o">=</span>/Users/jack/pipelinewise/.virtualenvs
+  $ pipelinewise status
+
+--------------------------------------------------------------------------
 </pre></div>
 </div>
-<p>Later if you want to update PipelineWise checkouts to get the latest version from GitHub, use pull-with-rebase
-so any local changes are replayed and rerun the install script.</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ git pull --rebase
-$ ./install.sh
-</pre></div>
-</div>
-<p>Now let’s activate the virtual environment with the Command Line Tools and test things with a status command:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ . .virtualenvs/cli/bin/activate
+<p>Once the install script finished, you will need to activate the virtual environment
+with the Command Line Tools and set the <code class="docutils literal notranslate"><span class="pre">PIPELINEWISE_HOME</span></code> environment variable
+as it is displayed above at the end of the install script:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ <span class="nb">source</span> /Users/jack/pipelinewise/.virtualenvs/cli/bin/activate
+$ <span class="nb">export</span> <span class="nv">PIPELINEWISE_HOME</span><span class="o">=</span>/Users/jack/pipelinewise/.virtualenvs
 $ pipelinewise status
 
 Warehouse ID    Source ID    Enabled    Type          Status    Last Sync    Last Sync Result
@@ -252,10 +258,18 @@ Warehouse ID    Source ID    Enabled    Type          Status    Last Sync    Las
 <span class="m">0</span> pipeline<span class="o">(</span>s<span class="o">)</span>
 </pre></div>
 </div>
+<p>If you see that above output saying that you have 0 pipeline in the system then the Installation
+was successful.</p>
 </div>
 <div class="section" id="cool-what-s-next">
 <h2>Cool, what’s Next?<a class="headerlink" href="#cool-what-s-next" title="Permalink to this headline">¶</a></h2>
-<p>From this point, you can head to the <a class="reference internal" href="creating_pipelines.html#creating-pipelines"><span class="std std-ref">Creating Pipelines</span></a> section to create pipelines and to start replicating data.</p>
+<p>From this point, you can go to the <a class="reference internal" href="creating_pipelines.html#creating-pipelines"><span class="std std-ref">Creating Pipelines</span></a> section to create pipelines and to start replicating data.</p>
+<p><strong>Note</strong>: Later if you want to update PipelineWise checkouts to get the latest version from GitHub, use pull-with-rebase
+so any local changes are replayed and rerun the install script.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ git pull --rebase
+$ ./install.sh
+</pre></div>
+</div>
 </div>
 </div>
 

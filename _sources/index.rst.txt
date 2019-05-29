@@ -63,6 +63,7 @@ Content
    user_guide/yaml_config
    user_guide/cli
    user_guide/fastsync
+   user_guide/logging
    user_guide/scheduling
    user_guide/integration
    user_guide/scaling
