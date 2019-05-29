@@ -12,8 +12,6 @@ SRC_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 # Install pipelinewise venvs in the present working directory
 VENV_DIR=$(pwd)/.virtualenvs
 
-python3 -m pip install --upgrade pip
-
 make_virtualenv() {
     echo
     echo "--------------------------------------------------------------------------"
