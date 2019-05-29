@@ -20,9 +20,9 @@ PipelineWise configures every tap with a common structured YAML file format.
 A sample YAML for Kafka replication can be generated into a project directory by
 following the steps in the :ref:`generating_pipelines` section.
 
-Example YAML for tap-kafka:
+Example YAML for ``tap-kafka``:
 
-.. code-block:: yaml
+.. code-block:: bash
 
     ---
 

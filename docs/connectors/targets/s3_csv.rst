@@ -14,7 +14,7 @@ following the steps in the :ref:`generating_pipelines` section.
 
 Example YAML for target-s3-csv:
 
-.. code-block:: yaml
+.. code-block:: bash
 
     ---
 

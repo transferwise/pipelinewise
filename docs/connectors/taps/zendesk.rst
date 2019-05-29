@@ -14,7 +14,7 @@ following the steps in the :ref:`generating_pipelines` section.
 
 Example YAML for tap-zendesk:
 
-.. code-block:: yaml
+.. code-block:: bash
 
     ---
 
