@@ -5,21 +5,20 @@ Transformations
 ---------------
 
 PipelineWise can perform row level load time transformations between tap and target components
-and makes and ideal place to obfuscate, mask or filter sensitive data that should never been
-replicated in the Data Warehouse.
+and makes and ideal place to obfuscate, mask or filter sensitive data that should never be replicated in the Data Warehouse.
 
 
 .. warning::
 
   **Important**: Load Time Transformations are not designed for complex transformations, mapping,
   joins or aggregations. It was designed primarily to meet certain data security requirements
-  and making sure that PII and other sensitive data are not landing at external service providers
+  and to make sure that PII and other sensitive data does not end up at external service providers
   like AWS, MS Azure or similar.
 
   If you want to apply complex transformations you'll need to do it at a later stage once the
   data is ingested into the Data Warehouse. PipelineWise fits into the ELT landscape and not
   doing traditional ETL. ELT ingests data first into DWH in the original format and the
-  "transformation" shifting to the end of the data pipeline.
+  "transformation" is shifting to the end of the data pipeline.
 
 
 .. _transformation_methods:
@@ -45,8 +44,8 @@ The following transformations can be added optionally into the :ref:`yaml_config
 Conditional Transformations
 '''''''''''''''''''''''''''
 
-Using the optional ``when`` keyword you can specify conditions when
-the transformation has to be applied. If the condition matches
+Using the optional ``when`` keyword, you can specify conditions how
+the transformation should be applied. If the condition matches
 PipelineWise performs the transformation, otherwise it keeps
 the original value.
 

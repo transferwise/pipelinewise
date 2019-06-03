@@ -8,10 +8,10 @@ Target Postgres
 Postgres setup requirements
 ''''''''''''''''''''''''''''
 
-.. warning::
-
-  This section of the documentation is work in progress.
-
+Configuring PostgreSQL as a replication target is straightforward.
+You need to have a user with permissions to create new schemas and
+tables in a Postgres database and you can replicate data from all the
+supported :ref:`taps_list`.
 
 Configuring where to replicate data
 '''''''''''''''''''''''''''''''''''
@@ -20,7 +20,7 @@ PipelineWise configures every target with a common structured YAML file format.
 A sample YAML for Postgres target can be generated into a project directory by
 following the steps in the :ref:`generating_pipelines` section.
 
-Example YAML for target-postgres:
+Example YAML for ``target-postgres``:
 
 .. code-block:: bash
 

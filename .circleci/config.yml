@@ -1,38 +1,15 @@
 version: 2
 jobs:
+  # Install PipelineWise components:
+  #  Singer components
+  #  FastSync components
+  #  Command Line Interface
   build:
     docker:
       - image: circleci/python:3.6.2
     steps:
       - checkout
-
-      # target-snowflake
-      - run:
-          name: install dependencies
-          command: |
-            cd singer-connectors/target-snowflake
-            python3 -m venv venv
-            . venv/bin/activate
-            pip install --upgrade pip
-            pip install .
-            pip install pylint
-            pylint target_snowflake -d C,W,unexpected-keyword-arg,duplicate-code
-        
-      - run:
-          name: 'Unit Tests'
-          command: |
-            cd singer-connectors/target-snowflake
-            . venv/bin/activate
-            pip install nose
-            nosetests --where=tests/unit
-
-      - run:
-          name: 'Integration Tests'
-          command: |
-            cd singer-connectors/target-snowflake
-            . venv/bin/activate
-            pip install nose
-            nosetests --where=tests/integration/
+      - run: ./install.sh
 
 
   # For documentation deployment. You'll need the following environment vars
