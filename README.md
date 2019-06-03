@@ -1,7 +1,7 @@
 # PipelineWise
 PipelineWise is a Data Pipeline Framework using the singer.io specification to ingest and replicate data from various sources to various destinations.
 
-Documentation is available at https://transferwise.github.io/pipelinewise
+Documentation is available at https://transferwise.github.io
 
 ## Links
 
@@ -18,17 +18,20 @@ Documentation is available at https://transferwise.github.io/pipelinewise
 * **Target**: Consumes data from taps and do something with it, like load it into a file, API or database
 
 ### Supported Connectors
-* **[Tap Postgres](https://github.com/transferwise/pipelinewise-tap-postgres)**: Extracts data from PostgreSQL databases. Supporting Log-Based Inremental, Key-Based Incremental and Full Table replications
-* **[Tap MySQL](https://github.com/transferwise/pipelinewise-tap-mysql)**: Extracts data from MySQL databases. Supporting Log-Based Inremental, Key-Based Incremental and Full Table replications
-* **[Tap Kafka](https://github.com/transferwise/pipelinewise-tap-kafka)**: Extracts data from Kafka topics
-* **[Tap AdWords](https://github.com/singer-io/tap-adwords)**: Extracts data Google Ads API (former Google Adwords) using OAuth and support incremental loading based on input state
-* **[Tap S3 CSV](https://github.com/transferwise/pipelinewise-tap-s3-csv)**: Extracts data from S3 csv files (currently a fork of tap-s3-csv because we wanted to use our own auth method)
-* **[Tap Zendesk](https://github.com/singer-io/tap-zendesk)**: Extracts data from Zendesk using OAuth and Key-Based incremental replications
-* **[Tap Snowflake](https://github.com/transferwise/pipelinewise-tap-snowflake)**: Extracts data from Snowflake databases. Supporting Key-Based Incremental and Full Table replications
-* **[Target Postgres](https://github.com/transferwise/pipelinewise-target-postgres)**: Loads data from any tap into PostgreSQL database
-* **[Target Snowflake](https://github.com/transferwise/pipelinewise-target-snowflake)**: Loads data from any tap into Snowflake Data Warehouse
-* **[Target S3 CSV](https://github.com/transferwise/pipelinewise-target-s3-csv)v**: Uploads data from any tap to S3 in CSV format
-* **[Transform Field](https://github.com/transferwise/pipelinewise-transform-field)**: Transforms fields from any tap and sends the results to any target. Recommended for data masking/ obfuscation
+
+| Type      | Name       | Latest Version | Description                                          |
+|-----------|------------|----------------|------------------------------------------------------|
+| Tap       | **[Postgres](https://github.com/transferwise/pipelinewise-tap-postgres)** | [![PyPI version](https://badge.fury.io/py/pipelinewise-tap-postgres.svg)](https://badge.fury.io/py/pipelinewise-tap-postgres) | Extracts data from PostgreSQL databases. Supporting Log-Based Inremental, Key-Based Incremental and Full Table replications |
+| Tap       | **[MySQL](https://github.com/transferwise/pipelinewise-tap-mysql)** | [![PyPI version](https://badge.fury.io/py/pipelinewise-tap-mysql.svg)](https://badge.fury.io/py/pipelinewise-tap-mysql) | Extracts data from MySQL databases. Supporting Log-Based Inremental, Key-Based Incremental and Full Table replications |
+| Tap       |**[Kafka](https://github.com/transferwise/pipelinewise-tap-kafka)** | [![PyPI version](https://badge.fury.io/py/pipelinewise-tap-kafka.svg)](https://badge.fury.io/py/pipelinewise-tap-kafka) | Extracts data from Kafka topics |
+| Tap       |**[AdWords](https://github.com/singer-io/tap-adwords)** | [![PyPI version](https://badge.fury.io/py/tap-adwords.svg)](https://badge.fury.io/py/tap-adwords) | Extracts data Google Ads API (former Google Adwords) using OAuth and support incremental loading based on input state |
+| Tap       | **[S3 CSV](https://github.com/transferwise/pipelinewise-tap-s3-csv)** | [![PyPI version](https://badge.fury.io/py/pipelinewise-tap-s3-csv.svg)](https://badge.fury.io/py/pipelinewise-tap-s3-csv) | Extracts data from S3 csv files (currently a fork of tap-s3-csv because we wanted to use our own auth method) |
+| Tap       | **[Zendesk](https://github.com/singer-io/tap-zendesk)** | [![PyPI version](https://badge.fury.io/py/tap-zendesk.svg)](https://badge.fury.io/py/tap-zendesk) | Extracts data from Zendesk using OAuth and Key-Based incremental replications |
+| Tap       | **[Snowflake](https://github.com/transferwise/pipelinewise-tap-snowflake)** | [![PyPI version](https://badge.fury.io/py/pipelinewise-tap-snowflake.svg)](https://badge.fury.io/py/pipelinewise-tap-snowflake) | Extracts data from Snowflake databases. Supporting Key-Based Incremental and Full Table replications |
+| Target    | **[Postgres](https://github.com/transferwise/pipelinewise-target-postgres)** | [![PyPI version](https://badge.fury.io/py/pipelinewise-target-postgres.svg)](https://badge.fury.io/py/pipelinewise-target-postgres) | Loads data from any tap into PostgreSQL database |
+| Target    | **[Snowflake](https://github.com/transferwise/pipelinewise-target-snowflake)** | [![PyPI version](https://badge.fury.io/py/pipelinewise-target-snowflake.svg)](https://badge.fury.io/py/pipelinewise-target-snowflake) | Loads data from any tap into Snowflake Data Warehouse |
+| Target    | **[S3 CSV](https://github.com/transferwise/pipelinewise-target-s3-csv)** | [![PyPI version](https://badge.fury.io/py/pipelinewise-target-s3-csv.svg)](https://badge.fury.io/py/pipelinewise-target-s3-csv) | Uploads data from any tap to S3 in CSV format |
+| Transform | **[Field](https://github.com/transferwise/pipelinewise-transform-field)** | [![PyPI version](https://badge.fury.io/py/pipelinewise-transform-field.svg)](https://badge.fury.io/py/pipelinewise-transform-field) | Transforms fields from any tap and sends the results to any target. Recommended for data masking/ obfuscation |
 
 ## Installation
 
