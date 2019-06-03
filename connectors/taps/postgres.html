@@ -206,9 +206,7 @@
 <p><em>(Section based on Stitch documentation)</em></p>
 <p><strong>Step 1: Check if you have all the required credentials for replicating data from PostgreSQL</strong></p>
 <ul class="simple">
-<li><p>The <code class="docutils literal notranslate"><span class="pre">CREATEROLE</span></code> or <code class="docutils literal notranslate"><span class="pre">SUPERUSER</span></code> privilege. Either permission is required to create a database user for PipelineWise.</p></li>
-<li><p>The <code class="docutils literal notranslate"><span class="pre">GRANT</span> <span class="pre">OPTION</span></code> privilege in MySQL. The <code class="docutils literal notranslate"><span class="pre">GRANT</span> <span class="pre">OPTION</span></code> privilege is required to grant the necessary privileges to the PipelineWise database user.</p></li>
-<li><p>The <code class="docutils literal notranslate"><span class="pre">SUPER</span></code> privilege in MySQL. If using <a class="reference internal" href="../../concept/replication_methods.html#log-based"><span class="std std-ref">Log Based Incremental</span></a>, the <code class="docutils literal notranslate"><span class="pre">SUPER</span></code> privilege is required to define the appropriate server settings.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">CREATEROLE</span></code> or <code class="docutils literal notranslate"><span class="pre">SUPERUSER</span></code> privilege - Either permission is required to create a database user for PipelineWise.</p></li>
 </ul>
 <p><strong>Step 2. Create a PipelineWise database user</strong></p>
 <p>Next, you’ll create a dedicated database user for PipelineWise. Create a new user and grant the required permissions

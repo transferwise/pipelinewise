@@ -195,22 +195,25 @@
 <span id="intro-installation-guide"></span><span id="installation-guide"></span><h1>Installation<a class="headerlink" href="#installation" title="Permalink to this headline">¶</a></h1>
 <div class="section" id="getting-pipelinewise">
 <h2>Getting PipelineWise<a class="headerlink" href="#getting-pipelinewise" title="Permalink to this headline">¶</a></h2>
+<p>PipelineWise is a collection of pre-selected and customised <a class="reference internal" href="../concept/singer.html#singer"><span class="std std-ref">Singer.io</span></a> components
+with a config management and runtime framework on top of it. When installing PipelineWise
+you will also install a bunch of Singer components into a well defined location.</p>
 <p>PipelineWise installs <a class="reference external" href="https://www.singer.io/">Singer.io</a>  <a class="reference internal" href="../concept/singer.html#taps"><span class="std std-ref">Taps</span></a> and <a class="reference internal" href="../concept/singer.html#targets"><span class="std std-ref">Targets</span></a>
 components into separate and multiple separate virtual environments to avoid conflicting
 dependencies between any of the components. It is common that multiple Singer components
 use the same python library with different versions.</p>
-<p>This also means PipelineWise is not distributed on <a class="reference external" href="https://pypi.org//">PyPI</a> as a pyton package
-and cannot be installed by <code class="docutils literal notranslate"><span class="pre">pip</span></code>. PipelineWise has to be installed from source and the built-in
-install script will create every virtual environment required at the right place in the right format
-and will take care of finding the required components at run time.</p>
+<p>This also means <strong>PipelineWise is not distributed on</strong> <a class="reference external" href="https://pypi.org//">PyPI</a> as a pyton package
+and cannot be installed by <code class="docutils literal notranslate"><span class="pre">pip</span></code>. PipelineWise <strong>must be installed from source</strong> and the built-in
+install script will create all the virtual environments at the right place in the right format
+and will take care of finding them at runtime.</p>
 </div>
 <div class="section" id="installing-from-source">
 <span id="source"></span><h2>Installing from source<a class="headerlink" href="#installing-from-source" title="Permalink to this headline">¶</a></h2>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
 <p><strong>PipelineWise is not publicly available as of May 2019.</strong>
-TransferWise has not open sourced the project by that time and
-it’s not available as a public GitHub repository.</p>
+TransferWise has not yet open sourced the project to date and
+it’s therefore not available as a public GitHub repository.</p>
 <dl class="simple">
 <dt><strong>Required OS Packages</strong>:</dt><dd><ul class="simple">
 <li><p>Ubuntu: <code class="docutils literal notranslate"><span class="pre">apt-get</span> <span class="pre">install</span> <span class="pre">python3-dev</span> <span class="pre">python3-pip</span> <span class="pre">python3-venv</span> <span class="pre">libpq-dev</span> <span class="pre">libsnappy-dev</span></code></p></li>
@@ -264,8 +267,8 @@ was successful.</p>
 <div class="section" id="cool-what-s-next">
 <h2>Cool, what’s Next?<a class="headerlink" href="#cool-what-s-next" title="Permalink to this headline">¶</a></h2>
 <p>From this point, you can go to the <a class="reference internal" href="creating_pipelines.html#creating-pipelines"><span class="std std-ref">Creating Pipelines</span></a> section to create pipelines and to start replicating data.</p>
-<p><strong>Note</strong>: Later if you want to update PipelineWise checkouts to get the latest version from GitHub, use pull-with-rebase
-so any local changes are replayed and rerun the install script.</p>
+<p><strong>Note</strong>: If you want to update PipelineWise checkouts later, to get the latest version from GitHub, use pull-with-rebase
+so any local changes are replayed and rerun based on the install script.</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ git pull --rebase
 $ ./install.sh
 </pre></div>

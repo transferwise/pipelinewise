@@ -12,11 +12,11 @@ MySQL setup requirements
 
 **Step 1: Check if you have all the required credentials for replicating data from MySQL**
 
-* The ``CREATE USER`` or ``INSERT`` privilege (for the mysql database). The ``CREATE USER`` privilege is required to create a database user for PipelineWise.
+* ``CREATE USER`` or ``INSERT`` privilege (for the mysql database) - The ``CREATE USER`` privilege is required to create a database user for PipelineWise.
 
-* The ``GRANT OPTION`` privilege in MySQL. The ``GRANT OPTION`` privilege is required to grant the necessary privileges to the PipelineWise database user.
+* ``GRANT OPTION`` privilege in MySQL - The ``GRANT OPTION`` privilege is required to grant the necessary privileges to the PipelineWise database user.
 
-* The ``SUPER`` privilege in MySQL. If using :ref:`log_based`, the ``SUPER`` privilege is required to define the appropriate server settings.
+* ``SUPER`` privilege in MySQL - If using :ref:`log_based`, the ``SUPER`` privilege is required to define the appropriate server settings.
 
 **Step 2: Configuring database server settings**
 
@@ -38,7 +38,7 @@ MySQL setup requirements
     mysql> select @@log_bin;
 
 
-3. Locate the ``my.cnf file``, usually located at ``/etc/my.cnf``. Verify that ``my.cnf`` has the following lines in the mysqld section:
+3. Locate the ``my.cnf file``. It's usually located at ``/etc/my.cnf``. Verify that ``my.cnf`` has the following lines in the mysqld section:
 
 .. code-block:: bash
 

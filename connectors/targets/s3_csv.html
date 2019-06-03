@@ -121,7 +121,8 @@
 <li class="toctree-l2"><a class="reference internal" href="snowflake.html">Target Snowflake</a></li>
 <li class="toctree-l2"><a class="reference internal" href="postgres.html">Target Postgres</a></li>
 <li class="toctree-l2 current"><a class="current reference internal" href="#">Target S3 CSV</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#configuring">Configuring</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#aws-s3-setup-requirements">AWS S3 setup requirements</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#configuring-where-to-replicate-data">Configuring where to replicate data</a></li>
 </ul>
 </li>
 </ul>
@@ -198,12 +199,18 @@
             
   <div class="section" id="target-s3-csv">
 <span id="id1"></span><h1>Target S3 CSV<a class="headerlink" href="#target-s3-csv" title="Permalink to this headline">¶</a></h1>
-<div class="section" id="configuring">
-<h2>Configuring<a class="headerlink" href="#configuring" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="aws-s3-setup-requirements">
+<h2>AWS S3 setup requirements<a class="headerlink" href="#aws-s3-setup-requirements" title="Permalink to this headline">¶</a></h2>
+<p>Loading data to S3 in CSV file format is straightforward. You need to have
+access to an S3 bucket and you can generate data files on S3 from all the
+supported <a class="reference internal" href="../taps.html#taps-list"><span class="std std-ref">Taps (Data Sources)</span></a>.</p>
+</div>
+<div class="section" id="configuring-where-to-replicate-data">
+<h2>Configuring where to replicate data<a class="headerlink" href="#configuring-where-to-replicate-data" title="Permalink to this headline">¶</a></h2>
 <p>PipelineWise configures every target with a common structured YAML file format.
-A sample YAML for Snowflake target can be generated into a project directory by
+A sample YAML for S3 CSV target can be generated into a project directory by
 following the steps in the <a class="reference internal" href="../../installation_guide/creating_pipelines.html#generating-pipelines"><span class="std std-ref">Generating Sample Pipelines</span></a> section.</p>
-<p>Example YAML for target-s3-csv:</p>
+<p>Example YAML for <code class="docutils literal notranslate"><span class="pre">target-s3-csv</span></code>:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>---
 
 <span class="c1"># ------------------------------------------------------------------------------</span>

@@ -200,37 +200,36 @@ how data is loaded into your destination and your overall row usage.</p>
 <p>PipelineWise supports the following replication strategies to extract
 data from data sources.</p>
 <ul class="simple">
-<li><p><a class="reference internal" href="#log-based"><span class="std std-ref">Log Based Incremental</span></a>: It’s replicating, updated records and also deleted records.</p></li>
+<li><p><a class="reference internal" href="#log-based"><span class="std std-ref">Log Based Incremental</span></a>: It’s replicating newly inserted, updated and also deleted records.</p></li>
 <li><p><a class="reference internal" href="#incremental"><span class="std std-ref">Key Based Incremental</span></a>: The Tap saves it’s progress via bookmarks. Only new or updated records are replicated during each sync.</p></li>
 <li><p><a class="reference internal" href="#full-table"><span class="std std-ref">Full Table</span></a>: The Tap replicates all available records dating back to a start_date, defined in the tap config YAML, during every sync</p></li>
 <li><p><a class="reference internal" href="#fast-sync"><span class="std std-ref">Fast Sync</span></a>: Same functionality as Full Table but optimised for data transfers between specific sources
 and targets and bypassing the Singer specification. Useful when initial syncing large tables with
-hundreds of millions of rows where singer components usually running for long hours or sometimes for days.</p></li>
+hundreds of millions of rows where singer components would usually be running for long hours or sometimes for days.</p></li>
 </ul>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
 <p><strong>Important</strong>: Replication Methods are one of the most important settings in PipelineWise.
-Incorrectly defining a table’s Replication Method can cause data discrepancies and latency.
+Defining a table’s Replication Method incorrectly can cause data discrepancies and latency.
 Before configuring the replication settings for a data pipeline, read through this  guide
 so you understand how PipelineWise will replicate your data.</p>
 </div>
 <div class="section" id="log-based-incremental">
 <span id="log-based"></span><h2>Log Based Incremental<a class="headerlink" href="#log-based-incremental" title="Permalink to this headline">¶</a></h2>
-<p>Log-based Incremental Replication is a replication method in which the  identifies modifications
+<p>Log-based Incremental Replication is a replication method in which the we identify modifications
 to records - including inserts, updates, and deletes - using a database’s binary log files.</p>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
 <p><strong>Log Based Incremental</strong> replication method is available <strong>only for MySQL and PostgreSQL-backed</strong> databases
-that support binary log replication, and requires manual intervention when table structures change.</p>
+that support binary log replication and requires manual intervention when table structures change.</p>
 </div>
 </div>
 <div class="section" id="key-based-incremental">
 <span id="incremental"></span><h2>Key Based Incremental<a class="headerlink" href="#key-based-incremental" title="Permalink to this headline">¶</a></h2>
 <p>Key-based Incremental Replication is a replication method in which the <a class="reference internal" href="../connectors/taps.html#taps-list"><span class="std std-ref">Taps (Data Sources)</span></a> identify new and updated
-data using a column called a Replication Key. It uses a column called a Replication Key to identify new
-and updated data in a table for replication. A Replication Key is a <code class="docutils literal notranslate"><span class="pre">timestamp</span></code>, <code class="docutils literal notranslate"><span class="pre">date-time</span></code>, or <code class="docutils literal notranslate"><span class="pre">integer</span></code>
+data using a column called a Replication Key. A Replication Key is a <code class="docutils literal notranslate"><span class="pre">timestamp</span></code>, <code class="docutils literal notranslate"><span class="pre">date-time</span></code>, or <code class="docutils literal notranslate"><span class="pre">integer</span></code>
 column that exists in a source table.</p>
-<p>When it replicates a table using Key-based Incremental Replication, a few things will happen:</p>
+<p>When replicating a table using Key-based Incremental Replication, the following will happen:</p>
 <ol class="arabic simple">
 <li><p>During a replication job, PipelineWise stores the maximum value of a table’s Replication Key column.</p></li>
 <li><p>During the next replication job, <a class="reference internal" href="../connectors/taps.html#taps-list"><span class="std std-ref">Taps (Data Sources)</span></a> will compare saved value from the previous job to Replication Key column values in the source.</p></li>
@@ -265,15 +264,15 @@ this method will be used to replicate data.</p>
 <span id="id3"></span><h2>Fast Sync<a class="headerlink" href="#fast-sync" title="Permalink to this headline">¶</a></h2>
 <p>Fast Sync Replication is functionally identical to <a class="reference internal" href="#full-table"><span class="std std-ref">Full Table</span></a> replication but Fast Sync
 bypassing the <a class="reference external" href="https://github.com/singer-io/getting-started/blob/master/docs/SPEC.md">Singer Specification</a>
-for optimised performance. Primary use case of Fast Sync is initial sync or resync large tables
-with hundreds of millions of rows where singer components usually running for long hours or
+for optimised performance. Primary use case of Fast Sync is initial sync or to resync large tables
+with hundreds of millions of rows where singer components would usually run for long hours or
 sometimes for days.</p>
 <p><strong>Important</strong>: Fast Sync is not a selectable replication method in the <a class="reference internal" href="../user_guide/yaml_config.html#yaml-configuration"><span class="std std-ref">YAML configuration</span></a>.
 PipelineWise detects automatically when Fast Sync gives better performance than the singer
 components and uses it whenever it’s possible.</p>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
-<p><strong>Fast Sync</strong> is not a generic component and <strong>available only from some specific data sources to some specific targets</strong>.
+<p><strong>Fast Sync</strong> is not a generic component and is <strong>available only from some specific data sources to some specific targets</strong>.
 Check <a class="reference internal" href="#fast-sync"><span class="std std-ref">Fast Sync</span></a> section for the supported components.</p>
 </div>
 </div>

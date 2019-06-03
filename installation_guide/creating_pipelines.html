@@ -193,21 +193,21 @@
             
   <div class="section" id="creating-pipelines">
 <span id="id1"></span><h1>Creating Pipelines<a class="headerlink" href="#creating-pipelines" title="Permalink to this headline">¶</a></h1>
-<p>Pipelines defines how the data should flow from source sytem to target. It defines the data source
-credentials, the data that needs to be captures, replication methods, load time transformations,
+<p>Pipelines define how the data should flow from source sytem to target. It defines the data source
+credentials, the data that needs to be captured, replication methods, load time transformations,
 destination database credentials, source to target mapping, grants etc.</p>
 <p>Pipelines are expressed in YAML format and have a minimum of syntax, which intentionally tries
 to not be a programming language or script, but rather a model of a configuration or a process.
-PipelineWise using these YAML files as the main input to generate every required JSON files
-for the underlying singer.io componets.</p>
-<p>Under the hood <a class="reference external" href="https://www.singer.io/">Singer.io</a>  components needs several JSON files to
-operate correctly but you will never need to edit these JSON config files directly.
+PipelineWise is using these YAML files as the main input to generate all the required JSON files
+for the underlying singer.io components.</p>
+<p>Under the hood <a class="reference external" href="https://www.singer.io/">Singer.io</a>  components need several JSON files to
+operate properly, but you will never need to edit these JSON config files directly.
 PipelineWise will generate it from the YAML files and install into a correct place automatically
 whenever it’s needed.</p>
 <div class="section" id="generating-sample-pipelines">
 <span id="generating-pipelines"></span><h2>Generating Sample Pipelines<a class="headerlink" href="#generating-sample-pipelines" title="Permalink to this headline">¶</a></h2>
 <p>The easiest way to understand these pipeline YAML files is to generate the sample set for each
-of the supported connectors and you can adjust them for your own purpose.</p>
+of the supported connectors, which you can then adjust for your own purposes.</p>
 <p>Once you completed the <a class="reference internal" href="installation.html#installation-guide"><span class="std std-ref">Installation</span></a> section you should be able to create a new
 project with the PipelineWise  <a class="reference internal" href="../user_guide/cli.html#cli-init"><span class="std std-ref">init</span></a> command:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ pipelinewise init --dir pipelinewise_samples
@@ -235,8 +235,8 @@ $ mv tap_mysql_mariadb.yml.sample tap_my_mysql_db_one.yml
 $ mv target_snowflake.yml.sample  target_snowflake.yml
 </pre></div>
 </div>
-<p>1.  Edit <code class="docutils literal notranslate"><span class="pre">target_snowflake.yml</span></code>, this will be the destination of one ore many  sources.
-You can edit with your favourite text editor:</p>
+<p>1.  Edit <code class="docutils literal notranslate"><span class="pre">target_snowflake.yml</span></code>. This will be the destination of one or more sources.
+You can edit it with the text editor of your choice:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>---
 id: <span class="s2">&quot;snowflake_test&quot;</span>
 name: <span class="s2">&quot;Snowflake Test&quot;</span>
@@ -265,7 +265,7 @@ db_conn:
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p><strong>PipelineWise can encrypt sensitive data</strong> in the YAML files (like database password or other credentials)
-making them safe to distribute or place in source control. Further details check the
+making them safe to distribute or place in source control. For further details, please check the
 <a class="reference internal" href="encrypting_passwords.html#encrypting-passwords"><span class="std std-ref">Encrypting Passwords</span></a> section.</p>
 </div>
 <ol class="arabic simple" start="2">
@@ -317,7 +317,7 @@ tracking the state files for <a class="reference internal" href="../concept/repl
 (aka. bookmarks) and this will be the directory where the log files will be created.
 Normally you will need to go into <code class="docutils literal notranslate"><span class="pre">~/.pipelinewise</span></code> only when you want to access the
 log files.</p>
-<p>Once the config YAML files imported you can see the new pipelines with the <a class="reference internal" href="../user_guide/cli.html#cli-status"><span class="std std-ref">status</span></a> command:</p>
+<p>Once the config YAML files are imported, you can see the new pipelines with the <a class="reference internal" href="../user_guide/cli.html#cli-status"><span class="std std-ref">status</span></a> command:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ pipelinewise status
 Warehouse ID    Source ID     Enabled    Type       Status    Last Sync    Last Sync Result
 --------------  ------------  ---------  ---------  --------  -----------  ------------------
@@ -325,8 +325,8 @@ snowflake       mysql_sample  True       tap-mysql  ready                  unkno
 <span class="m">1</span> pipeline<span class="o">(</span>s<span class="o">)</span>
 </pre></div>
 </div>
-<p>Congratulations, at this point you have successfuly çreated your first pipeline in PipelineWise and it’s now
-ready to run. If you want you can create a new git repository and push the <code class="docutils literal notranslate"><span class="pre">pipelinewise_samples</span></code>
+<p>Congratulations! At this point you have successfully çreated your first pipeline in PipelineWise and it’s now
+ready to run. You may want you can create a new git repository and push the <code class="docutils literal notranslate"><span class="pre">pipelinewise_samples</span></code>
 directory into it to keep everything under version control.</p>
 <p>Now you can head to the <a class="reference internal" href="running_pipelines.html#running-pipelines"><span class="std std-ref">Running Pipelines</span></a> section to run the pipelines and to start replicating data.</p>
 </div>

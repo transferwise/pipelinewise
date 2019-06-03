@@ -195,24 +195,24 @@ specification to ingest and replicate data from various sources to various desti
 <div class="section" id="features">
 <h2>Features<a class="headerlink" href="#features" title="Permalink to this headline">¶</a></h2>
 <ul class="simple">
-<li><p><strong>Built with ELT in mind</strong>: PipelineWise fits into the ELT landscape and not doing traditional ETL. PipelineWise ingests data first into DWH in the original format and the “transformation” shifting to the end of the data pipeline. Load time transformations are still supported but complex mapping and joins have to be done once the data is replicated into the Data Warehouse.</p></li>
+<li><p><strong>Built with ELT in mind</strong>: PipelineWise fits into the ELT landscape but does not do traditional ETL. PipelineWise ingests data first into DWH in the original format and the “transformation” shifts to the end of the data pipeline. Load time transformations are still supported but complex mapping and joins have to be done once the data is replicated into the Data Warehouse.</p></li>
 <li><p><strong>Lightweight</strong>: No daemons or database setup are required</p></li>
 <li><p><strong>Replication Methods</strong>: CDC (Log Based), Key-Based Incremental and Full Table snapshots</p></li>
 <li><p><strong>Managed Schema Changes</strong>: When source data changes, PipelineWise detects the change and alters the schema in your DWH automatically</p></li>
-<li><p><strong>Load time transformations</strong>: Ideal place to obfuscate, mask or filter sensitive data that should never been replicated in the Data Warehouse</p></li>
-<li><p><strong>YAML based configuration</strong>: Data pipelines are defined as YAML files, which ensures that the entire configuration is kept under version control</p></li>
-<li><p><strong>Integration with external tools</strong>: With built-in event handlers you can trigger external scripts automatically when a certain even occurred</p></li>
-<li><p><strong>Extensible</strong>: PipelineWise is using <a class="reference external" href="https://www.singer.io/">Singer.io</a>  compatible taps and target connectors and new connectors can be added to PipelineWise with relatively small effort</p></li>
+<li><p><strong>Load time transformations</strong>: Ideal place to obfuscate, mask or filter sensitive data that should never be replicated in the Data Warehouse</p></li>
+<li><p><strong>YAML based configuration</strong>: Data pipelines are defined as YAML files, ensuring that the entire configuration is kept under version control</p></li>
+<li><p><strong>Integration with external tools</strong>: With built-in event handlers you can trigger external scripts automatically when a certain event occures</p></li>
+<li><p><strong>Extensible</strong>: PipelineWise is using <a class="reference external" href="https://www.singer.io/">Singer.io</a>  compatible taps and target connectors. New connectors can be added to PipelineWise with relatively small effort</p></li>
 </ul>
 </div>
 <div class="section" id="beyond-the-horizon">
 <h2>Beyond the Horizon<a class="headerlink" href="#beyond-the-horizon" title="Permalink to this headline">¶</a></h2>
 <p>PipelineWise is built on top of several <a class="reference external" href="https://www.singer.io/">Singer.io</a> components. Singer.io components
-are responsible to do certain tasks like extracting data from a specific data source or loading data into a
-specific destination but to replicate data end to end you’ll need have an extra layer on top these components to
-run the jobs, make configurations, select streams to replicate, do logging and more.</p>
+are responsible for certain tasks like extracting data from a specific data source or loading data into a
+specific destination, however to replicate data end to end you’ll need an extra layer on top of these components to
+run the jobs, create configurations, select streams to replicate, do logging and more.</p>
 <p>This is where PipelineWise comes in place. PipelineWise is a collection of pre-selected singer taps and
-targets and adds the required functionalities to create, run and maintain data pipelines in a production Data Warehouse
+targets to add the required functionalities to create, run and maintain data pipelines in a production Data Warehouse
 environment without the extra hassle.</p>
 </div>
 <div class="section" id="content">

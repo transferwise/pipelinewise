@@ -8,15 +8,19 @@ Installation
 Getting PipelineWise
 --------------------
 
+PipelineWise is a collection of pre-selected and customised :ref:`singer` components
+with a config management and runtime framework on top of it. When installing PipelineWise
+you will also install a bunch of Singer components into a well defined location.
+
 PipelineWise installs `Singer.io <https://www.singer.io/>`_  :ref:`taps` and :ref:`targets`
 components into separate and multiple separate virtual environments to avoid conflicting
 dependencies between any of the components. It is common that multiple Singer components
 use the same python library with different versions.
 
-This also means PipelineWise is not distributed on `PyPI <https://pypi.org//>`_ as a pyton package
-and cannot be installed by ``pip``. PipelineWise has to be installed from source and the built-in
-install script will create every virtual environment required at the right place in the right format
-and will take care of finding the required components at run time.
+This also means **PipelineWise is not distributed on** `PyPI <https://pypi.org//>`_ as a pyton package
+and cannot be installed by ``pip``. PipelineWise **must be installed from source** and the built-in
+install script will create all the virtual environments at the right place in the right format
+and will take care of finding them at runtime.
 
 .. _source:
 
@@ -26,8 +30,8 @@ Installing from source
 .. warning::
 
   **PipelineWise is not publicly available as of May 2019.**
-  TransferWise has not open sourced the project by that time and
-  it's not available as a public GitHub repository.
+  TransferWise has not yet open sourced the project to date and
+  it's therefore not available as a public GitHub repository.
 
   **Required OS Packages**:
     * Ubuntu: ``apt-get install python3-dev python3-pip python3-venv libpq-dev libsnappy-dev``
@@ -88,8 +92,8 @@ Cool, what's Next?
 
 From this point, you can go to the :ref:`creating_pipelines` section to create pipelines and to start replicating data.
 
-**Note**: Later if you want to update PipelineWise checkouts to get the latest version from GitHub, use pull-with-rebase
-so any local changes are replayed and rerun the install script.
+**Note**: If you want to update PipelineWise checkouts later, to get the latest version from GitHub, use pull-with-rebase
+so any local changes are replayed and rerun based on the install script.
 
 .. code-block:: bash
 

@@ -204,7 +204,7 @@
             
   <div class="section" id="command-line-interface">
 <span id="id1"></span><h1>Command Line Interface<a class="headerlink" href="#command-line-interface" title="Permalink to this headline">¶</a></h1>
-<p>PipelineWise’s command line interface allows for many types of operation on a pipeline.</p>
+<p>PipelineWise’s command line interface allows for a number of operation types on a pipeline.</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>usage: pipelinewise <span class="o">[</span>-h<span class="o">]</span>
                     <span class="o">{</span>init,run_tap,discover_tap,status,test_tap_connection,clear_crontab,init_crontab,sync_tables,import_config<span class="o">}</span>
 </pre></div>
@@ -277,7 +277,7 @@ and will return success if it’s available.</p>
 <div class="section" id="sync-tables">
 <span id="cli-sync-tables"></span><h3>sync_tables<a class="headerlink" href="#sync-tables" title="Permalink to this headline">¶</a></h3>
 <p>Sync or resync one or more tables from a specific datasource. It performs an initial
-sync and reset the table bookmarks to their new location.</p>
+sync and resets the table bookmarks to their new location.</p>
 <dl class="field-list simple">
 <dt class="field-odd">–target</dt>
 <dd class="field-odd"><p>Target connector id</p>
@@ -292,7 +292,7 @@ sync and reset the table bookmarks to their new location.</p>
 </div>
 <div class="section" id="import-config">
 <span id="cli-import-config"></span><h3>import_config<a class="headerlink" href="#import-config" title="Permalink to this headline">¶</a></h3>
-<p>Import a project directory into PipelineWise. It will create every required JSON file for
+<p>Import a project directory into PipelineWise. It will create every JSON file required for
 the tap and target connectors into <code class="docutils literal notranslate"><span class="pre">~/.pipelinewise</span></code>.</p>
 <dl class="field-list simple">
 <dt class="field-odd">–dir</dt>

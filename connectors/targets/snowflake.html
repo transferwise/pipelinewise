@@ -201,9 +201,18 @@
 <span id="id1"></span><h1>Target Snowflake<a class="headerlink" href="#target-snowflake" title="Permalink to this headline">¶</a></h1>
 <div class="section" id="snowflake-setup-requirements">
 <h2>Snowflake setup requirements<a class="headerlink" href="#snowflake-setup-requirements" title="Permalink to this headline">¶</a></h2>
-<p>You need to create two objects in Snowflake in a schema before start replicating data:</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>You need to create two objects in a Snowflake schema before start replicating data to Snowflake.</p>
+<blockquote>
+<div><ul class="simple">
+<li><p><strong>Named External Stage</strong>: to upload the CSV files to S3 and to MERGE data into snowflake tables.</p></li>
+<li><p><strong>Named File Format</strong>: to run MERGE/COPY commands and to parse the CSV files correctly</p></li>
+</ul>
+</div></blockquote>
+</div>
 <ol class="arabic simple">
-<li><p>A named external stage object on S3. This will be used to upload the CSV files to S3 and to MERGE data into snowflake tables.</p></li>
+<li><p>Create a named external stage object on S3:</p></li>
 </ol>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>CREATE STAGE <span class="o">{</span>schema<span class="o">}</span>.<span class="o">{</span>stage_name<span class="o">}</span>
 <span class="nv">url</span><span class="o">=</span><span class="s1">&#39;s3://{s3_bucket}&#39;</span>
@@ -211,15 +220,24 @@
 <span class="nv">encryption</span><span class="o">=(</span><span class="nv">MASTER_KEY</span><span class="o">=</span><span class="s1">&#39;{client_side_encryption_master_key}&#39;</span><span class="o">)</span><span class="p">;</span>
 </pre></div>
 </div>
-<p>The encryption option is optional and used for client side encryption.
-If you want client side encryption  you’ll need to define the same master key in the <cite>target-snowflake</cite> YAML. See the example below.</p>
+<dl class="simple">
+<dt><strong>Note</strong>:</dt><dd><ul class="simple">
+<li><p>The <code class="docutils literal notranslate"><span class="pre">{schema}</span></code> and <code class="docutils literal notranslate"><span class="pre">{stage_name}</span></code> can be any name that Snowflake accepts.</p></li>
+<li><p>The encryption option is optional and used for client side encryption.
+If you want client side encryption  you’ll need to define the same master
+key in the <code class="docutils literal notranslate"><span class="pre">target-snowflake</span></code> YAML. See the example below.</p></li>
+</ul>
+</dd>
+</dl>
 <ol class="arabic simple" start="2">
-<li><p>A named file format. This will be used by the MERGE/COPY commands to parse the CSV files correctly from S3:</p></li>
+<li><p>Create a named file format:</p></li>
 </ol>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>CREATE file format IF NOT EXISTS <span class="o">{</span>schema<span class="o">}</span>.<span class="o">{</span>file_format_name<span class="o">}</span>
 <span class="nb">type</span> <span class="o">=</span> <span class="s1">&#39;CSV&#39;</span> <span class="nv">escape</span><span class="o">=</span><span class="s1">&#39;\\&#39;</span> <span class="nv">field_optionally_enclosed_by</span><span class="o">=</span><span class="s1">&#39;&quot;&#39;</span><span class="p">;</span>
 </pre></div>
 </div>
+<p>3. Create a Snowflake user with permissions to create new schemas and tables in a
+Snowflake database.</p>
 </div>
 <div class="section" id="configuring-where-to-replicate-data">
 <h2>Configuring where to replicate data<a class="headerlink" href="#configuring-where-to-replicate-data" title="Permalink to this headline">¶</a></h2>
@@ -258,8 +276,8 @@ db_conn:
   <span class="c1">#  stage      : External stage object pointing to an S3 bucket</span>
   <span class="c1">#  file_format: Named file format object used for bulk loading data from S3 into</span>
   <span class="c1">#               snowflake tables.</span>
-  stage: <span class="s2">&quot;pipelinewise.encrypted_etl_stage&quot;</span>
-  file_format: <span class="s2">&quot;pipelinewise.etl_stage_file_format&quot;</span>
+  stage: <span class="s2">&quot;&lt;SCHEMA&gt;.&lt;STAGE_OBJECT_NAME&gt;&quot;</span>
+  file_format: <span class="s2">&quot;&lt;SCHEMA&gt;.&lt;FILE_FORMAT_OBJECT_NAME&gt;&quot;</span>
 
   <span class="c1"># Optional: Client Side Encryption</span>
   <span class="c1"># The same master key has to be added to the external stage object created in snowflake</span>

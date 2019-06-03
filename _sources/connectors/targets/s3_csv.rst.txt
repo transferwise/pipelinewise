@@ -5,14 +5,21 @@ Target S3 CSV
 ----------------
 
 
-Configuring
-'''''''''''
+AWS S3 setup requirements
+'''''''''''''''''''''''''
+
+Loading data to S3 in CSV file format is straightforward. You need to have
+access to an S3 bucket and you can generate data files on S3 from all the
+supported :ref:`taps_list`.
+
+Configuring where to replicate data
+'''''''''''''''''''''''''''''''''''
 
 PipelineWise configures every target with a common structured YAML file format.
-A sample YAML for Snowflake target can be generated into a project directory by
+A sample YAML for S3 CSV target can be generated into a project directory by
 following the steps in the :ref:`generating_pipelines` section.
 
-Example YAML for target-s3-csv:
+Example YAML for ``target-s3-csv``:
 
 .. code-block:: bash
 
