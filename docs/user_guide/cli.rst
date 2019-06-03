@@ -4,7 +4,7 @@
 Command Line Interface
 ======================
 
-PipelineWise's command line interface allows for many types of operation on a pipeline.
+PipelineWise's command line interface allows for a number of operation types on a pipeline.
 
 
 .. code-block:: bash
@@ -90,7 +90,7 @@ sync_tables
 """""""""""
 
 Sync or resync one or more tables from a specific datasource. It performs an initial
-sync and reset the table bookmarks to their new location.
+sync and resets the table bookmarks to their new location.
 
 :--target: Target connector id
 
@@ -104,7 +104,7 @@ sync and reset the table bookmarks to their new location.
 import_config
 """""""""""""
 
-Import a project directory into PipelineWise. It will create every required JSON file for
+Import a project directory into PipelineWise. It will create every JSON file required for
 the tap and target connectors into ``~/.pipelinewise``.
 
 :--dir: relative path to the project directory to import

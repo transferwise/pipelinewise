@@ -4,17 +4,17 @@
 Creating Pipelines
 ==================
 
-Pipelines defines how the data should flow from source sytem to target. It defines the data source
-credentials, the data that needs to be captures, replication methods, load time transformations,
+Pipelines define how the data should flow from source sytem to target. It defines the data source
+credentials, the data that needs to be captured, replication methods, load time transformations,
 destination database credentials, source to target mapping, grants etc.
 
 Pipelines are expressed in YAML format and have a minimum of syntax, which intentionally tries
 to not be a programming language or script, but rather a model of a configuration or a process.
-PipelineWise using these YAML files as the main input to generate every required JSON files
-for the underlying singer.io componets.
+PipelineWise is using these YAML files as the main input to generate all the required JSON files
+for the underlying singer.io components.
 
-Under the hood `Singer.io <https://www.singer.io/>`_  components needs several JSON files to
-operate correctly but you will never need to edit these JSON config files directly.
+Under the hood `Singer.io <https://www.singer.io/>`_  components need several JSON files to
+operate properly, but you will never need to edit these JSON config files directly.
 PipelineWise will generate it from the YAML files and install into a correct place automatically
 whenever it's needed.
 
@@ -25,7 +25,7 @@ Generating Sample Pipelines
 ---------------------------
 
 The easiest way to understand these pipeline YAML files is to generate the sample set for each
-of the supported connectors and you can adjust them for your own purpose.
+of the supported connectors, which you can then adjust for your own purposes.
 
 Once you completed the :ref:`installation_guide` section you should be able to create a new
 project with the PipelineWise  :ref:`cli_init` command:
@@ -60,8 +60,8 @@ We will need the ``tap_mysql_mariadb.yml`` and ``target_snowflake.yml``:
     $ mv tap_mysql_mariadb.yml.sample tap_my_mysql_db_one.yml
     $ mv target_snowflake.yml.sample  target_snowflake.yml
 
-1.  Edit ``target_snowflake.yml``, this will be the destination of one ore many  sources.
-You can edit with your favourite text editor:
+1.  Edit ``target_snowflake.yml``. This will be the destination of one or more sources.
+You can edit it with the text editor of your choice:
 
 .. code-block:: bash
 
@@ -93,7 +93,7 @@ You can edit with your favourite text editor:
 .. note::
 
   **PipelineWise can encrypt sensitive data** in the YAML files (like database password or other credentials)
-  making them safe to distribute or place in source control. Further details check the
+  making them safe to distribute or place in source control. For further details, please check the
   :ref:`encrypting_passwords` section.
 
 
@@ -150,7 +150,7 @@ tracking the state files for :ref:`incremental` and :ref:`log_based` replication
 Normally you will need to go into ``~/.pipelinewise`` only when you want to access the
 log files.
 
-Once the config YAML files imported you can see the new pipelines with the :ref:`cli_status` command:
+Once the config YAML files are imported, you can see the new pipelines with the :ref:`cli_status` command:
 
 .. code-block:: bash
 
@@ -161,8 +161,8 @@ Once the config YAML files imported you can see the new pipelines with the :ref:
     1 pipeline(s)
 
 
-Congratulations, at this point you have successfuly çreated your first pipeline in PipelineWise and it's now
-ready to run. If you want you can create a new git repository and push the ``pipelinewise_samples``
+Congratulations! At this point you have successfully çreated your first pipeline in PipelineWise and it's now
+ready to run. You may want you can create a new git repository and push the ``pipelinewise_samples``
 directory into it to keep everything under version control.
 
 Now you can head to the :ref:`running_pipelines` section to run the pipelines and to start replicating data.
