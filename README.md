@@ -1,7 +1,7 @@
 # PipelineWise
 PipelineWise is a Data Pipeline Framework using the singer.io specification to ingest and replicate data from various sources to various destinations.
 
-Documentation is available at https://transferwise.github.io
+Documentation is available at https://transferwise.github.io/pipelinewise/
 
 ## Links
 
