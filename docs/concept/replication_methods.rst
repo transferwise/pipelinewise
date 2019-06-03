@@ -11,7 +11,7 @@ how data is loaded into your destination and your overall row usage.
 PipelineWise supports the following replication strategies to extract
 data from data sources.
 
-* :ref:`log_based`: It's replicating, updated records and also deleted records.
+* :ref:`log_based`: It's replicating newly inserted, updated and also deleted records.
 
 * :ref:`incremental`: The Tap saves it's progress via bookmarks. Only new or updated records are replicated during each sync.
 
@@ -19,13 +19,13 @@ data from data sources.
 
 * :ref:`fast_sync`: Same functionality as Full Table but optimised for data transfers between specific sources
   and targets and bypassing the Singer specification. Useful when initial syncing large tables with
-  hundreds of millions of rows where singer components usually running for long hours or sometimes for days.
+  hundreds of millions of rows where singer components would usually be running for long hours or sometimes for days.
 
 
 .. warning::
 
   **Important**: Replication Methods are one of the most important settings in PipelineWise.
-  Incorrectly defining a table’s Replication Method can cause data discrepancies and latency.
+  Defining a table’s Replication Method incorrectly can cause data discrepancies and latency.
   Before configuring the replication settings for a data pipeline, read through this  guide
   so you understand how PipelineWise will replicate your data.
 
@@ -35,13 +35,13 @@ data from data sources.
 Log Based Incremental
 '''''''''''''''''''''
 
-Log-based Incremental Replication is a replication method in which the  identifies modifications
+Log-based Incremental Replication is a replication method in which the we identify modifications
 to records - including inserts, updates, and deletes - using a database’s binary log files.
 
 .. warning::
 
   **Log Based Incremental** replication method is available **only for MySQL and PostgreSQL-backed** databases
-  that support binary log replication, and requires manual intervention when table structures change.
+  that support binary log replication and requires manual intervention when table structures change.
 
 
 .. _incremental:
@@ -50,11 +50,10 @@ Key Based Incremental
 '''''''''''''''''''''
 
 Key-based Incremental Replication is a replication method in which the :ref:`taps_list` identify new and updated
-data using a column called a Replication Key. It uses a column called a Replication Key to identify new
-and updated data in a table for replication. A Replication Key is a ``timestamp``, ``date-time``, or ``integer``
+data using a column called a Replication Key. A Replication Key is a ``timestamp``, ``date-time``, or ``integer``
 column that exists in a source table.
 
-When it replicates a table using Key-based Incremental Replication, a few things will happen:
+When replicating a table using Key-based Incremental Replication, the following will happen:
 
 1. During a replication job, PipelineWise stores the maximum value of a table’s Replication Key column.
 2. During the next replication job, :ref:`taps_list` will compare saved value from the previous job to Replication Key column values in the source.
@@ -101,8 +100,8 @@ Fast Sync
 
 Fast Sync Replication is functionally identical to :ref:`full_table` replication but Fast Sync
 bypassing the `Singer Specification <https://github.com/singer-io/getting-started/blob/master/docs/SPEC.md>`_
-for optimised performance. Primary use case of Fast Sync is initial sync or resync large tables
-with hundreds of millions of rows where singer components usually running for long hours or
+for optimised performance. Primary use case of Fast Sync is initial sync or to resync large tables
+with hundreds of millions of rows where singer components would usually run for long hours or
 sometimes for days.
 
 **Important**: Fast Sync is not a selectable replication method in the :ref:`yaml_configuration`.
@@ -111,5 +110,7 @@ components and uses it whenever it's possible.
 
 .. warning::
 
-  **Fast Sync** is not a generic component and **available only from some specific data sources to some specific targets**.
+  **Fast Sync** is not a generic component and is **available only from some specific data sources to some specific targets**.
   Check :ref:`fast_sync` section for the supported components.
+
+

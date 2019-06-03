@@ -8,9 +8,14 @@ Target Snowflake
 Snowflake setup requirements
 ''''''''''''''''''''''''''''
 
-You need to create two objects in Snowflake in a schema before start replicating data:
+.. warning::
 
-1. A named external stage object on S3. This will be used to upload the CSV files to S3 and to MERGE data into snowflake tables.
+  You need to create two objects in a Snowflake schema before start replicating data to Snowflake.
+
+   * **Named External Stage**: to upload the CSV files to S3 and to MERGE data into snowflake tables.
+   * **Named File Format**: to run MERGE/COPY commands and to parse the CSV files correctly
+
+1. Create a named external stage object on S3:
 
 .. code-block:: bash
 
@@ -19,16 +24,21 @@ You need to create two objects in Snowflake in a schema before start replicating
     credentials=(AWS_KEY_ID='{aws_key_id}' AWS_SECRET_KEY='{aws_secret_key}')
     encryption=(MASTER_KEY='{client_side_encryption_master_key}');
 
+**Note**:
+ * The ``{schema}`` and ``{stage_name}`` can be any name that Snowflake accepts.
+ * The encryption option is optional and used for client side encryption.
+   If you want client side encryption  you'll need to define the same master
+   key in the ``target-snowflake`` YAML. See the example below.
 
-The encryption option is optional and used for client side encryption.
-If you want client side encryption  you'll need to define the same master key in the `target-snowflake` YAML. See the example below.
-
-2. A named file format. This will be used by the MERGE/COPY commands to parse the CSV files correctly from S3:
+2. Create a named file format:
 
 .. code-block:: bash
 
     CREATE file format IF NOT EXISTS {schema}.{file_format_name}
     type = 'CSV' escape='\\' field_optionally_enclosed_by='"';
+
+3. Create a Snowflake user with permissions to create new schemas and tables in a
+Snowflake database.
 
 
 Configuring where to replicate data
@@ -73,8 +83,8 @@ Example YAML for target-snowflake:
       #  stage      : External stage object pointing to an S3 bucket
       #  file_format: Named file format object used for bulk loading data from S3 into
       #               snowflake tables.
-      stage: "pipelinewise.encrypted_etl_stage"
-      file_format: "pipelinewise.etl_stage_file_format"
+      stage: "<SCHEMA>.<STAGE_OBJECT_NAME>"
+      file_format: "<SCHEMA>.<FILE_FORMAT_OBJECT_NAME>"
       
       # Optional: Client Side Encryption
       # The same master key has to be added to the external stage object created in snowflake

@@ -12,11 +12,7 @@ PostgreSQL setup requirements
 
 **Step 1: Check if you have all the required credentials for replicating data from PostgreSQL**
 
-* The ``CREATEROLE`` or ``SUPERUSER`` privilege. Either permission is required to create a database user for PipelineWise.
-
-* The ``GRANT OPTION`` privilege in MySQL. The ``GRANT OPTION`` privilege is required to grant the necessary privileges to the PipelineWise database user.
-
-* The ``SUPER`` privilege in MySQL. If using :ref:`log_based`, the ``SUPER`` privilege is required to define the appropriate server settings.
+* ``CREATEROLE`` or ``SUPERUSER`` privilege - Either permission is required to create a database user for PipelineWise.
 
 **Step 2. Create a PipelineWise database user**
 

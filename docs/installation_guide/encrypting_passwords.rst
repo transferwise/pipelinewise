@@ -4,13 +4,13 @@ Encrypting Passwords
 ====================
 
 PipelineWise has a built-in feature that allows you to keep sensitive data such as passwords or keys
-in encrypted format, rather than as plaintext in the project YAML files. These encrypted strings can
+in encrypted format, rather than as plain text in the project YAML files. These encrypted strings can
 then be distributed or placed in source control.
 
 PipelineWise is using the `Ansible Vault <https://docs.ansible.com/ansible/latest/user_guide/vault.html>`_
 python libraries to encrypt and decrypt strings. The default cipher is AES (which is shared-secret based).
 
-1. To encrypt data, first you need to create file with a secret password. In this example we will create
+1. To encrypt data, first you need to create a file with a secret password. In this example we will create
 a ``vault-password.txt`` file from the command that you will keep in a safe place:
 
 .. code-block:: bash
@@ -18,7 +18,7 @@ a ``vault-password.txt`` file from the command that you will keep in a safe plac
     $ echo "M@st3rP@ssw0rd" > vault-password.txt
 
 
-2. Now you can encrypt the sensitive strings in the PipelineWise project that is usually database passwords
+2. Now you can encrypt the sensitive strings in your PipelineWise project. These are usually database passwords
 or other data source or destination credentials that you don't want to place in source control as
 plain texts. To encrypt a string run:
 
@@ -43,7 +43,7 @@ plain passwords. For example in a ``tap_mysql.yml`` file the ``db_conn`` section
   db_conn:
     host: "mysql_source_database"
     port: 3306
-    user: "pgninja_replica"
+    user: "jack_replica"
     password: !vault |
           $ANSIBLE_VAULT;1.1;AES256
           31376164363334663765396232363562653463613862333163396565396239336134636261326137
@@ -53,7 +53,7 @@ plain passwords. For example in a ``tap_mysql.yml`` file the ``db_conn`` section
           37376232313836613939636434303863333035653534633533333739303137323034
     dbname: "fx"
 
-4. When importing the project YAML files into PipelineWise you will need to provide
+4. When importing the project YAML files into PipelineWise, you will need to provide
 the path to the file with the password (the one that you created in the first step) using the
 ``--secret`` command line option. For example if you have a sample project in
 ``pipelinewise_samples`` you will need to run:
@@ -67,6 +67,6 @@ the path to the file with the password (the one that you created in the first st
 
 
 **Tip:**
-Further details about creating and importing project please check the :ref:`creating_pipelines`
+For further details about creating and importing projects, please check the :ref:`creating_pipelines`
 section.
 
