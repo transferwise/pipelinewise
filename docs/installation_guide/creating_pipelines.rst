@@ -70,7 +70,7 @@ You can edit it with the text editor of your choice:
     name: "Snowflake Test"
     type: "target-snowflake"
     db_conn:
-      account: "rt27428.eu-central-1"
+      account: "rtxxxxxx.eu-central-1"
       dbname: "analytics_db_test"
       user: "circleci"
       password: "PASSWORD"                                   # Plain string or Vault Encrypted password
