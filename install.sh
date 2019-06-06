@@ -3,6 +3,9 @@
 # Exit script on first error
 set -e
 
+# Capture start_time
+start_time=`date +%s`
+
 # Ubuntu prerequisites
 # apt install python3 python3-pip python3-venv libpq-dev libsnappy-dev -y
 
@@ -64,8 +67,12 @@ install_fastsync postgres-to-snowflake
 # Install CLI
 install_cli
 
+# Capture end_time
+end_time=`date +%s`
+
+echo
 echo "--------------------------------------------------------------------------"
-echo "PipelineWise installed successfully"
+echo "PipelineWise installed successfully in $((end_time-start_time)) seconds"
 echo "--------------------------------------------------------------------------"
 echo
 echo "To start CLI:"
