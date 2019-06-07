@@ -157,7 +157,12 @@ class Postgres:
             , PRIMARY KEY ({}))
             """.format(target_schema,target_table,', '.join(snowflake_columns),primary_key)
         else:
-            snowflake_ddl = "CREATE OR REPLACE TABLE {}.{} ({})".format(target_schema, target_table, ', '.join(snowflake_columns))
+            snowflake_ddl = """CREATE OR REPLACE TABLE {}.{} ({}
+            ,_SDC_BATCHED_AT TIMESTAMP_NTZ
+            ,_SDC_DELETED_AT TIMESTAMP_NTZ
+            ,_SDC_EXTRACTED_AT TIMESTAMP_NTZ
+            )
+            """.format(target_schema, target_table, ', '.join(snowflake_columns))
         return(snowflake_ddl)
 
 
