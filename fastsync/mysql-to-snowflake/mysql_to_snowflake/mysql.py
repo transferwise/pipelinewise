@@ -175,9 +175,19 @@ class MySql:
         snowflake_columns = ["{} {}".format(pc.get('column_name'), self.mysql_type_to_snowflake(pc.get('data_type'), pc.get('column_type'))) for pc in mysql_columns]
         primary_key = self.get_primary_key(table_name)
         if primary_key:
-            snowflake_ddl = "CREATE OR REPLACE TABLE {}.{} ({}, PRIMARY KEY ({}))".format(target_schema, target_table, ', '.join(snowflake_columns), primary_key)
+            snowflake_ddl = """CREATE OR REPLACE TABLE {}.{} ({}
+            ,_SDC_BATCHED_AT TIMESTAMP_NTZ
+            ,_SDC_DELETED_AT TIMESTAMP_NTZ
+            ,_SDC_EXTRACTED_AT TIMESTAMP_NTZ
+            , PRIMARY KEY ({}))
+            """.format(target_schema, target_table, ', '.join(snowflake_columns), primary_key)
         else:
-            snowflake_ddl = "CREATE OR REPLACE TABLE {}.{} ({})".format(target_schema, target_table, ', '.join(snowflake_columns))
+            snowflake_ddl = """CREATE OR REPLACE TABLE {}.{} ({}
+            ,_SDC_BATCHED_AT TIMESTAMP_NTZ
+            ,_SDC_DELETED_AT TIMESTAMP_NTZ
+            ,_SDC_EXTRACTED_AT TIMESTAMP_NTZ
+            )
+            """.format(target_schema, target_table, ', '.join(snowflake_columns))
         return(snowflake_ddl)
 
 
@@ -189,7 +199,12 @@ class MySql:
         if len(column_safe_sql_values) == 0:
             raise Exception("{} table not found.".format(table_name))
 
-        sql = "SELECT {} FROM {}".format(','.join(column_safe_sql_values), table_name)
+        sql = """SELECT {}
+        ,now()
+        ,null
+        ,now()
+        FROM {}
+        """.format(','.join(column_safe_sql_values), table_name)
         export_batch_rows = self.connection_config['export_batch_rows']
         exported_rows = 0
         with self.conn_unbuffered as cur:
