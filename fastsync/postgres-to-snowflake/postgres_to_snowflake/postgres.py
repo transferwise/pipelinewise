@@ -174,7 +174,12 @@ class Postgres:
         if len(column_safe_sql_values) == 0:
             raise Exception("{} table not found.".format(table_name))
 
-        sql = "COPY (SELECT {}, now(), null, now() FROM {}) TO STDOUT with CSV DELIMITER ','".format(','.join(column_safe_sql_values), table_name)
+        sql = """COPY (SELECT {}
+        ,now()
+        ,null
+        ,now()
+        FROM {}) TO STDOUT with CSV DELIMITER ','
+        """.format(','.join(column_safe_sql_values), table_name)
         utils.log("POSTGRES - Exporting data: {}".format(sql))
         with gzip.open(path, 'wt') as gzfile:
             self.curr.copy_expert(sql, gzfile)
