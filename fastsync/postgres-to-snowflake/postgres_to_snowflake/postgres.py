@@ -149,9 +149,20 @@ class Postgres:
         snowflake_columns = ["{} {}".format(pc[0], self.postgres_type_to_snowflake(pc[1])) for pc in postgres_columns]
         primary_key = self.get_primary_key(table_name)
         if primary_key:
-            snowflake_ddl = "CREATE OR REPLACE TABLE {}.{} ({}, PRIMARY KEY ({}))".format(target_schema, target_table, ', '.join(snowflake_columns), primary_key)
+            snowflake_ddl = """
+            CREATE OR REPLACE TABLE {}.{} ({}
+            ,_SDC_EXTRACTED_AT TIMESTAMP_NTZ
+            ,_SDC_BATCHED_AT TIMESTAMP_NTZ
+            ,_SDC_DELETED_AT TIMESTAMP_NTZ
+            , PRIMARY KEY ({}))
+            """.format(target_schema,target_table,', '.join(snowflake_columns),primary_key)
         else:
-            snowflake_ddl = "CREATE OR REPLACE TABLE {}.{} ({})".format(target_schema, target_table, ', '.join(snowflake_columns))
+            snowflake_ddl = """CREATE OR REPLACE TABLE {}.{} ({}
+            ,_SDC_EXTRACTED_AT TIMESTAMP_NTZ
+            ,_SDC_BATCHED_AT TIMESTAMP_NTZ
+            ,_SDC_DELETED_AT TIMESTAMP_NTZ
+            )
+            """.format(target_schema, target_table, ', '.join(snowflake_columns))
         return(snowflake_ddl)
 
 
@@ -163,7 +174,12 @@ class Postgres:
         if len(column_safe_sql_values) == 0:
             raise Exception("{} table not found.".format(table_name))
 
-        sql = "COPY (SELECT {} FROM {}) TO STDOUT with CSV DELIMITER ','".format(','.join(column_safe_sql_values), table_name)
+        sql = """COPY (SELECT {}
+        ,now()
+        ,now()
+        ,null
+        FROM {}) TO STDOUT with CSV DELIMITER ','
+        """.format(','.join(column_safe_sql_values), table_name)
         utils.log("POSTGRES - Exporting data: {}".format(sql))
         with gzip.open(path, 'wt') as gzfile:
             self.curr.copy_expert(sql, gzfile)
