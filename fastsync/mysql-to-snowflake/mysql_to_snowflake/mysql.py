@@ -176,16 +176,16 @@ class MySql:
         primary_key = self.get_primary_key(table_name)
         if primary_key:
             snowflake_ddl = """CREATE OR REPLACE TABLE {}.{} ({}
+            ,_SDC_EXTRACTED_AT TIMESTAMP_NTZ
             ,_SDC_BATCHED_AT TIMESTAMP_NTZ
             ,_SDC_DELETED_AT TIMESTAMP_NTZ
-            ,_SDC_EXTRACTED_AT TIMESTAMP_NTZ
             , PRIMARY KEY ({}))
             """.format(target_schema, target_table, ', '.join(snowflake_columns), primary_key)
         else:
             snowflake_ddl = """CREATE OR REPLACE TABLE {}.{} ({}
+            ,_SDC_EXTRACTED_AT TIMESTAMP_NTZ
             ,_SDC_BATCHED_AT TIMESTAMP_NTZ
             ,_SDC_DELETED_AT TIMESTAMP_NTZ
-            ,_SDC_EXTRACTED_AT TIMESTAMP_NTZ
             )
             """.format(target_schema, target_table, ', '.join(snowflake_columns))
         return(snowflake_ddl)
@@ -201,8 +201,8 @@ class MySql:
 
         sql = """SELECT {}
         ,now()
-        ,null
         ,now()
+        ,null
         FROM {}
         """.format(','.join(column_safe_sql_values), table_name)
         export_batch_rows = self.connection_config['export_batch_rows']
