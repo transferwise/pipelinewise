@@ -65,3 +65,21 @@ snowflake_test tap has been configured to use Snowflake test database, AWS stagi
 5. Run your tap: `pipelinewise run_tap --target snowflake_test --tap adwords`
 
     Logs for tap outputs are stored in `~/.pipelinewise/snowflake_test/`
+
+
+### To run tests:
+
+1. Install python dependencies in a virtual env and run nose unit tests
+```
+  python3 -m venv .virtualenvs/cli
+  . .virtualenvs/cli/bin/activate
+  pip install --upgrade pip
+  pip install -e cli
+  pip install nose
+```
+
+2. To run unit tests:
+```
+  nosetests --where=cli/tests
+```
+
