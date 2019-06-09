@@ -80,8 +80,8 @@ as it is displayed above at the end of the install script:
     $ export PIPELINEWISE_HOME=/Users/jack/pipelinewise/.virtualenvs
     $ pipelinewise status
 
-    Warehouse ID    Source ID    Enabled    Type          Status    Last Sync    Last Sync Result
-    --------------  -----------  ---------  ------------  --------  -----------  ------------------
+    Tap ID    Tap Type    Target ID    Target Type    Enabled    Status    Last Sync    Last Sync Result
+    --------  ----------  -----------  -------------  ---------  --------  -----------  ------------------
     0 pipeline(s)
 
 If you see that above output saying that you have 0 pipeline in the system then the Installation
