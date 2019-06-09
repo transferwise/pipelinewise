@@ -10,15 +10,8 @@ VIRTUALENVS_DIR="./virtualenvs-dummy"
 
 class TestUtils(unittest.TestCase):
     """
-    Unit Tests
+    Unit Tests for PipelineWise CLI utility functions
     """
-    #@classmethod
-    #def setUp(self):
-    #    # Create CLI arguments
-    #    self.args = CliArgs()
-    #    self.pipelinewise = PipelineWise(self.args, CONFIG_DIR, VIRTUALENVS_DIR)
-
-
     def test_json_detectors(self):
         """Testing JSON detector functions"""
         self.assertFalse(cli.utils.is_json("{Invalid JSON}"))

@@ -10,7 +10,7 @@ VIRTUALENVS_DIR="./virtualenvs-dummy"
 
 class TestCli(unittest.TestCase):
     """
-    Unit Tests
+    Unit Tests for PipelineWise CLI executable
     """
     @classmethod
     def setUp(self):
