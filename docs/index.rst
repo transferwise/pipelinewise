@@ -38,6 +38,125 @@ targets to add the required functionalities to create, run and maintain data pip
 environment without the extra hassle.
 
 
+Taps (Data Source Connectors)
+-----------------------------
+
+PipelineWise can replicate data from the following data sources:
+
+.. container:: tile-wrapper
+
+    .. container:: tile
+
+        .. container:: img-hover-zoom
+
+          .. image:: img/mysql-logo.png
+             :target: connectors/taps/mysql.html
+
+        :ref:`tap-mysql`
+
+    .. container:: tile
+
+        .. container:: img-hover-zoom
+
+          .. image:: img/mariadb-logo.png
+             :target: connectors/taps/mysql.html
+
+        :ref:`tap-mysql`
+
+    .. container:: tile
+
+        .. container:: img-hover-zoom
+
+          .. image:: img/postgres-logo.png
+             :target: connectors/taps/postgres.html
+
+        :ref:`tap-postgres`
+
+    .. container:: tile
+
+        .. container:: img-hover-zoom
+
+          .. image:: img/s3-logo.png
+             :target: connectors/taps/s3_csv.html
+
+        :ref:`tap-s3-csv`
+
+
+.. container:: tile-wrapper
+
+    .. container:: tile
+
+        .. container:: img-hover-zoom
+
+          .. image:: img/kafka-logo.png
+             :target: connectors/taps/kafka.html
+
+        :ref:`tap-kafka`
+
+    .. container:: tile
+
+        .. container:: img-hover-zoom
+
+          .. image:: img/snowflake-logo.png
+             :target: connectors/taps/snowflake.html
+
+        :ref:`tap-snowflake`
+
+    .. container:: tile
+
+        .. container:: img-hover-zoom
+
+          .. image:: img/salesforce-logo.png
+             :target: connectors/taps/salesforce.html
+
+        :ref:`tap-salesforce`
+
+    .. container:: tile
+
+        .. container:: img-hover-zoom
+
+          .. image:: img/zendesk-logo.png
+             :target: connectors/taps/zendesk.html
+
+        :ref:`tap-zendesk`
+
+
+Target (Destination Connectors)
+-------------------------------
+
+PipelineWise can replicate data into the following destinations:
+
+.. container:: tile-wrapper
+
+    .. container:: tile
+
+        .. container:: img-hover-zoom
+
+          .. image:: img/snowflake-logo.png
+             :target: connectors/targets/snowflake.html
+
+        :ref:`target-snowflake`
+
+    .. container:: tile
+
+        .. container:: img-hover-zoom
+
+          .. image:: img/postgres-logo.png
+             :target: connectors/targets/postgres.html
+
+        :ref:`target-postgres`
+
+    .. container:: tile
+
+        .. container:: img-hover-zoom
+
+          .. image:: img/s3-logo.png
+             :target: connectors/targets/s3_csv.html
+
+        :ref:`target-s3-csv` 
+
+
+
 Content
 -------
 .. toctree::

@@ -43,9 +43,13 @@ This will create a ``pipelinewise_samples`` directory with samples for each supp
         ├── tap_mysql_mariadb.yml.sample
         ├── tap_postgres.yml.sample
         ├── tap_s3_csv.yml.sample
-        ├── tap_zendesk.yml.sample
         ├── tap_kafka.yml.sample
-        └── target_snowflake.yml.sample
+        ├── tap_snowflake.yml.sample
+        ├── tap_salesforce.yml.sample
+        ├── tap_zendesk.yml.sample
+        ├── target_snowflake.yml.sample
+        ├── target_postgres.yml.sample
+        └── target_s3_csv.yml.sample
 
 Customising the Pipelines
 -------------------------
