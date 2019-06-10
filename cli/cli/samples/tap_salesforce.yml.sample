@@ -4,20 +4,28 @@
 # General Properties
 # ------------------------------------------------------------------------------
 id: "salesforce"                       # Unique identifier of the tap
-name: "Sampe data on Salesforce"       # Name of the tap
+name: "Sample data on Salesforce"      # Name of the tap
 type: "tap-salesforce"                 # !! THIS SHOULD NOT CHANGE !!
 owner: "somebody@foo.com"              # Data owner to contact
 
 
 # ------------------------------------------------------------------------------
 # Source (Tap) - Salesforce connection details
+#
+# The client_id and client_secret keys are your OAuth Salesforce App secrets.
+# The refresh_token is a secret created during the OAuth flow. For more info on
+# the Salesforce OAuth flow, visit the Salesforce documentation at
+# https://developer.salesforce.com/docs/atlas.en-us.api_rest.meta/api_rest/intro_understanding_web_server_oauth_flow.htm
+#
+# api_type to use extracting data from Snowflake. This can be BULK or REST.
+# Further details about API types at https://www.stitchdata.com/docs/integrations/saas/salesforce#bulk-vs-rest-api
 # ------------------------------------------------------------------------------
 db_conn:
-  client_id: "<ACCESS_TOKEN>"             #
-  client_secret: "<CLIENT_SECRET>"        #
-  refresh_token: "<REFRESH_TOKEN"         #
-  start_date: "2019-01-01T00:00:00Z"
-  api_type: "BULK"
+  client_id: "<ACCESS_TOKEN>"             # Salesforce Client ID
+  client_secret: "<CLIENT_SECRET>"        # Salesforce Client Secret
+  refresh_token: "<REFRESH_TOKEN"         # Salesforce Refresh Token
+  start_date: "2019-01-01T00:00:00Z"      # Bound on SOQL queries when searching for records
+  api_type: "BULK"                        # Salesforce API Type: BULK or REST
 
 
 # ------------------------------------------------------------------------------
