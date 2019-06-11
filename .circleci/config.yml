@@ -11,6 +11,13 @@ jobs:
       - checkout
       - run: ./install.sh
 
+      - run:
+          name: 'Unit Tests'
+          command: |
+            . .virtualenvs/cli/bin/activate
+            pip install nose
+            nosetests --where=cli/tests/
+
 
   # For documentation deployment. You'll need the following environment vars
   # in your Circle CI settings, otherwise this will not work.

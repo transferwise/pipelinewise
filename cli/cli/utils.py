@@ -112,6 +112,31 @@ def save_json(data, path):
         raise Exception("Cannot save JSON {} {}".format(path, exc))
 
 
+def is_yaml(string):
+    '''
+    Detects if a string is a valid yaml or not
+    '''
+    try:
+        yaml_object = yaml.safe_load(string)
+    except Exception as exc:
+        return False
+    return True
+
+
+def is_yaml_file(path):
+    '''
+    Detects if a file is a valid yaml file or not
+    '''
+    try:
+        if os.path.isfile(path):
+            with open(path) as f:
+                if yaml.safe_load(f):
+                    return True
+        return False
+    except Exception as exc:
+        return False
+
+
 def load_yaml(yaml_file, vault_secret=None):
     '''
     Load a YAML file into a python dictionary.
@@ -129,23 +154,24 @@ def load_yaml(yaml_file, vault_secret=None):
         vault.secrets = [('default', secret_file)]
 
     data = None
-    with open(yaml_file, 'r') as stream:
-        try:
-            if is_encrypted_file(stream):
-                file_data = stream.read()
-                data = yaml.load(vault.decrypt(file_data, None))
-            else:
-                loader = AnsibleLoader(stream, None, vault.secrets)
-                try:
-                    data = loader.get_single_data()
-                except Exception as exc:
-                    logger.critical("Error when loading YAML config at {} {}".format(yaml_file, exc))
-                    sys.exit(1)
-                finally:
-                    loader.dispose()
-        except yaml.YAMLError as exc:
-            logger.critical("Error when loading YAML config at {} {}".format(yaml_file, exc))
-            sys.exit(1)
+    if os.path.isfile(yaml_file):
+        with open(yaml_file, 'r') as stream:
+            try:
+                if is_encrypted_file(stream):
+                    file_data = stream.read()
+                    data = yaml.load(vault.decrypt(file_data, None))
+                else:
+                    loader = AnsibleLoader(stream, None, vault.secrets)
+                    try:
+                        data = loader.get_single_data()
+                    except Exception as exc:
+                        raise Exception("Error when loading YAML config at {} {}".format(yaml_file, exc))
+                    finally:
+                        loader.dispose()
+            except yaml.YAMLError as exc:
+                raise Exception("Error when loading YAML config at {} {}".format(yaml_file, exc))
+    else:
+        logger.debug("No file at {}".format(yaml_file))
 
     return data
 
@@ -282,15 +308,17 @@ def extract_log_attributes(log_file):
     target_id = 'unknown'
     tap_id = 'unknown'
     timestamp = datetime.utcfromtimestamp(0).isoformat()
+    sync_engine = 'unknown'
     status = 'unknown'
 
     try:
         # Extract attributes from log file name
-        log_attr = re.search('(.*)-(.*)-(.*).log.(.*)', log_file)
+        log_attr = re.search('(.*)-(.*)-(.*)\.(.*)\.log\.(.*)', log_file)
         target_id = log_attr.group(1)
         tap_id = log_attr.group(2)
         timestamp = datetime.strptime(log_attr.group(3), '%Y%m%d_%H%M%S').isoformat()
-        status = log_attr.group(4)
+        sync_engine = log_attr.group(4)
+        status = log_attr.group(5)
 
     # Ignore exception when attributes cannot be extracted - Defaults will be used
     except Exception:
@@ -302,6 +330,7 @@ def extract_log_attributes(log_file):
         'target_id': target_id,
         'tap_id': tap_id,
         'timestamp': timestamp,
+        'sync_engine': sync_engine,
         'status': status
     }
 
