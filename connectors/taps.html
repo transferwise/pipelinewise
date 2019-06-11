@@ -115,12 +115,14 @@
 <p class="caption"><span class="caption-text">Connectors</span></p>
 <ul class="current">
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Taps (Data Sources)</a></li>
-<li class="toctree-l1"><a class="reference internal" href="#configuring-the-taps">Configuring the taps</a><ul>
+<li class="toctree-l1"><a class="reference internal" href="#configuring-taps">Configuring taps</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="taps/mysql.html">Tap MySQL</a></li>
 <li class="toctree-l2"><a class="reference internal" href="taps/postgres.html">Tap PostgreSQL</a></li>
-<li class="toctree-l2"><a class="reference internal" href="taps/zendesk.html">Tap Zendesk</a></li>
 <li class="toctree-l2"><a class="reference internal" href="taps/s3_csv.html">Tap S3 CSV</a></li>
 <li class="toctree-l2"><a class="reference internal" href="taps/kafka.html">Tap Kafka</a></li>
+<li class="toctree-l2"><a class="reference internal" href="taps/snowflake.html">Tap Snowflake</a></li>
+<li class="toctree-l2"><a class="reference internal" href="taps/salesforce.html">Tap Salesforce</a></li>
+<li class="toctree-l2"><a class="reference internal" href="taps/zendesk.html">Tap Zendesk</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="targets.html">Targets (Destinations)</a></li>
@@ -196,42 +198,70 @@
   <div class="section" id="taps-data-sources">
 <span id="taps-list"></span><h1>Taps (Data Sources)<a class="headerlink" href="#taps-data-sources" title="Permalink to this headline">¶</a></h1>
 <p>PipelineWise can replicate data from the following data sources:</p>
-<ul class="simple">
-<li><p>MySQL (<a class="reference internal" href="taps/mysql.html#tap-mysql"><span class="std std-ref">Tap MySQL</span></a>)</p></li>
-<li><p>MariaDB (<a class="reference internal" href="taps/mysql.html#tap-mysql"><span class="std std-ref">Tap MySQL</span></a>)</p></li>
-<li><p>PostgreSQL (<a class="reference internal" href="taps/postgres.html#tap-postgres"><span class="std std-ref">Tap PostgreSQL</span></a>)</p></li>
-<li><p>Zendesk (<a class="reference internal" href="taps/zendesk.html#tap-zendesk"><span class="std std-ref">Tap Zendesk</span></a>)</p></li>
-<li><p>Kafka stream (<a class="reference internal" href="taps/kafka.html#tap-kafka"><span class="std std-ref">Tap Kafka</span></a>)</p></li>
-<li><p>CSV file on S3 (<a class="reference internal" href="targets/s3_csv.html#target-s3-csv"><span class="std std-ref">Target S3 CSV</span></a>)</p></li>
-</ul>
+<div class="tile-wrapper docutils container">
+<div class="tile docutils container">
+<div class="img-hover-zoom docutils container">
+<a class="reference external image-reference" href="taps/mysql.html"><img alt="../_images/mysql-logo.png" src="../_images/mysql-logo.png" /></a>
 </div>
-<div class="section" id="configuring-the-taps">
-<h1>Configuring the taps<a class="headerlink" href="#configuring-the-taps" title="Permalink to this headline">¶</a></h1>
+<p><a class="reference internal" href="taps/mysql.html#tap-mysql"><span class="std std-ref">Tap MySQL</span></a></p>
+</div>
+<div class="tile docutils container">
+<div class="img-hover-zoom docutils container">
+<a class="reference external image-reference" href="taps/mysql.html"><img alt="../_images/mariadb-logo.png" src="../_images/mariadb-logo.png" /></a>
+</div>
+<p><a class="reference internal" href="taps/mysql.html#tap-mysql"><span class="std std-ref">Tap MySQL</span></a></p>
+</div>
+<div class="tile docutils container">
+<div class="img-hover-zoom docutils container">
+<a class="reference external image-reference" href="taps/postgres.html"><img alt="../_images/postgres-logo.png" src="../_images/postgres-logo.png" /></a>
+</div>
+<p><a class="reference internal" href="taps/postgres.html#tap-postgres"><span class="std std-ref">Tap PostgreSQL</span></a></p>
+</div>
+<div class="tile docutils container">
+<div class="img-hover-zoom docutils container">
+<a class="reference external image-reference" href="taps/s3_csv.html"><img alt="../_images/s3-logo.png" src="../_images/s3-logo.png" /></a>
+</div>
+<p><a class="reference internal" href="taps/s3_csv.html#tap-s3-csv"><span class="std std-ref">Tap S3 CSV</span></a></p>
+</div>
+</div>
+<div class="tile-wrapper docutils container">
+<div class="tile docutils container">
+<div class="img-hover-zoom docutils container">
+<a class="reference external image-reference" href="taps/kafka.html"><img alt="../_images/kafka-logo.png" src="../_images/kafka-logo.png" /></a>
+</div>
+<p><a class="reference internal" href="taps/kafka.html#tap-kafka"><span class="std std-ref">Tap Kafka</span></a></p>
+</div>
+<div class="tile docutils container">
+<div class="img-hover-zoom docutils container">
+<a class="reference external image-reference" href="taps/snowflake.html"><img alt="../_images/snowflake-logo.png" src="../_images/snowflake-logo.png" /></a>
+</div>
+<p><a class="reference internal" href="taps/snowflake.html#tap-snowflake"><span class="std std-ref">Tap Snowflake</span></a></p>
+</div>
+<div class="tile docutils container">
+<div class="img-hover-zoom docutils container">
+<a class="reference external image-reference" href="taps/salesforce.html"><img alt="../_images/salesforce-logo.png" src="../_images/salesforce-logo.png" /></a>
+</div>
+<p><a class="reference internal" href="taps/salesforce.html#tap-salesforce"><span class="std std-ref">Tap Salesforce</span></a></p>
+</div>
+<div class="tile docutils container">
+<div class="img-hover-zoom docutils container">
+<a class="reference external image-reference" href="taps/zendesk.html"><img alt="../_images/zendesk-logo.png" src="../_images/zendesk-logo.png" /></a>
+</div>
+<p><a class="reference internal" href="taps/zendesk.html#tap-zendesk"><span class="std std-ref">Tap Zendesk</span></a></p>
+</div>
+</div>
+</div>
+<div class="section" id="configuring-taps">
+<h1>Configuring taps<a class="headerlink" href="#configuring-taps" title="Permalink to this headline">¶</a></h1>
 <div class="toctree-wrapper compound">
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="taps/mysql.html">Tap MySQL</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="taps/mysql.html#mysql-setup-requirements">MySQL setup requirements</a></li>
-<li class="toctree-l2"><a class="reference internal" href="taps/mysql.html#configuring-what-to-replicate">Configuring what to replicate</a></li>
-</ul>
-</li>
-<li class="toctree-l1"><a class="reference internal" href="taps/postgres.html">Tap PostgreSQL</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="taps/postgres.html#postgresql-setup-requirements">PostgreSQL setup requirements</a></li>
-<li class="toctree-l2"><a class="reference internal" href="taps/postgres.html#configuring-what-to-replicate">Configuring what to replicate</a></li>
-</ul>
-</li>
-<li class="toctree-l1"><a class="reference internal" href="taps/zendesk.html">Tap Zendesk</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="taps/zendesk.html#configuring-what-to-replicate">Configuring what to replicate</a></li>
-</ul>
-</li>
-<li class="toctree-l1"><a class="reference internal" href="taps/s3_csv.html">Tap S3 CSV</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="taps/s3_csv.html#configuring-what-to-replicate">Configuring what to replicate</a></li>
-</ul>
-</li>
-<li class="toctree-l1"><a class="reference internal" href="taps/kafka.html">Tap Kafka</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="taps/kafka.html#connecting-to-kafka">Connecting to Kafka</a></li>
-<li class="toctree-l2"><a class="reference internal" href="taps/kafka.html#configuring-what-to-replicate">Configuring what to replicate</a></li>
-</ul>
-</li>
+<li class="toctree-l1"><a class="reference internal" href="taps/mysql.html">Tap MySQL</a></li>
+<li class="toctree-l1"><a class="reference internal" href="taps/postgres.html">Tap PostgreSQL</a></li>
+<li class="toctree-l1"><a class="reference internal" href="taps/s3_csv.html">Tap S3 CSV</a></li>
+<li class="toctree-l1"><a class="reference internal" href="taps/kafka.html">Tap Kafka</a></li>
+<li class="toctree-l1"><a class="reference internal" href="taps/snowflake.html">Tap Snowflake</a></li>
+<li class="toctree-l1"><a class="reference internal" href="taps/salesforce.html">Tap Salesforce</a></li>
+<li class="toctree-l1"><a class="reference internal" href="taps/zendesk.html">Tap Zendesk</a></li>
 </ul>
 </div>
 </div>

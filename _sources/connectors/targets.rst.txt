@@ -6,9 +6,35 @@ Targets (Destinations)
 
 PipelineWise can replicate data from every supported :ref:`taps_list` into the following destinations:
 
-* Snowflake - :ref:`target-snowflake`                    
-* PostgreSQL - :ref:`target-postgres`              
-* S3 in CSV format - :ref:`target-s3-csv`     
+
+.. container:: tile-wrapper
+
+    .. container:: tile
+
+        .. container:: img-hover-zoom
+
+          .. image:: ../img/snowflake-logo.png
+             :target: targets/snowflake.html
+
+        :ref:`target-snowflake`
+
+    .. container:: tile
+
+        .. container:: img-hover-zoom
+
+          .. image:: ../img/postgres-logo.png
+             :target: targets/postgres.html
+
+        :ref:`target-postgres`
+
+    .. container:: tile
+
+        .. container:: img-hover-zoom
+
+          .. image:: ../img/s3-logo.png
+             :target: targets/s3_csv.html
+
+        :ref:`target-s3-csv` 
 
 
 Configuring the targets
