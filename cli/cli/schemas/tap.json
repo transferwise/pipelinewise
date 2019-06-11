@@ -80,7 +80,8 @@
       "tap-zendesk",
       "tap-kafka",
       "tap-s3-csv",
-      "tap-snowflake"
+      "tap-snowflake",
+      "tap-salesforce"
       ] },
     "db_conn":{ "type": "object" },
     "target": { "type": "string" },

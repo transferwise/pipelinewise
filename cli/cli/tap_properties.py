@@ -126,6 +126,15 @@ def get_tap_properties(tap=None):
         'tap_catalog_argument': '--properties',
     },
 
+    'tap-salesforce': {
+        'tap_config_extras': {
+            'select_fields_by_default': True
+        },
+        'tap_stream_id_pattern': '{{table_name}}',
+        'tap_stream_name_pattern': '{{table_name}}',
+        'tap_catalog_argument': '--properties',
+    },
+
     # Default values to use as a fallback method
     'DEFAULT': {
         'tap_config_extras': {},

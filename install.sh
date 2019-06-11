@@ -54,6 +54,7 @@ install_connector tap-kafka
 install_connector tap-adwords
 install_connector tap-s3-csv
 install_connector tap-snowflake
+install_connector tap-salesforce
 install_connector target-postgres
 install_connector target-snowflake
 install_connector target-s3-csv
