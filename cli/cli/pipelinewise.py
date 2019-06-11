@@ -645,7 +645,7 @@ class PipelineWise(object):
     def status(self):
         targets = self.get_targets()
 
-        tab_headers = ['Warehouse ID', 'Warehouse Type', 'Source ID', 'Enabled', 'Source Type', 'Status', 'Last Sync', 'Last Sync Result']
+        tab_headers = ['Tap ID', 'Tap Type', 'Target ID', 'Target Type', 'Enabled', 'Status', 'Last Sync', 'Last Sync Result']
         tab_body = []
         pipelines = 0
         for target in targets:
@@ -653,11 +653,11 @@ class PipelineWise(object):
 
             for tap in taps:
                 tab_body.append([
+                    tap.get('id', '<Unknown>'),
+                    tap.get('type', '<Unknown>'),
                     target.get('id', '<Unknown>'),
                     target.get('type', '<Unknown>'),
-                    tap.get('id', '<Unknown>'),
                     tap.get('enabled', '<Unknown>'),
-                    tap.get('type', '<Unknown>'),
                     tap.get('status', {}).get('currentStatus', '<Unknown>'),
                     tap.get('status', {}).get('lastTimestamp', '<Unknown>'),
                     tap.get('status', {}).get('lastStatus', '<Unknown>')

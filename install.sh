@@ -13,7 +13,8 @@ start_time=`date +%s`
 SRC_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
 # Install pipelinewise venvs in the present working directory
-VENV_DIR=$(pwd)/.virtualenvs
+PIPELINEWISE_HOME=$(pwd)
+VENV_DIR=${PIPELINEWISE_HOME}/.virtualenvs
 
 make_virtualenv() {
     echo
@@ -78,7 +79,7 @@ echo "--------------------------------------------------------------------------
 echo
 echo "To start CLI:"
 echo " $ source $VENV_DIR/cli/bin/activate"
-echo " $ export PIPELINEWISE_HOME=$VENV_DIR"
+echo " $ export PIPELINEWISE_HOME=$PIPELINEWISE_HOME"
 
 echo " $ pipelinewise status"
 echo
