@@ -323,9 +323,9 @@ Normally you will need to go into <code class="docutils literal notranslate"><sp
 log files.</p>
 <p>Once the config YAML files are imported, you can see the new pipelines with the <a class="reference internal" href="../user_guide/cli.html#cli-status"><span class="std std-ref">status</span></a> command:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ pipelinewise status
-Warehouse ID    Source ID     Enabled    Type       Status    Last Sync    Last Sync Result
---------------  ------------  ---------  ---------  --------  -----------  ------------------
-snowflake       mysql_sample  True       tap-mysql  ready                  unknown
+Tap ID        Tap Type    Target ID    Target Type       Enabled    Status    Last Sync    Last Sync Result
+------------  ----------  -----------  ----------------  ---------  --------  -----------  ------------------
+mysql_sample  tap-mysql   snowflake    target-snowflake  True       ready                  unknown
 <span class="m">1</span> pipeline<span class="o">(</span>s<span class="o">)</span>
 </pre></div>
 </div>

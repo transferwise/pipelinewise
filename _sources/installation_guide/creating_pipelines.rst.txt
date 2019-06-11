@@ -159,9 +159,9 @@ Once the config YAML files are imported, you can see the new pipelines with the 
 .. code-block:: bash
 
     $ pipelinewise status
-    Warehouse ID    Source ID     Enabled    Type       Status    Last Sync    Last Sync Result
-    --------------  ------------  ---------  ---------  --------  -----------  ------------------
-    snowflake       mysql_sample  True       tap-mysql  ready                  unknown
+    Tap ID        Tap Type    Target ID    Target Type       Enabled    Status    Last Sync    Last Sync Result
+    ------------  ----------  -----------  ----------------  ---------  --------  -----------  ------------------
+    mysql_sample  tap-mysql   snowflake    target-snowflake  True       ready                  unknown
     1 pipeline(s)
 
 
