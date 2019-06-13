@@ -8,6 +8,7 @@ import shlex
 import copy
 import re
 import logging
+import jsonschema
 
 from subprocess import Popen, PIPE, STDOUT
 from datetime import date, datetime
@@ -21,6 +22,9 @@ from ansible.parsing.yaml.objects import AnsibleVaultEncryptedUnicode
 from ansible.utils.unsafe_proxy import AnsibleUnsafe
 from ansible.module_utils._text import to_text
 from ansible.module_utils.common._collections_compat import Mapping
+from ansible.errors import AnsibleError
+
+from . import tap_properties
 
 logger = logging.getLogger('Pipelinewise CLI')
 
@@ -90,6 +94,7 @@ def load_json(path):
             with open(path) as f:
                 return json.load(f)
         else:
+            logger.debug("No file at {}".format(path))
             return None
     except Exception as exc:
         raise Exception("Error parsing {} {}".format(path, exc))
@@ -107,6 +112,31 @@ def save_json(data, path):
         raise Exception("Cannot save JSON {} {}".format(path, exc))
 
 
+def is_yaml(string):
+    '''
+    Detects if a string is a valid yaml or not
+    '''
+    try:
+        yaml_object = yaml.safe_load(string)
+    except Exception as exc:
+        return False
+    return True
+
+
+def is_yaml_file(path):
+    '''
+    Detects if a file is a valid yaml file or not
+    '''
+    try:
+        if os.path.isfile(path):
+            with open(path) as f:
+                if yaml.safe_load(f):
+                    return True
+        return False
+    except Exception as exc:
+        return False
+
+
 def load_yaml(yaml_file, vault_secret=None):
     '''
     Load a YAML file into a python dictionary.
@@ -116,32 +146,107 @@ def load_yaml(yaml_file, vault_secret=None):
     encryption is ideal to store passwords or encrypt the entire file
     with sensitive data if required.
     '''
-    secret_file = get_file_vault_secret(filename=vault_secret, loader=DataLoader())
-    secret_file.load()
-
     vault = VaultLib()
-    vault.secrets = [('default', secret_file)]
+
+    if vault_secret:
+        secret_file = get_file_vault_secret(filename=vault_secret, loader=DataLoader())
+        secret_file.load()
+        vault.secrets = [('default', secret_file)]
 
     data = None
-    with open(yaml_file, 'r') as stream:
-        try:
-            if is_encrypted_file(stream):
-                file_data = stream.read()
-                data = yaml.load(vault.decrypt(file_data, None))
-            else:
-                loader = AnsibleLoader(stream, None, vault.secrets)
-                try:
-                    data = loader.get_single_data()
-                except Exception as exc:
-                    logger.critical("Error when loading YAML config at {} {}".format(yaml_file, exc))
-                    sys.exit(1)
-                finally:
-                    loader.dispose()
-        except yaml.YAMLError as exc:
-            logger.critical("Error when loading YAML config at {} {}".format(yaml_file, exc))
-            sys.exit(1)
+    if os.path.isfile(yaml_file):
+        with open(yaml_file, 'r') as stream:
+            try:
+                if is_encrypted_file(stream):
+                    file_data = stream.read()
+                    data = yaml.load(vault.decrypt(file_data, None))
+                else:
+                    loader = AnsibleLoader(stream, None, vault.secrets)
+                    try:
+                        data = loader.get_single_data()
+                    except Exception as exc:
+                        raise Exception("Error when loading YAML config at {} {}".format(yaml_file, exc))
+                    finally:
+                        loader.dispose()
+            except yaml.YAMLError as exc:
+                raise Exception("Error when loading YAML config at {} {}".format(yaml_file, exc))
+    else:
+        logger.debug("No file at {}".format(yaml_file))
 
     return data
+
+
+def vault_encrypt(plaintext, secret):
+    '''
+    Vault encrypt a piece of data.
+    '''
+    try:
+        vault = VaultLib()
+        secret_file = get_file_vault_secret(filename=secret, loader=DataLoader())
+        secret_file.load()
+        vault.secrets = [('default', secret_file)]
+
+        return vault.encrypt(plaintext)
+    except AnsibleError as e:
+        logger.critical("Cannot encrypt string: {}".format(e))
+        sys.exit(1)
+
+
+def vault_format_ciphertext_yaml(b_ciphertext, indent=None, name=None):
+    '''
+    Format a ciphertext to YAML compatible string
+    '''
+    indent = indent or 10
+
+    block_format_var_name = ""
+    if name:
+        block_format_var_name = "%s: " % name
+
+    block_format_header = "%s!vault |" % block_format_var_name
+    lines = []
+    vault_ciphertext = to_text(b_ciphertext)
+
+    lines.append(block_format_header)
+    for line in vault_ciphertext.splitlines():
+        lines.append('%s%s' % (' ' * indent, line))
+
+    yaml_ciphertext = '\n'.join(lines)
+    return yaml_ciphertext
+
+
+def load_schema(name):
+    '''
+    Load a json schema
+    '''
+    path = "{}/schemas/{}.json".format(os.path.dirname(__file__), name)
+    schema = load_json(path)
+
+    if not schema:
+        logger.critical("Cannot load schema at {}".format(path))
+        sys.exit(1)
+
+    return schema
+
+
+def get_sample_file_paths():
+    '''
+    Get list of every available sample files (YAML, etc.) with absolute paths
+    '''
+    samples_dir = os.path.join(os.path.dirname(__file__), "samples")
+    return search_files(samples_dir, patterns=['*.yml.sample', 'README.md'], abs_path=True)
+
+
+def validate(instance, schema):
+    '''
+    Validate an instance under a given json schema
+    '''
+    try:
+        # Serialise vault encrypted objects to string
+        schema_safe_inst = json.loads(json.dumps(instance, cls=AnsibleJSONEncoder))
+        jsonschema.validate(instance=schema_safe_inst, schema=schema)
+    except Exception as exc:
+        logger.critical("Invalid object. {}".format(exc))
+        sys.exit(1)
 
 
 def delete_empty_keys(d):
@@ -176,7 +281,7 @@ def silentremove(path):
             raise
 
 
-def search_files(search_dir, patterns=['*'], sort=False):
+def search_files(search_dir, patterns=['*'], sort=False, abs_path=False):
     '''
     Searching files in a specific directory that match a pattern
     '''
@@ -190,7 +295,7 @@ def search_files(search_dir, patterns=['*'], sort=False):
             p_files.sort(key=lambda x: os.path.getmtime(x), reverse=True)
 
         # Cut the whole paths, we only need the filenames
-        files = list(map(lambda x: os.path.basename(x), p_files))
+        files = list(map(lambda x: os.path.basename(x) if not abs_path else x, p_files))
 
     return files
 
@@ -203,15 +308,17 @@ def extract_log_attributes(log_file):
     target_id = 'unknown'
     tap_id = 'unknown'
     timestamp = datetime.utcfromtimestamp(0).isoformat()
+    sync_engine = 'unknown'
     status = 'unknown'
 
     try:
         # Extract attributes from log file name
-        log_attr = re.search('(.*)-(.*)-(.*).log.(.*)', log_file)
+        log_attr = re.search('(.*)-(.*)-(.*)\.(.*)\.log\.(.*)', log_file)
         target_id = log_attr.group(1)
         tap_id = log_attr.group(2)
         timestamp = datetime.strptime(log_attr.group(3), '%Y%m%d_%H%M%S').isoformat()
-        status = log_attr.group(4)
+        sync_engine = log_attr.group(4)
+        status = log_attr.group(5)
 
     # Ignore exception when attributes cannot be extracted - Defaults will be used
     except Exception:
@@ -223,8 +330,70 @@ def extract_log_attributes(log_file):
         'target_id': target_id,
         'tap_id': tap_id,
         'timestamp': timestamp,
+        'sync_engine': sync_engine,
         'status': status
     }
+
+
+def get_tap_property(tap, property_key):
+    '''
+    Get a tap specific property value
+    '''
+    tap_props_inst = tap_properties.get_tap_properties(tap)
+    tap_props = tap_props_inst.get(tap.get('type'), tap_props_inst.get('DEFAULT', {}))
+
+    return tap_props.get(property_key)
+
+
+def get_tap_property_by_tap_type(tap_type, property_key):
+    '''
+    Get a tap specific property value by a tap type.
+
+    Some attributes cannot derived only by tap type. These
+    properties might not be returned as expected.
+    '''
+    tap_props_inst = tap_properties.get_tap_properties()
+    tap_props = tap_props_inst.get(tap_type, tap_props_inst.get('DEFAULT', {}))
+
+    return tap_props.get(property_key)
+
+
+def get_tap_extra_config_keys(tap):
+    '''
+    '''
+    return get_tap_property(tap, 'tap_config_extras')
+
+
+def get_tap_stream_id(tap, database_name, schema_name, table_name):
+    '''
+    Generate tap_stream_id in the same format as a specific
+    tap generating it. They are not consistent.
+
+    Stream id is the string that tha tap's discovery mode puts
+    into the properties.json file
+    '''
+    pattern = get_tap_property(tap, 'tap_stream_id_pattern')
+
+    return pattern \
+        .replace("{{database_name}}", "{}".format(database_name)) \
+        .replace("{{schema_name}}", "{}".format(schema_name)) \
+        .replace("{{table_name}}", "{}".format(table_name))
+
+
+def get_tap_stream_name(tap, database_name, schema_name, table_name):
+    '''
+    Generate tap_stream_name in the same format as a specific
+    tap generating it. They are not consistent.
+
+    Stream name is the string that the tap puts into the output
+    singer messages
+    '''
+    pattern = get_tap_property(tap, 'tap_stream_name_pattern')
+
+    return pattern \
+        .replace("{{database_name}}", "{}".format(database_name)) \
+        .replace("{{schema_name}}", "{}".format(schema_name)) \
+        .replace("{{table_name}}", "{}".format(table_name))
 
 
 def get_fastsync_bin(venv_dir, tap_type, target_type):

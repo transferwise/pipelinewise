@@ -147,15 +147,20 @@ class Snowflake:
     def obfuscate_columns(self, target_schema, table_name):
         utils.log("SNOWFLAKE - Applying obfuscation rules")
         table_dict = utils.tablename_to_dict(table_name)
-        target_table = table_dict.get('name')
         temp_table = table_dict.get('temp_name')
         transformations = self.transformation_config.get('transformations', [])
         trans_cols = []
 
         # Find obfuscation rule for the current table
         for t in transformations:
-            if t.get('stream') == target_table:
-                column = t.get('fieldId')
+            # Input table_name is formatted as {{schema}}.{{table}}
+            # Stream name in taps transformation.json is formatted as {{schema}}-{{table}}
+            #
+            # We need to convert to the same format to find the transformation
+            # has that has to be applied
+            tap_stream_name_by_table_name = "{}-{}".format(table_dict.get('schema'), table_dict.get('name'))
+            if t.get('tap_stream_name') == tap_stream_name_by_table_name:
+                column = t.get('field_id')
                 transform_type = t.get('type')
                 if transform_type == 'SET-NULL':
                     trans_cols.append("{} = NULL".format(column))

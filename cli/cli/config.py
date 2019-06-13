@@ -1,4 +1,5 @@
 import os
+import sys
 import logging
 
 from . import utils
@@ -43,21 +44,35 @@ class Config(object):
         # Load every target yaml into targets dictionary        
         for yaml_file in target_yamls:
             config.logger.info("LOADING TARGET: {}".format(yaml_file))
-            yaml_data = utils.load_yaml(os.path.join(yaml_dir, yaml_file), vault_secret)
-            for t in yaml_data.keys():
-                # Add generated extra keys that not available in the YAML
-                yaml_data[t]['files'] = config.get_connector_files(config.get_target_dir(t))
-                yaml_data[t]['taps'] = []
-                targets[t] = yaml_data[t]
+            target_data = utils.load_yaml(os.path.join(yaml_dir, yaml_file), vault_secret)
+            utils.validate(instance=target_data, schema=utils.load_schema("target"))
+
+            # Add generated extra keys that not available in the YAML
+            target_id = target_data['id']
+
+            target_data['files'] = config.get_connector_files(config.get_target_dir(target_id))
+            target_data['taps'] = []
+
+            # Add target to list
+            targets[target_id] = target_data
 
         # Load every tap yaml into targets dictionary
         for yaml_file in tap_yamls:
             config.logger.info("LOADING TAP: {}".format(yaml_file))
-            yaml_data = utils.load_yaml(os.path.join(yaml_dir, yaml_file), vault_secret)
-            for t in yaml_data.keys():
-                # Add generated extra keys that not available directly in YAML
-                yaml_data[t]['files'] = config.get_connector_files(config.get_tap_dir(yaml_data[t].get('target'), yaml_data[t].get('id')))
-                taps[t] = yaml_data[t]
+            tap_data = utils.load_yaml(os.path.join(yaml_dir, yaml_file), vault_secret)
+            utils.validate(instance=tap_data, schema=utils.load_schema("tap"))
+
+            tap_id = tap_data['id']
+            target_id = tap_data['target']
+            if target_id not in targets:
+                config.logger.error("Can't find the target with the ID \"{}\" but it's referenced in {}".format(target_id, yaml_file))
+                sys.exit(1)
+
+            # Add generated extra keys that not available in the YAML
+            tap_data['files'] = config.get_connector_files(config.get_tap_dir(target_id, tap_id))
+
+            # Add tap to list
+            taps[tap_id] = tap_data
 
         # Link taps to targets
         for target_key in targets.keys():
@@ -117,11 +132,7 @@ class Config(object):
 
             # Save every tap JSON files
             for i, tap in enumerate(target['taps']):
-                # Add unique server_id to db_conn when tap type is mysql
-                extra_config_keys = {}
-                if tap.get('type') == 'tap-mysql':
-                    extra_config_keys = {'server_id': 900000000 + i}
-
+                extra_config_keys = utils.get_tap_extra_config_keys(tap)
                 self.save_tap_jsons(target, tap, extra_config_keys)
 
 
@@ -158,6 +169,10 @@ class Config(object):
         main_config = {
             "targets": targets
         }
+
+        # Create config dir if not exists
+        if not os.path.exists(self.config_dir):
+            os.mkdir(self.config_dir)
 
         # Save to JSON
         utils.save_json(main_config, self.config_path)
@@ -201,9 +216,9 @@ class Config(object):
 
         # Define tap JSON file paths
         tap_config_path = os.path.join(tap_dir, "config.json")
-        tap_inheritable_config_path = os.path.join(tap_dir, "inheritable_config.json")
-        tap_transformation_path = os.path.join(tap_dir, "transformation.json")
         tap_selection_path = os.path.join(tap_dir, "selection.json")
+        tap_transformation_path = os.path.join(tap_dir, "transformation.json")
+        tap_inheritable_config_path = os.path.join(tap_dir, "inheritable_config.json")
 
         # Create tap dir if not exists
         if not os.path.exists(tap_dir):
@@ -212,45 +227,84 @@ class Config(object):
         # Generate tap config dict: a merged dictionary of db_connection and optional extra_keys
         tap_config = {**tap.get('db_conn'), **extra_config_keys}
 
-        # Generate tap inheritable_config dict
-        tap_inheritable_config = utils.delete_empty_keys({
-            "batch_size_rows": tap.get('batch_size_rows'),
-            "schema": tap.get('target_schema'),
-            "dynamic_schema_name": tap.get('dynamic_schema_name'),
-            "dynamic_schema_name_postfix": tap.get('dynamic_schema_name_postfix'),
-            "hard_delete": tap.get('hard_delete', True),
-            "grant_select_to": tap.get('grant_select_to'),
-            "primary_key_required": tap.get('primary_key_required', True)
-        })
+        # Get additional properties will be needed later to generate tap_stream_id
+        tap_dbname = tap_config.get('dbname')
+
+        # Generate tap selection
+        selection = []
+        for schema in tap.get('schemas', []):
+            schema_name = schema.get('source_schema')
+            for table in schema.get('tables', []):
+                table_name = table.get('table_name')
+                selection.append(utils.delete_empty_keys({
+                    "tap_stream_id": utils.get_tap_stream_id(tap, tap_dbname, schema_name, table_name),
+
+                    # Default replication_method is LOG_BASED
+                    "replication_method": table.get('replication_method', 'LOG_BASED'),
+
+                    # Add replication_key only if replication_method is INCREMENTAL
+                    "replication_key": table.get('replication_key') if table.get('replication_method') == 'INCREMENTAL' else None
+                }))
+        tap_selection = {
+            "selection": selection
+        }
 
         # Generate tap transformation
         transformations = []
-        for table in tap.get('tables', []):
-            for trans in table.get('transformations', []):
-                transformations.append({
-                    "stream": table.get('table_name'),
-                    "fieldId": trans.get('column'),
-                    "type": trans.get('type')
-                })
+        for schema in tap.get('schemas', []):
+            schema_name = schema.get('source_schema')
+            for table in schema.get('tables', []):
+                table_name = table.get('table_name')
+                for trans in table.get('transformations', []):
+                    transformations.append({
+                        "tap_stream_name": utils.get_tap_stream_name(tap, tap_dbname, schema_name, table_name),
+                        "field_id": trans.get('column'),
+                        "type": trans.get('type'),
+                        "when": trans.get('when')
+                    })
         tap_transformation = {
             "transformations": transformations
         }
 
-        # Generate tap selection
-        selection = []
-        for table in tap.get('tables', []):
-            selection.append(utils.delete_empty_keys({
-                "table_name": table.get('table_name'),
+        # Generate stream to schema mapping
+        schema_mapping = {}
+        for schema in tap.get('schemas', []):
+            source_schema = schema.get('source_schema')
+            target_schema = schema.get('target_schema')
+            target_schema_select_permissions = schema.get('target_schema_select_permissions')
 
-                # Default replication_method is LOG_BASED
-                "replication_method": table.get('replication_method', 'LOG_BASED'),
+            schema_mapping[source_schema] = {
+                "target_schema": target_schema,
+                "target_schema_select_permissions": target_schema_select_permissions
+            }
 
-                # Add replication_key only if replication_method is INCREMENTAL
-                "replication_key": table.get('replication_key') if table.get('replication_method') == 'INCREMENTAL' else None
-            }))
-        tap_selection = {
-            "selection": selection
+            # Schema mapping can include list of indices to create. Some target components
+            # like target-postgres create indices automatically
+            indices = {}
+            for table in schema.get('tables', []):
+                table_name = table.get('table_name')
+                table_indices = table.get('indices')
+                if table_indices:
+                    indices[table_name] = table_indices
+
+            # Add indices map to schema mapping
+            if indices:
+                schema_mapping[source_schema]['indices'] = indices
+
+        # Schema mapping is ready
+        tap_schema_mapping = {
+            "schema_mapping": schema_mapping
         }
+
+        # Generate tap inheritable_config dict
+        tap_inheritable_config = utils.delete_empty_keys({
+            "batch_size_rows": tap.get('batch_size_rows'),
+            "hard_delete": tap.get('hard_delete', True),
+            "primary_key_required": tap.get('primary_key_required', True),
+            "default_target_schema": tap.get('default_target_schema'),
+            "default_target_schema_select_permissions": tap.get('default_target_schema_select_permissions'),
+            "schema_mapping": schema_mapping
+        })
 
         # Save the generated JSON files
         utils.save_json(tap_config, tap_config_path)

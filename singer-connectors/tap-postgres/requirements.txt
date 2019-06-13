@@ -1,1 +1,1 @@
-tap-postgres-koszti==1.0.2
+pipelinewise-tap-postgres==1.0.3

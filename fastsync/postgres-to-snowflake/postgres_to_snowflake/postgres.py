@@ -39,7 +39,8 @@ class Postgres:
             'timestamp with time zone':'TIMESTAMP_TZ',
             'time':'TIME',
             'time without time zone':'TIME',
-            'time with time zone':'TIME'
+            'time with time zone':'TIME',
+            'ARRAY':'VARIANT'
         }.get(pg_type, 'VARCHAR')
 
 
@@ -119,7 +120,24 @@ class Postgres:
 
     def get_table_columns(self, table_name):
         table_dict = utils.tablename_to_dict(table_name)
-        sql = "SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = '{}' and table_name = '{}' ORDER BY ordinal_position".format(table_dict.get('schema'), table_dict.get('name'))
+        sql = """
+                SELECT
+                    column_name
+                    ,data_type
+                    ,safe_sql_value
+                FROM (SELECT
+                column_name,
+                data_type,
+                CASE
+                    WHEN data_type = 'ARRAY' THEN 'array_to_json(' || column_name || ') AS ' || column_name
+                    ELSE column_name
+                END AS safe_sql_value
+                FROM information_schema.columns
+                WHERE table_schema = '{}'
+                    AND table_name = '{}'
+                ORDER BY ordinal_position
+                ) AS x
+            """.format(table_dict.get('schema'), table_dict.get('name'))
         return self.query(sql)
 
 
@@ -131,22 +149,37 @@ class Postgres:
         snowflake_columns = ["{} {}".format(pc[0], self.postgres_type_to_snowflake(pc[1])) for pc in postgres_columns]
         primary_key = self.get_primary_key(table_name)
         if primary_key:
-            snowflake_ddl = "CREATE OR REPLACE TABLE {}.{} ({}, PRIMARY KEY ({}))".format(target_schema, target_table, ', '.join(snowflake_columns), primary_key)
+            snowflake_ddl = """
+            CREATE OR REPLACE TABLE {}.{} ({}
+            ,_SDC_EXTRACTED_AT TIMESTAMP_NTZ
+            ,_SDC_BATCHED_AT TIMESTAMP_NTZ
+            ,_SDC_DELETED_AT VARCHAR
+            , PRIMARY KEY ({}))
+            """.format(target_schema,target_table,', '.join(snowflake_columns),primary_key)
         else:
-            snowflake_ddl = "CREATE OR REPLACE TABLE {}.{} ({})".format(target_schema, target_table, ', '.join(snowflake_columns))
+            snowflake_ddl = """CREATE OR REPLACE TABLE {}.{} ({}
+            ,_SDC_EXTRACTED_AT TIMESTAMP_NTZ
+            ,_SDC_BATCHED_AT TIMESTAMP_NTZ
+            ,_SDC_DELETED_AT VARCHAR
+            )
+            """.format(target_schema, target_table, ', '.join(snowflake_columns))
         return(snowflake_ddl)
 
 
     def copy_table(self, table_name, path):
         table_columns = self.get_table_columns(table_name)
-        columns = [c[0] for c in table_columns]
+        column_safe_sql_values = [c.get('safe_sql_value') for c in table_columns]
 
         # If self.get_table_columns returns zero row then table not exist
-        if len(columns) == 0:
+        if len(column_safe_sql_values) == 0:
             raise Exception("{} table not found.".format(table_name))
 
-        sql = "COPY {} ({}) TO STDOUT with CSV DELIMITER ','".format(table_name, ','.join(columns))
+        sql = """COPY (SELECT {}
+        ,now()
+        ,now()
+        ,null
+        FROM {}) TO STDOUT with CSV DELIMITER ','
+        """.format(','.join(column_safe_sql_values), table_name)
         utils.log("POSTGRES - Exporting data: {}".format(sql))
         with gzip.open(path, 'wt') as gzfile:
             self.curr.copy_expert(sql, gzfile)
-

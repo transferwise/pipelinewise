@@ -1,46 +1,51 @@
+#!/bin/bash
 
-DIR=$(pwd)
-VENV_DIR=$DIR/.virtualenvs
+# Exit script on first error
+set -e
 
-create_virtualenv() {
-    python3 -m venv $VENV_DIR/$1
-}
+# Capture start_time
+start_time=`date +%s`
+
+# Ubuntu prerequisites
+# apt install python3 python3-pip python3-venv libpq-dev libsnappy-dev -y
+
+# Source directory defined as location of install.sh
+SRC_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+
+# Install pipelinewise venvs in the present working directory
+PIPELINEWISE_HOME=$(pwd)
+VENV_DIR=${PIPELINEWISE_HOME}/.virtualenvs
 
 make_virtualenv() {
-    create_virtualenv $1
+    echo
+    echo "--------------------------------------------------------------------------"
+    echo "Making Virtual Environment for $1"
+    echo "--------------------------------------------------------------------------"
+    python3 -m venv $VENV_DIR/$1
     source $VENV_DIR/$1/bin/activate
-    pip install --upgrade pip
-    pip install -r requirements.txt
+    python3 -m pip install --upgrade pip
+    python3 -m pip install -r requirements.txt
     if [ -f "setup.py" ]; then
-        pip install .
+        python3 -m pip install .
     fi
     deactivate
 }
 
 install_connector() {
-    cd $DIR/singer-connectors/$1
+    cd $SRC_DIR/singer-connectors/$1
     make_virtualenv $1
 }
 
 install_fastsync() {
-    cd $DIR/fastsync/$1
+    cd $SRC_DIR/fastsync/$1
     make_virtualenv $1
 }
 
 install_cli() {
-    cd $DIR/cli
+    cd $SRC_DIR/cli
     make_virtualenv cli
 }
 
-install_rest_api() {
-    cd $DIR/rest-api
-    make_virtualenv rest-api
-}
-
-install_admin_console() {
-    cd $DIR/admin-console
-    npm run setup
-}
 
 # Install Singer connectors
 install_connector tap-mysql
@@ -48,9 +53,13 @@ install_connector tap-postgres
 install_connector tap-zendesk
 install_connector tap-kafka
 install_connector tap-adwords
+install_connector tap-s3-csv
+install_connector tap-snowflake
+install_connector tap-salesforce
 install_connector tap-jira
 install_connector target-postgres
 install_connector target-snowflake
+install_connector target-s3-csv
 install_connector transform-field
 
 
@@ -61,20 +70,18 @@ install_fastsync postgres-to-snowflake
 # Install CLI
 install_cli
 
-# Install REST API
-#install_rest_api
+# Capture end_time
+end_time=`date +%s`
 
-# Install web frontent
-#install_admin_console
-
+echo
 echo "--------------------------------------------------------------------------"
-echo "PipelineWise installed successfully"
+echo "PipelineWise installed successfully in $((end_time-start_time)) seconds"
 echo "--------------------------------------------------------------------------"
 echo
-echo "To start REST API:"
-echo "> source .virtualenvs/rest-api/bin/activate && cd rest-api && export FLASK_APP=rest_api && export FLASK_DEBUG=1 && flask run"
-echo
-echo "To start Web Interface:"
-echo "> cd admin-console && npm run start"
+echo "To start CLI:"
+echo " $ source $VENV_DIR/cli/bin/activate"
+echo " $ export PIPELINEWISE_HOME=$PIPELINEWISE_HOME"
+
+echo " $ pipelinewise status"
 echo
 echo "--------------------------------------------------------------------------"

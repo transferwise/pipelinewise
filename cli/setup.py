@@ -15,12 +15,17 @@ setup(name='cli',
         'python-crontab==2.3.5',
         'tabulate==0.8.2',
         'PyYAML==5.1.0',
-        'ansible-vault==1.2.0',
+        'jsonschema==3.0.1',
+        'ansible==2.7.10',
         'joblib==0.13.2'
     ],
     entry_points='''
         [console_scripts]
         pipelinewise=cli:main
     ''',
-    packages=['cli']
+    packages=['cli'],
+    package_data = {
+        "schemas": ["cli/schemas/*.json"]
+    },
+    include_package_data=True
 )
