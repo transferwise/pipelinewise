@@ -1,1 +1,1 @@
-tap-jira==1.0.3
+tap-jira==1.0.4
