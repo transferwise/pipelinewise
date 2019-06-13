@@ -102,6 +102,13 @@ def get_tap_properties(tap=None):
         'tap_catalog_argument': '--catalog',
     },
 
+    'tap-jira': {
+        'tap_config_extras': {},
+        'tap_stream_id_pattern': '{{table_name}}',
+        'tap_stream_name_pattern': '{{table_name}}',
+        'tap_catalog_argument': '--catalog',
+    },
+
     'tap-s3-csv': {
         'tap_config_extras': {
             'tables': generate_tap_s3_csv_to_table_mappings(tap)
