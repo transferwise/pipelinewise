@@ -64,6 +64,7 @@ def get_tap_properties(tap=None):
         'tap_stream_id_pattern': '{{schema_name}}-{{table_name}}',
         'tap_stream_name_pattern': '{{schema_name}}-{{table_name}}',
         'tap_catalog_argument': '--properties',
+        'tap_default_replication_method': 'LOG_BASED'
     },
 
     'tap-postgres': {
@@ -79,6 +80,7 @@ def get_tap_properties(tap=None):
         'tap_stream_id_pattern': '{{database_name}}-{{schema_name}}-{{table_name}}',
         'tap_stream_name_pattern': '{{schema_name}}-{{table_name}}',
         'tap_catalog_argument': '--properties',
+        'tap_default_replication_method': 'INCREMENTAL'
     },
 
     'tap-kafka': {
@@ -86,6 +88,7 @@ def get_tap_properties(tap=None):
         'tap_stream_id_pattern': '{{table_name}}',
         'tap_stream_name_pattern': '{{table_name}}',
         'tap_catalog_argument': '--properties',
+        'tap_default_replication_method': 'LOG_BASED'
     },
 
     'tap-zendesk': {
@@ -93,6 +96,7 @@ def get_tap_properties(tap=None):
         'tap_stream_id_pattern': '{{table_name}}',
         'tap_stream_name_pattern': '{{table_name}}',
         'tap_catalog_argument': '--catalog',
+        'tap_default_replication_method': 'INCREMENTAL'
     },
 
     'tap-adwords': {
@@ -100,6 +104,7 @@ def get_tap_properties(tap=None):
         'tap_stream_id_pattern': '{{table_name}}',
         'tap_stream_name_pattern': '{{table_name}}',
         'tap_catalog_argument': '--catalog',
+        'tap_default_replication_method': 'INCREMENTAL'
     },
 
     'tap-s3-csv': {
@@ -109,6 +114,7 @@ def get_tap_properties(tap=None):
         'tap_stream_id_pattern': '{{table_name}}',
         'tap_stream_name_pattern': '{{table_name}}',
         'tap_catalog_argument': '--properties',
+        'tap_default_replication_method': 'INCREMENTAL'
     },
 
     'tap-snowflake': {
@@ -124,6 +130,7 @@ def get_tap_properties(tap=None):
         'tap_stream_id_pattern': '{{database_name}}-{{schema_name}}-{{table_name}}',
         'tap_stream_name_pattern': '{{schema_name}}-{{table_name}}',
         'tap_catalog_argument': '--properties',
+        'tap_default_replication_method': 'INCREMENTAL'
     },
 
     'tap-salesforce': {
@@ -133,6 +140,7 @@ def get_tap_properties(tap=None):
         'tap_stream_id_pattern': '{{table_name}}',
         'tap_stream_name_pattern': '{{table_name}}',
         'tap_catalog_argument': '--properties',
+        'tap_default_replication_method': 'INCREMENTAL'
     },
 
     # Default values to use as a fallback method
@@ -141,5 +149,6 @@ def get_tap_properties(tap=None):
         'tap_stream_id_pattern': '{{schema_name}}-{{table_name}}',
         'tap_stream_name_pattern': '{{schema_name}}-{{table_name}}',
         'tap_catalog_argument': '--catalog',
+        'tap_default_replication_method': 'LOG_BASED'
     },
 }
