@@ -161,13 +161,13 @@ class PipelineWise(object):
                     # Valid bookmark keys:
                     #   'replication_key_value' key created for INCREMENTAL tables
                     #   'log_pos' key created by MySQL LOG_BASED tables
-                    #    TODO: Add key for Postgres logical replication
+                    #   'lsn' key created by PostgreSQL LOG_BASED tables
                     #
                     # FULL_TABLE replication method is taken as initial sync required
                     replication_method == 'FULL_TABLE' or
                     (
                         (replication_method in ['INCREMENTAL', 'LOG_BASED']) and
-                        (not ('replication_key_value' in stream_bookmark or 'log_pos' in stream_bookmark))
+                        (not ('replication_key_value' in stream_bookmark or 'log_pos' in stream_bookmark or 'lsn' in stream_bookmark))
                     )
                    ):
                     initial_sync_required = True
