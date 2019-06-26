@@ -80,7 +80,7 @@ def get_tap_properties(tap=None):
         'tap_stream_id_pattern': '{{database_name}}-{{schema_name}}-{{table_name}}',
         'tap_stream_name_pattern': '{{schema_name}}-{{table_name}}',
         'tap_catalog_argument': '--properties',
-        'tap_default_replication_method': 'INCREMENTAL'
+        'tap_default_replication_method': 'LOG_BASED'
     },
 
     'tap-kafka': {
