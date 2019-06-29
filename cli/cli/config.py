@@ -236,14 +236,13 @@ class Config(object):
             schema_name = schema.get('source_schema')
             for table in schema.get('tables', []):
                 table_name = table.get('table_name')
+                replication_method = table.get('replication_method', utils.get_tap_default_replication_method(tap))
                 selection.append(utils.delete_empty_keys({
                     "tap_stream_id": utils.get_tap_stream_id(tap, tap_dbname, schema_name, table_name),
-
-                    # Default replication_method is LOG_BASED
-                    "replication_method": table.get('replication_method', 'LOG_BASED'),
+                    "replication_method": replication_method,
 
                     # Add replication_key only if replication_method is INCREMENTAL
-                    "replication_key": table.get('replication_key') if table.get('replication_method') == 'INCREMENTAL' else None
+                    "replication_key": table.get('replication_key') if replication_method == 'INCREMENTAL' else None
                 }))
         tap_selection = {
             "selection": selection

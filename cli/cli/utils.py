@@ -396,6 +396,13 @@ def get_tap_stream_name(tap, database_name, schema_name, table_name):
         .replace("{{table_name}}", "{}".format(table_name))
 
 
+def get_tap_default_replication_method(tap):
+    '''
+    Get the default replication method for a tap
+    '''
+    return get_tap_property(tap, 'default_replication_method')
+
+
 def get_fastsync_bin(venv_dir, tap_type, target_type):
     '''
     Get the absolute path of a fastsync executable

@@ -3,6 +3,7 @@ import gzip
 import csv
 import os
 import datetime
+import decimal
 
 import mysql_to_snowflake.utils as utils
 
@@ -118,6 +119,9 @@ class MySql:
 
             elif isinstance(mysql_key_value, datetime.date):
                 key_value = mysql_key_value.isoformat() + 'T00:00:00'
+
+            elif isinstance(mysql_key_value, decimal.Decimal):
+                key_value = float(mysql_key_value)
 
             return {
                 "key": replication_key,

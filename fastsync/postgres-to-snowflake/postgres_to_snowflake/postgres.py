@@ -2,6 +2,7 @@ import psycopg2
 from psycopg2 import extras
 import gzip
 import datetime
+import decimal
 
 import postgres_to_snowflake.utils as utils
 
@@ -94,6 +95,9 @@ class Postgres:
 
             elif isinstance(postgres_key_value, datetime.date):
                 key_value = postgres_key_value.isoformat() + 'T00:00:00'
+
+            elif isinstance(postgres_key_value, decimal.Decimal):
+                key_value = float(postgres_key_value)
 
             return {
                 "key": replication_key,
