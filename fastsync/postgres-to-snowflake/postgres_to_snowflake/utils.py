@@ -51,10 +51,8 @@ def get_tables_from_properties(properties):
 
 
 def get_bookmark_for_table(dbname, table, properties, postgres):
-    """Get actual bookmark for a specific table used for INCREMENTAL
-    replications.
-
-    TODO: Do the same for LOG_BASED Postgres logical replication
+    """Get actual bookmark for a specific table used for LOG_BASED or INCREMENTAL
+    replications
     """
     bookmark = {}
 
@@ -72,6 +70,14 @@ def get_bookmark_for_table(dbname, table, properties, postgres):
 
         fully_qualified_table_name = "{}.{}".format(schema_name, table_name)
         if db_name == dbname and fully_qualified_table_name == table:
+            # Log based replication: get postgres lsn
+            if replication_method == "LOG_BASED":
+                lsn_pos = postgres.fetch_current_log_sequence_number()
+                bookmark = {
+                    "lsn": lsn_pos,
+                    "version": 1
+                }
+
             # Key based incremental replication: Get max replication key from source
             if replication_method == "INCREMENTAL":
                 incremental_pos = postgres.fetch_current_incremental_key_pos(fully_qualified_table_name, replication_key)
@@ -80,8 +86,6 @@ def get_bookmark_for_table(dbname, table, properties, postgres):
                     "replication_key_value": incremental_pos.get('key_value'),
                     "version": incremental_pos.get('version', 1)
                 }
-
-            # TODO: LOG_BASED: Get Postgres logical replication position
 
             break
 
