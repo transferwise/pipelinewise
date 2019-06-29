@@ -320,7 +320,7 @@ class Config(object):
             #   1: First we try to find it in the tap YAML
             #   2: Second we try to get the tap type specific default value
             #   3: Othwerise we set flattening level to 0 (disabled)
-            "data_flattening_max_level": tap.get('data_flattening_max_level', utils.get_tap_property(tap, 'data_flattening_max_level') or 0)
+            "data_flattening_max_level": tap.get('data_flattening_max_level', utils.get_tap_property(tap, 'default_data_flattening_max_level') or 0)
         })
 
         # Save the generated JSON files
