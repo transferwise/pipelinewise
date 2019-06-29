@@ -91,8 +91,12 @@ class Postgres:
         # Create replication slot, ignore error if already exists
         try:
             result = self.query("SELECT * FROM pg_create_logical_replication_slot('stitch_{}', 'wal2json')".format(self.connection_config['dbname']))
-        except:
-            pass
+        except Exception as e:
+            # ERROR: replication slot "stitch_{}" already exists SQL state: 42710
+            if (e.pgcode == '42710'):
+                pass
+            else:
+                raise e
 
         # Get current lsn
         if version >= 100000:
