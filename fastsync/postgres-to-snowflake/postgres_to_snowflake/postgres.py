@@ -41,7 +41,9 @@ class Postgres:
             'time':'TIME',
             'time without time zone':'TIME',
             'time with time zone':'TIME',
-            'ARRAY':'VARIANT'
+            'ARRAY':'VARIANT',
+            'json':'VARIANT',
+            'jsonb':'VARIANT'
         }.get(pg_type, 'VARCHAR')
 
 
