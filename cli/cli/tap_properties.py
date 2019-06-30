@@ -113,7 +113,9 @@ def get_tap_properties(tap=None):
     },
 
     'tap-jira': {
-        'tap_config_extras': {},
+        'tap_config_extras': {
+            'user_agent': 'PipelineWise - Tap Jira'
+        },
         'tap_stream_id_pattern': '{{table_name}}',
         'tap_stream_name_pattern': '{{table_name}}',
         'tap_catalog_argument': '--properties',
