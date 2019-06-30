@@ -116,7 +116,7 @@ def get_tap_properties(tap=None):
         'tap_config_extras': {},
         'tap_stream_id_pattern': '{{table_name}}',
         'tap_stream_name_pattern': '{{table_name}}',
-        'tap_catalog_argument': '--catalog',
+        'tap_catalog_argument': '--properties',
         'default_replication_method': 'INCREMENTAL',
         'default_data_flattening_max_level': 0
     },
