@@ -400,7 +400,7 @@ def get_tap_default_replication_method(tap):
     '''
     Get the default replication method for a tap
     '''
-    return get_tap_property(tap, 'tap_default_replication_method')
+    return get_tap_property(tap, 'default_replication_method')
 
 
 def get_fastsync_bin(venv_dir, tap_type, target_type):

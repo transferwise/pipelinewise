@@ -302,7 +302,24 @@ class Config(object):
             "primary_key_required": tap.get('primary_key_required', True),
             "default_target_schema": tap.get('default_target_schema'),
             "default_target_schema_select_permissions": tap.get('default_target_schema_select_permissions'),
-            "schema_mapping": schema_mapping
+            "schema_mapping": schema_mapping,
+
+            # data_flattening_max_level
+            # -------------------------
+            #
+            # 'data_flattening_max_level' is an optional parameter in some target connectors that specifies
+            # how to load nested object into destination.
+            #
+            # We can load the original object represented as JSON or string (data flattening off) or we can
+            # flatten the schema and data by creating columns automatically. When 'data_flattening_max_level'
+            # is set to 0 then flattenning functionality is turned off.
+            #
+            # The value can be set in mutliple place and evaluated in the following order:
+            # ------------
+            #   1: First we try to find it in the tap YAML
+            #   2: Second we try to get the tap type specific default value
+            #   3: Othwerise we set flattening level to 0 (disabled)
+            "data_flattening_max_level": tap.get('data_flattening_max_level', utils.get_tap_property(tap, 'default_data_flattening_max_level') or 0)
         })
 
         # Save the generated JSON files
