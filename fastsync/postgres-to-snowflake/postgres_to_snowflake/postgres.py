@@ -41,7 +41,7 @@ class Postgres:
             'time':'TIME',
             'time without time zone':'TIME',
             'time with time zone':'TIME',
-            'ARRAY':'VARIANT',
+            'ARRAY':'VARIANT',  # This is all uppercase, because postgres stores it in this format in information_schema.columns.data_type
             'json':'VARIANT',
             'jsonb':'VARIANT'
         }.get(pg_type, 'VARCHAR')
