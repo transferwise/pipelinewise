@@ -80,21 +80,31 @@ class Postgres:
                 else:
                     return []
 
+
     def fetch_current_log_sequence_number(self):
         # Make sure PostgreSQL version is 9.4 or higher
         result = self.query("SELECT setting::int AS version FROM pg_settings WHERE name='server_version_num'")
         version = result[0].get("version")
         if version < 90400 :
-                    raise Exception('Unable to use logical replication on PostgreSQL version {}'.format(version))
+            raise Exception('Unable to use logical replication on PostgreSQL version {}'.format(version))
 
         # Create replication slot, ignore error if already exists
         try:
             result = self.query("SELECT * FROM pg_create_logical_replication_slot('stitch_{}', 'wal2json')".format(self.connection_config['dbname']))
-        except:
-            pass
+        except Exception as e:
+            # ERROR: replication slot "stitch_{}" already exists SQL state: 42710
+            if (e.pgcode == '42710'):
+                pass
+            else:
+                raise e
 
         # Get current lsn
-        result = self.query("SELECT pg_current_wal_lsn() AS current_lsn")
+        if version >= 100000:
+            result = self.query("SELECT pg_current_wal_lsn() AS current_lsn")
+        elif version >= 90400:
+            result = self.query("SELECT pg_current_xlog_location() AS current_lsn")
+        else:
+            raise Exception('Unable to use logical replication on PostgreSQL version {}'.format(version))
         current_lsn = result[0].get("current_lsn")
         file, index = current_lsn.split('/')
         return (int(file, 16)  << 32) + int(index, 16)
