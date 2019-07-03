@@ -42,7 +42,7 @@ Example YAML for tap-snowflake:
       dbname: "<DBNANE>"                   # Snowflake database name
       user: "<USER>"                       # Snowflake user
       password: "<PASSWORD>"               # Plain string or vault encrypted
-      dbname: "<DB_NAME>"                  # MySQL/ MariaDB database name
+      warehouse: "<WAREHOUSE>"             # Snowflake warehouse
       #filter_dbs: "<DBNAME"               # Optional: Scan only the required dbs
       #filter_schemas: "SCHEMA_1,SCHEMA_2" # Optional: Scan only the required schemas
                                           #           to improve the performance of
