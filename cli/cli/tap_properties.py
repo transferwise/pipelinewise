@@ -64,7 +64,8 @@ def get_tap_properties(tap=None):
         'tap_stream_id_pattern': '{{schema_name}}-{{table_name}}',
         'tap_stream_name_pattern': '{{schema_name}}-{{table_name}}',
         'tap_catalog_argument': '--properties',
-        'tap_default_replication_method': 'LOG_BASED'
+        'default_replication_method': 'LOG_BASED',
+        'default_data_flattening_max_level': 0
     },
 
     'tap-postgres': {
@@ -80,7 +81,8 @@ def get_tap_properties(tap=None):
         'tap_stream_id_pattern': '{{database_name}}-{{schema_name}}-{{table_name}}',
         'tap_stream_name_pattern': '{{schema_name}}-{{table_name}}',
         'tap_catalog_argument': '--properties',
-        'tap_default_replication_method': 'LOG_BASED'
+        'default_replication_method': 'LOG_BASED',
+        'default_data_flattening_max_level': 0
     },
 
     'tap-kafka': {
@@ -88,7 +90,8 @@ def get_tap_properties(tap=None):
         'tap_stream_id_pattern': '{{table_name}}',
         'tap_stream_name_pattern': '{{table_name}}',
         'tap_catalog_argument': '--properties',
-        'tap_default_replication_method': 'LOG_BASED'
+        'default_replication_method': 'LOG_BASED',
+        'default_data_flattening_max_level': 10
     },
 
     'tap-zendesk': {
@@ -96,7 +99,8 @@ def get_tap_properties(tap=None):
         'tap_stream_id_pattern': '{{table_name}}',
         'tap_stream_name_pattern': '{{table_name}}',
         'tap_catalog_argument': '--catalog',
-        'tap_default_replication_method': 'INCREMENTAL'
+        'default_replication_method': 'INCREMENTAL',
+        'default_data_flattening_max_level': 10
     },
 
     'tap-adwords': {
@@ -104,7 +108,19 @@ def get_tap_properties(tap=None):
         'tap_stream_id_pattern': '{{table_name}}',
         'tap_stream_name_pattern': '{{table_name}}',
         'tap_catalog_argument': '--catalog',
-        'tap_default_replication_method': 'INCREMENTAL'
+        'default_replication_method': 'INCREMENTAL',
+        'default_data_flattening_max_level': 0
+    },
+
+    'tap-jira': {
+        'tap_config_extras': {
+            'user_agent': 'PipelineWise - Tap Jira'
+        },
+        'tap_stream_id_pattern': '{{table_name}}',
+        'tap_stream_name_pattern': '{{table_name}}',
+        'tap_catalog_argument': '--properties',
+        'default_replication_method': 'INCREMENTAL',
+        'default_data_flattening_max_level': 0
     },
 
     'tap-s3-csv': {
@@ -114,7 +130,8 @@ def get_tap_properties(tap=None):
         'tap_stream_id_pattern': '{{table_name}}',
         'tap_stream_name_pattern': '{{table_name}}',
         'tap_catalog_argument': '--properties',
-        'tap_default_replication_method': 'INCREMENTAL'
+        'default_replication_method': 'INCREMENTAL',
+        'default_data_flattening_max_level': 0
     },
 
     'tap-snowflake': {
@@ -130,7 +147,8 @@ def get_tap_properties(tap=None):
         'tap_stream_id_pattern': '{{database_name}}-{{schema_name}}-{{table_name}}',
         'tap_stream_name_pattern': '{{schema_name}}-{{table_name}}',
         'tap_catalog_argument': '--properties',
-        'tap_default_replication_method': 'INCREMENTAL'
+        'default_replication_method': 'INCREMENTAL',
+        'default_data_flattening_max_level': 0
     },
 
     'tap-salesforce': {
@@ -140,7 +158,8 @@ def get_tap_properties(tap=None):
         'tap_stream_id_pattern': '{{table_name}}',
         'tap_stream_name_pattern': '{{table_name}}',
         'tap_catalog_argument': '--properties',
-        'tap_default_replication_method': 'INCREMENTAL'
+        'default_replication_method': 'INCREMENTAL',
+        'default_data_flattening_max_level': 10
     },
 
     # Default values to use as a fallback method
@@ -149,6 +168,7 @@ def get_tap_properties(tap=None):
         'tap_stream_id_pattern': '{{schema_name}}-{{table_name}}',
         'tap_stream_name_pattern': '{{schema_name}}-{{table_name}}',
         'tap_catalog_argument': '--catalog',
-        'tap_default_replication_method': 'LOG_BASED'
+        'default_replication_method': 'LOG_BASED',
+        'default_data_flattening_max_level': 0
     },
 }

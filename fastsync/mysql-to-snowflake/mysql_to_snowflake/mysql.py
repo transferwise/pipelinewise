@@ -41,9 +41,9 @@ class MySql:
             'float':'FLOAT',
             'bool':'BOOLEAN',
             'boolean':'BOOLEAN',
-            'date':'TIMESTAMP_NTZ',
-            'datetime':'TIMESTAMP_NTZ',
-            'timestamp':'TIMESTAMP_NTZ',
+            'date':'TIMESTAMP_NTZ(3)',
+            'datetime':'TIMESTAMP_NTZ(3)',
+            'timestamp':'TIMESTAMP_NTZ(3)',
         }.get(data_type, 'VARCHAR')
 
 

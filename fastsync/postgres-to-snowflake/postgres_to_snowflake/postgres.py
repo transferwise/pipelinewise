@@ -34,13 +34,13 @@ class Postgres:
             'real':'FLOAT',
             'bool':'BOOLEAN',
             'boolean':'BOOLEAN',
-            'date':'TIMESTAMP_NTZ',
-            'timestamp':'TIMESTAMP',
-            'timestamp without time zone':'TIMESTAMP_NTZ',
-            'timestamp with time zone':'TIMESTAMP_TZ',
-            'time':'TIME',
-            'time without time zone':'TIME',
-            'time with time zone':'TIME',
+            'date':'TIMESTAMP_NTZ(3)',
+            'timestamp':'TIMESTAMP_NTZ(3)',
+            'timestamp without time zone':'TIMESTAMP_NTZ(3)',
+            'timestamp with time zone':'TIMESTAMP_TZ(3)',
+            'time':'TIMESTAMP_NTZ(3)',
+            'time without time zone':'TIMESTAMP_NTZ(3)',
+            'time with time zone':'TIMESTAMP_TZ(3)'
             'ARRAY':'VARIANT',  # This is all uppercase, because postgres stores it in this format in information_schema.columns.data_type
             'json':'VARIANT',
             'jsonb':'VARIANT'

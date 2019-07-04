@@ -29,6 +29,7 @@ Documentation is available at https://transferwise.github.io/pipelinewise/
 | Tap       | **[Zendesk](https://github.com/singer-io/tap-zendesk)** | [![PyPI version](https://badge.fury.io/py/tap-zendesk.svg)](https://badge.fury.io/py/tap-zendesk) | Extracts data from Zendesk using OAuth and Key-Based incremental replications |
 | Tap       | **[Snowflake](https://github.com/transferwise/pipelinewise-tap-snowflake)** | [![PyPI version](https://badge.fury.io/py/pipelinewise-tap-snowflake.svg)](https://badge.fury.io/py/pipelinewise-tap-snowflake) | Extracts data from Snowflake databases. Supporting Key-Based Incremental and Full Table replications |
 | Tap       | **[Salesforce](https://github.com/singer-io/tap-salesforce)** | [![PyPI version](https://badge.fury.io/py/tap-salesforce.svg)](https://badge.fury.io/py/tap-zendesk) | Extracts data from Salesforce database using BULK and REST extraction API with Key-Based incremental replications |
+| Tap       | **[Jira](https://github.com/singer-io/tap-jira)** | [![PyPI version](https://badge.fury.io/py/tap-jira.svg)](https://badge.fury.io/py/tap-jira) | Extracts data from Atlassian Jira using Base auth or OAuth credentials |
 | Target    | **[Postgres](https://github.com/transferwise/pipelinewise-target-postgres)** | [![PyPI version](https://badge.fury.io/py/pipelinewise-target-postgres.svg)](https://badge.fury.io/py/pipelinewise-target-postgres) | Loads data from any tap into PostgreSQL database |
 | Target    | **[Snowflake](https://github.com/transferwise/pipelinewise-target-snowflake)** | [![PyPI version](https://badge.fury.io/py/pipelinewise-target-snowflake.svg)](https://badge.fury.io/py/pipelinewise-target-snowflake) | Loads data from any tap into Snowflake Data Warehouse |
 | Target    | **[S3 CSV](https://github.com/transferwise/pipelinewise-target-s3-csv)** | [![PyPI version](https://badge.fury.io/py/pipelinewise-target-s3-csv.svg)](https://badge.fury.io/py/pipelinewise-target-s3-csv) | Uploads data from any tap to S3 in CSV format |
@@ -62,6 +63,8 @@ snowflake_test tap has been configured to use Snowflake test database, AWS stagi
 4. Import configurations:  `pipelinewise import_config --dir ~/analytics-platform-config/pipelinewise/ --secret ~/ap-secret.txt`
     - --dir argument points to analytics-platform-config repo
     - --secret points to vault encryption key
+    
+    If it says ~/.pipelinewise directory doesn't exist, simply create that dir. TODO! create through install. 
 
 5. Run your tap: `pipelinewise run_tap --target snowflake_test --tap adwords`
 
