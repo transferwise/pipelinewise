@@ -35,7 +35,7 @@ class Postgres:
             'bool':'BOOLEAN',
             'boolean':'BOOLEAN',
             'date':'TIMESTAMP_NTZ(3)',
-            'timestamp':'TIMESTAMP(3)',
+            'timestamp':'TIMESTAMP_NTZ(3)',
             'timestamp without time zone':'TIMESTAMP_NTZ(3)',
             'timestamp with time zone':'TIMESTAMP_TZ(3)',
             'time':'TIME',
