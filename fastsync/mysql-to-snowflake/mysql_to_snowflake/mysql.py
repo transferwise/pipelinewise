@@ -2,6 +2,8 @@ import pymysql
 import gzip
 import csv
 import os
+import datetime
+import decimal
 
 import mysql_to_snowflake.utils as utils
 
@@ -47,18 +49,28 @@ class MySql:
 
     def open_connection(self):
         self.conn = pymysql.connect(
-            host = self.connection_config['host'],
-            port = self.connection_config['port'],
-            user = self.connection_config['user'],
-            password = self.connection_config['password'],
+            # Fastsync is using bulk_sync_{host|port|user|password} values from the config by default
+            # to avoid making heavy load on the primary source database when syncing large tables
+            #
+            # If bulk_sync_{host|port|user|password} values are not defined in the config then it's
+            # using the normal credentials to connect
+            host = self.connection_config.get('bulk_sync_host', self.connection_config['host']),
+            port = self.connection_config.get('bulk_sync_port', self.connection_config['port']),
+            user = self.connection_config.get('bulk_sync_user', self.connection_config['user']),
+            password = self.connection_config.get('bulk_sync_password', self.connection_config['password']),
             charset = self.connection_config['charset'],
             cursorclass = pymysql.cursors.DictCursor
         )
         self.conn_unbuffered = pymysql.connect(
-            host = self.connection_config['host'],
-            port = self.connection_config['port'],
-            user = self.connection_config['user'],
-            password = self.connection_config['password'],
+            # Fastsync is using bulk_sync_{host|port|user|password} values from the config by default
+            # to avoid making heavy load on the primary source database when syncing large tables
+            #
+            # If bulk_sync_{host|port|user|password} values are not defined in the config then it's
+            # using the normal credentials to connect
+            host = self.connection_config.get('bulk_sync_host', self.connection_config['host']),
+            port = self.connection_config.get('bulk_sync_port', self.connection_config['port']),
+            user = self.connection_config.get('bulk_sync_user', self.connection_config['user']),
+            password = self.connection_config.get('bulk_sync_password', self.connection_config['password']),
             charset = self.connection_config['charset'],
             cursorclass = pymysql.cursors.SSCursor
         )
@@ -93,6 +105,30 @@ class MySql:
             return result[0]
 
 
+    def fetch_current_incremental_key_pos(self, table, replication_key):
+        result = self.query("SELECT MAX({}) AS key_value FROM {}".format(replication_key, table))
+        if len(result) == 0:
+            raise Exception("Cannot get replication key value for table: {}".format(table))
+        else:
+            mysql_key_value = result[0].get("key_value")
+            key_value = mysql_key_value
+
+            # Convert msyql data/datetime format to JSON friendly values
+            if isinstance(mysql_key_value, datetime.datetime):
+                key_value = mysql_key_value.isoformat()
+
+            elif isinstance(mysql_key_value, datetime.date):
+                key_value = mysql_key_value.isoformat() + 'T00:00:00'
+
+            elif isinstance(mysql_key_value, decimal.Decimal):
+                key_value = float(mysql_key_value)
+
+            return {
+                "key": replication_key,
+                "key_value": key_value
+            }
+
+
     def get_primary_key(self, table_name):
         sql = "SHOW KEYS FROM {} WHERE Key_name = 'PRIMARY'".format(table_name)
         pk = self.query(sql)
@@ -119,6 +155,8 @@ class MySql:
                                     THEN concat('cast(`', column_name, '` AS unsigned)')
                             WHEN data_type IN ('datetime', 'timestamp', 'date')
                                     THEN concat('nullif(`', column_name, '`,"0000-00-00 00:00:00")')
+                            WHEN column_type IN ('tinyint(1)')
+                                    THEN concat('CASE WHEN `' , column_name , '` is null THEN null WHEN `' , column_name , '` = 0 THEN 0 ELSE 1 END')
                             WHEN column_name = 'raw_data_hash'
                                     THEN concat('hex(', column_name, ')')
                             ELSE concat('cast(`', column_name, '` AS char CHARACTER SET utf8)')
@@ -141,9 +179,19 @@ class MySql:
         snowflake_columns = ["{} {}".format(pc.get('column_name'), self.mysql_type_to_snowflake(pc.get('data_type'), pc.get('column_type'))) for pc in mysql_columns]
         primary_key = self.get_primary_key(table_name)
         if primary_key:
-            snowflake_ddl = "CREATE OR REPLACE TABLE {}.{} ({}, PRIMARY KEY ({}))".format(target_schema, target_table, ', '.join(snowflake_columns), primary_key)
+            snowflake_ddl = """CREATE OR REPLACE TABLE {}.{} ({}
+            ,_SDC_EXTRACTED_AT TIMESTAMP_NTZ
+            ,_SDC_BATCHED_AT TIMESTAMP_NTZ
+            ,_SDC_DELETED_AT VARCHAR
+            , PRIMARY KEY ({}))
+            """.format(target_schema, target_table, ', '.join(snowflake_columns), primary_key)
         else:
-            snowflake_ddl = "CREATE OR REPLACE TABLE {}.{} ({})".format(target_schema, target_table, ', '.join(snowflake_columns))
+            snowflake_ddl = """CREATE OR REPLACE TABLE {}.{} ({}
+            ,_SDC_EXTRACTED_AT TIMESTAMP_NTZ
+            ,_SDC_BATCHED_AT TIMESTAMP_NTZ
+            ,_SDC_DELETED_AT VARCHAR
+            )
+            """.format(target_schema, target_table, ', '.join(snowflake_columns))
         return(snowflake_ddl)
 
 
@@ -155,7 +203,12 @@ class MySql:
         if len(column_safe_sql_values) == 0:
             raise Exception("{} table not found.".format(table_name))
 
-        sql = "SELECT {} FROM {}".format(','.join(column_safe_sql_values), table_name)
+        sql = """SELECT {}
+        ,now()
+        ,now()
+        ,null
+        FROM {}
+        """.format(','.join(column_safe_sql_values), table_name)
         export_batch_rows = self.connection_config['export_batch_rows']
         exported_rows = 0
         with self.conn_unbuffered as cur:

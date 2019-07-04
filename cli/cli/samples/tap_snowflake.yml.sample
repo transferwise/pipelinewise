@@ -1,0 +1,59 @@
+---
+
+# ------------------------------------------------------------------------------
+# General Properties
+# ------------------------------------------------------------------------------
+id: "snowflake_sample"                 # Unique identifier of the tap
+name: "Sample Snowflake Database Tap"  # Name of the tap
+type: "tap-snowflake"                  # !! THIS SHOULD NOT CHANGE !!
+owner: "somebody@foo.com"              # Data owner to contact
+
+
+# ------------------------------------------------------------------------------
+# Source (Tap) - Snowflake connection details
+# ------------------------------------------------------------------------------
+db_conn:
+  account: "<HOST>"                    # Snowflake host
+  dbname: "<DBNANE>"                   # Snowflake database name
+  user: "<USER>"                       # Snowflake user
+  password: "<PASSWORD>"               # Plain string or vault encrypted
+  dbname: "<DB_NAME>"                  # MySQL/ MariaDB database name
+  #filter_dbs: "<DBNAME"               # Optional: Scan only the required dbs
+  #filter_schemas: "SCHEMA_1,SCHEMA_2" # Optional: Scan only the required schemas
+                                       #           to improve the performance of
+                                       #           data extraction
+
+
+# ------------------------------------------------------------------------------
+# Destination (Target) - Target properties
+# Connection details should be in the relevant target YAML file
+# ------------------------------------------------------------------------------
+target: "snowflake"                    # ID of the target connector where the data will be loaded
+batch_size_rows: 20000                 # Batch size for the stream to optimise load performance
+
+
+# ------------------------------------------------------------------------------
+# Source to target Schema mapping
+# ------------------------------------------------------------------------------
+schemas:
+
+  - source_schema: "SCHEMA_1"          # Source schema (aka. database) in Snowflake with tables
+    target_schema: "REPL_SCHEMA_1"     # Target schema in the destination Data Warehouse
+
+    # List of tables to replicate from Snowflake to a destination
+    #
+    # Please check the Replication Strategies section in the documentation to understand the differences.
+    # For LOG_BASED replication method you might need to adjust the source mysql/ mariadb configuration.
+    tables:
+      - table_name: "TABLE_ONE"
+        replication_method: "INCREMENTAL"   # One of INCREMENTAL, LOG_BASED and FULL_TABLE
+        replication_key: "last_update"      # Important: Incremental load always needs replication key
+
+        # OPTIONAL: Load time transformations
+        #transformations:                    
+        #  - column: "last_name"            # Column to transform
+        #    type: "SET-NULL"               # Transformation type
+
+      # You can add as many tables as you need...
+      - table_name: "table_two"
+        replication_method: "LOG_BASED"     # Important! Log based must be enabled in MySQL

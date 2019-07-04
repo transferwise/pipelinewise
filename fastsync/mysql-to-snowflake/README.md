@@ -14,7 +14,7 @@ Sync mysql tables to snowflake with the most optimal steps:
 * Swap temp to to final destination table in snowflake
 * Write binlog position to singer state file
 
-`mysql-to-snowflake --mysql-config [MYSQL_TAP_CONFIG] --snowflake-config [SNOWFLAKE_TARGET_CONFIG] --transform-config [TRANSFORMATIONS_CONFIG] --state [MYSQL_TAP_STATE] --target-schema [SNOWFLAKE_SCHEMA] --tables [LIST_OF_TABLES] --export-dir [TEMP_PATH_DIR]`
+`mysql-to-snowflake --tap [MYSQL_TAP_CONFIG] --target [SNOWFLAKE_TARGET_CONFIG] --state [TAP_STATE] [--transform [TRANSFORM]] --tables [LIST_OF_TABLES]`
 
 Sample config files
 
@@ -22,12 +22,11 @@ Sample config files
 
 ```
   {
-    "host": "localhost",
-    "port": 5432,
-    "dbname": "my_database",
-    "user": "my_user",
-    "password": "<PASSWORD>",
-    "batch_size": 20000
+    "host": "<mysql-host>",
+    "port": <mysql-port>,
+    "dbname": "<mysql-db",
+    "user": "<mysql-user>",
+    "password": "<mysql-password>"
   }
 ```
 
@@ -35,15 +34,18 @@ Sample config files
 
 ```
   {
-      "account": "rt123456.eu-central-1",
-      "aws_access_key_id": "<ACCESS_KEY_ID>",
-      "aws_secret_access_key": "<SECRET_ACCESS_KEY>",
-      "dbname": "analytics_db",
-      "password": "<PASSWORD>",
-      "s3_bucket": "tw-analyticsdb-etl",
-      "s3_key_prefix": "snowflake-imports/",
-      "user": "analyticsdb_etl",
-      "warehouse": "LOAD_WH"
+      "account": "<snowflake-account-name>",
+      "dbname": "<snowflake-database-name>",
+      "user": "<snowflake-user>",
+      "password": "<snowfale-password>",
+      "warehouse": "<snowflake-warehouse>",
+      "aws_access_key_id": "<aws-access-key-id>",
+      "aws_secret_access_key": "<aws-access-secret-access-key>",
+      "s3_bucket": "<s3-external-bucket>",
+      "s3_key_prefix": "<bucket-directory>",
+      "schema": "<snowflake-schema>",
+      "client_side_encryption_master_key": "<client_side_encryption_master_key>",
+      "client_side_encryption_stage_object": "<client_side_encryption_stage_object>"
   }
 ```
 

@@ -1,0 +1,1 @@
+pipelinewise-tap-salesforce==1.0.0

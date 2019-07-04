@@ -1,1 +1,1 @@
-tap-mysql-koszti==1.0.3
+pipelinewise-tap-mysql==1.0.5

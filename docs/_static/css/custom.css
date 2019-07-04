@@ -1,0 +1,108 @@
+/* Content fonts */
+@import "https://fonts.googleapis.com/css?family=Comfortaa";
+h1, h2, .rst-content .toctree-wrapper p.caption, h3, h4, h5, h6, legend {
+  margin-top: 0;
+  font-weight: 700;
+  font-family: "Comfortaa","ff-tisa-web-pro","Georgia",Arial,sans-serif;
+}
+
+/* Navbar colors */
+.wy-side-nav-search {
+  background-color: #00a4de;
+}
+
+.wy-nav-content {
+  max-width: 850px;
+}
+
+div.leftside {
+  width: 414px;
+  padding: 0px 3px 0px 0px;
+  float: left;
+}
+
+div.rightside {
+  margin-left: 425px;
+}
+
+/*
+.wy-nav-side {
+  background: #073642;
+}
+
+
+.wy-menu-vertical li.current {
+  background: #eee8d5;
+}
+*/
+
+/* Solarised code highligth */
+.rst-content pre.literal-block, .rst-content div[class^='highlight'] {
+  background-color: #073642;
+  color: #fdf6e3;
+}
+
+.wy-menu-vertical header, .wy-menu-vertical p.caption {
+  color: #839496;
+}
+
+.highlight .c1 {
+  color: #93a1a1;
+}
+
+.highlight .nb {
+  color: #fdf6e3;
+}
+
+.highlight .nv {
+  color: #6c71c4;
+}
+
+.highlight .m {
+  color: #eee8d5;
+}
+
+.highlight .k {
+  color: #b58900;
+}
+
+.highlight .s1 {
+  color: #2aa198;
+}
+
+.highlight .s2 {
+  color: #859900;
+}
+
+.tile {
+  padding: 10px;
+}
+
+.tile-wrapper {
+  display: flex;
+}
+
+.tile p {
+  text-align: center;
+}
+
+.tile span {
+  text-align: center;
+}
+
+.img-hover-zoom {
+  box-shadow: 0 2px 5px 0 rgba(0, 0, 0, 0.2), 0 2px 2px 0 rgba(0, 0, 0, 0.19);
+  overflow: hidden;
+  width: 120px;
+  height: 120px;
+  padding: 5px;
+  margin: 10px;
+}
+
+.img-hover-zoom img {
+  transition: transform .3s;
+}
+
+.img-hover-zoom:hover img {
+  transform: scale(1.15);
+}

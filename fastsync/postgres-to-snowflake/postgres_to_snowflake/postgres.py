@@ -1,6 +1,8 @@
 import psycopg2
 from psycopg2 import extras
 import gzip
+import datetime
+import decimal
 
 import postgres_to_snowflake.utils as utils
 
@@ -39,16 +41,24 @@ class Postgres:
             'time':'TIME',
             'time without time zone':'TIMESTAMP_NTZ(3)',
             'time with time zone':'TIMESTAMP_TZ'
+            'ARRAY':'VARIANT',  # This is all uppercase, because postgres stores it in this format in information_schema.columns.data_type
+            'json':'VARIANT',
+            'jsonb':'VARIANT'
         }.get(pg_type, 'VARCHAR')
 
 
     def open_connection(self):
-        conn_string = "host='{}' dbname='{}' user='{}' password='{}' port='{}'".format(
-            self.connection_config['host'],
-            self.connection_config['dbname'],
-            self.connection_config['user'],
-            self.connection_config['password'],
-            self.connection_config['port']
+        conn_string = "host='{}' port='{}' user='{}' password='{}' dbname='{}'".format(
+            # Fastsync is using bulk_sync_{host|port|user|password} values from the config by default
+            # to avoid making heavy load on the primary source database when syncing large tables
+            #
+            # If bulk_sync_{host|port|user|password} values are not defined in the config then it's
+            # using the normal credentials to connect
+            self.connection_config.get('bulk_sync_host', self.connection_config['host']),
+            self.connection_config.get('bulk_sync_port', self.connection_config['port']),
+            self.connection_config.get('bulk_sync_user', self.connection_config['user']),
+            self.connection_config.get('bulk_sync_password', self.connection_config['password']),
+            self.connection_config['dbname']
         )
         self.conn = psycopg2.connect(conn_string)
         self.curr = self.conn.cursor()
@@ -73,6 +83,59 @@ class Postgres:
                     return []
 
 
+    def fetch_current_log_sequence_number(self):
+        # Make sure PostgreSQL version is 9.4 or higher
+        result = self.query("SELECT setting::int AS version FROM pg_settings WHERE name='server_version_num'")
+        version = result[0].get("version")
+        if version < 90400 :
+            raise Exception('Unable to use logical replication on PostgreSQL version {}'.format(version))
+
+        # Create replication slot, ignore error if already exists
+        try:
+            result = self.query("SELECT * FROM pg_create_logical_replication_slot('stitch_{}', 'wal2json')".format(self.connection_config['dbname']))
+        except Exception as e:
+            # ERROR: replication slot "stitch_{}" already exists SQL state: 42710
+            if (e.pgcode == '42710'):
+                pass
+            else:
+                raise e
+
+        # Get current lsn
+        if version >= 100000:
+            result = self.query("SELECT pg_current_wal_lsn() AS current_lsn")
+        elif version >= 90400:
+            result = self.query("SELECT pg_current_xlog_location() AS current_lsn")
+        else:
+            raise Exception('Unable to use logical replication on PostgreSQL version {}'.format(version))
+        current_lsn = result[0].get("current_lsn")
+        file, index = current_lsn.split('/')
+        return (int(file, 16)  << 32) + int(index, 16)
+
+
+    def fetch_current_incremental_key_pos(self, table, replication_key):
+        result = self.query("SELECT MAX({}) AS key_value FROM {}".format(replication_key, table))
+        if len(result) == 0:
+            raise Exception("Cannot get replication key value for table: {}".format(table))
+        else:
+            postgres_key_value = result[0].get("key_value")
+            key_value = postgres_key_value
+
+            # Convert postgres data/datetime format to JSON friendly values
+            if isinstance(postgres_key_value, datetime.datetime):
+                key_value = postgres_key_value.isoformat()
+
+            elif isinstance(postgres_key_value, datetime.date):
+                key_value = postgres_key_value.isoformat() + 'T00:00:00'
+
+            elif isinstance(postgres_key_value, decimal.Decimal):
+                key_value = float(postgres_key_value)
+
+            return {
+                "key": replication_key,
+                "key_value": key_value
+            }
+
+
     def get_primary_key(self, table):
         sql = """SELECT pg_attribute.attname
                     FROM pg_index, pg_class, pg_attribute, pg_namespace
@@ -92,7 +155,24 @@ class Postgres:
 
     def get_table_columns(self, table_name):
         table_dict = utils.tablename_to_dict(table_name)
-        sql = "SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = '{}' and table_name = '{}' ORDER BY ordinal_position".format(table_dict.get('schema'), table_dict.get('name'))
+        sql = """
+                SELECT
+                    column_name
+                    ,data_type
+                    ,safe_sql_value
+                FROM (SELECT
+                column_name,
+                data_type,
+                CASE
+                    WHEN data_type = 'ARRAY' THEN 'array_to_json(' || column_name || ') AS ' || column_name
+                    ELSE column_name
+                END AS safe_sql_value
+                FROM information_schema.columns
+                WHERE table_schema = '{}'
+                    AND table_name = '{}'
+                ORDER BY ordinal_position
+                ) AS x
+            """.format(table_dict.get('schema'), table_dict.get('name'))
         return self.query(sql)
 
 
@@ -104,22 +184,37 @@ class Postgres:
         snowflake_columns = ["{} {}".format(pc[0], self.postgres_type_to_snowflake(pc[1])) for pc in postgres_columns]
         primary_key = self.get_primary_key(table_name)
         if primary_key:
-            snowflake_ddl = "CREATE OR REPLACE TABLE {}.{} ({}, PRIMARY KEY ({}))".format(target_schema, target_table, ', '.join(snowflake_columns), primary_key)
+            snowflake_ddl = """
+            CREATE OR REPLACE TABLE {}.{} ({}
+            ,_SDC_EXTRACTED_AT TIMESTAMP_NTZ
+            ,_SDC_BATCHED_AT TIMESTAMP_NTZ
+            ,_SDC_DELETED_AT VARCHAR
+            , PRIMARY KEY ({}))
+            """.format(target_schema,target_table,', '.join(snowflake_columns),primary_key)
         else:
-            snowflake_ddl = "CREATE OR REPLACE TABLE {}.{} ({})".format(target_schema, target_table, ', '.join(snowflake_columns))
+            snowflake_ddl = """CREATE OR REPLACE TABLE {}.{} ({}
+            ,_SDC_EXTRACTED_AT TIMESTAMP_NTZ
+            ,_SDC_BATCHED_AT TIMESTAMP_NTZ
+            ,_SDC_DELETED_AT VARCHAR
+            )
+            """.format(target_schema, target_table, ', '.join(snowflake_columns))
         return(snowflake_ddl)
 
 
     def copy_table(self, table_name, path):
         table_columns = self.get_table_columns(table_name)
-        columns = [c[0] for c in table_columns]
+        column_safe_sql_values = [c.get('safe_sql_value') for c in table_columns]
 
         # If self.get_table_columns returns zero row then table not exist
-        if len(columns) == 0:
+        if len(column_safe_sql_values) == 0:
             raise Exception("{} table not found.".format(table_name))
 
-        sql = "COPY {} ({}) TO STDOUT with CSV DELIMITER ','".format(table_name, ','.join(columns))
+        sql = """COPY (SELECT {}
+        ,now()
+        ,now()
+        ,null
+        FROM {}) TO STDOUT with CSV DELIMITER ','
+        """.format(','.join(column_safe_sql_values), table_name)
         utils.log("POSTGRES - Exporting data: {}".format(sql))
         with gzip.open(path, 'wt') as gzfile:
             self.curr.copy_expert(sql, gzfile)
-
