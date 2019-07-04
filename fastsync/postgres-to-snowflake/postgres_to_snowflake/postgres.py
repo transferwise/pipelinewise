@@ -37,7 +37,7 @@ class Postgres:
             'date':'TIMESTAMP_NTZ(3)',
             'timestamp':'TIMESTAMP(3)',
             'timestamp without time zone':'TIMESTAMP_NTZ(3)',
-            'timestamp with time zone':'TIMESTAMP_TZ',
+            'timestamp with time zone':'TIMESTAMP_TZ(3)',
             'time':'TIME',
             'time without time zone':'TIMESTAMP_NTZ(3)',
             'time with time zone':'TIMESTAMP_TZ'
