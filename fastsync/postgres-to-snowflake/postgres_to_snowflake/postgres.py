@@ -38,7 +38,7 @@ class Postgres:
             'timestamp':'TIMESTAMP_NTZ(3)',
             'timestamp without time zone':'TIMESTAMP_NTZ(3)',
             'timestamp with time zone':'TIMESTAMP_TZ(3)',
-            'time':'TIME',
+            'time':'TIMESTAMP_NTZ(3)',
             'time without time zone':'TIMESTAMP_NTZ(3)',
             'time with time zone':'TIMESTAMP_TZ(3)'
             'ARRAY':'VARIANT',  # This is all uppercase, because postgres stores it in this format in information_schema.columns.data_type
