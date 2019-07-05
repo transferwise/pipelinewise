@@ -34,13 +34,13 @@ class Postgres:
             'real':'FLOAT',
             'bool':'BOOLEAN',
             'boolean':'BOOLEAN',
-            'date':'TIMESTAMP_NTZ(6)',
-            'timestamp':'TIMESTAMP_NTZ(6)',
-            'timestamp without time zone':'TIMESTAMP_NTZ(6)',
-            'timestamp with time zone':'TIMESTAMP_TZ(6)',
-            'time':'TIME(6)',
-            'time without time zone':'TIME(6)',
-            'time with time zone':'TIME(6)',
+            'date':'TIMESTAMP_NTZ',
+            'timestamp':'TIMESTAMP_NTZ',
+            'timestamp without time zone':'TIMESTAMP_NTZ',
+            'timestamp with time zone':'TIMESTAMP_TZ',
+            'time':'TIME',
+            'time without time zone':'TIME',
+            'time with time zone':'TIME',
             'ARRAY':'VARIANT',  # This is all uppercase, because postgres stores it in this format in information_schema.columns.data_type
             'json':'VARIANT',
             'jsonb':'VARIANT'
@@ -186,15 +186,15 @@ class Postgres:
         if primary_key:
             snowflake_ddl = """
             CREATE OR REPLACE TABLE {}.{} ({}
-            ,_SDC_EXTRACTED_AT TIMESTAMP_NTZ(6)
-            ,_SDC_BATCHED_AT TIMESTAMP_NTZ(6)
+            ,_SDC_EXTRACTED_AT TIMESTAMP_NTZ
+            ,_SDC_BATCHED_AT TIMESTAMP_NTZ
             ,_SDC_DELETED_AT VARCHAR
             , PRIMARY KEY ({}))
             """.format(target_schema,target_table,', '.join(snowflake_columns),primary_key)
         else:
             snowflake_ddl = """CREATE OR REPLACE TABLE {}.{} ({}
-            ,_SDC_EXTRACTED_AT TIMESTAMP_NTZ(6)
-            ,_SDC_BATCHED_AT TIMESTAMP_NTZ(6)
+            ,_SDC_EXTRACTED_AT TIMESTAMP_NTZ
+            ,_SDC_BATCHED_AT TIMESTAMP_NTZ
             ,_SDC_DELETED_AT VARCHAR
             )
             """.format(target_schema, target_table, ', '.join(snowflake_columns))

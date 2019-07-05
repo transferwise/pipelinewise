@@ -41,9 +41,9 @@ class MySql:
             'float':'FLOAT',
             'bool':'BOOLEAN',
             'boolean':'BOOLEAN',
-            'date':'TIMESTAMP_NTZ(6)',
-            'datetime':'TIMESTAMP_NTZ(6)',
-            'timestamp':'TIMESTAMP_NTZ(6)',
+            'date':'TIMESTAMP_NTZ',
+            'datetime':'TIMESTAMP_NTZ',
+            'timestamp':'TIMESTAMP_NTZ',
         }.get(data_type, 'VARCHAR')
 
 
@@ -180,15 +180,15 @@ class MySql:
         primary_key = self.get_primary_key(table_name)
         if primary_key:
             snowflake_ddl = """CREATE OR REPLACE TABLE {}.{} ({}
-            ,_SDC_EXTRACTED_AT TIMESTAMP_NTZ(6)
-            ,_SDC_BATCHED_AT TIMESTAMP_NTZ(6)
+            ,_SDC_EXTRACTED_AT TIMESTAMP_NTZ
+            ,_SDC_BATCHED_AT TIMESTAMP_NTZ
             ,_SDC_DELETED_AT VARCHAR
             , PRIMARY KEY ({}))
             """.format(target_schema, target_table, ', '.join(snowflake_columns), primary_key)
         else:
             snowflake_ddl = """CREATE OR REPLACE TABLE {}.{} ({}
-            ,_SDC_EXTRACTED_AT TIMESTAMP_NTZ(6)
-            ,_SDC_BATCHED_AT TIMESTAMP_NTZ(6)
+            ,_SDC_EXTRACTED_AT TIMESTAMP_NTZ
+            ,_SDC_BATCHED_AT TIMESTAMP_NTZ
             ,_SDC_DELETED_AT VARCHAR
             )
             """.format(target_schema, target_table, ', '.join(snowflake_columns))
