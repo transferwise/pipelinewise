@@ -1,4 +1,7 @@
 # PipelineWise
+
+[![CircleCI](https://circle.tw.ee/gh/transferwise/pipelinewise.svg?style=svg&circle-token=ae106b83e9ebfdee3aa410bf095b5ccb4f222b95)](https://circle.tw.ee/gh/transferwise/pipelinewise)
+
 PipelineWise is a Data Pipeline Framework using the singer.io specification to ingest and replicate data from various sources to various destinations.
 
 Documentation is available at https://transferwise.github.io/pipelinewise/
@@ -73,17 +76,19 @@ snowflake_test tap has been configured to use Snowflake test database, AWS stagi
 
 ### To run tests:
 
-1. Install python dependencies in a virtual env and run nose unit tests
+1. Install python dependencies in a virtual env:
 ```
   python3 -m venv .virtualenvs/cli
   . .virtualenvs/cli/bin/activate
   pip install --upgrade pip
   pip install -e cli
-  pip install nose
+  pip install pytest coverage
 ```
 
-2. To run unit tests:
+2. To run unit tests and report code coverage:
 ```
-  nosetests --where=cli/tests
+  cd cli
+  coverage run -m pytest --disable-pytest-warnings
+  coverage report
 ```
 

@@ -8,6 +8,11 @@ __pycache__/
 *.py[cod]
 *$py.class
 .virtualenvs
+*.egg-info/
+.coverage
+.coverage.*
+coverage.svg
+coverage_html
 
 # Singer Tap state
 .state.json
