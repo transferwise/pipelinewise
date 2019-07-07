@@ -6,8 +6,8 @@ from setuptools import setup, find_packages
 setup(name='cli',
     version='0.0.1',
     description='PipelineWise Command Line Interface',
-    author='xyz',
-    url='xzy',
+    author="TransferWise",
+    url='https://github.com/transferwise/pipelinewise',
     classifiers=['Programming Language :: Python :: 3 :: Only'],
     py_modules=['cli'],
     install_requires=[
