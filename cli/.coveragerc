@@ -4,3 +4,4 @@ source = cli
 
 [report]
 show_missing=False
+fail_under=20
