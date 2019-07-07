@@ -23,10 +23,10 @@ jobs:
             coverage-badge -fo coverage.svg
 
       - store_artifacts:
-          path:
-            - cli/coverage_html
-            - cli/coverage.svg
+          path: - cli/coverage_html
 
+      - store_artifacts:
+          path: - cli/coverage.svg
 
   # For documentation deployment. You'll need the following environment vars
   # in your Circle CI settings, otherwise this will not work.
