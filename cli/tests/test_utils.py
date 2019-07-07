@@ -1,41 +1,39 @@
 import os
 import re
-import unittest
-from nose.tools import assert_raises
-
+import pytest
 import cli.utils
-
 
 VIRTUALENVS_DIR="./virtualenvs-dummy"
 
-class TestUtils(unittest.TestCase):
+
+class TestUtils(object):
     """
     Unit Tests for PipelineWise CLI utility functions
     """
     def test_json_detectors(self):
         """Testing JSON detector functions"""
-        self.assertFalse(cli.utils.is_json("{Invalid JSON}"))
+        assert cli.utils.is_json("{Invalid JSON}") == False
 
-        self.assertTrue(cli.utils.is_json("[]"))
-        self.assertTrue(cli.utils.is_json("{}"))
-        self.assertTrue(cli.utils.is_json('{"prop": 123}'))
-        self.assertTrue(cli.utils.is_json('{"prop-str":"dummy-string","prop-int":123,"prop-bool":true}'))
+        assert cli.utils.is_json("[]") == True
+        assert cli.utils.is_json("{}") == True
+        assert cli.utils.is_json('{"prop": 123}') == True
+        assert cli.utils.is_json('{"prop-str":"dummy-string","prop-int":123,"prop-bool":true}') == True
 
-        self.assertFalse(cli.utils.is_json_file("./dummy-json"))
-        self.assertTrue(cli.utils.is_json_file("{}/resources/example.json".format(os.path.dirname(__file__))))
+        assert cli.utils.is_json_file("./dummy-json") == False
+        assert cli.utils.is_json_file("{}/resources/example.json".format(os.path.dirname(__file__))) == True
 
 
     def test_json_loader(self):
         """Testing JSON loader functions"""
         # Loading JSON file that not exist should return None
-        self.assertIsNone(cli.utils.load_json("/invalid/location/to/json"))
+        assert cli.utils.load_json("/invalid/location/to/json") is None
 
         # Loading JSON file with invalid JSON syntax should raise exception
-        with assert_raises(Exception):
+        with pytest.raises(Exception):
             cli.utils.load_json("{}/resources/invalid.json".format(os.path.dirname(__file__)))
 
         # Loading JSON should return python dict
-        self.assertEquals(
+        assert (
             cli.utils.load_json("{}/resources/example.json".format(os.path.dirname(__file__))),
             {
                 "glossary": {
@@ -63,30 +61,30 @@ class TestUtils(unittest.TestCase):
 
     def test_yaml_detectors(self):
         """Testing YAML detector functions"""
-        self.assertFalse(cli.utils.is_json("{Invalid YAML}"))
+        assert cli.utils.is_json("{Invalid YAML}") == False
 
-        self.assertTrue(cli.utils.is_yaml("id: 123"))
-        self.assertTrue(cli.utils.is_yaml("""
+        assert cli.utils.is_yaml("id: 123") == True
+        assert cli.utils.is_yaml("""
             id: 123
             details:
                 - prop1: 123
                 - prop2: 456
-            """))
+            """) == True
 
-        self.assertFalse(cli.utils.is_yaml_file("./dummy-yaml"))
-        self.assertTrue(cli.utils.is_yaml_file("{}/resources/example.yml".format(os.path.dirname(__file__))))
+        assert cli.utils.is_yaml_file("./dummy-yaml") == False
+        assert cli.utils.is_yaml_file("{}/resources/example.yml".format(os.path.dirname(__file__))) == True 
 
 
     def test_yaml_loader(self):
         """Testing YAML loader functions"""
         # Loading YAML file that not exist should return None
-        self.assertIsNone(cli.utils.load_yaml("/invalid/location/to/yaml"))
+        assert cli.utils.load_yaml("/invalid/location/to/yaml") is None
 
         # Loading YAML file with invalid YAML syntax should raise exception
-        with assert_raises(Exception):
+        with pytest.raises(Exception):
             cli.utils.load_yaml("{}/resources/invalid.yml".format(os.path.dirname(__file__)))
 
-        self.assertEquals(
+        assert (
             cli.utils.load_yaml("{}/resources/example.yml".format(os.path.dirname(__file__))),
             ['Apple', 'Orange', 'Strawberry', 'Mango'])
 
@@ -94,14 +92,14 @@ class TestUtils(unittest.TestCase):
     def test_sample_file_path(self):
         """Sample files must be a tap, target YAML or README file"""
         for sample in cli.utils.get_sample_file_paths():
-            self.assertTrue(os.path.isfile)
-            self.assertIsNotNone(
+            assert os.path.isfile(sample) == True
+            assert (
                 re.match(".*[tap|target]_.*.yml.sample$", sample) or re.match(".*README.md$", sample))
 
 
     def test_extract_log_attributes(self):
         """Log files must match to certain pattern with embedded attributes in the file name"""
-        self.assertEquals(
+        assert (
             cli.utils.extract_log_attributes("snowflake-fx-20190508_000038.singer.log.success"),
             {
                 'filename': 'snowflake-fx-20190508_000038.singer.log.success',
@@ -112,7 +110,7 @@ class TestUtils(unittest.TestCase):
                 'status': 'success'
             })
 
-        self.assertEquals(
+        assert (
             cli.utils.extract_log_attributes("snowflake-fx-20190508_231238.fastsync.log.running"),
             {
                 'filename': 'snowflake-fx-20190508_231238.fastsync.log.running',
@@ -123,7 +121,7 @@ class TestUtils(unittest.TestCase):
                 'status': 'running'
             })
 
-        self.assertEquals(
+        assert (
             cli.utils.extract_log_attributes("dummy-log-file.log"),
             {
                 'filename': 'dummy-log-file.log',
@@ -137,6 +135,6 @@ class TestUtils(unittest.TestCase):
 
     def test_fastsync_bin(self):
         """..."""
-        self.assertEquals(
+        assert (
             cli.utils.get_fastsync_bin(VIRTUALENVS_DIR, 'mysql', 'snowflake'),
             "{}/mysql-to-snowflake/bin/mysql-to-snowflake".format(VIRTUALENVS_DIR))
