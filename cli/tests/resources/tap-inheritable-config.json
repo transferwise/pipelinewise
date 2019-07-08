@@ -1,0 +1,18 @@
+{
+  "batch_size_rows": 5000,
+  "data_flattening_max_level": 0,
+  "default_target_schema": "jira_clear",
+  "default_target_schema_select_permissions": [
+      "grp_power"
+  ],
+  "hard_delete": true,
+  "primary_key_required": true,
+  "schema_mapping": {
+      "jira": {
+          "target_schema": "jira_clear",
+          "target_schema_select_permissions": [
+              "grp_power"
+          ]
+      }
+  }
+}
