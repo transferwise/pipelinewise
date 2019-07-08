@@ -9,15 +9,19 @@ jobs:
       - image: circleci/python:3.6.2
     steps:
       - checkout
-      - run: ./install.sh
+      - run:
+          name: 'Installing PipelineWise components and connectors'
+          command: ./install.sh
 
       - run:
-          name: 'Unit Tests'
+          name: 'Unit Tests and Coverage'
           command: |
             . .virtualenvs/cli/bin/activate
-            pip install nose
-            nosetests --where=cli/tests/
-
+            pip install pytest coverage
+            cd cli
+            coverage run -m pytest --disable-pytest-warnings
+            coverage report
+            coverage html -d coverage_html
 
   # For documentation deployment. You'll need the following environment vars
   # in your Circle CI settings, otherwise this will not work.
