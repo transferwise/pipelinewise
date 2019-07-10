@@ -103,7 +103,7 @@ class Postgres:
         # Get current lsn
         if version >= 100000:
             result = self.query("SELECT pg_current_wal_lsn() AS current_lsn")
-        elif version >= 90400:
+        elif version >= 90600:
             result = self.query("SELECT pg_current_xlog_location() AS current_lsn")
         else:
             raise Exception('Unable to use logical replication on PostgreSQL version {}'.format(version))
