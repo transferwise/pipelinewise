@@ -1,0 +1,14 @@
+{
+    "batch_size_rows": 20000,
+    "data_flattening_max_level": 0,
+    "hard_delete": true,
+    "primary_key_required": true,
+    "schema_mapping": {
+        "db_test_mysql": {
+            "target_schema": "db_test_mysql",
+            "target_schema_select_permissions": [
+                "grp_stats"
+            ]
+        }
+    }
+}

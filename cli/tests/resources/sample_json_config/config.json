@@ -1,0 +1,44 @@
+{
+    "targets": [
+        {
+            "id": "target_one",
+            "name": "Target One",
+            "type": "target-snowflake",
+            "status": "ready",
+            "taps": [
+                {
+                    "enabled": true,
+                    "id": "tap_one",
+                    "name": "Source One",
+                    "owner": "somebody@transferwise.com",
+                    "sync_period": "0 3 * * *",
+                    "type": "tap-mysql"
+                },
+                {
+                    "enabled": true,
+                    "id": "tap_two",
+                    "name": "Source Two",
+                    "owner": "marten.hallik@transferwise.com",
+                    "sync_period": "0 */4 * * *",
+                    "type": "tap-postgres"
+                }
+            ]
+        },
+        {
+            "id": "target_two",
+            "name": "Target Two",
+            "type": "target-s3-csv",
+            "status": "ready",
+            "taps": [
+                {
+                    "enabled": true,
+                    "id": "tap_three",
+                    "name": "Source Three",
+                    "owner": "somebody@transferwise.com",
+                    "sync_period": "0 3 * * *",
+                    "type": "tap-mysql"
+                }
+            ]
+        }
+    ]
+}

@@ -1,0 +1,8 @@
+{
+    "dbname": "db_test_postgres",
+    "filter_dbs": "db_test_postgres",
+    "host": "localhost",
+    "password": "password",
+    "port": 5432,
+    "user": "user"
+}
