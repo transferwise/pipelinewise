@@ -143,8 +143,8 @@ def sync_table(table):
 
         # Exporting table data, get table definitions and close connection to avoid timeouts
         postgres.copy_table(table, filepath)
-        temp_table_sql = postgres.snowflake_ddl(table, target_schema, True)
-        target_table_sql = postgres.snowflake_ddl(table, target_schema, False)
+        create_temp_table_sql = postgres.snowflake_ddl(table, target_schema, True)
+        create_target_table_sql = postgres.snowflake_ddl(table, target_schema, False)
         postgres.close_connection()
 
         # Uploading to S3
@@ -153,7 +153,7 @@ def sync_table(table):
 
         # Creating temp table in Snowflake
         snowflake.create_schema(target_schema)
-        snowflake.query(temp_table_sql)
+        snowflake.query(create_temp_table_sql)
 
         # Load into Snowflake table
         snowflake.copy_to_table(s3_key, target_schema, table, True)
@@ -162,7 +162,7 @@ def sync_table(table):
         snowflake.obfuscate_columns(target_schema, table)
 
         # Create target table and swap with the temp table in Snowflake
-        snowflake.query(target_table_sql)
+        snowflake.query(create_target_table_sql)
         snowflake.swap_tables(target_schema, table)
 
         # Save bookmark to singer state file
