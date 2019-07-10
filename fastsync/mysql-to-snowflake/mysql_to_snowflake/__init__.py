@@ -135,8 +135,10 @@ def sync_table(table):
         # Get bookmark - Binlog position or Incremental Key value
         bookmark = utils.get_bookmark_for_table(table, args.properties, mysql)
 
-        # Exporting table data and close connection to avoid timeouts for huge tables
+        # Exporting table data, get table definitions and close connection to avoid timeouts
         mysql.copy_table(table, filepath)
+        temp_table_sql = mysql.snowflake_ddl(table, target_schema, True)
+        target_table_sql = mysql.snowflake_ddl(table, target_schema, False)
         mysql.close_connection()
 
         # Uploading to S3
@@ -145,12 +147,7 @@ def sync_table(table):
 
         # Creating temp table in Snowflake
         snowflake.create_schema(target_schema)
-        mysql.open_connection()
-        snowflake.query(mysql.snowflake_ddl(table, target_schema, True))
-
-        # Create target table in Snowflake
-        snowflake.query(mysql.snowflake_ddl(table, target_schema, False))
-        mysql.close_connection()
+        snowflake.query(temp_table_sql)
 
         # Load into Snowflake table
         snowflake.copy_to_table(s3_key, target_schema, table, True)
@@ -158,7 +155,8 @@ def sync_table(table):
         # Obfuscate columns
         snowflake.obfuscate_columns(target_schema, table)
 
-        # Swap temp and target tables in Snowflake
+        # Create target table and swap with the temp table in Snowflake
+        snowflake.query(target_table_sql)
         snowflake.swap_tables(target_schema, table)
 
         # Save bookmark to singer state file
