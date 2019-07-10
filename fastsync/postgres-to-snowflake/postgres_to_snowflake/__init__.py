@@ -154,14 +154,17 @@ def sync_table(table):
         postgres.open_connection()
         snowflake.query(postgres.snowflake_ddl(table, target_schema, True))
 
+        # Create target table in snowflake
+        snowflake.query(postgres.snowflake_ddl(table, target_schema, False))
+        postgres.close_connection()
+
         # Load into Snowflake table
         snowflake.copy_to_table(s3_key, target_schema, table, True)
 
         # Obfuscate columns
         snowflake.obfuscate_columns(target_schema, table)
 
-        # Create target table in snowflake and swap with temp table
-        snowflake.query(postgres.snowflake_ddl(table, target_schema, False))
+        # Swap temp and target tables in Snowflake
         snowflake.swap_tables(target_schema, table)
 
         # Save bookmark to singer state file
@@ -172,7 +175,7 @@ def sync_table(table):
         finally:
             lock.release()
 
-        postgres.close_connection()
+
 
         # Table loaded, grant select on all tables in target schema
         for grantee in get_grantees(args.target, table):
