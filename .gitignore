@@ -11,7 +11,7 @@ __pycache__/
 *.egg-info/
 .coverage
 .coverage.*
-coverage.svg
+coverage.log
 coverage_html
 
 # Singer Tap state
