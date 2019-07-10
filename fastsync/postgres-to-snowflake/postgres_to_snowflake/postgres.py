@@ -84,10 +84,10 @@ class Postgres:
 
 
     def fetch_current_log_sequence_number(self):
-        # Make sure PostgreSQL version is 9.4 or higher
+        # Make sure PostgreSQL version is 9.6 or higher
         result = self.query("SELECT setting::int AS version FROM pg_settings WHERE name='server_version_num'")
         version = result[0].get("version")
-        if version < 90400 :
+        if version < 90600 :
             raise Exception('Unable to use logical replication on PostgreSQL version {}'.format(version))
 
         # Create replication slot, ignore error if already exists
