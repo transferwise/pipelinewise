@@ -88,6 +88,42 @@ def get_target_schema(target_config, table):
 
     return target_schema
 
+def get_target_schemas(target_config, tables):
+    target_schemas = []
+    for t in tables:
+        target_schemas.append(get_target_schema(target_config, t))
+
+    return list(dict.fromkeys(target_schemas))
+
+
+def cache_information_schema_columns(target_config, tables):
+    snowflake = Snowflake(target_config)
+    pipelinewise_schema = utils.tablename_to_dict(target_config['stage'])['schema']
+    schemas_to_cache = get_target_schemas(target_config, tables)
+
+    # Create an empty cache table if not exists
+    snowflake.query("""
+        CREATE TABLE IF NOT EXISTS {}.columns (table_schema VARCHAR, table_name VARCHAR, column_name VARCHAR, date_type VARCHAR)
+    """.format(pipelinewise_schema))
+
+    # Cache table columns from information_schema
+    for schema_name in schemas_to_cache:
+        utils.log("rebuilding information_schema cache for schema: {}".format(schemas_to_cache))
+
+        # Delete existing data about the current schema
+        snowflake.query("""
+            DELETE FROM {}.columns
+            WHERE LOWER(table_schema) = '{}'
+        """.format(pipelinewise_schema, schema_name.lower()))
+
+        # Insert the latest data from information_schema into the cache table
+        snowflake.query("""
+            INSERT INTO {}.columns
+            SELECT table_schema, table_name, column_name, data_type
+            FROM information_schema.columns
+            WHERE LOWER(table_schema) = '{}'
+        """.format(pipelinewise_schema, schema_name.lower()))
+
 
 def get_grantees(target_config, table):
     """
@@ -201,6 +237,9 @@ def main_impl():
     # utilising all available CPU cores
     with multiprocessing.Pool(cpu_cores) as p:
         table_sync_excs = list(filter(None, p.map(sync_table, args.tables)))
+
+    # Refresh information_schema columns cache
+    cache_information_schema_columns(args.target, args.tables)
 
     # Log summary
     end_time = datetime.now()
