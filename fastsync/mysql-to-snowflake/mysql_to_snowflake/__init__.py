@@ -103,7 +103,7 @@ def cache_information_schema_columns(target_config, tables):
 
     # Create an empty cache table if not exists
     snowflake.query("""
-        CREATE TABLE IF NOT EXISTS {}.columns (table_schema VARCHAR, table_name VARCHAR, column_name VARCHAR, date_type VARCHAR)
+        CREATE TABLE IF NOT EXISTS {}.columns (table_schema VARCHAR, table_name VARCHAR, column_name VARCHAR, data_type VARCHAR)
     """.format(pipelinewise_schema))
 
     # Cache table columns from information_schema
