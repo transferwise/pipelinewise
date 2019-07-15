@@ -11,7 +11,7 @@ jobs:
       - checkout
       - run:
           name: 'Installing PipelineWise components and connectors'
-          command: ./install.sh
+          command: ./install.sh --acceptlicenses
 
       - run:
           name: 'Unit Tests and Coverage'
