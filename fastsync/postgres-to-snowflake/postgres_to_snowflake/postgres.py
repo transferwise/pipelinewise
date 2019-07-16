@@ -84,11 +84,23 @@ class Postgres:
 
 
     def fetch_current_log_sequence_number(self):
-        # Make sure PostgreSQL version is 9.6 or higher
+        # Make sure PostgreSQL version is 9.4 or higher
         result = self.query("SELECT setting::int AS version FROM pg_settings WHERE name='server_version_num'")
         version = result[0].get("version")
-        if version < 90600 :
-            raise Exception('Unable to use logical replication on PostgreSQL version {}'.format(version))
+
+            # Do not allow minor versions with PostgreSQL BUG #15114
+            if (version >= 110000) and (version < 110002):
+                raise Exception('PostgreSQL upgrade required to minor version 11.2')
+            elif (version >= 100000) and (version < 100007):
+                raise Exception('PostgreSQL upgrade required to minor version 10.7')
+            elif (version >= 90600) and (version < 90612):
+                raise Exception('PostgreSQL upgrade required to minor version 9.6.12')
+            elif (version >= 90500) and (version < 90516):
+                raise Exception('PostgreSQL upgrade required to minor version 9.5.16')
+            elif (version >= 90400) and (version < 90421):
+                raise Exception('PostgreSQL upgrade required to minor version 9.4.21')
+            elif (version < 90400):
+                raise Exception('Logical replication only supported from PostgreSQL 9.4')
 
         # Create replication slot, ignore error if already exists
         try:
@@ -103,10 +115,11 @@ class Postgres:
         # Get current lsn
         if version >= 100000:
             result = self.query("SELECT pg_current_wal_lsn() AS current_lsn")
-        elif version >= 90600:
+        elif version >= 90400:
             result = self.query("SELECT pg_current_xlog_location() AS current_lsn")
         else:
-            raise Exception('Unable to use logical replication on PostgreSQL version {}'.format(version))
+            raise Exception('Logical replication only supported from PostgreSQL 9.4')
+
         current_lsn = result[0].get("current_lsn")
         file, index = current_lsn.split('/')
         return (int(file, 16)  << 32) + int(index, 16)
