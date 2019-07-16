@@ -100,7 +100,7 @@ class Postgres:
             elif (version >= 90400) and (version < 90421):
                 raise Exception('PostgreSQL upgrade required to minor version 9.4.21')
             elif (version < 90400):
-                raise Exception('Logical replication only supported from PostgreSQL 9.4')
+                raise Exception('Logical replication only not supported before PostgreSQL 9.4')
 
         # Create replication slot, ignore error if already exists
         try:
@@ -118,7 +118,7 @@ class Postgres:
         elif version >= 90400:
             result = self.query("SELECT pg_current_xlog_location() AS current_lsn")
         else:
-            raise Exception('Logical replication only supported from PostgreSQL 9.4')
+            raise Exception('Logical replication only not supported before PostgreSQL 9.4')
 
         current_lsn = result[0].get("current_lsn")
         file, index = current_lsn.split('/')
