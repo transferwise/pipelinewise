@@ -204,9 +204,9 @@ class MySql:
             raise Exception("{} table not found.".format(table_name))
 
         sql = """SELECT {}
-        ,now()
-        ,now()
-        ,null
+        ,CONVERT_TZ( NOW(),@@session.time_zone,'+00:00') AS _SDC_EXTRACTED_AT
+        ,CONVERT_TZ( NOW(),@@session.time_zone,'+00:00') AS _SDC_BATCHED_AT
+        ,null AS _SDC_DELETED_AT
         FROM {}
         """.format(','.join(column_safe_sql_values), table_name)
         export_batch_rows = self.connection_config['export_batch_rows']
