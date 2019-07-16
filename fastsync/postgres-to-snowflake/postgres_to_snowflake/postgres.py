@@ -88,19 +88,19 @@ class Postgres:
         result = self.query("SELECT setting::int AS version FROM pg_settings WHERE name='server_version_num'")
         version = result[0].get("version")
 
-            # Do not allow minor versions with PostgreSQL BUG #15114
-            if (version >= 110000) and (version < 110002):
-                raise Exception('PostgreSQL upgrade required to minor version 11.2')
-            elif (version >= 100000) and (version < 100007):
-                raise Exception('PostgreSQL upgrade required to minor version 10.7')
-            elif (version >= 90600) and (version < 90612):
-                raise Exception('PostgreSQL upgrade required to minor version 9.6.12')
-            elif (version >= 90500) and (version < 90516):
-                raise Exception('PostgreSQL upgrade required to minor version 9.5.16')
-            elif (version >= 90400) and (version < 90421):
-                raise Exception('PostgreSQL upgrade required to minor version 9.4.21')
-            elif (version < 90400):
-                raise Exception('Logical replication not supported before PostgreSQL 9.4')
+        # Do not allow minor versions with PostgreSQL BUG #15114
+        if (version >= 110000) and (version < 110002):
+            raise Exception('PostgreSQL upgrade required to minor version 11.2')
+        elif (version >= 100000) and (version < 100007):
+            raise Exception('PostgreSQL upgrade required to minor version 10.7')
+        elif (version >= 90600) and (version < 90612):
+            raise Exception('PostgreSQL upgrade required to minor version 9.6.12')
+        elif (version >= 90500) and (version < 90516):
+            raise Exception('PostgreSQL upgrade required to minor version 9.5.16')
+        elif (version >= 90400) and (version < 90421):
+            raise Exception('PostgreSQL upgrade required to minor version 9.4.21')
+        elif (version < 90400):
+            raise Exception('Logical replication not supported before PostgreSQL 9.4')
 
         # Create replication slot, ignore error if already exists
         try:
