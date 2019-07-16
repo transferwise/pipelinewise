@@ -223,8 +223,8 @@ class Postgres:
             raise Exception("{} table not found.".format(table_name))
 
         sql = """COPY (SELECT {}
-        ,now()
-        ,now()
+        ,now() AT TIME ZONE 'UTC'
+        ,now() AT TIME ZONE 'UTC'
         ,null
         FROM {}) TO STDOUT with CSV DELIMITER ','
         """.format(','.join(column_safe_sql_values), table_name)
