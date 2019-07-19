@@ -61,6 +61,8 @@ class Postgres:
             self.connection_config['dbname']
         )
         self.conn = psycopg2.connect(conn_string)
+        # Set connection to autocommit
+        self.conn.autocommit = True
         self.curr = self.conn.cursor()
 
 
