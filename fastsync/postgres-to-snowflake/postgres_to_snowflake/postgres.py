@@ -85,9 +85,39 @@ class Postgres:
                     return []
 
 
+    def rs_query(self, query, params=None):
+        utils.log("POSTGRES - Running query: {}".format(query))
+        with self.rs_conn as connection:
+            with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
+                cur.execute(
+                    query,
+                    params
+                )
+
+                if cur.rowcount > 0:
+                    return cur.fetchall()
+                else:
+                    return []
+
+
     def fetch_current_log_sequence_number(self):
+        # Create replication slot dedicated connection
+        # Always use Primary server for creating replication_slot
+        rs_conn_string = "host='{}' port='{}' user='{}' password='{}' dbname='{}'".format(
+
+            self.connection_config['host'],
+            self.connection_config['port'],
+            self.connection_config['user'],
+            self.connection_config['password'],
+            self.connection_config['dbname']
+        )
+        self.rs_conn = psycopg2.connect(rs_conn_string)
+        # Set connection to autocommit
+        self.rs_conn.autocommit = True
+        self.rs_curr = self.rs_conn.cursor()
+
         # Make sure PostgreSQL version is 9.4 or higher
-        result = self.query("SELECT setting::int AS version FROM pg_settings WHERE name='server_version_num'")
+        result = self.rs_query("SELECT setting::int AS version FROM pg_settings WHERE name='server_version_num'")
         version = result[0].get("version")
 
         # Do not allow minor versions with PostgreSQL BUG #15114
@@ -106,13 +136,16 @@ class Postgres:
 
         # Create replication slot, ignore error if already exists
         try:
-            result = self.query("SELECT * FROM pg_create_logical_replication_slot('stitch_{}', 'wal2json')".format(self.connection_config['dbname']))
+            result = self.rs_query("SELECT * FROM pg_create_logical_replication_slot('stitch_{}', 'wal2json')".format(self.connection_config['dbname']))
         except Exception as e:
             # ERROR: replication slot "stitch_{}" already exists SQL state: 42710
             if (e.pgcode == '42710'):
                 pass
             else:
                 raise e
+
+        # Close replication slot dedicated connection
+        self.rs_conn.close()
 
         # Get current lsn
         if version >= 100000:
