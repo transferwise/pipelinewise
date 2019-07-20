@@ -147,13 +147,23 @@ class Postgres:
         # Close replication slot dedicated connection
         self.rs_conn.close()
 
-        # Get current lsn
-        if version >= 100000:
-            result = self.query("SELECT pg_current_wal_lsn() AS current_lsn")
-        elif version >= 90400:
-            result = self.query("SELECT pg_current_xlog_location() AS current_lsn")
+        # is bulk_sync_host set ?
+        if self.connection_config.get('bulk_sync_host'):
+            # Get latest applied lsn from bulk_sync_host
+            if version >= 100000:
+                result = self.query("SELECT pg_last_wal_replay_lsn() AS current_lsn")
+            elif version >= 90400:
+                result = self.query("SELECT pg_last_xlog_replay_location() AS current_lsn")
+            else:
+                raise Exception('Logical replication not supported before PostgreSQL 9.4')
         else:
-            raise Exception('Logical replication not supported before PostgreSQL 9.4')
+            # Get current lsn from primary host
+            if version >= 100000:
+                result = self.query("SELECT pg_current_wal_lsn() AS current_lsn")
+            elif version >= 90400:
+                result = self.query("SELECT pg_current_xlog_location() AS current_lsn")
+            else:
+                raise Exception('Logical replication not supported before PostgreSQL 9.4')
 
         current_lsn = result[0].get("current_lsn")
         file, index = current_lsn.split('/')
