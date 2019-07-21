@@ -6,22 +6,38 @@ jobs:
   #  Command Line Interface
   build:
     docker:
+      # Primary container image where all commands run
       - image: circleci/python:3.6.2
+        environment:
+          TAP_POSTGRES_HOST: localhost
+          TAP_POSTGRES_PORT: 5432
+          TAP_POSTGRES_USER: pipelinewise
+          TAP_POSTGRES_PASSWORD: secret
+          TAP_POSTGRES_DBNAME: postgres_source_db
+
+      # PostgreSQL service container image used as test source database
+      - image: circleci/postgres:9.6.14
+        environment:
+          POSTGRES_USER: pipelinewise
+          POSTGRES_PASSWORD: secret
+          POSTGRES_DB: postgres_source_db
+
     steps:
       - checkout
       - run:
           name: 'Installing PipelineWise components and connectors'
-          command: ./install.sh --acceptlicenses
+          #command: ./install.sh --acceptlicenses
+          command: ls
 
-      - run:
-          name: 'Unit Tests and Coverage'
-          command: |
-            . .virtualenvs/cli/bin/activate
-            pip install pytest coverage
-            cd cli
-            coverage run -m pytest --disable-pytest-warnings
-            coverage report
-            coverage html -d coverage_html
+      #- run:
+      #    name: 'Unit Tests and Coverage'
+      #    command: |
+      #      . .virtualenvs/cli/bin/activate
+      #      pip install pytest coverage
+      #      cd cli
+      #      coverage run -m pytest --disable-pytest-warnings
+      #      coverage report
+      #      coverage html -d coverage_html
 
   # For documentation deployment. You'll need the following environment vars
   # in your Circle CI settings, otherwise this will not work.
