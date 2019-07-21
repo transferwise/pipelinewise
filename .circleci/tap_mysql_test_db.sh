@@ -23,4 +23,4 @@ MYSQL_PWD=${TAP_MYSQL_PASSWORD}
 
 # Download the sample database and build it
 wget https://raw.githubusercontent.com/ikostan/RESTAURANT-DATABASE/master/DB_backup/structure_and_data/grp24.sql
-mysql --user ${TAP_MYSQL_USER} ${TAP_MYSQL_DBNAME} < grp24.sql
+mysql --protocol TCP --user ${TAP_MYSQL_USER} ${TAP_MYSQL_DBNAME} < grp24.sql
