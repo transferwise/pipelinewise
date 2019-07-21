@@ -43,20 +43,20 @@ jobs:
       - checkout
 
       # Installing PipelineWise components and connectors
-      #- run:
-      #    name: 'Installing PipelineWise components and connectors'
-      #    command: ./install.sh --acceptlicenses
+      - run:
+          name: 'Installing PipelineWise components and connectors'
+          command: ./install.sh --acceptlicenses
 
       # Unit Tests and Coverage
-      #- run:
-      #    name: 'Unit Tests and Coverage'
-      #    command: |
-      #      . .virtualenvs/cli/bin/activate
-      #      pip install pytest coverage
-      #      cd cli
-      #      coverage run -m pytest --disable-pytest-warnings
-      #      coverage report
-      #      coverage html -d coverage_html
+      - run:
+          name: 'Unit Tests and Coverage'
+          command: |
+            . .virtualenvs/cli/bin/activate
+            pip install pytest coverage
+            cd cli
+            coverage run -m pytest --disable-pytest-warnings
+            coverage report
+            coverage html -d coverage_html
 
       # Build source databases for integration tests
       - run:
