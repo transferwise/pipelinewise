@@ -13,5 +13,5 @@ chmod 0600 ${PGPASS}
 cat ${PGPASS}
 
 # Download the sample database and build it
-wget https://raw.githubusercontent.com/morenoh149/postgresDBSamples/master/chinook-1.4/Chinook_PostgreSql_utf8.sql
-psql -f Chinook_PostgreSql_utf8.sql -d postgres_source_db
+#wget https://raw.githubusercontent.com/morenoh149/postgresDBSamples/master/chinook-1.4/Chinook_PostgreSql_utf8.sql
+#psql -f Chinook_PostgreSql_utf8.sql -d postgres_source_db
