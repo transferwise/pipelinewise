@@ -25,6 +25,10 @@ jobs:
     steps:
       - checkout
       - run:
+          name: 'Install OS dependencies'
+          command: sudo apt install postgresql-client
+
+      - run:
           name: 'Build source databases for integration tests'
           command: ./.circleci/tap_postgres_test_db.sh
 
