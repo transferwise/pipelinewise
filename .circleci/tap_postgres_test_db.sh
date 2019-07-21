@@ -7,11 +7,12 @@
 # Create a postgres password file for non-interaction connection
 # Envrionment variables are set in circleci config.yml
 PGPASS=~/.pgpass
-echo ${TAP_POSTGRES_HOST}:${TAP_POSTGRES_PORT}:${TAP_POSTGRES_DBNAME}:${TAP_POSTGRES_USER}:${TAP_POSTGRES_PASSWORD}
 echo ${TAP_POSTGRES_HOST}:${TAP_POSTGRES_PORT}:${TAP_POSTGRES_DBNAME}:${TAP_POSTGRES_USER}:${TAP_POSTGRES_PASSWORD} > ${PGPASS}
 chmod 0600 ${PGPASS}
-cat ${PGPASS}
+
+DB_CONNECTION=`echo ${PGPASS}`
+echo "Postgres test DB connection: ${DB_CONNECTION}"
 
 # Download the sample database and build it
-#wget https://raw.githubusercontent.com/morenoh149/postgresDBSamples/master/chinook-1.4/Chinook_PostgreSql_utf8.sql
+wget https://raw.githubusercontent.com/morenoh149/postgresDBSamples/master/chinook-1.4/Chinook_PostgreSql_utf8.sql
 #psql -f Chinook_PostgreSql_utf8.sql -d postgres_source_db
