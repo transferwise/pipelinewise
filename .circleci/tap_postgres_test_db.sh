@@ -7,6 +7,7 @@
 # Create a postgres password file for non-interaction connection
 # Envrionment variables are set in circleci config.yml
 PGPASS=~/.pgpass
+echo ${TAP_POSTGRES_HOST}:${TAP_POSTGRES_PORT}:${TAP_POSTGRES_DBNAME}:${TAP_POSTGRES_USER}:${TAP_POSTGRES_PASSWORD}
 echo ${TAP_POSTGRES_HOST}:${TAP_POSTGRES_PORT}:${TAP_POSTGRES_DBNAME}:${TAP_POSTGRES_USER}:${TAP_POSTGRES_PASSWORD} > ${PGPASS}
 chmod 0600 ${PGPASS}
 cat ${PGPASS}
