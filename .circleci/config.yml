@@ -17,6 +17,12 @@ jobs:
           TAP_POSTGRES_PASSWORD: secret
           TAP_POSTGRES_DBNAME: postgres_source_db
 
+          TAP_MYSQL_HOST: localhost
+          TAP_MYSQL_PORT: 3306
+          TAP_MYSQL_USER: pipelinewise
+          TAP_MYSQL_PASSWORD: secret
+          TAP_MYSQL_DBNAME: mysql_source_db
+
       # PostgreSQL service container image used as test source database
       - image: circleci/postgres:9.6.14
         environment:
@@ -24,37 +30,42 @@ jobs:
           POSTGRES_PASSWORD: secret
           POSTGRES_DB: postgres_source_db
 
+      # MySQL service container image used as test source database
+      - image: circleci/mysql:5.7.26
+        environment:
+          MYSQL_ROOT_PASSWORD: secret
+          MYSQL_USER: pipelinewise
+          MYSQL_PASSWORD: secret
+          MYSQL_DATABASE: mysql_source_db
+
     # Steps to build the full test environment and to run the tests
     steps:
       - checkout
 
-      # Install OS dependencies
-      - run:
-          name: 'Install OS dependencies'
-          command: |
-            sudo apt-get update
-            sudo apt install postgresql-client
+      # Installing PipelineWise components and connectors
+      #- run:
+      #    name: 'Installing PipelineWise components and connectors'
+      #    command: ./install.sh --acceptlicenses
+
+      # Unit Tests and Coverage
+      #- run:
+      #    name: 'Unit Tests and Coverage'
+      #    command: |
+      #      . .virtualenvs/cli/bin/activate
+      #      pip install pytest coverage
+      #      cd cli
+      #      coverage run -m pytest --disable-pytest-warnings
+      #      coverage report
+      #      coverage html -d coverage_html
 
       # Build source databases for integration tests
       - run:
           name: 'Build source databases for integration tests'
-          command: ./.circleci/tap_postgres_test_db.sh
-
-      # Installing PipelineWise components and connectors
-      - run:
-          name: 'Installing PipelineWise components and connectors'
-          command: ./install.sh --acceptlicenses
-
-      # Unit Tests and Coverage
-      - run:
-          name: 'Unit Tests and Coverage'
           command: |
-            . .virtualenvs/cli/bin/activate
-            pip install pytest coverage
-            cd cli
-            coverage run -m pytest --disable-pytest-warnings
-            coverage report
-            coverage html -d coverage_html
+            sudo apt-get update
+            sudo apt install postgresql-client mysql-client
+            ./.circleci/tap_postgres_test_db.sh
+            ./.circleci/tap_mysql_test_db.sh
 
   # For documentation deployment. You'll need the following environment vars
   # in your Circle CI settings, otherwise this will not work.
