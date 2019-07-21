@@ -6,11 +6,11 @@
 
 # Create a postgres password file for non-interaction connection
 # Envrionment variables are set in circleci config.yml
-PGPASS=~/.pgpass
-echo ${TAP_POSTGRES_HOST}:${TAP_POSTGRES_PORT}:${TAP_POSTGRES_DBNAME}:${TAP_POSTGRES_USER}:${TAP_POSTGRES_PASSWORD} > ${PGPASS}
-chmod 0600 ${PGPASS}
+PGPASSFILE=~/.pgpass
+echo ${TAP_POSTGRES_HOST}:${TAP_POSTGRES_PORT}:${TAP_POSTGRES_DBNAME}:${TAP_POSTGRES_USER}:${TAP_POSTGRES_PASSWORD} > ${PGPASSFILE}
+chmod 0600 ${PGPASSFILE}
 
-DB_CONNECTION=`cat ${PGPASS}`
+DB_CONNECTION=`cat ${PGPASSFILE}`
 echo "Postgres test DB connection: ${DB_CONNECTION}"
 
 # Download the sample database and build it

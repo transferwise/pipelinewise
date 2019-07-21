@@ -9,7 +9,7 @@ jobs:
       # Primary container image where all commands run
       - image: circleci/python:3.6.2
         environment:
-          TAP_POSTGRES_HOST: localhost
+          TAP_POSTGRES_HOST: "127.0.0.1"
           TAP_POSTGRES_PORT: 5432
           TAP_POSTGRES_USER: pipelinewise
           TAP_POSTGRES_PASSWORD: secret
