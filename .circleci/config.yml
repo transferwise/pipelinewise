@@ -27,20 +27,25 @@ jobs:
     # Steps to build the full test environment and to run the tests
     steps:
       - checkout
+
+      # Install OS dependencies
       - run:
           name: 'Install OS dependencies'
           command: |
             sudo apt-get update
             sudo apt install postgresql-client
 
+      # Build source databases for integration tests
       - run:
           name: 'Build source databases for integration tests'
           command: ./.circleci/tap_postgres_test_db.sh
 
+      # Installing PipelineWise components and connectors
+      - run:
           name: 'Installing PipelineWise components and connectors'
           command: ./install.sh --acceptlicenses
-          command: ls
 
+      # Unit Tests and Coverage
       - run:
           name: 'Unit Tests and Coverage'
           command: |
