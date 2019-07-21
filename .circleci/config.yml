@@ -25,6 +25,9 @@ jobs:
     steps:
       - checkout
       - run:
+          name: 'Build source databases for integration tests'
+          command: tap_postgres_test_db.sh
+
           name: 'Installing PipelineWise components and connectors'
           #command: ./install.sh --acceptlicenses
           command: ls
