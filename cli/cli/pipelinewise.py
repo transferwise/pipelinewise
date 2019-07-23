@@ -1035,7 +1035,7 @@ class PipelineWise(object):
             with parallel_backend('threading', n_jobs=-1):
                 # Discover taps in parallel and return the list
                 # of exception of the failed ones
-                discover_excs.append(list(filter(None,
+                discover_excs.extend(list(filter(None,
                     Parallel(verbose=100)(delayed(self.discover_tap)(
                         tap=tap,
                         target=target
