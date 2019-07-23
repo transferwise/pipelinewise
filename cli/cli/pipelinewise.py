@@ -1021,39 +1021,47 @@ class PipelineWise(object):
         # doing that sequentially is slow. For a better performance we do it
         # in parallel.
         self.logger.info("ACTIVATING TAP STREAM SELECTIONS...")
+        total_targets = 0
+        total_taps = 0
+        discover_excs = []
+
+        # Import every tap from every target
+        start_time = datetime.now()
         for tk in config.targets.keys():
             target = config.targets.get(tk)
-            start_time = datetime.now()
+            total_targets += 1
+            total_taps += len(target.get('taps'))
+
             with parallel_backend('threading', n_jobs=-1):
                 # Discover taps in parallel and return the list
                 # of exception of the failed ones
-                discover_excs = list(filter(None,
+                discover_excs.append(list(filter(None,
                     Parallel(verbose=100)(delayed(self.discover_tap)(
                         tap=tap,
                         target=target
-                    ) for (tap) in target.get('taps'))))
+                    ) for (tap) in target.get('taps')))))
 
-            # Log summary
-            end_time = datetime.now()
-            self.logger.info("""
-                -------------------------------------------------------
-                IMPORTING YAML CONFIGS FINISHED - TARGET: [{}]
-                -------------------------------------------------------
-                    Total taps to import           : {}
-                    Taps imported successfully     : {}
-                    Taps failed to import          : {}
-
-                    Runtime                        : {}
-                -------------------------------------------------------
-                """.format(
-                    tk,
-                    len(target.get('taps')),
-                    len(target.get('taps')) - len(discover_excs),
-                    str(discover_excs),
-                    end_time  - start_time
-                ))
-            if len(discover_excs) > 0:
-                sys.exit(1)
+        # Log summary
+        end_time = datetime.now()
+        self.logger.info("""
+            -------------------------------------------------------
+            IMPORTING YAML CONFIGS FINISHED
+            -------------------------------------------------------
+                Total targets to import        : {}
+                Total taps to import           : {}
+                Taps imported successfully     : {}
+                Taps failed to import          : {}
+                Runtime                        : {}
+            -------------------------------------------------------
+            """.format(
+                total_targets,
+                total_taps,
+                total_taps - len(discover_excs),
+                str(discover_excs),
+                end_time - start_time
+            ))
+        if len(discover_excs) > 0:
+            sys.exit(1)
 
 
     def encrypt_string(self):
