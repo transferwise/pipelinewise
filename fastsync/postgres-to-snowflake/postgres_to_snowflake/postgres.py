@@ -49,15 +49,15 @@ class Postgres:
 
     def open_connection(self):
         conn_string = "host='{}' port='{}' user='{}' password='{}' dbname='{}'".format(
-            # Fastsync is using bulk_sync_{host|port|user|password} values from the config by default
+            # Fastsync is using replica_{host|port|user|password} values from the config by default
             # to avoid making heavy load on the primary source database when syncing large tables
             #
-            # If bulk_sync_{host|port|user|password} values are not defined in the config then it's
+            # If replica_{host|port|user|password} values are not defined in the config then it's
             # using the normal credentials to connect
-            self.connection_config.get('bulk_sync_host', self.connection_config['host']),
-            self.connection_config.get('bulk_sync_port', self.connection_config['port']),
-            self.connection_config.get('bulk_sync_user', self.connection_config['user']),
-            self.connection_config.get('bulk_sync_password', self.connection_config['password']),
+            self.connection_config.get('replica_host', self.connection_config['host']),
+            self.connection_config.get('replica_port', self.connection_config['port']),
+            self.connection_config.get('replica_user', self.connection_config['user']),
+            self.connection_config.get('replica_password', self.connection_config['password']),
             self.connection_config['dbname']
         )
         self.conn = psycopg2.connect(conn_string)
@@ -147,9 +147,9 @@ class Postgres:
         # Close replication slot dedicated connection
         self.rs_conn.close()
 
-        # is bulk_sync_host set ?
-        if self.connection_config.get('bulk_sync_host'):
-            # Get latest applied lsn from bulk_sync_host
+        # is replica_host set ?
+        if self.connection_config.get('replica_host'):
+            # Get latest applied lsn from replica_host
             if version >= 100000:
                 result = self.query("SELECT pg_last_wal_replay_lsn() AS current_lsn")
             elif version >= 90400:
