@@ -37,17 +37,111 @@ Documentation is available at https://transferwise.github.io/pipelinewise/
 
 ## Installation
 
-### Requirements
+### Building from source
+
+1. Make sure that every dependencies installed on your system:
 * Python 3.x
 * python3-dev
 * python3-venv
 
-### Build from source:
+2. Run the install script that installs the PipelineWise CLI and every supported singer connectors into separated virtual environments:
+   
+```sh
+$ ./install.sh
+```
+(Press Y to accept the license agreement of the required singer components)
 
-1. `./intall.sh` : Installs the PipelineWise CLI and supported singer connectors in separated virtual environments
+3. To start CLI you need to activate the CLI virtual environment and has to set `PIPELINEWISE_HOME` environment variable:
+   
+```sh
+$ source {ACTUAL_ABSOLUTE_PATH}/.virtualenvs/cli/bin/activate
+$ export PIPELINEWISE_HOME={ACTUAL_ABSOLUTE_PATH}
+```
+(The `ACTUAL_ABSOLUTE_PATH` differs on every system, the install script prints you the correct command that fits
+to your system once the installation completed)
+
+4. Run any pipelinewise commands to test the installation:
+   
+```sh
+$ pipelinewise status # Can be any other valid PipelineWise command
+```
+
+## Developing with Docker
+
+If you have [Docker](https://www.docker.com/) and [Docker Compose](https://docs.docker.com/compose/) installed, you can
+easily create a local development environment setup quickly that includes not only the PipelineWise executables but
+some open source databases for a more convenient development experience:
+* PipelineWise CLI with every supported tap and target connectors
+* MySQL test source database    (for tap-mysql)
+* Postgres test source database (for tap-postgres)
+* Postgres test target database (for target-snowflake)
+
+To create local development environment:
+```
+$ docker-compose up --build
+```
+
+As soon as you see `PipelineWise Dev environment is ready in Docker container(s).` you can shell into the container and
+start running PipelineWise commands. At this point every virtual environment is created and every required environment
+variables is set.
+
+To shell into the ready to use PipelineWise container:
+
+```sh
+$ docker exec -it pipelinewise_dev bash
+```
+
+To run PipelineWise command:
+
+```sh
+$ pipelinewise status # Can be any other valid PipelineWise command
+```
+
+To run unit tests:
+
+```sh
+$ pytest --disable-pytest-warnings
+```
+
+To run unit tests and report code coverage:
+
+```
+$ cd cli
+$ coverage run -m pytest --disable-pytest-warnings && coverage report
+```
+
+To generate HTML coverage report.
+
+```
+$ cd cli
+$ coverage run -m pytest --disable-pytest-warnings && coverage html -d coverage_html
+```
+
+**Note**: The HTML report will be generated in `cli/coverage_html/index.html`
+and can be opened **only** from the docker host and not inside from the container.
 
 
-#### Loading configurations and running taps
+To refresh the containers with new local code changes stop the running instances with ctrl+c
+and restart as usual.
+
+```sh
+$ docker exec -it pipelinewise_dev bash
+```
+
+### Test databases in the docker development environment
+
+The docker environment 
+
+| Database      | Port (from docker host) | Port (inside from CLI container) | Database Name      |
+|---------------|-------------------------|----------------------------------|--------------------|
+| Postgres (1)  | localhost:15432         | db_postgres_source:5432          | postgres_source_db |
+| MySQL         | localhost:13306         | db_mysql_source:3306             | mysql_source_db    |
+| Postgres (2)  | localhost:15433         | db_postgres_dwh:5432             | postgres_dwh       |
+
+For user and passwords check the `.env` file.
+
+
+## Loading configurations and running taps
 
 1. Clone [analytics-platform-config](https://github.com/transferwise/analytics-platform-config) repo.
 
@@ -69,29 +163,3 @@ snowflake_test tap has been configured to use Snowflake test database, AWS stagi
 5. Run your tap: `pipelinewise run_tap --target snowflake_test --tap adwords`
 
     Logs for tap outputs are stored in `~/.pipelinewise/snowflake_test/`
-
-
-### To run tests:
-
-1. Install python dependencies in a virtual env:
-```
-  python3 -m venv .virtualenvs/cli
-  . .virtualenvs/cli/bin/activate
-  pip install --upgrade pip
-  pip install -e cli
-  pip install pytest coverage
-```
-
-2. To run unit tests and report code coverage:
-```
-  cd cli
-  coverage run -m pytest --disable-pytest-warnings && coverage report
-```
-
-3. To generate HTML coverage report
-```
-  coverage run -m pytest --disable-pytest-warnings && coverage html -d coverage_html
-```
-
-The HTML report is generating into `coverage_html/index.html`
-

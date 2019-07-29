@@ -19,6 +19,12 @@ setup(name='cli',
         'ansible==2.7.10',
         'joblib==0.13.2'
     ],
+    extras_require={
+        "test": [
+            "pytest==5.0.1",
+            "coverage==4.5.3"
+        ]
+    },
     entry_points='''
         [console_scripts]
         pipelinewise=cli:main

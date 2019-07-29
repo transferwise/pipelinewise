@@ -1,0 +1,61 @@
+version: '3'
+services:
+  ### Primary container with PipelineWise CLI
+  pipelinewise:
+    image: python:3.7.4-buster
+    container_name: pipelinewise_dev
+    working_dir: /usr/src/app
+    entrypoint: /usr/src/app/docker-entrypoint.sh
+    environment:
+      PIPELINEWISE_HOME: /usr/src/app
+      DB_TAP_MYSQL_PORT: ${DB_TAP_MYSQL_PORT}
+      DB_TAP_POSTGRES_PORT: ${DB_TAP_POSTGRES_PORT}
+      DB_TARGET_POSTGRES_PORT: ${DB_TARGET_POSTGRES_PORT}
+
+    volumes:
+      - .:/usr/src/app
+      - /usr/src/app/.virtualenvs/
+
+    # Build only when test databases are ready
+    depends_on:
+      - db_postgres_source
+      - db_mysql_source
+      - db_postgres_dwh
+
+
+  ### TAP (Data source) containers
+  # PostgreSQL service container used as test source database
+  db_postgres_source:
+    image: circleci/postgres:9.6.14
+    container_name: pipelinewise_dev_postgres_source
+    ports:
+      - ${DB_TAP_POSTGRES_PORT}:5432
+    environment:
+      POSTGRES_USER: ${DB_TAP_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${DB_TAP_POSRTGRES_PASSWORD}
+      POSTGRES_DB: ${DB_TAP_POSTGRES_DB}
+
+  # MySQL service container used as test source database
+  db_mysql_source:
+    image: circleci/mysql:5.7.26
+    container_name: pipelinewise_dev_mysql_source
+    ports:
+      - ${DB_TAP_MYSQL_PORT}:3306
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_TAP_MYSQL_ROOT_PASSWORD}
+      MYSQL_USER: ${DB_TAP_MYSQL_USER}
+      MYSQL_PASSWORD: ${DB_TAP_MYSQL_PASSWORD}
+      MYSQL_DATABASE: ${DB_TAP_MYSQL_DATABASE}
+
+  ### Target containers
+  # PostgreSQL service container used as test target database
+  db_postgres_dwh:
+    image: circleci/postgres:9.6.14
+    container_name: pipelinewise_dev_postgres_dwh
+    ports:
+      - ${DB_TARGET_POSTGRES_PORT}:5432
+    environment:
+      POSTGRES_USER: ${DB_TARGET_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${DB_TARGET_POSRTGRES_PASSWORD}
+      POSTGRES_DB: ${DB_TARGET_POSTGRES_DB}
+
