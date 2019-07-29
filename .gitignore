@@ -17,6 +17,9 @@ coverage_html
 # Singer Tap state
 .state.json
 
+# Docker
+#.env
+
 *.db
 .DS_Store
 venv

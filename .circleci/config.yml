@@ -16,7 +16,7 @@ jobs:
       - run:
           name: 'Unit Tests and Coverage'
           command: |
-            . .virtualenvs/cli/bin/activate
+            . .virtualenvs/pipelinewise/bin/activate
             pip install pytest coverage
             cd cli
             coverage run -m pytest --disable-pytest-warnings
