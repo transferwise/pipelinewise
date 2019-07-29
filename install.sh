@@ -6,9 +6,6 @@ set -e
 # Capture start_time
 start_time=`date +%s`
 
-# Ubuntu prerequisites
-# apt install python3 python3-pip python3-venv libpq-dev libsnappy-dev -y
-
 # Source directory defined as location of install.sh
 SRC_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
@@ -61,7 +58,12 @@ make_virtualenv() {
         python3 -m pip install -r requirements.txt
     fi
     if [ -f "setup.py" ]; then
-        python3 -m pip install .
+        PIP_ARGS=
+        if [[ $WITH_TEST_EXTRAS == "YES" ]]; then
+            PIP_ARGS=$PIP_ARGS"[test]"
+        fi
+
+        python3 -m pip install .$PIP_ARGS
     fi
 
     check_license $1
@@ -71,10 +73,36 @@ make_virtualenv() {
 install_connector() {
     echo
     echo "--------------------------------------------------------------------------"
-    echo "Insalling $1 connector..."
+    echo "Installing $1 connector..."
     echo "--------------------------------------------------------------------------"
     cd $SRC_DIR/singer-connectors/$1
     make_virtualenv $1
+}
+
+print_installed_connectors() {
+    cd $SRC_DIR
+
+    echo "Installed components:"
+    echo
+    echo "--------------------------------------------------------------------------"
+    echo "Installed components"
+    echo "--------------------------------------------------------------------------"
+    echo
+    echo "Component            Version"
+    echo "-------------------- -------"
+
+    for i in `ls singer-connectors`; do
+        VERSION=1
+        REQUIREMENTS_TXT=$SRC_DIR/singer-connectors/$i/requirements.txt
+        SETUP_PY=$SRC_DIR/singer-connectors/$i/setup.py
+        if [ -f $REQUIREMENTS_TXT ]; then
+            VERSION=`grep $i $REQUIREMENTS_TXT | cut -f 3 -d "="`
+        elif [ -f $SETUP_PY ]; then
+            VERSION="`python3 $SETUP_PY -V` (not from PyPI)"
+        fi
+
+        printf "%-20s %s\n" $i "$VERSION"
+    done
 }
 
 install_fastsync() {
@@ -84,34 +112,38 @@ install_fastsync() {
 
 install_cli() {
     cd $SRC_DIR/cli
-    make_virtualenv cli
+    make_virtualenv pipelinewise
 }
 
 # Parse command line arguments
 for arg in "$@"; do
-    case $1 in
+    case $arg in
         # Auto accept license agreemnets. Useful if PipelineWise installed by an automated script
         --acceptlicenses)
             ACCEPT_LICENSES="YES"
+            ;;
+        # Do not print usage information at the end of the install
+        --nousage)
+            NO_USAGE="YES"
+            ;;
+        # Install with test requirements that allows running tests
+        --withtestextras)
+            WITH_TEST_EXTRAS="YES"
+            ;;
+        *)
+            echo "Invalid argument: $arg"
+            exit 1
+            ;;
     esac
 done
 
+# Welcome message
+cat motd
 
 # Install Singer connectors
-install_connector tap-mysql
-install_connector tap-postgres
-install_connector tap-zendesk
-install_connector tap-kafka
-install_connector tap-adwords
-install_connector tap-s3-csv
-install_connector tap-snowflake
-install_connector tap-salesforce
-install_connector tap-jira
-install_connector target-postgres
-install_connector target-snowflake
-install_connector target-s3-csv
-install_connector transform-field
-
+for i in `ls singer-connectors`; do
+    install_connector $i
+done
 
 # Install fastsyncs
 install_fastsync mysql-to-snowflake
@@ -123,15 +155,18 @@ install_cli
 # Capture end_time
 end_time=`date +%s`
 
-echo
-echo "--------------------------------------------------------------------------"
-echo "PipelineWise installed successfully in $((end_time-start_time)) seconds"
-echo "--------------------------------------------------------------------------"
-echo
-echo "To start CLI:"
-echo " $ source $VENV_DIR/cli/bin/activate"
-echo " $ export PIPELINEWISE_HOME=$PIPELINEWISE_HOME"
+print_installed_connectors
+if [[ $NO_USAGE != "YES" ]]; then
+    echo
+    echo "--------------------------------------------------------------------------"
+    echo "PipelineWise installed successfully in $((end_time-start_time)) seconds"
+    echo "--------------------------------------------------------------------------"
+    echo
+    echo "To start CLI:"
+    echo " $ source $VENV_DIR/cli/bin/activate"
+    echo " $ export PIPELINEWISE_HOME=$PIPELINEWISE_HOME"
 
-echo " $ pipelinewise status"
-echo
-echo "--------------------------------------------------------------------------"
+    echo " $ pipelinewise status"
+    echo
+    echo "--------------------------------------------------------------------------"
+fi
