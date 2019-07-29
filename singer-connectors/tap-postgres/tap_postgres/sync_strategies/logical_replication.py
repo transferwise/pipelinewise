@@ -3,7 +3,6 @@
 
 import singer
 import datetime
-import time
 import decimal
 from singer import utils, get_bookmark
 import singer.metadata as metadata
@@ -27,10 +26,39 @@ def get_pg_version(cur):
     LOGGER.debug("Detected PostgreSQL version: %s", version)
     return version
 
-def lsn_to_int(f_lsn):
+
+def lsn_to_int(lsn):
     """Convert pg_lsn to int"""
-    file, index = f_lsn.split('/')
-    return (int(file, 16)  << 32) + int(index, 16)
+
+    if not lsn:
+        return None
+
+    file, index = lsn.split('/')
+    lsni = (int(file, 16)  << 32) + int(index, 16)
+    return(lsni)
+
+
+def int_to_lsn(lsni):
+    """Convert int to pg_lsn"""
+
+    if not lsni:
+        return None
+
+    # Convert the integer to binary
+    lsnb = '{0:b}'.format(lsni)
+
+    # file is the binary before the 32nd character, converted to hex
+    if len(lsnb) > 32:
+        file = (format(int(lsnb[:-32], 2), 'x')).upper()
+    else:
+        file = '0'
+
+    # index is the binary from the 32nd character, converted to hex
+    index = (format(int(lsnb[-32:], 2), 'x')).upper()
+    # Formatting
+    lsn = "{}/{}".format(file, index)
+    return(lsn)
+
 
 def fetch_current_lsn(conn_config):
     with post_db.open_connection(conn_config, False) as conn:
@@ -310,7 +338,7 @@ def consume_message(streams, state, msg, time_extracted, conn_info, end_lsn):
     # This is the behaviour of the original tap-progres
     # The Pipelinewise version flushes only at the start of the next run
     # This is to ensure the data has been comitted on the destination
-    # LOGGER.info("Sending flush_lsn = {} to source server".format(msg.data_start))
+    # LOGGER.info("Sending flush_lsn = {} ({}) to source server".format(msg.data_start, int_to_lsn(msg.data_start)))
     # msg.cursor.send_feedback(flush_lsn=msg.data_start)
 
     return state
@@ -318,7 +346,7 @@ def consume_message(streams, state, msg, time_extracted, conn_info, end_lsn):
 def locate_replication_slot(conn_info):
     with post_db.open_connection(conn_info, False) as conn:
         with conn.cursor() as cur:
-            db_specific_slot = "stitch_{}".format(conn_info['dbname'])
+            db_specific_slot = "pipelinewise_{}".format(conn_info['dbname'])
             cur.execute("SELECT * FROM pg_replication_slots WHERE slot_name = %s AND plugin = %s", (db_specific_slot, 'wal2json'))
             if len(cur.fetchall()) == 1:
                 LOGGER.info("Using pg_replication_slot %s", db_specific_slot)
@@ -332,63 +360,71 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
     start_lsn = comitted_lsn
     time_extracted = utils.now()
     slot = locate_replication_slot(conn_info)
-    last_lsn_processed = None
-    logical_poll_total_seconds = conn_info['logical_poll_total_seconds'] or 600
+    lsn_last_processed = None
+    lsn_currently_processing = None
+    lsn_received_timestamp = datetime.datetime.utcnow()
+    lsn_processed = 0
+    logical_poll_total_seconds = conn_info['logical_poll_total_seconds'] or 300
     poll_interval = 10
-    poll_timestamp = datetime.datetime.now()
-    wal_received_timestamp = datetime.datetime.now()
-    wal_entries_processed = 0
+    poll_timestamp = datetime.datetime.utcnow()
 
     for s in logical_streams:
         sync_common.send_schema_message(s, ['lsn'])
 
     with post_db.open_connection(conn_info, True) as conn:
         with conn.cursor() as cur:
-            LOGGER.info("Starting Logical Replication for %s(%s): %s -> %s. logical_poll_total_seconds: %s", list(map(lambda s: s['tap_stream_id'], logical_streams)), slot, start_lsn, end_lsn, logical_poll_total_seconds)
+            LOGGER.info("Starting Logical Replication for %s(%s): %s -> %s. logical_poll_total_seconds: %s", list(map(lambda s: s['tap_stream_id'], logical_streams)), slot, int_to_lsn(start_lsn), int_to_lsn(end_lsn), logical_poll_total_seconds)
             try:
                 cur.start_replication(slot_name=slot, decode=True, start_lsn=start_lsn, options={'write-in-chunks': 1})
             except psycopg2.ProgrammingError:
                 raise Exception("unable to start replication with logical replication slot {}".format(slot))
 
             # Flush Postgres log up to lsn saved in state file from previous run
-            LOGGER.info("Sending flush_lsn = {} to source server".format(comitted_lsn))
+            LOGGER.info("{} : Sending flush_lsn = {} ({}) to source server".format(datetime.datetime.utcnow(), comitted_lsn, int_to_lsn(comitted_lsn)))
             cur.send_feedback(flush_lsn=comitted_lsn, reply=True)
-            # Give source server a short rest
-            time.sleep(1)
-
 
             while True:
                 # Disconnect when no data received for logical_poll_total_seconds
                 # needs to be long enough to wait for the largest single wal payload to avoid unplanned timeouts
-                poll_duration = (datetime.datetime.now() - wal_received_timestamp).total_seconds()
+                poll_duration = (datetime.datetime.utcnow() - lsn_received_timestamp).total_seconds()
                 if poll_duration > logical_poll_total_seconds:
                     LOGGER.info("Breaking after %s seconds of polling with no data", poll_duration)
                     break
 
                 msg = cur.read_message()
                 if msg:
-                    wal_received_timestamp = datetime.datetime.now()
                     if msg.data_start > end_lsn:
-                        LOGGER.info("Gone past end_lsn %s for run. breaking", end_lsn)
+                        LOGGER.info("{} : Current {} is past end_lsn {} - breaking".format(datetime.datetime.utcnow(), int_to_lsn(msg.data_start), int_to_lsn(end_lsn)))
                         break
 
                     state = consume_message(logical_streams, state, msg, time_extracted, conn_info, end_lsn)
-                    last_lsn_processed = msg.data_start
-                    wal_entries_processed = wal_entries_processed + 1
-                    if wal_entries_processed >= UPDATE_BOOKMARK_PERIOD:
-                        singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
-                        wal_entries_processed = 0
+
+                    # When using wal2json with write-in-chunks, multiple messages can have the same lsn
+                    # This is to ensure we only flush to lsn that has completed entirely
+                    if (lsn_currently_processing is None):
+                        lsn_currently_processing = msg.data_start
+                    elif (int(msg.data_start) > lsn_currently_processing):
+                        lsn_last_processed = lsn_currently_processing
+                        lsn_currently_processing = msg.data_start
+                        lsn_received_timestamp = datetime.datetime.utcnow()
+                        lsn_processed = lsn_processed + 1
+                        if lsn_processed >= UPDATE_BOOKMARK_PERIOD:
+                            singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
+                            lsn_processed = 0
 
                 # When data is received, and when data is not received, a keep-alive poll needs to be returned to PostgreSQL
-                if datetime.datetime.now() >= (poll_timestamp + datetime.timedelta(seconds=poll_interval)):
-                    LOGGER.info("{} : Sending keep-alive to source server - waiting for wal entries".format(datetime.datetime.utcnow()))
+                if datetime.datetime.utcnow() >= (poll_timestamp + datetime.timedelta(seconds=poll_interval)):
+                    LOGGER.info("{} : Sending keep-alive to source server (last message received was {} at {})".format(datetime.datetime.utcnow(), int_to_lsn(lsn_last_processed), lsn_received_timestamp))
                     cur.send_feedback()
-                    poll_timestamp = datetime.datetime.now()
+                    poll_timestamp = datetime.datetime.utcnow()
 
-    if last_lsn_processed:
+            # Attempt to close connection to source
+            cur.close()
+
+    if lsn_last_processed:
         for s in logical_streams:
-            LOGGER.info("updating bookmark for stream %s to last_lsn_processed %s", s['tap_stream_id'], last_lsn_processed)
-            state = singer.write_bookmark(state, s['tap_stream_id'], 'lsn', last_lsn_processed)
+            LOGGER.info("updating bookmark for stream {} to lsn = {} ({})".format(s['tap_stream_id'], lsn_last_processed, int_to_lsn(lsn_last_processed)))
+            state = singer.write_bookmark(state, s['tap_stream_id'], 'lsn', lsn_last_processed)
 
     singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
     return state
