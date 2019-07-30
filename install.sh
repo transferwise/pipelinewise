@@ -138,10 +138,10 @@ for arg in "$@"; do
 done
 
 # Welcome message
-cat motd
+cat $SRC_DIR/motd
 
 # Install Singer connectors
-for i in `ls singer-connectors`; do
+for i in `ls $SRC_DIR/singer-connectors`; do
     install_connector $i
 done
 
