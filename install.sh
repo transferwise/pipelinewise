@@ -91,7 +91,7 @@ print_installed_connectors() {
     echo "Component            Version"
     echo "-------------------- -------"
 
-    for i in `ls singer-connectors`; do
+    for i in `ls $VENV_DIR`; do
         VERSION=1
         REQUIREMENTS_TXT=$SRC_DIR/singer-connectors/$i/requirements.txt
         SETUP_PY=$SRC_DIR/singer-connectors/$i/setup.py
