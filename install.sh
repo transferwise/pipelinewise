@@ -105,16 +105,6 @@ print_installed_connectors() {
     done
 }
 
-install_fastsync() {
-    cd $SRC_DIR/fastsync/$1
-    make_virtualenv $1
-}
-
-install_cli() {
-    cd $SRC_DIR/cli
-    make_virtualenv pipelinewise
-}
-
 # Parse command line arguments
 for arg in "$@"; do
     case $arg in
@@ -140,17 +130,13 @@ done
 # Welcome message
 cat motd
 
+# Install PipelineWise core components
+make_virtualenv pipelinewise
+
 # Install Singer connectors
 for i in `ls singer-connectors`; do
     install_connector $i
 done
-
-# Install fastsyncs
-install_fastsync mysql-to-snowflake
-install_fastsync postgres-to-snowflake
-
-# Install CLI
-install_cli
 
 # Capture end_time
 end_time=`date +%s`
@@ -163,7 +149,7 @@ if [[ $NO_USAGE != "YES" ]]; then
     echo "--------------------------------------------------------------------------"
     echo
     echo "To start CLI:"
-    echo " $ source $VENV_DIR/cli/bin/activate"
+    echo " $ source $VENV_DIR/pipelinewise/bin/activate"
     echo " $ export PIPELINEWISE_HOME=$PIPELINEWISE_HOME"
 
     echo " $ pipelinewise status"

@@ -1,6 +1,6 @@
 [run]
 branch=True
-source = cli
+source = pipelinewise
 
 [report]
 show_missing=False

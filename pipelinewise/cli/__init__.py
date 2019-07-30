@@ -4,10 +4,11 @@ import sys
 from pathlib import Path
 
 from pkg_resources import get_distribution
-from cli.pipelinewise import PipelineWise
 import argparse
 
-__version__ = get_distribution('cli').version
+from .pipelinewise import PipelineWise
+
+__version__ = get_distribution('pipelinewise').version
 user_home = os.path.expanduser('~')
 config_dir = os.path.join(user_home, '.pipelinewise')
 pipelinewise_default_home = os.path.join(user_home, 'pipelinewise')

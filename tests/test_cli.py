@@ -2,9 +2,10 @@ import os
 import pytest
 import shutil
 
-import cli.utils
+import pipelinewise.cli.utils
+from pipelinewise.cli.pipelinewise import PipelineWise
+
 from cli_args import CliArgs
-from cli.pipelinewise import PipelineWise
 
 CONFIG_DIR="{}/resources/sample_json_config".format(os.path.dirname(__file__))
 VIRTUALENVS_DIR="./virtualenvs-dummy"
@@ -331,7 +332,7 @@ class TestCli(object):
         pipelinewise.init()
 
         # The test project should contain every sample YAML file
-        for s in os.listdir("{}/../cli/samples".format(os.path.dirname(__file__))):
+        for s in os.listdir("{}/../pipelinewise/cli/samples".format(os.path.dirname(__file__))):
             assert os.path.isfile(os.path.join(TEST_PROJECT_DIR, s))
 
         # Re-creating project should reaise exception of directory not empty
