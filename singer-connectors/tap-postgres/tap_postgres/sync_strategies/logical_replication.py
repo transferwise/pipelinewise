@@ -418,8 +418,9 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
                     cur.send_feedback()
                     poll_timestamp = datetime.datetime.utcnow()
 
-            # Attempt to close connection to source
-            cur.close()
+    # Close cursor and connection
+    cur.close()
+    conn.close()
 
     if lsn_last_processed:
         for s in logical_streams:
