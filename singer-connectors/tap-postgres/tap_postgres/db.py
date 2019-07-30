@@ -29,10 +29,10 @@ def fully_qualified_table_name(schema, table):
 
 def open_connection(conn_config, logical_replication=False):
     if logical_replication:
-        conn = psycopg2.connect(host=conn_config['host'], dbname=conn_config['dbname'], user=conn_config['user'], password=conn_config['password'], port=conn_config['port'],
+        conn = psycopg2.connect(application_name='pipelinewise', host=conn_config['host'], dbname=conn_config['dbname'], user=conn_config['user'], password=conn_config['password'], port=conn_config['port'],
                                 connection_factory=psycopg2.extras.LogicalReplicationConnection, connect_timeout=30)
     else:
-        conn = psycopg2.connect(host=conn_config['host'], dbname=conn_config['dbname'], user=conn_config['user'], password=conn_config['password'], port=conn_config['port'], connect_timeout=30)
+        conn = psycopg2.connect(application_name='pipelinewise', host=conn_config['host'], dbname=conn_config['dbname'], user=conn_config['user'], password=conn_config['password'], port=conn_config['port'], connect_timeout=30)
 
     return conn
 
