@@ -11,7 +11,7 @@ setup(name='postgres-to-snowflake',
       install_requires=[
           'attrs==16.3.0',
           'idna==2.7',
-          'psycopg2==2.7.5',
+          'psycopg2==2.8.2',
           "boto3==1.9.33",
           "snowflake-connector-python==1.7.2",
       ],
