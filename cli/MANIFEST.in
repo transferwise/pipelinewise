@@ -1,4 +1,0 @@
-
-include cli/schemas/*.json
-include cli/samples/README.md
-include cli/samples/*.yml.sample
