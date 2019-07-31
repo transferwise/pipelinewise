@@ -8,8 +8,8 @@ import mysql_to_snowflake.utils
 import multiprocessing
 
 from datetime import datetime, timedelta
-from mysql_to_snowflake.mysql import MySql
-from mysql_to_snowflake.snowflake import Snowflake
+from .mysql import MySql
+from .snowflake import Snowflake
 
 
 REQUIRED_CONFIG_KEYS = {

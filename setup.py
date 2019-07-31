@@ -29,7 +29,7 @@ setup(name='pipelinewise',
         'attrs==17.4.0',
         'idna==2.7',
         'PyMySQL==0.7.11',
-        'psycopg2==2.7.5',
+        'psycopg2==2.8.2',
         'boto3==1.9.33',
         'snowflake-connector-python==1.7.2'
     ],
@@ -41,9 +41,9 @@ setup(name='pipelinewise',
     },
     entry_points='''
         [console_scripts]
-        pipelinewise=pipelinewise.cli:main
-        mysql-to-snowflake=pipelinewise.fastsync.mysql_to_snowflake:main
-        postgres-to-snowflake=pipelinewise.fastsync.postgres_to_snowflake:main
+        pipelinewise=pipelinewise.pipelinewise:main
+        mysql-to-snowflake=pipelinewise.mysql_to_snowflake:main
+        postgres-to-snowflake=pipelinewise.postgres_to_snowflake:main
     ''',
     packages=find_packages(exclude=['tests*']),
     package_data = {

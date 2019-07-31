@@ -85,22 +85,15 @@ print_installed_connectors() {
     echo "Installed components:"
     echo
     echo "--------------------------------------------------------------------------"
-    echo "Installed components"
+    echo "Installed components:"
     echo "--------------------------------------------------------------------------"
     echo
     echo "Component            Version"
     echo "-------------------- -------"
 
-    for i in `ls singer-connectors`; do
-        VERSION=1
-        REQUIREMENTS_TXT=$SRC_DIR/singer-connectors/$i/requirements.txt
-        SETUP_PY=$SRC_DIR/singer-connectors/$i/setup.py
-        if [ -f $REQUIREMENTS_TXT ]; then
-            VERSION=`grep $i $REQUIREMENTS_TXT | cut -f 3 -d "="`
-        elif [ -f $SETUP_PY ]; then
-            VERSION="`python3 $SETUP_PY -V` (not from PyPI)"
-        fi
-
+    for i in `ls $VENV_DIR`; do
+        source $VENV_DIR/$i/bin/activate
+        VERSION=`pip list | grep $i | awk '{print $2}'`
         printf "%-20s %s\n" $i "$VERSION"
     done
 }
@@ -128,13 +121,13 @@ for arg in "$@"; do
 done
 
 # Welcome message
-cat motd
+cat $SRC_DIR/motd
 
 # Install PipelineWise core components
 make_virtualenv pipelinewise
 
 # Install Singer connectors
-for i in `ls singer-connectors`; do
+for i in `ls $SRC_DIR/singer-connectors`; do
     install_connector $i
 done
 

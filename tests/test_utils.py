@@ -1,7 +1,7 @@
 import os
 import re
 import pytest
-import pipelinewise.cli as cli
+import pipelinewise.pipelinewise as cli
 
 VIRTUALENVS_DIR="./virtualenvs-dummy"
 
@@ -167,11 +167,11 @@ class TestUtils(object):
         
 
     def test_fastsync_bin(self):
-        """Fastsync binary paths must point to certain virtual environments"""
+        """Fastsync binary paths must point to pipelinewise virtual environments"""
         # Giving tap and target types should be enough to generate full path to fastsync binaries
         assert \
             cli.utils.get_fastsync_bin(VIRTUALENVS_DIR, 'mysql', 'snowflake') == \
-            "{}/mysql-to-snowflake/bin/mysql-to-snowflake".format(VIRTUALENVS_DIR)
+            "{}/pipelinewise/bin/mysql-to-snowflake".format(VIRTUALENVS_DIR)
 
 
     def test_vault(self):
@@ -206,7 +206,7 @@ class TestUtils(object):
         assert pytest_wrapped_e.value.code == 1
 
         # Loading existing JSON schema should be loaded correctly
-        tap_schema = cli.utils.load_json("{}/../cli/schemas/tap.json".format(os.path.dirname(__file__)))
+        tap_schema = cli.utils.load_json("{}/../pipelinewise/pipelinewise/schemas/tap.json".format(os.path.dirname(__file__)))
         assert cli.utils.load_schema("tap") == tap_schema
 
 

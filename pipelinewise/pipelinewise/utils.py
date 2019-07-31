@@ -411,7 +411,7 @@ def get_fastsync_bin(venv_dir, tap_type, target_type):
     target = target_type.replace('target-', '')
     fastsync_name = "{}-to-{}".format(source, target)
 
-    return os.path.join(venv_dir, fastsync_name, "bin", fastsync_name)
+    return os.path.join(venv_dir, "pipelinewise", "bin", fastsync_name)
 
 
 def run_command(command, log_file=False):

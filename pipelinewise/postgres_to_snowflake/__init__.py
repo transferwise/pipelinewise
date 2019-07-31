@@ -8,8 +8,8 @@ import postgres_to_snowflake.utils
 import multiprocessing
 
 from datetime import datetime, timedelta
-from postgres_to_snowflake.postgres import Postgres
-from postgres_to_snowflake.snowflake import Snowflake
+from .postgres import Postgres
+from .snowflake import Snowflake
 
 
 REQUIRED_CONFIG_KEYS = {

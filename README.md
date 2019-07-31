@@ -49,7 +49,7 @@ Documentation is available at https://transferwise.github.io/pipelinewise/
 ```sh
 $ ./install.sh
 ```
-(Press Y to accept the license agreement of the required singer components)
+Press `Y` to accept the license agreement of the required singer components. To automate the installation and accept every license agreement run `./install --acceptlicenses`)
 
 3. To start CLI you need to activate the CLI virtual environment and has to set `PIPELINEWISE_HOME` environment variable:
    
