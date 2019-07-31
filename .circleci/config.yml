@@ -18,7 +18,6 @@ jobs:
           command: |
             . .virtualenvs/pipelinewise/bin/activate
             pip install pytest coverage
-            cd cli
             coverage run -m pytest --disable-pytest-warnings
             coverage report
             coverage html -d coverage_html
