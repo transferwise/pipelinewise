@@ -3,6 +3,7 @@
 
 import singer
 import datetime
+import time
 import decimal
 from singer import utils, get_bookmark
 import singer.metadata as metadata
@@ -362,11 +363,11 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
     slot = locate_replication_slot(conn_info)
     lsn_last_processed = None
     lsn_currently_processing = None
-    lsn_received_timestamp = datetime.datetime.utcnow()
+    lsn_received_timestamp = None
     lsn_processed_count = 0
     logical_poll_total_seconds = conn_info['logical_poll_total_seconds'] or 300
     poll_interval = 10
-    poll_timestamp = datetime.datetime.utcnow()
+    poll_timestamp = None
 
     for s in logical_streams:
         sync_common.send_schema_message(s, ['lsn'])
@@ -374,14 +375,21 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
     with post_db.open_connection(conn_info, True) as conn:
         with conn.cursor() as cur:
             try:
-                LOGGER.info("{} : Starting Replication for {} -> {} from {}".format(datetime.datetime.utcnow(), int_to_lsn(start_lsn), int_to_lsn(end_lsn), slot))
+                LOGGER.info("{} : Starting log streaming at {} to {} (slot {})".format(datetime.datetime.utcnow(), int_to_lsn(start_lsn), int_to_lsn(end_lsn), slot))
                 cur.start_replication(slot_name=slot, decode=True, start_lsn=start_lsn, options={'write-in-chunks': 1})
             except psycopg2.ProgrammingError:
-                raise Exception("unable to start replication with logical replication slot {}".format(slot))
+                raise Exception("Unable to start replication with logical replication (slot {})".format(slot))
 
-            # Flush Postgres log up to lsn saved in state file from previous run
-            LOGGER.info("{} : Sending flush_lsn = {} ({}) to source server".format(datetime.datetime.utcnow(), lsn_comitted, int_to_lsn(lsn_comitted)))
-            cur.send_feedback(flush_lsn=lsn_comitted, reply=True)
+            # Emulate some behaviour of pg_recvlogical
+            LOGGER.info("{} : Confirming write up to 0/0, flush to 0/0".format(datetime.datetime.utcnow()))
+            cur.send_feedback(write_lsn=0, flush_lsn=0, reply=True)
+            time.sleep(poll_interval)
+            LOGGER.info("{} : Confirming write up to {}, flush to 0/0".format(datetime.datetime.utcnow(), int_to_lsn(start_lsn)))
+            cur.send_feedback(write_lsn=start_lsn, flush_lsn=0, reply=True)
+            time.sleep(poll_interval)
+
+            lsn_received_timestamp = datetime.datetime.utcnow()
+            poll_timestamp = datetime.datetime.utcnow()
 
             while True:
                 # Disconnect when no data received for logical_poll_total_seconds
@@ -403,6 +411,11 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
                     # This is to ensure we only flush to lsn that has completed entirely
                     if (lsn_currently_processing is None):
                         lsn_currently_processing = msg.data_start
+
+                        # Flush Postgres log up to lsn saved in state file from previous run
+                        LOGGER.info("{} : Confirming write up to {}, flush to {}".format(datetime.datetime.utcnow(), int_to_lsn(lsn_comitted), int_to_lsn(lsn_comitted)))
+                        cur.send_feedback(write_lsn=lsn_comitted, flush_lsn=lsn_comitted, reply=True)
+
                     elif (int(msg.data_start) > lsn_currently_processing):
                         lsn_last_processed = lsn_currently_processing
                         lsn_currently_processing = msg.data_start
@@ -419,7 +432,10 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
                     poll_timestamp = datetime.datetime.utcnow()
 
             # Close replication cursor
-            cur.close()
+            try:
+                cur.close()
+            except:
+                pass
 
     if lsn_last_processed:
         if lsn_comitted > lsn_last_processed:
