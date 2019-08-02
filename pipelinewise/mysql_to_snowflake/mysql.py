@@ -5,7 +5,7 @@ import os
 import datetime
 import decimal
 
-import pipelinewise.mysql_to_snowflake.utils as utils
+from . import utils
 
 
 class MySql:
