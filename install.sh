@@ -123,6 +123,7 @@ done
 cat $SRC_DIR/motd
 
 # Install PipelineWise core components
+cd $SRC_DIR
 make_virtualenv pipelinewise
 
 # Install Singer connectors
