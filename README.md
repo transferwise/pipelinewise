@@ -106,14 +106,12 @@ $ pytest --disable-pytest-warnings
 To run unit tests and report code coverage:
 
 ```
-$ cd cli
 $ coverage run -m pytest --disable-pytest-warnings && coverage report
 ```
 
 To generate HTML coverage report.
 
 ```
-$ cd cli
 $ coverage run -m pytest --disable-pytest-warnings && coverage html -d coverage_html
 ```
 

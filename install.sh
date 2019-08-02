@@ -82,7 +82,6 @@ install_connector() {
 print_installed_connectors() {
     cd $SRC_DIR
 
-    echo "Installed components attempted:"
     echo
     echo "--------------------------------------------------------------------------"
     echo "Installed components:"
