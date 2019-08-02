@@ -9,7 +9,7 @@ import multiprocessing
 from datetime import datetime, timedelta
 from .mysql import MySql
 from .snowflake import Snowflake
-import pipelinewise.mysql_to_snowflake.utils as utils
+from . import utils
 
 
 REQUIRED_CONFIG_KEYS = {

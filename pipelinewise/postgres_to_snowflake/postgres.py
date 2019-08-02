@@ -4,7 +4,7 @@ import gzip
 import datetime
 import decimal
 
-import pipelinewise.postgres_to_snowflake.utils as utils
+from . import utils
 
 
 class Postgres:
