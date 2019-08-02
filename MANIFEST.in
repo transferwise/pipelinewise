@@ -1,0 +1,4 @@
+
+include pipelinewise/pipelinewise/schemas/*.json
+include pipelinewise/pipelinewise/samples/README.md
+include pipelinewise/pipelinewise/samples/*.yml.sample

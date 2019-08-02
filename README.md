@@ -49,7 +49,7 @@ Documentation is available at https://transferwise.github.io/pipelinewise/
 ```sh
 $ ./install.sh
 ```
-(Press Y to accept the license agreement of the required singer components)
+Press `Y` to accept the license agreement of the required singer components. To automate the installation and accept every license agreement run `./install --acceptlicenses`)
 
 3. To start CLI you need to activate the CLI virtual environment and has to set `PIPELINEWISE_HOME` environment variable:
    
@@ -106,14 +106,12 @@ $ pytest --disable-pytest-warnings
 To run unit tests and report code coverage:
 
 ```
-$ cd cli
 $ coverage run -m pytest --disable-pytest-warnings && coverage report
 ```
 
 To generate HTML coverage report.
 
 ```
-$ cd cli
 $ coverage run -m pytest --disable-pytest-warnings && coverage html -d coverage_html
 ```
 

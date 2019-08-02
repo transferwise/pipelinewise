@@ -2,7 +2,7 @@ import os
 import pytest
 import shutil
 
-import cli.config
+import pipelinewise.pipelinewise as cli
 
 PIPELINEWISE_TEST_HOME="/tmp/.pipelinewise"
 
