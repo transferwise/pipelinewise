@@ -9,7 +9,7 @@ import multiprocessing
 from datetime import datetime, timedelta
 from .postgres import Postgres
 from .snowflake import Snowflake
-from .utils import *
+import pipelinewise.postgres_to_snowflake.utils as utils
 
 
 REQUIRED_CONFIG_KEYS = {
