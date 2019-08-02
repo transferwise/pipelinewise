@@ -5,7 +5,7 @@ import os
 import datetime
 import decimal
 
-import mysql_to_snowflake.utils as utils
+from .utils import *
 
 
 class MySql:

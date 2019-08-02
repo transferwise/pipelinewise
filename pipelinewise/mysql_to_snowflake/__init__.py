@@ -4,12 +4,12 @@ import os
 import sys
 import time
 
-import mysql_to_snowflake.utils
 import multiprocessing
 
 from datetime import datetime, timedelta
 from .mysql import MySql
 from .snowflake import Snowflake
+from .utils import *
 
 
 REQUIRED_CONFIG_KEYS = {
