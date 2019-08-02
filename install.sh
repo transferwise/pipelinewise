@@ -14,7 +14,7 @@ PIPELINEWISE_HOME=$(pwd)
 VENV_DIR=${PIPELINEWISE_HOME}/.virtualenvs
 
 check_license() {
-    pip install pip-licenses
+    python3 -m pip install pip-licenses
 
     echo
     echo "Checking license..."
@@ -92,7 +92,7 @@ print_installed_connectors() {
 
     for i in `ls $VENV_DIR`; do
         source $VENV_DIR/$i/bin/activate
-        VERSION=`pip list | grep $i | awk '{print $2}'`
+        VERSION=`python3 -m pip list | grep $i | awk '{print $2}'`
         printf "%-20s %s\n" $i "$VERSION"
     done
 }
