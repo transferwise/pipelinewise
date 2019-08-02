@@ -3,7 +3,7 @@ import time
 import boto3
 import os
 
-from .utils import *
+import pipelinewise.postgres_to_snowflake.utils as utils
 
 from snowflake.connector.encryption_util import SnowflakeEncryptionUtil
 from snowflake.connector.remote_storage_util import SnowflakeFileEncryptionMaterial
