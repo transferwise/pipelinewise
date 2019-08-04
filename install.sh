@@ -63,7 +63,7 @@ make_virtualenv() {
             PIP_ARGS=$PIP_ARGS"[test]"
         fi
 
-        python3 -m pip install .$PIP_ARGS
+        python3 -m pip install -e .$PIP_ARGS
     fi
 
     check_license $1
