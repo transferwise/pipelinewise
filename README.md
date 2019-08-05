@@ -51,6 +51,8 @@ $ ./install.sh
 ```
 Press `Y` to accept the license agreement of the required singer components. To automate the installation and accept every license agreement run `./install --acceptlicenses`)
 
+If you want to run tests use `./install.sh --withtestextras`
+
 3. To start CLI you need to activate the CLI virtual environment and has to set `PIPELINEWISE_HOME` environment variable:
    
 ```sh
@@ -64,6 +66,26 @@ to your system once the installation completed)
    
 ```sh
 $ pipelinewise status # Can be any other valid PipelineWise command
+```
+
+5. If you installed with tests extras using `./install.sh --withtestextras`:
+
+To run unit tests:
+
+```sh
+$ pytest
+```
+
+To run unit tests and report code coverage:
+
+```
+$ coverage run -m pytest && coverage report
+```
+
+To generate HTML coverage report.
+
+```
+$ coverage run -m pytest && coverage html -d coverage_html
 ```
 
 ## Developing with Docker
@@ -81,6 +103,8 @@ To create local development environment:
 $ docker-compose up --build
 ```
 
+Creating the dev environment with source and target databases and with test data and every singer component might take
+same time at the first time when running docker-compose at the first time.
 As soon as you see `PipelineWise Dev environment is ready in Docker container(s).` you can shell into the container and
 start running PipelineWise commands. At this point every virtual environment is created and every required environment
 variables is set.
@@ -100,19 +124,19 @@ $ pipelinewise status # Can be any other valid PipelineWise command
 To run unit tests:
 
 ```sh
-$ pytest --disable-pytest-warnings
+$ pytest
 ```
 
 To run unit tests and report code coverage:
 
 ```
-$ coverage run -m pytest --disable-pytest-warnings && coverage report
+$ coverage run -m pytest && coverage report
 ```
 
 To generate HTML coverage report.
 
 ```
-$ coverage run -m pytest --disable-pytest-warnings && coverage html -d coverage_html
+$ coverage run -m pytest && coverage html -d coverage_html
 ```
 
 **Note**: The HTML report will be generated in `cli/coverage_html/index.html`
