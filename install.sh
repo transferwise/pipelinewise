@@ -50,7 +50,7 @@ check_license() {
 }
 
 make_virtualenv() {
-    echo "Making Virtual Environment for $1"
+    echo "Making Virtual Environment for [$1] in $VENV_DIR"
     python3 -m venv $VENV_DIR/$1
     source $VENV_DIR/$1/bin/activate
     python3 -m pip install --upgrade pip
@@ -133,13 +133,13 @@ done
 
 # Capture end_time
 end_time=`date +%s`
+echo
+echo "--------------------------------------------------------------------------"
+echo "PipelineWise installed successfully in $((end_time-start_time)) seconds"
+echo "--------------------------------------------------------------------------"
 
 print_installed_connectors
 if [[ $NO_USAGE != "YES" ]]; then
-    echo
-    echo "--------------------------------------------------------------------------"
-    echo "PipelineWise installed successfully in $((end_time-start_time)) seconds"
-    echo "--------------------------------------------------------------------------"
     echo
     echo "To start CLI:"
     echo " $ source $VENV_DIR/pipelinewise/bin/activate"
