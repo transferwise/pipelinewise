@@ -103,8 +103,7 @@ To create local development environment:
 $ docker-compose up --build
 ```
 
-Creating the dev environment with source and target databases and with test data and every singer component might take
-same time at the first time when running docker-compose at the first time.
+Creating the dev environment (source and target dbs, test data, singer components)  might take some time at the first run.
 As soon as you see `PipelineWise Dev environment is ready in Docker container(s).` you can shell into the container and
 start running PipelineWise commands. At this point every virtual environment is created and every required environment
 variables is set.
