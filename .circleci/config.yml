@@ -23,7 +23,7 @@ references:
           DB_TARGET_POSTGRES_PASSWORD: test
           DB_TARGET_POSTGRES_DB: postgres_dwh
 
-      # PostgreSQL service container image used as test source database
+      # PostgreSQL service container image used as test source database (for tap-postgres)
       - image: postgres:11.4
         name: db_postgres_source
         environment:
@@ -31,7 +31,7 @@ references:
           POSTGRES_PASSWORD: test
           POSTGRES_DB: postgres_source_db
 
-       # MariaDB service container image used as test source database
+       # MariaDB service container image used as test source database (for tap-mysql)
       - image: mariadb:10.2.26
         name: db_mysql_source
         environment:
@@ -40,7 +40,7 @@ references:
           MYSQL_PASSWORD: test
           MYSQL_DATABASE: mysql_source_db
 
-      # PostgreSQL service container image used as test source database
+      # PostgreSQL service container image used as test target (DWH) database (for target-postgres)
       - image: postgres:11.4
         name: db_postgres_dwh
         environment:
