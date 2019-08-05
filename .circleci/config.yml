@@ -8,28 +8,28 @@ jobs:
       - image: circleci/python:3.7.4
         environment:
           DB_TAP_MYSQL_HOST: db_mysql_source
-          DB_TAP_MYSQL_PORT: ${DB_TAP_MYSQL_PORT}
-          DB_TAP_MYSQL_USER: ${DB_TAP_MYSQL_USER}
-          DB_TAP_MYSQL_PASSWORD: ${DB_TAP_MYSQL_PASSWORD}
-          DB_TAP_MYSQL_DB: ${DB_TAP_MYSQL_DB}
+          DB_TAP_MYSQL_PORT: 3306
+          DB_TAP_MYSQL_USER: pipelinewise
+          DB_TAP_MYSQL_PASSWORD: secret
+          DB_TAP_MYSQL_DB: mysql_source_db
 
           DB_TAP_POSTGRES_HOST: db_postgres_source
-          DB_TAP_POSTGRES_PORT: ${DB_TAP_POSTGRES_PORT}
-          DB_TAP_POSTGRES_USER: ${DB_TAP_POSTGRES_USER}
-          DB_TAP_POSTGRES_PASSWORD: ${DB_TAP_POSTGRES_PASSWORD}
-          DB_TAP_POSTGRES_DB: ${DB_TAP_POSTGRES_DB}
+          DB_TAP_POSTGRES_PORT: 5432
+          DB_TAP_POSTGRES_USER: pipelinewise
+          DB_TAP_POSTGRES_PASSWORD: secret
+          DB_TAP_POSTGRES_DB: postgres_source_db
 
           DB_TARGET_POSTGRES_HOST: db_postgres_dwh
-          DB_TARGET_POSTGRES_PORT: ${DB_TARGET_POSTGRES_PORT}
-          DB_TARGET_POSTGRES_USER: ${DB_TARGET_POSTGRES_USER}
-          DB_TARGET_POSTGRES_PASSWORD: ${DB_TARGET_POSTGRES_PASSWORD}
-          DB_TARGET_POSTGRES_DB: ${DB_TARGET_POSTGRES_DB}
+          DB_TARGET_POSTGRES_PORT: 5432
+          DB_TARGET_POSTGRES_USER: pipelinewise
+          DB_TARGET_POSTGRES_PASSWORD: secret
+          DB_TARGET_POSTGRES_DB: postgres_dwh
 
       # PostgreSQL service container image used as test source database
       - image: postgres:11.4
         name: db_postgres_source
         environment:
-          POSTGRES_USER: ${DB_TAP_POSTGRES_USER}
+          POSTGRES_USER: pipelinewise
           POSTGRES_PASSWORD: secret
           POSTGRES_DB: postgres_source_db
 
@@ -46,9 +46,9 @@ jobs:
       - image: postgres:11.4
         name: db_postgres_dwh
         environment:
-          POSTGRES_USER: ${DB_TARGET_POSTGRES_USER}
-          POSTGRES_PASSWORD: ${DB_TARGET_POSTGRES_PASSWORD}
-          POSTGRES_DB: ${DB_TARGET_POSTGRES_DB}
+          POSTGRES_USER: pipelinewise
+          POSTGRES_PASSWORD: secret
+          POSTGRES_DB: postgres_dwh
 
     steps:
       - checkout
@@ -61,8 +61,7 @@ jobs:
             sudo apt install mariadb-client postgresql-client
             ./tests/db/tap_mysql_test_db.sh
             ./tests/db/tap_postgres_test_db.sh
-            #./.circleci/tap_postgres_test_db.sh
-            #./.circleci/tap_mysql_test_db.sh
+
       # Installing PipelineWise components and connectors
       #- run:
       #    name: 'Installing PipelineWise components and connectors'
