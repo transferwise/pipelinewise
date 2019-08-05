@@ -37,10 +37,10 @@ jobs:
       - image: mariadb:10.2.26
         name: db_mysql_source
         environment:
-          MYSQL_ROOT_PASSWORD: ${DB_TAP_MYSQL_ROOT_PASSWORD}
-          MYSQL_USER: ${DB_TAP_MYSQL_USER}
-          MYSQL_PASSWORD: ${DB_TAP_MYSQL_PASSWORD}
-          MYSQL_DATABASE: ${DB_TAP_MYSQL_DB}
+          MYSQL_ROOT_PASSWORD: secret
+          MYSQL_USER: pipelinewise
+          MYSQL_PASSWORD: secret
+          MYSQL_DATABASE: mysql_source_db
 
       # PostgreSQL service container image used as test source database
       - image: postgres:11.4
