@@ -51,12 +51,20 @@ jobs:
           POSTGRES_DB: ${DB_TARGET_POSTGRES_DB}
 
     steps:
-      - checkout
+    #  - checkout
 
-      # Installing PipelineWise components and connectors
+      # Build source databases for integration tests
       - run:
-          name: 'Installing PipelineWise components and connectors'
-          command: ./install.sh --acceptlicenses
+          name: 'Build source databases for integration tests'
+          command: |
+            sudo apt-get update
+            sudo apt install mariadb-client postgresql-client
+            #./.circleci/tap_postgres_test_db.sh
+            #./.circleci/tap_mysql_test_db.sh
+      # Installing PipelineWise components and connectors
+      #- run:
+      #    name: 'Installing PipelineWise components and connectors'
+      #    command: ./install.sh --acceptlicenses
 
   #test:
   #  steps:
