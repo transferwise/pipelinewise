@@ -68,11 +68,13 @@ jobs:
           name: 'Run tests'
           command: |
             . .virtualenvs/pipelinewise/bin/activate
-            coverage run -m pytest
+            mkdir test-reports
+            coverage run -m pytest --junitxml=test-reports/junit.xml
             coverage report
             coverage html -d coverage_html
-      - run:
-          name: 'Store HTML coverage report'
+      - store_test_results:
+          path: test-reports
+      - store_artifacts:
           path: coverage_html
 
   # For documentation deployment. You'll need the following environment vars
