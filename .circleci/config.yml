@@ -7,20 +7,20 @@ references:
         environment:
           DB_TAP_MYSQL_HOST: db_mysql_source
           DB_TAP_MYSQL_PORT: 3306
-          DB_TAP_MYSQL_USER: pipelinewise
-          DB_TAP_MYSQL_PASSWORD: secret
+          DB_TAP_MYSQL_USER: test
+          DB_TAP_MYSQL_PASSWORD: test
           DB_TAP_MYSQL_DB: mysql_source_db
 
           DB_TAP_POSTGRES_HOST: db_postgres_source
           DB_TAP_POSTGRES_PORT: 5432
-          DB_TAP_POSTGRES_USER: pipelinewise
-          DB_TAP_POSTGRES_PASSWORD: secret
+          DB_TAP_POSTGRES_USER: test
+          DB_TAP_POSTGRES_PASSWORD: test
           DB_TAP_POSTGRES_DB: postgres_source_db
 
           DB_TARGET_POSTGRES_HOST: db_postgres_dwh
           DB_TARGET_POSTGRES_PORT: 5432
-          DB_TARGET_POSTGRES_USER: pipelinewise
-          DB_TARGET_POSTGRES_PASSWORD: secret
+          DB_TARGET_POSTGRES_USER: test
+          DB_TARGET_POSTGRES_PASSWORD: test
           DB_TARGET_POSTGRES_DB: postgres_dwh
 
       # PostgreSQL service container image used as test source database
@@ -63,14 +63,13 @@ jobs:
             ./tests/db/tap_postgres_test_db.sh
       - run:
           name: 'Installing PipelineWise components and connectors'
-          command: ./install.sh --acceptlicenses
+          command: ./install.sh --acceptlicenses --withtestextras
+      - run:
+          name: 'Run Tests'
+          command: |
+            . .virtualenvs/pipelinewise/bin/activate
+            coverage run -m pytest
 
-  #    - run:
-  #        name: 'Unit Tests and Coverage'
-  #        command: |
-  #          . .virtualenvs/pipelinewise/bin/activate
-  #          pip install pytest coverage
-  #          coverage run -m pytest --disable-pytest-warnings
   #          coverage report
   #          coverage html -d coverage_html
 
