@@ -8,9 +8,26 @@ services:
     entrypoint: /usr/src/app/docker-entrypoint.sh
     environment:
       PIPELINEWISE_HOME: /usr/src/app
+      DB_TAP_MYSQL_HOST: db_mysql_source
       DB_TAP_MYSQL_PORT: ${DB_TAP_MYSQL_PORT}
+      DB_TAP_MYSQL_PORT_ON_HOST: ${DB_TAP_MYSQL_PORT_ON_HOST}
+      DB_TAP_MYSQL_USER: ${DB_TAP_MYSQL_USER}
+      DB_TAP_MYSQL_PASSWORD: ${DB_TAP_MYSQL_PASSWORD}
+      DB_TAP_MYSQL_DB: ${DB_TAP_MYSQL_DB}
+
+      DB_TAP_POSTGRES_HOST: db_postgres_source
       DB_TAP_POSTGRES_PORT: ${DB_TAP_POSTGRES_PORT}
+      DB_TAP_POSTGRES_PORT_ON_HOST: ${DB_TAP_POSTGRES_PORT_ON_HOST}
+      DB_TAP_POSTGRES_USER: ${DB_TAP_POSTGRES_USER}
+      DB_TAP_POSTGRES_PASSWORD: ${DB_TAP_POSTGRES_PASSWORD}
+      DB_TAP_POSTGRES_DB: ${DB_TAP_POSTGRES_DB}
+
+      DB_TARGET_POSTGRES_HOST: db_postgres_dwh
       DB_TARGET_POSTGRES_PORT: ${DB_TARGET_POSTGRES_PORT}
+      DB_TARGET_POSTGRES_PORT_ON_HOST: ${DB_TARGET_POSTGRES_PORT_ON_HOST}
+      DB_TARGET_POSTGRES_USER: ${DB_TARGET_POSTGRES_USER}
+      DB_TARGET_POSTGRES_PASSWORD: ${DB_TARGET_POSTGRES_PASSWORD}
+      DB_TARGET_POSTGRES_DB: ${DB_TARGET_POSTGRES_DB}
 
     volumes:
       - .:/usr/src/app
@@ -26,36 +43,37 @@ services:
   ### TAP (Data source) containers
   # PostgreSQL service container used as test source database
   db_postgres_source:
-    image: circleci/postgres:9.6.14
+    image: postgres:11.4
     container_name: pipelinewise_dev_postgres_source
     ports:
-      - ${DB_TAP_POSTGRES_PORT}:5432
+      - ${DB_TAP_POSTGRES_PORT_ON_HOST}:${DB_TAP_POSTGRES_PORT}
     environment:
       POSTGRES_USER: ${DB_TAP_POSTGRES_USER}
-      POSTGRES_PASSWORD: ${DB_TAP_POSRTGRES_PASSWORD}
+      POSTGRES_PASSWORD: ${DB_TAP_POSTGRES_PASSWORD}
       POSTGRES_DB: ${DB_TAP_POSTGRES_DB}
 
   # MySQL service container used as test source database
   db_mysql_source:
-    image: circleci/mysql:5.7.26
+    image: mariadb:10.2.26
     container_name: pipelinewise_dev_mysql_source
     ports:
-      - ${DB_TAP_MYSQL_PORT}:3306
+      - ${DB_TAP_MYSQL_PORT_ON_HOST}:${DB_TAP_MYSQL_PORT}
+    command: --default-authentication-plugin=mysql_native_password
     environment:
       MYSQL_ROOT_PASSWORD: ${DB_TAP_MYSQL_ROOT_PASSWORD}
       MYSQL_USER: ${DB_TAP_MYSQL_USER}
       MYSQL_PASSWORD: ${DB_TAP_MYSQL_PASSWORD}
-      MYSQL_DATABASE: ${DB_TAP_MYSQL_DATABASE}
+      MYSQL_DATABASE: ${DB_TAP_MYSQL_DB}
 
   ### Target containers
   # PostgreSQL service container used as test target database
   db_postgres_dwh:
-    image: circleci/postgres:9.6.14
+    image: postgres:11.4
     container_name: pipelinewise_dev_postgres_dwh
     ports:
-      - ${DB_TARGET_POSTGRES_PORT}:5432
+      - ${DB_TARGET_POSTGRES_PORT_ON_HOST}:${DB_TARGET_POSTGRES_PORT}
     environment:
       POSTGRES_USER: ${DB_TARGET_POSTGRES_USER}
-      POSTGRES_PASSWORD: ${DB_TARGET_POSRTGRES_PASSWORD}
+      POSTGRES_PASSWORD: ${DB_TARGET_POSTGRES_PASSWORD}
       POSTGRES_DB: ${DB_TARGET_POSTGRES_DB}
 
