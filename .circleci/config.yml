@@ -5,7 +5,7 @@ jobs:
 
     # Required docker containers
     docker:
-      - image: circleci/python:3.6.2
+      - image: circleci/python:3.7.4
         environment:
           DB_TAP_MYSQL_HOST: db_mysql_source
           DB_TAP_MYSQL_PORT: ${DB_TAP_MYSQL_PORT}
@@ -51,7 +51,7 @@ jobs:
           POSTGRES_DB: ${DB_TARGET_POSTGRES_DB}
 
     steps:
-    #  - checkout
+      - checkout
 
       # Build source databases for integration tests
       - run:
