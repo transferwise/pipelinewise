@@ -29,7 +29,7 @@ jobs:
       - image: postgres:11.4
         name: db_postgres_source
         environment:
-          POSTGRES_USER: pipelinewise
+          POSTGRES_USER: ${DB_TAP_POSTGRES_USER}
           POSTGRES_PASSWORD: secret
           POSTGRES_DB: postgres_source_db
 
