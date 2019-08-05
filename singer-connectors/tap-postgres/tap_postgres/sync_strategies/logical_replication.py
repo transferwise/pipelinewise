@@ -335,12 +335,10 @@ def consume_message(streams, state, msg, time_extracted, conn_info, end_lsn):
     if msg.data_start > end_lsn:
         raise Exception("incorrectly attempting to flush an lsn({}) > end_lsn({})".format(msg.data_start, end_lsn))
 
-    # Flush Postgres log up to lsn received in current run
-    # This is the behaviour of the original tap-progres
-    # The Pipelinewise version flushes only at the start of the next run
-    # This is to ensure the data has been comitted on the destination
-    # LOGGER.info("Sending flush_lsn = {} ({}) to source server".format(msg.data_start, int_to_lsn(msg.data_start)))
-    # msg.cursor.send_feedback(flush_lsn=msg.data_start)
+    # Below is the behaviour of the original tap-progres to flush the source server wal to the latest lsn received in the current run
+    # The Pipelinewise version flushes only at the start of the next run to ensure the data has been comitted on the destination server
+    # LOGGER.info("Confirming write up to {}, flush to {}".format(int_to_lsn(msg.data_start), int_to_lsn(msg.data_start)))
+    # msg.cursor.send_feedback(write_lsn=msg.data_start, flush_lsn=msg.data_start, reply=True)
 
     return state
 
@@ -359,6 +357,7 @@ def locate_replication_slot(conn_info):
 def sync_tables(conn_info, logical_streams, state, end_lsn):
     lsn_comitted = min([get_bookmark(state, s['tap_stream_id'], 'lsn') for s in logical_streams])
     start_lsn = lsn_comitted
+    lsn_to_flush = None
     time_extracted = utils.now()
     slot = locate_replication_slot(conn_info)
     lsn_last_processed = None
@@ -384,9 +383,6 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
             LOGGER.info("{} : Confirming write up to 0/0, flush to 0/0".format(datetime.datetime.utcnow()))
             cur.send_feedback(write_lsn=0, flush_lsn=0, reply=True)
             time.sleep(poll_interval)
-            LOGGER.info("{} : Confirming write up to {}, flush to 0/0".format(datetime.datetime.utcnow(), int_to_lsn(start_lsn)))
-            cur.send_feedback(write_lsn=start_lsn, flush_lsn=0, reply=True)
-            time.sleep(poll_interval)
 
             lsn_received_timestamp = datetime.datetime.utcnow()
             poll_timestamp = datetime.datetime.utcnow()
@@ -411,10 +407,13 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
                     # This is to ensure we only flush to lsn that has completed entirely
                     if (lsn_currently_processing is None):
                         lsn_currently_processing = msg.data_start
+                        LOGGER.info("{} : First message received is {} at {}".format(datetime.datetime.utcnow(), int_to_lsn(lsn_currently_processing), datetime.datetime.utcnow()))
 
-                        # Flush Postgres log up to lsn saved in state file from previous run
-                        LOGGER.info("{} : Confirming write up to {}, flush to {}".format(datetime.datetime.utcnow(), int_to_lsn(lsn_comitted), int_to_lsn(lsn_comitted)))
-                        cur.send_feedback(write_lsn=lsn_comitted, flush_lsn=lsn_comitted, reply=True)
+                        # Flush Postgres wal up to lsn comitted in previous run, or first lsn received in this run
+                        lsn_to_flush = lsn_comitted
+                        if lsn_currently_processing < lsn_to_flush: lsn_to_flush = lsn_currently_processing
+                        LOGGER.info("{} : Confirming write up to {}, flush to {}".format(datetime.datetime.utcnow(), int_to_lsn(lsn_to_flush), int_to_lsn(lsn_to_flush)))
+                        cur.send_feedback(write_lsn=lsn_to_flush, flush_lsn=lsn_to_flush, reply=True)
 
                     elif (int(msg.data_start) > lsn_currently_processing):
                         lsn_last_processed = lsn_currently_processing
