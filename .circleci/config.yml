@@ -1,10 +1,8 @@
 version: 2
-jobs:
-  # Install PipelineWise components and full test environment
-  build-test-env:
-
-    # Required docker containers
+references:
+  container_config: &container_config
     docker:
+      # Main python container
       - image: circleci/python:3.7.4
         environment:
           DB_TAP_MYSQL_HOST: db_mysql_source
@@ -50,10 +48,12 @@ jobs:
           POSTGRES_PASSWORD: secret
           POSTGRES_DB: postgres_dwh
 
+jobs:
+  test:
+    <<: *container_config
+
     steps:
       - checkout
-
-      # Build source databases for integration tests
       - run:
           name: 'Build source databases for integration tests'
           command: |
@@ -61,18 +61,10 @@ jobs:
             sudo apt install mariadb-client postgresql-client
             ./tests/db/tap_mysql_test_db.sh
             ./tests/db/tap_postgres_test_db.sh
-
-  build:
-    steps:
-
-      # Installing PipelineWise components and connectors
       - run:
           name: 'Installing PipelineWise components and connectors'
           command: ./install.sh --acceptlicenses
 
-  #test:
-  #  steps:
-      # Unit Tests and Coverage
   #    - run:
   #        name: 'Unit Tests and Coverage'
   #        command: |
@@ -98,13 +90,10 @@ jobs:
 
 workflows:
   version: 2
-  build:
+  build_and_test:
     jobs:
-      - build-test-env
-      - build:
-          requires:
-            - build-test-env
+      - test
 
-  #deploy:
-  #  jobs:
-  #    - deploy-doc
+#  deploy_doc:
+#    jobs:
+#      - deploy-doc
