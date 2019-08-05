@@ -1,5 +1,13 @@
 #!/usr/bin/env bash
 
+# Install OS dependencies
+apt-get update
+apt-get install -y mariadb-client postgresql-client
+
+# Build test databasese
+tests/db/tap_mysql_test_db.sh
+tests/db/tap_postgres_test_db.sh
+
 # Install PipelineWise in the container
 ./install.sh --acceptlicenses --nousage --withtestextras
 if [[ $? != 0 ]]; then
@@ -20,9 +28,9 @@ echo "PipelineWise Dev environment is ready in Docker container(s)."
 echo
 echo "Running containers:"
 echo "   - PipelineWise CLI and connectors"
-echo "   - PostgreSQL server with test database  (From host: localhost:${DB_TAP_POSTGRES_PORT} - From CLI: db_postgres_source:5432)"
-echo "   - MySQL server with test database       (From host: localhost:${DB_TAP_MYSQL_PORT} - From CLI: db_mysql_source:3306)"
-echo "   - PostgreSQL server with empty database (From host: localhost:${DB_TARGET_POSTGRES_PORT} - From CLI: db_postgres_dwh:5432)"
+echo "   - PostgreSQL server with test database  (From host: localhost:${DB_TAP_POSTGRES_PORT_ON_HOST} - From CLI: ${DB_TAP_POSTGRES_HOST}:${DB_TAP_POSTGRES_PORT})"
+echo "   - MariaDB server with test database     (From host: localhost:${DB_TAP_MYSQL_PORT_ON_HOST} - From CLI: ${DB_TAP_MYSQL_HOST}:${DB_TAP_MYSQL_PORT})"
+echo "   - PostgreSQL server with empty database (From host: localhost:${DB_TARGET_POSTGRES_PORT_ON_HOST} - From CLI: ${DB_TARGET_POSTGRES_HOST}:${DB_TARGET_POSTGRES_PORT})"
 echo "(For database credentials check .env file)"
 echo
 echo

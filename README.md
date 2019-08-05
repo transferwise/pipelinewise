@@ -94,7 +94,7 @@ If you have [Docker](https://www.docker.com/) and [Docker Compose](https://docs.
 easily create a local development environment setup quickly that includes not only the PipelineWise executables but
 some open source databases for a more convenient development experience:
 * PipelineWise CLI with every supported tap and target connectors
-* MySQL test source database    (for tap-mysql)
+* MariaDB test source database  (for tap-mysql)
 * Postgres test source database (for tap-postgres)
 * Postgres test target database (for target-snowflake)
 
@@ -156,7 +156,7 @@ The docker environment
 | Database      | Port (from docker host) | Port (inside from CLI container) | Database Name      |
 |---------------|-------------------------|----------------------------------|--------------------|
 | Postgres (1)  | localhost:15432         | db_postgres_source:5432          | postgres_source_db |
-| MySQL         | localhost:13306         | db_mysql_source:3306             | mysql_source_db    |
+| MariaDB       | localhost:13306         | db_mysql_source:3306             | mysql_source_db    |
 | Postgres (2)  | localhost:15433         | db_postgres_dwh:5432             | postgres_dwh       |
 
 For user and passwords check the `.env` file.
