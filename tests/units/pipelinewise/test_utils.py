@@ -206,7 +206,7 @@ class TestUtils(object):
         assert pytest_wrapped_e.value.code == 1
 
         # Loading existing JSON schema should be loaded correctly
-        tap_schema = cli.utils.load_json("{}/../pipelinewise/pipelinewise/schemas/tap.json".format(os.path.dirname(__file__)))
+        tap_schema = cli.utils.load_json("{}/../../../pipelinewise/pipelinewise/schemas/tap.json".format(os.path.dirname(__file__)))
         assert cli.utils.load_schema("tap") == tap_schema
 
 
