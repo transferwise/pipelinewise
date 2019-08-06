@@ -303,8 +303,8 @@ class TestUtils(object):
         # If loggin enabled then a success command should create log file with success status
         [rc, stdout, stderr] = cli.utils.run_command("echo this is a test line", log_file="./test.log")
         assert [rc, stdout, stderr] == [0, "this is a test line\n", None]
-        os.path.isfile("test.log.success")
-        os.remove("test.log.success")
+        if os.path.isfile("test.log.success"):
+            os.remove("test.log.success")
 
         # If loggin enabled then a failed command should create log file with failed status
         # NOTE: When logging is enabled and the command fails then it raises an exception
@@ -313,5 +313,5 @@ class TestUtils(object):
         #       Both should return [rc, stdout, stderr] list or both should raise exception
         with pytest.raises(Exception):
             [rc, stdout, stderr] = cli.utils.run_command("invalid-command this is an invalid command", log_file="./test.log")
-        os.path.isfile("test.log.failed")
-        os.remove("test.log.failed")
+        if os.path.isfile("test.log.failed"):
+            os.remove("test.log.failed")
