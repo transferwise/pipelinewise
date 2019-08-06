@@ -440,13 +440,13 @@ def run_command(command, log_file=False):
         stdout = ''
         while True:
             line = proc.stdout.readline()
-            if proc.poll() is not None:
-                break
             if line:
                 decoded_line = line.decode('utf-8')
                 stdout += decoded_line
                 f.write(decoded_line)
                 f.flush()
+            if proc.poll() is not None:
+                break
 
         f.close()
         rc = proc.poll()
