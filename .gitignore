@@ -14,6 +14,7 @@ __pycache__/
 .coverage.*
 coverage.log
 coverage_html
+test-reports/
 
 # Singer Tap state
 .state.json

@@ -56,7 +56,7 @@ If you want to run tests use `./install.sh --withtestextras`
 3. To start CLI you need to activate the CLI virtual environment and has to set `PIPELINEWISE_HOME` environment variable:
    
 ```sh
-$ source {ACTUAL_ABSOLUTE_PATH}/.virtualenvs/cli/bin/activate
+$ source {ACTUAL_ABSOLUTE_PATH}/.virtualenvs/pipelinewise/bin/activate
 $ export PIPELINEWISE_HOME={ACTUAL_ABSOLUTE_PATH}
 ```
 (The `ACTUAL_ABSOLUTE_PATH` differs on every system, the install script prints you the correct command that fits
@@ -76,7 +76,7 @@ To run unit tests:
 $ pytest
 ```
 
-To run unit tests and report code coverage:
+To run unit tests and generate code coverage:
 
 ```
 $ coverage run -m pytest && coverage report
@@ -87,6 +87,8 @@ To generate HTML coverage report.
 ```
 $ coverage run -m pytest && coverage html -d coverage_html
 ```
+
+**Note**: The HTML report will be generated in `coverage_html/index.html`
 
 ## Developing with Docker
 
@@ -138,7 +140,7 @@ To generate HTML coverage report.
 $ coverage run -m pytest && coverage html -d coverage_html
 ```
 
-**Note**: The HTML report will be generated in `cli/coverage_html/index.html`
+**Note**: The HTML report will be generated in `coverage_html/index.html`
 and can be opened **only** from the docker host and not inside from the container.
 
 
@@ -169,7 +171,7 @@ For user and passwords check the `.env` file.
     For convenience, create a new branch in your local environment, and remove all taps and targets but `target_snowflake_test.yml` (Otherwise when you load config, Singer will try to connect to each production database that has been configured in the taps).
 snowflake_test tap has been configured to use Snowflake test database, AWS staging buckets, etc.
 
-2. Activate CLI virtualenv: `. .virtualenvs/cli/bin/activate`
+2. Activate CLI virtualenv: `. .virtualenvs/pipelinewise/bin/activate`
 
     You can activate singer-connectors virtual envs (all taps have their own virtualenv) with `. .virtualenvs/tap-mysql/bin/activate` (just substitute your own tap)
 

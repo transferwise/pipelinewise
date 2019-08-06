@@ -1,26 +1,81 @@
 version: 2
-jobs:
-  # Install PipelineWise components:
-  #  Singer components
-  #  FastSync components
-  #  Command Line Interface
-  build:
+references:
+  container_config: &container_config
     docker:
-      - image: circleci/python:3.6.2
+      # Main python container
+      - image: circleci/python:3.7.4
+        environment:
+          DB_TAP_MYSQL_HOST: db_mysql_source
+          DB_TAP_MYSQL_PORT: 3306
+          DB_TAP_MYSQL_USER: test
+          DB_TAP_MYSQL_PASSWORD: test
+          DB_TAP_MYSQL_DB: mysql_source_db
+
+          DB_TAP_POSTGRES_HOST: db_postgres_source
+          DB_TAP_POSTGRES_PORT: 5432
+          DB_TAP_POSTGRES_USER: test
+          DB_TAP_POSTGRES_PASSWORD: test
+          DB_TAP_POSTGRES_DB: postgres_source_db
+
+          DB_TARGET_POSTGRES_HOST: db_postgres_dwh
+          DB_TARGET_POSTGRES_PORT: 5432
+          DB_TARGET_POSTGRES_USER: test
+          DB_TARGET_POSTGRES_PASSWORD: test
+          DB_TARGET_POSTGRES_DB: postgres_dwh
+
+      # PostgreSQL service container image used as test source database (for tap-postgres)
+      - image: postgres:11.4
+        name: db_postgres_source
+        environment:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: postgres_source_db
+
+       # MariaDB service container image used as test source database (for tap-mysql)
+      - image: mariadb:10.2.26
+        name: db_mysql_source
+        environment:
+          MYSQL_ROOT_PASSWORD: test
+          MYSQL_USER: test
+          MYSQL_PASSWORD: test
+          MYSQL_DATABASE: mysql_source_db
+
+      # PostgreSQL service container image used as test target (DWH) database (for target-postgres)
+      - image: postgres:11.4
+        name: db_postgres_dwh
+        environment:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: postgres_dwh
+
+jobs:
+  test:
+    <<: *container_config
+
     steps:
       - checkout
       - run:
-          name: 'Installing PipelineWise components and connectors'
-          command: ./install.sh --acceptlicenses
-
+          name: Build source databases for integration tests
+          command: |
+            sudo apt-get update
+            sudo apt install mariadb-client postgresql-client
+            ./tests/db/tap_mysql_test_db.sh
+            ./tests/db/tap_postgres_test_db.sh
       - run:
-          name: 'Unit Tests and Coverage'
+          name: Installing PipelineWise components and connectors
+          command: ./install.sh --acceptlicenses --withtestextras
+      - run:
+          name: Run tests
           command: |
             . .virtualenvs/pipelinewise/bin/activate
-            pip install pytest coverage
-            coverage run -m pytest --disable-pytest-warnings
+            mkdir test-reports
+            coverage run -m pytest --junitxml=test-reports/junit.xml
             coverage report
             coverage html -d coverage_html
+      - store_test_results:
+          path: test-reports
+      - store_artifacts:
+          path: coverage_html
 
   # For documentation deployment. You'll need the following environment vars
   # in your Circle CI settings, otherwise this will not work.
@@ -30,7 +85,7 @@ jobs:
   # GH_TOKEN (the personal Git token with pushes enabled)
   deploy-doc:
     docker:
-      - image: circleci/python:3.6.2
+      - image: circleci/python:3.7.4
     working_directory: ~/gh_doc_automation
     steps:
       - checkout
@@ -38,10 +93,10 @@ jobs:
 
 workflows:
   version: 2
-  build:
+  build_and_test:
     jobs:
-      - build
+      - test
 
-  deploy:
+  deploy_doc:
     jobs:
       - deploy-doc
