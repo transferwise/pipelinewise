@@ -108,7 +108,6 @@ class TestE2E(object):
         """Import the YAML project with taps and target and do discovery mode to write the JSON files for singer connectors"""
         [rc, stdout, stderr] = self.run_command("pipelinewise import_config --dir {}".format(self.project_dir))
         self.assert_command_success(rc, stdout, stderr)
-        assert True
 
     @pytest.mark.dependency(depends=["import_config"])
     def test_replicate_mariadb_to_postgres(self):
