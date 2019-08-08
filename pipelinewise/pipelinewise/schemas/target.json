@@ -28,6 +28,21 @@
         "file_format"
       ]
     },
+    "db_conn_target_postgres": {
+      "type": "object",
+      "properties": {
+        "host": { "type": "string" },
+        "user": { "type": "string" },
+        "password": { "type": "string" },
+        "dbname": { "type": "string" }
+      },
+      "required": [
+        "host",
+        "user",
+        "password",
+        "dbname"
+      ]
+    },
     "db_conn_target_s3_csv": {
       "type": "object",
       "properties": {
@@ -54,6 +69,7 @@
     "db_conn": {
       "anyOf": [
         { "$ref": "#/definitions/db_conn_target_snowflake" },
+        { "$ref": "#/definitions/db_conn_target_postgres" },
         { "$ref": "#/definitions/db_conn_target_s3_csv" }
       ]
     }
