@@ -89,6 +89,7 @@ class TestE2E(object):
     def test_import_project(self):
         """Import the YAML project with taps and target and do discovery mode to write the JSON files for singer connectors"""
         [rc, stdout, stderr] = self.run_command("pipelinewise import_config --dir {}".format(self.project_dir))
+        assert stdout == "abc"
         assert stderr == ""
         assert rc == 0
 
