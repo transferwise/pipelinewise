@@ -85,26 +85,42 @@ class TestE2E(object):
             The generated full path is logged to STDOUT when tap starting"""
         return re.search('Writing output into (.+log)', stdout).group(1)
 
+    def assert_command_success(self, rc, stdout, stderr, log_path=None):
+        """Assert helper function to check if command finished successfully.
+        In case of failure it logs stdout, stderr and content of the failed command log
+        if exists"""
+        if rc != 0 or stderr != "":
+            failed_log = ""
+            # Load failed log file if exists
+            if os.path.isfile("{}.success".format(log_path)):
+                with open(log_path, 'r') as file:
+                    failed_log = file.read()
+
+            if failed_log:
+                assert not "STDOUT: {}\nSTDERR: {}\nFAILED LOG: {}".format(str(stdout), str(stderr), failed_log)
+            else:
+                assert not "STDOUT: {}\nSTDERR: {}".format(str(stdout), str(stderr))
+
+        assert True
+
     @pytest.mark.dependency(name="import_config")
     def test_import_project(self):
         """Import the YAML project with taps and target and do discovery mode to write the JSON files for singer connectors"""
         [rc, stdout, stderr] = self.run_command("pipelinewise import_config --dir {}".format(self.project_dir))
-        assert stderr == ""
-        assert rc == 0
+        self.assert_command_success(rc, stdout, stderr)
+        assert True
 
     @pytest.mark.dependency(depends=["import_config"])
     def test_replicate_mariadb_to_postgres(self):
         """Replicate data from MariaDB to Postgres DWH, check if return code is zero and success log file created"""
         [rc, stdout, stderr] = self.run_command("pipelinewise run_tap --tap mariadb_source --target postgres_dwh")
+        self.assert_command_success(rc, stdout, stderr)
         assert os.path.isfile("{}.success".format(self.find_run_tap_log_file(stdout)))
-        assert stderr == ""
-        assert rc == 0
 
     @pytest.mark.dependency(depends=["import_config"])
     def test_replicate_postgres_to_postgres(self):
         """Replicate data from Postgres to Postgres DWH, check if return code is zero and success log file created"""
         [rc, stdout, stderr] = self.run_command("pipelinewise run_tap --tap postgres_source --target postgres_dwh")
+        self.assert_command_success(rc, stdout, stderr)
         assert os.path.isfile("{}.success".format(self.find_run_tap_log_file(stdout)))
-        assert stderr == ""
-        assert rc == 0
 

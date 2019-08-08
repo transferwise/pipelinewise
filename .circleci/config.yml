@@ -68,6 +68,7 @@ jobs:
           name: Run tests
           command: |
             . .virtualenvs/pipelinewise/bin/activate
+            export PIPELINEWISE_HOME=$PWD
             mkdir test-reports
             coverage run -m pytest --junitxml=test-reports/junit.xml
             coverage report
