@@ -73,19 +73,21 @@ $ pipelinewise status # Can be any other valid PipelineWise command
 To run unit tests:
 
 ```sh
-$ pytest
+$ pytest --ignore tests/end-to-end
 ```
+**Note**: We ignore end-to-end tests because that requires specific environment with source and target databases.
+You need to use the full docker env provided to run end to end tests. Read more details below.
 
 To run unit tests and generate code coverage:
 
 ```
-$ coverage run -m pytest && coverage report
+$ coverage run -m pytest --ignore tests/end-to-end && coverage report
 ```
 
 To generate HTML coverage report.
 
 ```
-$ coverage run -m pytest && coverage html -d coverage_html
+$ coverage run -m pytest --ignore tests/end-to-end && coverage html -d coverage_html
 ```
 
 **Note**: The HTML report will be generated in `coverage_html/index.html`
@@ -122,13 +124,13 @@ To run PipelineWise command:
 $ pipelinewise status # Can be any other valid PipelineWise command
 ```
 
-To run unit tests:
+To run tests:
 
 ```sh
 $ pytest
 ```
 
-To run unit tests and report code coverage:
+To run tests and report code coverage:
 
 ```
 $ coverage run -m pytest && coverage report
