@@ -15,7 +15,7 @@ sync_period: "0 * * * *"
 # ------------------------------------------------------------------------------
 db_conn:
   host: "${DB_TAP_POSTGRES_HOST}"                  # PostgreSQL host
-  port: "${DB_TAP_POSTGRES_PORT}"                  # PostgreSQL port
+  port: ${DB_TAP_POSTGRES_PORT}                    # PostgreSQL port
   user: "${DB_TAP_POSTGRES_USER}"                  # PostgreSQL user
   password: "${DB_TAP_POSTGRES_PASSWORD}"          # Plain string or vault encrypted
   dbname: "${DB_TAP_POSTGRES_DB}"                  # PostgreSQL database name
