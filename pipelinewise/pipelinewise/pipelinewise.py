@@ -867,7 +867,7 @@ class PipelineWise(object):
             tap_state,
             {
                 "selected": True,
-                "target_type": ["target-snowflake"],
+                "target_type": ["target-snowflake", "target-redshift"],
                 "tap_type": ["tap-mysql", "tap-postgres"],
                 "initial_sync_required": True
             },
