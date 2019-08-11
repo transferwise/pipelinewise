@@ -152,6 +152,12 @@ def get_grantees(target_config, table):
     elif config_default_target_schema_select_permissions:
         grantees = config_default_target_schema_select_permissions
 
+    # Convert anything other to list
+    if isinstance(grantees, str):
+        grantees = [grantees]
+    elif grantees is None:
+        grantees = []
+
     return grantees
 
 
