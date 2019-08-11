@@ -36,7 +36,9 @@ setup(name='pipelinewise',
     extras_require={
         "test": [
             "pytest==5.0.1",
-            "coverage==4.5.3"
+            "pytest-dependency==0.4.0",
+            "coverage==4.5.3",
+            "python-dotenv==0.10.3"
         ]
     },
     entry_points='''

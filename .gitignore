@@ -19,6 +19,9 @@ test-reports/
 # Singer Tap state
 .state.json
 
+# Generated test yamls
+tests/end-to-end/test-project/*.yml
+
 # Docker
 #.env
 
