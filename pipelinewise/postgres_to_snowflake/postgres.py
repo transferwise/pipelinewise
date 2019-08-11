@@ -275,4 +275,4 @@ class Postgres:
         """.format(','.join(column_safe_sql_values), table_name)
         utils.log("POSTGRES - Exporting data: {}".format(sql))
         with gzip.open(path, 'wt') as gzfile:
-            self.curr.copy_expert(sql, gzfile)
+            self.curr.copy_expert(sql, gzfile, size=131072)

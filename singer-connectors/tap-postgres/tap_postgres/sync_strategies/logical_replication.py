@@ -371,70 +371,75 @@ def sync_tables(conn_info, logical_streams, state, end_lsn):
     for s in logical_streams:
         sync_common.send_schema_message(s, ['lsn'])
 
-    with post_db.open_connection(conn_info, True) as conn:
-        with conn.cursor() as cur:
-            try:
-                LOGGER.info("{} : Starting log streaming at {} to {} (slot {})".format(datetime.datetime.utcnow(), int_to_lsn(start_lsn), int_to_lsn(end_lsn), slot))
-                cur.start_replication(slot_name=slot, decode=True, start_lsn=start_lsn, options={'write-in-chunks': 1})
-            except psycopg2.ProgrammingError:
-                raise Exception("Unable to start replication with logical replication (slot {})".format(slot))
+    # Create replication connection and cursor
+    conn = post_db.open_connection(conn_info, True)
+    cur = conn.cursor()
 
-            # Emulate some behaviour of pg_recvlogical
-            LOGGER.info("{} : Confirming write up to 0/0, flush to 0/0".format(datetime.datetime.utcnow()))
-            cur.send_feedback(write_lsn=0, flush_lsn=0, reply=True)
-            time.sleep(poll_interval)
+    try:
+        LOGGER.info("{} : Starting log streaming at {} to {} (slot {})".format(datetime.datetime.utcnow(), int_to_lsn(start_lsn), int_to_lsn(end_lsn), slot))
+        cur.start_replication(slot_name=slot, decode=True, start_lsn=start_lsn, options={'write-in-chunks': 1})
+    except psycopg2.ProgrammingError:
+        raise Exception("Unable to start replication with logical replication (slot {})".format(slot))
 
-            lsn_received_timestamp = datetime.datetime.utcnow()
+    # Emulate some behaviour of pg_recvlogical
+    LOGGER.info("{} : Confirming write up to 0/0, flush to 0/0".format(datetime.datetime.utcnow()))
+    cur.send_feedback(write_lsn=0, flush_lsn=0, reply=True)
+    time.sleep(poll_interval)
+
+    lsn_received_timestamp = datetime.datetime.utcnow()
+    poll_timestamp = datetime.datetime.utcnow()
+
+    while True:
+        # Disconnect when no data received for logical_poll_total_seconds
+        # needs to be long enough to wait for the largest single wal payload to avoid unplanned timeouts
+        poll_duration = (datetime.datetime.utcnow() - lsn_received_timestamp).total_seconds()
+        if poll_duration > logical_poll_total_seconds:
+            LOGGER.info("{} : Breaking - {} seconds of polling with no data".format(datetime.datetime.utcnow(), poll_duration))
+            break
+
+        try:
+            msg = cur.read_message()
+        except Exception as e:
+            LOGGER.info("{} : Breaking - {}".format(datetime.datetime.utcnow(), e))
+            break
+
+        if msg:
+            if msg.data_start > end_lsn:
+                LOGGER.info("{} : Breaking - current {} is past end_lsn {}".format(datetime.datetime.utcnow(), int_to_lsn(msg.data_start), int_to_lsn(end_lsn)))
+                break
+
+            state = consume_message(logical_streams, state, msg, time_extracted, conn_info, end_lsn)
+
+            # When using wal2json with write-in-chunks, multiple messages can have the same lsn
+            # This is to ensure we only flush to lsn that has completed entirely
+            if (lsn_currently_processing is None):
+                lsn_currently_processing = msg.data_start
+                LOGGER.info("{} : First message received is {} at {}".format(datetime.datetime.utcnow(), int_to_lsn(lsn_currently_processing), datetime.datetime.utcnow()))
+
+                # Flush Postgres wal up to lsn comitted in previous run, or first lsn received in this run
+                lsn_to_flush = lsn_comitted
+                if lsn_currently_processing < lsn_to_flush: lsn_to_flush = lsn_currently_processing
+                LOGGER.info("{} : Confirming write up to {}, flush to {}".format(datetime.datetime.utcnow(), int_to_lsn(lsn_to_flush), int_to_lsn(lsn_to_flush)))
+                cur.send_feedback(write_lsn=lsn_to_flush, flush_lsn=lsn_to_flush, reply=True)
+
+            elif (int(msg.data_start) > lsn_currently_processing):
+                lsn_last_processed = lsn_currently_processing
+                lsn_currently_processing = msg.data_start
+                lsn_received_timestamp = datetime.datetime.utcnow()
+                lsn_processed_count = lsn_processed_count + 1
+                if lsn_processed_count >= UPDATE_BOOKMARK_PERIOD:
+                    singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
+                    lsn_processed_count = 0
+
+        # When data is received, and when data is not received, a keep-alive poll needs to be returned to PostgreSQL
+        if datetime.datetime.utcnow() >= (poll_timestamp + datetime.timedelta(seconds=poll_interval)):
+            LOGGER.info("{} : Sending keep-alive to source server (last message received was {} at {})".format(datetime.datetime.utcnow(), int_to_lsn(lsn_last_processed), lsn_received_timestamp))
+            cur.send_feedback()
             poll_timestamp = datetime.datetime.utcnow()
 
-            while True:
-                # Disconnect when no data received for logical_poll_total_seconds
-                # needs to be long enough to wait for the largest single wal payload to avoid unplanned timeouts
-                poll_duration = (datetime.datetime.utcnow() - lsn_received_timestamp).total_seconds()
-                if poll_duration > logical_poll_total_seconds:
-                    LOGGER.info("Breaking after %s seconds of polling with no data", poll_duration)
-                    break
-
-                msg = cur.read_message()
-                if msg:
-                    if msg.data_start > end_lsn:
-                        LOGGER.info("{} : Current {} is past end_lsn {} - breaking".format(datetime.datetime.utcnow(), int_to_lsn(msg.data_start), int_to_lsn(end_lsn)))
-                        break
-
-                    state = consume_message(logical_streams, state, msg, time_extracted, conn_info, end_lsn)
-
-                    # When using wal2json with write-in-chunks, multiple messages can have the same lsn
-                    # This is to ensure we only flush to lsn that has completed entirely
-                    if (lsn_currently_processing is None):
-                        lsn_currently_processing = msg.data_start
-                        LOGGER.info("{} : First message received is {} at {}".format(datetime.datetime.utcnow(), int_to_lsn(lsn_currently_processing), datetime.datetime.utcnow()))
-
-                        # Flush Postgres wal up to lsn comitted in previous run, or first lsn received in this run
-                        lsn_to_flush = lsn_comitted
-                        if lsn_currently_processing < lsn_to_flush: lsn_to_flush = lsn_currently_processing
-                        LOGGER.info("{} : Confirming write up to {}, flush to {}".format(datetime.datetime.utcnow(), int_to_lsn(lsn_to_flush), int_to_lsn(lsn_to_flush)))
-                        cur.send_feedback(write_lsn=lsn_to_flush, flush_lsn=lsn_to_flush, reply=True)
-
-                    elif (int(msg.data_start) > lsn_currently_processing):
-                        lsn_last_processed = lsn_currently_processing
-                        lsn_currently_processing = msg.data_start
-                        lsn_received_timestamp = datetime.datetime.utcnow()
-                        lsn_processed_count = lsn_processed_count + 1
-                        if lsn_processed_count >= UPDATE_BOOKMARK_PERIOD:
-                            singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
-                            lsn_processed_count = 0
-
-                # When data is received, and when data is not received, a keep-alive poll needs to be returned to PostgreSQL
-                if datetime.datetime.utcnow() >= (poll_timestamp + datetime.timedelta(seconds=poll_interval)):
-                    LOGGER.info("{} : Sending keep-alive to source server (last message received was {} at {})".format(datetime.datetime.utcnow(), int_to_lsn(lsn_last_processed), lsn_received_timestamp))
-                    cur.send_feedback()
-                    poll_timestamp = datetime.datetime.utcnow()
-
-            # Close replication cursor
-            try:
-                cur.close()
-            except:
-                pass
+    # Close replication connection and cursor
+    cur.close()
+    conn.close()
 
     if lsn_last_processed:
         if lsn_comitted > lsn_last_processed:
