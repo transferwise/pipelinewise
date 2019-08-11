@@ -13,7 +13,7 @@ type: "target-postgres"                # !! THIS SHOULD NOT CHANGE !!
 # ------------------------------------------------------------------------------
 db_conn:
   host: "${DB_TARGET_POSTGRES_HOST}"                  # PostgreSQL host
-  port: "${DB_TARGET_POSTGRES_PORT}"                  # PostgreSQL port
+  port: ${DB_TARGET_POSTGRES_PORT} .                  # PostgreSQL port
   user: "${DB_TARGET_POSTGRES_USER}"                  # PostgreSQL user
   password: "${DB_TARGET_POSTGRES_PASSWORD}"          # Plain string or vault encrypted
   dbname: "${DB_TARGET_POSTGRES_DB}"                  # PostgreSQL database name
