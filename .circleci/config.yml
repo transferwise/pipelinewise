@@ -7,6 +7,7 @@ references:
         environment:
           DB_TAP_MYSQL_HOST: db_mysql_source
           DB_TAP_MYSQL_PORT: 3306
+          DB_TAP_MYSQL_ROOT_PASSWORD: test
           DB_TAP_MYSQL_USER: test
           DB_TAP_MYSQL_PASSWORD: test
           DB_TAP_MYSQL_DB: mysql_source_db
