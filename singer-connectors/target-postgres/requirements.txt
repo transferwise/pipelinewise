@@ -1,1 +1,1 @@
-pipelinewise-target-postgres==1.0.0
+pipelinewise-target-postgres==1.0.1
