@@ -3,12 +3,13 @@
 [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/pipelinewise-tap-mysql.svg)](https://pypi.org/project/pipelinewise-tap-mysql/)
 [![License: Apache2](https://img.shields.io/badge/License-Apache2-yellow.svg)](https://opensource.org/licenses/Apache-2.0)
 
-PipelineWise is a Data Pipeline Framework using the singer.io specification to ingest and replicate data from various sources to various destinations.
+PipelineWise is a Data Pipeline Framework using the singer.io specification to ingest and replicate data from various sources to various destinations. Documentation is available at https://transferwise.github.io/pipelinewise/
 
-Documentation is available at https://transferwise.github.io/pipelinewise/
+![Logo](docs/img/pipelinewise-diagram-circle-bold.png)
 
 ## Links
 
+* [PipelineWise documentation](https://transferwise.github.io/pipelinewise/)
 * [Singer ETL specification](https://github.com/singer-io/getting-started/blob/master/docs/SPEC.md)
 * [Singer.io community slack channel](https://singer-slackin.herokuapp.com/)
 
