@@ -22,12 +22,13 @@ check_license() {
     PKG_VERSION=`pip-licenses | grep $1 | awk '{print $2}'`
     PKG_LICENSE=`pip-licenses --from mixed | grep $1 | awk '{for (i=1; i<=NF-2; i++) $i = $(i+2); NF-=2; print}'`
 
-    # Any License Agreement that is not MIT has to be accepted
-    if [[ $PKG_LICENSE != "MIT License" && $PKG_LICENSE != 'UNKNOWN' ]]; then
+    # Any License Agreement that is not Apache Software License (2.0) has to be accepted
+    MAIN_LICENSE="Apache Software License"
+    if [[ $PKG_LICENSE != $MAIN_LICENSE && $PKG_LICENSE != 'UNKNOWN' ]]; then
         echo
         echo "  | $PKG_NAME ($PKG_VERSION) is licensed under $PKG_LICENSE"
         echo "  |"
-        echo "  | WARNING. The license of this connector is different than the default PipelineWise license (MIT)."
+        echo "  | WARNING. The license of this connector is different than the default PipelineWise license ($MAIN_LICENSE)."
 
         if [[ $ACCEPT_LICENSES != "YES" ]]; then
             echo "  | You need to accept the connector's license agreement to proceed."

@@ -188,3 +188,9 @@ snowflake_test tap has been configured to use Snowflake test database, AWS stagi
 5. Run your tap: `pipelinewise run_tap --target snowflake_test --tap adwords`
 
     Logs for tap outputs are stored in `~/.pipelinewise/snowflake_test/`
+
+## License
+
+Apache License Version 2.0
+
+See [LICENSE](LICENSE) to see the full text.

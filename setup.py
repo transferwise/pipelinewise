@@ -14,7 +14,7 @@ setup(name='pipelinewise',
     author="TransferWise",
     url='https://github.com/transferwise/pipelinewise',
     classifiers=[
-        'License :: OSI Approved :: MIT License',
+        'License :: OSI Approved :: Apache Software License',
         'Programming Language :: Python :: 3 :: Only'
     ],
     install_requires=[
