@@ -9,7 +9,6 @@ import json
 import copy
 
 from datetime import datetime
-from crontab import CronTab, CronSlices
 from tabulate import tabulate
 from joblib import Parallel, delayed, parallel_backend
 
@@ -666,52 +665,6 @@ class PipelineWise(object):
 
         print(tabulate(tab_body, headers=tab_headers, tablefmt="simple"))
         print("{} pipeline(s)".format(pipelines))
-
-    def clear_crontab(self):
-        self.logger.info("Removing jobs from crontab")
-
-        # Remove every existing pipelinewise entry from crontab
-        cron = CronTab(user=True)
-        for j in cron.find_command('pipelinewise'):
-            cron.remove(j)
-
-        cron.write()
-
-    def init_crontab(self):
-        self.logger.info("Initialising crontab")
-        self.clear_crontab()
-
-        cron = CronTab(user=True)
-
-        # Find tap schedules and add entries to crontab
-        for target in (x for x in self.config["targets"] if "targets" in self.config):
-            for tap in (x for x in target["taps"] if "taps" in target):
-
-                if "sync_period" in tap:
-                    target_id = target["id"]
-                    tap_id = tap["id"]
-                    sync_period = tap["sync_period"]
-                    command = ' '.join([
-                        "{} run_tap --target {} --tap {}".format(self.pipelinewise_bin, target_id, tap_id)
-                    ])
-                    self.logger.info("Adding: {} {}".format(sync_period, command))
-
-                    if CronSlices.is_valid(sync_period):
-                        job = cron.new(command=command)
-
-                        if job.is_valid():
-                            job.setall(tap["sync_period"])
-                        else:
-                            self.logger.info("Cannot schedule job. Target: [{}] Tap [{}]. No changes made.".format(target_id, tap_id))
-                            sys.exit(1)
-
-                    else:
-                        self.logger.info("Cannot schedule job. Invalid sync period: [{}]. Target: [{}] Tap: [{}]. No changes made.".format(sync_period, target_id, tap_id))
-                        sys.exit(1)
-
-        # Every job valid, write crontab
-        cron.write()
-        self.logger.info("Jobs written to crontab")
 
 
     def run_tap_singer(self, tap_type, tap_config, tap_properties, tap_state, tap_transformation, target_config, log_file):
