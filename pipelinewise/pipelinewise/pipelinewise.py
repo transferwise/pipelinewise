@@ -495,7 +495,7 @@ class PipelineWise(object):
         else:
             os.mkdir(project_dir)
 
-        for yaml in utils.get_sample_file_paths():
+        for yaml in sorted(utils.get_sample_file_paths()):
             yaml_basename = os.path.basename(yaml)
             dst = os.path.join(project_dir, yaml_basename)
 
