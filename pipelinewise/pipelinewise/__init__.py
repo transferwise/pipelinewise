@@ -21,8 +21,6 @@ commands = [
   'discover_tap',
   'status',
   'test_tap_connection',
-  'clear_crontab',
-  'init_crontab',
   'sync_tables',
   'import_config',
   'encrypt_string'

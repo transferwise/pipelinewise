@@ -19,7 +19,6 @@ setup(name='pipelinewise',
     ],
     install_requires=[
         'argparse==1.4.0',
-        'python-crontab==2.3.5',
         'tabulate==0.8.2',
         'PyYAML==5.1.0',
         'jsonschema==3.0.1',
