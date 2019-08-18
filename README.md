@@ -3,26 +3,37 @@
 [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/pipelinewise-tap-mysql.svg)](https://pypi.org/project/pipelinewise-tap-mysql/)
 [![License: Apache2](https://img.shields.io/badge/License-Apache2-yellow.svg)](https://opensource.org/licenses/Apache-2.0)
 
-PipelineWise is a Data Pipeline Framework using the singer.io specification to ingest and replicate data from various sources to various destinations. Documentation is available at https://transferwise.github.io/pipelinewise/
+PipelineWise is a Data Pipeline Framework using the [Singer.io](https://www.singer.io/) specification to ingest and replicate data from various sources to various destinations.
+Documentation is available at https://transferwise.github.io/pipelinewise/
 
 ![Logo](docs/img/pipelinewise-diagram-circle-bold.png)
 
-## Links
 
-* [PipelineWise documentation](https://transferwise.github.io/pipelinewise/)
-* [Singer ETL specification](https://github.com/singer-io/getting-started/blob/master/docs/SPEC.md)
-* [Singer.io community slack channel](https://singer-slackin.herokuapp.com/)
+## Features
 
-## Components
+* **Built with ELT in mind**: PipelineWise fits into the ELT landscape but does not do traditional ETL. PipelineWise ingests data first into DWH in the original format and the “transformation” shifts to the end of the data pipeline. Load time transformations are still supported but complex mapping and joins have to be done once the data is replicated into the Data Warehouse.
+* **Replication Methods**: CDC (Log Based), Key-Based Incremental and Full Table snapshots
+* **Managed Schema Changes**: When source data changes, PipelineWise detects the change and alters the schema in your DWH automatically
+* **Load time transformations**: Ideal place to obfuscate, mask or filter sensitive data that should never be replicated in the Data Warehouse
+* **YAML based configuration**: Data pipelines are defined as YAML files, ensuring that the entire configuration is kept under version control
+* **Lightweight**: No daemons or database setup are required
+* **Extensible**: PipelineWise is using [Singer.io](https://www.singer.io/) compatible taps and target connectors. New connectors can be added to PipelineWise with relatively small effort
 
-* **Command Line Interface**: start/stop/query components from the command line
-* **Singer Connectors**: Simple, Composable, Open Source ETL framework 
- 
-### Singer Connector Definitions
-* **Tap**: Extracts data from any source and write it to a standard stream in a JSON-based format.
-* **Target**: Consumes data from taps and do something with it, like load it into a file, API or database
 
-### Supported Connectors
+## Table of Contents
+
+- [Connectors](#connectors)
+    - [Running from docker](#running-from-docker)
+    - [Building from source](#building-from-source)
+- [Developing with Docker](#developing-with-docker)
+- [Links](#links)
+- [License](#license)
+
+
+## Connectors
+
+Tap extracts data from any source and write it to a standard stream in a JSON-based format, and target
+consumes data from taps and do something with it, like load it into a file, API or database
 
 | Type      | Name       | Latest Version | Description                                          |
 |-----------|------------|----------------|------------------------------------------------------|
@@ -40,7 +51,36 @@ PipelineWise is a Data Pipeline Framework using the singer.io specification to i
 | Target    | **[S3 CSV](https://github.com/transferwise/pipelinewise-target-s3-csv)** | [![PyPI version](https://badge.fury.io/py/pipelinewise-target-s3-csv.svg)](https://badge.fury.io/py/pipelinewise-target-s3-csv) | Uploads data from any tap to S3 in CSV format |
 | Transform | **[Field](https://github.com/transferwise/pipelinewise-transform-field)** | [![PyPI version](https://badge.fury.io/py/pipelinewise-transform-field.svg)](https://badge.fury.io/py/pipelinewise-transform-field) | Transforms fields from any tap and sends the results to any target. Recommended for data masking/ obfuscation |
 
-## Installation
+
+### Running from docker
+
+If you have [Docker](https://www.docker.com/) installed then using docker is the easiest and
+recommended method of start using PipelineWise.
+
+1. Build an executable docker images that has every required dependency and it's isolated from your host system:
+
+```sh
+$ docker build -t pipelinewise:latest .
+```
+
+1. Once the image is ready, create an alias to the docker wrapper script:
+
+```sh
+$ alias pipelinewise='$(PWD)/bin/pipelinewise-docker'
+```
+
+3. Check if the installation was successfully by running the `pipelinewise status` command:
+
+```sh
+$ pipelinewise status
+
+Tap ID    Tap Type      Target ID     Target Type      Enabled    Status    Last Sync    Last Sync Result
+--------  ------------  ------------  ---------------  ---------  --------  -----------  ------------------
+0 pipeline(s)
+```
+
+You can run any pipelinewise command at this point. Tutorials to create and run pipelines is at https://transferwise.github.io/pipelinewise/installation_guide/creating_pipelines.html .
+
 
 ### Building from source
 
@@ -56,8 +96,6 @@ $ ./install.sh
 ```
 Press `Y` to accept the license agreement of the required singer components. To automate the installation and accept every license agreement run `./install --acceptlicenses`)
 
-If you want to run tests use `./install.sh --withtestextras`
-
 3. To start CLI you need to activate the CLI virtual environment and has to set `PIPELINEWISE_HOME` environment variable:
    
 ```sh
@@ -67,21 +105,26 @@ $ export PIPELINEWISE_HOME={ACTUAL_ABSOLUTE_PATH}
 (The `ACTUAL_ABSOLUTE_PATH` differs on every system, the install script prints you the correct command that fits
 to your system once the installation completed)
 
-4. Run any pipelinewise commands to test the installation:
-   
+4. Check if the installation was successfully by running the `pipelinewise status` command:
+
 ```sh
-$ pipelinewise status # Can be any other valid PipelineWise command
+$ pipelinewise status
+
+Tap ID    Tap Type      Target ID     Target Type      Enabled    Status    Last Sync    Last Sync Result
+--------  ------------  ------------  ---------------  ---------  --------  -----------  ------------------
+0 pipeline(s)
 ```
 
-5. If you installed with tests extras using `./install.sh --withtestextras`:
+You can run any pipelinewise command at this point. Tutorials to create and run pipelines is at https://transferwise.github.io/pipelinewise/installation_guide/creating_pipelines.html .
 
 To run unit tests:
 
 ```sh
 $ pytest --ignore tests/end-to-end
 ```
-**Note**: We ignore end-to-end tests because that requires specific environment with source and target databases.
-You need to use the full docker env provided to run end to end tests. Read more details below.
+**Note**: End-to-end tests are ignored because it requires specific environment with source
+and target databases. You need to use the docker development environment to run end to end tests.
+Read more details at [Developing with Docker](#developing-with-docker).
 
 To run unit tests and generate code coverage:
 
@@ -97,102 +140,24 @@ $ coverage run -m pytest --ignore tests/end-to-end && coverage html -d coverage_
 
 **Note**: The HTML report will be generated in `coverage_html/index.html`
 
+
 ## Developing with Docker
 
-If you have [Docker](https://www.docker.com/) and [Docker Compose](https://docs.docker.com/compose/) installed, you can
-easily create a local development environment setup quickly that includes not only the PipelineWise executables but
-some open source databases for a more convenient development experience:
-* PipelineWise CLI with every supported tap and target connectors
-* MariaDB test source database  (for tap-mysql)
-* Postgres test source database (for tap-postgres)
-* Postgres test target database (for target-snowflake)
+If you have [Docker](https://www.docker.com/) and [Docker Compose](https://docs.docker.com/compose/) installed,
+you can create a local development environment that includes not only the PipelineWise executables but a
+pre-configured development project as well with some databases as source and targets for a more convenient
+development experience.
 
-To create local development environment:
-```
-$ docker-compose up --build
-```
-
-Creating the dev environment (source and target dbs, test data, singer components)  might take some time at the first run.
-As soon as you see `PipelineWise Dev environment is ready in Docker container(s).` you can shell into the container and
-start running PipelineWise commands. At this point every virtual environment is created and every required environment
-variables is set.
-
-To shell into the ready to use PipelineWise container:
-
-```sh
-$ docker exec -it pipelinewise_dev bash
-```
-
-To run PipelineWise command:
-
-```sh
-$ pipelinewise status # Can be any other valid PipelineWise command
-```
-
-To run tests:
-
-```sh
-$ pytest
-```
-
-To run tests and report code coverage:
-
-```
-$ coverage run -m pytest && coverage report
-```
-
-To generate HTML coverage report.
-
-```
-$ coverage run -m pytest && coverage html -d coverage_html
-```
-
-**Note**: The HTML report will be generated in `coverage_html/index.html`
-and can be opened **only** from the docker host and not inside from the container.
+For further instructions about setting up local development environment go to
+[Test Project for Docker Development Environment](dev-project/README.md).
 
 
-To refresh the containers with new local code changes stop the running instances with ctrl+c
-and restart as usual.
+## Links
 
-```sh
-$ docker exec -it pipelinewise_dev bash
-```
+* [PipelineWise documentation](https://transferwise.github.io/pipelinewise/)
+* [Singer ETL specification](https://github.com/singer-io/getting-started/blob/master/docs/SPEC.md)
+* [Singer.io community slack channel](https://singer-slackin.herokuapp.com/)
 
-### Test databases in the docker development environment
-
-The docker environment 
-
-| Database      | Port (from docker host) | Port (inside from CLI container) | Database Name      |
-|---------------|-------------------------|----------------------------------|--------------------|
-| Postgres (1)  | localhost:15432         | db_postgres_source:5432          | postgres_source_db |
-| MariaDB       | localhost:13306         | db_mysql_source:3306             | mysql_source_db    |
-| Postgres (2)  | localhost:15433         | db_postgres_dwh:5432             | postgres_dwh       |
-
-For user and passwords check the `.env` file.
-
-
-## Loading configurations and running taps
-
-1. Clone [analytics-platform-config](https://github.com/transferwise/analytics-platform-config) repo.
-
-    For convenience, create a new branch in your local environment, and remove all taps and targets but `target_snowflake_test.yml` (Otherwise when you load config, Singer will try to connect to each production database that has been configured in the taps).
-snowflake_test tap has been configured to use Snowflake test database, AWS staging buckets, etc.
-
-2. Activate CLI virtualenv: `. .virtualenvs/pipelinewise/bin/activate`
-
-    You can activate singer-connectors virtual envs (all taps have their own virtualenv) with `. .virtualenvs/tap-mysql/bin/activate` (just substitute your own tap)
-
-3. Set `PIPELINEWISE_HOME` environment variable: `export PIPELINEWISE_HOME=<LOCAL_ABSOLUTE_PATH_TO_THIS_REPOSITORY>`
-
-4. Import configurations:  `pipelinewise import_config --dir ~/analytics-platform-config/pipelinewise/ --secret ~/ap-secret.txt`
-    - --dir argument points to analytics-platform-config repo
-    - --secret points to vault encryption key
-    
-    If it says ~/.pipelinewise directory doesn't exist, simply create that dir. TODO! create through install. 
-
-5. Run your tap: `pipelinewise run_tap --target snowflake_test --tap adwords`
-
-    Logs for tap outputs are stored in `~/.pipelinewise/snowflake_test/`
 
 ## License
 
