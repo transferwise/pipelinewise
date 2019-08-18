@@ -30,6 +30,7 @@ target_help = """Name of the target"""
 tap_help = """Name of the tap"""
 tables_help = """List of tables to sync"""
 dir_help = """Path to directory with config"""
+name_help = """Name of the project"""
 secret_help = """Path to vault password file"""
 version_help = """Displays the installed versions"""
 log_help = """File to log into"""
@@ -43,6 +44,7 @@ def main():
     parser.add_argument('--tap', type=str, default='*', help=tap_help)
     parser.add_argument('--tables', type=str, help=tables_help)
     parser.add_argument('--dir', type=str, default='*', help=dir_help)
+    parser.add_argument('--name', type=str, default='*', help=name_help)
     parser.add_argument('--secret', type=str, help=secret_help)
     parser.add_argument('--string', type=str)
     parser.add_argument('--version', action="version", help=version_help, version='PipelineWise {} - Command Line Interface'.format(__version__))
@@ -53,8 +55,8 @@ def main():
 
     # Command specific argument validations
     if args.command == 'init':
-        if args.dir == '*':
-            print("You must specify a directory path for the sample project using the argumant --dir")
+        if args.name == '*':
+            print("You must specify a project name using the argument --name")
             sys.exit(1)
 
     if args.command == 'discover_tap' or args.command == 'test_tap_connection' or args.command == 'run_tap':
