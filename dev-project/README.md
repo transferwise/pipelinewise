@@ -1,7 +1,7 @@
-# Test Project for Docker
+# Test Project for Docker Development Environment
 
-This is a sample test project that is compatible with the Development Environment
-in docker containers provided by this repository.
+This is a sample project that is compatible with the Docker Development Environment
+provided by this repository.
 
 The local development environment comes with the following containers and components:
 * PipelineWise CLI with every supported tap and target connectors
@@ -15,9 +15,11 @@ The local development environment comes with the following containers and compon
 Install [Docker](https://www.docker.com/) and [Docker Compose](https://docs.docker.com/compose/).
 
 Go to the main folder of the repository (the parent of this one) and To create local development environment:
-```
+
+```sh
 $ docker-compose up --build
 ```
+
 Wait until `PipelineWise Dev environment is ready in Docker container(s).` message. At the first run this can
 run up to 5-10 minutes depending on your computer and your network connection. Once it's completed every
 container, virtual environment and environment variables are set configured.
@@ -28,10 +30,10 @@ Open another terminal and shell into the PipelineWise container:
 $ docker exec -it pipelinewise_dev bash
 ```
 
-Import the test project:
+Import the dev project:
 
 ```sh
-$ pipelinewise import_config --dir test-project
+$ pipelinewise import_config --dir dev-project
 ```
 
 Check the status, you should see two pipelines. One is replicating data from MariaDB to Postgres DWH and
@@ -76,3 +78,31 @@ will capture the changes starting from the previously replicated position.
 If you want to connect to any of the test databases by a db client (CLI, MySQL Workbench, pgAdmin, intelliJ, DataGrip, etc.),
 check the `.env` file in the main folder of the repository for the credentials.
 
+
+To run tests:
+
+```sh
+$ pytest
+```
+
+To run tests and report code coverage:
+
+```
+$ coverage run -m pytest && coverage report
+```
+
+To generate HTML coverage report.
+
+```
+$ coverage run -m pytest && coverage html -d coverage_html
+```
+
+**Note**: The HTML report will be generated in `coverage_html/index.html`
+and can be opened **only** from the docker host and not inside from the container.
+
+To refresh the containers with new local code changes stop the running instances with ctrl+c
+and restart as usual:
+
+```sh
+$ docker exec -it pipelinewise_dev bash
+```
