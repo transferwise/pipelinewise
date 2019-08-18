@@ -60,7 +60,7 @@ make_virtualenv() {
     fi
     if [ -f "setup.py" ]; then
         PIP_ARGS=
-        if [[ $WITH_TEST_EXTRAS == "YES" ]]; then
+        if [[ ! $NO_TEST_EXTRAS == "YES" ]]; then
             PIP_ARGS=$PIP_ARGS"[test]"
         fi
 
@@ -110,8 +110,8 @@ for arg in "$@"; do
             NO_USAGE="YES"
             ;;
         # Install with test requirements that allows running tests
-        --withtestextras)
-            WITH_TEST_EXTRAS="YES"
+        --notestextras)
+            NO_TEST_EXTRAS="YES"
             ;;
         *)
             echo "Invalid argument: $arg"
