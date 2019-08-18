@@ -21,6 +21,6 @@ db_conn:
   # We use an intermediate S3 to load data into Redshift
   aws_access_key_id: "<ACCESS_KEY>"             # S3 - Plain string or vault encrypted
   aws_secret_access_key: "<SECRET_ACCESS_KEY>"  # S3 - Plain string or vault encrypted
-  s3_bucket: "<BUCKET_NAME>"                    # S3 external stbucket name
+  s3_bucket: "<BUCKET_NAME>"                    # S3 external bucket name
   s3_key_prefix: "redshift-imports/"            # Optional: S3 key prefix
 
