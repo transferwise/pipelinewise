@@ -3,11 +3,12 @@
 class CliArgs():
     """Class to simulate argparse command line arguments required by PipelineWise class
     """
-    def __init__(self, target='*', tap='*', tables=None, dir='*', secret=None, string=None, log='*', debug=False):
+    def __init__(self, target='*', tap='*', tables=None, dir='*', name='*', secret=None, string=None, log='*', debug=False):
         self.target = target
         self.tap = tap
         self.tables = tables
         self.dir = dir
+        self.name = name
         self.secret = secret
         self.string = string
         self.log = log

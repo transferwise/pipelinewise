@@ -32,7 +32,7 @@ project with the PipelineWise  :ref:`cli_init` command:
 
 .. code-block:: bash
 
-    $ pipelinewise init --dir pipelinewise_samples
+    $ pipelinewise init --name pipelinewise_samples
 
 This will create a ``pipelinewise_samples`` directory with samples for each supported component:
 
