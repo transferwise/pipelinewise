@@ -33,7 +33,7 @@ $ docker exec -it pipelinewise_dev bash
 Import the dev project:
 
 ```sh
-$ pipelinewise import_config --dir dev-project
+$ pipelinewise import --dir dev-project
 ```
 
 Check the status, you should see two pipelines. One is replicating data from MariaDB to Postgres DWH and

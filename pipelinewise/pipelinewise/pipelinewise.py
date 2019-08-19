@@ -951,7 +951,7 @@ class PipelineWise(object):
         utils.silentremove(cons_target_config)
 
 
-    def import_config(self):
+    def import_project(self):
         """
         Take a list of YAML files from a directory and use it as the source to build
         singer compatible json files and organise them into pipeline directory structure

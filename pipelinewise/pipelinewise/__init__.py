@@ -22,7 +22,8 @@ commands = [
   'status',
   'test_tap_connection',
   'sync_tables',
-  'import_config',
+  'import',
+  'import_config',  # This is for backward compatibility; use 'import' instead
   'encrypt_string'
 ]
 
@@ -75,10 +76,18 @@ def main():
             print("You must specify a destination name using the argument --target")
             sys.exit(1)
 
-    if args.command == 'import_config':
+    # import and import_config commands are synonyms
+    #
+    # import        : short CLI command name to import project
+    # import_config : this is for backward compatibility; use 'import' instead from CLI
+    if args.command == 'import' or args.command == 'import_config':
         if args.dir == '*':
             print("You must specify a directory path with config YAML files using the argumant --dir")
             sys.exit(1)
+
+        # Every command argument is mapped to a python function with the same name, but 'import' is a
+        # python keyword and can't be used as function name
+        args.command = 'import_project'
 
     if args.command == 'encrypt_string':
         if not args.secret:
