@@ -145,7 +145,7 @@ When you are happy with the configuration you need to import it with the :ref:`c
 
 .. code-block:: bash
 
-    $ pipelinewise import_config --dir pipelinewise_samples
+    $ pipelinewise import --dir pipelinewise_samples
 
 At this point PipelineWise will generate the required JSON files for the singer taps and
 targets into ``~/.pipelinewise``. PipelineWise will use this directory internally to keep
