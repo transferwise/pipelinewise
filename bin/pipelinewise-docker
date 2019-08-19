@@ -13,8 +13,13 @@
 IMAGE=pipelinewise
 VERSION=latest
 
+# To mount the host work directory to the running container wrk dir 
 HOST_DIR=$(PWD)
-WORK_DIR=/app/wrk
+CONT_WORK_DIR=/app/wrk
+
+# To mount the host pipelinewise home to the running container home dir
+HOST_CONFIG_DIR=${HOME}/.pipelinewise
+CONT_CONFIG_DIR=/app/.pipelinewise
 
 # Searching --dir argument from the command and replacing it as a mounting
 # point inside the container.
@@ -23,12 +28,12 @@ while [[ $# -gt 0 ]]; do
   case $1 in
     --dir)
     HOST_DIR=$(cd "$(dirname "$2")"; pwd)/$(basename "$2")
-    DOCKER_ARGS="$DOCKER_ARGS --dir $WORK_DIR"
+    ARGS="$ARGS --dir $CONT_WORK_DIR"
     shift
     shift
     ;;
     *)
-    DOCKER_ARGS="$DOCKER_ARGS $1"
+    ARGS="$ARGS $1"
     shift
     ;;
   esac
@@ -39,5 +44,15 @@ if [ ! -d ${HOST_DIR} ]; then
   exit 1
 fi
 
+if [ ! -d ${HOST_PIPELINEWISE_HOME} ]; then
+  echo "Error: directory not exists ${HOST_PIPELINEWISE_HOME}"
+  exit 1
+fi
+
 # Run the docker executable image with correct mount points
-docker run --rm -v ${HOST_DIR}:${WORK_DIR} ${IMAGE}:${VERSION} pipelinewise ${DOCKER_ARGS}
+docker run \
+  --rm \
+  -v ${HOST_CONFIG_DIR}:${CONT_CONFIG_DIR} \
+  -v ${HOST_DIR}:${CONT_WORK_DIR} \
+  ${IMAGE}:${VERSION} \
+  pipelinewise ${ARGS}
