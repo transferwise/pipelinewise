@@ -1,0 +1,65 @@
+---
+
+# ------------------------------------------------------------------------------
+# General Properties
+# ------------------------------------------------------------------------------
+id: "mariadb_db"                       # Unique identifier of the tap
+name: "Sample MariaDB Database"        # Name of the tap
+type: "tap-mysql"                      # !! THIS SHOULD NOT CHANGE !!
+owner: "somebody@foo.com"              # Data owner to contact
+
+
+# ------------------------------------------------------------------------------
+# Source (Tap) - MySQL/ MariaDB connection details
+# ------------------------------------------------------------------------------
+db_conn:
+  host: "db_mysql_source"              # MySQL/ MariaDB host
+  port: 3306                           # MySQL/ MariaDB port
+  user: "pipelinewise"                 # MySQL/ MariaDB user
+  password: "secret"                   # Plain string or vault encrypted
+  dbname: "mysql_source_db"             # MySQL/ MariaDB database name
+  #filter_dbs: "schema1,schema2"       # Optional: Scan only the required schemas
+                                       #           to improve the performance of
+                                       #           data extraction
+
+
+# ------------------------------------------------------------------------------
+# Destination (Target) - Target properties
+# Connection details should be in the relevant target YAML file
+# ------------------------------------------------------------------------------
+target: "postgres_dwh"                 # ID of the target connector where the data will be loaded
+batch_size_rows: 20000                 # Batch size for the stream to optimise load performance
+
+
+# ------------------------------------------------------------------------------
+# Source to target Schema mapping
+# ------------------------------------------------------------------------------
+schemas:
+
+  - source_schema: "mysql_source_db"   # Source schema (aka. database) in MySQL/ MariaDB with tables
+    target_schema: "mysql_grp24"       # Target schema in the destination Data Warehouse
+    #target_schema_select_permissions:  # Optional: Grant SELECT on schema and tables that created
+    #  - grp_read_only
+
+    # List of tables to replicate from Postgres to destination Data Warehouse
+    #
+    # Please check the Replication Strategies section in the documentation to understand the differences.
+    # For LOG_BASED replication method you might need to adjust the source mysql/ mariadb configuration.
+    tables:
+      - table_name: "address"
+        replication_method: "FULL_TABLE"   # One of INCREMENTAL, LOG_BASED and FULL_TABLE
+
+      - table_name: "area_code"
+        replication_method: "INCREMENTAL"
+        replication_key: "area_code_id"
+
+        # OPTIONAL: Load time transformations
+        #transformations:                    
+        #  - column: "last_name"            # Column to transform
+        #    type: "SET-NULL"               # Transformation type
+
+      # You can add as many tables as you need...
+      - table_name: "price"
+        replication_method: "LOG_BASED"     # Important! Log based must be enabled in MySQL
+      - table_name: "weight_unit"           # replication_method defaults to 'LOG_BASED'
+

@@ -1,0 +1,64 @@
+---
+
+# ------------------------------------------------------------------------------
+# General Properties
+# ------------------------------------------------------------------------------
+id: "postgres_db"                      # Unique identifier of the tap
+name: "Sample Postgres Database"       # Name of the tap
+type: "tap-postgres"                   # !! THIS SHOULD NOT CHANGE !!
+owner: "somebody@foo.com"              # Data owner to contact
+
+
+# ------------------------------------------------------------------------------
+# Source (Tap) - PostgreSQL connection details
+# ------------------------------------------------------------------------------
+db_conn:
+  host: "db_postgres_source"           # PostgreSQL host
+  port: 5432                           # PostgreSQL port
+  user: "pipelinewise"                 # PostfreSQL user
+  password: "secret"                   # Plain string or vault encrypted
+  dbname: "postgres_source_db"         # PostgreSQL database name
+  #filter_schemas: "schema1,schema2"   # Optional: Scan only the required schemas
+                                       #           to improve the performance of
+                                       #           data extraction
+
+
+# ------------------------------------------------------------------------------
+# Destination (Target) - Target properties
+# Connection details should be in the relevant target YAML file
+# ------------------------------------------------------------------------------
+target: "postgres_dwh"                 # ID of the target connector where the data will be loaded
+batch_size_rows: 20000                 # Batch size for the stream to optimise load performance
+
+
+# ------------------------------------------------------------------------------
+# Source to target Schema mapping
+# ------------------------------------------------------------------------------
+schemas:
+
+  - source_schema: "public"            # Source schema in postgres with tables
+    target_schema: "postgres_world"    # Target schema in the destination Data Warehouse
+    #target_schema_select_permissions:  # Optional: Grant SELECT on schema and tables that created
+    #  - grp_read_only
+
+    # List of tables to replicate from Postgres to destination Data Warehouse
+    #
+    # Please check the Replication Strategies section in the documentation to understand the differences.
+    # For LOG_BASED replication method you might need to adjust the source mysql/ mariadb configuration.
+    tables:
+      - table_name: "country"
+        replication_method: "FULL_TABLE"    # One of INCREMENTAL, LOG_BASED and FULL_TABLE
+
+      - table_name: "city"
+        replication_method: "INCREMENTAL"
+        replication_key: "id"
+
+        # OPTIONAL: Load time transformations
+        #transformations:                    
+        #  - column: "population"           # Column to transform
+        #    type: "SET-NULL"               # Transformation type
+
+      # You can add as many tables as you need...
+      #- table_name: "countrylanguage"
+      #  replication_method: "LOG_BASED"
+
