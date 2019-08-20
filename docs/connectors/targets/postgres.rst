@@ -4,7 +4,6 @@
 Target Postgres
 ----------------
 
-
 Postgres setup requirements
 ''''''''''''''''''''''''''''
 
@@ -29,8 +28,8 @@ Example YAML for ``target-postgres``:
     # ------------------------------------------------------------------------------
     # General Properties
     # ------------------------------------------------------------------------------
-    id: "postgres"                         # Unique identifier of the target
-    name: "Postgres"                       # Name of the target
+    id: "postgres_dwh"                     # Unique identifier of the target
+    name: "Postgres Data Warehouse"        # Name of the target
     type: "target-postgres"                # !! THIS SHOULD NOT CHANGE !!
 
 

@@ -1,0 +1,24 @@
+---
+
+# ------------------------------------------------------------------------------
+# General Properties
+# ------------------------------------------------------------------------------
+id: "s3"                               # Unique identifier of the target
+name: "S3 Target connector"            # Name of the target
+type: "target-s3-csv"                  # !! THIS SHOULD NOT CHANGE !!
+
+
+# ------------------------------------------------------------------------------
+# Target - S3 details
+# ------------------------------------------------------------------------------
+db_conn:
+  aws_access_key_id: "<ACCESS_KEY>"             # S3 access key id - Plain string or vault encrypted
+  aws_secret_access_key: "<SECRET_ACCESS_KEY"   # S3 secret access key - Plain string or vault encrypted
+  s3_bucket: "<BUCKET_NAME>"                    # S3 bucket name
+
+  # Optional keys
+  #s3_key_prefix: "pipelinewise-exports/"        # (Default: None) A static prefix before the generated S3 key names
+  #delimiter: ","                                # (Default: ',') A one-character string used to separate fields.
+  #quotechar: "\""                               # (Default: '\"') A one-character string used to quote fields containing
+                                                   special characters, such as the delimiter or quotechar, or which contain
+                                                   new-line characters.

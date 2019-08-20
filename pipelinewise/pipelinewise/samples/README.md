@@ -23,7 +23,7 @@ one `target_...yml` file:
 3. Import into pipelinewise
    
 ```
-  $ pipelinewise import_config --dir . [--secret path-to-fault-secret-file]
+  $ pipelinewise import --dir . [--secret path-to-fault-secret-file]
 ```
 
 4. Check if the configuration imported successfully:
