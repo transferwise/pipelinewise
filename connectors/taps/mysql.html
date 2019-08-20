@@ -210,12 +210,12 @@
 <ul class="simple">
 <li><p><code class="docutils literal notranslate"><span class="pre">CREATE</span> <span class="pre">USER</span></code> or <code class="docutils literal notranslate"><span class="pre">INSERT</span></code> privilege (for the mysql database) - The <code class="docutils literal notranslate"><span class="pre">CREATE</span> <span class="pre">USER</span></code> privilege is required to create a database user for PipelineWise.</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">GRANT</span> <span class="pre">OPTION</span></code> privilege in MySQL - The <code class="docutils literal notranslate"><span class="pre">GRANT</span> <span class="pre">OPTION</span></code> privilege is required to grant the necessary privileges to the PipelineWise database user.</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">SUPER</span></code> privilege in MySQL - If using <a class="reference internal" href="../../concept/replication_methods.html#log-based"><span class="std std-ref">Log Based Incremental</span></a>, the <code class="docutils literal notranslate"><span class="pre">SUPER</span></code> privilege is required to define the appropriate server settings.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">SUPER</span></code> privilege in MySQL - If using <a class="reference internal" href="../../concept/replication_methods.html#log-based"><span class="std std-ref">Log Based</span></a>, the <code class="docutils literal notranslate"><span class="pre">SUPER</span></code> privilege is required to define the appropriate server settings.</p></li>
 </ul>
 <p><strong>Step 2: Configuring database server settings</strong></p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>This step is only required if you use <a class="reference internal" href="../../concept/replication_methods.html#log-based"><span class="std std-ref">Log Based Incremental</span></a> replication method.</p>
+<p>This step is only required if you use <a class="reference internal" href="../../concept/replication_methods.html#log-based"><span class="std std-ref">Log Based</span></a> replication method.</p>
 </div>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
@@ -258,7 +258,7 @@
 <blockquote>
 <div><ul class="simple">
 <li><p><code class="docutils literal notranslate"><span class="pre">SELECT</span></code> privileges on the database and every table that you want to replicate.</p></li>
-<li><p>If using <a class="reference internal" href="../../concept/replication_methods.html#log-based"><span class="std std-ref">Log Based Incremental</span></a>, you’ll also need to grant <code class="docutils literal notranslate"><span class="pre">REPLICATION</span> <span class="pre">CLIENT</span></code> and <code class="docutils literal notranslate"><span class="pre">REPLICATION</span> <span class="pre">SLAVE</span></code> privileges.</p></li>
+<li><p>If using <a class="reference internal" href="../../concept/replication_methods.html#log-based"><span class="std std-ref">Log Based</span></a>, you’ll also need to grant <code class="docutils literal notranslate"><span class="pre">REPLICATION</span> <span class="pre">CLIENT</span></code> and <code class="docutils literal notranslate"><span class="pre">REPLICATION</span> <span class="pre">SLAVE</span></code> privileges.</p></li>
 </ul>
 </div></blockquote>
 </div>

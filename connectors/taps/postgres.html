@@ -224,20 +224,27 @@ on the database, schema and tables that you want to replicate:</p>
 <p><strong>Step 3: Configure Log-based Incremental Replication</strong></p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>This step is only required if you use <a class="reference internal" href="../../concept/replication_methods.html#log-based"><span class="std std-ref">Log Based Incremental</span></a> replication method.</p>
+<p>This step is only required if you use <a class="reference internal" href="../../concept/replication_methods.html#log-based"><span class="std std-ref">Log Based</span></a> replication method.</p>
 </div>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
-<p><a class="reference internal" href="../../concept/replication_methods.html#log-based"><span class="std std-ref">Log Based Incremental</span></a> for PostgreSQL-based databases requires:</p>
+<p><a class="reference internal" href="../../concept/replication_methods.html#log-based"><span class="std std-ref">Log Based</span></a> for PostgreSQL-based databases requires:</p>
+<ul class="simple">
+<li><p><strong>PostgreSQL databases running PostgreSQL versions 9.4.x or greater.</strong></p></li>
+<li><p><strong>To avoid a critical PostgreSQL bug, use at least one of the following minor versions</strong></p>
 <ul>
-<li><p><strong>PostgreSQL databases running PostgreSQL versions 9.4.x or greater.</strong> Earlier versions of PostgreSQL do not include logical replication functionality, which is required for Log-based Replication.</p></li>
-<li><p><strong>A connection to the master instance.</strong> Log-based replication will only work on master instances due to a feature gap in PostgreSQL 10. Based on their forums, PostgreSQL is working on adding support for using logical replication on a read replica to a future version.</p>
-<p>Until this feature is released, you can connect PipelineWise to the master instance and use Log-based Replication, or connect to a read replica and use Key-based Incremental Replication.</p>
+<li><p>PostgreSQL 11.2</p></li>
+<li><p>PostgreSQL 10.7</p></li>
+<li><p>PostgreSQL 9.6.12</p></li>
+<li><p>PostgreSQL 9.5.16</p></li>
+<li><p>PostgreSQL 9.4.21</p></li>
+</ul>
 </li>
+<li><p><strong>A connection to the master instance.</strong> Log-based replication will only work by connecting to the master instance.</p></li>
 </ul>
 </div>
 <p><strong>Step 3.1: Install the wal2json plugin</strong></p>
-<p>To use <a class="reference internal" href="../../concept/replication_methods.html#log-based"><span class="std std-ref">Log Based Incremental</span></a> for your PostgreSQL integration, you must install the <a class="reference external" href="https://github.com/eulerto/wal2json">wal2json</a> plugin. The wal2json plugin outputs JSON objects for logical decoding, which Stitch then uses to perform Log-based Replication.</p>
+<p>To use <a class="reference internal" href="../../concept/replication_methods.html#log-based"><span class="std std-ref">Log Based</span></a> for your PostgreSQL integration, you must install the <a class="reference external" href="https://github.com/eulerto/wal2json">wal2json</a> plugin. The wal2json plugin outputs JSON objects for logical decoding, which Stitch then uses to perform Log-based Replication.</p>
 <p>Steps for installing the plugin vary depending on your operating system. Instructions for each operating system type are in the wal2json’s GitHub repository:</p>
 <ul class="simple">
 <li><p><a class="reference external" href="https://github.com/eulerto/wal2json#unix-based-operating-systems">Unix-based operating systems</a></p></li>
@@ -267,16 +274,16 @@ for each database.</p>
 <li><p>Using the <code class="docutils literal notranslate"><span class="pre">wal2json</span></code> plugin, create a logical replication slot:</p></li>
 </ol>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>SELECT *
-FROM pg_create_logical_replication_slot<span class="o">(</span><span class="s1">&#39;pipelinewise_&lt;raw_database_name&gt;&#39;</span>, <span class="s1">&#39;wal2json&#39;</span><span class="o">)</span><span class="p">;</span>
+FROM pg_create_logical_replication_slot<span class="o">(</span><span class="s1">&#39;pipelinewise_&lt;database_name&gt;&#39;</span>, <span class="s1">&#39;wal2json&#39;</span><span class="o">)</span><span class="p">;</span>
 </pre></div>
 </div>
 <p>3. Log in as the PipelineWise user and verify you can read from the replication slot,
-replacing <code class="docutils literal notranslate"><span class="pre">&lt;replication_slot_name&gt;</span></code> with the name of the replication slot:</p>
+replacing <code class="docutils literal notranslate"><span class="pre">pipelinewise_&lt;database_name&gt;</span></code> with the name of the replication slot:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>SELECT COUNT<span class="o">(</span>*<span class="o">)</span>
-FROM pg_logical_slot_peek_changes<span class="o">(</span><span class="s1">&#39;&lt;replication_slot_name&gt;&#39;</span>, null, null<span class="o">)</span><span class="p">;</span>
+FROM pg_logical_slot_peek_changes<span class="o">(</span><span class="s1">&#39;pipelinewise_&lt;database_name&gt;&#39;</span>, null, null<span class="o">)</span><span class="p">;</span>
 </pre></div>
 </div>
-<p><strong>Note</strong>: <code class="docutils literal notranslate"><span class="pre">wal2json</span></code> is required to use <a class="reference internal" href="../../concept/replication_methods.html#log-based"><span class="std std-ref">Log Based Incremental</span></a> in Stitch for PostgreSQL-backed databases.</p>
+<p><strong>Note</strong>: <code class="docutils literal notranslate"><span class="pre">wal2json</span></code> is required to use <a class="reference internal" href="../../concept/replication_methods.html#log-based"><span class="std std-ref">Log Based</span></a> in Stitch for PostgreSQL-backed databases.</p>
 </div>
 <div class="section" id="configuring-what-to-replicate">
 <h2>Configuring what to replicate<a class="headerlink" href="#configuring-what-to-replicate" title="Permalink to this headline">¶</a></h2>

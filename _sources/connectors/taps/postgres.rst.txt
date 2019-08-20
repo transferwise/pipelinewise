@@ -34,11 +34,20 @@ on the database, schema and tables that you want to replicate:
 
   :ref:`log_based` for PostgreSQL-based databases requires:
 
-  * **PostgreSQL databases running PostgreSQL versions 9.4.x or greater.** Earlier versions of PostgreSQL do not include logical replication functionality, which is required for Log-based Replication.
+  * **PostgreSQL databases running PostgreSQL versions 9.4.x or greater.**
+  * **To avoid a critical PostgreSQL bug, use at least one of the following minor versions**
 
-  * **A connection to the master instance.** Log-based replication will only work on master instances due to a feature gap in PostgreSQL 10. Based on their forums, PostgreSQL is working on adding support for using logical replication on a read replica to a future version.
+    * PostgreSQL 11.2
 
-    Until this feature is released, you can connect PipelineWise to the master instance and use Log-based Replication, or connect to a read replica and use Key-based Incremental Replication.
+    * PostgreSQL 10.7
+
+    * PostgreSQL 9.6.12
+
+    * PostgreSQL 9.5.16
+
+    * PostgreSQL 9.4.21
+
+  * **A connection to the master instance.** Log-based replication will only work by connecting to the master instance.
 
 **Step 3.1: Install the wal2json plugin**
 
@@ -86,15 +95,15 @@ for each database.
 .. code-block:: bash
 
     SELECT *
-    FROM pg_create_logical_replication_slot('pipelinewise_<raw_database_name>', 'wal2json');
+    FROM pg_create_logical_replication_slot('pipelinewise_<database_name>', 'wal2json');
 
 3. Log in as the PipelineWise user and verify you can read from the replication slot,
-replacing ``<replication_slot_name>`` with the name of the replication slot:
+replacing ``pipelinewise_<database_name>`` with the name of the replication slot:
 
 .. code-block:: bash
 
     SELECT COUNT(*)
-    FROM pg_logical_slot_peek_changes('<replication_slot_name>', null, null);
+    FROM pg_logical_slot_peek_changes('pipelinewise_<database_name>', null, null);
 
 **Note**: ``wal2json`` is required to use :ref:`log_based` in Stitch for PostgreSQL-backed databases.
 

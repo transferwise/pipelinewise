@@ -232,7 +232,7 @@ project with the PipelineWise  <a class="reference internal" href="../user_guide
 <div class="section" id="customising-the-pipelines">
 <h2>Customising the Pipelines<a class="headerlink" href="#customising-the-pipelines" title="Permalink to this headline">¶</a></h2>
 <p>In this example we will replicate three tables from a MySQL database into a Snowflake Data Warehouse,
-using a mix of <a class="reference internal" href="../concept/replication_methods.html#full-table"><span class="std std-ref">Full Table</span></a>, <a class="reference internal" href="../concept/replication_methods.html#incremental"><span class="std std-ref">Key Based Incremental</span></a> and <a class="reference internal" href="../concept/replication_methods.html#log-based"><span class="std std-ref">Log Based Incremental</span></a> replication methods.
+using a mix of <a class="reference internal" href="../concept/replication_methods.html#full-table"><span class="std std-ref">Full Table</span></a>, <a class="reference internal" href="../concept/replication_methods.html#incremental"><span class="std std-ref">Key Based Incremental</span></a> and <a class="reference internal" href="../concept/replication_methods.html#log-based"><span class="std std-ref">Log Based</span></a> replication methods.
 We will need the <code class="docutils literal notranslate"><span class="pre">tap_mysql_mariadb.yml</span></code> and <code class="docutils literal notranslate"><span class="pre">target_snowflake.yml</span></code>:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ <span class="nb">cd</span> pipelinewise_samples
 $ mv tap_mysql_mariadb.yml.sample tap_my_mysql_db_one.yml
@@ -317,7 +317,7 @@ schemas:
 </div>
 <p>At this point PipelineWise will generate the required JSON files for the singer taps and
 targets into <code class="docutils literal notranslate"><span class="pre">~/.pipelinewise</span></code>. PipelineWise will use this directory internally to keep
-tracking the state files for <a class="reference internal" href="../concept/replication_methods.html#incremental"><span class="std std-ref">Key Based Incremental</span></a> and <a class="reference internal" href="../concept/replication_methods.html#log-based"><span class="std std-ref">Log Based Incremental</span></a> replications
+tracking the state files for <a class="reference internal" href="../concept/replication_methods.html#incremental"><span class="std std-ref">Key Based Incremental</span></a> and <a class="reference internal" href="../concept/replication_methods.html#log-based"><span class="std std-ref">Log Based</span></a> replications
 (aka. bookmarks) and this will be the directory where the log files will be created.
 Normally you will need to go into <code class="docutils literal notranslate"><span class="pre">~/.pipelinewise</span></code> only when you want to access the
 log files.</p>

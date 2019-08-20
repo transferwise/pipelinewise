@@ -32,15 +32,15 @@ data from data sources.
 
 .. _log_based:
 
-Log Based Incremental
-'''''''''''''''''''''
+Log Based
+'''''''''
 
-Log-based Incremental Replication is a replication method in which the we identify modifications
+Log-based Replication is a replication method in which the we identify modifications
 to records - including inserts, updates, and deletes - using a database’s binary log files.
 
 .. warning::
 
-  **Log Based Incremental** replication method is available **only for MySQL and PostgreSQL-backed** databases
+  **Log Based** replication method is available **only for MySQL and PostgreSQL-backed** databases
   that support binary log replication and requires manual intervention when table structures change.
 
 
