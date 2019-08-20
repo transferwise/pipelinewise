@@ -60,7 +60,7 @@ the path to the file with the password (the one that you created in the first st
 
 .. code-block:: bash
 
-    $ pipelinewise import_config --dir pipelinewise_samples --secret vault-password.txt
+    $ pipelinewise import --dir pipelinewise_samples --secret vault-password.txt
 
 
 ------------

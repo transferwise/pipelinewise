@@ -40,7 +40,7 @@
   <link rel="stylesheet" href="../_static/css/custom.css" type="text/css" />
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Encrypting Passwords" href="encrypting_passwords.html" />
+    <link rel="next" title="Singer.io" href="../concept/singer.html" />
     <link rel="prev" title="Creating Pipelines" href="creating_pipelines.html" /> 
 </head>
 
@@ -65,7 +65,7 @@
             
             
               <div class="version">
-                1.0.0
+                0.9.1
               </div>
             
           
@@ -94,23 +94,26 @@
 <li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="creating_pipelines.html">Creating Pipelines</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Running Pipelines</a></li>
-<li class="toctree-l1"><a class="reference internal" href="encrypting_passwords.html">Encrypting Passwords</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Concept</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../concept/singer.html">Singer.io</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../concept/replication_methods.html">Replication Methods</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concept/fastsync.html">Fast Sync</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Using PipelineWise</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/yaml_config.html">YAML configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/encrypting_passwords.html">Encrypting Passwords</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/cli.html">Command Line Interface</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/fastsync.html">Fast Sync</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/logging.html">Logging</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/scheduling.html">Scheduling</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/integration.html">Integration</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/scaling.html">Scaling</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/scheduling.html#multi-server-cluster">Multi-Server Cluster</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/metadata_columns.html">Metadata Columns</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/schema_changes.html">Schema Changes</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/transformations.html">Transformations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/logging.html">Logging</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/resync.html">Resync Tables</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/integration.html">Integration</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Connectors</span></p>
 <ul>
@@ -188,10 +191,47 @@
             
   <div class="section" id="running-pipelines">
 <span id="id1"></span><h1>Running Pipelines<a class="headerlink" href="#running-pipelines" title="Permalink to this headline">¶</a></h1>
+<p>First get a list of the available pipelines by running <code class="docutils literal notranslate"><span class="pre">pipelinewise</span> <span class="pre">status</span></code> command. If you followed the steps at
+<a class="reference internal" href="creating_pipelines.html#example-replication-mysql-to-snowflake"><span class="std std-ref">Example replication from MySQL to Snowflake</span></a> then you should see this output:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ pipelinewise status
+Tap ID        Tap Type    Target ID    Target Type       Enabled    Status    Last Sync    Last Sync Result
+------------  ----------  -----------  ----------------  ---------  --------  -----------  ------------------
+mysql_sample  tap-mysql   snowflake    target-snowflake  True       ready                  unknown
+<span class="m">1</span> pipeline<span class="o">(</span>s<span class="o">)</span>
+</pre></div>
+</div>
+<p>To run a pipeline use the <code class="docutils literal notranslate"><span class="pre">run_tap</span></code> command with <code class="docutils literal notranslate"><span class="pre">--tap</span></code> and <code class="docutils literal notranslate"><span class="pre">--target</span></code> arguments to specify which pipeline
+to run by IDs. In the above example we need to run <code class="docutils literal notranslate"><span class="pre">pipelinewise</span> <span class="pre">run_tap</span> <span class="pre">--tap</span> <span class="pre">mysql_sample</span> <span class="pre">--target</span> <span class="pre">snowflake</span></code>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ pipelinewise run_tap --tap mysql_sample --target snowflake
+
+<span class="m">2019</span>-08-19 <span class="m">16</span>:52:07 INFO: Running mysql_sample tap in snowflake target
+<span class="m">2019</span>-08-19 <span class="m">16</span>:52:08 INFO: Table<span class="o">(</span>s<span class="o">)</span> selected to sync by fastsync: <span class="o">[</span><span class="s1">&#39;table_one&#39;</span><span class="o">]</span>
+<span class="m">2019</span>-08-19 <span class="m">16</span>:52:08 INFO: Table<span class="o">(</span>s<span class="o">)</span> selected to sync by singer: <span class="o">[</span><span class="s1">&#39;table_two&#39;</span>, <span class="s1">&#39;table_three&#39;</span><span class="o">]</span>
+<span class="m">2019</span>-08-19 <span class="m">16</span>:52:08 INFO: Writing output into /app/.pipelinewise/postgres_dwh/mysql_fx/log/postgres_dwh-mysql_fx-20190819_165207.singer.log
+</pre></div>
+</div>
+<p>The pipeline should start running, it will detect automatically if initial sync or incremental load
+is required, when was the last time when it was running and will replicate every change since the last run.
+Once it’s successfully finished the data is available in the target database and PipelineWise will update
+the internal state file with the bookmark for the next run.</p>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
-<p>This section of the documentation is work in progress.</p>
+<p>If you <a class="reference internal" href="installation.html#running-from-docker"><span class="std std-ref">Running from Docker</span></a> then the full path to the log files in the output is
+maybe not correct. Everything that referring to <code class="docutils literal notranslate"><span class="pre">/app/.pipelinewise/...</span></code> in the output
+is available on your Docker host at <code class="docutils literal notranslate"><span class="pre">${HOME}/.pipelinewise</span></code> directory.</p>
+<p>Read the <a class="reference internal" href="../user_guide/logging.html#logging"><span class="std std-ref">Logging</span></a> section for furhter details about logging.</p>
 </div>
+<p>Typically you need to run the above command automatically, every midnight, every hour, every 5 minutes, etc.
+Now you can head to the <a class="reference internal" href="../user_guide/scheduling.html#scheduling"><span class="std std-ref">Scheduling</span></a> section that will give you some idea about scheduling.</p>
+<p>Alternatively you can learn more about PipelineWise how it automatically performs
+schema changes, how it does logging or load time transformations etc. in the recommeded sections below:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../user_guide/schema_changes.html#schema-changes"><span class="std std-ref">Schema Changes</span></a></p></li>
+<li><p><a class="reference internal" href="../user_guide/encrypting_passwords.html#encrypting-passwords"><span class="std std-ref">Encrypting Passwords</span></a></p></li>
+<li><p><a class="reference internal" href="../user_guide/transformations.html#transformations"><span class="std std-ref">Transformations</span></a></p></li>
+<li><p><a class="reference internal" href="../user_guide/logging.html#logging"><span class="std std-ref">Logging</span></a></p></li>
+<li><p><a class="reference internal" href="../user_guide/resync.html#resync"><span class="std std-ref">Resync Tables</span></a></p></li>
+</ul>
 </div>
 
 
@@ -202,7 +242,7 @@
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
-        <a href="encrypting_passwords.html" class="btn btn-neutral float-right" title="Encrypting Passwords" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+        <a href="../concept/singer.html" class="btn btn-neutral float-right" title="Singer.io" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
       
       
         <a href="creating_pipelines.html" class="btn btn-neutral float-left" title="Creating Pipelines" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>

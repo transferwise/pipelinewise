@@ -65,7 +65,7 @@
             
             
               <div class="version">
-                1.0.0
+                0.9.1
               </div>
             
           
@@ -93,29 +93,33 @@
 <ul class="current">
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Installation</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#getting-pipelinewise">Getting PipelineWise</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#running-from-docker">Running from Docker</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#installing-from-source">Installing from source</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#cool-what-s-next">Cool, what’s Next?</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="creating_pipelines.html">Creating Pipelines</a></li>
 <li class="toctree-l1"><a class="reference internal" href="running_pipelines.html">Running Pipelines</a></li>
-<li class="toctree-l1"><a class="reference internal" href="encrypting_passwords.html">Encrypting Passwords</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Concept</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../concept/singer.html">Singer.io</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../concept/replication_methods.html">Replication Methods</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concept/fastsync.html">Fast Sync</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Using PipelineWise</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/yaml_config.html">YAML configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/encrypting_passwords.html">Encrypting Passwords</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/cli.html">Command Line Interface</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/fastsync.html">Fast Sync</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/logging.html">Logging</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/scheduling.html">Scheduling</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/integration.html">Integration</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/scaling.html">Scaling</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/scheduling.html#multi-server-cluster">Multi-Server Cluster</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/metadata_columns.html">Metadata Columns</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/schema_changes.html">Schema Changes</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/transformations.html">Transformations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/logging.html">Logging</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/resync.html">Resync Tables</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/integration.html">Integration</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Connectors</span></p>
 <ul>
@@ -195,47 +199,88 @@
 <span id="intro-installation-guide"></span><span id="installation-guide"></span><h1>Installation<a class="headerlink" href="#installation" title="Permalink to this headline">¶</a></h1>
 <div class="section" id="getting-pipelinewise">
 <h2>Getting PipelineWise<a class="headerlink" href="#getting-pipelinewise" title="Permalink to this headline">¶</a></h2>
+<p>PipelineWise sorce code is available on GitHub at <a class="reference external" href="https://github.com/transferwise/pipelinewise">https://github.com/transferwise/pipelinewise</a>
+and can be installed in the following methods:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="#running-from-docker"><span class="std std-ref">Running from Docker</span></a>: Running a containerised docker executable image
+that is isolated from your host system.</p></li>
+<li><p><a class="reference internal" href="#building-from-source"><span class="std std-ref">Installing from source</span></a> Building from source code directly to your host system.</p></li>
+</ul>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
 <p>PipelineWise is a collection of pre-selected and customised <a class="reference internal" href="../concept/singer.html#singer"><span class="std std-ref">Singer.io</span></a> components
 with a config management and runtime framework on top of it. When installing PipelineWise
 you will also install a bunch of Singer components into a well defined location.</p>
 <p>PipelineWise installs <a class="reference external" href="https://www.singer.io/">Singer.io</a>  <a class="reference internal" href="../concept/singer.html#taps"><span class="std std-ref">Taps</span></a> and <a class="reference internal" href="../concept/singer.html#targets"><span class="std std-ref">Targets</span></a>
-components into separate and multiple separate virtual environments to avoid conflicting
-dependencies between any of the components. It is common that multiple Singer components
-use the same python library with different versions.</p>
+components into multiple virtual environments to avoid conflicting dependencies between
+any of the components. It is common that multiple Singer components use the same python
+library with different versions.</p>
 <p>This also means <strong>PipelineWise is not distributed on</strong> <a class="reference external" href="https://pypi.org//">PyPI</a> as a pyton package
-and cannot be installed by <code class="docutils literal notranslate"><span class="pre">pip</span></code>. PipelineWise <strong>must be installed from source</strong> and the built-in
-install script will create all the virtual environments at the right place in the right format
-and will take care of finding them at runtime.</p>
+and cannot be installed by <code class="docutils literal notranslate"><span class="pre">pip</span></code>. PipelineWise <strong>can run from Docker</strong> or can be
+<strong>installed from source</strong>. In both cases the build and install scripts will create all the
+virtual environments at the right place in the right format and will take care of finding them
+at runtime.</p>
 </div>
-<div class="section" id="installing-from-source">
-<span id="source"></span><h2>Installing from source<a class="headerlink" href="#installing-from-source" title="Permalink to this headline">¶</a></h2>
-<div class="admonition warning">
-<p class="admonition-title">Warning</p>
-<p><strong>PipelineWise is not publicly available as of May 2019.</strong>
-TransferWise has not yet open sourced the project to date and
-it’s therefore not available as a public GitHub repository.</p>
-<dl class="simple">
-<dt><strong>Required OS Packages</strong>:</dt><dd><ul class="simple">
-<li><p>Ubuntu: <code class="docutils literal notranslate"><span class="pre">apt-get</span> <span class="pre">install</span> <span class="pre">python3-dev</span> <span class="pre">python3-pip</span> <span class="pre">python3-venv</span> <span class="pre">libpq-dev</span> <span class="pre">libsnappy-dev</span></code></p></li>
-<li><p>Mac: <code class="docutils literal notranslate"><span class="pre">brew</span> <span class="pre">install</span> <span class="pre">python</span></code></p></li>
+<div class="admonition danger">
+<p class="admonition-title">Danger</p>
+<p><strong>PipelineWise is not publicly available as of August 2019.</strong>
+TransferWise has not yet open sourced the project to date and it’s therefore not available
+as a public GitHub repository.</p>
+<p>It will be publicly available on GitHub very soon.</p>
+</div>
+</div>
+<div class="section" id="running-from-docker">
+<span id="id1"></span><h2>Running from Docker<a class="headerlink" href="#running-from-docker" title="Permalink to this headline">¶</a></h2>
+<p>Running PipelineWise from docker is usually the easiest and the recommended method. We will
+build an executable docker images that has every required dependency and it’s isolated from
+your host system. First you need to install docker on your computer:</p>
+<ul class="simple">
+<li><p><a class="reference external" href="https://runnable.com/docker/install-docker-on-linux">Install Docker on Linux</a></p></li>
+<li><p><a class="reference external" href="https://runnable.com/docker/install-docker-on-macos">Install Docker on MacOS</a></p></li>
 </ul>
-</dd>
-</dl>
-</div>
-<p>PipelineWise is easy to run from a checkout - root permissions are not required to use
-it and there is no software to actually install. No daemons or database setup are required.</p>
-<p>To install from source, clone the PipelineWise git repository:</p>
+<p>Once Docker is installed you need to clone the PipelineWise git repository and build the
+executable docker image:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ git clone https://github.com/transferwise/pipelinewise.git
 $ <span class="nb">cd</span> ./pipelinewise
+$ docker build -t pipelinewise:latest .
 </pre></div>
 </div>
-<p>Once git has cloned the PipelineWise repository, run <code class="docutils literal notranslate"><span class="pre">install.sh</span></code> to setup the PipelineWise environment.
-PipelineWise components are running in multiple python virtual environments and each of them requires different
-dependencies. The <code class="docutils literal notranslate"><span class="pre">install.sh</span></code> creates the required virtual environments, installs python dependencies
-and makes everything ready to use.</p>
+<p>Building the image may take 5-10 minutes depending on your network connection. At the moment
+there is no official, pre-built image available to download on DockerHub. Once the image is
+ready, create an alias to the docker wrapper script so you can use the <code class="docutils literal notranslate"><span class="pre">pipelinewise</span></code>
+executable commands everywhere on your system:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ <span class="nb">alias</span> <span class="nv">pipelinewise</span><span class="o">=</span><span class="s2">&quot;</span><span class="k">$(</span>PWD<span class="k">)</span><span class="s2">/bin/pipelinewise-docker&quot;</span>
+</pre></div>
+</div>
+<p>Check if the installation was successfully by running the <code class="docutils literal notranslate"><span class="pre">pipelinewise</span> <span class="pre">status</span></code> command:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ pipelinewise status
+
+Tap ID    Tap Type      Target ID     Target Type      Enabled    Status    Last Sync    Last Sync Result
+--------  ------------  ------------  ---------------  ---------  --------  -----------  ------------------
+<span class="m">0</span> pipeline<span class="o">(</span>s<span class="o">)</span>
+</pre></div>
+</div>
+<p>From this point, you can go to the <a class="reference internal" href="creating_pipelines.html#creating-pipelines"><span class="std std-ref">Creating Pipelines</span></a> section to create pipelines and to start replicating data.</p>
+</div>
+<div class="section" id="installing-from-source">
+<span id="building-from-source"></span><h2>Installing from source<a class="headerlink" href="#installing-from-source" title="Permalink to this headline">¶</a></h2>
+<p>When building PipelineWise from source make sure that every OS dependencies are installed:</p>
+<ul class="simple">
+<li><p>Ubuntu: <code class="docutils literal notranslate"><span class="pre">apt-get</span> <span class="pre">install</span> <span class="pre">python3-dev</span> <span class="pre">python3-pip</span> <span class="pre">python3-venv</span></code></p></li>
+<li><p>MacOS: <code class="docutils literal notranslate"><span class="pre">brew</span> <span class="pre">install</span> <span class="pre">python</span></code></p></li>
+</ul>
+<p>Clone the PipelineWise git repository and run the install script that installs the
+PipelineWise CLI and every supported singer connectors into separated virtual environments:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ git clone https://github.com/transferwise/pipelinewise.git
+$ <span class="nb">cd</span> ./pipelinewise
+$ ./install.sh
+</pre></div>
+</div>
+<p>Press <code class="docutils literal notranslate"><span class="pre">Y</span></code> to accept the license agreement of the required singer components. To automate
+the installation and accept every license agreement run <code class="docutils literal notranslate"><span class="pre">./install</span> <span class="pre">--acceptlicenses</span></code>.</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ ./install.sh
 
-<span class="o">(</span>...installing usually takes a couple of minutes...<span class="o">)</span>
+<span class="o">(</span>...installation usually takes <span class="m">5</span>-10 minutes...<span class="o">)</span>
 
 --------------------------------------------------------------------------
 PipelineWise installed successfully
@@ -267,12 +312,6 @@ was successful.</p>
 <div class="section" id="cool-what-s-next">
 <h2>Cool, what’s Next?<a class="headerlink" href="#cool-what-s-next" title="Permalink to this headline">¶</a></h2>
 <p>From this point, you can go to the <a class="reference internal" href="creating_pipelines.html#creating-pipelines"><span class="std std-ref">Creating Pipelines</span></a> section to create pipelines and to start replicating data.</p>
-<p><strong>Note</strong>: If you want to update PipelineWise checkouts later, to get the latest version from GitHub, use pull-with-rebase
-so any local changes are replayed and rerun based on the install script.</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ git pull --rebase
-$ ./install.sh
-</pre></div>
-</div>
 </div>
 </div>
 

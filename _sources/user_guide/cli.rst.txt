@@ -10,13 +10,13 @@ PipelineWise's command line interface allows for a number of operation types on 
 .. code-block:: bash
 
     usage: pipelinewise [-h]
-                        {init,run_tap,discover_tap,status,test_tap_connection,clear_crontab,init_crontab,sync_tables,import_config}
+                        {init,run_tap,discover_tap,status,test_tap_connection,sync_tables,import_config}
 
 
 Positional Arguments
 --------------------
 
-:subcommand: Possible choices: init, run_tap, discover_tap, status, test_tap_connection, clear_crontab, init_crontab, sync_tables, import_config
+:subcommand: Possible choices: init, run_tap, discover_tap, status, test_tap_connection, sync_tables, import_config
 
 
 Sub-commands:
@@ -33,7 +33,7 @@ configuration for every supported tap and target connects.
 Positional Arguments
 ''''''''''''''''''''
 
-:--dir: relative path to the project directory
+:--name: name of the project
 
 
 
@@ -99,10 +99,10 @@ sync and resets the table bookmarks to their new location.
 :--tables: Optional: Comma separated list of tables to sync from the data source.
 
 
-.. _cli_import_config:
+.. _cli_import:
 
-import_config
-"""""""""""""
+import
+""""""
 
 Import a project directory into PipelineWise. It will create every JSON file required for
 the tap and target connectors into ``~/.pipelinewise``.

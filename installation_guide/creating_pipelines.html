@@ -65,7 +65,7 @@
             
             
               <div class="version">
-                1.0.0
+                0.9.1
               </div>
             
           
@@ -94,28 +94,31 @@
 <li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Creating Pipelines</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#generating-sample-pipelines">Generating Sample Pipelines</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#customising-the-pipelines">Customising the Pipelines</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#example-replication-from-mysql-to-snowflake">Example replication from MySQL to Snowflake</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#activating-the-pipelines-from-the-yaml-files">Activating the Pipelines from the YAML files</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="running_pipelines.html">Running Pipelines</a></li>
-<li class="toctree-l1"><a class="reference internal" href="encrypting_passwords.html">Encrypting Passwords</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Concept</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../concept/singer.html">Singer.io</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../concept/replication_methods.html">Replication Methods</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concept/fastsync.html">Fast Sync</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Using PipelineWise</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/yaml_config.html">YAML configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/encrypting_passwords.html">Encrypting Passwords</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/cli.html">Command Line Interface</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/fastsync.html">Fast Sync</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/logging.html">Logging</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/scheduling.html">Scheduling</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/integration.html">Integration</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/scaling.html">Scaling</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/scheduling.html#multi-server-cluster">Multi-Server Cluster</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/metadata_columns.html">Metadata Columns</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/schema_changes.html">Schema Changes</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/transformations.html">Transformations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/logging.html">Logging</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/resync.html">Resync Tables</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/integration.html">Integration</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Connectors</span></p>
 <ul>
@@ -210,27 +213,38 @@ whenever it’s needed.</p>
 of the supported connectors, which you can then adjust for your own purposes.</p>
 <p>Once you completed the <a class="reference internal" href="installation.html#installation-guide"><span class="std std-ref">Installation</span></a> section you should be able to create a new
 project with the PipelineWise  <a class="reference internal" href="../user_guide/cli.html#cli-init"><span class="std std-ref">init</span></a> command:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ pipelinewise init --dir pipelinewise_samples
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ pipelinewise init --name pipelinewise_samples
 </pre></div>
 </div>
 <p>This will create a <code class="docutils literal notranslate"><span class="pre">pipelinewise_samples</span></code> directory with samples for each supported component:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>└── pipelinewise_samples
     ├── README.md
+    ├── tap_jira.yml.sample
+    ├── tap_kafka.yml.sample
     ├── tap_mysql_mariadb.yml.sample
     ├── tap_postgres.yml.sample
     ├── tap_s3_csv.yml.sample
-    ├── tap_kafka.yml.sample
-    ├── tap_snowflake.yml.sample
     ├── tap_salesforce.yml.sample
+    ├── tap_snowflake.yml.sample
     ├── tap_zendesk.yml.sample
-    ├── target_snowflake.yml.sample
     ├── target_postgres.yml.sample
-    └── target_s3_csv.yml.sample
+    ├── target_redshift.yml.sample
+    ├── target_s3_csv.yml.sample
+    └── target_snowflake.yml.sample
 </pre></div>
 </div>
+<p>To create a new pipeline you need to enable at least one tap and target by renaming the
+<code class="docutils literal notranslate"><span class="pre">tap_....yml.sample</span></code> and one <code class="docutils literal notranslate"><span class="pre">target_...yml.sample</span></code> file by removing the <code class="docutils literal notranslate"><span class="pre">.sample</span></code>
+postfixes.</p>
+<p>Once you renamed the files that you need, edit the YAML files with your favourite text
+editor. Follow the instructions in the files to set database credentials, connection
+details, select tables to replicate, define source to target schema mapping or add load
+time transformations. Check the <a class="reference internal" href="#example-replication-mysql-to-snowflake"><span class="std std-ref">Example replication from MySQL to Snowflake</span></a> section
+for a real life example.</p>
+<p>Once you configured the YAML files you can go to <a class="reference internal" href="#import-project-from-yaml"><span class="std std-ref">Activating the Pipelines from the YAML files</span></a> section.</p>
 </div>
-<div class="section" id="customising-the-pipelines">
-<h2>Customising the Pipelines<a class="headerlink" href="#customising-the-pipelines" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="example-replication-from-mysql-to-snowflake">
+<span id="example-replication-mysql-to-snowflake"></span><h2>Example replication from MySQL to Snowflake<a class="headerlink" href="#example-replication-from-mysql-to-snowflake" title="Permalink to this headline">¶</a></h2>
 <p>In this example we will replicate three tables from a MySQL database into a Snowflake Data Warehouse,
 using a mix of <a class="reference internal" href="../concept/replication_methods.html#full-table"><span class="std std-ref">Full Table</span></a>, <a class="reference internal" href="../concept/replication_methods.html#incremental"><span class="std std-ref">Key Based Incremental</span></a> and <a class="reference internal" href="../concept/replication_methods.html#log-based"><span class="std std-ref">Log Based</span></a> replication methods.
 We will need the <code class="docutils literal notranslate"><span class="pre">tap_mysql_mariadb.yml</span></code> and <code class="docutils literal notranslate"><span class="pre">target_snowflake.yml</span></code>:</p>
@@ -248,10 +262,10 @@ type: <span class="s2">&quot;target-snowflake&quot;</span>
 db_conn:
   account: <span class="s2">&quot;rtxxxxxx.eu-central-1&quot;</span>
   dbname: <span class="s2">&quot;analytics_db_test&quot;</span>
-  user: <span class="s2">&quot;circleci&quot;</span>
+  user: <span class="s2">&quot;snoflake_user&quot;</span>
   password: <span class="s2">&quot;PASSWORD&quot;</span>                                   <span class="c1"># Plain string or Vault Encrypted password</span>
   warehouse: <span class="s2">&quot;LOAD_WH&quot;</span>
-  s3_bucket: <span class="s2">&quot;tw-staging-analyticsdb-etl&quot;</span>
+  s3_bucket: <span class="s2">&quot;pipelinewise-bucket&quot;</span>
   s3_key_prefix: <span class="s2">&quot;snowflake-imports-test/&quot;</span>
   aws_access_key_id: <span class="s2">&quot;ACCESS_KEY_ID&quot;</span>                     <span class="c1"># Plain string or Vault Encrypted password</span>
   <span class="c1"># stage and file_format are pre-created objects in Snowflake that requires to load and</span>
@@ -270,7 +284,7 @@ db_conn:
 <p class="admonition-title">Note</p>
 <p><strong>PipelineWise can encrypt sensitive data</strong> in the YAML files (like database password or other credentials)
 making them safe to distribute or place in source control. For further details, please check the
-<a class="reference internal" href="encrypting_passwords.html#encrypting-passwords"><span class="std std-ref">Encrypting Passwords</span></a> section.</p>
+<a class="reference internal" href="../user_guide/encrypting_passwords.html#encrypting-passwords"><span class="std std-ref">Encrypting Passwords</span></a> section.</p>
 </div>
 <ol class="arabic simple" start="2">
 <li><p>Edit <code class="docutils literal notranslate"><span class="pre">tap_mysql_mariadb.yml</span></code>:</p></li>
@@ -286,7 +300,7 @@ sync_period: <span class="s2">&quot;*/15 * * * *&quot;</span>
 db_conn:
   host: <span class="s2">&quot;localhost&quot;</span>
   port: <span class="m">10602</span>
-  user: <span class="s2">&quot;pgninja_replica&quot;</span>
+  user: <span class="s2">&quot;my_user&quot;</span>
   password: <span class="s2">&quot;&lt;PASSWORD&gt;&quot;</span>                  <span class="c1"># Plain string or Vault Encrypted password</span>
 
 target: <span class="s2">&quot;snowflake_test&quot;</span>                  <span class="c1"># Target ID, should match the id from target_snowflake.yml</span>
@@ -310,12 +324,25 @@ schemas:
 </div>
 </div>
 <div class="section" id="activating-the-pipelines-from-the-yaml-files">
-<h2>Activating the Pipelines from the YAML files<a class="headerlink" href="#activating-the-pipelines-from-the-yaml-files" title="Permalink to this headline">¶</a></h2>
-<p>When you are happy with the configuration you need to import it with the <a class="reference internal" href="../user_guide/cli.html#cli-import-config"><span class="std std-ref">import_config</span></a> command:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ pipelinewise import_config --dir pipelinewise_samples
+<span id="import-project-from-yaml"></span><h2>Activating the Pipelines from the YAML files<a class="headerlink" href="#activating-the-pipelines-from-the-yaml-files" title="Permalink to this headline">¶</a></h2>
+<p>When you are happy with the configuration you need to import it with the <a class="reference internal" href="../user_guide/cli.html#cli-import"><span class="std std-ref">import</span></a> command:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ pipelinewise import --dir pipelinewise_samples
+
+        ... detailed messages about import and discovery...
+
+        -------------------------------------------------------
+        IMPORTING YAML CONFIGS FINISHED
+        -------------------------------------------------------
+            Total targets to import        : <span class="m">1</span>
+            Total taps to import           : <span class="m">1</span>
+            Taps imported successfully     : <span class="m">1</span>
+            Taps failed to import          : <span class="o">[]</span>
+            Runtime                        : <span class="m">0</span>:00:01.835720
+        -------------------------------------------------------
 </pre></div>
 </div>
-<p>At this point PipelineWise will generate the required JSON files for the singer taps and
+<p>At this point PipelineWise will connect to and analyse every source database, discovering
+tables, columns and data types and will generate the required JSON files for the singer taps and
 targets into <code class="docutils literal notranslate"><span class="pre">~/.pipelinewise</span></code>. PipelineWise will use this directory internally to keep
 tracking the state files for <a class="reference internal" href="../concept/replication_methods.html#incremental"><span class="std std-ref">Key Based Incremental</span></a> and <a class="reference internal" href="../concept/replication_methods.html#log-based"><span class="std std-ref">Log Based</span></a> replications
 (aka. bookmarks) and this will be the directory where the log files will be created.
@@ -331,7 +358,7 @@ mysql_sample  tap-mysql   snowflake    target-snowflake  True       ready       
 </div>
 <p>Congratulations! At this point you have successfully çreated your first pipeline in PipelineWise and it’s now
 ready to run. You may want you can create a new git repository and push the <code class="docutils literal notranslate"><span class="pre">pipelinewise_samples</span></code>
-directory into it to keep everything under version control.</p>
+directory to keep everything under version control.</p>
 <p>Now you can head to the <a class="reference internal" href="running_pipelines.html#running-pipelines"><span class="std std-ref">Running Pipelines</span></a> section to run the pipelines and to start replicating data.</p>
 </div>
 </div>

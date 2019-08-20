@@ -64,7 +64,7 @@
             
             
               <div class="version">
-                1.0.0
+                0.9.1
               </div>
             
           
@@ -93,23 +93,26 @@
 <li class="toctree-l1"><a class="reference internal" href="installation_guide/installation.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="installation_guide/creating_pipelines.html">Creating Pipelines</a></li>
 <li class="toctree-l1"><a class="reference internal" href="installation_guide/running_pipelines.html">Running Pipelines</a></li>
-<li class="toctree-l1"><a class="reference internal" href="installation_guide/encrypting_passwords.html">Encrypting Passwords</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Concept</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="concept/singer.html">Singer.io</a></li>
 <li class="toctree-l1"><a class="reference internal" href="concept/replication_methods.html">Replication Methods</a></li>
+<li class="toctree-l1"><a class="reference internal" href="concept/fastsync.html">Fast Sync</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Using PipelineWise</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="user_guide/yaml_config.html">YAML configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/encrypting_passwords.html">Encrypting Passwords</a></li>
 <li class="toctree-l1"><a class="reference internal" href="user_guide/cli.html">Command Line Interface</a></li>
-<li class="toctree-l1"><a class="reference internal" href="user_guide/fastsync.html">Fast Sync</a></li>
-<li class="toctree-l1"><a class="reference internal" href="user_guide/logging.html">Logging</a></li>
 <li class="toctree-l1"><a class="reference internal" href="user_guide/scheduling.html">Scheduling</a></li>
-<li class="toctree-l1"><a class="reference internal" href="user_guide/integration.html">Integration</a></li>
-<li class="toctree-l1"><a class="reference internal" href="user_guide/scaling.html">Scaling</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/scheduling.html#multi-server-cluster">Multi-Server Cluster</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/metadata_columns.html">Metadata Columns</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/schema_changes.html">Schema Changes</a></li>
 <li class="toctree-l1"><a class="reference internal" href="user_guide/transformations.html">Transformations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/logging.html">Logging</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/resync.html">Resync Tables</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/integration.html">Integration</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Connectors</span></p>
 <ul>
@@ -302,18 +305,18 @@ environment without the extra hassle.</p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="installation_guide/installation.html">Installation</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="installation_guide/installation.html#getting-pipelinewise">Getting PipelineWise</a></li>
+<li class="toctree-l2"><a class="reference internal" href="installation_guide/installation.html#running-from-docker">Running from Docker</a></li>
 <li class="toctree-l2"><a class="reference internal" href="installation_guide/installation.html#installing-from-source">Installing from source</a></li>
 <li class="toctree-l2"><a class="reference internal" href="installation_guide/installation.html#cool-what-s-next">Cool, what’s Next?</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="installation_guide/creating_pipelines.html">Creating Pipelines</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="installation_guide/creating_pipelines.html#generating-sample-pipelines">Generating Sample Pipelines</a></li>
-<li class="toctree-l2"><a class="reference internal" href="installation_guide/creating_pipelines.html#customising-the-pipelines">Customising the Pipelines</a></li>
+<li class="toctree-l2"><a class="reference internal" href="installation_guide/creating_pipelines.html#example-replication-from-mysql-to-snowflake">Example replication from MySQL to Snowflake</a></li>
 <li class="toctree-l2"><a class="reference internal" href="installation_guide/creating_pipelines.html#activating-the-pipelines-from-the-yaml-files">Activating the Pipelines from the YAML files</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="installation_guide/running_pipelines.html">Running Pipelines</a></li>
-<li class="toctree-l1"><a class="reference internal" href="installation_guide/encrypting_passwords.html">Encrypting Passwords</a></li>
 </ul>
 </div>
 <div class="toctree-wrapper compound">
@@ -330,28 +333,35 @@ environment without the extra hassle.</p>
 <li class="toctree-l2"><a class="reference internal" href="concept/replication_methods.html#fast-sync">Fast Sync</a></li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="concept/fastsync.html">Fast Sync</a></li>
 </ul>
 </div>
 <div class="toctree-wrapper compound">
 <p class="caption"><span class="caption-text">Using PipelineWise</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="user_guide/yaml_config.html">YAML configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/encrypting_passwords.html">Encrypting Passwords</a></li>
 <li class="toctree-l1"><a class="reference internal" href="user_guide/cli.html">Command Line Interface</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="user_guide/cli.html#positional-arguments">Positional Arguments</a></li>
 <li class="toctree-l2"><a class="reference internal" href="user_guide/cli.html#sub-commands">Sub-commands:</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="user_guide/fastsync.html">Fast Sync</a></li>
-<li class="toctree-l1"><a class="reference internal" href="user_guide/logging.html">Logging</a></li>
 <li class="toctree-l1"><a class="reference internal" href="user_guide/scheduling.html">Scheduling</a></li>
-<li class="toctree-l1"><a class="reference internal" href="user_guide/integration.html">Integration</a></li>
-<li class="toctree-l1"><a class="reference internal" href="user_guide/scaling.html">Scaling</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/scheduling.html#multi-server-cluster">Multi-Server Cluster</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/metadata_columns.html">Metadata Columns</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/schema_changes.html">Schema Changes</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="user_guide/schema_changes.html#versioning-columns">Versioning columns</a></li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="user_guide/transformations.html">Transformations</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="user_guide/transformations.html#transformation-methods">Transformation Methods</a></li>
 <li class="toctree-l2"><a class="reference internal" href="user_guide/transformations.html#conditional-transformations">Conditional Transformations</a></li>
 <li class="toctree-l2"><a class="reference internal" href="user_guide/transformations.html#example">Example</a></li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/logging.html">Logging</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/resync.html">Resync Tables</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/integration.html">Integration</a></li>
 </ul>
 </div>
 <div class="toctree-wrapper compound">
@@ -366,11 +376,13 @@ environment without the extra hassle.</p>
 <li class="toctree-l2"><a class="reference internal" href="connectors/taps/snowflake.html">Tap Snowflake</a></li>
 <li class="toctree-l2"><a class="reference internal" href="connectors/taps/salesforce.html">Tap Salesforce</a></li>
 <li class="toctree-l2"><a class="reference internal" href="connectors/taps/zendesk.html">Tap Zendesk</a></li>
+<li class="toctree-l2"><a class="reference internal" href="connectors/taps/jira.html">Tap Jira</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="connectors/targets.html">Targets (Destinations)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="connectors/targets.html#configuring-the-targets">Configuring the targets</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="connectors/targets/snowflake.html">Target Snowflake</a></li>
+<li class="toctree-l2"><a class="reference internal" href="connectors/targets/redshift.html">Target Redshift</a></li>
 <li class="toctree-l2"><a class="reference internal" href="connectors/targets/postgres.html">Target Postgres</a></li>
 <li class="toctree-l2"><a class="reference internal" href="connectors/targets/s3_csv.html">Target S3 CSV</a></li>
 </ul>

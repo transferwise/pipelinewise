@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Scheduling &mdash; PipelineWise  documentation</title>
+  <title>Resync Tables &mdash; PipelineWise  documentation</title>
   
 
   
@@ -17,7 +17,7 @@
   
   
   
-    <link rel="canonical" href="https://docs.ansible.com/ansible/latest/user_guide/scheduling.html"/>
+    <link rel="canonical" href="https://docs.ansible.com/ansible/latest/user_guide/resync.html"/>
   
 
   
@@ -40,8 +40,8 @@
   <link rel="stylesheet" href="../_static/css/custom.css" type="text/css" />
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Metadata Columns" href="metadata_columns.html" />
-    <link rel="prev" title="Command Line Interface" href="cli.html" /> 
+    <link rel="next" title="Integration" href="integration.html" />
+    <link rel="prev" title="Logging" href="logging.html" /> 
 </head>
 
 <body class="wy-body-for-nav">
@@ -106,13 +106,13 @@
 <li class="toctree-l1"><a class="reference internal" href="yaml_config.html">YAML configuration</a></li>
 <li class="toctree-l1"><a class="reference internal" href="encrypting_passwords.html">Encrypting Passwords</a></li>
 <li class="toctree-l1"><a class="reference internal" href="cli.html">Command Line Interface</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Scheduling</a></li>
-<li class="toctree-l1"><a class="reference internal" href="#multi-server-cluster">Multi-Server Cluster</a></li>
+<li class="toctree-l1"><a class="reference internal" href="scheduling.html">Scheduling</a></li>
+<li class="toctree-l1"><a class="reference internal" href="scheduling.html#multi-server-cluster">Multi-Server Cluster</a></li>
 <li class="toctree-l1"><a class="reference internal" href="metadata_columns.html">Metadata Columns</a></li>
 <li class="toctree-l1"><a class="reference internal" href="schema_changes.html">Schema Changes</a></li>
 <li class="toctree-l1"><a class="reference internal" href="transformations.html">Transformations</a></li>
 <li class="toctree-l1"><a class="reference internal" href="logging.html">Logging</a></li>
-<li class="toctree-l1"><a class="reference internal" href="resync.html">Resync Tables</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Resync Tables</a></li>
 <li class="toctree-l1"><a class="reference internal" href="integration.html">Integration</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Connectors</span></p>
@@ -170,13 +170,13 @@
     
       <li><a href="../index.html">Docs</a> &raquo;</li>
         
-      <li>Scheduling</li>
+      <li>Resync Tables</li>
     
     
       <li class="wy-breadcrumbs-aside">
         
             
-            <a href="../_sources/user_guide/scheduling.rst.txt" rel="nofollow"> View page source</a>
+            <a href="../_sources/user_guide/resync.rst.txt" rel="nofollow"> View page source</a>
           
         
       </li>
@@ -189,64 +189,28 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
             
-  <div class="section" id="scheduling">
-<span id="id1"></span><h1>Scheduling<a class="headerlink" href="#scheduling" title="Permalink to this headline">¶</a></h1>
-<p>Scheduling and running PipelineWise tasks automatically is not part of the PipelineWise
-package but every task scheduler that can run Unix CLI commands can trigger PipelineWise
-jobs to run. Both Single Server and installations are achievable.</p>
-<p>Let’s say you have 5 microservice databases that you want to replicate to Amazon Redshift
-and <code class="docutils literal notranslate"><span class="pre">pipelinewise</span> <span class="pre">status</span></code> output looks like this:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ pipelinewise status
-
-Tap ID        Tap Type     Target ID   Target Type       Enabled    Status    Last Sync    Last Sync Result
-------------  ----------   ----------  ----------------  ---------  --------  -----------  ------------------
-microserv_1   tap-mysql    redshift    target-redshift   True       ready                  unknown
-microserv_2   tap-mysql    redshift    target-redshift   True       ready                  unknown
-microserv_3   tap-postgres redshift    target-redshift   True       ready                  unknown
-microserv_4   tap-postgres redshift    target-redshift   True       ready                  unknown
-microserv_5   tap-postgres redshift    target-redshift   True       ready                  unknown
-<span class="m">5</span> pipeline<span class="o">(</span>s<span class="o">)</span>
+  <div class="section" id="resync-tables">
+<span id="resync"></span><h1>Resync Tables<a class="headerlink" href="#resync-tables" title="Permalink to this headline">¶</a></h1>
+<p>Sometimes you will need to resync tables in ad-hoc bases. For example when
+binlog position deleted in MySQL or when a database migrated to another server
+and previous CDC bookmarks are not transferrable, etc.</p>
+<p>If you want to resync every table from a specific tap then use the <code class="docutils literal notranslate"><span class="pre">sync_tables</span></code>
+command and specify the tap and target ids:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ pipelinewise sync_tables --target &lt;target_id&gt; --tap &lt;tap_id&gt;
 </pre></div>
 </div>
-<p>Since every pipeline runs, logs and manages state files independently then you need to run
-5 commands independently. For example if using
-<a class="reference external" href="https://en.wikipedia.org/wiki/Cron/">Unix Cron</a> you can create the following crontab:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>*/5 *   * * * pipelinewise run_tap --tap source_1 --target my_data_warehouse <span class="c1"># Sync every 5 minutes</span>
-  <span class="m">0</span> *   * * * pipelinewise run_tap --tap source_2 --target my_data_warehouse <span class="c1"># Sync ever hour</span>
-  <span class="m">0</span> */3 * * * pipelinewise run_tap --tap source_3 --target my_data_warehouse <span class="c1"># Sync every three hours</span>
-  <span class="m">0</span> <span class="m">0</span>   * * * pipelinewise run_tap --tap source_4 --target my_data_warehouse <span class="c1"># Sync every midnight</span>
-  <span class="m">0</span> <span class="m">0</span>   * * <span class="m">6</span> pipelinewise run_tap --tap source_5 --target my_data_warehouse <span class="c1"># Sync every Saturday</span>
+<p>PipelineWise will update the bookmark(s) in the internal state files automatically
+and at the next normal run it will load only the changes since the resync.</p>
+<p>If you want to resync only a list of specific tables then
+add the <code class="docutils literal notranslate"><span class="pre">--tables</span></code> argument:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ pipelinewise sync_tables --target &lt;target_id&gt; --tap &lt;tap_id&gt; --tables schema.table_one,schema.table_two
 </pre></div>
 </div>
-<p>PipelineWise is tested and can run with at least the following
-schedulers:</p>
-<ul class="simple">
-<li><p><a class="reference external" href="https://en.wikipedia.org/wiki/Cron/">Unix Cron</a> Unix Cron - This is the simplest option
-for a single server installation.</p></li>
-<li><p><a class="reference external" href="https://github.com/jhuckaby/Cronicle/">Cronicle</a> - Cronicle is a reasonable good and
-relatively simple tool to schedule PipelineWise jobs in both Single Server and Multi-Server
-cluster installations.</p></li>
-<li><p><a class="reference external" href="https://airflow.apache.org/">Apache Airflow</a> - Airflow is a robust and mature tool to
-schedule and monitor workflows.</p></li>
-</ul>
-</div>
-<div class="section" id="multi-server-cluster">
-<span id="id3"></span><h1>Multi-Server Cluster<a class="headerlink" href="#multi-server-cluster" title="Permalink to this headline">¶</a></h1>
-<p>Running Multi-Server Cluster requires a <a class="reference external" href="https://en.wikipedia.org/wiki/Network_File_System">Network File System</a>
-that is accessible from every host in the PipelineWise cluster.
-(<a class="reference external" href="https://aws.amazon.com/efs/">Amazon EFS</a>, <a class="reference external" href="https://cloud.google.com/filestore/">Google FileStore</a> or similar)</p>
-<p>Network File System is required because PipelineWise keeps runtime configuration files in
-a common place on the host machine at <code class="docutils literal notranslate"><span class="pre">${HOME}/.pipelinewise</span></code> directory. If running
-PipelineWise commands on multiple nodes to operate on the same project then
-every node have to read/write into the same directory doesn’t matter where the nodes are
-located. This is typically done by mounting <code class="docutils literal notranslate"><span class="pre">${HOME}/.pipelinewise</span></code> on every node to
-a shared directory on NFS/EFS.</p>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
-<p>There are plans to store <code class="docutils literal notranslate"><span class="pre">${HOME}/.pipelinewise</span></code> runtime configuration files
-optionally on different data stores, like S3, RDBMs or on document stores like
-Couchbase or MongoDB. Once it is implemented, Multi-Server Cluster installation
-will not require NFS/EFS.</p>
+<p>The value of the optional <code class="docutils literal notranslate"><span class="pre">--tables</span></code> argument needs to be a comma separated
+list of table names using the <code class="docutils literal notranslate"><span class="pre">&lt;schema_name&gt;.&lt;table_name&gt;</span></code> format. Schema and
+table names have to be the names in the source database.</p>
 </div>
 </div>
 
@@ -258,10 +222,10 @@ will not require NFS/EFS.</p>
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
-        <a href="metadata_columns.html" class="btn btn-neutral float-right" title="Metadata Columns" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+        <a href="integration.html" class="btn btn-neutral float-right" title="Integration" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
       
       
-        <a href="cli.html" class="btn btn-neutral float-left" title="Command Line Interface" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+        <a href="logging.html" class="btn btn-neutral float-left" title="Logging" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
       
     </div>
   

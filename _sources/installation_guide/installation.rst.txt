@@ -8,56 +8,113 @@ Installation
 Getting PipelineWise
 --------------------
 
-PipelineWise is a collection of pre-selected and customised :ref:`singer` components
-with a config management and runtime framework on top of it. When installing PipelineWise
-you will also install a bunch of Singer components into a well defined location.
+PipelineWise sorce code is available on GitHub at https://github.com/transferwise/pipelinewise
+and can be installed in the following methods:
 
-PipelineWise installs `Singer.io <https://www.singer.io/>`_  :ref:`taps` and :ref:`targets`
-components into separate and multiple separate virtual environments to avoid conflicting
-dependencies between any of the components. It is common that multiple Singer components
-use the same python library with different versions.
+* :ref:`running_from_docker`: Running a containerised docker executable image
+  that is isolated from your host system.
 
-This also means **PipelineWise is not distributed on** `PyPI <https://pypi.org//>`_ as a pyton package
-and cannot be installed by ``pip``. PipelineWise **must be installed from source** and the built-in
-install script will create all the virtual environments at the right place in the right format
-and will take care of finding them at runtime.
-
-.. _source:
-
-Installing from source
-----------------------
+* :ref:`building_from_source` Building from source code directly to your host system.
 
 .. warning::
 
-  **PipelineWise is not publicly available as of May 2019.**
-  TransferWise has not yet open sourced the project to date and
-  it's therefore not available as a public GitHub repository.
+    PipelineWise is a collection of pre-selected and customised :ref:`singer` components
+    with a config management and runtime framework on top of it. When installing PipelineWise
+    you will also install a bunch of Singer components into a well defined location.
 
-  **Required OS Packages**:
-    * Ubuntu: ``apt-get install python3-dev python3-pip python3-venv libpq-dev libsnappy-dev``
+    PipelineWise installs `Singer.io <https://www.singer.io/>`_  :ref:`taps` and :ref:`targets`
+    components into multiple virtual environments to avoid conflicting dependencies between
+    any of the components. It is common that multiple Singer components use the same python
+    library with different versions.
 
-    * Mac: ``brew install python``
+    This also means **PipelineWise is not distributed on** `PyPI <https://pypi.org//>`_ as a pyton package
+    and cannot be installed by ``pip``. PipelineWise **can run from Docker** or can be
+    **installed from source**. In both cases the build and install scripts will create all the
+    virtual environments at the right place in the right format and will take care of finding them
+    at runtime.
 
-PipelineWise is easy to run from a checkout - root permissions are not required to use
-it and there is no software to actually install. No daemons or database setup are required.
+.. danger::
 
-To install from source, clone the PipelineWise git repository:
+  **PipelineWise is not publicly available as of August 2019.**
+  TransferWise has not yet open sourced the project to date and it's therefore not available
+  as a public GitHub repository.
+
+  It will be publicly available on GitHub very soon.
+
+.. _running_from_docker:
+
+Running from Docker
+-------------------
+
+Running PipelineWise from docker is usually the easiest and the recommended method. We will
+build an executable docker images that has every required dependency and it's isolated from
+your host system. First you need to install docker on your computer:
+
+* `Install Docker on Linux <https://runnable.com/docker/install-docker-on-linux>`_
+
+* `Install Docker on MacOS <https://runnable.com/docker/install-docker-on-macos>`_
+
+Once Docker is installed you need to clone the PipelineWise git repository and build the
+executable docker image:
 
 .. code-block:: bash
 
     $ git clone https://github.com/transferwise/pipelinewise.git
     $ cd ./pipelinewise
+    $ docker build -t pipelinewise:latest .
 
-Once git has cloned the PipelineWise repository, run ``install.sh`` to setup the PipelineWise environment.
-PipelineWise components are running in multiple python virtual environments and each of them requires different
-dependencies. The ``install.sh`` creates the required virtual environments, installs python dependencies
-and makes everything ready to use.
+
+Building the image may take 5-10 minutes depending on your network connection. At the moment
+there is no official, pre-built image available to download on DockerHub. Once the image is
+ready, create an alias to the docker wrapper script so you can use the ``pipelinewise``
+executable commands everywhere on your system:
+
+.. code-block:: bash
+
+    $ alias pipelinewise="$(PWD)/bin/pipelinewise-docker"
+
+
+Check if the installation was successfully by running the ``pipelinewise status`` command:
+
+.. code-block:: bash
+
+    $ pipelinewise status
+
+    Tap ID    Tap Type      Target ID     Target Type      Enabled    Status    Last Sync    Last Sync Result
+    --------  ------------  ------------  ---------------  ---------  --------  -----------  ------------------
+    0 pipeline(s)
+
+From this point, you can go to the :ref:`creating_pipelines` section to create pipelines and to start replicating data.
+
+
+.. _building_from_source:
+
+Installing from source
+----------------------
+
+When building PipelineWise from source make sure that every OS dependencies are installed:
+
+* Ubuntu: ``apt-get install python3-dev python3-pip python3-venv``
+
+* MacOS: ``brew install python``
+
+Clone the PipelineWise git repository and run the install script that installs the
+PipelineWise CLI and every supported singer connectors into separated virtual environments:
+
+.. code-block:: bash
+
+    $ git clone https://github.com/transferwise/pipelinewise.git
+    $ cd ./pipelinewise
+    $ ./install.sh
+
+Press ``Y`` to accept the license agreement of the required singer components. To automate
+the installation and accept every license agreement run ``./install --acceptlicenses``.
 
 .. code-block:: bash
 
     $ ./install.sh
 
-    (...installing usually takes a couple of minutes...)
+    (...installation usually takes 5-10 minutes...)
 
     --------------------------------------------------------------------------
     PipelineWise installed successfully
@@ -91,11 +148,3 @@ Cool, what's Next?
 ------------------
 
 From this point, you can go to the :ref:`creating_pipelines` section to create pipelines and to start replicating data.
-
-**Note**: If you want to update PipelineWise checkouts later, to get the latest version from GitHub, use pull-with-rebase
-so any local changes are replayed and rerun based on the install script.
-
-.. code-block:: bash
-
-    $ git pull --rebase
-    $ ./install.sh

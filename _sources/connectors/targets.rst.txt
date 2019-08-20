@@ -22,6 +22,15 @@ PipelineWise can replicate data from every supported :ref:`taps_list` into the f
 
         .. container:: img-hover-zoom
 
+          .. image:: ../img/redshift-logo.png
+             :target: targets/redshift.html
+
+        :ref:`target-redshift`
+
+    .. container:: tile
+
+        .. container:: img-hover-zoom
+
           .. image:: ../img/postgres-logo.png
              :target: targets/postgres.html
 
@@ -43,6 +52,7 @@ Configuring the targets
    :maxdepth: 2
 
    targets/snowflake
+   targets/redshift
    targets/postgres
    targets/s3_csv
 

@@ -41,7 +41,7 @@
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="Tap MySQL" href="taps/mysql.html" />
-    <link rel="prev" title="Transformations" href="../user_guide/transformations.html" /> 
+    <link rel="prev" title="Integration" href="../user_guide/integration.html" /> 
 </head>
 
 <body class="wy-body-for-nav">
@@ -65,7 +65,7 @@
             
             
               <div class="version">
-                1.0.0
+                0.9.1
               </div>
             
           
@@ -94,23 +94,26 @@
 <li class="toctree-l1"><a class="reference internal" href="../installation_guide/installation.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../installation_guide/creating_pipelines.html">Creating Pipelines</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../installation_guide/running_pipelines.html">Running Pipelines</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../installation_guide/encrypting_passwords.html">Encrypting Passwords</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Concept</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../concept/singer.html">Singer.io</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../concept/replication_methods.html">Replication Methods</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concept/fastsync.html">Fast Sync</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Using PipelineWise</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/yaml_config.html">YAML configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/encrypting_passwords.html">Encrypting Passwords</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/cli.html">Command Line Interface</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/fastsync.html">Fast Sync</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/logging.html">Logging</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/scheduling.html">Scheduling</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/integration.html">Integration</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/scaling.html">Scaling</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/scheduling.html#multi-server-cluster">Multi-Server Cluster</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/metadata_columns.html">Metadata Columns</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/schema_changes.html">Schema Changes</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/transformations.html">Transformations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/logging.html">Logging</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/resync.html">Resync Tables</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/integration.html">Integration</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Connectors</span></p>
 <ul class="current">
@@ -123,6 +126,7 @@
 <li class="toctree-l2"><a class="reference internal" href="taps/snowflake.html">Tap Snowflake</a></li>
 <li class="toctree-l2"><a class="reference internal" href="taps/salesforce.html">Tap Salesforce</a></li>
 <li class="toctree-l2"><a class="reference internal" href="taps/zendesk.html">Tap Zendesk</a></li>
+<li class="toctree-l2"><a class="reference internal" href="taps/jira.html">Tap Jira</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="targets.html">Targets (Destinations)</a></li>
@@ -250,6 +254,14 @@
 <p><a class="reference internal" href="taps/zendesk.html#tap-zendesk"><span class="std std-ref">Tap Zendesk</span></a></p>
 </div>
 </div>
+<div class="tile-wrapper docutils container">
+<div class="tile docutils container">
+<div class="img-hover-zoom docutils container">
+<a class="reference external image-reference" href="taps/jira.html"><img alt="../_images/jira-logo.png" src="../_images/jira-logo.png" /></a>
+</div>
+<p><a class="reference internal" href="taps/jira.html#tap-jira"><span class="std std-ref">Tap Jira</span></a></p>
+</div>
+</div>
 </div>
 <div class="section" id="configuring-taps">
 <h1>Configuring taps<a class="headerlink" href="#configuring-taps" title="Permalink to this headline">¶</a></h1>
@@ -262,6 +274,7 @@
 <li class="toctree-l1"><a class="reference internal" href="taps/snowflake.html">Tap Snowflake</a></li>
 <li class="toctree-l1"><a class="reference internal" href="taps/salesforce.html">Tap Salesforce</a></li>
 <li class="toctree-l1"><a class="reference internal" href="taps/zendesk.html">Tap Zendesk</a></li>
+<li class="toctree-l1"><a class="reference internal" href="taps/jira.html">Tap Jira</a></li>
 </ul>
 </div>
 </div>
@@ -277,7 +290,7 @@
         <a href="taps/mysql.html" class="btn btn-neutral float-right" title="Tap MySQL" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
       
       
-        <a href="../user_guide/transformations.html" class="btn btn-neutral float-left" title="Transformations" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+        <a href="../user_guide/integration.html" class="btn btn-neutral float-left" title="Integration" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
       
     </div>
   

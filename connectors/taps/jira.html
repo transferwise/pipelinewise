@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Tap Kafka &mdash; PipelineWise  documentation</title>
+  <title>Tap Jira &mdash; PipelineWise  documentation</title>
   
 
   
@@ -17,7 +17,7 @@
   
   
   
-    <link rel="canonical" href="https://docs.ansible.com/ansible/latest/connectors/taps/kafka.html"/>
+    <link rel="canonical" href="https://docs.ansible.com/ansible/latest/connectors/taps/jira.html"/>
   
 
   
@@ -40,8 +40,8 @@
   <link rel="stylesheet" href="../../_static/css/custom.css" type="text/css" />
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
-    <link rel="next" title="Tap Snowflake" href="snowflake.html" />
-    <link rel="prev" title="Tap S3 CSV" href="s3_csv.html" /> 
+    <link rel="next" title="Targets (Destinations)" href="../targets.html" />
+    <link rel="prev" title="Tap Zendesk" href="zendesk.html" /> 
 </head>
 
 <body class="wy-body-for-nav">
@@ -122,15 +122,14 @@
 <li class="toctree-l2"><a class="reference internal" href="mysql.html">Tap MySQL</a></li>
 <li class="toctree-l2"><a class="reference internal" href="postgres.html">Tap PostgreSQL</a></li>
 <li class="toctree-l2"><a class="reference internal" href="s3_csv.html">Tap S3 CSV</a></li>
-<li class="toctree-l2 current"><a class="current reference internal" href="#">Tap Kafka</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#connecting-to-kafka">Connecting to Kafka</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#configuring-what-to-replicate">Configuring what to replicate</a></li>
-</ul>
-</li>
+<li class="toctree-l2"><a class="reference internal" href="kafka.html">Tap Kafka</a></li>
 <li class="toctree-l2"><a class="reference internal" href="snowflake.html">Tap Snowflake</a></li>
 <li class="toctree-l2"><a class="reference internal" href="salesforce.html">Tap Salesforce</a></li>
 <li class="toctree-l2"><a class="reference internal" href="zendesk.html">Tap Zendesk</a></li>
-<li class="toctree-l2"><a class="reference internal" href="jira.html">Tap Jira</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Tap Jira</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#configuring-what-to-replicate">Configuring what to replicate</a></li>
+</ul>
+</li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../targets.html">Targets (Destinations)</a></li>
@@ -186,13 +185,13 @@
         
           <li><a href="../taps.html">Taps (Data Sources)</a> &raquo;</li>
         
-      <li>Tap Kafka</li>
+      <li>Tap Jira</li>
     
     
       <li class="wy-breadcrumbs-aside">
         
             
-            <a href="../../_sources/connectors/taps/kafka.rst.txt" rel="nofollow"> View page source</a>
+            <a href="../../_sources/connectors/taps/jira.rst.txt" rel="nofollow"> View page source</a>
           
         
       </li>
@@ -205,104 +204,42 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
             
-  <div class="section" id="tap-kafka">
-<span id="id1"></span><h1>Tap Kafka<a class="headerlink" href="#tap-kafka" title="Permalink to this headline">¶</a></h1>
-<div class="section" id="connecting-to-kafka">
-<h2>Connecting to Kafka<a class="headerlink" href="#connecting-to-kafka" title="Permalink to this headline">¶</a></h2>
-<div class="admonition warning">
-<p class="admonition-title">Warning</p>
-<p>This section of the documentation is work in progress.</p>
-</div>
-</div>
+  <div class="section" id="tap-jira">
+<span id="id1"></span><h1>Tap Jira<a class="headerlink" href="#tap-jira" title="Permalink to this headline">¶</a></h1>
 <div class="section" id="configuring-what-to-replicate">
 <h2>Configuring what to replicate<a class="headerlink" href="#configuring-what-to-replicate" title="Permalink to this headline">¶</a></h2>
 <p>PipelineWise configures every tap with a common structured YAML file format.
-A sample YAML for Kafka replication can be generated into a project directory by
+A sample YAML for Jira replication can be generated into a project directory by
 following the steps in the <a class="reference internal" href="../../installation_guide/creating_pipelines.html#generating-pipelines"><span class="std std-ref">Generating Sample Pipelines</span></a> section.</p>
-<p>Example YAML for <code class="docutils literal notranslate"><span class="pre">tap-kafka</span></code>:</p>
+<p>Example YAML for <code class="docutils literal notranslate"><span class="pre">tap-jira</span></code>:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>---
 
 <span class="c1"># ------------------------------------------------------------------------------</span>
 <span class="c1"># General Properties</span>
 <span class="c1"># ------------------------------------------------------------------------------</span>
-id: <span class="s2">&quot;kafka&quot;</span>                            <span class="c1"># Unique identifier of the tap</span>
-name: <span class="s2">&quot;Kafka Topic with sample data&quot;</span>   <span class="c1"># Name of the tap</span>
-type: <span class="s2">&quot;tap-kafka&quot;</span>                      <span class="c1"># !! THIS SHOULD NOT CHANGE !!</span>
+id: <span class="s2">&quot;jira&quot;</span>                             <span class="c1"># Unique identifier of the tap</span>
+name: <span class="s2">&quot;Jira&quot;</span>                           <span class="c1"># Name of the tap</span>
+type: <span class="s2">&quot;tap-jira&quot;</span>                       <span class="c1"># !! THIS SHOULD NOT CHANGE !!</span>
 owner: <span class="s2">&quot;somebody@foo.com&quot;</span>              <span class="c1"># Data owner to contact</span>
 
 
 <span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="c1"># Source (Tap) - Kafka connection details</span>
+<span class="c1"># Source (Tap) - Jira connection details</span>
 <span class="c1"># ------------------------------------------------------------------------------</span>
 db_conn:
-  group_id: <span class="s2">&quot;myGroupId&quot;</span>
-  bootstrap_servers: <span class="s2">&quot;kafka1.foo.com:9092,kafka2.foo.com:9092,kafka3.foo.com:9092&quot;</span>
-  topic: <span class="s2">&quot;myTopic&quot;</span>
+  <span class="c1"># Method 1: Base authentication</span>
+  base_url: <span class="s2">&quot;https://&lt;your_domain&gt;.atlassian.net&quot;</span>  <span class="c1"># the URL where your Jira installation can be found</span>
+  username: <span class="s2">&quot;&lt;USERNAME&gt;&quot;</span>
+  password: <span class="s2">&quot;&lt;PASSWORD&gt;&quot;</span>                            <span class="c1"># Plain string or vault encrypted</span>
 
-  <span class="c1"># --------------------------------------------------------------------------</span>
-  <span class="c1"># SCHEMA is a standard JSON Schema document that used for multiple purposes:</span>
-  <span class="c1">#</span>
-  <span class="c1"># 1. Validating kafka messages read from the stream</span>
-  <span class="c1"># 2. Creating destination table in Snowflake:</span>
-  <span class="c1">#        - Column names are flattened, using the &#39;__&#39; characters to</span>
-  <span class="c1">#          separate multi-level objects</span>
-  <span class="c1">#        - Snowflake column types will be generated from JSON schema types</span>
-  <span class="c1">#</span>
-  <span class="c1">#</span>
-  <span class="c1"># Sample Kafka message extracted from profileBehaviourStats topic:</span>
-  <span class="c1"># (The JSON Schema needs to be tailored for this sample JSON message)</span>
-  <span class="c1">#</span>
-  <span class="c1"># {</span>
-  <span class="c1">#   &quot;eventTime&quot;:1550564993738,</span>
-  <span class="c1">#   &quot;startingState&quot;:&quot;NEW&quot;,</span>
-  <span class="c1">#   &quot;ltvValueInGbp&quot;:1701.36,</span>
-  <span class="c1">#   &quot;ltvValueInEur&quot;:1919.7188620000002,</span>
-  <span class="c1">#   &quot;transferMetadata&quot;:{</span>
-  <span class="c1">#     &quot;transferId&quot;:63432435,</span>
-  <span class="c1">#     &quot;profileId&quot;:7623199,</span>
-  <span class="c1">#     &quot;userId&quot;:10523356,</span>
-  <span class="c1">#     &quot;currentState&quot;:&quot;NEW&quot;,</span>
-  <span class="c1">#     &quot;sourceCurrency&quot;:&quot;EUR&quot;,</span>
-  <span class="c1">#     &quot;targetCurrency&quot;:&quot;EUR&quot;,</span>
-  <span class="c1">#     &quot;invoiceValue&quot;:50.0,</span>
-  <span class="c1">#     &quot;invoiceValueInGbp&quot;:43.73,</span>
-  <span class="c1">#     &quot;invoiceValueInEur&quot;:50.0,</span>
-  <span class="c1">#     &quot;submitTime&quot;:1550564993000</span>
-  <span class="c1">#   }</span>
-  <span class="c1">#  }</span>
-  <span class="c1"># --------------------------------------------------------------------------</span>
-  schema: <span class="s1">&#39;</span>
-<span class="s1">      {</span>
-<span class="s1">        &quot;properties&quot;: {</span>
-<span class="s1">          &quot;eventTime&quot;: {&quot;type&quot;: [&quot;number&quot;, &quot;null&quot;]},</span>
-<span class="s1">          &quot;startingState&quot;: {&quot;type&quot;: [&quot;string&quot;, &quot;null&quot;]},</span>
-<span class="s1">          &quot;ltvValueInGbp&quot;: {&quot;type&quot;: [&quot;number&quot;, &quot;null&quot;]},</span>
-<span class="s1">          &quot;ltvValueInEur&quot;: {&quot;type&quot;: [&quot;number&quot;, &quot;null&quot;]},</span>
-<span class="s1">          &quot;transferMetadata&quot;: {</span>
-<span class="s1">            &quot;type&quot;: &quot;object&quot;,</span>
-<span class="s1">            &quot;properties&quot;: {</span>
-<span class="s1">              &quot;transferId&quot;: {&quot;type&quot;: &quot;integer&quot;},</span>
-<span class="s1">              &quot;profileId&quot;: {&quot;type&quot;: [&quot;integer&quot;, &quot;null&quot;]},</span>
-<span class="s1">              &quot;userId&quot;: {&quot;type&quot;: [&quot;integer&quot;, &quot;null&quot;]},</span>
-<span class="s1">              &quot;currentState&quot;: {&quot;type&quot;: [&quot;string&quot;, &quot;null&quot;]},</span>
-<span class="s1">              &quot;sourceCurrency&quot;: {&quot;type&quot;: [&quot;string&quot;, &quot;null&quot;]},</span>
-<span class="s1">              &quot;targetCurrency&quot;: {&quot;type&quot;: [&quot;string&quot;, &quot;null&quot;]},</span>
-<span class="s1">              &quot;invoiceValue&quot;: {&quot;type&quot;: [&quot;number&quot;, &quot;null&quot;]},</span>
-<span class="s1">              &quot;invoiceValueInGbp&quot;: {&quot;type&quot;: [&quot;number&quot;, &quot;null&quot;]},</span>
-<span class="s1">              &quot;invoiceValueInEur&quot;: {&quot;type&quot;: [&quot;number&quot;, &quot;null&quot;]},</span>
-<span class="s1">              &quot;submitTime&quot;: {&quot;type&quot;: [&quot;integer&quot;, &quot;null&quot;]}</span>
-<span class="s1">            }</span>
-<span class="s1">          }</span>
-<span class="s1">        }</span>
-<span class="s1">      }&#39;</span>
+  <span class="c1"># Mathod 2: OAuth authentication</span>
+  <span class="c1">#oauth_client_secret: &quot;&lt;oauth-client-secret&gt;&quot;     # Plain string or vault encrypted</span>
+  <span class="c1">#oauth_client_id: &quot;&lt;oauth-client-id&gt;&quot;</span>
+  <span class="c1">#access_token: &quot;&lt;access-token&gt;&quot;                   # Plain string or vault encrypted</span>
+  <span class="c1">#cloud_id: &quot;&lt;cloud-id&gt;&quot;</span>
+  <span class="c1">#refresh_token: &quot;&lt;refresh-token&gt;&quot;                 # Plain string or vault encrypted</span>
 
-  <span class="c1"># --------------------------------------------------------------------------</span>
-  <span class="c1"># One field from the kafka message will be the Primary Key of the target</span>
-  <span class="c1"># table. Selecting primary key is mandatory</span>
-  <span class="c1"># --------------------------------------------------------------------------</span>
-  primary_keys: <span class="s1">&#39;[&quot;transferMetadata__transferId&quot;]&#39;</span>
-
-  consumer_timeout_ms: <span class="m">5000</span>
+  start_date: <span class="s2">&quot;2010-01-01&quot;</span>  <span class="c1"># specifies the date at which the tap will begin pulling data</span>
 
 
 <span class="c1"># ------------------------------------------------------------------------------</span>
@@ -311,28 +248,46 @@ db_conn:
 <span class="c1"># ------------------------------------------------------------------------------</span>
 target: <span class="s2">&quot;snowflake&quot;</span>                       <span class="c1"># ID of the target connector where the data will be loaded</span>
 batch_size_rows: <span class="m">20000</span>                    <span class="c1"># Batch size for the stream to optimise load performance</span>
-default_target_schema: <span class="s2">&quot;kafka&quot;</span>            <span class="c1"># Target schema where the data will be loaded</span>
+default_target_schema: <span class="s2">&quot;jira&quot;</span>             <span class="c1"># Target schema where the data will be loaded</span>
 default_target_schema_select_permission:  <span class="c1"># Optional: Grant SELECT on schema and tables that created</span>
-  - grp_stats
+  - grp_power
 
 
 <span class="c1"># ------------------------------------------------------------------------------</span>
 <span class="c1"># Source to target Schema mapping</span>
 <span class="c1"># ------------------------------------------------------------------------------</span>
 schemas:
-  - source_schema: <span class="s2">&quot;kafka&quot;</span>             <span class="c1"># This is mandatory, but can be anything in this tap type</span>
-    target_schema: <span class="s2">&quot;kafka&quot;</span>             <span class="c1"># Target schema in the destination Data Warehouse</span>
+  - source_schema: <span class="s2">&quot;jira&quot;</span>               <span class="c1"># This is mandatory, but can be anything in this tap type</span>
+    target_schema: <span class="s2">&quot;jira&quot;</span>               <span class="c1"># Target schema in the destination Data Warehouse</span>
+    target_schema_select_permissions:   <span class="c1"># Optional: Grant SELECT on schema and tables that created</span>
+      - grp_stats
 
-    <span class="c1"># Kafka topic to replicate into destination Data Warehouse</span>
-    <span class="c1"># You can load data only from one kafka topic in one YAML file.</span>
-    <span class="c1"># If you want load from multiple kafka topics, create another tap YAML similar to this file</span>
+    <span class="c1"># List of Jira tables to replicate into destination Data Warehouse</span>
+    <span class="c1"># Tap-Jira will use the best incremental strategies automatically to replicate data</span>
     tables:
-      - table_name: <span class="s2">&quot;kafka_topic&quot;</span>
 
-        <span class="c1"># OPTIONAL: Load time transformations</span>
+      <span class="c1"># Tables replicated incrementally</span>
+      - table_name: <span class="s2">&quot;changelogs&quot;</span>
+      - table_name: <span class="s2">&quot;issues&quot;</span>
+      - table_name: <span class="s2">&quot;issue_comments&quot;</span>
+      - table_name: <span class="s2">&quot;issue_transitions&quot;</span>
+      - table_name: <span class="s2">&quot;worklogs&quot;</span>
+
+        <span class="c1"># OPTIONAL: Load time transformations - you can add it to any table</span>
         <span class="c1">#transformations:</span>
-        <span class="c1">#  - column: &quot;last_name&quot;            # Column to transform</span>
-        <span class="c1">#    type: &quot;SET-NULL&quot;               # Transformation type</span>
+        <span class="c1">#  - column: &quot;some_column_to_transform&quot; # Column to transform</span>
+        <span class="c1">#    type: &quot;SET-NULL&quot;                   # Transformation type</span>
+
+      <span class="c1"># FULL_TABLE replicated tables</span>
+      <span class="c1"># JIRA Cloud REST API doesn&#39;t provide reasonable replication keys for these tables.</span>
+      <span class="c1"># Replicating these tables can run longer. Please consider this when scheduling the tap.</span>
+      - table_name: <span class="s2">&quot;projects&quot;</span>
+      - table_name: <span class="s2">&quot;project_categories&quot;</span>
+      - table_name: <span class="s2">&quot;project_types&quot;</span>
+      - table_name: <span class="s2">&quot;resolutions&quot;</span>
+      - table_name: <span class="s2">&quot;roles&quot;</span>
+      - table_name: <span class="s2">&quot;users&quot;</span>
+      - table_name: <span class="s2">&quot;versions&quot;</span>
 </pre></div>
 </div>
 </div>
@@ -346,10 +301,10 @@ schemas:
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
-        <a href="snowflake.html" class="btn btn-neutral float-right" title="Tap Snowflake" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+        <a href="../targets.html" class="btn btn-neutral float-right" title="Targets (Destinations)" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
       
       
-        <a href="s3_csv.html" class="btn btn-neutral float-left" title="Tap S3 CSV" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+        <a href="zendesk.html" class="btn btn-neutral float-left" title="Tap Zendesk" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
       
     </div>
   

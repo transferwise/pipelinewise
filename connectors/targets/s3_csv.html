@@ -65,7 +65,7 @@
             
             
               <div class="version">
-                1.0.0
+                0.9.1
               </div>
             
           
@@ -94,23 +94,26 @@
 <li class="toctree-l1"><a class="reference internal" href="../../installation_guide/installation.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../installation_guide/creating_pipelines.html">Creating Pipelines</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../installation_guide/running_pipelines.html">Running Pipelines</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../installation_guide/encrypting_passwords.html">Encrypting Passwords</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Concept</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../concept/singer.html">Singer.io</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../concept/replication_methods.html">Replication Methods</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../concept/fastsync.html">Fast Sync</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Using PipelineWise</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/yaml_config.html">YAML configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/encrypting_passwords.html">Encrypting Passwords</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/cli.html">Command Line Interface</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/fastsync.html">Fast Sync</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/logging.html">Logging</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/scheduling.html">Scheduling</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/integration.html">Integration</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/scaling.html">Scaling</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/scheduling.html#multi-server-cluster">Multi-Server Cluster</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/metadata_columns.html">Metadata Columns</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/schema_changes.html">Schema Changes</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/transformations.html">Transformations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/logging.html">Logging</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/resync.html">Resync Tables</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/integration.html">Integration</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Connectors</span></p>
 <ul class="current">
@@ -119,6 +122,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../targets.html">Targets (Destinations)</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="../targets.html#configuring-the-targets">Configuring the targets</a><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="snowflake.html">Target Snowflake</a></li>
+<li class="toctree-l2"><a class="reference internal" href="redshift.html">Target Redshift</a></li>
 <li class="toctree-l2"><a class="reference internal" href="postgres.html">Target Postgres</a></li>
 <li class="toctree-l2 current"><a class="current reference internal" href="#">Target S3 CSV</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#aws-s3-setup-requirements">AWS S3 setup requirements</a></li>
@@ -216,8 +220,8 @@ following the steps in the <a class="reference internal" href="../../installatio
 <span class="c1"># ------------------------------------------------------------------------------</span>
 <span class="c1"># General Properties</span>
 <span class="c1"># ------------------------------------------------------------------------------</span>
-id: <span class="s2">&quot;csv_to_s3&quot;</span>                        <span class="c1"># Unique identifier of the target</span>
-name: <span class="s2">&quot;CSV exports to S3&quot;</span>              <span class="c1"># Name of the target</span>
+id: <span class="s2">&quot;s3&quot;</span>                               <span class="c1"># Unique identifier of the target</span>
+name: <span class="s2">&quot;S3 Target connector&quot;</span>            <span class="c1"># Name of the target</span>
 type: <span class="s2">&quot;target-s3-csv&quot;</span>                  <span class="c1"># !! THIS SHOULD NOT CHANGE !!</span>
 
 
@@ -229,9 +233,11 @@ db_conn:
   aws_secret_access_key: <span class="s2">&quot;&lt;SECRET_ACCESS_KEY&gt;&quot;</span>  <span class="c1"># S3 - Plain string or vault encrypted</span>
   s3_bucket: <span class="s2">&quot;&lt;BUCKET_NAME&gt;&quot;</span>                    <span class="c1"># S3 external stbucket name</span>
 
-  s3_key_prefix: <span class="s2">&quot;pipelinewise-exports/&quot;</span>        <span class="c1"># Optional S3 key prefix. Defaults to None</span>
-  delimiter: <span class="s2">&quot;,&quot;</span>                                <span class="c1"># Optional. Defaults to &#39;,&#39;</span>
-  quotechar: <span class="s2">&quot;\&quot;&quot;</span>                               <span class="c1"># Optional. Defaults to &#39;&quot;&#39;</span>
+  s3_key_prefix: <span class="s2">&quot;pipelinewise-exports/&quot;</span>        <span class="c1"># (Default: None) A static prefix before the generated S3 key names</span>
+  delimiter: <span class="s2">&quot;,&quot;</span>                                <span class="c1"># (Default: &#39;,&#39;) A one-character string used to separate fields.</span>
+  quotechar: <span class="s2">&quot;\&quot;&quot;</span>                               <span class="c1"># Default: &#39;\&quot;&#39;) A one-character string used to quote fields containing</span>
+                                                  special characters, such as the delimiter or quotechar, or which contain
+                                                  new-line characters.
 </pre></div>
 </div>
 </div>

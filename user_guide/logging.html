@@ -40,8 +40,8 @@
   <link rel="stylesheet" href="../_static/css/custom.css" type="text/css" />
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Scheduling" href="scheduling.html" />
-    <link rel="prev" title="Fast Sync" href="fastsync.html" /> 
+    <link rel="next" title="Resync Tables" href="resync.html" />
+    <link rel="prev" title="Transformations" href="transformations.html" /> 
 </head>
 
 <body class="wy-body-for-nav">
@@ -65,7 +65,7 @@
             
             
               <div class="version">
-                1.0.0
+                0.9.1
               </div>
             
           
@@ -94,23 +94,26 @@
 <li class="toctree-l1"><a class="reference internal" href="../installation_guide/installation.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../installation_guide/creating_pipelines.html">Creating Pipelines</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../installation_guide/running_pipelines.html">Running Pipelines</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../installation_guide/encrypting_passwords.html">Encrypting Passwords</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Concept</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../concept/singer.html">Singer.io</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../concept/replication_methods.html">Replication Methods</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concept/fastsync.html">Fast Sync</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Using PipelineWise</span></p>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="yaml_config.html">YAML configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="encrypting_passwords.html">Encrypting Passwords</a></li>
 <li class="toctree-l1"><a class="reference internal" href="cli.html">Command Line Interface</a></li>
-<li class="toctree-l1"><a class="reference internal" href="fastsync.html">Fast Sync</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Logging</a></li>
 <li class="toctree-l1"><a class="reference internal" href="scheduling.html">Scheduling</a></li>
-<li class="toctree-l1"><a class="reference internal" href="integration.html">Integration</a></li>
-<li class="toctree-l1"><a class="reference internal" href="scaling.html">Scaling</a></li>
+<li class="toctree-l1"><a class="reference internal" href="scheduling.html#multi-server-cluster">Multi-Server Cluster</a></li>
+<li class="toctree-l1"><a class="reference internal" href="metadata_columns.html">Metadata Columns</a></li>
+<li class="toctree-l1"><a class="reference internal" href="schema_changes.html">Schema Changes</a></li>
 <li class="toctree-l1"><a class="reference internal" href="transformations.html">Transformations</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Logging</a></li>
+<li class="toctree-l1"><a class="reference internal" href="resync.html">Resync Tables</a></li>
+<li class="toctree-l1"><a class="reference internal" href="integration.html">Integration</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Connectors</span></p>
 <ul>
@@ -199,7 +202,7 @@ section for further details how to run tap when you do a data sync.</p>
 <li><p><strong>TAP_ID</strong>: Unique identifier of the tap. This is the <code class="docutils literal notranslate"><span class="pre">id</span></code> property from a <a class="reference internal" href="../connectors/taps.html#taps-list"><span class="std std-ref">Taps (Data Sources)</span></a> YAML.</p></li>
 <li><p><strong>DATE</strong>: Date when the tap started in <code class="docutils literal notranslate"><span class="pre">YYYYMMDD</span></code> format</p></li>
 <li><p><strong>TIME</strong>: Time when the tap started in <code class="docutils literal notranslate"><span class="pre">HH24MMSS</span></code> format</p></li>
-<li><p><strong>SYNC_ENGINE</strong>: One of <code class="docutils literal notranslate"><span class="pre">singer</span></code> or <code class="docutils literal notranslate"><span class="pre">fastsync</span></code>. Check <a class="reference internal" href="../concept/replication_methods.html#replication-methods"><span class="std std-ref">Replication Methods</span></a> and <a class="reference internal" href="fastsync.html#fast-sync-main"><span class="std std-ref">Fast Sync</span></a> section for further details.</p></li>
+<li><p><strong>SYNC_ENGINE</strong>: One of <code class="docutils literal notranslate"><span class="pre">singer</span></code> or <code class="docutils literal notranslate"><span class="pre">fastsync</span></code>. Check <a class="reference internal" href="../concept/replication_methods.html#replication-methods"><span class="std std-ref">Replication Methods</span></a> and <a class="reference internal" href="../concept/fastsync.html#fast-sync-main"><span class="std std-ref">Fast Sync</span></a> section for further details.</p></li>
 <li><p><strong>STATUS</strong>: One of <code class="docutils literal notranslate"><span class="pre">running</span></code>, <code class="docutils literal notranslate"><span class="pre">failed</span></code> or <code class="docutils literal notranslate"><span class="pre">success</span></code></p></li>
 </ul>
 </div></blockquote>
@@ -233,10 +236,10 @@ section for further details how to run tap when you do a data sync.</p>
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
-        <a href="scheduling.html" class="btn btn-neutral float-right" title="Scheduling" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+        <a href="resync.html" class="btn btn-neutral float-right" title="Resync Tables" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
       
       
-        <a href="fastsync.html" class="btn btn-neutral float-left" title="Fast Sync" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+        <a href="transformations.html" class="btn btn-neutral float-left" title="Transformations" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
       
     </div>
   
