@@ -17,7 +17,7 @@ db_conn:
   s3_bucket: "<BUCKET_NAME>"                    # S3 bucket name
 
   # Optional keys
-  #s3_key_prefix: ""                             # (Default: None) A static prefix before the generated S3 key names
+  #s3_key_prefix: "pipelinewise-exports/"        # (Default: None) A static prefix before the generated S3 key names
   #delimiter: ","                                # (Default: ',') A one-character string used to separate fields.
   #quotechar: "\""                               # (Default: '\"') A one-character string used to quote fields containing
                                                    special characters, such as the delimiter or quotechar, or which contain

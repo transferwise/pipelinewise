@@ -84,6 +84,17 @@ PipelineWise can replicate data from the following data sources:
 
         :ref:`tap-zendesk`
 
+.. container:: tile-wrapper
+
+    .. container:: tile
+
+        .. container:: img-hover-zoom
+
+          .. image:: ../img/jira-logo.png
+             :target: taps/jira.html
+
+        :ref:`tap-jira`
+
 
 Configuring taps
 ----------------
@@ -97,4 +108,5 @@ Configuring taps
    taps/snowflake
    taps/salesforce
    taps/zendesk
+   taps/jira
 

@@ -41,7 +41,7 @@ Example YAML for ``tap-kafka``:
     db_conn:
       group_id: "myGroupId"
       bootstrap_servers: "kafka1.foo.com:9092,kafka2.foo.com:9092,kafka3.foo.com:9092"
-      topic: "StreamingEngine.out.profileLtvUpdateEvent"
+      topic: "myTopic"
 
       # --------------------------------------------------------------------------
       # SCHEMA is a standard JSON Schema document that used for multiple purposes:

@@ -40,19 +40,35 @@ This will create a ``pipelinewise_samples`` directory with samples for each supp
 
     └── pipelinewise_samples
         ├── README.md
+        ├── tap_jira.yml.sample
+        ├── tap_kafka.yml.sample
         ├── tap_mysql_mariadb.yml.sample
         ├── tap_postgres.yml.sample
         ├── tap_s3_csv.yml.sample
-        ├── tap_kafka.yml.sample
-        ├── tap_snowflake.yml.sample
         ├── tap_salesforce.yml.sample
+        ├── tap_snowflake.yml.sample
         ├── tap_zendesk.yml.sample
-        ├── target_snowflake.yml.sample
         ├── target_postgres.yml.sample
-        └── target_s3_csv.yml.sample
+        ├── target_redshift.yml.sample
+        ├── target_s3_csv.yml.sample
+        └── target_snowflake.yml.sample
 
-Customising the Pipelines
--------------------------
+To create a new pipeline you need to enable at least one tap and target by renaming the
+``tap_....yml.sample`` and one ``target_...yml.sample`` file by removing the ``.sample``
+postfixes.
+
+Once you renamed the files that you need, edit the YAML files with your favourite text
+editor. Follow the instructions in the files to set database credentials, connection
+details, select tables to replicate, define source to target schema mapping or add load
+time transformations. Check the :ref:`example_replication_mysql_to_snowflake` section
+for a real life example.
+
+Once you configured the YAML files you can go to :ref:`import_project_from_yaml` section.
+
+.. _example_replication_mysql_to_snowflake:
+
+Example replication from MySQL to Snowflake
+-------------------------------------------
 
 In this example we will replicate three tables from a MySQL database into a Snowflake Data Warehouse,
 using a mix of :ref:`full_table`, :ref:`incremental` and :ref:`log_based` replication methods.
@@ -76,10 +92,10 @@ You can edit it with the text editor of your choice:
     db_conn:
       account: "rtxxxxxx.eu-central-1"
       dbname: "analytics_db_test"
-      user: "circleci"
+      user: "snoflake_user"
       password: "PASSWORD"                                   # Plain string or Vault Encrypted password
       warehouse: "LOAD_WH"
-      s3_bucket: "tw-staging-analyticsdb-etl"
+      s3_bucket: "pipelinewise-bucket"
       s3_key_prefix: "snowflake-imports-test/"
       aws_access_key_id: "ACCESS_KEY_ID"                     # Plain string or Vault Encrypted password
       # stage and file_format are pre-created objects in Snowflake that requires to load and
@@ -116,7 +132,7 @@ You can edit it with the text editor of your choice:
     db_conn:
       host: "localhost"
       port: 10602
-      user: "pgninja_replica"
+      user: "my_user"
       password: "<PASSWORD>"                  # Plain string or Vault Encrypted password
       
     target: "snowflake_test"                  # Target ID, should match the id from target_snowflake.yml
@@ -138,16 +154,32 @@ You can edit it with the text editor of your choice:
               replication_key: "updated_at"   #    Incremental load needs replication key
 
 
+.. _import_project_from_yaml:
+
 Activating the Pipelines from the YAML files
 --------------------------------------------
 
-When you are happy with the configuration you need to import it with the :ref:`cli_import_config` command:
+When you are happy with the configuration you need to import it with the :ref:`cli_import` command:
 
 .. code-block:: bash
 
     $ pipelinewise import --dir pipelinewise_samples
 
-At this point PipelineWise will generate the required JSON files for the singer taps and
+            ... detailed messages about import and discovery...
+
+            -------------------------------------------------------
+            IMPORTING YAML CONFIGS FINISHED
+            -------------------------------------------------------
+                Total targets to import        : 1
+                Total taps to import           : 1
+                Taps imported successfully     : 1
+                Taps failed to import          : []
+                Runtime                        : 0:00:01.835720
+            -------------------------------------------------------
+
+
+At this point PipelineWise will connect to and analyse every source database, discovering
+tables, columns and data types and will generate the required JSON files for the singer taps and
 targets into ``~/.pipelinewise``. PipelineWise will use this directory internally to keep
 tracking the state files for :ref:`incremental` and :ref:`log_based` replications
 (aka. bookmarks) and this will be the directory where the log files will be created.
@@ -167,6 +199,6 @@ Once the config YAML files are imported, you can see the new pipelines with the 
 
 Congratulations! At this point you have successfully çreated your first pipeline in PipelineWise and it's now
 ready to run. You may want you can create a new git repository and push the ``pipelinewise_samples``
-directory into it to keep everything under version control.
+directory to keep everything under version control.
 
 Now you can head to the :ref:`running_pipelines` section to run the pipelines and to start replicating data.
