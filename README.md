@@ -63,10 +63,10 @@ recommended method of start using PipelineWise.
 $ docker build -t pipelinewise:latest .
 ```
 
-1. Once the image is ready, create an alias to the docker wrapper script:
+2. Once the image is ready, create an alias to the docker wrapper script:
 
 ```sh
-$ alias pipelinewise='$(PWD)/bin/pipelinewise-docker'
+$ alias pipelinewise="$(PWD)/bin/pipelinewise-docker"
 ```
 
 3. Check if the installation was successfully by running the `pipelinewise status` command:

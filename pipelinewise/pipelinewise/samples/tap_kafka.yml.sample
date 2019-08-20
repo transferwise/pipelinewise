@@ -13,9 +13,9 @@ owner: "somebody@foo.com"              # Data owner to contact
 # Source (Tap) - Kafka connection details
 # ------------------------------------------------------------------------------
 db_conn:
-  group_id: "analyticsDb"
-  bootstrap_servers: "kafka1.tw.ee:9092,kafka2.tw.ee:9092,kafka3.tw.ee:9092,kafka4.tw.ee:9092,kafka5.tw.ee:9092"
-  topic: "StreamingEngine.out.profileLtvUpdateEvent"
+  group_id: "myGroupId"
+      bootstrap_servers: "kafka1.foo.com:9092,kafka2.foo.com:9092,kafka3.foo.com:9092"
+  topic: "myTopic"
 
   # --------------------------------------------------------------------------
   # SCHEMA is a standard JSON Schema document that used for multiple purposes:

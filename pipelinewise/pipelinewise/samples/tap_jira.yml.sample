@@ -8,6 +8,10 @@ name: "Jira"                           # Name of the tap
 type: "tap-jira"                       # !! THIS SHOULD NOT CHANGE !!
 owner: "somebody@foo.com"              # Data owner to contact
 
+
+# ------------------------------------------------------------------------------
+# Source (Tap) - Jira connection details
+# ------------------------------------------------------------------------------
 db_conn:
   # Method 1: Base authentication
   base_url: "https://<your_domain>.atlassian.net"  # the URL where your Jira installation can be found

@@ -168,8 +168,7 @@ Example YAML for ``tap-postgres``:
             #    type: "SET-NULL"               # Transformation type
 
           # You can add as many tables as you need...
-          - table_name: "table_tow"
-            replication_method: "INCREMENTAL"   # Important! Log based must be enabled in MySQL
+          - table_name: "table_tow"        replication_method: "LOG_BASED"     # Important! Log based must be enabled in MySQL
 
       # You can add as many schemas as you need...
       # Uncommend this if you want replicate tables from multiple schemas
