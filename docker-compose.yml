@@ -5,7 +5,7 @@ services:
     image: python:3.7.4-buster
     container_name: pipelinewise_dev
     working_dir: /usr/src/app
-    entrypoint: /usr/src/app/docker-entrypoint.sh
+    entrypoint: /usr/src/app/entrypoint-dev.sh
     environment:
       PIPELINEWISE_HOME: /usr/src/app
       DB_TAP_MYSQL_HOST: db_mysql_source
