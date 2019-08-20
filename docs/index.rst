@@ -166,7 +166,6 @@ Content
    installation_guide/installation
    installation_guide/creating_pipelines
    installation_guide/running_pipelines
-   installation_guide/encrypting_passwords
 
 .. toctree::
    :maxdepth: 2
@@ -174,19 +173,22 @@ Content
 
    concept/singer
    concept/replication_methods
+   concept/fastsync
 
 .. toctree::
    :maxdepth: 2
    :caption: Using PipelineWise
 
    user_guide/yaml_config
+   user_guide/encrypting_passwords
    user_guide/cli
-   user_guide/fastsync
-   user_guide/logging
    user_guide/scheduling
-   user_guide/integration
-   user_guide/scaling
+   user_guide/metadata_columns
+   user_guide/schema_changes
    user_guide/transformations
+   user_guide/logging
+   user_guide/resync
+   user_guide/integration
 
 .. toctree::
    :maxdepth: 2

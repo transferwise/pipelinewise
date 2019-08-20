@@ -10,8 +10,7 @@ Snowflake setup requirements
 
 .. warning::
 
-  You need to create two objects in a Snowflake schema before start replicating data to Snowflake.
-
+  You need to create two objects in a Snowflake schema before start replicating data to Snowflake:
    * **Named External Stage**: to upload the CSV files to S3 and to MERGE data into snowflake tables.
    * **Named File Format**: to run MERGE/COPY commands and to parse the CSV files correctly
 

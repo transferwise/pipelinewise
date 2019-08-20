@@ -21,7 +21,7 @@ Example YAML for ``tap-s3-csv``:
     # ------------------------------------------------------------------------------
     # General Properties
     # ------------------------------------------------------------------------------
-    id: "feeds_on_s3"                       # Unique identifier of the tap
+    id: "csv_on_s3"                        # Unique identifier of the tap
     name: "Sampe CSV files on S3"          # Name of the tap
     type: "tap-s3-csv"                     # !! THIS SHOULD NOT CHANGE !!
     owner: "somebody@foo.com"              # Data owner to contact
@@ -58,8 +58,8 @@ Example YAML for ``tap-s3-csv``:
     # Source to target Schema mapping
     # ------------------------------------------------------------------------------
     schemas:
-      - source_schema: "greenhouse" # This is mandatory, but can be anything in this tap type
-        target_schema: "greenhouse" # Target schema in the destination Data Warehouse
+      - source_schema: "s3_feeds" # This is mandatory, but can be anything in this tap type
+        target_schema: "s3_feeds" # Target schema in the destination Data Warehouse
         
         # List of CSV files to destination tables
         tables:
