@@ -141,6 +141,15 @@ PipelineWise can replicate data into the following destinations:
 
         .. container:: img-hover-zoom
 
+          .. image:: img/redshift-logo.png
+             :target: connectors/targets/redshift.html
+
+        :ref:`target-redshift`
+
+    .. container:: tile
+
+        .. container:: img-hover-zoom
+
           .. image:: img/postgres-logo.png
              :target: connectors/targets/postgres.html
 
