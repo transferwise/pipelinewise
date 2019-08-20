@@ -9,7 +9,8 @@ from cli_args import CliArgs
 
 CONFIG_DIR="{}/resources/sample_json_config".format(os.path.dirname(__file__))
 VIRTUALENVS_DIR="./virtualenvs-dummy"
-TEST_PROJECT_DIR="{}/test-project".format(os.path.dirname(__file__))
+TEST_PROJECT_NAME="test-project"
+TEST_PROJECT_DIR="{}/{}".format(os.getcwd(), TEST_PROJECT_NAME)
 
 
 class TestCli(object):
@@ -325,7 +326,7 @@ class TestCli(object):
 
     def test_command_init(self):
         """Test init command"""
-        args = CliArgs(dir=TEST_PROJECT_DIR)
+        args = CliArgs(name=TEST_PROJECT_NAME)
         pipelinewise = PipelineWise(args, CONFIG_DIR, VIRTUALENVS_DIR)
 
         # Init new project
