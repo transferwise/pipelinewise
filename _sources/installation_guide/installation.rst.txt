@@ -33,13 +33,6 @@ and can be installed in the following methods:
     virtual environments at the right place in the right format and will take care of finding them
     at runtime.
 
-.. danger::
-
-  **PipelineWise is not publicly available as of August 2019.**
-  TransferWise has not yet open sourced the project to date and it's therefore not available
-  as a public GitHub repository.
-
-  It will be publicly available on GitHub very soon.
 
 .. _running_from_docker:
 
