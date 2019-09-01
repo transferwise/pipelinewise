@@ -22,7 +22,7 @@ setup(name='pipelinewise',
         'tabulate==0.8.2',
         'PyYAML==5.1.0',
         'jsonschema==3.0.1',
-        'ansible==2.7.10',
+        'ansible==2.7.13',
         'joblib==0.13.2',
         
         'attrs==17.4.0',
