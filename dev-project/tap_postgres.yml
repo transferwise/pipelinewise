@@ -56,9 +56,12 @@ schemas:
         # OPTIONAL: Load time transformations
         #transformations:                    
         #  - column: "population"           # Column to transform
-        #    type: "SET-NULL"               # Transformation type
+        #    type: "MASK-NUMBER"            # Transformation type
 
       # You can add as many tables as you need...
-      #- table_name: "countrylanguage"
-      #  replication_method: "LOG_BASED"
-
+      - table_name: "countrylanguage"
+        replication_method: "LOG_BASED"     # Optional: replication_method defaults to 'LOG_BASED'
+                                            #
+                                            # Important! Log based must be enabled in PostgreSQL and
+                                            #            requires wal2json plugin and config adjustments
+                                            # Doc: https://transferwise.github.io/pipelinewise/connectors/taps/postgres.html

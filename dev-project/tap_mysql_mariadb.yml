@@ -47,7 +47,7 @@ schemas:
     # For LOG_BASED replication method you might need to adjust the source mysql/ mariadb configuration.
     tables:
       - table_name: "address"
-        replication_method: "FULL_TABLE"   # One of INCREMENTAL, LOG_BASED and FULL_TABLE
+        replication_method: "FULL_TABLE"    # One of INCREMENTAL, LOG_BASED and FULL_TABLE
 
       - table_name: "area_code"
         replication_method: "INCREMENTAL"
@@ -55,11 +55,15 @@ schemas:
 
         # OPTIONAL: Load time transformations
         #transformations:                    
-        #  - column: "last_name"            # Column to transform
-        #    type: "SET-NULL"               # Transformation type
+        #  - column: "provance_provance_id"  # Column to transform
+        #    type: "SET-NULL"                # Transformation type
 
       # You can add as many tables as you need...
       - table_name: "price"
-        replication_method: "LOG_BASED"     # Important! Log based must be enabled in MySQL
-      - table_name: "weight_unit"           # replication_method defaults to 'LOG_BASED'
+        replication_method: "LOG_BASED"     # Optional: replication_method defaults to 'LOG_BASED'
+      - table_name: "weight_unit"           #
+                                            # Important! Log based must be enabled in MySQL and
+                                            #            requires config adjustments
+                                            # Doc: https://transferwise.github.io/pipelinewise/connectors/taps/mysql.html
+
 
