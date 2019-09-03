@@ -7,44 +7,10 @@ import decimal
 from . import utils
 
 
-class Postgres:
-    def __init__(self, connection_config):
+class FastSyncTapPostgres:
+    def __init__(self, connection_config, tap_type_to_target_type):
         self.connection_config = connection_config
-
-
-    def postgres_type_to_snowflake(self, pg_type):
-        return {
-            'char':'VARCHAR',
-            'character':'VARCHAR',
-            'varchar':'VARCHAR',
-            'character varying':'VARCHAR',
-            'text':'TEXT',
-            'bit': 'BOOLEAN',
-            'varbit':'NUMBER',
-            'bit varying':'NUMBER',
-            'smallint':'NUMBER',
-            'int':'NUMBER',
-            'integer':'NUMBER',
-            'bigint':'NUMBER',
-            'smallserial':'NUMBER',
-            'serial':'NUMBER',
-            'bigserial':'NUMBER',
-            'numeric':'FLOAT',
-            'double precision':'FLOAT',
-            'real':'FLOAT',
-            'bool':'BOOLEAN',
-            'boolean':'BOOLEAN',
-            'date':'TIMESTAMP_NTZ',
-            'timestamp':'TIMESTAMP_NTZ',
-            'timestamp without time zone':'TIMESTAMP_NTZ',
-            'timestamp with time zone':'TIMESTAMP_TZ',
-            'time':'TIME',
-            'time without time zone':'TIME',
-            'time with time zone':'TIME',
-            'ARRAY':'VARIANT',  # This is all uppercase, because postgres stores it in this format in information_schema.columns.data_type
-            'json':'VARIANT',
-            'jsonb':'VARIANT'
-        }.get(pg_type, 'VARCHAR')
+        self.tap_type_to_target_type = tap_type_to_target_type
 
 
     def open_connection(self):
@@ -100,7 +66,7 @@ class Postgres:
                     return []
 
 
-    def fetch_current_log_sequence_number(self):
+    def fetch_current_log_pos(self):
         # Create replication slot dedicated connection
         # Always use Primary server for creating replication_slot
         primary_host_conn_string = "host='{}' port='{}' user='{}' password='{}' dbname='{}'".format(
@@ -167,7 +133,12 @@ class Postgres:
 
         current_lsn = result[0].get("current_lsn")
         file, index = current_lsn.split('/')
-        return (int(file, 16)  << 32) + int(index, 16)
+        lsn = (int(file, 16)  << 32) + int(index, 16)
+
+        return {
+          "lsn": lsn,
+          "version": 1
+        }
 
 
     def fetch_current_incremental_key_pos(self, table, replication_key):
@@ -189,8 +160,9 @@ class Postgres:
                 key_value = float(postgres_key_value)
 
             return {
-                "key": replication_key,
-                "key_value": key_value
+                "replication_key": replication_key,
+                "replication_key_value": key_value,
+                "version": 1
             }
 
 
@@ -230,33 +202,18 @@ class Postgres:
                     AND table_name = '{}'
                 ORDER BY ordinal_position
                 ) AS x
-            """.format(table_dict.get('schema'), table_dict.get('name'))
+            """.format(table_dict.get('schema_name'), table_dict.get('table_name'))
         return self.query(sql)
 
 
-    def snowflake_ddl(self, table_name, target_schema, is_temporary):
-        table_dict = utils.tablename_to_dict(table_name)
-        target_table = table_dict.get('name') if not is_temporary else table_dict.get('temp_name')
-
+    def map_column_types_to_target(self, table_name):
         postgres_columns = self.get_table_columns(table_name)
-        snowflake_columns = ["{} {}".format(pc[0], self.postgres_type_to_snowflake(pc[1])) for pc in postgres_columns]
-        primary_key = self.get_primary_key(table_name)
-        if primary_key:
-            snowflake_ddl = """
-            CREATE OR REPLACE TABLE {}.{} ({}
-            ,_SDC_EXTRACTED_AT TIMESTAMP_NTZ
-            ,_SDC_BATCHED_AT TIMESTAMP_NTZ
-            ,_SDC_DELETED_AT VARCHAR
-            , PRIMARY KEY ({}))
-            """.format(target_schema,target_table,', '.join(snowflake_columns),primary_key)
-        else:
-            snowflake_ddl = """CREATE OR REPLACE TABLE {}.{} ({}
-            ,_SDC_EXTRACTED_AT TIMESTAMP_NTZ
-            ,_SDC_BATCHED_AT TIMESTAMP_NTZ
-            ,_SDC_DELETED_AT VARCHAR
-            )
-            """.format(target_schema, target_table, ', '.join(snowflake_columns))
-        return(snowflake_ddl)
+        mapped_columns = ["{} {}".format(pc[0], self.tap_type_to_target_type(pc[1])) for pc in postgres_columns]
+
+        return {
+            "columns": mapped_columns,
+            "primary_key": self.get_primary_key(table_name)
+        }
 
 
     def copy_table(self, table_name, path):
