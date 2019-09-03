@@ -5,8 +5,8 @@ Schema Changes
 --------------
 
 Taps detect schema changes in source databases and target connectors alter the
-destination tables automatically. Based on the schema change type PipelineWise
-performs different actions in the destination tables:
+destination tables automatically. Based on the schema change type, PipelineWise
+performs different actions in the destination tables as per the below:
 
 * **When new column added**: target connectors **add the new column** to the destination
   table with the same name using a compatible data type.
@@ -15,9 +15,9 @@ performs different actions in the destination tables:
   Old column remains in the table in case you need to do historical analysis on
   the column. If the old column is not needed in the destination table then you can
   perform a manual ``ALTER TABLE ... DROP COLUMN ...`` statement in the target database
-  or alternatively you can :ref:`resync` the table.
+  or alternatively you can :ref:`resync`.
 
-* **When column data type changed**: target connectors **versioning the column**.
+* **When column data type changed**: target connectors are **versioning the column**.
 
 
 .. _versioning_columns:
@@ -25,7 +25,7 @@ performs different actions in the destination tables:
 Versioning columns
 ''''''''''''''''''
 
-Target connectors are versioning columns **when data type change detected** in the source
+Target connectors are versioning columns **when data type change is detected** in the source
 table. Versioning columns means that the old column with the old datatype is
 renamed by adding a timestamp to column name and a new column with the new data
 type will be added to the table.
