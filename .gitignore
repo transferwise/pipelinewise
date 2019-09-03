@@ -22,6 +22,10 @@ test-reports/
 # Generated test yamls
 tests/end-to-end/test-project/*.yml
 
+# Dev project
+dev-project/target_redshift.yml
+dev-project/target_snowflake.yml
+
 # Docker
 #.env
 

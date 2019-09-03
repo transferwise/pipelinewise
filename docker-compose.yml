@@ -43,9 +43,12 @@ services:
 
   ### TAP (Data source) containers
   # PostgreSQL service container used as test source database
+  # Using Debezium image with wal2json plugin for logical decoding
   db_postgres_source:
-    image: postgres:11.4
+    image: debezium/postgres:11-alpine
     container_name: pipelinewise_dev_postgres_source
+    # Making some logical decoding adjustments
+    command: -c "wal_level=logical" -c "max_replication_slots=5" -c "max_wal_senders=5"
     ports:
       - ${DB_TAP_POSTGRES_PORT_ON_HOST}:${DB_TAP_POSTGRES_PORT}
     environment:
