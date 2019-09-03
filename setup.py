@@ -42,11 +42,11 @@ setup(name='pipelinewise',
     },
     entry_points='''
         [console_scripts]
-        pipelinewise=pipelinewise.pipelinewise:main
-        mysql-to-snowflake=pipelinewise.mysql_to_snowflake:main
-        postgres-to-snowflake=pipelinewise.postgres_to_snowflake:main
-        mysql-to-redshift=pipelinewise.mysql_to_redshift:main
-        postgres-to-redshift=pipelinewise.postgres_to_redshift:main
+        pipelinewise=pipelinewise.cli:main
+        mysql-to-snowflake=pipelinewise.fastsync.mysql_to_snowflake:main
+        postgres-to-snowflake=pipelinewise.fastsync.postgres_to_snowflake:main
+        mysql-to-redshift=pipelinewise.fastsync.mysql_to_redshift:main
+        postgres-to-redshift=pipelinewise.fastsync.postgres_to_redshift:main
     ''',
     packages=find_packages(exclude=['tests*']),
     package_data = {

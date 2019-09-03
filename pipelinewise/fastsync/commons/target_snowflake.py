@@ -9,7 +9,7 @@ from snowflake.connector.encryption_util import SnowflakeEncryptionUtil
 from snowflake.connector.remote_storage_util import SnowflakeFileEncryptionMaterial
 
 
-class Snowflake:
+class FastSyncTargetSnowflake:
     def __init__(self, connection_config, transformation_config = None):
         self.connection_config = connection_config
         self.transformation_config = transformation_config
@@ -90,10 +90,39 @@ class Snowflake:
         self.query(sql)
 
 
+    def drop_table(self, target_schema, table_name, is_temporary=False):
+        table_dict = utils.tablename_to_dict(table_name)
+        target_table = table_dict.get('table_name') if not is_temporary else table_dict.get('temp_table_name')
+
+        sql = "DROP TABLE IF EXISTS {}.{}".format(target_schema, target_table)
+        self.query(sql)
+
+
+    def create_table(self, target_schema, table_name, columns, primary_key, is_temporary=False):
+        table_dict = utils.tablename_to_dict(table_name)
+        target_table = table_dict.get('table_name') if not is_temporary else table_dict.get('temp_table_name')
+
+        if primary_key:
+            sql = """CREATE OR REPLACE TABLE {}.{} ({}
+            ,_SDC_EXTRACTED_AT TIMESTAMP_NTZ
+            ,_SDC_BATCHED_AT TIMESTAMP_NTZ
+            ,_SDC_DELETED_AT VARCHAR
+            , PRIMARY KEY ({}))
+            """.format(target_schema, target_table, ', '.join(columns), primary_key)
+        else:
+            sql = """CREATE OR REPLACE TABLE {}.{} ({}
+            ,_SDC_EXTRACTED_AT TIMESTAMP_NTZ
+            ,_SDC_BATCHED_AT TIMESTAMP_NTZ
+            ,_SDC_DELETED_AT VARCHAR
+            )
+            """.format(target_schema, target_table, ', '.join(columns))
+        self.query(sql)
+
+
     def copy_to_table(self, s3_key, target_schema, table_name, is_temporary):
         utils.log("SNOWFLAKE - Loading {} into Snowflake...".format(s3_key))
         table_dict = utils.tablename_to_dict(table_name)
-        target_table = table_dict.get('name') if not is_temporary else table_dict.get('temp_name')
+        target_table = table_dict.get('table_name') if not is_temporary else table_dict.get('temp_table_name')
 
         aws_access_key_id=self.connection_config['aws_access_key_id']
         aws_secret_access_key=self.connection_config['aws_secret_access_key']
@@ -126,7 +155,7 @@ class Snowflake:
         # Grant role is not mandatory parameter, do nothing if not specified
         if role:
             table_dict = utils.tablename_to_dict(table_name)
-            target_table = table_dict.get('name') if not is_temporary else table_dict.get('temp_name')
+            target_table = table_dict.get('table_name') if not is_temporary else table_dict.get('temp_table_name')
             sql = "GRANT SELECT ON {}.{} TO ROLE {}".format(target_schema, target_table, role)
             self.query(sql)
 
@@ -148,7 +177,7 @@ class Snowflake:
     def obfuscate_columns(self, target_schema, table_name):
         utils.log("SNOWFLAKE - Applying obfuscation rules")
         table_dict = utils.tablename_to_dict(table_name)
-        temp_table = table_dict.get('temp_name')
+        temp_table = table_dict.get('temp_table_name')
         transformations = self.transformation_config.get('transformations', [])
         trans_cols = []
 
@@ -159,7 +188,7 @@ class Snowflake:
             #
             # We need to convert to the same format to find the transformation
             # has that has to be applied
-            tap_stream_name_by_table_name = "{}-{}".format(table_dict.get('schema'), table_dict.get('name'))
+            tap_stream_name_by_table_name = "{}-{}".format(table_dict.get('schema_name'), table_dict.get('table_name'))
             if t.get('tap_stream_name') == tap_stream_name_by_table_name:
                 column = t.get('field_id')
                 transform_type = t.get('type')
@@ -183,11 +212,38 @@ class Snowflake:
 
     def swap_tables(self, schema, table_name):
         table_dict = utils.tablename_to_dict(table_name)
-        target_table = table_dict.get('name')
-        temp_table = table_dict.get('temp_name')
+        target_table = table_dict.get('table_name')
+        temp_table = table_dict.get('temp_table_name')
 
         # Swap tables and drop the temp tamp
         self.query("ALTER TABLE {}.{} SWAP WITH {}.{}".format(schema, temp_table, schema, target_table))
         self.query("DROP TABLE IF EXISTS {}.{}".format(schema, temp_table))
         
+
+    def cache_information_schema_columns(self, tables):
+        pipelinewise_schema = utils.tablename_to_dict(self.connection_config['stage'])['schema_name']
+        schemas_to_cache = utils.get_target_schemas(self.connection_config, tables)
+
+        # Create an empty cache table if not exists
+        self.query("""
+            CREATE TABLE IF NOT EXISTS {}.columns (table_schema VARCHAR, table_name VARCHAR, column_name VARCHAR, data_type VARCHAR)
+        """.format(pipelinewise_schema))
+
+        # Cache table columns from information_schema
+        for schema_name in schemas_to_cache:
+            utils.log("rebuilding information_schema cache for schema: {}".format(schemas_to_cache))
+
+            # Delete existing data about the current schema
+            self.query("""
+                DELETE FROM {}.columns
+                WHERE LOWER(table_schema) = '{}'
+            """.format(pipelinewise_schema, schema_name.lower()))
+
+            # Insert the latest data from information_schema into the cache table
+            self.query("""
+                INSERT INTO {}.columns
+                SELECT table_schema, table_name, column_name, data_type
+                FROM information_schema.columns
+                WHERE LOWER(table_schema) = '{}'
+            """.format(pipelinewise_schema, schema_name.lower()))
 

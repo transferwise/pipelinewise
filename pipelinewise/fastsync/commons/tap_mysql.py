@@ -8,43 +8,12 @@ import decimal
 from . import utils
 
 
-class MySql:
-    def __init__(self, connection_config):
+class FastSyncTapMySql:
+    def __init__(self, connection_config, tap_type_to_target_type):
         self.connection_config = connection_config
         self.connection_config['charset'] = connection_config.get('charset', 'utf8')
         self.connection_config['export_batch_rows'] = connection_config.get('export_batch_rows', 20000)
-
-
-    def mysql_type_to_redshift(self, data_type, column_type):
-        return {
-            'char':'CHARACTER VARYING',
-            'varchar':'CHARACTER VARYING',
-            'binary':'CHARACTER VARYING',
-            'varbinary':'CHARACTER VARYING',
-            'blob':'CHARACTER VARYING',
-            'tinyblob':'CHARACTER VARYING',
-            'mediumblob':'CHARACTER VARYING',
-            'longblob':'CHARACTER VARYING',
-            'geometry':'CHARACTER VARYING',
-            'text':'CHARACTER VARYING',
-            'tinytext':'CHARACTER VARYING',
-            'mediumtext':'CHARACTER VARYING',
-            'longtext':'CHARACTER VARYING',
-            'enum':'CHARACTER VARYING',
-            'int':'NUMERIC NULL',
-            'tinyint':'BOOLEAN' if column_type == 'tinyint(1)' else 'NUMERIC NULL',
-            'smallint':'NUMERIC NULL',
-            'bigint':'NUMERIC NULL',
-            'bit':'BOOLEAN',
-            'decimal':'FLOAT',
-            'double':'FLOAT',
-            'float':'FLOAT',
-            'bool':'BOOLEAN',
-            'boolean':'BOOLEAN',
-            'date':'TIMESTAMP WITHOUT TIME ZONE',
-            'datetime':'TIMESTAMP WITHOUT TIME ZONE',
-            'timestamp':'TIMESTAMP WITHOUT TIME ZONE',
-        }.get(data_type, 'CHARACTER VARYING')
+        self.tap_type_to_target_type = tap_type_to_target_type
 
 
     def open_connection(self):
@@ -97,12 +66,18 @@ class MySql:
                 return []
 
 
-    def fetch_current_log_file_and_pos(self):
+    def fetch_current_log_pos(self):
         result = self.query("SHOW MASTER STATUS")
         if len(result) == 0:
             raise Exception("MySQL binary logging is not enabled.")
         else:
-            return result[0]
+            binlog_pos = result[0]
+
+            return {
+                "log_file": binlog_pos.get('File'),
+                "log_pos": binlog_pos.get('Position'),
+                "version": binlog_pos.get('version', 1)
+            }
 
 
     def fetch_current_incremental_key_pos(self, table, replication_key):
@@ -124,8 +99,9 @@ class MySql:
                 key_value = float(mysql_key_value)
 
             return {
-                "key": replication_key,
-                "key_value": key_value
+                "replication_key": replication_key,
+                "replication_key_value": key_value,
+                "version": 1
             }
 
 
@@ -167,39 +143,18 @@ class MySql:
                         AND table_name = '{}') x
                 ORDER BY
                         ordinal_position
-            """.format(table_dict.get('schema'), table_dict.get('name'))
+            """.format(table_dict.get('schema_name'), table_dict.get('table_name'))
         return self.query(sql)
 
 
-    def redshift_ddl_drop(self, table_name, target_schema, is_temporary):
-        table_dict = utils.tablename_to_dict(table_name)
-        target_table = table_dict.get('name') if not is_temporary else table_dict.get('temp_name')
-        return "DROP TABLE IF EXISTS {}.{}".format(target_schema, target_table)
-
-
-    def redshift_ddl(self, table_name, target_schema, is_temporary):
-        table_dict = utils.tablename_to_dict(table_name)
-        target_table = table_dict.get('name') if not is_temporary else table_dict.get('temp_name')
-
+    def map_column_types_to_target(self, table_name):
         mysql_columns = self.get_table_columns(table_name)
-        redshift_columns = ["{} {}".format(pc.get('column_name'), self.mysql_type_to_redshift(pc.get('data_type'), pc.get('column_type'))) for pc in mysql_columns]
-        primary_key = self.get_primary_key(table_name)
-        #if primary_key:
-        if False:
-            redshift_ddl = """CREATE TABLE IF NOT EXISTS {}.{} ({}
-            ,_SDC_EXTRACTED_AT TIMESTAMP WITHOUT TIME ZONE
-            ,_SDC_BATCHED_AT TIMESTAMP WITHOUT TIME ZONE
-            ,_SDC_DELETED_AT CHARACTER VARYING
-            , PRIMARY KEY ({}))
-            """.format(target_schema, target_table, ', '.join(redshift_columns), primary_key)
-        else:
-            redshift_ddl = """CREATE TABLE IF NOT EXISTS {}.{} ({}
-            ,_SDC_EXTRACTED_AT TIMESTAMP WITHOUT TIME ZONE
-            ,_SDC_BATCHED_AT TIMESTAMP WITHOUT TIME ZONE
-            ,_SDC_DELETED_AT CHARACTER VARYING
-            )
-            """.format(target_schema, target_table, ', '.join(redshift_columns))
-        return(redshift_ddl)
+        mapped_columns = ["{} {}".format(pc.get('column_name'), self.tap_type_to_target_type(pc.get('data_type'), pc.get('column_type'))) for pc in mysql_columns]
+
+        return {
+            "columns": mapped_columns,
+            "primary_key": self.get_primary_key(table_name)
+        }
 
 
     def copy_table(self, table_name, path):

@@ -6,7 +6,7 @@ import os
 
 from . import utils
 
-class Redshift:
+class FastSyncTargetRedshift:
     def __init__(self, connection_config, transformation_config = None):
         self.connection_config = connection_config
         self.transformation_config = transformation_config
@@ -61,6 +61,36 @@ class Redshift:
         self.query(sql)
 
 
+    def drop_table(self, target_schema, table_name, is_temporary=False):
+        table_dict = utils.tablename_to_dict(table_name)
+        target_table = table_dict.get('table_name') if not is_temporary else table_dict.get('temp_table_name')
+
+        sql = "DROP TABLE IF EXISTS {}.{}".format(target_schema, target_table)
+        self.query(sql)
+
+
+    def create_table(self, target_schema, table_name, columns, primary_key, is_temporary=False):
+        table_dict = utils.tablename_to_dict(table_name)
+        target_table = table_dict.get('table_name') if not is_temporary else table_dict.get('temp_table_name')
+
+        #if primary_key:
+        if False:
+            sql = """CREATE TABLE IF NOT EXISTS {}.{} ({}
+            ,_SDC_EXTRACTED_AT TIMESTAMP WITHOUT TIME ZONE
+            ,_SDC_BATCHED_AT TIMESTAMP WITHOUT TIME ZONE
+            ,_SDC_DELETED_AT CHARACTER VARYING
+            , PRIMARY KEY ({}))
+            """.format(target_schema, target_table, ', '.join(columns), primary_key)
+        else:
+            sql = """CREATE TABLE IF NOT EXISTS {}.{} ({}
+            ,_SDC_EXTRACTED_AT TIMESTAMP WITHOUT TIME ZONE
+            ,_SDC_BATCHED_AT TIMESTAMP WITHOUT TIME ZONE
+            ,_SDC_DELETED_AT CHARACTER VARYING
+            )
+            """.format(target_schema, target_table, ', '.join(columns))
+        self.query(sql)
+
+
     def copy_to_table(self, s3_key, target_schema, table_name, is_temporary):
         utils.log("REDSHIFT - Loading {} into Redshift...".format(s3_key))
         table_dict = utils.tablename_to_dict(table_name)
@@ -87,7 +117,7 @@ class Redshift:
         # Grant role is not mandatory parameter, do nothing if not specified
         if role:
             table_dict = utils.tablename_to_dict(table_name)
-            target_table = table_dict.get('name') if not is_temporary else table_dict.get('temp_name')
+            target_table = table_dict.get('table_name') if not is_temporary else table_dict.get('temp_table_name')
             sql = "GRANT SELECT ON {}.{} TO GROUP {}".format(target_schema, target_table, role)
             self.query(sql)
 
@@ -109,7 +139,7 @@ class Redshift:
     def obfuscate_columns(self, target_schema, table_name):
         utils.log("REDSHIFT - Applying obfuscation rules")
         table_dict = utils.tablename_to_dict(table_name)
-        temp_table = table_dict.get('temp_name')
+        temp_table = table_dict.get('temp_table_name')
         transformations = self.transformation_config.get('transformations', [])
         trans_cols = []
 
@@ -144,11 +174,10 @@ class Redshift:
 
     def swap_tables(self, schema, table_name):
         table_dict = utils.tablename_to_dict(table_name)
-        target_table = table_dict.get('name')
-        temp_table = table_dict.get('temp_name')
+        target_table = table_dict.get('table_name')
+        temp_table = table_dict.get('temp_table_name')
 
         # Swap tables and drop the temp tamp
         self.query("DROP TABLE IF EXISTS {}.{}".format(schema, target_table))
         self.query("ALTER TABLE {}.{} RENAME TO {}".format(schema, temp_table, target_table))
-        
 
