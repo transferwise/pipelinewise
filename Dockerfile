@@ -5,12 +5,8 @@ RUN apt-get -qq update && \
 
 COPY . /app
 
-RUN groupadd --gid 3434 pipelinewise && \
-    useradd --uid 3434 --gid pipelinewise --shell /bin/bash --home-dir /app pipelinewise && \
-    chown -R pipelinewise:pipelinewise /app
-
-USER pipelinewise
-RUN cd /app && ./install.sh --acceptlicenses --nousage --notestextras
+RUN cd /app \
+    && ./install.sh --acceptlicenses --nousage --notestextras \
+    && ln -s /root/.pipelinewise /app/.pipelinewise
 
 ENTRYPOINT ["/app/entrypoint.sh"]
-CMD ["pipelinewise"]
