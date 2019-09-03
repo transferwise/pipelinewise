@@ -63,6 +63,9 @@ PipelineWise can replicate data from the following data sources:
 
         :ref:`tap-mysql`
 
+
+.. container:: tile-wrapper
+
     .. container:: tile
 
         .. container:: img-hover-zoom
@@ -101,6 +104,8 @@ PipelineWise can replicate data from the following data sources:
              :target: connectors/taps/snowflake.html
 
         :ref:`tap-snowflake`
+
+.. container:: tile-wrapper
 
     .. container:: tile
 
@@ -145,6 +150,8 @@ PipelineWise can replicate data into the following destinations:
              :target: connectors/targets/redshift.html
 
         :ref:`target-redshift`
+
+.. container:: tile-wrapper
 
     .. container:: tile
 
