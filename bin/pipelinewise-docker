@@ -54,4 +54,4 @@ docker run \
   -v ${HOST_CONFIG_DIR}:${CONT_CONFIG_DIR} \
   -v ${HOST_DIR}:${CONT_WORK_DIR} \
   ${IMAGE}:${VERSION} \
-  pipelinewise ${ARGS}
+  ${ARGS}

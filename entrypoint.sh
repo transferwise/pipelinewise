@@ -9,4 +9,5 @@ WORK_DIR=/app/wrk
 mkdir -p ${WORK_DIR}
 cd ${WORK_DIR}
 
-exec "$@"
+exec pipelinewise \
+    "$@"
