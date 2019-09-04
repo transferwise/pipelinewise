@@ -12,12 +12,16 @@ YAML configuration
   and usage of these YAML files in the following sections:
 
   * :ref:`creating_pipelines`
+  * :ref:`tap-jira`
+  * :ref:`tap-kafka`
   * :ref:`tap-mysql`
   * :ref:`tap-postgres`
-  * :ref:`tap-zendesk`
-  * :ref:`tap-kafka`
   * :ref:`tap-s3-csv`
-  * :ref:`target-snowflake`
+  * :ref:`tap-salesforce`
+  * :ref:`tap-snowflake`
+  * :ref:`tap-zendesk`
   * :ref:`target-postgres`
+  * :ref:`target-redshift`
+  * :ref:`target-snowflake`
   * :ref:`target-s3-csv`
 

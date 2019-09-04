@@ -65,7 +65,7 @@
             
             
               <div class="version">
-                0.9.1
+                0.9.2
               </div>
             
           
@@ -192,13 +192,13 @@
   <div class="section" id="metadata-columns">
 <span id="id1"></span><h1>Metadata Columns<a class="headerlink" href="#metadata-columns" title="Permalink to this headline">¶</a></h1>
 <p>Metadata columns add extra row level information about data ingestions in target connectors.
-(i.e. when was the row read in source, when was inserted or deleted in snowflake etc.)</p>
-<p>Metadata columns are creating automatically by adding extra columns to the tables with a
+(i.e. when a row was read in source, when it was inserted or deleted in snowflake etc.)</p>
+<p>Metadata columns are created automatically by adding extra columns to the tables with a
 column prefix <code class="docutils literal notranslate"><span class="pre">_SDC_</span></code>:</p>
 <ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">_SDC_EXTRACTED_AT</span></code>: Timestamp when the record extracted from the source</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">_SDC_BATCHED_AT</span></code>: Timestamp when the record batched to load into target</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">_SDC_DELETED_AT</span></code>: Timestamp when the record delete event received from source.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">_SDC_EXTRACTED_AT</span></code>: Timestamp when the record was extracted from the source</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">_SDC_BATCHED_AT</span></code>: Timestamp when the record was batched to load into target</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">_SDC_DELETED_AT</span></code>: Timestamp when the record delete event was received from source.</p></li>
 </ul>
 <p>For example if you replicate a table that has three columns in source <code class="docutils literal notranslate"><span class="pre">COLUMN_ONE</span></code>,
 <code class="docutils literal notranslate"><span class="pre">COLUMN_TWO</span></code> and <code class="docutils literal notranslate"><span class="pre">COLUMN_THREE</span></code> then typically you find <code class="docutils literal notranslate"><span class="pre">_SDC_</span></code> metadata columns
@@ -245,14 +245,18 @@ at the end of the table:</p>
 </table>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
-<p>Optionally you can turn off creating metadata columns by creating
-<code class="docutils literal notranslate"><span class="pre">add_metadata_columns:</span> <span class="pre">False</span></code> to the target YAML config file.
-Please not if adding metadata columns option is turned off then deleted rows
-in source are not get deleted in target.</p>
-<p>Please note that <strong>Hard Delete</strong> mode is enabled by default for every target connector
-which means that every record that deleted in source will be deleted in the replicated
+<p>Optionally, you can turn off creating metadata columns by creating
+<code class="docutils literal notranslate"><span class="pre">add_metadata_columns:</span> <span class="pre">False</span></code> to the <a class="reference internal" href="../connectors/targets.html#targets-list"><span class="std std-ref">Targets (Destinations)</span></a> YAML config file.
+Please note, if adding metadata columns option is turned off then deleted rows
+in source do not get deleted in target.</p>
+<p>Please note that <strong>Hard Delete</strong> mode is enabled by default for every target connector,
+which means that every record that was deleted in source will be deleted in the replicated
 target database as well. Please also note that Only <a class="reference internal" href="../concept/replication_methods.html#log-based"><span class="std std-ref">Log Based</span></a> replication method
 detects delete row events.</p>
+<p>To turn off <strong>Hard Delete</strong> mode add <code class="docutils literal notranslate"><span class="pre">hard_delete:</span> <span class="pre">True</span></code> to the target <a class="reference internal" href="../connectors/targets.html#targets-list"><span class="std std-ref">Targets (Destinations)</span></a>
+YAML config file. In this case when a deleted row captured in source then
+<code class="docutils literal notranslate"><span class="pre">_SDC_DELETED_AT</span></code> column will only get flagged and not get deleted in the target.
+Please also note that Only <a class="reference internal" href="../concept/replication_methods.html#log-based"><span class="std std-ref">Log Based</span></a> replication method detects delete row events.</p>
 </div>
 </div>
 

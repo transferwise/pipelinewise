@@ -65,7 +65,7 @@
             
             
               <div class="version">
-                0.9.1
+                0.9.2
               </div>
             
           
@@ -195,8 +195,8 @@
   <div class="section" id="schema-changes">
 <span id="id1"></span><h1>Schema Changes<a class="headerlink" href="#schema-changes" title="Permalink to this headline">¶</a></h1>
 <p>Taps detect schema changes in source databases and target connectors alter the
-destination tables automatically. Based on the schema change type PipelineWise
-performs different actions in the destination tables:</p>
+destination tables automatically. Based on the schema change type, PipelineWise
+performs different actions in the destination tables as per the below:</p>
 <ul class="simple">
 <li><p><strong>When new column added</strong>: target connectors <strong>add the new column</strong> to the destination
 table with the same name using a compatible data type.</p></li>
@@ -204,12 +204,12 @@ table with the same name using a compatible data type.</p></li>
 Old column remains in the table in case you need to do historical analysis on
 the column. If the old column is not needed in the destination table then you can
 perform a manual <code class="docutils literal notranslate"><span class="pre">ALTER</span> <span class="pre">TABLE</span> <span class="pre">...</span> <span class="pre">DROP</span> <span class="pre">COLUMN</span> <span class="pre">...</span></code> statement in the target database
-or alternatively you can <a class="reference internal" href="resync.html#resync"><span class="std std-ref">Resync Tables</span></a> the table.</p></li>
-<li><p><strong>When column data type changed</strong>: target connectors <strong>versioning the column</strong>.</p></li>
+or alternatively you can <a class="reference internal" href="resync.html#resync"><span class="std std-ref">Resync Tables</span></a>.</p></li>
+<li><p><strong>When column data type changed</strong>: target connectors are <strong>versioning the column</strong>.</p></li>
 </ul>
 <div class="section" id="versioning-columns">
 <span id="id2"></span><h2>Versioning columns<a class="headerlink" href="#versioning-columns" title="Permalink to this headline">¶</a></h2>
-<p>Target connectors are versioning columns <strong>when data type change detected</strong> in the source
+<p>Target connectors are versioning columns <strong>when data type change is detected</strong> in the source
 table. Versioning columns means that the old column with the old datatype is
 renamed by adding a timestamp to column name and a new column with the new data
 type will be added to the table.</p>

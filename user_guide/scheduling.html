@@ -65,7 +65,7 @@
             
             
               <div class="version">
-                0.9.1
+                0.9.2
               </div>
             
           
@@ -192,8 +192,8 @@
   <div class="section" id="scheduling">
 <span id="id1"></span><h1>Scheduling<a class="headerlink" href="#scheduling" title="Permalink to this headline">¶</a></h1>
 <p>Scheduling and running PipelineWise tasks automatically is not part of the PipelineWise
-package but every task scheduler that can run Unix CLI commands can trigger PipelineWise
-jobs to run. Both Single Server and installations are achievable.</p>
+package but any task scheduler that can run Unix CLI commands can trigger PipelineWise
+jobs to run. Both Single Server and <a class="reference internal" href="#multi-server-cluster"><span class="std std-ref">Multi-Server Cluster</span></a> installations are achievable.</p>
 <p>Let’s say you have 5 microservice databases that you want to replicate to Amazon Redshift
 and <code class="docutils literal notranslate"><span class="pre">pipelinewise</span> <span class="pre">status</span></code> output looks like this:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ pipelinewise status
@@ -208,14 +208,14 @@ microserv_5   tap-postgres redshift    target-redshift   True       ready       
 <span class="m">5</span> pipeline<span class="o">(</span>s<span class="o">)</span>
 </pre></div>
 </div>
-<p>Since every pipeline runs, logs and manages state files independently then you need to run
+<p>Since every pipeline runs, logs and manages state files independently, you’ll need to run
 5 commands independently. For example if using
 <a class="reference external" href="https://en.wikipedia.org/wiki/Cron/">Unix Cron</a> you can create the following crontab:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>*/5 *   * * * pipelinewise run_tap --tap source_1 --target my_data_warehouse <span class="c1"># Sync every 5 minutes</span>
-  <span class="m">0</span> *   * * * pipelinewise run_tap --tap source_2 --target my_data_warehouse <span class="c1"># Sync ever hour</span>
-  <span class="m">0</span> */3 * * * pipelinewise run_tap --tap source_3 --target my_data_warehouse <span class="c1"># Sync every three hours</span>
-  <span class="m">0</span> <span class="m">0</span>   * * * pipelinewise run_tap --tap source_4 --target my_data_warehouse <span class="c1"># Sync every midnight</span>
-  <span class="m">0</span> <span class="m">0</span>   * * <span class="m">6</span> pipelinewise run_tap --tap source_5 --target my_data_warehouse <span class="c1"># Sync every Saturday</span>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>*/5 *   * * * pipelinewise run_tap --tap microserv_1 --target redshift <span class="c1"># Sync every 5 minutes</span>
+  <span class="m">0</span> *   * * * pipelinewise run_tap --tap microserv_2 --target redshift <span class="c1"># Sync ever hour</span>
+  <span class="m">0</span> */3 * * * pipelinewise run_tap --tap microserv_3 --target redshift <span class="c1"># Sync every three hours</span>
+  <span class="m">0</span> <span class="m">0</span>   * * * pipelinewise run_tap --tap microserv_4 --target redshift <span class="c1"># Sync every midnight</span>
+  <span class="m">0</span> <span class="m">0</span>   * * <span class="m">6</span> pipelinewise run_tap --tap microserv_5 --target redshift <span class="c1"># Sync every Saturday</span>
 </pre></div>
 </div>
 <p>PipelineWise is tested and can run with at least the following
@@ -223,7 +223,7 @@ schedulers:</p>
 <ul class="simple">
 <li><p><a class="reference external" href="https://en.wikipedia.org/wiki/Cron/">Unix Cron</a> Unix Cron - This is the simplest option
 for a single server installation.</p></li>
-<li><p><a class="reference external" href="https://github.com/jhuckaby/Cronicle/">Cronicle</a> - Cronicle is a reasonable good and
+<li><p><a class="reference external" href="https://github.com/jhuckaby/Cronicle/">Cronicle</a> - Cronicle is a reasonably good and
 relatively simple tool to schedule PipelineWise jobs in both Single Server and Multi-Server
 cluster installations.</p></li>
 <li><p><a class="reference external" href="https://airflow.apache.org/">Apache Airflow</a> - Airflow is a robust and mature tool to
@@ -236,9 +236,9 @@ schedule and monitor workflows.</p></li>
 that is accessible from every host in the PipelineWise cluster.
 (<a class="reference external" href="https://aws.amazon.com/efs/">Amazon EFS</a>, <a class="reference external" href="https://cloud.google.com/filestore/">Google FileStore</a> or similar)</p>
 <p>Network File System is required because PipelineWise keeps runtime configuration files in
-a common place on the host machine at <code class="docutils literal notranslate"><span class="pre">${HOME}/.pipelinewise</span></code> directory. If running
-PipelineWise commands on multiple nodes to operate on the same project then
-every node have to read/write into the same directory doesn’t matter where the nodes are
+a common place on the host machine at <code class="docutils literal notranslate"><span class="pre">${HOME}/.pipelinewise</span></code> directory. If you run
+PipelineWise commands on multiple nodes that operate on the same project, then
+every node has to read/write into the same directory, doesn’t matter where the nodes are
 located. This is typically done by mounting <code class="docutils literal notranslate"><span class="pre">${HOME}/.pipelinewise</span></code> on every node to
 a shared directory on NFS/EFS.</p>
 <div class="admonition warning">
