@@ -54,7 +54,7 @@ MySQL setup requirements
 
 A few things to note:
 
-  * ``log_bin`` doesn’t have to be ``mysql-binlog`` - this value can be anything. Additionally, if ``log_bin`` already has an entry (which you checked in step one), you don’t need to change it.
+  * ``log_bin`` doesn't have to be ``mysql-binlog`` - this value can be anything. Additionally, if ``log_bin`` already has an entry (which you checked in step one), you don’t need to change it.
   
   * Use either ``expire_log_days`` or ``binlog_expire_logs_seconds``, not both
   
@@ -146,7 +146,7 @@ Example YAML for ``tap-mysql``:
           replication_method: "LOG_BASED"     # Important! Log based must be enabled in MySQL
 
     # You can add as many schemas as you need...
-    # Uncommend this if you want replicate tables from multiple schemas
+    # Uncomment this if you want replicate tables from multiple schemas
     #- source_schema: "another_schema_in_mysql" 
     #  target_schema: "another
 

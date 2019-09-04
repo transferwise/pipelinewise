@@ -73,7 +73,7 @@ Let’s use a SQL query as an example:
     WHERE replication_key_column >= 'last_saved_maximum_value'
 
 
-If :ref:`log_based` Replication isn’t feasible or availble for a data source, Key-based Incremental Replication
+If :ref:`log_based` Replication isn’t feasible or available for a data source, Key-based Incremental Replication
 is the next best option.
 
 .. warning::
@@ -89,7 +89,7 @@ Full Table
 Full Table Replication is a replication method in which all rows in a table - including new, updated, and existing - are
 replicated during every replication job.
 
-If a table doesn’t have a column suitable for :ref:`incremental` or if :ref:`log_based` is unavailable,
+If a table doesn't have a column suitable for :ref:`incremental` or if :ref:`log_based` is unavailable,
 this method will be used to replicate data. 
 
 

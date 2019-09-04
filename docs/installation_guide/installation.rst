@@ -8,7 +8,7 @@ Installation
 Getting PipelineWise
 --------------------
 
-PipelineWise sorce code is available on GitHub at https://github.com/transferwise/pipelinewise
+PipelineWise source code is available on GitHub at https://github.com/transferwise/pipelinewise
 and can be installed in the following methods:
 
 * :ref:`running_from_docker`: Running a containerised docker executable image
@@ -27,7 +27,7 @@ and can be installed in the following methods:
     any of the components. It is common that multiple Singer components use the same python
     library with different versions.
 
-    This also means **PipelineWise is not distributed on** `PyPI <https://pypi.org//>`_ as a pyton package
+    This also means **PipelineWise is not distributed on** `PyPI <https://pypi.org//>`_ as a Python package
     and cannot be installed by ``pip``. PipelineWise **can run from Docker** or can be
     **installed from source**. In both cases the build and install scripts will create all the
     virtual environments at the right place in the right format and will take care of finding them

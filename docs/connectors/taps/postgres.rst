@@ -181,6 +181,6 @@ Example YAML for ``tap-postgres``:
             replication_method: "LOG_BASED"     # Important! Log based must be enabled in MySQL
 
       # You can add as many schemas as you need...
-      # Uncommend this if you want replicate tables from multiple schemas
+      # Uncomment this if you want replicate tables from multiple schemas
       #- source_schema: "another_schema_in_postgres" 
       #  target_schema: "another

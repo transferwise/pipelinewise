@@ -35,7 +35,7 @@ Example YAML for ``tap-jira``:
       username: "<USERNAME>"
       password: "<PASSWORD>"                            # Plain string or vault encrypted
 
-      # Mathod 2: OAuth authentication
+      # Method 2: OAuth authentication
       #oauth_client_secret: "<oauth-client-secret>"     # Plain string or vault encrypted
       #oauth_client_id: "<oauth-client-id>"
       #access_token: "<access-token>"                   # Plain string or vault encrypted

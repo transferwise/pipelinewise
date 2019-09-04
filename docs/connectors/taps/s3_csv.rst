@@ -22,7 +22,7 @@ Example YAML for ``tap-s3-csv``:
     # General Properties
     # ------------------------------------------------------------------------------
     id: "csv_on_s3"                        # Unique identifier of the tap
-    name: "Sampe CSV files on S3"          # Name of the tap
+    name: "Sample CSV files on S3"          # Name of the tap
     type: "tap-s3-csv"                     # !! THIS SHOULD NOT CHANGE !!
     owner: "somebody@foo.com"              # Data owner to contact
 
@@ -32,7 +32,7 @@ Example YAML for ``tap-s3-csv``:
     # ------------------------------------------------------------------------------
     db_conn:
       aws_access_key_id: "<ACCESS_KEY_ID>"          # Plain string or vault encrypted
-      aws_secret_access_key: "<SECRET_ASCCESS_KEY>" # Plain string or vault encrypted
+      aws_secret_access_key: "<SECRET_ACCESS_KEY>" # Plain string or vault encrypted
       bucket: "my-bucket"                           # S3 Bucket name
       start_date: "2000-01-01"                      # File before this data will be excluded
 
@@ -50,7 +50,7 @@ Example YAML for ``tap-s3-csv``:
                                               #            properties, uncomment this. Please note
                                               #            that files without primary keys will not
                                               #            be de-duplicated and could cause
-                                              #            duplicates. Aloways try selecting
+                                              #            duplicates. Always try selecting
                                               #            a reasonable key from the CSV file
 
 
