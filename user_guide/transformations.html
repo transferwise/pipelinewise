@@ -214,7 +214,7 @@ doing traditional ETL. ELT ingests data first into DWH in the original format an
 <p>The following transformations can be added optionally into the <a class="reference internal" href="yaml_config.html#yaml-configuration"><span class="std std-ref">YAML configuration</span></a>:</p>
 <ul class="simple">
 <li><p><strong>SET-NULL</strong>: Transforms any column to NULL</p></li>
-<li><p><strong>HASH</strong>: Transfroms string columns to hash</p></li>
+<li><p><strong>HASH</strong>: Transforms string columns to hash</p></li>
 <li><p><strong>HASH-SKIP-FIRST-n</strong>: Transforms string columns to hash skipping first n characters, e.g. HASH-SKIP-FIRST-2</p></li>
 <li><p><strong>MASK-DATA</strong>: Replaces the months and day parts of date columns to be always 1st of Jan</p></li>
 <li><p><strong>MASK-NUMBER</strong>: Transforms any numeric column to zero</p></li>
@@ -247,7 +247,7 @@ tables:
             equals: <span class="s1">&#39;passwordHash&#39;</span>
 
             <span class="c1"># Tip: Use &#39;regex_match&#39; instead of &#39;equal&#39; if you need</span>
-            <span class="c1"># more complex matching criterias. For example:</span>
+            <span class="c1"># more complex matching criteria. For example:</span>
             <span class="c1"># regex_match: &#39;password|salt|passwordHash&#39;</span>
 
       - column: <span class="s2">&quot;column_2&quot;</span>

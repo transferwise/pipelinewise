@@ -39,7 +39,7 @@ Example YAML for ``target-postgres``:
     db_conn:
       host: "<HOST>"                       # PostgreSQL host
       port: 5432                           # PostgreSQL port
-      user: "<USER>"                       # PostfreSQL user
+      user: "<USER>"                       # PostgreSQL user
       password: "<PASSWORD>"               # Plain string or vault encrypted
       dbname: "<DB_NAME>"                  # PostgreSQL database name
 

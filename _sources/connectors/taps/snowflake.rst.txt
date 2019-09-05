@@ -84,6 +84,6 @@ Example YAML for tap-snowflake:
             replication_method: "FULL_TABLE"
 
       # You can add as many schemas as you need...
-      # Uncommend this if you want replicate tables from multiple schemas
+      # Uncomment this if you want replicate tables from multiple schemas
       #- source_schema: "SCHEMA_2" 
       #  target_schema: "REPL_SCHEMA_2"

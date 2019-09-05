@@ -8,7 +8,7 @@ YAML configuration
 
   This section of the documentation is work in progress.
   
-  Pipelines using YAML format for configurations. You can find some informations
+  Pipelines using YAML format for configurations. You can find some information
   and usage of these YAML files in the following sections:
 
   * :ref:`creating_pipelines`

@@ -196,7 +196,7 @@
             
   <div class="section" id="creating-pipelines">
 <span id="id1"></span><h1>Creating Pipelines<a class="headerlink" href="#creating-pipelines" title="Permalink to this headline">¶</a></h1>
-<p>Pipelines define how the data should flow from source sytem to target. It defines the data source
+<p>Pipelines define how the data should flow from source system to target. It defines the data source
 credentials, the data that needs to be captured, replication methods, load time transformations,
 destination database credentials, source to target mapping, grants etc.</p>
 <p>Pipelines are expressed in YAML format and have a minimum of syntax, which intentionally tries
@@ -262,7 +262,7 @@ type: <span class="s2">&quot;target-snowflake&quot;</span>
 db_conn:
   account: <span class="s2">&quot;rtxxxxxx.eu-central-1&quot;</span>
   dbname: <span class="s2">&quot;analytics_db_test&quot;</span>
-  user: <span class="s2">&quot;snoflake_user&quot;</span>
+  user: <span class="s2">&quot;snowflake_user&quot;</span>
   password: <span class="s2">&quot;PASSWORD&quot;</span>                                   <span class="c1"># Plain string or Vault Encrypted password</span>
   warehouse: <span class="s2">&quot;LOAD_WH&quot;</span>
   s3_bucket: <span class="s2">&quot;pipelinewise-bucket&quot;</span>
@@ -356,7 +356,7 @@ mysql_sample  tap-mysql   snowflake    target-snowflake  True       ready       
 <span class="m">1</span> pipeline<span class="o">(</span>s<span class="o">)</span>
 </pre></div>
 </div>
-<p>Congratulations! At this point you have successfully çreated your first pipeline in PipelineWise and it’s now
+<p>Congratulations! At this point you have successfully created your first pipeline in PipelineWise and it’s now
 ready to run. You may want you can create a new git repository and push the <code class="docutils literal notranslate"><span class="pre">pipelinewise_samples</span></code>
 directory to keep everything under version control.</p>
 <p>Now you can head to the <a class="reference internal" href="running_pipelines.html#running-pipelines"><span class="std std-ref">Running Pipelines</span></a> section to run the pipelines and to start replicating data.</p>

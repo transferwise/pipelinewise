@@ -5,7 +5,7 @@ Metadata Columns
 ----------------
 
 
-Metadata columns add extra row level information about data ingestions in target connectors.
+Metadata columns add extra row level information about data ingestion in target connectors.
 (i.e. when a row was read in source, when it was inserted or deleted in snowflake etc.)
 
 Metadata columns are created automatically by adding extra columns to the tables with a
