@@ -30,7 +30,7 @@ The following transformations can be added optionally into the :ref:`yaml_config
 
 * **SET-NULL**: Transforms any column to NULL
 
-* **HASH**: Transfroms string columns to hash
+* **HASH**: Transforms string columns to hash
 
 * **HASH-SKIP-FIRST-n**: Transforms string columns to hash skipping first n characters, e.g. HASH-SKIP-FIRST-2
 
@@ -76,7 +76,7 @@ in the :ref:`yaml_configuration`:
                 equals: 'passwordHash'
 
                 # Tip: Use 'regex_match' instead of 'equal' if you need
-                # more complex matching criterias. For example:
+                # more complex matching criteria. For example:
                 # regex_match: 'password|salt|passwordHash'
 
           - column: "column_2"

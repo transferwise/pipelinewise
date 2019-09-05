@@ -40,13 +40,13 @@ the internal state file with the bookmark for the next run.
   maybe not correct. Everything that referring to ``/app/.pipelinewise/...`` in the output
   is available on your Docker host at ``${HOME}/.pipelinewise`` directory.
 
-  Read the :ref:`logging` section for furhter details about logging. 
+  Read the :ref:`logging` section for further details about logging.
 
 Typically you need to run the above command automatically, every midnight, every hour, every 5 minutes, etc.
 Now you can head to the :ref:`scheduling` section that will give you some idea about scheduling.
 
 Alternatively you can learn more about PipelineWise how it automatically performs
-schema changes, how it does logging or load time transformations etc. in the recommeded sections below:
+schema changes, how it does logging or load time transformations etc. in the recommended sections below:
 
 * :ref:`schema_changes`
 

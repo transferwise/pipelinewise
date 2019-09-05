@@ -59,61 +59,71 @@ recommended method of start using PipelineWise.
 
 1. Build an executable docker images that has every required dependency and it's isolated from your host system:
 
-```sh
-$ docker build -t pipelinewise:latest .
-```
+    ```sh
+    $ docker build -t pipelinewise:latest .
+    ```
 
 2. Once the image is ready, create an alias to the docker wrapper script:
 
-```sh
-$ alias pipelinewise="$(PWD)/bin/pipelinewise-docker"
-```
+    ```sh
+    $ alias pipelinewise="$(PWD)/bin/pipelinewise-docker"
+    ```
 
 3. Check if the installation was successfully by running the `pipelinewise status` command:
 
-```sh
-$ pipelinewise status
-
-Tap ID    Tap Type      Target ID     Target Type      Enabled    Status    Last Sync    Last Sync Result
---------  ------------  ------------  ---------------  ---------  --------  -----------  ------------------
-0 pipeline(s)
-```
+    ```sh
+    $ pipelinewise status
+    
+    Tap ID    Tap Type      Target ID     Target Type      Enabled    Status    Last Sync    Last Sync Result
+    --------  ------------  ------------  ---------------  ---------  --------  -----------  ------------------
+    0 pipeline(s)
+    ```
 
 You can run any pipelinewise command at this point. Tutorials to create and run pipelines is at https://transferwise.github.io/pipelinewise/installation_guide/creating_pipelines.html .
+
+**PS**: 
+
+For the tests to work, run the commands inside a PipelineWise container.
+To create, start and get a bash shell in the container:
+
+```sh
+$ docker-compose up -d pipelinewise
+$ docker exec -it pipelinewise_dev bash
+```
 
 
 ### Building from source
 
 1. Make sure that every dependencies installed on your system:
-* Python 3.x
-* python3-dev
-* python3-venv
+    * Python 3.x
+    * python3-dev
+    * python3-venv
 
 2. Run the install script that installs the PipelineWise CLI and every supported singer connectors into separated virtual environments:
    
-```sh
-$ ./install.sh
-```
-Press `Y` to accept the license agreement of the required singer components. To automate the installation and accept every license agreement run `./install --acceptlicenses`)
+    ```sh
+    $ ./install.sh
+    ```
+    Press `Y` to accept the license agreement of the required singer components. To automate the installation and accept every license agreement run `./install --acceptlicenses`)
 
 3. To start CLI you need to activate the CLI virtual environment and has to set `PIPELINEWISE_HOME` environment variable:
    
-```sh
-$ source {ACTUAL_ABSOLUTE_PATH}/.virtualenvs/pipelinewise/bin/activate
-$ export PIPELINEWISE_HOME={ACTUAL_ABSOLUTE_PATH}
-```
-(The `ACTUAL_ABSOLUTE_PATH` differs on every system, the install script prints you the correct command that fits
-to your system once the installation completed)
+    ```sh
+    $ source {ACTUAL_ABSOLUTE_PATH}/.virtualenvs/pipelinewise/bin/activate
+    $ export PIPELINEWISE_HOME={ACTUAL_ABSOLUTE_PATH}
+    ```
+    (The `ACTUAL_ABSOLUTE_PATH` differs on every system, the install script prints you the correct command that fits
+    to your system once the installation completed)
 
 4. Check if the installation was successfully by running the `pipelinewise status` command:
 
-```sh
-$ pipelinewise status
-
-Tap ID    Tap Type      Target ID     Target Type      Enabled    Status    Last Sync    Last Sync Result
---------  ------------  ------------  ---------------  ---------  --------  -----------  ------------------
-0 pipeline(s)
-```
+    ```sh
+    $ pipelinewise status
+    
+    Tap ID    Tap Type      Target ID     Target Type      Enabled    Status    Last Sync    Last Sync Result
+    --------  ------------  ------------  ---------------  ---------  --------  -----------  ------------------
+    0 pipeline(s)
+    ```
 
 You can run any pipelinewise command at this point. Tutorials to create and run pipelines is at https://transferwise.github.io/pipelinewise/installation_guide/creating_pipelines.html .
 

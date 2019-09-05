@@ -4,7 +4,7 @@
 Creating Pipelines
 ==================
 
-Pipelines define how the data should flow from source sytem to target. It defines the data source
+Pipelines define how the data should flow from source system to target. It defines the data source
 credentials, the data that needs to be captured, replication methods, load time transformations,
 destination database credentials, source to target mapping, grants etc.
 
@@ -92,7 +92,7 @@ You can edit it with the text editor of your choice:
     db_conn:
       account: "rtxxxxxx.eu-central-1"
       dbname: "analytics_db_test"
-      user: "snoflake_user"
+      user: "snowflake_user"
       password: "PASSWORD"                                   # Plain string or Vault Encrypted password
       warehouse: "LOAD_WH"
       s3_bucket: "pipelinewise-bucket"
@@ -197,7 +197,7 @@ Once the config YAML files are imported, you can see the new pipelines with the 
     1 pipeline(s)
 
 
-Congratulations! At this point you have successfully çreated your first pipeline in PipelineWise and it's now
+Congratulations! At this point you have successfully created your first pipeline in PipelineWise and it's now
 ready to run. You may want you can create a new git repository and push the ``pipelinewise_samples``
 directory to keep everything under version control.
 
