@@ -50,7 +50,7 @@ mariadb   tap-mysql     postgres_dwh  target-postgres  True       ready         
 ```
 
 **Note**: To configure the list of tables to replicate, replication methods, load time transformations, etc.,
-edit the YAML files in the `test-project` directory. Don't forget to re-import the project with
+edit the YAML files in the `dev-project` directory. Don't forget to re-import the project with
 `pipelinewise import --dir dev-project` when making changes in the YAML files.
 
 To start replicating data from source MariaDB to target Postgres DWH:
