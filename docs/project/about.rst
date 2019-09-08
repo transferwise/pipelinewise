@@ -14,7 +14,8 @@ Committers
 
 - `@koszti <https://github.com/koszti>`_ (Peter Kosztolanyi)
 - `@kasparg <https://github.com/kasparg>`_ (Kaspar Gering)
-- `@louispietw <https://github.com/louispietw>`_ (Louis Pieterse)
+- `@louis-pie <https://github.com/louis-pie>`_ (Louis Pieterse)
+- `@samira-el <https://github.com/samira-el>`_ (Samira El Aabidi)
 
 Singer Community
 ----------------
