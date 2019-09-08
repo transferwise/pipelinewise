@@ -7,7 +7,7 @@ History
 -------
 
 PipelineWise was started in August 2018 by Peter Kosztolanyi at TransferWise
-and the project may be open sourced in the near future.
+and the project was open sourced at the end of August 2019.
 
 Committers
 ----------
