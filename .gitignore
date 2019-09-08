@@ -23,6 +23,7 @@ test-reports/
 tests/end-to-end/test-project/*.yml
 
 # Dev project
+dev-project/tap_oracle.yml
 dev-project/target_redshift.yml
 dev-project/target_snowflake.yml
 

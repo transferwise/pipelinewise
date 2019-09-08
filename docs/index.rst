@@ -63,7 +63,6 @@ PipelineWise can replicate data from the following data sources:
 
         :ref:`tap-mysql`
 
-
 .. container:: tile-wrapper
 
     .. container:: tile
@@ -79,13 +78,21 @@ PipelineWise can replicate data from the following data sources:
 
         .. container:: img-hover-zoom
 
+          .. image:: img/oracle-logo.png
+             :target: connectors/taps/oracle.html
+
+        :ref:`tap-oracle`
+
+.. container:: tile-wrapper
+
+    .. container:: tile
+
+        .. container:: img-hover-zoom
+
           .. image:: img/s3-logo.png
              :target: connectors/taps/s3_csv.html
 
         :ref:`tap-s3-csv`
-
-
-.. container:: tile-wrapper
 
     .. container:: tile
 
@@ -96,6 +103,8 @@ PipelineWise can replicate data from the following data sources:
 
         :ref:`tap-kafka`
 
+.. container:: tile-wrapper
+
     .. container:: tile
 
         .. container:: img-hover-zoom
@@ -104,8 +113,6 @@ PipelineWise can replicate data from the following data sources:
              :target: connectors/taps/snowflake.html
 
         :ref:`tap-snowflake`
-
-.. container:: tile-wrapper
 
     .. container:: tile
 
@@ -116,6 +123,8 @@ PipelineWise can replicate data from the following data sources:
 
         :ref:`tap-salesforce`
 
+.. container:: tile-wrapper
+
     .. container:: tile
 
         .. container:: img-hover-zoom
@@ -124,6 +133,15 @@ PipelineWise can replicate data from the following data sources:
              :target: connectors/taps/zendesk.html
 
         :ref:`tap-zendesk`
+
+    .. container:: tile
+
+        .. container:: img-hover-zoom
+
+          .. image:: img/jira-logo.png
+             :target: connectors/taps/jira.html
+
+        :ref:`tap-jira`
 
 
 Target (Destination Connectors)

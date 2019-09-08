@@ -27,6 +27,8 @@ PipelineWise can replicate data from every supported :ref:`taps_list` into the f
 
         :ref:`target-redshift`
 
+.. container:: tile-wrapper
+
     .. container:: tile
 
         .. container:: img-hover-zoom
