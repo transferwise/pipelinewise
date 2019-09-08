@@ -31,26 +31,30 @@ REQUIRED_CONFIG_KEYS = {
     ]
 }
 
+DEFAULT_VARCHAR_LENGTH = 10000
+SHORT_VARCHAR_LENGTH = 256
+LONG_VARCHAR_LENGTH = 65535
+
 lock = multiprocessing.Lock()
 
 
 def tap_type_to_target_type(mysql_type, mysql_column_type):
     """Data type mapping from MySQL to Redshift"""
     return {
-        'char':'CHARACTER VARYING',
-        'varchar':'CHARACTER VARYING',
-        'binary':'CHARACTER VARYING',
-        'varbinary':'CHARACTER VARYING',
-        'blob':'CHARACTER VARYING',
-        'tinyblob':'CHARACTER VARYING',
-        'mediumblob':'CHARACTER VARYING',
-        'longblob':'CHARACTER VARYING',
-        'geometry':'CHARACTER VARYING',
-        'text':'CHARACTER VARYING',
-        'tinytext':'CHARACTER VARYING',
-        'mediumtext':'CHARACTER VARYING',
-        'longtext':'CHARACTER VARYING',
-        'enum':'CHARACTER VARYING',
+        'char':'CHARACTER VARYING({})'.format(SHORT_VARCHAR_LENGTH),
+        'varchar':'CHARACTER VARYING({})'.format(SHORT_VARCHAR_LENGTH),
+        'binary':'CHARACTER VARYING({})'.format(LONG_VARCHAR_LENGTH),
+        'varbinary':'CHARACTER VARYING({})'.format(LONG_VARCHAR_LENGTH),
+        'blob':'CHARACTER VARYING({})'.format(LONG_VARCHAR_LENGTH),
+        'tinyblob':'CHARACTER VARYING({})'.format(LONG_VARCHAR_LENGTH),
+        'mediumblob':'CHARACTER VARYING({})'.format(LONG_VARCHAR_LENGTH),
+        'longblob':'CHARACTER VARYING({})'.format(LONG_VARCHAR_LENGTH),
+        'geometry':'CHARACTER VARYING({})'.format(DEFAULT_VARCHAR_LENGTH),
+        'text':'CHARACTER VARYING({})'.format(LONG_VARCHAR_LENGTH),
+        'tinytext':'CHARACTER VARYING({})'.format(SHORT_VARCHAR_LENGTH),
+        'mediumtext':'CHARACTER VARYING({})'.format(LONG_VARCHAR_LENGTH),
+        'longtext':'CHARACTER VARYING({})'.format(LONG_VARCHAR_LENGTH),
+        'enum':'CHARACTER VARYING({})'.format(DEFAULT_VARCHAR_LENGTH),
         'int':'NUMERIC NULL',
         'tinyint':'BOOLEAN' if mysql_column_type == 'tinyint(1)' else 'NUMERIC NULL',
         'smallint':'NUMERIC NULL',
@@ -64,7 +68,7 @@ def tap_type_to_target_type(mysql_type, mysql_column_type):
         'date':'TIMESTAMP WITHOUT TIME ZONE',
         'datetime':'TIMESTAMP WITHOUT TIME ZONE',
         'timestamp':'TIMESTAMP WITHOUT TIME ZONE',
-    }.get(mysql_type, 'CHARACTER VARYING')
+    }.get(mysql_type, 'CHARACTER VARYING({})'.format(DEFAULT_VARCHAR_LENGTH),)
 
 
 def sync_table(table):
