@@ -77,7 +77,7 @@ class FastSyncTargetPostgres:
     def copy_to_table(self, s3_key, target_schema, table_name, is_temporary):
         utils.log("POSTGRES - Loading {} into Redshift...".format(s3_key))
         table_dict = utils.tablename_to_dict(table_name)
-        target_table = table_dict.get('name') if not is_temporary else table_dict.get('temp_name')
+        target_table = table_dict.get('table_name') if not is_temporary else table_dict.get('temp_table_name')
 
         aws_access_key_id=self.connection_config['aws_access_key_id']
         aws_secret_access_key=self.connection_config['aws_secret_access_key']
@@ -133,7 +133,7 @@ class FastSyncTargetPostgres:
             #
             # We need to convert to the same format to find the transformation
             # has that has to be applied
-            tap_stream_name_by_table_name = "{}-{}".format(table_dict.get('schema'), table_dict.get('name'))
+            tap_stream_name_by_table_name = "{}-{}".format(table_dict.get('schema_name'), table_dict.get('table_name'))
             if t.get('tap_stream_name') == tap_stream_name_by_table_name:
                 column = t.get('field_id')
                 transform_type = t.get('type')
