@@ -11,7 +11,7 @@ Getting PipelineWise
 PipelineWise source code is available on GitHub at https://github.com/transferwise/pipelinewise
 and can be installed in the following methods:
 
-* :ref:`running_from_docker`: Running a containerised docker executable image
+* :ref:`running_in_docker`: Running a containerised docker executable image
   that is isolated from your host system.
 
 * :ref:`building_from_source` Building from source code directly to your host system.
@@ -34,10 +34,10 @@ and can be installed in the following methods:
     at runtime.
 
 
-.. _running_from_docker:
+.. _running_in_docker:
 
-Running from Docker
--------------------
+Running in Docker
+-----------------
 
 Running PipelineWise from docker is usually the easiest and the recommended method. We will
 build an executable docker images that has every required dependency and it's isolated from

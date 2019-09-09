@@ -16,6 +16,7 @@ YAML configuration
   * :ref:`tap-kafka`
   * :ref:`tap-mysql`
   * :ref:`tap-postgres`
+  * :ref:`tap-oracle`
   * :ref:`tap-s3-csv`
   * :ref:`tap-salesforce`
   * :ref:`tap-snowflake`

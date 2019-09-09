@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Tap PostgreSQL &mdash; PipelineWise  documentation</title>
+  <title>Tap Oracle &mdash; PipelineWise  documentation</title>
   
 
   
@@ -17,7 +17,7 @@
   
   
   
-    <link rel="canonical" href="https://docs.ansible.com/ansible/latest/connectors/taps/postgres.html"/>
+    <link rel="canonical" href="https://docs.ansible.com/ansible/latest/connectors/taps/oracle.html"/>
   
 
   
@@ -40,8 +40,8 @@
   <link rel="stylesheet" href="../../_static/css/custom.css" type="text/css" />
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
-    <link rel="next" title="Tap Oracle" href="oracle.html" />
-    <link rel="prev" title="Tap MySQL" href="mysql.html" /> 
+    <link rel="next" title="Tap S3 CSV" href="s3_csv.html" />
+    <link rel="prev" title="Tap PostgreSQL" href="postgres.html" /> 
 </head>
 
 <body class="wy-body-for-nav">
@@ -120,12 +120,12 @@
 <li class="toctree-l1"><a class="reference internal" href="../taps.html">Taps (Data Sources)</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="../taps.html#configuring-taps">Configuring taps</a><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="mysql.html">Tap MySQL</a></li>
-<li class="toctree-l2 current"><a class="current reference internal" href="#">Tap PostgreSQL</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#postgresql-setup-requirements">PostgreSQL setup requirements</a></li>
+<li class="toctree-l2"><a class="reference internal" href="postgres.html">Tap PostgreSQL</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Tap Oracle</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#oracle-setup-requirements">Oracle setup requirements</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#configuring-what-to-replicate">Configuring what to replicate</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="oracle.html">Tap Oracle</a></li>
 <li class="toctree-l2"><a class="reference internal" href="s3_csv.html">Tap S3 CSV</a></li>
 <li class="toctree-l2"><a class="reference internal" href="kafka.html">Tap Kafka</a></li>
 <li class="toctree-l2"><a class="reference internal" href="snowflake.html">Tap Snowflake</a></li>
@@ -187,13 +187,13 @@
         
           <li><a href="../taps.html">Taps (Data Sources)</a> &raquo;</li>
         
-      <li>Tap PostgreSQL</li>
+      <li>Tap Oracle</li>
     
     
       <li class="wy-breadcrumbs-aside">
         
             
-            <a href="../../_sources/connectors/taps/postgres.rst.txt" rel="nofollow"> View page source</a>
+            <a href="../../_sources/connectors/taps/oracle.rst.txt" rel="nofollow"> View page source</a>
           
         
       </li>
@@ -206,104 +206,112 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
             
-  <div class="section" id="tap-postgresql">
-<span id="tap-postgres"></span><h1>Tap PostgreSQL<a class="headerlink" href="#tap-postgresql" title="Permalink to this headline">¶</a></h1>
-<div class="section" id="postgresql-setup-requirements">
-<h2>PostgreSQL setup requirements<a class="headerlink" href="#postgresql-setup-requirements" title="Permalink to this headline">¶</a></h2>
-<p><em>(Section based on Stitch documentation)</em></p>
-<p><strong>Step 1: Check if you have all the required credentials for replicating data from PostgreSQL</strong></p>
-<ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">CREATEROLE</span></code> or <code class="docutils literal notranslate"><span class="pre">SUPERUSER</span></code> privilege - Either permission is required to create a database user for PipelineWise.</p></li>
-</ul>
-<p><strong>Step 2. Create a PipelineWise database user</strong></p>
-<p>Next, you’ll create a dedicated database user for PipelineWise. Create a new user and grant the required permissions
+  <div class="section" id="tap-oracle">
+<span id="id1"></span><h1>Tap Oracle<a class="headerlink" href="#tap-oracle" title="Permalink to this headline">¶</a></h1>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p><a class="reference external" href="https://www.oracle.com/database/technologies/instant-client.html">Oracle Instant Client</a> is
+required to use Tap Oracle. If PipelineWise is <a class="reference internal" href="../../installation_guide/installation.html#running-in-docker"><span class="std std-ref">Running in Docker</span></a> then no further
+action needed because  <strong>PipelineWise Docker Image includes Oracle Instant Client</strong>
+automatically.</p>
+<p>If PipelineWise <a class="reference internal" href="../../installation_guide/installation.html#building-from-source"><span class="std std-ref">Installing from source</span></a> then you have to
+<strong>install Oracle Instant Client manually</strong> to your machine.</p>
+</div>
+<div class="section" id="oracle-setup-requirements">
+<h2>Oracle setup requirements<a class="headerlink" href="#oracle-setup-requirements" title="Permalink to this headline">¶</a></h2>
+<p><strong>Step 1. Create a PipelineWise database user</strong></p>
+<p>You’ll create a dedicated database user for PipelineWise. Create a new user and grant the required permissions
 on the database, schema and tables that you want to replicate:</p>
 <blockquote>
 <div><ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">CREATE</span> <span class="pre">USER</span> <span class="pre">pipelinewise</span> <span class="pre">WITH</span> <span class="pre">ENCRYPTED</span> <span class="pre">PASSWORD</span> <span class="pre">'&lt;password&gt;'</span></code></p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">GRANT</span> <span class="pre">CONNECT</span> <span class="pre">ON</span> <span class="pre">DATABASE</span> <span class="pre">&lt;database_name&gt;</span> <span class="pre">TO</span> <span class="pre">pipelinewise</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">CREATE</span> <span class="pre">USER</span> <span class="pre">pipelinewise</span> <span class="pre">IDENTIFIEDBY</span> <span class="pre">&lt;password&gt;</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">GRANT</span> <span class="pre">CONNECT</span> <span class="pre">TO</span> <span class="pre">pipelinewise</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">GRANT</span> <span class="pre">CREATE</span> <span class="pre">SESSION</span> <span class="pre">TO</span> <span class="pre">pipelinewise</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">GRANT</span> <span class="pre">UNLIMITED</span> <span class="pre">TABLESPACE</span> <span class="pre">TO</span> <span class="pre">TO</span> <span class="pre">pipelinewise</span></code></p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">GRANT</span> <span class="pre">USAGE</span> <span class="pre">ON</span> <span class="pre">SCHEMA</span> <span class="pre">&lt;schema_name&gt;</span> <span class="pre">TO</span> <span class="pre">pipelinewise</span></code></p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">GRANT</span> <span class="pre">SELECT</span> <span class="pre">ON</span> <span class="pre">ALL</span> <span class="pre">TABLES</span> <span class="pre">IN</span> <span class="pre">SCHEMA</span> <span class="pre">&lt;schema_name&gt;</span> <span class="pre">TO</span> <span class="pre">pipelinewise</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">GRANT</span> <span class="pre">SELECT</span> <span class="pre">ON</span> <span class="pre">&lt;schema_name&gt;.&lt;table_name&gt;</span> <span class="pre">TO</span> <span class="pre">pipelinewise</span></code> (Repeat this grant on every table that you want to replicate)</p></li>
 </ul>
 </div></blockquote>
-<p><strong>Step 3: Configure Log-based Incremental Replication</strong></p>
+<p><strong>Step 2: Check if you have all the required credentials for replicating data from Oracle</strong></p>
+<p>Access to <code class="docutils literal notranslate"><span class="pre">V$DATABASE</span></code> and <code class="docutils literal notranslate"><span class="pre">V_$THREAD</span></code> performance views.
+These are required to verify setting configuration while setting up your Oracle database and to
+retrieve the database’s Oracle System ID.</p>
+<p><strong>Step 3: Configure Log-based Incremental Replication with LogMiner</strong></p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>This step is only required if you use <a class="reference internal" href="../../concept/replication_methods.html#log-based"><span class="std std-ref">Log Based</span></a> replication method.</p>
 </div>
+<p><strong>Step 3.1: Verify the database’s current archiving mode</strong></p>
+<p>To check the database’s current mode, run:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>SELECT LOG_MODE FROM V<span class="nv">$DATABASE</span>
+</pre></div>
+</div>
+<p>If the result is <code class="docutils literal notranslate"><span class="pre">ARCHIVELOG</span></code>, archiving is enabled and no further action is required. Skip to Step 3.3 to configure RMAN backups.</p>
+<p><strong>Step 3.2: Enable ARCHIVELOG mode</strong></p>
+<ol class="arabic simple">
+<li><p>Shut down the database instance. The database and any associated instances must be shut down before the database’s archiving mode can be changed.</p></li>
+</ol>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>SQL&gt; SHUTDOWN IMMEDIATE
+SQL&gt; STARTUP MOUNT
+SQL&gt; ALTER DATABASE ARCHIVELOG
+SQL&gt; ALTER DATABASE OPEN
+</pre></div>
+</div>
+<p><strong>Step 3.3: Set retention period by RMAN</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>RMAN&gt; CONFIGURE RETENTION POLICY TO RECOVERY WINDOW OF <span class="m">3</span> DAYS<span class="p">;</span>
+</pre></div>
+</div>
+<p><strong>Note</strong>: To ensure that archive log files don’t consume all of your available disk space,
+you should also set the <code class="docutils literal notranslate"><span class="pre">DB_RECOVERY_FILE_DEST_SIZE</span></code> parameter to a value that agrees with
+your available disk quota. Refer to <a class="reference external" href="https://docs.oracle.com/cd/B28359_01/backup.111/b28270/rcmconfb.htm#BRADV89425">Oracle’s documentation</a>
+for more info about this parameter.</p>
+<p><strong>Step 3.4: Enable supplemental logging</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>SQL&gt; ALTER DATABASE ADD SUPPLEMENTAL LOG DATA <span class="o">(</span>ALL<span class="o">)</span> COLUMNS
+</pre></div>
+</div>
+<p><strong>Note</strong>: Alternatively to enable supplemental logging at the table level, run
+<code class="docutils literal notranslate"><span class="pre">ALTER</span> <span class="pre">TABLE</span> <span class="pre">&lt;SCHEMA_NAME&gt;.&lt;TABLE_NAME&gt;</span> <span class="pre">ADD</span> <span class="pre">SUPPLEMENTAL</span> <span class="pre">LOG</span> <span class="pre">DATA</span> <span class="pre">(ALL)</span> <span class="pre">COLUMNS</span></code>
+for every table you want to replicate.</p>
+<p>Verify that supplemental logging was successfully enabled by running the following query:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>SELECT SUPPLEMENTAL_LOG_DATA_MIN FROM V<span class="nv">$DATABASE</span>
+</pre></div>
+</div>
+<p>If the returned value is <code class="docutils literal notranslate"><span class="pre">YES</span></code> or <code class="docutils literal notranslate"><span class="pre">IMPLICIT</span></code>, supplemental logging is enabled.</p>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
-<p><a class="reference internal" href="../../concept/replication_methods.html#log-based"><span class="std std-ref">Log Based</span></a> for PostgreSQL-based databases requires:</p>
+<p>If you want to use Log-based Incremental Replication, you’ll also need to
+<strong>grant additional permissions</strong> to the <code class="docutils literal notranslate"><span class="pre">pipelinewise</span></code> user:</p>
 <ul class="simple">
-<li><p><strong>PostgreSQL databases running PostgreSQL versions 9.4.x or greater.</strong></p></li>
-<li><p><strong>To avoid a critical PostgreSQL bug, use at least one of the following minor versions</strong></p>
-<ul>
-<li><p>PostgreSQL 11.2</p></li>
-<li><p>PostgreSQL 10.7</p></li>
-<li><p>PostgreSQL 9.6.12</p></li>
-<li><p>PostgreSQL 9.5.16</p></li>
-<li><p>PostgreSQL 9.4.21</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">GRANT</span> <span class="pre">EXECUTE_CATALOG_ROLE</span> <span class="pre">TO</span> <span class="pre">PIPELINEWISE</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">GRANT</span> <span class="pre">SELECT</span> <span class="pre">ANY</span> <span class="pre">TRANSACTION</span> <span class="pre">TO</span> <span class="pre">PIPELINEWISE</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">GRANT</span> <span class="pre">SELECT</span> <span class="pre">ANY</span> <span class="pre">DICTIONARY</span> <span class="pre">TO</span> <span class="pre">PIPELINEWISE</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">GRANT</span> <span class="pre">EXECUTE</span> <span class="pre">ON</span> <span class="pre">DBMS_LOGMNR</span> <span class="pre">TO</span> <span class="pre">PIPELINEWISE</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">GRANT</span> <span class="pre">EXECUTE</span> <span class="pre">ON</span> <span class="pre">DBMS_LOGMNR_D</span> <span class="pre">TO</span> <span class="pre">PIPELINEWISE</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">GRANT</span> <span class="pre">SELECT</span> <span class="pre">ON</span> <span class="pre">SYS.V_$DATABASE</span> <span class="pre">TO</span> <span class="pre">PIPELINEWISE</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">GRANT</span> <span class="pre">SELECT</span> <span class="pre">ON</span> <span class="pre">SYS.V_$ARCHIVED_LOG</span> <span class="pre">TO</span> <span class="pre">PIPELINEWISE</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">GRANT</span> <span class="pre">SELECT</span> <span class="pre">ON</span> <span class="pre">SYS.V_$LOGMNR_CONTENTS</span> <span class="pre">TO</span> <span class="pre">PIPELINEWISE</span></code></p></li>
 </ul>
-</li>
-<li><p><strong>A connection to the master instance.</strong> Log-based replication will only work by connecting to the master instance.</p></li>
-</ul>
-</div>
-<p><strong>Step 3.1: Install the wal2json plugin</strong></p>
-<p>To use <a class="reference internal" href="../../concept/replication_methods.html#log-based"><span class="std std-ref">Log Based</span></a> for your PostgreSQL integration, you must install the <a class="reference external" href="https://github.com/eulerto/wal2json">wal2json</a> plugin. The wal2json plugin outputs JSON objects for logical decoding, which Stitch then uses to perform Log-based Replication.</p>
-<p>Steps for installing the plugin vary depending on your operating system. Instructions for each operating system type are in the wal2json’s GitHub repository:</p>
+<p><strong>If you’re using version 12 of Oracle</strong>, you’ll also need to grant the
+<code class="docutils literal notranslate"><span class="pre">LOGMINING</span></code> privilege to the PipelineWise user:</p>
 <ul class="simple">
-<li><p><a class="reference external" href="https://github.com/eulerto/wal2json#unix-based-operating-systems">Unix-based operating systems</a></p></li>
-<li><p><a class="reference external" href="https://github.com/eulerto/wal2json#windows">Windows</a></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">GRANT</span> <span class="pre">LOGMINING</span> <span class="pre">TO</span> <span class="pre">PIPELINEWISE</span></code></p></li>
 </ul>
-<p>After you’ve installed the plugin, you can move onto the next step.</p>
-<p><strong>Step 3.2: Edit the database configuration file</strong></p>
-<p>Locate the database configuration file (usually <code class="docutils literal notranslate"><span class="pre">postgresql.conf</span></code>) and define the parameters as follows:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">wal_level</span><span class="o">=</span>logical
-<span class="nv">max_replication_slots</span><span class="o">=</span><span class="m">5</span>
-<span class="nv">max_wal_senders</span><span class="o">=</span><span class="m">5</span>
-</pre></div>
 </div>
-<p><strong>Note</strong>: For <code class="docutils literal notranslate"><span class="pre">max_replication_slots</span></code> and <code class="docutils literal notranslate"><span class="pre">max_wal_senders</span></code>, we’re defaulting to a value of 5.
-This should be sufficient unless you have a large number of read replicas connected to the master instance.</p>
-<p><strong>Step 3.3: Restart the PostgreSQL service</strong></p>
-<p>Restart your PostgreSQL service to ensure the changes take effect.</p>
-<p><strong>Step 3.4: Create a replication slot</strong></p>
-<p>Next, you’ll create a dedicated logical replication slot for Stitch. In PostgreSQL, a logical replication
-slot represents a stream of database changes that can then be replayed to a client in the order they were
-made on the original server. Each slot streams a sequence of changes from a single database.</p>
-<p><strong>Note</strong>: Replication slots are specific to a given database in a cluster. If you want to connect
-multiple databases - whether in one integration or several - you’ll need to create a replication slot
-for each database.</p>
-<ol class="arabic simple">
-<li><p>Log into the master database as a superuser.</p></li>
-<li><p>Using the <code class="docutils literal notranslate"><span class="pre">wal2json</span></code> plugin, create a logical replication slot:</p></li>
-</ol>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>SELECT *
-FROM pg_create_logical_replication_slot<span class="o">(</span><span class="s1">&#39;pipelinewise_&lt;database_name&gt;&#39;</span>, <span class="s1">&#39;wal2json&#39;</span><span class="o">)</span><span class="p">;</span>
-</pre></div>
-</div>
-<p>3. Log in as the PipelineWise user and verify you can read from the replication slot,
-replacing <code class="docutils literal notranslate"><span class="pre">pipelinewise_&lt;database_name&gt;</span></code> with the name of the replication slot:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>SELECT COUNT<span class="o">(</span>*<span class="o">)</span>
-FROM pg_logical_slot_peek_changes<span class="o">(</span><span class="s1">&#39;pipelinewise_&lt;database_name&gt;&#39;</span>, null, null<span class="o">)</span><span class="p">;</span>
-</pre></div>
-</div>
-<p><strong>Note</strong>: <code class="docutils literal notranslate"><span class="pre">wal2json</span></code> is required to use <a class="reference internal" href="../../concept/replication_methods.html#log-based"><span class="std std-ref">Log Based</span></a> in Stitch for PostgreSQL-backed databases.</p>
 </div>
 <div class="section" id="configuring-what-to-replicate">
 <h2>Configuring what to replicate<a class="headerlink" href="#configuring-what-to-replicate" title="Permalink to this headline">¶</a></h2>
 <p>PipelineWise configures every tap with a common structured YAML file format.
 A sample YAML for Postgres replication can be generated into a project directory by
 following the steps in the <a class="reference internal" href="../../installation_guide/creating_pipelines.html#generating-pipelines"><span class="std std-ref">Generating Sample Pipelines</span></a> section.</p>
-<p>Example YAML for <code class="docutils literal notranslate"><span class="pre">tap-postgres</span></code>:</p>
+<p>Example YAML for <code class="docutils literal notranslate"><span class="pre">tap-oracle</span></code>:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>---
 
 <span class="c1"># ------------------------------------------------------------------------------</span>
 <span class="c1"># General Properties</span>
 <span class="c1"># ------------------------------------------------------------------------------</span>
-id: <span class="s2">&quot;postgres_sample&quot;</span>                  <span class="c1"># Unique identifier of the tap</span>
-name: <span class="s2">&quot;Sample Postgres Database&quot;</span>       <span class="c1"># Name of the tap</span>
-type: <span class="s2">&quot;tap-postgres&quot;</span>                   <span class="c1"># !! THIS SHOULD NOT CHANGE !!</span>
+id: <span class="s2">&quot;oracle_sample&quot;</span>                    <span class="c1"># Unique identifier of the tap</span>
+name: <span class="s2">&quot;Sample Oracle Database&quot;</span>         <span class="c1"># Name of the tap</span>
+type: <span class="s2">&quot;tap-oracle&quot;</span>                     <span class="c1"># !! THIS SHOULD NOT CHANGE !!</span>
 owner: <span class="s2">&quot;somebody@foo.com&quot;</span>              <span class="c1"># Data owner to contact</span>
 
 
@@ -311,14 +319,14 @@ owner: <span class="s2">&quot;somebody@foo.com&quot;</span>              <span c
 <span class="c1"># Source (Tap) - PostgreSQL connection details</span>
 <span class="c1"># ------------------------------------------------------------------------------</span>
 db_conn:
-  host: <span class="s2">&quot;&lt;HOST&gt;&quot;</span>                       <span class="c1"># PostgreSQL host</span>
-  port: <span class="m">5432</span>                           <span class="c1"># PostgreSQL port</span>
-  user: <span class="s2">&quot;&lt;USER&gt;&quot;</span>                       <span class="c1"># PostfreSQL user</span>
-  password: <span class="s2">&quot;&lt;PASSWORD&gt;&quot;</span>               <span class="c1"># Plain string or vault encrypted</span>
-  dbname: <span class="s2">&quot;&lt;DB_NAME&gt;&quot;</span>                  <span class="c1"># PostgreSQL database name</span>
-  <span class="c1">#filter_schemas: &quot;schema1,schema2&quot;   # Optional: Scan only the required schemas</span>
-                                       <span class="c1">#           to improve the performance of</span>
-                                       <span class="c1">#           data extraction</span>
+  sid: <span class="s2">&quot;&lt;SID&gt;&quot;</span>                        <span class="c1"># Oracle SID</span>
+  host: <span class="s2">&quot;&lt;HOST&gt;&quot;</span>                      <span class="c1"># Oracle host</span>
+  port: <span class="m">1521</span>                          <span class="c1"># Oracle port</span>
+  user: <span class="s2">&quot;&lt;USER&gt;&quot;</span>                      <span class="c1"># Oracle user</span>
+  password: <span class="s2">&quot;&lt;PASSWORD&gt;&quot;</span>              <span class="c1"># Plain string or vault encrypted</span>
+  <span class="c1">#filter_schemas: &quot;SCHEMA1,SCHEMA2&quot;  # Optional: Scan only the required schemas</span>
+                                      <span class="c1">#           to improve the performance of</span>
+                                      <span class="c1">#           data extraction</span>
 
 
 <span class="c1"># ------------------------------------------------------------------------------</span>
@@ -334,19 +342,19 @@ batch_size_rows: <span class="m">20000</span>                 <span class="c1">#
 <span class="c1"># ------------------------------------------------------------------------------</span>
 schemas:
 
-  - source_schema: <span class="s2">&quot;public&quot;</span>            <span class="c1"># Source schema in postgres with tables</span>
-    target_schema: <span class="s2">&quot;repl_pg_public&quot;</span>    <span class="c1"># Target schema in the destination Data Warehouse</span>
+  - source_schema: <span class="s2">&quot;SCHEMA1&quot;</span>           <span class="c1"># Source schema in Oracle with tables</span>
+    target_schema: <span class="s2">&quot;repl_oracle&quot;</span>       <span class="c1"># Target schema in the destination Data Warehouse</span>
     target_schema_select_permissions:  <span class="c1"># Optional: Grant SELECT on schema and tables that created</span>
       - grp_stats
 
     <span class="c1"># List of tables to replicate from Postgres to destination Data Warehouse</span>
     <span class="c1">#</span>
     <span class="c1"># Please check the Replication Strategies section in the documentation to understand the differences.</span>
-    <span class="c1"># For LOG_BASED replication method you might need to adjust the source mysql/ mariadb configuration.</span>
+    <span class="c1"># For LOG_BASED replication method you might need to adjust the source Oracle database.</span>
     tables:
-      - table_name: <span class="s2">&quot;table_one&quot;</span>
+      - table_name: <span class="s2">&quot;TABLE_ONE&quot;</span>
         replication_method: <span class="s2">&quot;INCREMENTAL&quot;</span>   <span class="c1"># One of INCREMENTAL, LOG_BASED and FULL_TABLE</span>
-        replication_key: <span class="s2">&quot;last_update&quot;</span>      <span class="c1"># Important: Incremental load always needs replication key</span>
+        replication_key: <span class="s2">&quot;LAST_UPDATE&quot;</span>      <span class="c1"># Important: Incremental load always needs replication key</span>
 
         <span class="c1"># OPTIONAL: Load time transformations</span>
         <span class="c1">#transformations:</span>
@@ -354,11 +362,11 @@ schemas:
         <span class="c1">#    type: &quot;SET-NULL&quot;               # Transformation type</span>
 
       <span class="c1"># You can add as many tables as you need...</span>
-      - table_name: <span class="s2">&quot;table_two&quot;</span>
+      - table_name: <span class="s2">&quot;TABLE_TWO&quot;</span>
         replication_method: <span class="s2">&quot;LOG_BASED&quot;</span>     <span class="c1"># Important! Log based must be enabled in MySQL</span>
 
   <span class="c1"># You can add as many schemas as you need...</span>
-  <span class="c1"># Uncomment this if you want replicate tables from multiple schemas</span>
+  <span class="c1"># Uncommend this if you want replicate tables from multiple schemas</span>
   <span class="c1">#- source_schema: &quot;another_schema_in_postgres&quot;</span>
   <span class="c1">#  target_schema: &quot;another</span>
 </pre></div>
@@ -374,10 +382,10 @@ schemas:
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
-        <a href="oracle.html" class="btn btn-neutral float-right" title="Tap Oracle" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+        <a href="s3_csv.html" class="btn btn-neutral float-right" title="Tap S3 CSV" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
       
       
-        <a href="mysql.html" class="btn btn-neutral float-left" title="Tap MySQL" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+        <a href="postgres.html" class="btn btn-neutral float-left" title="Tap PostgreSQL" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
       
     </div>
   
