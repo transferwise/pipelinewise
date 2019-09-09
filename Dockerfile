@@ -1,7 +1,14 @@
 FROM python:3.7.4-buster
 
-RUN apt-get -qq update && \
-    pip install --upgrade pip
+RUN apt-get -qq update && apt-get -qqy install \
+        apt-utils \
+        alien \
+        libaio1 \
+    && pip install --upgrade pip
+
+# Oracle Instant Clinet for tap-oracle
+ADD https://download.oracle.com/otn_software/linux/instantclient/193000/oracle-instantclient19.3-basiclite-19.3.0.0.0-1.x86_64.rpm /app/oracle-instantclient.rpm
+RUN alien -i /app/oracle-instantclient.rpm --scripts && rm -rf /app/oracle-instantclient.rpm
 
 COPY . /app
 

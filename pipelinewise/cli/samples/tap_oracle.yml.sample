@@ -1,0 +1,65 @@
+---
+
+# ------------------------------------------------------------------------------
+# General Properties
+# ------------------------------------------------------------------------------
+id: "oracle_sample"                    # Unique identifier of the tap
+name: "Sample Oracle Database"         # Name of the tap
+type: "tap-oracle"                     # !! THIS SHOULD NOT CHANGE !!
+owner: "somebody@foo.com"              # Data owner to contact
+
+
+# ------------------------------------------------------------------------------
+# Source (Tap) - PostgreSQL connection details
+# ------------------------------------------------------------------------------
+db_conn:
+  sid: "<SID>"                         # Oracle SID
+  host: "<HOST>"                       # Oracle host
+  port: 1521                           # Oracle port
+  user: "<USER>"                       # Oracle user
+  password: "<PASSWORD>"               # Plain string or vault encrypted
+  #filter_schemas: "SCHEMA1,SCHEMA2"   # Optional: Scan only the required schemas
+                                       #           to improve the performance of
+                                       #           data extraction
+
+
+# ------------------------------------------------------------------------------
+# Destination (Target) - Target properties
+# Connection details should be in the relevant target YAML file
+# ------------------------------------------------------------------------------
+target: "snowflake"                    # ID of the target connector where the data will be loaded
+batch_size_rows: 20000                 # Batch size for the stream to optimise load performance
+
+
+# ------------------------------------------------------------------------------
+# Source to target Schema mapping
+# ------------------------------------------------------------------------------
+schemas:
+
+  - source_schema: "SCHEMA1"           # Source schema in Oracle with tables
+    target_schema: "repl_oracle"       # Target schema in the destination Data Warehouse
+    target_schema_select_permissions:  # Optional: Grant SELECT on schema and tables that created
+      - grp_stats
+
+    # List of tables to replicate from Oracle to destination Data Warehouse
+    #
+    # Please check the Replication Strategies section in the documentation to understand the differences.
+    # For LOG_BASED replication method you might need to adjust the source Oracle database.
+    tables:
+      - table_name: "TABLE_ONE"
+        replication_method: "INCREMENTAL"   # One of INCREMENTAL, LOG_BASED and FULL_TABLE
+        replication_key: "LAST_UPDATE"      # Important: Incremental load always needs replication key
+
+        # OPTIONAL: Load time transformations
+        #transformations:                    
+        #  - column: "last_name"            # Column to transform
+        #    type: "SET-NULL"               # Transformation type
+
+      # You can add as many tables as you need...
+      - table_name: "TABLE_TWO"
+        replication_method: "LOG_BASED"     # Important! Log based must be enabled in Oracle
+
+  # You can add as many schemas as you need...
+  # Uncommend this if you want replicate tables from multiple schemas
+  #- source_schema: "ANOTHER_SCHEMA_IN_ORACLE" 
+  #  target_schema: "another"

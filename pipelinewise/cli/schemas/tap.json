@@ -76,6 +76,7 @@
     "type": { "type": "string", "enum": [
       "tap-postgres",
       "tap-mysql",
+      "tap-oracle",
       "tap-adwords",
       "tap-zendesk",
       "tap-kafka",
