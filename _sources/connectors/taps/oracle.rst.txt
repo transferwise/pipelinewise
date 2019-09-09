@@ -132,7 +132,7 @@ Configuring what to replicate
 '''''''''''''''''''''''''''''
 
 PipelineWise configures every tap with a common structured YAML file format.
-A sample YAML for Postgres replication can be generated into a project directory by
+A sample YAML for Oracle replication can be generated into a project directory by
 following the steps in the :ref:`generating_pipelines` section.
 
 Example YAML for ``tap-oracle``:
@@ -151,7 +151,7 @@ Example YAML for ``tap-oracle``:
 
 
     # ------------------------------------------------------------------------------
-    # Source (Tap) - PostgreSQL connection details
+    # Source (Tap) - Oracle connection details
     # ------------------------------------------------------------------------------
     db_conn:
       sid: "<SID>"                        # Oracle SID
@@ -182,7 +182,7 @@ Example YAML for ``tap-oracle``:
         target_schema_select_permissions:  # Optional: Grant SELECT on schema and tables that created
           - grp_stats
 
-        # List of tables to replicate from Postgres to destination Data Warehouse
+        # List of tables to replicate from Oracle to destination Data Warehouse
         #
         # Please check the Replication Strategies section in the documentation to understand the differences.
         # For LOG_BASED replication method you might need to adjust the source Oracle database.
@@ -198,9 +198,9 @@ Example YAML for ``tap-oracle``:
 
           # You can add as many tables as you need...
           - table_name: "TABLE_TWO"
-            replication_method: "LOG_BASED"     # Important! Log based must be enabled in MySQL
+            replication_method: "LOG_BASED"     # Important! Log based must be enabled in Oracle
 
       # You can add as many schemas as you need...
       # Uncommend this if you want replicate tables from multiple schemas
-      #- source_schema: "another_schema_in_postgres" 
+      #- source_schema: "another_schema_in_oracle"
       #  target_schema: "another

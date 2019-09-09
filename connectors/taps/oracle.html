@@ -301,7 +301,7 @@ for every table you want to replicate.</p>
 <div class="section" id="configuring-what-to-replicate">
 <h2>Configuring what to replicate<a class="headerlink" href="#configuring-what-to-replicate" title="Permalink to this headline">¶</a></h2>
 <p>PipelineWise configures every tap with a common structured YAML file format.
-A sample YAML for Postgres replication can be generated into a project directory by
+A sample YAML for Oracle replication can be generated into a project directory by
 following the steps in the <a class="reference internal" href="../../installation_guide/creating_pipelines.html#generating-pipelines"><span class="std std-ref">Generating Sample Pipelines</span></a> section.</p>
 <p>Example YAML for <code class="docutils literal notranslate"><span class="pre">tap-oracle</span></code>:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>---
@@ -316,7 +316,7 @@ owner: <span class="s2">&quot;somebody@foo.com&quot;</span>              <span c
 
 
 <span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="c1"># Source (Tap) - PostgreSQL connection details</span>
+<span class="c1"># Source (Tap) - Oracle connection details</span>
 <span class="c1"># ------------------------------------------------------------------------------</span>
 db_conn:
   sid: <span class="s2">&quot;&lt;SID&gt;&quot;</span>                        <span class="c1"># Oracle SID</span>
@@ -347,7 +347,7 @@ schemas:
     target_schema_select_permissions:  <span class="c1"># Optional: Grant SELECT on schema and tables that created</span>
       - grp_stats
 
-    <span class="c1"># List of tables to replicate from Postgres to destination Data Warehouse</span>
+    <span class="c1"># List of tables to replicate from Oracle to destination Data Warehouse</span>
     <span class="c1">#</span>
     <span class="c1"># Please check the Replication Strategies section in the documentation to understand the differences.</span>
     <span class="c1"># For LOG_BASED replication method you might need to adjust the source Oracle database.</span>
@@ -363,11 +363,11 @@ schemas:
 
       <span class="c1"># You can add as many tables as you need...</span>
       - table_name: <span class="s2">&quot;TABLE_TWO&quot;</span>
-        replication_method: <span class="s2">&quot;LOG_BASED&quot;</span>     <span class="c1"># Important! Log based must be enabled in MySQL</span>
+        replication_method: <span class="s2">&quot;LOG_BASED&quot;</span>     <span class="c1"># Important! Log based must be enabled in Oracle</span>
 
   <span class="c1"># You can add as many schemas as you need...</span>
   <span class="c1"># Uncommend this if you want replicate tables from multiple schemas</span>
-  <span class="c1">#- source_schema: &quot;another_schema_in_postgres&quot;</span>
+  <span class="c1">#- source_schema: &quot;another_schema_in_oracle&quot;</span>
   <span class="c1">#  target_schema: &quot;another</span>
 </pre></div>
 </div>
