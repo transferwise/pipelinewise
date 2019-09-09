@@ -10,7 +10,7 @@ owner: "somebody@foo.com"              # Data owner to contact
 
 
 # ------------------------------------------------------------------------------
-# Source (Tap) - PostgreSQL connection details
+# Source (Tap) - Oracle connection details
 # ------------------------------------------------------------------------------
 db_conn:
   sid: "<SID>"                         # Oracle SID
