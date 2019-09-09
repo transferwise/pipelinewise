@@ -31,16 +31,21 @@ REQUIRED_CONFIG_KEYS = {
     ]
 }
 
+DEFAULT_VARCHAR_LENGTH = 10000
+SHORT_VARCHAR_LENGTH = 256
+LONG_VARCHAR_LENGTH = 65535
+
 lock = multiprocessing.Lock()
+
 
 def tap_type_to_target_type(pg_type):
     """Data type mapping from MySQL to Redshift"""
     return {
-        'char':'CHARACTER VARYING',
-        'character':'CHARACTER VARYING',
-        'varchar':'CHARACTER VARYING',
-        'character varying':'CHARACTER VARYING',
-        'text':'CHARACTER VARYING',
+        'char':'CHARACTER VARYING({})'.format(DEFAULT_VARCHAR_LENGTH),
+        'character':'CHARACTER VARYING({})'.format(DEFAULT_VARCHAR_LENGTH),
+        'varchar':'CHARACTER VARYING({})'.format(DEFAULT_VARCHAR_LENGTH),
+        'character varying':'CHARACTER VARYING({})'.format(DEFAULT_VARCHAR_LENGTH),
+        'text':'CHARACTER VARYING({})'.format(LONG_VARCHAR_LENGTH),
         'bit': 'BOOLEAN',
         'varbit':'NUMERIC NULL',
         'bit varying':'NUMERIC NULL',
@@ -60,13 +65,13 @@ def tap_type_to_target_type(pg_type):
         'timestamp':'TIMESTAMP WITHOUT TIME ZONE',
         'timestamp without time zone':'TIMESTAMP WITHOUT TIME ZONE',
         'timestamp with time zone':'TIMESTAMP WITH TIME ZONE',
-        'time':'CHARACTER VARYING',
-        'time without time zone':'CHARACTER VARYING',
-        'time with time zone':'CHARACTER VARYING',
-        'ARRAY':'CHARACTER VARYING',  # This is all uppercase, because postgres stores it in this format in information_schema.columns.data_type
-        'json':'CHARACTER VARYING',
-        'jsonb':'CHARACTER VARYING'
-    }.get(pg_type, 'CHARACTER VARYING')
+        'time':'CHARACTER VARYING({})'.format(SHORT_VARCHAR_LENGTH),
+        'time without time zone':'CHARACTER VARYING({})'.format(SHORT_VARCHAR_LENGTH),
+        'time with time zone':'CHARACTER VARYING({})'.format(SHORT_VARCHAR_LENGTH),
+        'ARRAY':'CHARACTER VARYING({})'.format(LONG_VARCHAR_LENGTH),  # This is all uppercase, because postgres stores it in this format in information_schema.columns.data_type
+        'json':'CHARACTER VARYING({})'.format(LONG_VARCHAR_LENGTH),
+        'jsonb':'CHARACTER VARYING({})'.format(LONG_VARCHAR_LENGTH),
+    }.get(pg_type, 'CHARACTER VARYING({})'.format(DEFAULT_VARCHAR_LENGTH))
 
 
 def sync_table(table):
@@ -151,8 +156,8 @@ def main_impl():
 
     # Create target schemas sequentially, Redshift doesn't like it running in parallel
     redshift = FastSyncTargetRedshift(args.target, args.transform)
-    #for target_schema in utils.get_target_schemas(args.target, args.tables):
-    #    redshift.create_schema(target_schema)
+    for target_schema in utils.get_target_schemas(args.target, args.tables):
+        redshift.create_schema(target_schema)
 
     # Start loading tables in parallel in spawning processes by
     # utilising all available CPU cores

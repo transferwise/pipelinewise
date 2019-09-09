@@ -1,1 +1,1 @@
-pipelinewise-target-redshift==1.0.3
+pipelinewise-target-redshift==1.0.5
