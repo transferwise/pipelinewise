@@ -102,7 +102,7 @@ class FastSyncTapPostgres:
 
         # Create replication slot, ignore error if already exists
         try:
-            result = self.primary_host_query("SELECT * FROM pg_create_logical_replication_slot('pipelinewise_{}', 'wal2json')".format(self.connection_config['dbname']))
+            result = self.primary_host_query("SELECT * FROM pg_create_logical_replication_slot('pipelinewise_{}', 'wal2json')".format(self.connection_config['dbname'].lower()))
         except Exception as e:
             # ERROR: replication slot "stitch_{}" already exists SQL state: 42710
             if (e.pgcode == '42710'):
