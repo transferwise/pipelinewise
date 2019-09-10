@@ -15,6 +15,7 @@ owner: "somebody@foo.com"              # Data owner to contact
 db_conn:
   aws_access_key_id: "<ACCESS_KEY_ID>"          # Plain string or vault encrypted
   aws_secret_access_key: "<SECRET_ASCCESS_KEY>" # Plain string or vault encrypted
+  #aws_endpoint_url: "<FULL_ENDPOINT_URL>"      # OPTIONAL: for non AWS S3, for example https://nyc3.digitaloceanspaces.com
   bucket: "my-bucket"                           # S3 Bucket name
   start_date: "2000-01-01"                      # File before this data will be excluded
 
