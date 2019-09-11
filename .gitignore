@@ -26,6 +26,7 @@ tests/end-to-end/test-project/*.yml
 dev-project/tap_oracle.yml
 dev-project/target_redshift.yml
 dev-project/target_snowflake.yml
+dev-project/target_snowflake_test.yml
 
 # Docker
 #.env
