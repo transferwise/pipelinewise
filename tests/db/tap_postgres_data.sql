@@ -25,9 +25,9 @@ ALTER TABLE ONLY edgyData
 
 COPY edgyData (cTimeNTZ, cTimeTZ, cJson, cJsonB) FROM stdin;
 \N	\N	\N	\N
-23:00:15	\N	\N	\N
-24:00:00	\N	\N	\N
-00:00:00	\N	\N	\N
+23:00:15	23:00:15	\N	\N
+24:00:00	24:00:00	\N	\N
+00:00:00	00:00:00	\N	\N
 \.
 
 
