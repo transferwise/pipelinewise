@@ -46,6 +46,9 @@ schemas:
     # Please check the Replication Strategies section in the documentation to understand the differences.
     # For LOG_BASED replication method you might need to adjust the source mysql/ mariadb configuration.
     tables:
+      - table_name: "edgydata"
+        replication_method: "FULL_TABLE"    # One of INCREMENTAL, LOG_BASED and FULL_TABLE
+
       - table_name: "country"
         replication_method: "FULL_TABLE"    # One of INCREMENTAL, LOG_BASED and FULL_TABLE
 
