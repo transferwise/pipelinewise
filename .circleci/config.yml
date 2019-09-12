@@ -60,8 +60,8 @@ jobs:
           command: |
             sudo apt-get update
             sudo apt install mariadb-client postgresql-client
-            ./tests/db/tap_mysql_test_db.sh
-            ./tests/db/tap_postgres_test_db.sh
+            ./tests/db/tap_mysql_db.sh
+            ./tests/db/tap_postgres_db.sh
       - run:
           name: Installing PipelineWise components and connectors
           command: ./install.sh --acceptlicenses
