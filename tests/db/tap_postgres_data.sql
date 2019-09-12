@@ -12,7 +12,7 @@ BEGIN;
 SET client_encoding = 'LATIN1';
 
 
-CREATE TABLE edgyData (
+CREATE TABLE edgydata (
     cId serial NOT NULL,
     cTimeNTZ time without time zone,
     cTimeTZ TIME with time zone,
@@ -20,10 +20,10 @@ CREATE TABLE edgyData (
     cJsonB jsonb
 );
 
-ALTER TABLE ONLY edgyData
+ALTER TABLE ONLY edgydata
     ADD PRIMARY KEY (cId);
 
-COPY edgyData (cTimeNTZ, cTimeTZ, cJson, cJsonB) FROM stdin;
+COPY edgydata (cTimeNTZ, cTimeTZ, cJson, cJsonB) FROM stdin;
 \N	\N	\N	\N
 23:00:15	23:00:15	\N	\N
 24:00:00	24:00:00	\N	\N
