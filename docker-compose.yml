@@ -81,3 +81,9 @@ services:
       POSTGRES_PASSWORD: ${DB_TARGET_POSTGRES_PASSWORD}
       POSTGRES_DB: ${DB_TARGET_POSTGRES_DB}
 
+networks:
+  default:
+    driver: bridge
+    ipam:
+      config:
+      - subnet: 192.168.55.0/24
