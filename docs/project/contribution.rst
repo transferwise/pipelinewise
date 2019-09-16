@@ -69,7 +69,7 @@ Adding new tap
 Adding new target
 '''''''''''''''''
 
-1. Make sure your target is implemented and meets the following criterias:
+1. Make sure your target is following the Singer specification and meets the following criterias:
 
    * Configuration JSON is mandatory and defined with the ``--config`` CLI argument
 
