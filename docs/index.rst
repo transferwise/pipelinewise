@@ -235,6 +235,7 @@ Content
    :maxdepth: 2
    :caption: Project
 
+   project/contribution
    project/about
 
 Indices and tables
