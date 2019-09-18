@@ -5,15 +5,15 @@ Contribution
 ------------
 
 PipelineWise is using the `Singer Specification <https://github.com/singer-io/getting-started/blob/master/docs/SPEC.md>`_
-for moving data from Taps and Targets. Adding new taps and targets that following the singer specification is relatively
-simple but requires some preparation making sure the new component is compatible with the PipelineWise framework.
+for moving data from Taps to Targets. Adding new taps and targets that are following the singer specification is relatively
+simple but requires some preparation to make sure the new component is compatible with the PipelineWise framework.
 
-To add new item to the supported :ref:`taps` or :ref:`targets` please follow the steps below. 
+To add new item to the supported :ref:`taps` or :ref:`targets` please follow the steps below.
 
 Adding new tap
 ''''''''''''''
 
-1. Make sure your tap is following the Singer specification and meets the following criterias:
+1. Make sure your tap is following the Singer specification by following the following criterias:
 
    * Configuration JSON is mandatory and defined with the ``--config`` CLI argument
 
@@ -32,8 +32,7 @@ Adding new tap
 
 2. Extend the ``get_tap_properties`` function in `tap_properties.py <https://github.com/transferwise/pipelinewise/blob/master/pipelinewise/cli/tap_properties.py#L56>`_.
 
-  The singer specification doesn't specify common naming conventions for stream ID's names, catalog arguments etc. and we
-  need to register the connectors behaviour to be compatible with the PipelineWise common :ref:`yaml_configuration` file structure.
+  We have expanded upon the singer specification to enable some required elements like common naming conventions for stream ID's names, catalog arguments et cetera. We need to register the connectors behaviour to be compatible with the PipelineWise common :ref:`yaml_configuration` file structure.
   Properties to define in `tap_properties.py <https://github.com/transferwise/pipelinewise/blob/master/pipelinewise/cli/tap_properties.py#L56>`_:
 
 .. hint::
@@ -55,10 +54,10 @@ Adding new tap
   | **tap_config_extras**                        | Anything else that's required in the tap ``config.json`` to run. This can be static or dynamically generated values at runtime.        |
   +----------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------+  
 
-3. Add your tap to `singer-connectors <https://github.com/transferwise/pipelinewise/tree/master/singer-connectors>`_ directory.
+3. Add your tap to the `singer-connectors <https://github.com/transferwise/pipelinewise/tree/master/singer-connectors>`_ directory.
    The new directory should have only one ``requirements.txt`` file with a reference and version of the tap in PyPI.
    Some taps are forks of the community versions and customised to PipelineWise. If new fork or project required in PyPI please
-   mention this the PR.
+   mention this the PR. The TransferWise team will create the PyPi package.
 
 4. Document your tap in the :ref:`taps_list` section with some YAML examples.
    The editable documentation is at `GitHub Taps in RST format <https://github.com/transferwise/pipelinewise/tree/master/docs/connectors/taps>`_.
@@ -79,9 +78,9 @@ Adding new target
      compatible across every target connetor.
 
 2. Add your target to `singer-connectors <https://github.com/transferwise/pipelinewise/tree/master/singer-connectors>`_ directory.
-   The directory should have only a ``requirements.txt`` file with a reference and version of the tap in PyPI.
-   Some targets are forks of the community versions and customised to PipelineWise. If new fork or project required in PyPI please
-   mention this the PR.
+   The new directory should have only one ``requirements.txt`` file with a reference and version of the tap in PyPI.
+   Some taps are forks of the community versions and customised to PipelineWise. If new fork or project required in PyPI please
+   mention this the PR. The TransferWise team will create the PyPi package.
 
 3. Document your target in the :ref:`targets_list` section with some YAML examples.
    The editable documentation is at `GitHub Targets in RST format <https://github.com/transferwise/pipelinewise/tree/master/docs/connectors/targets>`_.
