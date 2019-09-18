@@ -1,0 +1,341 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Contribution &mdash; PipelineWise  documentation</title>
+  
+
+  
+  
+    <link rel="shortcut icon" href="../_static/pipelinewise.png"/>
+  
+  
+  
+    <link rel="canonical" href="https://docs.ansible.com/ansible/latest/project/contribution.html"/>
+  
+
+  
+  <script type="text/javascript" src="../_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+        <script type="text/javascript" src="../_static/jquery.js"></script>
+        <script type="text/javascript" src="../_static/underscore.js"></script>
+        <script type="text/javascript" src="../_static/doctools.js"></script>
+        <script type="text/javascript" src="../_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/css/custom.css" type="text/css" />
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Project" href="about.html" />
+    <link rel="prev" title="Target S3 CSV" href="../connectors/targets/s3_csv.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../index.html" class="icon icon-home"> PipelineWise
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.10.1
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Installation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../installation_guide/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../installation_guide/creating_pipelines.html">Creating Pipelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../installation_guide/running_pipelines.html">Running Pipelines</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Concept</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../concept/singer.html">Singer.io</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concept/replication_methods.html">Replication Methods</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concept/fastsync.html">Fast Sync</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Using PipelineWise</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/yaml_config.html">YAML configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/encrypting_passwords.html">Encrypting Passwords</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/cli.html">Command Line Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/scheduling.html">Scheduling</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/scheduling.html#multi-server-cluster">Multi-Server Cluster</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/metadata_columns.html">Metadata Columns</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/schema_changes.html">Schema Changes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/transformations.html">Transformations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/logging.html">Logging</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/resync.html">Resync Tables</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/integration.html">Integration</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Connectors</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../connectors/taps.html">Taps (Data Sources)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../connectors/taps.html#configuring-taps">Configuring taps</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../connectors/targets.html">Targets (Destinations)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../connectors/targets.html#configuring-the-targets">Configuring the targets</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Project</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Contribution</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#adding-new-tap">Adding new tap</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#adding-new-target">Adding new target</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="about.html">Project</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">PipelineWise</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../index.html">Docs</a> &raquo;</li>
+        
+      <li>Contribution</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="../_sources/project/contribution.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="contribution">
+<span id="id1"></span><h1>Contribution<a class="headerlink" href="#contribution" title="Permalink to this headline">¶</a></h1>
+<p>PipelineWise is using the <a class="reference external" href="https://github.com/singer-io/getting-started/blob/master/docs/SPEC.md">Singer Specification</a>
+for moving data from Taps to Targets. Adding new taps and targets that are following the singer specification is relatively
+simple but requires some preparation to make sure the new component is compatible with the PipelineWise framework.</p>
+<p>To add new item to the supported <a class="reference internal" href="../concept/singer.html#taps"><span class="std std-ref">Taps</span></a> or <a class="reference internal" href="../concept/singer.html#targets"><span class="std std-ref">Targets</span></a> please follow the steps below.</p>
+<div class="section" id="adding-new-tap">
+<h2>Adding new tap<a class="headerlink" href="#adding-new-tap" title="Permalink to this headline">¶</a></h2>
+<ol class="arabic simple">
+<li><p>Make sure your tap is following the Singer specification by following the following criterias:</p>
+<ul class="simple">
+<li><p>Configuration JSON is mandatory and defined with the <code class="docutils literal notranslate"><span class="pre">--config</span></code> CLI argument</p></li>
+<li><p>Catalog JSON is mandatory and defined with the <code class="docutils literal notranslate"><span class="pre">--catalog</span></code> or <code class="docutils literal notranslate"><span class="pre">--properties</span></code> CLI arguments</p></li>
+<li><p>State JSON is optional and defined with the <code class="docutils literal notranslate"><span class="pre">--state</span></code> CLI argument</p></li>
+<li><p>The tap implements the <a class="reference external" href="https://github.com/singer-io/getting-started/blob/8b24cc5239c2605738ba1c0822ea80377ae1fab8/docs/DISCOVERY_MODE.md">Discovery Mode</a>
+and generates a singer compatible catalog JSON to <code class="docutils literal notranslate"><span class="pre">STDOUT</span></code></p></li>
+</ul>
+</li>
+</ol>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Most of the available Singer Taps meet these criterias but you should always double check when
+adding new connectors.</p>
+</div>
+<ol class="arabic simple" start="2">
+<li><p>Extend the <code class="docutils literal notranslate"><span class="pre">get_tap_properties</span></code> function in <a class="reference external" href="https://github.com/transferwise/pipelinewise/blob/master/pipelinewise/cli/tap_properties.py#L56">tap_properties.py</a>.</p></li>
+</ol>
+<blockquote>
+<div><p>We have expanded upon the singer specification to enable some required elements like common naming conventions for stream ID’s names, catalog arguments et cetera. We need to register the connectors behaviour to be compatible with the PipelineWise common <a class="reference internal" href="../user_guide/yaml_config.html#yaml-configuration"><span class="std std-ref">YAML configuration</span></a> file structure.
+Properties to define in <a class="reference external" href="https://github.com/transferwise/pipelinewise/blob/master/pipelinewise/cli/tap_properties.py#L56">tap_properties.py</a>:</p>
+</div></blockquote>
+<div class="admonition hint">
+<p class="admonition-title">Hint</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25%" />
+<col style="width: 75%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><strong>tap_stream_id_pattern</strong></p></td>
+<td><p>Stream id pattern in the <code class="docutils literal notranslate"><span class="pre">properties.json</span></code> generated by the tap.</p></td>
+</tr>
+<tr class="row-even"><td><p><strong>tap_stream_name_pattern</strong></p></td>
+<td><p>Stream name pattern in the <code class="docutils literal notranslate"><span class="pre">SCHEMA</span></code>, <code class="docutils literal notranslate"><span class="pre">RECORD</span></code> and <code class="docutils literal notranslate"><span class="pre">STATE</span></code> singer JSON messages.</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>tap_catalog_argument</strong></p></td>
+<td><p>The catalog CLI argument of the tap. This is usually <code class="docutils literal notranslate"><span class="pre">--properties</span></code> for old styled singer taps and <code class="docutils literal notranslate"><span class="pre">--catalog</span></code> for new styled
+singer taps.</p></td>
+</tr>
+<tr class="row-even"><td><p><strong>default_replication_method</strong></p></td>
+<td><p>Replication method to use when not specified in <a class="reference internal" href="../user_guide/yaml_config.html#yaml-configuration"><span class="std std-ref">YAML configuration</span></a></p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>default_data_flattening_max_level</strong></p></td>
+<td><p>Set to 0 if auto data flattening is not required. Data flattening is usually required for taps that extracting data from APIs in JSON
+messages.</p></td>
+</tr>
+<tr class="row-even"><td><p><strong>tap_config_extras</strong></p></td>
+<td><p>Anything else that’s required in the tap <code class="docutils literal notranslate"><span class="pre">config.json</span></code> to run. This can be static or dynamically generated values at runtime.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<ol class="arabic simple" start="3">
+<li><p>Add your tap to the <a class="reference external" href="https://github.com/transferwise/pipelinewise/tree/master/singer-connectors">singer-connectors</a> directory.
+The new directory should have only one <code class="docutils literal notranslate"><span class="pre">requirements.txt</span></code> file with a reference and version of the tap in PyPI.
+Some taps are forks of the community versions and customised to PipelineWise. If new fork or project required in PyPI please
+mention this the PR. The TransferWise team will create the PyPi package.</p></li>
+<li><p>Document your tap in the <a class="reference internal" href="../connectors/taps.html#taps-list"><span class="std std-ref">Taps (Data Sources)</span></a> section with some YAML examples.
+The editable documentation is at <a class="reference external" href="https://github.com/transferwise/pipelinewise/tree/master/docs/connectors/taps">GitHub Taps in RST format</a>.</p></li>
+<li><p>Send a Pull Request to the <a class="reference external" href="https://github.com/transferwise/pipelinewise">PipelineWise Github Repository</a>.</p></li>
+</ol>
+</div>
+<div class="section" id="adding-new-target">
+<h2>Adding new target<a class="headerlink" href="#adding-new-target" title="Permalink to this headline">¶</a></h2>
+<ol class="arabic simple">
+<li><p>Make sure your target is following the Singer specification and meets the following criterias:</p>
+<ul class="simple">
+<li><p>Configuration JSON is mandatory and defined with the <code class="docutils literal notranslate"><span class="pre">--config</span></code> CLI argument</p></li>
+<li><p>State messages printed to standard output. PipelineWise compatible target connectors should send
+<a class="reference external" href="https://github.com/singer-io/getting-started/blob/master/docs/SPEC.md#state-message">Singer State Messages</a>
+in the original format to <code class="docutils literal notranslate"><span class="pre">STDOUT</span></code>. Other components of PipelineWise will process it at a later stage making it
+compatible across every target connetor.</p></li>
+</ul>
+</li>
+<li><p>Add your target to <a class="reference external" href="https://github.com/transferwise/pipelinewise/tree/master/singer-connectors">singer-connectors</a> directory.
+The new directory should have only one <code class="docutils literal notranslate"><span class="pre">requirements.txt</span></code> file with a reference and version of the tap in PyPI.
+Some taps are forks of the community versions and customised to PipelineWise. If new fork or project required in PyPI please
+mention this the PR. The TransferWise team will create the PyPi package.</p></li>
+<li><p>Document your target in the <a class="reference internal" href="../connectors/targets.html#targets-list"><span class="std std-ref">Targets (Destinations)</span></a> section with some YAML examples.
+The editable documentation is at <a class="reference external" href="https://github.com/transferwise/pipelinewise/tree/master/docs/connectors/targets">GitHub Targets in RST format</a>.</p></li>
+<li><p>Send a Pull Request to the <a class="reference external" href="https://github.com/transferwise/pipelinewise">PipelineWise Github Repository</a>.</p></li>
+</ol>
+</div>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="about.html" class="btn btn-neutral float-right" title="Project" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="../connectors/targets/s3_csv.html" class="btn btn-neutral float-left" title="Target S3 CSV" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2019, TransferWise Ltd.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>
