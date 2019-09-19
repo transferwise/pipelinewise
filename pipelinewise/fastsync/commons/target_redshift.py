@@ -100,10 +100,11 @@ class FastSyncTargetRedshift:
         aws_secret_access_key=self.connection_config['aws_secret_access_key']
         bucket = self.connection_config['s3_bucket']
 
+        # Using the built-in CSV COPY option for fastsync
         sql = """COPY {}.{} FROM 's3://{}/{}'            
             ACCESS_KEY_ID '{}'
             SECRET_ACCESS_KEY '{}'
-            DELIMITER ',' REMOVEQUOTES ESCAPE
+            CSV
             BLANKSASNULL TIMEFORMAT 'auto'
             GZIP
         """.format(target_schema, target_table, bucket, s3_key, aws_access_key_id, aws_secret_access_key)
