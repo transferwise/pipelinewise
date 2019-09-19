@@ -13,18 +13,16 @@ SET client_encoding = 'LATIN1';
 DROP SCHEMA IF EXISTS public2;
 CREATE SCHEMA public2;
 
-CREATE TABLE public2.edgydata
+CREATE TABLE public2.edgydata(
     cId serial NOT NULL,
     cTimeNTZ time without time zone,
     cTimeTZ TIME with time zone,
     cJson json,
-    cJsonB jsonb
+    cJsonB jsonb,
+    PRIMARY KEY (cId)
 );
 
-ALTER TABLE ONLY public2.edgydata
-    ADD PRIMARY KEY (cId);
-
-COPY edgydata (cTimeNTZ, cTimeTZ, cJson, cJsonB) FROM stdin;
+COPY public2.edgydata (cTimeNTZ, cTimeTZ, cJson, cJsonB) FROM stdin;
 \N  \N  \N  \N
 23:00:15    23:00:15    \N  \N
 24:00:00    24:00:00    \N  \N
