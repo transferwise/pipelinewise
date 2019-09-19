@@ -49,6 +49,9 @@ schemas:
       - table_name: "address"
         replication_method: "FULL_TABLE"    # One of INCREMENTAL, LOG_BASED and FULL_TABLE
 
+      - table_name: "edgydata"
+        replication_method: "FULL_TABLE"
+
       - table_name: "area_code"
         replication_method: "INCREMENTAL"
         replication_key: "area_code_id"

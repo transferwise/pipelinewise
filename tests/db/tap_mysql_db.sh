@@ -2,10 +2,10 @@
 #
 # Building a test MySQL database for integration testing of tap-mysql 
 # The sample database available at https://github.com/ikostan/RESTAURANT-DATABASE
+PWD="$(dirname "$0")"
 
-TEST_DB_URL=https://raw.githubusercontent.com/ikostan/RESTAURANT-DATABASE/master/DB_backup/structure_and_data/grp24.sql
-TEST_DB_TMP_SQL=/tmp/test-mysql-db.sql
-echo "Building test MySQL database from ${TEST_DB_URL}..."
+TEST_DB_SQL=${PWD}/tap_mysql_data.sql
+echo "Building test MySQL database..."
 
 # To run this script some environment variables must be set.
 # Normally it's defined in .circleci/config.yml
@@ -27,6 +27,4 @@ mysql --protocol TCP --host ${DB_TAP_MYSQL_HOST} --port ${DB_TAP_MYSQL_PORT} --u
 
 # Download the sample database and build it
 export MYSQL_PWD=${DB_TAP_MYSQL_PASSWORD}
-wget -O ${TEST_DB_TMP_SQL} ${TEST_DB_URL}
-mysql --protocol TCP --host ${DB_TAP_MYSQL_HOST} --port ${DB_TAP_MYSQL_PORT} --user ${DB_TAP_MYSQL_USER} ${DB_TAP_MYSQL_DB} < ${TEST_DB_TMP_SQL}
-rm -f ${TEST_DB_TMP_SQL}
+mysql --protocol TCP --host ${DB_TAP_MYSQL_HOST} --port ${DB_TAP_MYSQL_PORT} --user ${DB_TAP_MYSQL_USER} ${DB_TAP_MYSQL_DB} < ${TEST_DB_SQL}

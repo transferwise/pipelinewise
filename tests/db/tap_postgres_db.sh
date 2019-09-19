@@ -1,10 +1,10 @@
 #!/bin/bash -e
 #
-# Building a test PostgreSQL database for integration testing of tap-postgres 
+# Building a test PostgreSQL database for integration testing of tap-postgres
+PWD="$(dirname "$0")"
 
-
-TEST_DB_SQL=./tests/db/tap_postgres_data.sql
-echo "Building test PostgreSQL database from ${TEST_DB_URL}..."
+TEST_DB_SQL=${PWD}/tap_postgres_data.sql
+echo "Building test PostgreSQL database..."
 
 # To run this script some environment variables must be set.
 # Normally it's defined in .circleci/config.yml

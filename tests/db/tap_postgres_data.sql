@@ -43,17 +43,19 @@ CREATE TABLE edgydata (
     cTimeNTZ time without time zone,
     cTimeTZ TIME with time zone,
     cJson json,
-    cJsonB jsonb
+    cJsonB jsonb,
+    cVarchar varchar
 );
 
 ALTER TABLE ONLY edgydata
     ADD PRIMARY KEY (cId);
 
-COPY edgydata (cTimeNTZ, cTimeTZ, cJson, cJsonB) FROM stdin;
-\N	\N	\N	\N
-23:00:15	23:00:15	\N	\N
-24:00:00	24:00:00	\N	\N
-00:00:00	00:00:00	\N	\N
+COPY edgydata (cTimeNTZ, cTimeTZ, cJson, cJsonB, cVarchar) FROM stdin (ENCODING 'UTF8');
+\N	\N	\N	\N	\N
+23:00:15	23:00:15	\N	\N	Lorem ipsum dolor sit amet
+12:00:00	12:00:15	\N	\N	Chinese: 和毛泽东 <<重上井冈山>>. 严永欣, 一九八八年.
+24:00:00	24:00:00	\N	\N	Thai: แผ่นดินฮั่นเสื่อมโทรมแสนสังเวช
+00:00:00	00:00:00	\N	\N	Special Characters: ["\\,'!@£$%^&*()]\\\\
 \.
 
 
