@@ -18,9 +18,6 @@ db_conn:
   user: "pipelinewise"                 # PostfreSQL user
   password: "secret"                   # Plain string or vault encrypted
   dbname: "postgres_source_db"         # PostgreSQL database name
-  include_schemas_in_destination_stream_name: "true"  # Optional required only when
-                                                      #   replicating from more
-                                                      #   than one schema
   #filter_schemas: "schema1,schema2"   # Optional: Scan only the required schemas
                                        #           to improve the performance of
                                        #           data extraction
