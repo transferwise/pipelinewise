@@ -24,6 +24,7 @@ echo ${DB_TAP_POSTGRES_HOST}:${DB_TAP_POSTGRES_PORT}:${DB_TAP_POSTGRES_DB}:${DB_
 chmod 0600 ${PGPASSFILE}
 
 # Drop target tables if exists, the test db sql works only if tables not exist
+psql -U ${DB_TAP_POSTGRES_USER} -h ${DB_TAP_POSTGRES_HOST} -c 'DROP TABLE IF EXISTS public2.edgyData CASCADE;' ${DB_TAP_POSTGRES_DB}
 psql -U ${DB_TAP_POSTGRES_USER} -h ${DB_TAP_POSTGRES_HOST} -c 'DROP TABLE IF EXISTS public.edgyData CASCADE;' ${DB_TAP_POSTGRES_DB}
 psql -U ${DB_TAP_POSTGRES_USER} -h ${DB_TAP_POSTGRES_HOST} -c 'DROP TABLE IF EXISTS public.countrylanguage CASCADE;' ${DB_TAP_POSTGRES_DB}
 psql -U ${DB_TAP_POSTGRES_USER} -h ${DB_TAP_POSTGRES_HOST} -c 'DROP TABLE IF EXISTS public.country CASCADE;' ${DB_TAP_POSTGRES_DB}

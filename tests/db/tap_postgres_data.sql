@@ -8,9 +8,35 @@
 -- Originally copied from https://raw.githubusercontent.com/morenoh149/postgresDBSamples/master/worldDB-1.0/world.sql
 
 BEGIN;
-
 SET client_encoding = 'LATIN1';
 
+DROP SCHEMA IF EXISTS;
+CREATE SCHEMA public2;
+
+CREATE TABLE public2.edgydata
+    cId serial NOT NULL,
+    cTimeNTZ time without time zone,
+    cTimeTZ TIME with time zone,
+    cJson json,
+    cJsonB jsonb
+);
+
+ALTER TABLE ONLY public2.edgydata
+    ADD PRIMARY KEY (cId);
+
+COPY edgydata (cTimeNTZ, cTimeTZ, cJson, cJsonB) FROM stdin;
+\N  \N  \N  \N
+23:00:15    23:00:15    \N  \N
+24:00:00    24:00:00    \N  \N
+00:00:00    00:00:00    \N  \N
+\.
+
+COMMIT;
+
+
+
+BEGIN;
+SET client_encoding = 'LATIN1';
 
 CREATE TABLE edgydata (
     cId serial NOT NULL,
