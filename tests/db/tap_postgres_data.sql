@@ -7,10 +7,36 @@
 -- The sample database available at https://github.com/morenoh149/postgresDBSamples
 -- Originally copied from https://raw.githubusercontent.com/morenoh149/postgresDBSamples/master/worldDB-1.0/world.sql
 
-BEGIN;
+SELECT pg_drop_replication_slot('pipelinewise_postgres_source_db');
+SELECT slot_name, lsn, lsn - '0/0'::pg_lsn as lsn FROM pg_create_logical_replication_slot('pipelinewise_postgres_source_db', 'wal2json');
 
+BEGIN;
 SET client_encoding = 'LATIN1';
 
+DROP SCHEMA IF EXISTS public2 CASCADE;
+CREATE SCHEMA public2;
+
+CREATE TABLE public2.wearehere(
+    cId serial NOT NULL,
+    cVarchar varchar,
+    PRIMARY KEY (cId)
+);
+
+INSERT INTO public2.wearehere
+    (cVarchar)
+VALUES
+    ('Horton'),
+    ('Hears'),
+    ('A'),
+    ('Who')
+;
+
+COMMIT;
+
+
+
+BEGIN;
+SET client_encoding = 'LATIN1';
 
 CREATE TABLE edgydata (
     cId serial NOT NULL,
