@@ -10,7 +10,7 @@
 BEGIN;
 SET client_encoding = 'LATIN1';
 
-DROP SCHEMA IF EXISTS public2;
+DROP SCHEMA IF EXISTS public2 CASCADE;
 CREATE SCHEMA public2;
 
 CREATE TABLE public2.edgydata(
@@ -22,12 +22,14 @@ CREATE TABLE public2.edgydata(
     PRIMARY KEY (cId)
 );
 
-COPY public2.edgydata (cTimeNTZ, cTimeTZ, cJson, cJsonB) FROM stdin;
-\N  \N  \N  \N
-23:00:15    23:00:15    \N  \N
-24:00:00    24:00:00    \N  \N
-00:00:00    00:00:00    \N  \N
-\.
+INSERT INTO public2.edgydata
+    (cTimeNTZ, cTimeTZ, cJson, cJsonB)
+VALUES
+    (null, null, null, null),
+    ('23:00:15', '23:00:15', null, null),
+    ('24:00:00', '24:00:00', null, null),
+    ('00:00:00', '00:00:00', null, null)
+;
 
 COMMIT;
 
