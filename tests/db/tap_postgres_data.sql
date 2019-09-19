@@ -15,22 +15,19 @@ SET client_encoding = 'LATIN1';
 DROP SCHEMA IF EXISTS public2 CASCADE;
 CREATE SCHEMA public2;
 
-CREATE TABLE public2.edgydata(
+CREATE TABLE public2.wearehere(
     cId serial NOT NULL,
-    cTimeNTZ time without time zone,
-    cTimeTZ TIME with time zone,
-    cJson json,
-    cJsonB jsonb,
+    cVarchar varchar,
     PRIMARY KEY (cId)
 );
 
-INSERT INTO public2.edgydata
-    (cTimeNTZ, cTimeTZ, cJson, cJsonB)
+INSERT INTO public2.wearehere
+    (cVarchar)
 VALUES
-    (null, null, null, null),
-    ('23:00:15', '23:00:15', null, null),
-    ('24:00:00', '24:00:00', null, null),
-    ('00:00:00', '00:00:00', null, null)
+    ('Horton'),
+    ('Hears'),
+    ('A'),
+    ('Who')
 ;
 
 COMMIT;
