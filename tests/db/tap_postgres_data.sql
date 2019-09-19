@@ -10,7 +10,7 @@
 BEGIN;
 SET client_encoding = 'LATIN1';
 
-DROP SCHEMA IF EXISTS;
+DROP SCHEMA IF EXISTS public2;
 CREATE SCHEMA public2;
 
 CREATE TABLE public2.edgydata
