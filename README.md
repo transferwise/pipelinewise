@@ -164,6 +164,12 @@ For further instructions about setting up local development environment go to
 [Test Project for Docker Development Environment](dev-project/README.md).
 
 
+## Contribution
+
+To add new taps and targets follow the instructions on
+[Contribution Page](https://transferwise.github.io/pipelinewise/project/contribution.html)
+
+
 ## Links
 
 * [PipelineWise documentation](https://transferwise.github.io/pipelinewise/)
