@@ -38,6 +38,8 @@ The following transformations can be added optionally into the :ref:`yaml_config
 
 * **MASK-NUMBER**: Transforms any numeric column to zero
 
+* **MASK-HIDDEN**: Transforms any value to 'hidden'
+
 
 .. _conditional_transformations:
 
