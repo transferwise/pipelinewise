@@ -48,7 +48,8 @@
           "HASH-SKIP-FIRST-8",
           "HASH-SKIP-FIRST-9",
           "MASK-DATE",
-          "MASK-NUMBER"
+          "MASK-NUMBER",
+          "MASK-HIDDEN"
           ] }
       },
       "required": [ "column", "type" ]
