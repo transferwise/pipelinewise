@@ -35,7 +35,6 @@ batch_size_rows: 20000                 # Batch size for the stream to optimise l
 # Source to target Schema mapping
 # ------------------------------------------------------------------------------
 schemas:
-
   - source_schema: "public2"            # Source schema in postgres with tables
     target_schema: "postgres_world_2"    # Target schema in the destination Data Warehouse
     #target_schema_select_permissions:  # Optional: Grant SELECT on schema and tables that created
@@ -47,7 +46,7 @@ schemas:
     # For LOG_BASED replication method you might need to adjust the source mysql/ mariadb configuration.
     tables:
       - table_name: "wearehere"
-        replication_method: "LOG_BASED"    # One of INCREMENTAL, LOG_BASED and FULL_TABLE
+        replication_method: "FULL_TABLE"    # One of INCREMENTAL, LOG_BASED and FULL_TABLE
 
 
   - source_schema: "public"            # Source schema in postgres with tables
@@ -77,8 +76,28 @@ schemas:
 
       # You can add as many tables as you need...
       - table_name: "countrylanguage"
-        replication_method: "LOG_BASED"     # Optional: replication_method defaults to 'LOG_BASED'
+        replication_method: "FULL_TABLE"     # Optional: replication_method defaults to 'LOG_BASED'
                                             #
                                             # Important! Log based must be enabled in PostgreSQL and
                                             #            requires wal2json plugin and config adjustments
                                             # Doc: https://transferwise.github.io/pipelinewise/connectors/taps/postgres.html
+
+
+# ------------------------------------------------------------------------------
+# LOG_BASED replication data
+# ------------------------------------------------------------------------------
+  - source_schema: "logical1"                   # Source schema in postgres with tables
+    target_schema: "postgres_world_logical1"    # Target schema in the destination Data Warehouse
+    tables:
+      - table_name: "logical1_table1"
+      - table_name: "logical1_table2"
+
+  - source_schema: "logical2"                   # Source schema in postgres with tables
+    target_schema: "postgres_world_logical2"    # Target schema in the destination Data Warehouse
+    tables:
+      - table_name: "logical2_table1"
+
+  - source_schema: "logical3"                   # Source schema in postgres with tables
+    target_schema: "postgres_world_logical3"    # Target schema in the destination Data Warehouse
+    tables:
+      - table_name: "logical3_table1"

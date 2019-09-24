@@ -3,7 +3,6 @@
 # Building a test PostgreSQL database for integration testing of tap-postgres
 PWD="$(dirname "$0")"
 
-TEST_DB_SQL=${PWD}/tap_postgres_data.sql
 echo "Building test PostgreSQL database..."
 
 # To run this script some environment variables must be set.
@@ -30,4 +29,8 @@ psql -U ${DB_TAP_POSTGRES_USER} -h ${DB_TAP_POSTGRES_HOST} -c 'DROP TABLE IF EXI
 psql -U ${DB_TAP_POSTGRES_USER} -h ${DB_TAP_POSTGRES_HOST} -c 'DROP TABLE IF EXISTS public.city CASCADE;' ${DB_TAP_POSTGRES_DB}
 
 # Build the test DB
+TEST_DB_SQL=${PWD}/tap_postgres_data.sql
+psql -U ${DB_TAP_POSTGRES_USER} -h ${DB_TAP_POSTGRES_HOST} -f ${TEST_DB_SQL} -d ${DB_TAP_POSTGRES_DB}
+
+TEST_DB_SQL=${PWD}/tap_postgres_logical_data.sql
 psql -U ${DB_TAP_POSTGRES_USER} -h ${DB_TAP_POSTGRES_HOST} -f ${TEST_DB_SQL} -d ${DB_TAP_POSTGRES_DB}
