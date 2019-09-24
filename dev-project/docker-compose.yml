@@ -32,7 +32,7 @@ services:
 
     volumes:
       - ../:/usr/src/app
-      - /usr/src/app/.virtualenvs/
+      - /usr/src/app/dev-project/.virtualenvs/
 
     # Build only when test databases are ready
     depends_on:

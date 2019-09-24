@@ -16,8 +16,8 @@ alien -i oracle-instantclient.rpm --scripts
 rm -f oracle-instantclient.rpm
 
 # Build test databasese
-dev-project/db/tap_mysql_db.sh
-dev-project/db/tap_postgres_db.sh
+db/tap_mysql_db.sh
+db/tap_postgres_db.sh
 
 # Install PipelineWise in the container
 ../install.sh --acceptlicenses --nousage
