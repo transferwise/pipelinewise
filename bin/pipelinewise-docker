@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env bash
 # This is a startup script when running pipelinewise docker executable image
 #
 # It is required to mount directories from host to read/write project YAML files.
