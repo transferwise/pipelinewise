@@ -2,7 +2,7 @@
 set -e
 
 # Activate virtual environment
-source /app/.virtualenvs/pipelinewise/bin/activate
+source /usr/src/app/dev-project/.virtualenvs/pipelinewise/bin/activate
 export PIPELINEWISE_HOME=/app
 
 WORK_DIR=/app/wrk
