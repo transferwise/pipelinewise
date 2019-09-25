@@ -243,7 +243,7 @@ $ docker build -t pipelinewise:latest .
 there is no official, pre-built image available to download on DockerHub. Once the image is
 ready, create an alias to the docker wrapper script so you can use the <code class="docutils literal notranslate"><span class="pre">pipelinewise</span></code>
 executable commands everywhere on your system:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ <span class="nb">alias</span> <span class="nv">pipelinewise</span><span class="o">=</span><span class="s2">&quot;</span><span class="k">$(</span>PWD<span class="k">)</span><span class="s2">/bin/pipelinewise-docker&quot;</span>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ <span class="nb">alias</span> <span class="nv">pipelinewise</span><span class="o">=</span><span class="s2">&quot;</span><span class="k">$(</span><span class="nb">pwd</span><span class="k">)</span><span class="s2">/bin/pipelinewise-docker&quot;</span>
 </pre></div>
 </div>
 <p>Check if the installation was successfully by running the <code class="docutils literal notranslate"><span class="pre">pipelinewise</span> <span class="pre">status</span></code> command:</p>

@@ -64,7 +64,7 @@ executable commands everywhere on your system:
 
 .. code-block:: bash
 
-    $ alias pipelinewise="$(PWD)/bin/pipelinewise-docker"
+    $ alias pipelinewise="$(pwd)/bin/pipelinewise-docker"
 
 
 Check if the installation was successfully by running the ``pipelinewise status`` command:
