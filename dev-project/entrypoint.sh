@@ -28,7 +28,7 @@ if [[ $? != 0 ]]; then
 fi
 
 # Activate CLI virtual environment at every login
-DO_AT_LOGIN="source $PIPELINEWISE_HOME/.virtualenvs/pipelinewise/bin/activate && cat $PIPELINEWISE_HOME/motd"
+DO_AT_LOGIN="source $PIPELINEWISE_HOME/.virtualenvs/pipelinewise/bin/activate && cat $PIPELINEWISE_HOME/../motd"
 if [[ `tail -n1 ~/.bashrc` != "$DO_AT_LOGIN" ]]; then
     echo $DO_AT_LOGIN >> ~/.bashrc
 fi
