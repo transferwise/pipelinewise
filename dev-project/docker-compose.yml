@@ -32,7 +32,13 @@ services:
 
     volumes:
       - ../:/usr/src/app
-      # - /usr/src/app/.virtualenvs/
+      # Do not mount .virtualenvs dirs from host, but recreate it in the container as empty dirs:
+      #   - Makes install script faster in the container because it doesn't need to "jump" back
+      #     to host every time when installing that many files to dev-project/.virtualenvs/
+      #   - Doesn't create container specific dev-project/.virtualenvs/ files on host
+      #   - Doesn't bring host specific .virtualenvs/ files to container
+      - /usr/src/app/dev-project/.virtualenvs/
+      - /usr/src/app/.virtualenvs
 
     # Build only when test databases are ready
     depends_on:
