@@ -14,7 +14,7 @@ IMAGE=pipelinewise
 VERSION=latest
 
 # To mount the host work directory to the running container wrk dir 
-HOST_DIR=$(PWD)
+HOST_DIR=$(pwd)
 CONT_WORK_DIR=/app/wrk
 
 # To mount the host pipelinewise home to the running container home dir

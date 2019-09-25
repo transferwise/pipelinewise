@@ -17,6 +17,7 @@ Install [Docker](https://www.docker.com/) and [Docker Compose](https://docs.dock
 Go to the main folder of the repository (the parent of this one) and To create local development environment:
 
 ```sh
+$ cd dev-project/
 $ docker-compose up --build
 ```
 
@@ -33,7 +34,7 @@ $ docker exec -it pipelinewise_dev bash
 Import the dev project:
 
 ```sh
-$ pipelinewise import --dir dev-project
+$ pipelinewise import --dir /usr/src/app/dev-project/pipelinewise
 ```
 
 Check the status, you should see two pipelines. One is replicating data from MariaDB to Postgres DWH and
