@@ -7,7 +7,7 @@ services:
     working_dir: /usr/src/app
     entrypoint: /usr/src/app/dev-project/entrypoint.sh
     environment:
-      PIPELINEWISE_HOME: /usr/src/app
+      PIPELINEWISE_HOME: /usr/src/app/dev-project
       DB_TAP_MYSQL_HOST: db_mysql_source
       DB_TAP_MYSQL_PORT: ${DB_TAP_MYSQL_PORT}
       DB_TAP_MYSQL_PORT_ON_HOST: ${DB_TAP_MYSQL_PORT_ON_HOST}

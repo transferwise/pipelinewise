@@ -4,21 +4,22 @@
 apt-get update
 apt-get install -y mariadb-client postgresql-client alien libaio1
 
+# Change to dev-project folder
+cd dev-project
+
 # Install Oracle Instant Client required for tap-oracle
-cd 
 ORA_INSTACLIENT_URL=https://download.oracle.com/otn_software/linux/instantclient/193000/oracle-instantclient19.3-basiclite-19.3.0.0.0-1.x86_64.rpm
 wget -O oracle-instantclient.rpm ${ORA_INSTACLIENT_URL}
 echo "Installing Oracle Instant Client for tap-oracle..."
 alien -i oracle-instantclient.rpm --scripts
 rm -f oracle-instantclient.rpm
-cd -
 
 # Build test databasese
-tests/db/tap_mysql_db.sh
-tests/db/tap_postgres_db.sh
+../tests/db/tap_mysql_db.sh
+../tests/db/tap_postgres_db.sh
 
 # Install PipelineWise in the container
-./install.sh --acceptlicenses --nousage
+../install.sh --acceptlicenses --nousage
 if [[ $? != 0 ]]; then
     echo
     echo "ERROR: Docker container not started. Failed to install one or more PipelineWise components."
