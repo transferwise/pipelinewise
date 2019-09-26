@@ -18,6 +18,8 @@ MySQL setup requirements
 
 * ``SUPER`` privilege in MySQL - If using :ref:`log_based`, the ``SUPER`` privilege is required to define the appropriate server settings.
 
+* The database connection credentials (which you will supply to the connection details in the tap) also need to have access to ``INFORMATION_SCHEMA`` of the MySQL DB in order to get metadata of the tables (like primary key details, column data type details etc)
+
 **Step 2: Configuring database server settings**
 
 .. note::
