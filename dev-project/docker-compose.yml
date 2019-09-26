@@ -4,10 +4,10 @@ services:
   pipelinewise:
     image: python:3.7.4-buster
     container_name: pipelinewise_dev
-    working_dir: /usr/src/app
-    entrypoint: /usr/src/app/dev-project/entrypoint.sh
+    working_dir: /opt/pipelinewise
+    entrypoint: /opt/pipelinewise/dev-project/entrypoint.sh
     environment:
-      PIPELINEWISE_HOME: /usr/src/app/dev-project
+      PIPELINEWISE_HOME: /opt/pipelinewise/dev-project
       DB_TAP_MYSQL_HOST: db_mysql_source
       DB_TAP_MYSQL_PORT: ${DB_TAP_MYSQL_PORT}
       DB_TAP_MYSQL_PORT_ON_HOST: ${DB_TAP_MYSQL_PORT_ON_HOST}
@@ -31,9 +31,9 @@ services:
       DB_TARGET_POSTGRES_DB: ${DB_TARGET_POSTGRES_DB}
 
     volumes:
-      - ../:/usr/src/app
+      - ../:/opt/pipelinewise
       # don't create container specific .virtualenvs files on host
-      - /usr/src/app/dev-project/.virtualenvs/
+      - /opt/pipelinewise/dev-project/.virtualenvs/
       # mount pipelinewise pipe configuration directory to host for ease of troubleshooting
       - .pipelinewise:/root/.pipelinewise
 
