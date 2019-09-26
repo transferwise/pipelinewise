@@ -6,4 +6,5 @@
 *.egg-info
 *.egg/
 docs
+dev-project
 *.rpm
