@@ -32,11 +32,10 @@ services:
 
     volumes:
       - ../:/usr/src/app
-      # Do not mount .virtualenvs dirs from host, but recreate it in the container as empty dirs:
-      #   - Makes install script faster in the container because it doesn't need to "jump" back
-      #     to host every time when installing that many files to dev-project/.virtualenvs/
-      #   - Doesn't create container specific dev-project/.virtualenvs/ files on host
+      # don't create container specific .virtualenvs files on host
       - /usr/src/app/dev-project/.virtualenvs/
+      # mount pipelinewise pipe configuration directory to host for ease of troubleshooting
+      - .pipelinewise:/root/.pipelinewise
 
     # Build only when test databases are ready
     depends_on:
