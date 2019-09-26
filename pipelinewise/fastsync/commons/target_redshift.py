@@ -114,26 +114,26 @@ class FastSyncTargetRedshift:
         self.s3.delete_object(Bucket=bucket, Key=s3_key)
 
 
-    def grant_select_on_table(self, target_schema, table_name, role, is_temporary):
+    def grant_select_on_table(self, target_schema, table_name, grantee, is_temporary, to_group=False):
         # Grant role is not mandatory parameter, do nothing if not specified
-        if role:
+        if grantee:
             table_dict = utils.tablename_to_dict(table_name)
             target_table = table_dict.get('table_name') if not is_temporary else table_dict.get('temp_table_name')
-            sql = "GRANT SELECT ON {}.{} TO GROUP {}".format(target_schema, target_table, role)
+            sql = "GRANT SELECT ON {}.{} TO {} {}".format(target_schema, target_table, 'GROUP' if to_group else '', grantee)
             self.query(sql)
 
 
-    def grant_usage_on_schema(self, target_schema, role):
+    def grant_usage_on_schema(self, target_schema, grantee, to_group=False):
         # Grant role is not mandatory parameter, do nothing if not specified
-        if role:
-            sql = "GRANT USAGE ON SCHEMA {} TO GROUP {}".format(target_schema,role)
+        if grantee:
+            sql = "GRANT USAGE ON SCHEMA {} TO {} {}".format(target_schema, 'GROUP' if to_group else '', grantee)
             self.query(sql)
 
 
-    def grant_select_on_schema(self, target_schema, role):
+    def grant_select_on_schema(self, target_schema, grantee, to_group=False):
         # Grant role is not mandatory parameter, do nothing if not specified
-        if role:
-            sql = "GRANT SELECT ON ALL TABLES IN SCHEMA {} TO GROUP {}".format(target_schema,role)
+        if grantee:
+            sql = "GRANT SELECT ON ALL TABLES IN SCHEMA {} TO {} {}".format(target_schema, 'GROUP' if to_group else '', grantee)
             self.query(sql)
 
 

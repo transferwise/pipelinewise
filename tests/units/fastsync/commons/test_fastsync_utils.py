@@ -254,3 +254,23 @@ def test_get_grantees():
         "schema_mapping": {"foo2": {"target_schema_select_permissions": ["grantee3", "grantee4"]}}
     }
     assert utils.get_grantees(target_config, "foo.foo") == ["grantee1", "grantee2"]
+
+    # default_target_schema_select_permissions as dict with string should return dict
+    target_config_with_default_as_dict = { "default_target_schema_select_permissions": {
+        "users": "grantee_user1",
+        "groups": "grantee_group1"
+    }}
+    assert utils.get_grantees(target_config_with_default_as_dict, "foo.foo") == {
+        "users": ["grantee_user1"],
+        "groups": ["grantee_group1"]
+    }
+
+    # default_target_schema_select_permissions as dict with list should return dict
+    target_config_with_default_as_dict = { "default_target_schema_select_permissions": {
+        "users": ["grantee_user1", "grantee_user2"],
+        "groups": ["grantee_group1", "grantee_group2"]
+    }}
+    assert utils.get_grantees(target_config_with_default_as_dict, "foo.foo") == {
+        "users": ["grantee_user1", "grantee_user2"],
+        "groups": ["grantee_group1", "grantee_group2"]
+    }
