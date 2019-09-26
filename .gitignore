@@ -25,12 +25,7 @@ tests/end-to-end/test-project/*.yml
 # Dev project
 dev-project/.pipelinewise
 dev-project/.virtualenvs
-dev-project/pipelinewise-config/target_snowflake_test.yml
-dev-project/pipelinewise-config/target_snowflake_test.yml.disabled
-dev-project/pipelinewise-config/target_redshift_test.yml
-dev-project/pipelinewise-config/target_redshift_test.yml.disabled
-dev-project/pipelinewise-config/target_s3_csv_test.yml
-dev-project/pipelinewise-config/target_s3_csv_test.yml.disabled
+dev-project/pipelinewise-config/*_test.yml*
 
 # Docker
 #.env
