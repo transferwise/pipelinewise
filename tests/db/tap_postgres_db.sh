@@ -22,15 +22,9 @@ PGPASSFILE=~/.pgpass
 echo ${DB_TAP_POSTGRES_HOST}:${DB_TAP_POSTGRES_PORT}:${DB_TAP_POSTGRES_DB}:${DB_TAP_POSTGRES_USER}:${DB_TAP_POSTGRES_PASSWORD} > ${PGPASSFILE}
 chmod 0600 ${PGPASSFILE}
 
-# Drop target tables if exists, the test db sql works only if tables not exist
-psql -U ${DB_TAP_POSTGRES_USER} -h ${DB_TAP_POSTGRES_HOST} -c 'DROP TABLE IF EXISTS public.edgyData CASCADE;' ${DB_TAP_POSTGRES_DB}
-psql -U ${DB_TAP_POSTGRES_USER} -h ${DB_TAP_POSTGRES_HOST} -c 'DROP TABLE IF EXISTS public.countrylanguage CASCADE;' ${DB_TAP_POSTGRES_DB}
-psql -U ${DB_TAP_POSTGRES_USER} -h ${DB_TAP_POSTGRES_HOST} -c 'DROP TABLE IF EXISTS public.country CASCADE;' ${DB_TAP_POSTGRES_DB}
-psql -U ${DB_TAP_POSTGRES_USER} -h ${DB_TAP_POSTGRES_HOST} -c 'DROP TABLE IF EXISTS public.city CASCADE;' ${DB_TAP_POSTGRES_DB}
-
-# Build the test DB
+# Build the test Databases
 TEST_DB_SQL=${PWD}/tap_postgres_data.sql
 psql -U ${DB_TAP_POSTGRES_USER} -h ${DB_TAP_POSTGRES_HOST} -f ${TEST_DB_SQL} -d ${DB_TAP_POSTGRES_DB}
 
-TEST_DB_SQL=${PWD}/tap_postgres_logical_data.sql
+TEST_DB_SQL=${PWD}/tap_postgres_data_logical.sql
 psql -U ${DB_TAP_POSTGRES_USER} -h ${DB_TAP_POSTGRES_HOST} -f ${TEST_DB_SQL} -d ${DB_TAP_POSTGRES_DB}

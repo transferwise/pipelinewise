@@ -13,21 +13,26 @@ CREATE TABLE logical1.logical1_table1(
     PRIMARY KEY (cid)
 );
 
-DROP SCHEMA IF EXISTS logical2 CASCADE;
-
-CREATE SCHEMA logical2;
-
 CREATE TABLE logical1.logical1_table2(
     cid serial NOT NULL,
     cvarchar varchar,
     PRIMARY KEY (cid)
 );
 
+CREATE TABLE logical1.logical1_edgydata (LIKE public.edgydata);
+
+
+DROP SCHEMA IF EXISTS logical2 CASCADE;
+
+CREATE SCHEMA logical2;
+
 CREATE TABLE logical2.logical2_table1(
     cid serial NOT NULL,
     cvarchar varchar,
     PRIMARY KEY (cid)
 );
+
+
 
 DROP SCHEMA IF EXISTS logical3 CASCADE;
 
@@ -40,6 +45,8 @@ CREATE TABLE logical3.logical3_table1(
 );
 
 -- activity stream
+INSERT INTO logical1.logical1_edgydata SELECT * FROM public.edgydata;
+
 INSERT INTO logical1.logical1_table1 (cvarchar) VALUES ('inserted row');
 
 INSERT INTO logical1.logical1_table2 (cvarchar) VALUES ('inserted row');
