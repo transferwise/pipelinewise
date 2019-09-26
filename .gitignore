@@ -24,7 +24,6 @@ tests/end-to-end/test-project/*.yml
 
 # Dev project
 dev-project/.pipelinewise
-dev-project/.virtualenvs
 dev-project/pipelinewise-config/*_test.yml*
 
 # Docker
