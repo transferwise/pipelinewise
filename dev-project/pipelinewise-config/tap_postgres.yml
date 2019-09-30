@@ -18,9 +18,12 @@ db_conn:
   user: "pipelinewise"                 # PostfreSQL user
   password: "secret"                   # Plain string or vault encrypted
   dbname: "postgres_source_db"         # PostgreSQL database name
+  logical_poll_total_seconds: 5        # Seconds to wait before assuming no more data
+                                       #    on older versions of PostgreSQL, this needs to be
+                                       #    increased if source server has very old wal files
   #filter_schemas: "schema1,schema2"   # Optional: Scan only the required schemas
-                                       #           to improve the performance of
-                                       #           data extraction
+                                       #    to improve the performance of
+                                       #    data extraction
 
 
 # ------------------------------------------------------------------------------
@@ -35,9 +38,9 @@ batch_size_rows: 20000                 # Batch size for the stream to optimise l
 # Source to target Schema mapping
 # ------------------------------------------------------------------------------
 schemas:
-  - source_schema: "public2"            # Source schema in postgres with tables
-    target_schema: "postgres_world_2"    # Target schema in the destination Data Warehouse
-    #target_schema_select_permissions:  # Optional: Grant SELECT on schema and tables that created
+  - source_schema: "public2"           # Source schema in postgres with tables
+    target_schema: "postgres_world_2"  # Target schema in the destination Data Warehouse
+    # target_schema_select_permissions:  # Optional: Grant SELECT on schema and tables that created
     #  - grp_read_only
 
     # List of tables to replicate from Postgres to destination Data Warehouse
