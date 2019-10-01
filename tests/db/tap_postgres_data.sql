@@ -32,14 +32,10 @@ VALUES
 COMMIT;
 
 
-
 BEGIN;
 SET client_encoding = 'LATIN1';
 
 DROP TABLE IF EXISTS public.edgyData CASCADE;
-DROP TABLE IF EXISTS public.countrylanguage CASCADE;
-DROP TABLE IF EXISTS public.country CASCADE;
-DROP TABLE IF EXISTS public.city CASCADE;
 
 CREATE TABLE edgydata (
     cid serial not null,
@@ -56,9 +52,22 @@ insert into edgydata (ctimentz, ctimetz, cjson, cjsonb, cvarchar) values
     ('23:00:15','23:00:15', null, null,'Lorem ipsum dolor sit amet'),
     ('12:00:00','12:00:15', null, null,'Chinese: 和毛泽东 <<重上井冈山>>. 严永欣, 一九八八年.'),
     ('24:00:00','24:00:00', null, null,'Thai: แผ่นดินฮั่นเสื่อมโทรมแสนสังเวช'),
-    ('00:00:00','00:00:00', null, null,e'Special Characters: ["\\,!@£$%^&*()]'),
-    ( null, null, '[{"key": "ValueOne", "actions": []}, {"key": "ValueTwo", "actions": []}]','[{"key": "ValueOne", "actions": []}, {"key": "ValueTwo", "actions": []}]' , null),
+    ('00:00:00','00:00:00', null, null,e'Special Characters: ["/\\,!@£$%^&*()]'),
+    ( null, null, '[]','[]' , null),
+    ( null, null, '{}','{}' , null),
+    ( null, null, '[{}, {}]','[{}, {}]' , null),
+    ( null, null, '[{"key": "ValueOne", "actions": []}, {"key": "ValueTwo", "actions": []}]','[{"key": "ValueOne", "actions": []}, {"key": "ValueTwo", "actions": []}]' , null)
 ;
+
+COMMIT;
+
+
+BEGIN;
+SET client_encoding = 'LATIN1';
+
+DROP TABLE IF EXISTS public.countrylanguage CASCADE;
+DROP TABLE IF EXISTS public.country CASCADE;
+DROP TABLE IF EXISTS public.city CASCADE;
 
 CREATE TABLE city (
     id integer NOT NULL,

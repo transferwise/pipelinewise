@@ -19,7 +19,7 @@ CREATE TABLE logical1.logical1_table2(
     PRIMARY KEY (cid)
 );
 
-CREATE TABLE logical1.logical1_edgydata (LIKE public.edgydata);
+CREATE TABLE logical1.logical1_edgydata (LIKE public.edgydata INCLUDING INDEXES);
 
 
 DROP SCHEMA IF EXISTS logical2 CASCADE;
