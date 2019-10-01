@@ -109,6 +109,8 @@ Example YAML for ``tap-mysql``:
     #filter_dbs: "schema1,schema2"       # Optional: Scan only the required schemas
                                          #           to improve the performance of
                                          #           data extraction
+    #export_batch_rows                   # Optional: Number of rows to export from MySQL
+                                         #           in one batch. Default is 20000.
 
 
   # ------------------------------------------------------------------------------
