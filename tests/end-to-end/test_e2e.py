@@ -3,6 +3,7 @@ import re
 import glob
 import shlex
 import pytest
+import psycopg2
 import subprocess
 
 from dotenv import load_dotenv
@@ -26,7 +27,7 @@ class TestE2E(object):
         """Load environment variables in priority order:
             1: Existing environment variables 
             2: Docker compose .env environment variables"""
-        load_dotenv(dotenv_path=os.path.join(DIR, "../../.env"))
+        load_dotenv(dotenv_path=os.path.join(DIR, "../../dev-project/.env"))
         env = {}
         
         env['DB_TAP_POSTGRES_HOST'] = os.environ.get('DB_TAP_POSTGRES_HOST')
@@ -64,6 +65,28 @@ class TestE2E(object):
             yaml_path = template_path.replace(".template", "")
             with open(yaml_path, "w+") as file:
                 file.write(yaml)
+
+    def clean_target_postgres(self):
+        """Clean postgres_dwh"""
+        try:
+            conn = psycopg2.connect(host=self.env['DB_TARGET_POSTGRES_HOST'],
+                                    port=self.env['DB_TARGET_POSTGRES_PORT'],
+                                    user=self.env['DB_TARGET_POSTGRES_USER'],
+                                    password=self.env['DB_TARGET_POSTGRES_PASSWORD'],
+                                    database=self.env['DB_TARGET_POSTGRES_DB'])
+            conn.set_session(autocommit=True)
+            cur = conn.cursor()
+
+            # Drop target schemas if exists
+            cur.execute("DROP SCHEMA IF EXISTS mysql_grp24 CASCADE;")
+            cur.execute("DROP SCHEMA IF EXISTS postgres_world CASCADE;")
+
+            # Create groups required for tests
+            cur.execute("DROP GROUP IF EXISTS group1;")
+            cur.execute("CREATE GROUP group1;")
+        finally:
+            cur.close()
+            conn.close()
 
     def run_command(self, command):
         """Run shell command and return returncode, stdout and stderr"""
@@ -106,6 +129,7 @@ class TestE2E(object):
     @pytest.mark.dependency(name="import_config")
     def test_import_project(self):
         """Import the YAML project with taps and target and do discovery mode to write the JSON files for singer connectors"""
+        self.clean_target_postgres()
         [rc, stdout, stderr] = self.run_command("pipelinewise import_config --dir {}".format(self.project_dir))
         self.assert_command_success(rc, stdout, stderr)
 
