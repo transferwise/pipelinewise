@@ -7,6 +7,7 @@
 -- The sample database available at https://github.com/morenoh149/postgresDBSamples
 -- Originally copied from https://raw.githubusercontent.com/morenoh149/postgresDBSamples/master/worldDB-1.0/world.sql
 
+
 BEGIN;
 SET client_encoding = 'LATIN1';
 
@@ -31,30 +32,42 @@ VALUES
 COMMIT;
 
 
+BEGIN;
+SET client_encoding = 'LATIN1';
+
+DROP TABLE IF EXISTS public.edgyData CASCADE;
+
+CREATE TABLE edgydata (
+    cid serial not null,
+    ctimentz time without time zone,
+    ctimetz time with time zone,
+    cjson json,
+    cjsonb jsonb,
+    cvarchar varchar,
+    PRIMARY KEY (cid)
+);
+
+insert into edgydata (ctimentz, ctimetz, cjson, cjsonb, cvarchar) values
+    ( null, null, null, null, null),
+    ('23:00:15','23:00:15', null, null,'Lorem ipsum dolor sit amet'),
+    ('12:00:00','12:00:15', null, null,'Chinese: 和毛泽东 <<重上井冈山>>. 严永欣, 一九八八年.'),
+    ('24:00:00','24:00:00', null, null,'Thai: แผ่นดินฮั่นเสื่อมโทรมแสนสังเวช'),
+    ('00:00:00','00:00:00', null, null,e'Special Characters: ["/\\,!@£$%^&*()]'),
+    ( null, null, '[]','[]' , null),
+    ( null, null, '{}','{}' , null),
+    ( null, null, '[{}, {}]','[{}, {}]' , null),
+    ( null, null, '[{"key": "ValueOne", "actions": []}, {"key": "ValueTwo", "actions": []}]','[{"key": "ValueOne", "actions": []}, {"key": "ValueTwo", "actions": []}]' , null)
+;
+
+COMMIT;
+
 
 BEGIN;
 SET client_encoding = 'LATIN1';
 
-CREATE TABLE edgydata (
-    cId serial NOT NULL,
-    cTimeNTZ time without time zone,
-    cTimeTZ TIME with time zone,
-    cJson json,
-    cJsonB jsonb,
-    cVarchar varchar
-);
-
-ALTER TABLE ONLY edgydata
-    ADD PRIMARY KEY (cId);
-
-COPY edgydata (cTimeNTZ, cTimeTZ, cJson, cJsonB, cVarchar) FROM stdin (ENCODING 'UTF8');
-\N	\N	\N	\N	\N
-23:00:15	23:00:15	\N	\N	Lorem ipsum dolor sit amet
-12:00:00	12:00:15	\N	\N	Chinese: 和毛泽东 <<重上井冈山>>. 严永欣, 一九八八年.
-24:00:00	24:00:00	\N	\N	Thai: แผ่นดินฮั่นเสื่อมโทรมแสนสังเวช
-00:00:00	00:00:00	\N	\N	Special Characters: ["\\,'!@£$%^&*()]\\\\
-\.
-
+DROP TABLE IF EXISTS public.countrylanguage CASCADE;
+DROP TABLE IF EXISTS public.country CASCADE;
+DROP TABLE IF EXISTS public.city CASCADE;
 
 CREATE TABLE city (
     id integer NOT NULL,
