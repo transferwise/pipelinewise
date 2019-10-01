@@ -123,9 +123,9 @@ def sync_table(table):
             lock.release()
 
         # Table loaded, grant select on all tables in target schema
-        for grantee in utils.get_grantees(args.target, table):
-            snowflake.grant_usage_on_schema(target_schema, grantee)
-            snowflake.grant_select_on_schema(target_schema, grantee)
+        grantees = utils.get_grantees(args.target, table)
+        utils.grant_privilege(target_schema, grantees, snowflake.grant_usage_on_schema)
+        utils.grant_privilege(target_schema, grantees, snowflake.grant_select_on_schema)
 
     except Exception as exc:
         utils.log("CRITICAL: {}".format(exc))
