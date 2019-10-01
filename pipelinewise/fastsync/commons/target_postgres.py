@@ -96,7 +96,10 @@ class FastSyncTargetPostgres:
         #self.s3.delete_object(Bucket=bucket, Key=s3_key)
 
 
-    def grant_select_on_table(self, target_schema, table_name, role, is_temporary):
+    # grant_... functions are common functions called by utils.py: grant_privilege function
+    # "to_group" is not used here but exists for compatibility reasons with other database types
+    # "to_group" is for databases that can grant to users and groups separately like Amazon Redshift
+    def grant_select_on_table(self, target_schema, table_name, role, is_temporary, to_group=False):
         # Grant role is not mandatory parameter, do nothing if not specified
         if role:
             table_dict = utils.tablename_to_dict(table_name)
@@ -105,14 +108,14 @@ class FastSyncTargetPostgres:
             self.query(sql)
 
 
-    def grant_usage_on_schema(self, target_schema, role):
+    def grant_usage_on_schema(self, target_schema, role, to_group=False):
         # Grant role is not mandatory parameter, do nothing if not specified
         if role:
             sql = "GRANT USAGE ON SCHEMA {} TO GROUP {}".format(target_schema,role)
             self.query(sql)
 
 
-    def grant_select_on_schema(self, target_schema, role):
+    def grant_select_on_schema(self, target_schema, role, to_group=False):
         # Grant role is not mandatory parameter, do nothing if not specified
         if role:
             sql = "GRANT SELECT ON ALL TABLES IN SCHEMA {} TO GROUP {}".format(target_schema,role)

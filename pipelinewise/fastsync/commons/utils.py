@@ -183,13 +183,37 @@ def get_grantees(target_config, table):
     elif config_default_target_schema_select_permissions:
         grantees = config_default_target_schema_select_permissions
 
-    # Convert anything other to list
+    # Grantees can be string
     if isinstance(grantees, str):
         grantees = [grantees]
-    elif grantees is None:
+    # Grantees can be a dict with string/list of users and groups
+    elif isinstance(grantees, dict):
+        users = grantees.get('users')
+        groups = grantees.get('groups')
+
+        grantees = {
+            'users': [users] if isinstance(users, str) else users,
+            'groups': [groups] if isinstance(groups, str) else groups,
+        }
+    # Convert anything else that not list empty list
+    elif not isinstance(grantees, list):
         grantees = []
 
     return grantees
+
+
+def grant_privilege(schema, grantees, grant_method, to_group=False):
+    if isinstance(grantees, list):
+        for grantee in grantees:
+            grant_method(schema, grantee, to_group)
+    elif isinstance(grantees, str):
+        grant_method(schema, grantees, to_group)
+    elif isinstance(grantees, dict):
+        users = grantees.get('users')
+        groups = grantees.get('groups')
+
+        grant_privilege(schema, users, grant_method)
+        grant_privilege(schema, groups, grant_method, to_group=True)
 
 
 def save_state_file(path, table, bookmark, dbname=None):

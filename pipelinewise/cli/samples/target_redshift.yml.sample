@@ -24,3 +24,11 @@ db_conn:
   s3_bucket: "<BUCKET_NAME>"                    # S3 external bucket name
   s3_key_prefix: "redshift-imports/"            # Optional: S3 key prefix
 
+  # Optional: Overrides the default COPY options to load data into Redshift
+  #           The values below are the defaults and fit for purpose for most cases.
+  #           Some basic file formatting parameters are fixed values and not
+  #           recommended overriding by custom ones.
+  #           They are like: CSV GZIP DELIMITER ',' REMOVEQUOTES ESCAPE
+  #copy_options: "
+  #  EMPTYASNULL BLANKSASNULL TRIMBLANKS TRUNCATECOLUMNS
+  #  TIMEFORMAT 'auto'"
