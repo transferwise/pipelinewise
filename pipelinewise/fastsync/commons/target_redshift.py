@@ -100,14 +100,27 @@ class FastSyncTargetRedshift:
         aws_secret_access_key=self.connection_config['aws_secret_access_key']
         bucket = self.connection_config['s3_bucket']
 
+        # Generate copy options - Override defaults if defined
+        copy_options = self.connection_config.get('copy_options',"""
+            EMPTYASNULL BLANKSASNULL TRIMBLANKS TRUNCATECOLUMNS
+            TIMEFORMAT 'auto'
+        """)
+
         # Using the built-in CSV COPY option for fastsync
         sql = """COPY {}.{} FROM 's3://{}/{}'            
             ACCESS_KEY_ID '{}'
             SECRET_ACCESS_KEY '{}'
-            CSV
-            BLANKSASNULL TIMEFORMAT 'auto'
-            GZIP
-        """.format(target_schema, target_table, bucket, s3_key, aws_access_key_id, aws_secret_access_key)
+            {}
+            CSV GZIP
+        """.format(
+            target_schema,
+            target_table,
+            bucket,
+            s3_key,
+            aws_access_key_id,
+            aws_secret_access_key,
+            copy_options
+        )
         self.query(sql)
 
         utils.log("REDSHIFT - Deleting {} from S3...".format(s3_key))
