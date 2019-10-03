@@ -48,15 +48,23 @@ CREATE TABLE edgydata (
 );
 
 insert into edgydata (ctimentz, ctimetz, cjson, cjsonb, cvarchar) values
-    ( null, null, null, null, null),
-    ('23:00:15','23:00:15', null, null,'Lorem ipsum dolor sit amet'),
-    ('12:00:00','12:00:15', null, null,'Chinese: 和毛泽东 <<重上井冈山>>. 严永欣, 一九八八年.'),
-    ('24:00:00','24:00:00', null, null,'Thai: แผ่นดินฮั่นเสื่อมโทรมแสนสังเวช'),
-    ('00:00:00','00:00:00', null, null,e'Special Characters: ["/\\,!@£$%^&*()]'),
-    ( null, null, '[]','[]' , null),
-    ( null, null, '{}','{}' , null),
-    ( null, null, '[{}, {}]','[{}, {}]' , null),
-    ( null, null, '[{"key": "ValueOne", "actions": []}, {"key": "ValueTwo", "actions": []}]','[{"key": "ValueOne", "actions": []}, {"key": "ValueTwo", "actions": []}]' , null)
+    (null, null, null, null, null),
+    ('23:00:15','23:00:15+00', null, null, null),
+    ('12:00:15','12:00:15+00:00', null, null, null),
+    ('12:00:15','12:00:15+0300', null, null, null),
+    ('12:00:15','12:00:15-0300', null, null, null),
+    ('24:00:00','24:00:00', null, null, null),
+    ('24:00:00','24:00:00+0000', null, null, null),
+    ('24:00:00','24:00:00-0100', null, null, null),
+    ('00:00:00','00:00:00', null, null, null),
+    (null, null, null, null,'Lorem ipsum dolor sit amet'),
+    (null, null, null, null,'Chinese: 和毛泽东 <<重上井冈山>>. 严永欣, 一九八八年.'),
+    (null, null, null, null,'Thai: แผ่นดินฮั่นเสื่อมโทรมแสนสังเวช'),
+    (null, null, null, null,e'Special Characters: ["/\\,!@£$%^&*()]'),
+    (null, null, '[]','[]' , null),
+    (null, null, '{}','{}' , null),
+    (null, null, '[{}, {}]','[{}, {}]' , null),
+    (null, null, '[{"key": "ValueOne", "actions": []}, {"key": "ValueTwo", "actions": []}]','[{"key": "ValueOne", "actions": []}, {"key": "ValueTwo", "actions": []}]' , null)
 ;
 
 COMMIT;
