@@ -196,7 +196,7 @@ class FastSyncTapPostgres:
                 CASE
                     WHEN data_type = 'ARRAY' THEN 'array_to_json(' || column_name || ') AS ' || column_name
                     WHEN udt_name = 'time' THEN 'replace(' || column_name || E'::varchar,\\\'24:00:00\\\',\\\'00:00:00\\\') AS ' || column_name
-                    WHEN udt_name = 'timetz' THEN 'replace(' || column_name || E'::time::varchar,\\\'24:00:00\\\',\\\'00:00:00\\\') AS ' || column_name
+                    WHEN udt_name = 'timetz' THEN 'replace((' || column_name || E' at time zone \'\'UTC\'\')::time::varchar,\\\'24:00:00\\\',\\\'00:00:00\\\') AS ' || column_name
                     ELSE column_name
                 END AS safe_sql_value
                 FROM information_schema.columns
