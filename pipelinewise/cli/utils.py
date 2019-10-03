@@ -24,6 +24,9 @@ from ansible.module_utils._text import to_text
 from ansible.module_utils.common._collections_compat import Mapping
 from ansible.errors import AnsibleError
 
+from jinja2 import Template
+import os
+
 from . import tap_properties
 
 logger = logging.getLogger('Pipelinewise CLI')
@@ -92,7 +95,8 @@ def load_json(path):
         logger.debug('Parsing file at {}'.format(path))
         if os.path.isfile(path):
             with open(path) as f:
-                return json.load(f)
+                template = Template(f.read())
+                return json.load(template.render(**os.getenv))
         else:
             logger.debug("No file at {}".format(path))
             return None

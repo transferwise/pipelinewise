@@ -5,6 +5,8 @@ import time
 import datetime
 import multiprocessing
 
+from jinja2 import Template
+import os
 
 def log(message):
     st = datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')
@@ -22,7 +24,8 @@ def get_cpu_cores():
 
 def load_json(path):
     with open(path) as fil:
-        return json.load(fil)
+        template = Template(fil.read())
+        return json.load(template.render(**os.getenv))
 
 
 def save_dict_to_json(path, data):
