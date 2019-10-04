@@ -119,9 +119,9 @@ def sync_table(table):
             lock.release()
 
         # Table loaded, grant select on all tables in target schema
-        for grantee in utils.get_grantees(args.target, table):
-            snowflake.grant_usage_on_schema(target_schema, grantee)
-            snowflake.grant_select_on_schema(target_schema, grantee)
+        grantees = utils.get_grantees(args.target, table)
+        utils.grant_privilege(target_schema, grantees, snowflake.grant_usage_on_schema)
+        utils.grant_privilege(target_schema, grantees, snowflake.grant_select_on_schema)
 
     except Exception as exc:
         utils.log("CRITICAL: {}".format(exc))
@@ -155,8 +155,8 @@ def main_impl():
         table_sync_excs = list(filter(None, p.map(sync_table, args.tables)))
 
     # Refresh information_schema columns cache
-    snowflake = FastSyncTargetSnowflake(args.target, args.transform)
-    snowflake.cache_information_schema_columns(args.tables)
+    #snowflake = FastSyncTargetSnowflake(args.target, args.transform)
+    #snowflake.cache_information_schema_columns(args.tables)
 
     # Log summary
     end_time = datetime.now()

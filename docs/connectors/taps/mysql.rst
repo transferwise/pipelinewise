@@ -18,6 +18,8 @@ MySQL setup requirements
 
 * ``SUPER`` privilege in MySQL - If using :ref:`log_based`, the ``SUPER`` privilege is required to define the appropriate server settings.
 
+* The database connection credentials (which you will supply to the connection details in the tap) also need to have access to ``INFORMATION_SCHEMA`` of the MySQL DB in order to get metadata of the tables (like primary key details, column data type details etc)
+
 **Step 2: Configuring database server settings**
 
 .. note::
@@ -107,6 +109,8 @@ Example YAML for ``tap-mysql``:
     #filter_dbs: "schema1,schema2"       # Optional: Scan only the required schemas
                                          #           to improve the performance of
                                          #           data extraction
+    #export_batch_rows                   # Optional: Number of rows to export from MySQL
+                                         #           in one batch. Default is 20000.
 
 
   # ------------------------------------------------------------------------------
