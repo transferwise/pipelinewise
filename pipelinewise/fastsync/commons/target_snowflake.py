@@ -103,14 +103,14 @@ class FastSyncTargetSnowflake:
         target_table = table_dict.get('table_name') if not is_temporary else table_dict.get('temp_table_name')
 
         if primary_key:
-            sql = """CREATE OR REPLACE TABLE {}.{} ({}
+            sql = """CREATE OR REPLACE TABLE {}.\"{}\" ({}
             ,_SDC_EXTRACTED_AT TIMESTAMP_NTZ
             ,_SDC_BATCHED_AT TIMESTAMP_NTZ
             ,_SDC_DELETED_AT VARCHAR
             , PRIMARY KEY ({}))
             """.format(target_schema, target_table, ', '.join(columns), primary_key)
         else:
-            sql = """CREATE OR REPLACE TABLE {}.{} ({}
+            sql = """CREATE OR REPLACE TABLE {}.\"{}\" ({}
             ,_SDC_EXTRACTED_AT TIMESTAMP_NTZ
             ,_SDC_BATCHED_AT TIMESTAMP_NTZ
             ,_SDC_DELETED_AT VARCHAR
@@ -219,7 +219,7 @@ class FastSyncTargetSnowflake:
         temp_table = table_dict.get('temp_table_name')
 
         # Swap tables and drop the temp tamp
-        self.query("ALTER TABLE {}.{} SWAP WITH {}.{}".format(schema, temp_table, schema, target_table))
+        self.query("ALTER TABLE {}.\"{}\" SWAP WITH {}.\"{}\"".format(schema, temp_table, schema, target_table))
         self.query("DROP TABLE IF EXISTS {}.{}".format(schema, temp_table))
         
 
