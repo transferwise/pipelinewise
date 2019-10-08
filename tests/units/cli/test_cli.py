@@ -1,6 +1,8 @@
 import os
 import pytest
 import shutil
+import signal
+from pathlib import Path
 
 import pipelinewise.cli as cli
 from pipelinewise.cli.pipelinewise import PipelineWise
@@ -399,3 +401,25 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
             pipelinewise.sync_tables()
         assert pytest_wrapped_e.type == SystemExit
         assert pytest_wrapped_e.value.code == 1
+
+
+    def test_exit_gracefully(self):
+        """Gracefully shoudl run tap command"""
+        args = CliArgs(target="target_one", tap="tap_one")
+        pipelinewise = PipelineWise(args, CONFIG_DIR, VIRTUALENVS_DIR)
+
+        # Create a test log file, simulating a running tap
+        pipelinewise.tap_run_log_file = "test-tap-run-dummy.log"
+        Path("{}.running".format(pipelinewise.tap_run_log_file)).touch()
+
+        # Graceful exit should return 1 by default
+        with pytest.raises(SystemExit) as pytest_wrapped_e:
+            pipelinewise._exit_gracefully(signal.SIGINT, frame=None)
+        assert pytest_wrapped_e.type == SystemExit
+        assert pytest_wrapped_e.value.code == 1
+
+        # Graceful exit should rename log file from running status to terminated
+        assert os.path.isfile("{}.terminated".format(pipelinewise.tap_run_log_file))
+
+        # Delete test log file
+        os.remove("{}.terminated".format(pipelinewise.tap_run_log_file))

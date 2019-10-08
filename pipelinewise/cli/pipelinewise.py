@@ -3,6 +3,7 @@
 import os
 import shutil
 import tempfile
+import signal
 import sys
 import logging
 import json
@@ -75,6 +76,11 @@ class PipelineWise(object):
             self.target_bin = self.get_connector_bin(self.target["type"])
 
         self.tranform_field_bin = self.get_connector_bin("transform-field")
+        self.tap_run_log_file = None
+
+        # Catch SIGINT and SIGTERM to exit gracefully
+        for sig in [signal.SIGINT, signal.SIGTERM]:
+            signal.signal(sig, self._exit_gracefully)
 
     def create_consumable_target_config(self, target_config, tap_inheritable_config):
         try:
@@ -691,8 +697,7 @@ class PipelineWise(object):
         print(tabulate(tab_body, headers=tab_headers, tablefmt="simple"))
         print("{} pipeline(s)".format(pipelines))
 
-    def run_tap_singer(self, tap_type, tap_config, tap_properties, tap_state, tap_transformation, target_config,
-                       log_file):
+    def run_tap_singer(self, tap_type, tap_config, tap_properties, tap_state, tap_transformation, target_config):
         """
         Generating and running piped shell command to sync tables using singer taps and targets
         """
@@ -735,7 +740,7 @@ class PipelineWise(object):
             ))
 
         # Do not run if another instance is already running
-        log_dir = os.path.dirname(log_file)
+        log_dir = os.path.dirname(self.tap_run_log_file)
         if os.path.isdir(log_dir) and len(utils.search_files(log_dir, patterns=['*.log.running'])) > 0:
             self.logger.info(
                 "Failed to run. Another instance of the same tap is already running. Log file detected in running status at {} ".format(
@@ -743,7 +748,7 @@ class PipelineWise(object):
             sys.exit(1)
 
         # Run command
-        result = utils.run_command(command, log_file)
+        result = utils.run_command(command, self.tap_run_log_file)
 
         # Save the new state file if created correctly
         if utils.is_json_file(new_tap_state):
@@ -751,7 +756,7 @@ class PipelineWise(object):
             os.remove(new_tap_state)
 
     def run_tap_fastsync(self, tap_type, target_type, tap_config, tap_properties, tap_state, tap_transformation,
-                         target_config, log_file):
+                         target_config):
         """
         Generating and running shell command to sync tables using the native fastsync components
         """
@@ -773,7 +778,7 @@ class PipelineWise(object):
         ))
 
         # Do not run if another instance is already running
-        log_dir = os.path.dirname(log_file)
+        log_dir = os.path.dirname(self.tap_run_log_file)
         if os.path.isdir(log_dir) and len(utils.search_files(log_dir, patterns=['*.log.running'])) > 0:
             self.logger.info(
                 "Failed to run. Another instance of the same tap is already running. Log file detected in running status at {} ".format(
@@ -781,7 +786,7 @@ class PipelineWise(object):
             sys.exit(1)
 
         # Run command
-        result = utils.run_command(command, log_file)
+        result = utils.run_command(command, self.tap_run_log_file)
 
     def run_tap(self):
         """
@@ -856,13 +861,11 @@ class PipelineWise(object):
             },
             create_fallback=True)
 
-        log_file_fastsync = os.path.join(log_dir, "{}-{}-{}.fastsync.log".format(target_id, tap_id, current_time))
-        log_file_singer = os.path.join(log_dir, "{}-{}-{}.singer.log".format(target_id, tap_id, current_time))
-
         try:
             # Run fastsync for FULL_TABLE replication method
             if len(fastsync_stream_ids) > 0:
                 self.logger.info("Table(s) selected to sync by fastsync: {}".format(fastsync_stream_ids))
+                self.tap_run_log_file = os.path.join(log_dir, "{}-{}-{}.fastsync.log".format(target_id, tap_id, current_time))
                 self.run_tap_fastsync(
                     tap_type,
                     target_type,
@@ -870,8 +873,7 @@ class PipelineWise(object):
                     tap_properties_fastsync,
                     tap_state,
                     tap_transformation,
-                    cons_target_config,
-                    log_file_fastsync
+                    cons_target_config
                 )
             else:
                 self.logger.info("No table available that needs to be sync by fastsync")
@@ -879,14 +881,14 @@ class PipelineWise(object):
             # Run singer tap for INCREMENTAL and LOG_BASED replication methods
             if len(singer_stream_ids) > 0:
                 self.logger.info("Table(s) selected to sync by singer: {}".format(singer_stream_ids))
+                self.tap_run_log_file = os.path.join(log_dir, "{}-{}-{}.singer.log".format(target_id, tap_id, current_time))
                 self.run_tap_singer(
                     tap_type,
                     tap_config,
                     tap_properties_singer,
                     tap_state,
                     tap_transformation,
-                    cons_target_config,
-                    log_file_singer
+                    cons_target_config
                 )
             else:
                 self.logger.info("No table available that needs to be sync by singer")
@@ -958,10 +960,10 @@ class PipelineWise(object):
         # Output will be redirected into target and tap specific log directory
         log_dir = self.get_tap_log_dir(target_id, tap_id)
         current_time = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-        log_file = os.path.join(log_dir, "{}-{}-{}.fastsync.log".format(target_id, tap_id, current_time))
 
         # sync_tables command always using fastsync
         try:
+            self.tap_run_log_file = os.path.join(log_dir, "{}-{}-{}.fastsync.log".format(target_id, tap_id, current_time))
             self.run_tap_fastsync(
                 tap_type,
                 target_type,
@@ -969,8 +971,7 @@ class PipelineWise(object):
                 tap_properties,
                 tap_state,
                 tap_transformation,
-                cons_target_config,
-                log_file
+                cons_target_config
             )
 
         # Delete temp file if there is any
@@ -1081,3 +1082,16 @@ class PipelineWise(object):
                         'lsn' in stream_bookmark
                 ))
         )
+
+    def _exit_gracefully(self, sig, frame, exit_code=1):
+        self.logger.info("Stopping gracefully...")
+
+        # Rename log files from running to terminated status
+        if self.tap_run_log_file:
+            tap_run_log_file_running = "{}.running".format(self.tap_run_log_file)
+            tap_run_log_file_terminated = "{}.terminated".format(self.tap_run_log_file)
+
+            if os.path.isfile(tap_run_log_file_running):
+                os.rename(tap_run_log_file_running, tap_run_log_file_terminated)
+
+        sys.exit(exit_code)
