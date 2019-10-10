@@ -1103,14 +1103,34 @@ class PipelineWise(object):
         sys.exit(exit_code)
 
     def _print_tap_run_summary(self, status, start_time, end_time):
-        self.logger.info("""
-            -------------------------------------------------------
-            TAP RUN SUMMARY
-            -------------------------------------------------------
-                Status  : {}
-                Runtime : {}
-            -------------------------------------------------------
-            """.format(
-                status,
-                end_time  - start_time
-            ))
+        summary = """
+-------------------------------------------------------
+TAP RUN SUMMARY
+-------------------------------------------------------
+    Status  : {}
+    Runtime : {}
+-------------------------------------------------------
+""".format(
+            status,
+            end_time  - start_time
+        )
+
+        # Print summary to stdout
+        self.logger.info(summary)
+
+        # Add summary to tap run log file
+        if self.tap_run_log_file:
+            tap_run_log_file_success = "{}.success".format(self.tap_run_log_file)
+            tap_run_log_file_failed = "{}.failed".format(self.tap_run_log_file)
+
+            # Find which log file we need to write the summary
+            log_file_to_write_summary = None
+            if os.path.isfile(tap_run_log_file_success):
+                log_file_to_write_summary = tap_run_log_file_success
+            elif os.path.isfile(tap_run_log_file_failed):
+                log_file_to_write_summary = tap_run_log_file_failed
+
+            # Append the summary to the right log file
+            if log_file_to_write_summary:
+                with open(log_file_to_write_summary, "a") as f:
+                    f.write(summary)
