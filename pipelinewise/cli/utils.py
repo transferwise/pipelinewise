@@ -100,6 +100,14 @@ def load_json(path):
         raise Exception("Error parsing {} {}".format(path, exc))
 
 
+def is_state_message(line: str) -> bool:
+    try:
+        json_object = json.loads(line)
+        return 'currently_syncing' in json_object and 'bookmarks' in json_object
+    except Exception as exc:
+        return False
+
+
 def save_json(data, path):
     '''
     Serializes and saves any data structure to JSON files 
@@ -313,7 +321,7 @@ def extract_log_attributes(log_file):
 
     try:
         # Extract attributes from log file name
-        log_attr = re.search('(.*)-(.*)-(.*)\.(.*)\.log\.(.*)', log_file)
+        log_attr = re.search(r'(.*)-(.*)-(.*)\.(.*)\.log\.(.*)', log_file)
         target_id = log_attr.group(1)
         tap_id = log_attr.group(2)
         timestamp = datetime.strptime(log_attr.group(3), '%Y%m%d_%H%M%S').isoformat()
@@ -414,16 +422,16 @@ def get_fastsync_bin(venv_dir, tap_type, target_type):
     return os.path.join(venv_dir, "pipelinewise", "bin", fastsync_name)
 
 
-def run_command(command, log_file=False):
-    '''
+def run_command(command, log_file=None, line_callback=None):
+    """
     Runs a shell command with or without log file with STDOUT and STDERR
-    '''
+    """
     piped_command = "/bin/bash -o pipefail -c '{}'".format(command)
     logger.debug('Running command: {}'.format(piped_command))
 
     # Logfile is needed: Continuously polling STDOUT and STDERR and writing into a log file
     # Once the command finished STDERR redirects to STDOUT and returns _only_ STDOUT
-    if log_file:
+    if log_file is not None:
         logger.info('Writing output into {}'.format(log_file))
 
         # Create log dir if not exists
@@ -442,6 +450,10 @@ def run_command(command, log_file=False):
             line = proc.stdout.readline()
             if line:
                 decoded_line = line.decode('utf-8')
+
+                if line_callback is not None:
+                    decoded_line = line_callback(decoded_line)
+
                 stdout += decoded_line
                 f.write(decoded_line)
                 f.flush()
