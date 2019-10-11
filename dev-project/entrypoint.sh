@@ -8,11 +8,11 @@ apt-get install -y mariadb-client postgresql-client alien libaio1
 cd dev-project
 
 # Install Oracle Instant Client required for tap-oracle
-ORA_INSTACLIENT_URL=https://download.oracle.com/otn_software/linux/instantclient/193000/oracle-instantclient19.3-basiclite-19.3.0.0.0-1.x86_64.rpm
-wget -O oracle-instantclient.rpm ${ORA_INSTACLIENT_URL}
-echo "Installing Oracle Instant Client for tap-oracle..."
-alien -i oracle-instantclient.rpm --scripts
-rm -f oracle-instantclient.rpm
+# ORA_INSTACLIENT_URL=https://download.oracle.com/otn_software/linux/instantclient/193000/oracle-instantclient19.3-basiclite-19.3.0.0.0-1.x86_64.rpm
+# wget -O oracle-instantclient.rpm ${ORA_INSTACLIENT_URL}
+# echo "Installing Oracle Instant Client for tap-oracle..."
+# alien -i oracle-instantclient.rpm --scripts
+# rm -f oracle-instantclient.rpm
 
 # Build test databasese
 ../tests/db/tap_mysql_db.sh
