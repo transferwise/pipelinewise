@@ -23,6 +23,8 @@ class PipelineWise(object):
     INCREMENTAL = 'INCREMENTAL'
     LOG_BASED = 'LOG_BASED'
     FULL_TABLE = 'FULL_TABLE'
+    STATUS_SUCCESS = 'SUCCESS'
+    STATUS_FAILED = 'FAILED'
 
     def __init_logger(self, logger_name, log_file=None, level=logging.INFO):
         self.logger = logging.getLogger(logger_name)
@@ -861,6 +863,7 @@ class PipelineWise(object):
             },
             create_fallback=True)
 
+        start_time = datetime.now()
         try:
             # Run fastsync for FULL_TABLE replication method
             if len(fastsync_stream_ids) > 0:
@@ -899,16 +902,19 @@ class PipelineWise(object):
             utils.silentremove(cons_target_config)
             utils.silentremove(tap_properties_fastsync)
             utils.silentremove(tap_properties_singer)
+            self._print_tap_run_summary(self.STATUS_FAILED, start_time, datetime.now())
             sys.exit(1)
         except Exception as exc:
             utils.silentremove(cons_target_config)
             utils.silentremove(tap_properties_fastsync)
             utils.silentremove(tap_properties_singer)
+            self._print_tap_run_summary(self.STATUS_FAILED, start_time, datetime.now())
             raise exc
 
         utils.silentremove(cons_target_config)
         utils.silentremove(tap_properties_fastsync)
         utils.silentremove(tap_properties_singer)
+        self._print_tap_run_summary(self.STATUS_SUCCESS, start_time, datetime.now())
 
     def sync_tables(self):
         """
@@ -1095,3 +1101,36 @@ class PipelineWise(object):
                 os.rename(tap_run_log_file_running, tap_run_log_file_terminated)
 
         sys.exit(exit_code)
+
+    def _print_tap_run_summary(self, status, start_time, end_time):
+        summary = """
+-------------------------------------------------------
+TAP RUN SUMMARY
+-------------------------------------------------------
+    Status  : {}
+    Runtime : {}
+-------------------------------------------------------
+""".format(
+            status,
+            end_time  - start_time
+        )
+
+        # Print summary to stdout
+        self.logger.info(summary)
+
+        # Add summary to tap run log file
+        if self.tap_run_log_file:
+            tap_run_log_file_success = "{}.success".format(self.tap_run_log_file)
+            tap_run_log_file_failed = "{}.failed".format(self.tap_run_log_file)
+
+            # Find which log file we need to write the summary
+            log_file_to_write_summary = None
+            if os.path.isfile(tap_run_log_file_success):
+                log_file_to_write_summary = tap_run_log_file_success
+            elif os.path.isfile(tap_run_log_file_failed):
+                log_file_to_write_summary = tap_run_log_file_failed
+
+            # Append the summary to the right log file
+            if log_file_to_write_summary:
+                with open(log_file_to_write_summary, "a") as f:
+                    f.write(summary)
