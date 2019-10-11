@@ -26,7 +26,8 @@ class FastSyncTargetSnowflake:
             password=self.connection_config['password'],
             account=self.connection_config['account'],
             database=self.connection_config['dbname'],
-            warehouse=self.connection_config['warehouse']
+            warehouse=self.connection_config['warehouse'],
+            autocommit=True
         )
 
 
