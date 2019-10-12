@@ -218,10 +218,7 @@ def grant_privilege(schema, grantees, grant_method, to_group=False):
 
 def save_state_file(path, table, bookmark, dbname=None):
     table_dict = tablename_to_dict(table)
-    if dbname:
-        stream_id = "{}-{}-{}".format(dbname, table_dict.get('schema_name'), table_dict.get('table_name'))
-    else:
-        stream_id = "{}-{}".format(table_dict.get('schema_name'), table_dict.get('table_name'))
+    stream_id = "{}-{}".format(table_dict.get('schema_name'), table_dict.get('table_name'))
 
     # Do nothing if state path not defined
     if not path:
