@@ -78,7 +78,7 @@ def get_tap_properties(tap=None):
             # the db that's in scope
             'filter_dbs': tap.get('db_conn', {}).get('dbname') if tap else None
         },
-        'tap_stream_id_pattern': '{{database_name}}-{{schema_name}}-{{table_name}}',
+        'tap_stream_id_pattern': '{{schema_name}}-{{table_name}}',
         'tap_stream_name_pattern': '{{schema_name}}-{{table_name}}',
         'tap_catalog_argument': '--properties',
         'default_replication_method': 'LOG_BASED',
