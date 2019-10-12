@@ -5,8 +5,51 @@
 -- Finland, http://www.stat.fi/worldinfigures.
 --
 -- The sample database available at https://github.com/morenoh149/postgresDBSamples
--- Originally copied from https://raw.githubusercontent.com/morenoh149/postgresDBSamples/master/worldDB-1.0/world.sql
+-- Partially copied from https://raw.githubusercontent.com/morenoh149/postgresDBSamples/master/worldDB-1.0/world.sql
 
+
+BEGIN;
+SET client_encoding = 'UTF8';
+
+DROP TABLE IF EXISTS public.edgyData CASCADE;
+
+CREATE TABLE edgydata (
+    cid serial not null,
+    ctimentz time without time zone,
+    ctimetz time with time zone,
+    cjson json,
+    cjsonb jsonb,
+    cvarchar varchar,
+    PRIMARY KEY (cid)
+);
+
+insert into edgydata (ctimentz, ctimetz, cjson, cjsonb, cvarchar) values
+    (null, null, null, null, null),
+    ('23:00:15', '23:00:15+00', null, null, null),
+    ('12:00:15', '12:00:15+00:00', null, null, null),
+    ('12:00:15', '12:00:15+0300', null, null, null),
+    ('12:00:15', '12:00:15-0300', null, null, null),
+    ('24:00:00', '24:00:00', null, null, null),
+    ('24:00:00', '24:00:00+0000', null, null, null),
+    ('24:00:00', '24:00:00-0100', null, null, null),
+    ('00:00:00', '00:00:00', null, null, null),
+    (null, null, null, null,'Lorem ipsum dolor sit amet'),
+    (null, null, null, null,'Chinese: 和毛泽东 <<重上井冈山>>. 严永欣, 一九八八年.'),
+    (null, null, null, null,'Thai: แผ่นดินฮั่นเสื่อมโทรมแสนสังเวช'),
+    (null, null, null, null,E'Special Characters: ["/\\,!@£$%^&*()]'),
+    (null, null, '[]', '[]', '[]' ),
+    (null, null, '{}', '{}', '{}'),
+    (null, null, '[{}, {}]', '[{}, {}]',  '[{}, {}]'),
+    (null, null, '[{"key": "ValueOne", "actions": []}, {"key": "ValueTwo", "actions": []}]',
+        '[{"key": "ValueOne", "actions": []}, {"key": "ValueTwo", "actions": []}]',
+        '[{"key": "ValueOne", "actions": []}, {"key": "ValueTwo", "actions": []}]'),
+    (null, null, E'{"key": "Value\'s One"}', E'{"key": "Value\'s One"}', E'{"key": "Value\'s One"}'),
+    (null, null, E'[{"key": "Value\'s One", "actions": []},{"key": "Value\U00000027s Two", "actions": []}]',
+        E'[{"key": "Value\'s One", "actions": []},{"key": "Value\U00000027s Two", "actions": []}]',
+        E'[{"key": "Value\'s One", "actions": []},{"key": "Value\U00000027s Two", "actions": []}]')
+;
+
+COMMIT;
 
 BEGIN;
 SET client_encoding = 'LATIN1';
@@ -29,45 +72,12 @@ VALUES
     ('Who')
 ;
 
+CREATE TABLE public2.edgydata (LIKE public.edgydata INCLUDING INDEXES);
+INSERT INTO public2.edgydata SELECT * FROM public.edgydata;
+
+
 COMMIT;
 
-
-BEGIN;
-SET client_encoding = 'LATIN1';
-
-DROP TABLE IF EXISTS public.edgyData CASCADE;
-
-CREATE TABLE edgydata (
-    cid serial not null,
-    ctimentz time without time zone,
-    ctimetz time with time zone,
-    cjson json,
-    cjsonb jsonb,
-    cvarchar varchar,
-    PRIMARY KEY (cid)
-);
-
-insert into edgydata (ctimentz, ctimetz, cjson, cjsonb, cvarchar) values
-    (null, null, null, null, null),
-    ('23:00:15','23:00:15+00', null, null, null),
-    ('12:00:15','12:00:15+00:00', null, null, null),
-    ('12:00:15','12:00:15+0300', null, null, null),
-    ('12:00:15','12:00:15-0300', null, null, null),
-    ('24:00:00','24:00:00', null, null, null),
-    ('24:00:00','24:00:00+0000', null, null, null),
-    ('24:00:00','24:00:00-0100', null, null, null),
-    ('00:00:00','00:00:00', null, null, null),
-    (null, null, null, null,'Lorem ipsum dolor sit amet'),
-    (null, null, null, null,'Chinese: 和毛泽东 <<重上井冈山>>. 严永欣, 一九八八年.'),
-    (null, null, null, null,'Thai: แผ่นดินฮั่นเสื่อมโทรมแสนสังเวช'),
-    (null, null, null, null,e'Special Characters: ["/\\,!@£$%^&*()]'),
-    (null, null, '[]','[]' , null),
-    (null, null, '{}','{}' , null),
-    (null, null, '[{}, {}]','[{}, {}]' , null),
-    (null, null, '[{"key": "ValueOne", "actions": []}, {"key": "ValueTwo", "actions": []}]','[{"key": "ValueOne", "actions": []}, {"key": "ValueTwo", "actions": []}]' , null)
-;
-
-COMMIT;
 
 
 BEGIN;
