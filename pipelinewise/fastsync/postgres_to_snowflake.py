@@ -118,7 +118,7 @@ def sync_table(table):
         # Lock to ensure that only one process writes the same state file at a time
         lock.acquire()
         try:
-            utils.save_state_file(args.state, table, bookmark, dbname=dbname)
+            utils.save_state_file(args.state, table, bookmark)
         finally:
             lock.release()
 
