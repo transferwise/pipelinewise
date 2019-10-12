@@ -71,7 +71,7 @@ def get_tap_properties(tap=None):
     'tap-postgres': {
         'tap_config_extras': {
             # PipelineWise doesn't support replicating from multiple
-            # databases by one tap but tap-postgres does.
+            # databases and neither does pipelinewise-tap-postgres.
             #
             # To avoid problems of loading two tables with the same name
             # but from differnet dbs we force tap-postgres to filter only
