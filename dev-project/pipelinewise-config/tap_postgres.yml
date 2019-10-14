@@ -1,7 +1,7 @@
 ---
-
 # ------------------------------------------------------------------------------
 # General Properties
+# Doc: https://transferwise.github.io/pipelinewise/connectors/taps/postgres.html
 # ------------------------------------------------------------------------------
 id: "postgres_db"                      # Unique identifier of the tap
 name: "Sample Postgres Database"       # Name of the tap
@@ -38,25 +38,15 @@ batch_size_rows: 20000                 # Batch size for the stream to optimise l
 # Source to target Schema mapping
 # ------------------------------------------------------------------------------
 schemas:
-  - source_schema: "public2"           # Source schema in postgres with tables
-    target_schema: "postgres_world_2"  # Target schema in the destination Data Warehouse
-    # target_schema_select_permissions:  # Optional: Grant SELECT on schema and tables that created
+  - source_schema: "public"           # Source schema in postgres with tables
+    target_schema: "postgres_world"   # Target schema in the destination Data Warehouse
+    # target_schema_select_permissions: # Optional: Grant SELECT on schema and tables that created
     #  - grp_read_only
-
+    tables:
     # List of tables to replicate from Postgres to destination Data Warehouse
     # Please check the Replication Strategies section in the documentation to understand the differences.
-    # LOG_BASED in PostgreSQL and requires wal2json plugin and config adjustments
-    #   Doc: https://transferwise.github.io/pipelinewise/connectors/taps/postgres.html
-    tables:
-      - table_name: "wearehere"
-        replication_method: "FULL_TABLE"    # One of INCREMENTAL, LOG_BASED and FULL_TABLE
-
-
-  - source_schema: "public"
-    target_schema: "postgres_world"
-    tables:
       - table_name: "edgydata"
-        replication_method: "FULL_TABLE"
+        replication_method: "FULL_TABLE"  # INCREMENTAL, LOG_BASED or FULL_TABLE (Default LOG_BASED)
 
       - table_name: "country"
         replication_method: "FULL_TABLE"
@@ -64,21 +54,34 @@ schemas:
       - table_name: "city"
         replication_method: "INCREMENTAL"
         replication_key: "id"
-        #transformations:                   # OPTIONAL: Load time transformations
+        # transformations:                  # Optional: Load time transformations
         #  - column: "population"           # Column to transform
         #    type: "MASK-NUMBER"            # Transformation type
 
       - table_name: "countrylanguage"
         replication_method: "FULL_TABLE"
 
+  - source_schema: "public2"
+    target_schema: "postgres_world_2"
+
+    tables:
+      - table_name: "wearehere"
+        replication_method: "FULL_TABLE"
+      - table_name: "public2_edgydata"
+        replication_method: "INCREMENTAL"
+        replication_key: "cid"
+
 
 # ------------------------------------------------------------------------------
 # LOG_BASED replication data
+#   requires wal2json plugin and other source adjustments
+#   LOG_BASED is the default replication_method
 # ------------------------------------------------------------------------------
   - source_schema: "logical1"
     target_schema: "postgres_world_logical1"
     tables:
       - table_name: "logical1_table1"
+        replication_method: "LOG_BASED"
       - table_name: "logical1_table2"
       - table_name: "logical1_edgydata"
 
