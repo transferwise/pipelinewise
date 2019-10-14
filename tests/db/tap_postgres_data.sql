@@ -72,8 +72,8 @@ VALUES
     ('Who')
 ;
 
-CREATE TABLE public2.edgydata (LIKE public.edgydata INCLUDING INDEXES);
-INSERT INTO public2.edgydata SELECT * FROM public.edgydata;
+CREATE TABLE public2.public2_edgydata (LIKE public.edgydata INCLUDING INDEXES);
+INSERT INTO public2.public2_edgydata SELECT * FROM public.edgydata;
 
 
 COMMIT;

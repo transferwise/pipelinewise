@@ -67,7 +67,7 @@ schemas:
     tables:
       - table_name: "wearehere"
         replication_method: "FULL_TABLE"
-      - table_name: "edgydata"
+      - table_name: "public2_edgydata"
         replication_method: "INCREMENTAL"
         replication_key: "cid"
 
