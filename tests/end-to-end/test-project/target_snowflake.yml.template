@@ -1,5 +1,3 @@
----
-
 # ------------------------------------------------------------------------------
 # General Properties
 # ------------------------------------------------------------------------------
@@ -12,27 +10,23 @@ type: "target-snowflake"               # !! THIS SHOULD NOT CHANGE !!
 # Target - Data Warehouse connection details
 # ------------------------------------------------------------------------------
 db_conn:
-  account: "rtxxxxx.eu-central-1"               # Snowflake account
-  dbname: "<DB_NAME>"                           # Snowflake database name
-  user: "<USER>"                                # Snowflake user
-  password: "<PASSWORD>"                        # Plain string or vault encrypted
-  warehouse: "<WAREHOUSE>"                      # Snowflake virtual warehouse
+  account: "${TARGET_SNOWFLAKE_ACCOUNT}"                          # Snowflake account
+  dbname: "${TARGET_SNOWFLAKE_DBNAME}"                            # Snowflake database name
+  user: "${TARGET_SNOWFLAKE_USER}"                                # Snowflake user
+  password: "${TARGET_SNOWFLAKE_PASSWORD}"                        # Plain string or vault encrypted
+  warehouse: "${TARGET_SNOWFLAKE_WAREHOUSE}"                      # Snowflake virtual warehouse
 
   # We use an intermediate external stage on S3 to load data into Snowflake
-  aws_access_key_id: "<ACCESS_KEY>"             # S3 - Plain string or vault encrypted
-  aws_secret_access_key: "<SECRET_ACCESS_KEY>"  # S3 - Plain string or vault encrypted
-  s3_bucket: "<BUCKET_NAME>"                    # S3 external stbucket name
-  s3_key_prefix: "snowflake-imports/"           # Optional: S3 key prefix
+  aws_access_key_id: "${TARGET_SNOWFLAKE_AWS_ACCESS_KEY}"             # S3 - Plain string or vault encrypted
+  aws_secret_access_key: "${TARGET_SNOWFLAKE_AWS_SECRET_ACCESS_KEY}"  # S3 - Plain string or vault encrypted
+  s3_bucket: "${TARGET_SNOWFLAKE_S3_BUCKET}"                    # S3 external stbucket name
+  s3_key_prefix: "${TARGET_SNOWFLAKE_S3_KEY_PREFIX}"           # Optional: S3 key prefix
 
   # stage and file_format are pre-created objects in Snowflake that requires to load and
   # merge data correctly from S3 to tables in one step without using temp tables
   #  stage      : External stage object pointing to an S3 bucket
   #  file_format: Named file format object used for bulk loading data from S3 into
   #               snowflake tables.
-  stage: "pipelinewise.encrypted_etl_stage"
-  file_format: "pipelinewise.etl_stage_file_format"
-  
-  # Optional: Client Side Encryption
-  # The same master key has to be added to the external stage object created in snowflake
-  #client_side_encryption_master_key: "<MASTER_KEY"> # Plain string or vault encrypted
+  stage: "${TARGET_SNOWFLAKE_STAGE}"
+  file_format: "${TARGET_SNOWFLAKE_FILE_FORMAT}"
 

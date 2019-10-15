@@ -173,11 +173,6 @@ class TestE2E(object):
 
         [rc, stdout, stderr] = self.run_command("pipelinewise run_tap --tap {} --target {}".format(tap_name,
                                                                                                    target_name))
-
-        print(rc)
-        print(stdout)
-        print(stderr)
-
         self.assert_command_success(rc, stdout, stderr)
         log_file = "{}.success".format(self.find_run_tap_log_file(stdout, 'singer'))
 
