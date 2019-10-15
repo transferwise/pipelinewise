@@ -8,13 +8,14 @@ import subprocess
 
 from dotenv import load_dotenv
 
-
 DIR = os.path.dirname(__file__)
+
 
 class TestE2E(object):
     """
     End to end tests
     """
+
     def setup_method(self):
         self.env = self.load_env()
         self.project_dir = os.path.join(DIR, "test-project")
@@ -28,27 +29,36 @@ class TestE2E(object):
             1: Existing environment variables 
             2: Docker compose .env environment variables"""
         load_dotenv(dotenv_path=os.path.join(DIR, "../../dev-project/.env"))
-        env = {}
-        
-        env['DB_TAP_POSTGRES_HOST'] = os.environ.get('DB_TAP_POSTGRES_HOST')
-        env['DB_TAP_POSTGRES_PORT'] = os.environ.get('DB_TAP_POSTGRES_PORT')
-        env['DB_TAP_POSTGRES_USER'] = os.environ.get('DB_TAP_POSTGRES_USER')
-        env['DB_TAP_POSTGRES_PASSWORD'] = os.environ.get('DB_TAP_POSTGRES_PASSWORD')
-        env['DB_TAP_POSTGRES_DB'] = os.environ.get('DB_TAP_POSTGRES_DB')
+        env = {
+            'DB_TAP_POSTGRES_HOST': os.environ.get('DB_TAP_POSTGRES_HOST'),
+            'DB_TAP_POSTGRES_PORT': os.environ.get('DB_TAP_POSTGRES_PORT'),
+            'DB_TAP_POSTGRES_USER': os.environ.get('DB_TAP_POSTGRES_USER'),
+            'DB_TAP_POSTGRES_PASSWORD': os.environ.get('DB_TAP_POSTGRES_PASSWORD'),
+            'DB_TAP_POSTGRES_DB': os.environ.get('DB_TAP_POSTGRES_DB'),
+            'DB_TAP_MYSQL_HOST': os.environ.get('DB_TAP_MYSQL_HOST'),
+            'DB_TAP_MYSQL_PORT': os.environ.get('DB_TAP_MYSQL_PORT'),
+            'DB_TAP_MYSQL_USER': os.environ.get('DB_TAP_MYSQL_USER'),
+            'DB_TAP_MYSQL_PASSWORD': os.environ.get('DB_TAP_MYSQL_PASSWORD'),
+            'DB_TAP_MYSQL_DB': os.environ.get('DB_TAP_MYSQL_DB'),
+            'DB_TARGET_POSTGRES_HOST': os.environ.get('DB_TARGET_POSTGRES_HOST'),
+            'DB_TARGET_POSTGRES_PORT': os.environ.get('DB_TARGET_POSTGRES_PORT'),
+            'DB_TARGET_POSTGRES_USER': os.environ.get('DB_TARGET_POSTGRES_USER'),
+            'DB_TARGET_POSTGRES_PASSWORD': os.environ.get('DB_TARGET_POSTGRES_PASSWORD'),
+            'DB_TARGET_POSTGRES_DB': os.environ.get('DB_TARGET_POSTGRES_DB'),
+            'TARGET_SNOWFLAKE_ACCOUNT': os.environ.get('TARGET_SNOWFLAKE_ACCOUNT'),
+            'TARGET_SNOWFLAKE_DBNAME': os.environ.get('TARGET_SNOWFLAKE_DBNAME'),
+            'TARGET_SNOWFLAKE_USER': os.environ.get('TARGET_SNOWFLAKE_USER'),
+            'TARGET_SNOWFLAKE_PASSWORD': os.environ.get('TARGET_SNOWFLAKE_PASSWORD'),
+            'TARGET_SNOWFLAKE_WAREHOUSE': os.environ.get('TARGET_SNOWFLAKE_WAREHOUSE'),
+            'TARGET_SNOWFLAKE_AWS_ACCESS_KEY': os.environ.get('TARGET_SNOWFLAKE_AWS_ACCESS_KEY'),
+            'TARGET_SNOWFLAKE_AWS_SECRET_ACCESS_KEY': os.environ.get('TARGET_SNOWFLAKE_AWS_SECRET_ACCESS_KEY'),
+            'TARGET_SNOWFLAKE_S3_BUCKET': os.environ.get('TARGET_SNOWFLAKE_S3_BUCKET'),
+            'TARGET_SNOWFLAKE_S3_KEY_PREFIX': os.environ.get('TARGET_SNOWFLAKE_S3_KEY_PREFIX'),
+            'TARGET_SNOWFLAKE_STAGE': os.environ.get('TARGET_SNOWFLAKE_STAGE'),
+            'TARGET_SNOWFLAKE_FILE_FORMAT': os.environ.get('TARGET_SNOWFLAKE_FILE_FORMAT'),
+        }
 
-        env['DB_TAP_MYSQL_HOST'] = os.environ.get('DB_TAP_MYSQL_HOST')
-        env['DB_TAP_MYSQL_PORT'] = os.environ.get('DB_TAP_MYSQL_PORT')
-        env['DB_TAP_MYSQL_USER'] = os.environ.get('DB_TAP_MYSQL_USER')
-        env['DB_TAP_MYSQL_PASSWORD'] = os.environ.get('DB_TAP_MYSQL_PASSWORD')
-        env['DB_TAP_MYSQL_DB'] = os.environ.get('DB_TAP_MYSQL_DB')
-
-        env['DB_TARGET_POSTGRES_HOST'] = os.environ.get('DB_TARGET_POSTGRES_HOST')
-        env['DB_TARGET_POSTGRES_PORT'] = os.environ.get('DB_TARGET_POSTGRES_PORT')
-        env['DB_TARGET_POSTGRES_USER'] = os.environ.get('DB_TARGET_POSTGRES_USER')
-        env['DB_TARGET_POSTGRES_PASSWORD'] = os.environ.get('DB_TARGET_POSTGRES_PASSWORD')
-        env['DB_TARGET_POSTGRES_DB'] = os.environ.get('DB_TARGET_POSTGRES_DB')
-
-        return env 
+        return env
 
     def init_test_project_dir(self):
         """Load every YML template from test-project directory, replace the environment
@@ -98,7 +108,7 @@ class TestE2E(object):
 
         return [rc, stdout, stderr]
 
-    def find_run_tap_log_file(self, stdout):
+    def find_run_tap_log_file(self, stdout, sync_engine=None):
         """Pipelinewise creates log file per running tap instances in a dynamically created directory:
             ~/.pipelinewise/<TARGET_ID>/<TAP_ID>/log
             
@@ -106,7 +116,12 @@ class TestE2E(object):
             <TARGET_ID>-<TAP_ID>-<DATE>_<TIME>.<SYNC_ENGINE>.log.<STATUS>
 
             The generated full path is logged to STDOUT when tap starting"""
-        return re.search('Writing output into (.+log)', stdout).group(1)
+        if sync_engine:
+            pattern = re.compile(r"Writing output into (.+\.{}\.log)".format(sync_engine))
+        else:
+            pattern = re.compile(r"Writing output into (.+\.log)")
+
+        return pattern.search(stdout).group(1)
 
     def assert_command_success(self, rc, stdout, stderr, log_path=None):
         """Assert helper function to check if command finished successfully.
@@ -128,7 +143,8 @@ class TestE2E(object):
 
     @pytest.mark.dependency(name="import_config")
     def test_import_project(self):
-        """Import the YAML project with taps and target and do discovery mode to write the JSON files for singer connectors"""
+        """Import the YAML project with taps and target and do discovery mode to write the JSON files for singer
+        connectors """
         self.clean_target_postgres()
         [rc, stdout, stderr] = self.run_command("pipelinewise import_config --dir {}".format(self.project_dir))
         self.assert_command_success(rc, stdout, stderr)
@@ -147,3 +163,30 @@ class TestE2E(object):
         self.assert_command_success(rc, stdout, stderr)
         assert os.path.isfile("{}.success".format(self.find_run_tap_log_file(stdout)))
 
+    @pytest.mark.dependency(depends=["import_config"])
+    def test_replicate_postgres_to_snowflake(self):
+        """Replicate data from Postgres to Snowflake, check if return code is zero and success log file created"""
+
+        tap_name = 'postgres_source_sf'
+        target_name = 'snowflake'
+        state_file = '/root/.pipelinewise/{}/{}/state.json'.format(target_name, tap_name)
+
+        [rc, stdout, stderr] = self.run_command("pipelinewise run_tap --tap {} --target {}".format(tap_name,
+                                                                                                   target_name))
+
+        print(rc)
+        print(stdout)
+        print(stderr)
+
+        self.assert_command_success(rc, stdout, stderr)
+        log_file = "{}.success".format(self.find_run_tap_log_file(stdout, 'singer'))
+
+        assert os.path.isfile(log_file)
+        assert os.path.isfile(state_file)
+
+        with open(log_file, 'r') as log_f:
+            last_state = \
+                re.search(r'\nINFO STATE emitted from target: (.+\n)', '\n'.join(log_f.readlines())).groups()[-1]
+
+            with open(state_file, 'r') as state_f:
+                assert last_state == ''.join(state_f.readlines())
