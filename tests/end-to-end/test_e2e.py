@@ -182,7 +182,7 @@ class TestE2E(object):
         state_file = Path(state_file).resolve()
 
         assert os.path.isfile(log_file)
-        assert os.path.isfile(state_file)
+        assert state_file.is_file()
 
         with open(log_file, 'r') as log_f:
             last_state = \
