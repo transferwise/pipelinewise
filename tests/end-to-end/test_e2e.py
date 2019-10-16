@@ -177,6 +177,10 @@ class TestE2E(object):
 
         state_file = os.path.join(DIR, "../../dev-project/.pipelinewise/{}/{}/state.json".format(target_name, tap_name))
 
+        from pathlib import Path
+
+        state_file = Path(state_file).resolve()
+
         assert os.path.isfile(log_file)
         assert os.path.isfile(state_file)
 
