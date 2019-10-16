@@ -11,6 +11,7 @@ import copy
 
 from datetime import datetime
 from typing import Dict
+from time import time
 
 from tabulate import tabulate
 from joblib import Parallel, delayed, parallel_backend
@@ -703,14 +704,12 @@ class PipelineWise(object):
         """
         Generating and running piped shell command to sync tables using singer taps and targets
         """
-        new_tap_state = tempfile.mkstemp()[1]
-
         # Following the singer spec the catalog JSON file needs to be passed by the --catalog argument
         # However some tap (i.e. tap-mysql and tap-postgres) requires it as --properties
-        # This is problably for historical reasons and need to clarify on Singer slack channels
+        # This is probably for historical reasons and need to clarify on Singer slack channels
         tap_catalog_argument = utils.get_tap_property_by_tap_type(tap_type, 'tap_catalog_argument')
 
-        # Add state arugment if exists to extract data incrementally
+        # Add state argument if exists to extract data incrementally
         tap_state_arg = ""
         if os.path.isfile(tap_state):
             tap_state_arg = "--state {}".format(tap_state)
@@ -727,8 +726,7 @@ class PipelineWise(object):
             command = ' '.join((
                 "  {} --config {} {} {} {}".format(self.tap_bin, tap_config, tap_catalog_argument, tap_properties,
                                                    tap_state_arg),
-                "| {} --config {}".format(self.target_bin, target_config),
-                "> {}".format(new_tap_state)
+                "| {} --config {}".format(self.target_bin, target_config)
             ))
 
         # Run with transformation in the middle
@@ -737,25 +735,53 @@ class PipelineWise(object):
                 "  {} --config {} {} {} {}".format(self.tap_bin, tap_config, tap_catalog_argument, tap_properties,
                                                    tap_state_arg),
                 "| {} --config {}".format(self.tranform_field_bin, tap_transformation),
-                "| {} --config {}".format(self.target_bin, target_config),
-                "> {}".format(new_tap_state)
+                "| {} --config {}".format(self.target_bin, target_config)
             ))
 
         # Do not run if another instance is already running
         log_dir = os.path.dirname(self.tap_run_log_file)
         if os.path.isdir(log_dir) and len(utils.search_files(log_dir, patterns=['*.log.running'])) > 0:
             self.logger.info(
-                "Failed to run. Another instance of the same tap is already running. Log file detected in running status at {} ".format(
+                "Failed to run. Another instance of the same tap is already running. "
+                "Log file detected in running status at {} ".format(
                     log_dir))
             sys.exit(1)
 
-        # Run command
-        result = utils.run_command(command, self.tap_run_log_file)
+        start = None
+        state = None
 
-        # Save the new state file if created correctly
-        if utils.is_json_file(new_tap_state):
-            shutil.copyfile(new_tap_state, tap_state)
-            os.remove(new_tap_state)
+        def update_state_file(line: str) -> str:
+            # Update state variable with latest state
+            if utils.is_state_message(line):
+                # if it has been more than 2 seconds since we last updated the state file
+                # update it again with newly received state
+                nonlocal start, state
+
+                if start is None or time() - start >= 2:
+                    with open(tap_state, 'w') as state_file:
+                        state_file.write(line)
+
+                    # Update start time to be the current time.
+                    start = time()
+
+                # Keep track of state message so that we do one last file update at the end of the run_tap_singer
+                # function. This is to avoid the edge case where the last state message and the one before it are
+                # less than 2 sec apart.
+                state = line
+
+                # update line and return it
+                # for better readability in logs
+                return 'INFO STATE emitted from target: %s' % line
+
+            return line
+
+        # Run command with update_state_file as a callback to call for every stdout line
+        utils.run_command(command, self.tap_run_log_file, update_state_file)
+
+        # update the state file one last time to make sure it always has the last state message.
+        if state is not None:
+            with open(tap_state, 'w') as f:
+                f.write(state)
 
     def run_tap_fastsync(self, tap_type, target_type, tap_config, tap_properties, tap_state, tap_transformation,
                          target_config):
@@ -764,7 +790,7 @@ class PipelineWise(object):
         """
         fastsync_bin = utils.get_fastsync_bin(self.venv_dir, tap_type, target_type)
 
-        # Add state arugment if exists to extract data incrementally
+        # Add state argument if exists to extract data incrementally
         tap_transform_arg = ""
         if os.path.isfile(tap_transformation):
             tap_transform_arg = "--transform {}".format(tap_transformation)
@@ -783,12 +809,13 @@ class PipelineWise(object):
         log_dir = os.path.dirname(self.tap_run_log_file)
         if os.path.isdir(log_dir) and len(utils.search_files(log_dir, patterns=['*.log.running'])) > 0:
             self.logger.info(
-                "Failed to run. Another instance of the same tap is already running. Log file detected in running status at {} ".format(
+                "Failed to run. Another instance of the same tap is already running. "
+                "Log file detected in running status at {} ".format(
                     log_dir))
             sys.exit(1)
 
         # Run command
-        result = utils.run_command(command, self.tap_run_log_file)
+        utils.run_command(command, self.tap_run_log_file)
 
     def run_tap(self):
         """

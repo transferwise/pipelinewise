@@ -1,0 +1,32 @@
+# ------------------------------------------------------------------------------
+# General Properties
+# ------------------------------------------------------------------------------
+id: "snowflake"                        # Unique identifier of the target
+name: "Snowflake"                      # Name of the target
+type: "target-snowflake"               # !! THIS SHOULD NOT CHANGE !!
+
+
+# ------------------------------------------------------------------------------
+# Target - Data Warehouse connection details
+# ------------------------------------------------------------------------------
+db_conn:
+  account: "${TARGET_SNOWFLAKE_ACCOUNT}"                          # Snowflake account
+  dbname: "${TARGET_SNOWFLAKE_DBNAME}"                            # Snowflake database name
+  user: "${TARGET_SNOWFLAKE_USER}"                                # Snowflake user
+  password: "${TARGET_SNOWFLAKE_PASSWORD}"                        # Plain string or vault encrypted
+  warehouse: "${TARGET_SNOWFLAKE_WAREHOUSE}"                      # Snowflake virtual warehouse
+
+  # We use an intermediate external stage on S3 to load data into Snowflake
+  aws_access_key_id: "${TARGET_SNOWFLAKE_AWS_ACCESS_KEY}"             # S3 - Plain string or vault encrypted
+  aws_secret_access_key: "${TARGET_SNOWFLAKE_AWS_SECRET_ACCESS_KEY}"  # S3 - Plain string or vault encrypted
+  s3_bucket: "${TARGET_SNOWFLAKE_S3_BUCKET}"                    # S3 external stbucket name
+  s3_key_prefix: "${TARGET_SNOWFLAKE_S3_KEY_PREFIX}"           # Optional: S3 key prefix
+
+  # stage and file_format are pre-created objects in Snowflake that requires to load and
+  # merge data correctly from S3 to tables in one step without using temp tables
+  #  stage      : External stage object pointing to an S3 bucket
+  #  file_format: Named file format object used for bulk loading data from S3 into
+  #               snowflake tables.
+  stage: "${TARGET_SNOWFLAKE_STAGE}"
+  file_format: "${TARGET_SNOWFLAKE_FILE_FORMAT}"
+

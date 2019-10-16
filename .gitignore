@@ -24,6 +24,7 @@ tests/end-to-end/test-project/*.yml
 
 # Dev project
 dev-project/.pipelinewise
+dev-project/.env
 dev-project/pipelinewise-config/*_test.yml*
 
 # Docker
@@ -41,3 +42,4 @@ tmp
 # Docs
 docs/_build/
 docs/_templates/
+/build/

@@ -1,0 +1,48 @@
+---
+
+# ------------------------------------------------------------------------------
+# General Properties
+# ------------------------------------------------------------------------------
+id: "postgres_source_sf"
+name: "PostgreSQL source test database"
+type: "tap-postgres"
+owner: "test-runner"
+sync_period: "0 * * * *"
+
+
+# ------------------------------------------------------------------------------
+# Source (Tap) - PostgreSQL connection details
+# ------------------------------------------------------------------------------
+db_conn:
+  host: "${DB_TAP_POSTGRES_HOST}"                  # PostgreSQL host
+  port: ${DB_TAP_POSTGRES_PORT}                    # PostgreSQL port
+  user: "${DB_TAP_POSTGRES_USER}"                  # PostgreSQL user
+  password: "${DB_TAP_POSTGRES_PASSWORD}"          # Plain string or vault encrypted
+  dbname: "${DB_TAP_POSTGRES_DB}"                  # PostgreSQL database name
+
+
+# ------------------------------------------------------------------------------
+# Destination (Target) - Target properties
+# Connection details should be in the relevant target YAML file
+# ------------------------------------------------------------------------------
+target: "snowflake"                 # ID of the target connector where the data will be loaded
+batch_size_rows: 1000                 # Batch size for the stream to optimise load performance
+
+
+# ------------------------------------------------------------------------------
+# Source to target Schema mapping
+# ------------------------------------------------------------------------------
+schemas:
+  - source_schema: "public"
+    target_schema: "postgres_world_sf"
+
+    tables:
+      - table_name: "city"
+        replication_method: "INCREMENTAL"
+        replication_key: "id"
+
+      - table_name: "country"
+        replication_method: "FULL_TABLE"
+
+      - table_name: "countrylanguage"
+        replication_method: "FULL_TABLE"
