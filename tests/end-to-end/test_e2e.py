@@ -169,12 +169,13 @@ class TestE2E(object):
 
         tap_name = 'postgres_source_sf'
         target_name = 'snowflake'
-        state_file = '/root/.pipelinewise/{}/{}/state.json'.format(target_name, tap_name)
 
         [rc, stdout, stderr] = self.run_command("pipelinewise run_tap --tap {} --target {}".format(tap_name,
                                                                                                    target_name))
         self.assert_command_success(rc, stdout, stderr)
         log_file = "{}.success".format(self.find_run_tap_log_file(stdout, 'singer'))
+
+        state_file = os.path.join(DIR, "../../dev-project/.pipelinewise/{}/{}/state.json".format(target_name, tap_name))
 
         assert os.path.isfile(log_file)
         assert os.path.isfile(state_file)
