@@ -175,14 +175,12 @@ class TestE2E(object):
         self.assert_command_success(rc, stdout, stderr)
         log_file = "{}.success".format(self.find_run_tap_log_file(stdout, 'singer'))
 
-        state_file = os.path.join(DIR, "../../dev-project/.pipelinewise/{}/{}/state.json".format(target_name, tap_name))
-
         from pathlib import Path
 
-        state_file = Path(state_file).resolve()
+        state_file = Path("{}/.pipelinewise/{}/{}/state.json".format(str(Path.home()), target_name, tap_name)).resolve()
 
         assert os.path.isfile(log_file)
-        assert state_file.is_file()
+        assert os.path.isfile(state_file)
 
         with open(log_file, 'r') as log_f:
             last_state = \
