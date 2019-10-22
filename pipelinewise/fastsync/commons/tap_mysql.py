@@ -106,7 +106,8 @@ class FastSyncTapMySql:
 
 
     def get_primary_key(self, table_name):
-        sql = "SHOW KEYS FROM {} WHERE Key_name = 'PRIMARY'".format(table_name)
+
+        sql = "SHOW KEYS FROM {} WHERE Key_name = 'PRIMARY'".format(utils.backtick_quote_dbtablename(table_name))
         pk = self.query(sql)
         if len(pk) > 0:
             return pk[0].get('Column_name')
@@ -170,7 +171,7 @@ class FastSyncTapMySql:
         ,CONVERT_TZ( NOW(),@@session.time_zone,'+00:00') AS _SDC_BATCHED_AT
         ,null AS _SDC_DELETED_AT
         FROM {}
-        """.format(','.join(column_safe_sql_values), table_name)
+        """.format(','.join(column_safe_sql_values), utils.backtick_quote_dbtablename(table_name))
         export_batch_rows = self.connection_config['export_batch_rows']
         exported_rows = 0
         with self.conn_unbuffered as cur:

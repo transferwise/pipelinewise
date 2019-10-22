@@ -87,7 +87,7 @@ class FastSyncTargetSnowflake:
 
 
     def create_schema(self, schema):
-        sql = "CREATE SCHEMA IF NOT EXISTS {}".format(schema)
+        sql = "CREATE SCHEMA IF NOT EXISTS \"{}\"".format(schema)
         self.query(sql)
 
 
@@ -95,23 +95,36 @@ class FastSyncTargetSnowflake:
         table_dict = utils.tablename_to_dict(table_name)
         target_table = table_dict.get('table_name') if not is_temporary else table_dict.get('temp_table_name')
 
-        sql = "DROP TABLE IF EXISTS {}.{}".format(target_schema, target_table)
+        sql = "DROP TABLE IF EXISTS \"{}\".\"{}\"".format(target_schema, target_table)
         self.query(sql)
 
 
     def create_table(self, target_schema, table_name, columns, primary_key, is_temporary=False):
         table_dict = utils.tablename_to_dict(table_name)
+
+
+        # Wrap each column name in quotes
+        newcols = []
+        for column in columns:
+            # Since the column name and data type are in a single string and white space seperated, a column name with spaces in could create many elements in the split
+            table_name_elements=[]
+            table_name_elements = column.split(" ");  
+            datatype=table_name_elements.pop() # Take the last element as the datatype
+            col=" ".join(table_name_elements) # Put everything else back together as the column name
+            newcols.append('"'+col+'"'+" "+datatype)
+        columns=newcols
+
         target_table = table_dict.get('table_name') if not is_temporary else table_dict.get('temp_table_name')
 
         if primary_key:
-            sql = """CREATE OR REPLACE TABLE {}.{} ({}
+            sql = """CREATE OR REPLACE TABLE "{}"."{}" ({}
             ,_SDC_EXTRACTED_AT TIMESTAMP_NTZ
             ,_SDC_BATCHED_AT TIMESTAMP_NTZ
             ,_SDC_DELETED_AT VARCHAR
-            , PRIMARY KEY ({}))
+            , PRIMARY KEY ("{}"))
             """.format(target_schema, target_table, ', '.join(columns), primary_key)
         else:
-            sql = """CREATE OR REPLACE TABLE {}.{} ({}
+            sql = """CREATE OR REPLACE TABLE "{}"."{}" ({}
             ,_SDC_EXTRACTED_AT TIMESTAMP_NTZ
             ,_SDC_BATCHED_AT TIMESTAMP_NTZ
             ,_SDC_DELETED_AT VARCHAR
@@ -131,7 +144,7 @@ class FastSyncTargetSnowflake:
 
         master_key = self.connection_config.get('client_side_encryption_master_key', '')
         if master_key != '':
-            sql = """COPY INTO {}.{} FROM @{}/{}
+            sql = """COPY INTO "{}"."{}" FROM @{}/{}
                 FILE_FORMAT = (type='CSV' escape='\\x1e' escape_unenclosed_field='\\x1e' field_optionally_enclosed_by='\"')
             """.format(
                 target_schema,
@@ -142,7 +155,7 @@ class FastSyncTargetSnowflake:
             self.query(sql)
 
         else:
-            sql = """COPY INTO {}.{} FROM 's3://{}/{}'
+            sql = """COPY INTO "{}"."{}" FROM 's3://{}/{}'
                 CREDENTIALS = (aws_key_id='{}' aws_secret_key='{}')
                 FILE_FORMAT = (type='CSV' escape='\\x1e' escape_unenclosed_field='\\x1e' field_optionally_enclosed_by='\"')
             """.format(target_schema, target_table, bucket, s3_key, aws_access_key_id, aws_secret_access_key)
@@ -220,8 +233,8 @@ class FastSyncTargetSnowflake:
         temp_table = table_dict.get('temp_table_name')
 
         # Swap tables and drop the temp tamp
-        self.query("ALTER TABLE {}.{} SWAP WITH {}.{}".format(schema, temp_table, schema, target_table))
-        self.query("DROP TABLE IF EXISTS {}.{}".format(schema, temp_table))
+        self.query("ALTER TABLE \"{}\".\"{}\" SWAP WITH \"{}\".\"{}\"".format(schema, temp_table, schema, target_table))
+        self.query("DROP TABLE IF EXISTS \"{}\".\"{}\"".format(schema, temp_table))
         
 
     def cache_information_schema_columns(self, tables):
@@ -230,7 +243,7 @@ class FastSyncTargetSnowflake:
 
         # Create an empty cache table if not exists
         self.query("""
-            CREATE TABLE IF NOT EXISTS {}.columns (table_schema VARCHAR, table_name VARCHAR, column_name VARCHAR, data_type VARCHAR)
+            CREATE TABLE IF NOT EXISTS "{}"."columns" (table_schema VARCHAR, table_name VARCHAR, column_name VARCHAR, data_type VARCHAR)
         """.format(pipelinewise_schema))
 
         # Cache table columns from information_schema
@@ -239,13 +252,13 @@ class FastSyncTargetSnowflake:
 
             # Delete existing data about the current schema
             self.query("""
-                DELETE FROM {}.columns
+                DELETE FROM "{}"."columns"
                 WHERE LOWER(table_schema) = '{}'
             """.format(pipelinewise_schema, schema_name.lower()))
 
             # Insert the latest data from information_schema into the cache table
             self.query("""
-                INSERT INTO {}.columns
+                INSERT INTO "{}"."columns"
                 SELECT table_schema, table_name, column_name, data_type
                 FROM information_schema.columns
                 WHERE LOWER(table_schema) = '{}'

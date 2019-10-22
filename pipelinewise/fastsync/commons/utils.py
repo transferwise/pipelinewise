@@ -24,6 +24,10 @@ def load_json(path):
     with open(path) as fil:
         return json.load(fil)
 
+def backtick_quote_dbtablename(dbtablename):
+    # Currently table_name is actually database.tablename - we need it in `database`.`tablename` to handle special characters e.g. whitespace
+    dbname,tablename=dbtablename.split(".")
+    return("`"+dbname+"`.`"+tablename+"`")
 
 def save_dict_to_json(path, data):
     log("Saving new state file to {}".format(path))
