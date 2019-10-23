@@ -66,6 +66,7 @@ class PipelineWise(object):
 
         self.config_dir = config_dir
         self.venv_dir = venv_dir
+        self.extra_log = args.extra_log
         self.pipelinewise_bin = os.path.join(self.venv_dir, "cli", "bin", "pipelinewise")
         self.config_path = os.path.join(self.config_dir, "config.json")
         self.load_config()
@@ -775,8 +776,15 @@ class PipelineWise(object):
 
             return line
 
+        def update_state_file_with_extra_log(line: str) -> str:
+            self.logger.info(line.rstrip('\n'))
+            return update_state_file(line)
+
         # Run command with update_state_file as a callback to call for every stdout line
-        utils.run_command(command, self.tap_run_log_file, update_state_file)
+        if self.extra_log:
+            utils.run_command(command, self.tap_run_log_file, update_state_file_with_extra_log)
+        else:
+            utils.run_command(command, self.tap_run_log_file, update_state_file)
 
         # update the state file one last time to make sure it always has the last state message.
         if state is not None:
@@ -814,8 +822,16 @@ class PipelineWise(object):
                     log_dir))
             sys.exit(1)
 
-        # Run command
-        utils.run_command(command, self.tap_run_log_file)
+        def add_fastsync_output_to_main_logger(line: str) -> str:
+            self.logger.info(line.rstrip('\n'))
+            return line
+
+        if self.extra_log:
+            # Run command and copy fastsync output to main logger
+            utils.run_command(command, self.tap_run_log_file, add_fastsync_output_to_main_logger)
+        else:
+            # Run command
+            utils.run_command(command, self.tap_run_log_file)
 
     def run_tap(self):
         """
