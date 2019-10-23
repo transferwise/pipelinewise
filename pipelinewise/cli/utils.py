@@ -103,7 +103,7 @@ def load_json(path):
 def is_state_message(line: str) -> bool:
     try:
         json_object = json.loads(line)
-        return 'currently_syncing' in json_object and 'bookmarks' in json_object
+        return 'bookmarks' in json_object
     except Exception as exc:
         return False
 
