@@ -100,6 +100,7 @@ $ docker exec -it pipelinewise_dev bash
     * Python 3.x
     * python3-dev
     * python3-venv
+    * postgresql
 
 2. Run the install script that installs the PipelineWise CLI and every supported singer connectors into separated virtual environments:
    
