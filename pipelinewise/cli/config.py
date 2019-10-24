@@ -18,7 +18,6 @@ class Config(object):
 
         self.targets = []
 
-
     @classmethod
     def from_yamls(cls, config_dir, yaml_dir=".", vault_secret=None):
         '''
@@ -30,22 +29,20 @@ class Config(object):
         from human friendly easy to understand YAML files.
         '''
         config = cls(config_dir)
-        config.logger.info("Searching YAML config files in {}".format(yaml_dir))
         targets = {}
         taps = {}
 
-        # YAML files must match one of the patterns:
-        #   target_*.yml
-        #   tap_*.yml        
-        yamls = [f for f in os.listdir(yaml_dir) if os.path.isfile(os.path.join(yaml_dir, f)) and f.endswith(".yml")]
-        target_yamls = list(filter(lambda y: y.startswith("target_"), yamls))
-        tap_yamls = list(filter(lambda y: y.startswith("tap_"), yamls))
+        config.logger.info(f"Searching YAML config files in {yaml_dir}")
+        tap_yamls, target_yamls = utils.get_tap_target_names(yaml_dir)
+
+        target_schema = utils.load_schema("target")
+        tap_schema = utils.load_schema("tap")
 
         # Load every target yaml into targets dictionary        
         for yaml_file in target_yamls:
             config.logger.info("LOADING TARGET: {}".format(yaml_file))
             target_data = utils.load_yaml(os.path.join(yaml_dir, yaml_file), vault_secret)
-            utils.validate(instance=target_data, schema=utils.load_schema("target"))
+            utils.validate(instance=target_data, schema=target_schema)
 
             # Add generated extra keys that not available in the YAML
             target_id = target_data['id']
@@ -60,7 +57,7 @@ class Config(object):
         for yaml_file in tap_yamls:
             config.logger.info("LOADING TAP: {}".format(yaml_file))
             tap_data = utils.load_yaml(os.path.join(yaml_dir, yaml_file), vault_secret)
-            utils.validate(instance=tap_data, schema=utils.load_schema("tap"))
+            utils.validate(instance=tap_data, schema=tap_schema)
 
             tap_id = tap_data['id']
             target_id = tap_data['target']

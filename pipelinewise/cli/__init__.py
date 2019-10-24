@@ -24,6 +24,7 @@ commands = [
   'sync_tables',
   'import',
   'import_config',  # This is for backward compatibility; use 'import' instead
+  'validate_config',
   'encrypt_string'
 ]
 
@@ -89,6 +90,11 @@ def main():
         # python keyword and can't be used as function name
         args.command = 'import_project'
 
+    if args.command == 'validate_config':
+        if args.dir == '*':
+            print("You must specify a directory path with config YAML files using the argumant --dir")
+            sys.exit(1)
+
     if args.command == 'encrypt_string':
         if not args.secret:
             print("You must specify a path to a file with vault secret using the argument --secret")
@@ -99,6 +105,7 @@ def main():
 
     pipelinewise = PipelineWise(args, config_dir, venv_dir)
     getattr(pipelinewise, args.command)()
+
 
 if __name__ == '__main__':
     main()
