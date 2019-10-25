@@ -48,6 +48,7 @@ Run a specific pipeline
 
 :--tap: Tap connector id
 
+:--extra_log: Optional: Copy logging into PipelineWise logger to see tap run logs at runtime in STDOUT
 
 
 .. _cli_discover_tap:
