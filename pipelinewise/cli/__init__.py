@@ -35,6 +35,7 @@ name_help = """Name of the project"""
 secret_help = """Path to vault password file"""
 version_help = """Displays the installed versions"""
 log_help = """File to log into"""
+extra_log_help = """Copy singer and fastsync logging into PipelineWise logger"""
 debug_help = """Forces the debug mode with logging on stdout and log level debug."""
 
 def main():
@@ -50,6 +51,7 @@ def main():
     parser.add_argument('--string', type=str)
     parser.add_argument('--version', action="version", help=version_help, version='PipelineWise {} - Command Line Interface'.format(__version__))
     parser.add_argument('--log', type=str, default='*', help=log_help)
+    parser.add_argument('--extra_log', default=False, required=False, help=extra_log_help, action="store_true")
     parser.add_argument('--debug', default=False, required=False, help=debug_help, action="store_true")
 
     args = parser.parse_args()
