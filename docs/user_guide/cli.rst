@@ -10,13 +10,13 @@ PipelineWise's command line interface allows for a number of operation types on 
 .. code-block:: bash
 
     usage: pipelinewise [-h]
-                        {init,run_tap,discover_tap,status,test_tap_connection,sync_tables,import_config}
+                        {init,run_tap,discover_tap,status,test_tap_connection,sync_tables,import_config,validate}
 
 
 Positional Arguments
 --------------------
 
-:subcommand: Possible choices: init, run_tap, discover_tap, status, test_tap_connection, sync_tables, import_config
+:subcommand: Possible choices: init, run_tap, discover_tap, status, test_tap_connection, sync_tables, import_config, validate
 
 
 Sub-commands:
@@ -108,3 +108,12 @@ Import a project directory into PipelineWise. It will create every JSON file req
 the tap and target connectors into ``~/.pipelinewise``.
 
 :--dir: relative path to the project directory to import
+
+.. _cli_validate
+
+validate
+""""""""
+
+Validates a project directory with YAML tap and target files.
+
+:--dir: relative path to the project directory with YAML taps and targets.
