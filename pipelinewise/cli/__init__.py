@@ -24,7 +24,7 @@ commands = [
   'sync_tables',
   'import',
   'import_config',  # This is for backward compatibility; use 'import' instead
-  'validate_config',
+  'validate',
   'encrypt_string'
 ]
 

@@ -1017,7 +1017,7 @@ class PipelineWise(object):
 
         utils.silentremove(cons_target_config)
 
-    def validate_config(self):
+    def validate(self):
         yaml_dir = self.args.dir
         self.logger.info(f"Searching YAML config files in {yaml_dir}")
         tap_yamls, target_yamls = utils.get_tap_target_names(yaml_dir)
