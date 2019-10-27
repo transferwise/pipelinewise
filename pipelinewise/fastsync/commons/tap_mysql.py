@@ -189,10 +189,13 @@ class FastSyncTapMySql:
                         break
 
                     # Log export status
-                    exported_rows += export_batch_rows
-                    utils.log("Exported {} rows from {}...".format(exported_rows, table_name))
+                    exported_rows += len(rows)
+                    if (len(rows) == export_batch_rows):
+                        #Then we believe this to be just an interim batch and not the final one so report on progress
+                        utils.log("Exporting batch from {} to {} rows from {}...".format((exported_rows-export_batch_rows),exported_rows, table_name))
 
                     # Write rows to file
                     for row in rows:
                         writer.writerow(row)
 
+                utils.log("Exported total of {} rows from {}...".format(exported_rows, table_name))
