@@ -423,3 +423,31 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
 
         # Delete test log file
         os.remove("{}.terminated".format(pipelinewise.tap_run_log_file))
+
+    def test_validate_command(self):
+        test_validate_command_dir = f'{os.path.dirname(__file__)}/resources/test_validate_command'
+
+        test_cases = [
+            {
+                'dir': 'missing_replication_key_incremental',
+                'exception': True
+            },
+            {
+                'dir': 'missing_replication_key',
+                'exception': False
+            },
+            {
+                'dir': 'invalid_target',
+                'exception': True
+            }
+        ]
+
+        for test_case in test_cases:
+            args = CliArgs(dir=f'{test_validate_command_dir}/{test_case["dir"]}')
+            pipelinewise = PipelineWise(args, CONFIG_DIR, VIRTUALENVS_DIR)
+
+            if test_case['exception']:
+                with pytest.raises(SystemExit):
+                    pipelinewise.validate()
+            else:
+                pipelinewise.validate()
