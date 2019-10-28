@@ -160,8 +160,8 @@ def get_tap_target_names(yaml_dir):
     YAML_EXTENSION = ".yml"
 
     yamls = [f for f in os.listdir(yaml_dir) if os.path.isfile(os.path.join(yaml_dir, f)) and f.endswith(YAML_EXTENSION)]
-    target_yamls = list(filter(lambda y: y.startswith(TARGET_PREFIX), yamls))
-    tap_yamls = list(filter(lambda y: y.startswith(TAP_PREFIX), yamls))
+    target_yamls = set(filter(lambda y: y.startswith(TARGET_PREFIX), yamls))
+    tap_yamls = set(filter(lambda y: y.startswith(TAP_PREFIX), yamls))
 
     return tap_yamls, target_yamls
 
