@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-
 import os
 import shutil
 import tempfile
@@ -1022,6 +1021,42 @@ class PipelineWise(object):
             raise exc
 
         utils.silentremove(cons_target_config)
+
+    def validate(self):
+        yaml_dir = self.args.dir
+        self.logger.info(f"Searching YAML config files in {yaml_dir}")
+        tap_yamls, target_yamls = utils.get_tap_target_names(yaml_dir)
+        self.logger.info(f"Detected taps: {tap_yamls}")
+        self.logger.info(f"Detected targets: {target_yamls}")
+
+        target_schema = utils.load_schema("target")
+        tap_schema = utils.load_schema("tap")
+
+        vault_secret = self.args.secret
+
+        target_ids = set()
+        # Validate target json schemas
+        for yaml_file in target_yamls:
+            self.logger.info(f"Started validating {yaml_file}")
+            loaded_yaml = utils.load_yaml(os.path.join(yaml_dir, yaml_file), vault_secret)
+            utils.validate(loaded_yaml, target_schema)
+            target_ids.add(loaded_yaml['id'])
+            self.logger.info(f"Finished validating {yaml_file}")
+
+        # Validate tap json schemas and check that every tap has valid 'target'
+        for yaml_file in tap_yamls:
+            self.logger.info(f"Started validating {yaml_file}")
+            loaded_yaml = utils.load_yaml(os.path.join(yaml_dir, yaml_file), vault_secret)
+            utils.validate(loaded_yaml, tap_schema)
+
+            if loaded_yaml['target'] not in target_ids:
+                self.logger.error(f"Can'f find the target with the ID '{loaded_yaml['target']}' "
+                                  f"referenced in '{yaml_file}'. Available target IDs: {target_ids}")
+                sys.exit(1)
+
+            self.logger.info(f"Finished validating {yaml_file}")
+
+        self.logger.info("Validation successful")
 
     def import_project(self):
         """

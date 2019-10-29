@@ -145,6 +145,27 @@ def is_yaml_file(path):
         return False
 
 
+def get_tap_target_names(yaml_dir):
+    """Retrieves names of taps and targets inside yaml_dir.
+
+    Args:
+        yaml_dir (str): Path to the directory, which contains taps and targets files with .yml extension.
+
+    Returns:
+        (tap_yamls, target_yamls): tap_yamls is a list of names inside yaml_dir with "tap_*.yml" pattern.
+                                   target_yamls is a list of names inside yaml_dir with "target_*.yml" pattern.
+    """
+    TAP_PREFIX = "tap_"
+    TARGET_PREFIX = "target_"
+    YAML_EXTENSION = ".yml"
+
+    yamls = [f for f in os.listdir(yaml_dir) if os.path.isfile(os.path.join(yaml_dir, f)) and f.endswith(YAML_EXTENSION)]
+    target_yamls = set(filter(lambda y: y.startswith(TARGET_PREFIX), yamls))
+    tap_yamls = set(filter(lambda y: y.startswith(TAP_PREFIX), yamls))
+
+    return tap_yamls, target_yamls
+
+
 def load_yaml(yaml_file, vault_secret=None):
     '''
     Load a YAML file into a python dictionary.
