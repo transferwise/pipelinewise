@@ -18,6 +18,7 @@ class Config(object):
 
         self.targets = []
 
+
     @classmethod
     def from_yamls(cls, config_dir, yaml_dir=".", vault_secret=None):
         '''
@@ -40,7 +41,7 @@ class Config(object):
 
         # Load every target yaml into targets dictionary        
         for yaml_file in target_yamls:
-            config.logger.info("LOADING TARGET: {}".format(yaml_file))
+            config.logger.info(f"LOADING TARGET: {yaml_file}")
             target_data = utils.load_yaml(os.path.join(yaml_dir, yaml_file), vault_secret)
             utils.validate(instance=target_data, schema=target_schema)
 
@@ -55,14 +56,14 @@ class Config(object):
 
         # Load every tap yaml into targets dictionary
         for yaml_file in tap_yamls:
-            config.logger.info("LOADING TAP: {}".format(yaml_file))
+            config.logger.info(f"LOADING TAP: {yaml_file}")
             tap_data = utils.load_yaml(os.path.join(yaml_dir, yaml_file), vault_secret)
             utils.validate(instance=tap_data, schema=tap_schema)
 
             tap_id = tap_data['id']
             target_id = tap_data['target']
             if target_id not in targets:
-                config.logger.error("Can't find the target with the ID \"{}\" but it's referenced in {}".format(target_id, yaml_file))
+                config.logger.error(f"Can't find the target with the ID \"{target_id}\" but it's referenced in {yaml_file}")
                 sys.exit(1)
 
             # Add generated extra keys that not available in the YAML
@@ -140,7 +141,7 @@ class Config(object):
         This is in the main config directory, usually at ~/.pipelinewise/config.json
         and has the list of targets and its taps with some basic information.
         '''
-        self.logger.info("SAVING MAIN CONFIG JSON to {}".format(self.config_path))
+        self.logger.info(f"SAVING MAIN CONFIG JSON to {self.config_path}")
         targets = []
 
         # Generate dictionary for config.json
@@ -182,7 +183,7 @@ class Config(object):
         '''
         target_dir = self.get_target_dir(target.get('id'))
         target_config_path = os.path.join(target_dir, "config.json")
-        self.logger.info("SAVING TARGET JSONS to {}".format(target_config_path))
+        self.logger.info(f"SAVING TARGET JSONS to {target_config_path}")
 
         # Create target dir if not exists
         if not os.path.exists(target_dir):
@@ -209,7 +210,7 @@ class Config(object):
         '''
         target_dir = self.get_target_dir(target.get('id'))
         tap_dir = self.get_tap_dir(target.get('id'), tap.get('id'))
-        self.logger.info("SAVING TAP JSONS to {}".format(tap_dir))
+        self.logger.info(f"SAVING TAP JSONS to {tap_dir}")
 
         # Define tap JSON file paths
         tap_config_path = os.path.join(tap_dir, "config.json")
