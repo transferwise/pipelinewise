@@ -118,6 +118,7 @@
 <li class="toctree-l3"><a class="reference internal" href="#test-tap-connection">test_tap_connection</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#sync-tables">sync_tables</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#import">import</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#validate">validate</a></li>
 </ul>
 </li>
 </ul>
@@ -210,14 +211,14 @@
 <span id="id1"></span><h1>Command Line Interface<a class="headerlink" href="#command-line-interface" title="Permalink to this headline">¶</a></h1>
 <p>PipelineWise’s command line interface allows for a number of operation types on a pipeline.</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>usage: pipelinewise <span class="o">[</span>-h<span class="o">]</span>
-                    <span class="o">{</span>init,run_tap,discover_tap,status,test_tap_connection,sync_tables,import_config<span class="o">}</span>
+                    <span class="o">{</span>init,run_tap,discover_tap,status,test_tap_connection,sync_tables,import_config,validate<span class="o">}</span>
 </pre></div>
 </div>
 <div class="section" id="positional-arguments">
 <h2>Positional Arguments<a class="headerlink" href="#positional-arguments" title="Permalink to this headline">¶</a></h2>
 <dl class="field-list simple">
 <dt class="field-odd">subcommand</dt>
-<dd class="field-odd"><p>Possible choices: init, run_tap, discover_tap, status, test_tap_connection, sync_tables, import_config</p>
+<dd class="field-odd"><p>Possible choices: init, run_tap, discover_tap, status, test_tap_connection, sync_tables, import_config, validate</p>
 </dd>
 </dl>
 </div>
@@ -304,6 +305,15 @@ the tap and target connectors into <code class="docutils literal notranslate"><s
 <dl class="field-list simple">
 <dt class="field-odd">–dir</dt>
 <dd class="field-odd"><p>relative path to the project directory to import</p>
+</dd>
+</dl>
+</div>
+<div class="section" id="validate">
+<h3>validate<a class="headerlink" href="#validate" title="Permalink to this headline">¶</a></h3>
+<p>Validates a project directory with YAML tap and target files.</p>
+<dl class="field-list simple">
+<dt class="field-odd">–dir</dt>
+<dd class="field-odd"><p>relative path to the project directory with YAML taps and targets.</p>
 </dd>
 </dl>
 </div>
