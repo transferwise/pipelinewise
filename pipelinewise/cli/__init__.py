@@ -90,7 +90,7 @@ def main():
         # python keyword and can't be used as function name
         args.command = 'import_project'
 
-    if args.command == 'validate_config':
+    if args.command == 'validate':
         if args.dir == '*':
             print("You must specify a directory path with config YAML files using the argument --dir")
             sys.exit(1)
