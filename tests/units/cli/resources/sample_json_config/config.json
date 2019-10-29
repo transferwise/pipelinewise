@@ -11,7 +11,6 @@
                     "id": "tap_one",
                     "name": "Source One",
                     "owner": "somebody@transferwise.com",
-                    "sync_period": "0 3 * * *",
                     "type": "tap-mysql"
                 },
                 {
@@ -19,7 +18,6 @@
                     "id": "tap_two",
                     "name": "Source Two",
                     "owner": "marten.hallik@transferwise.com",
-                    "sync_period": "0 */4 * * *",
                     "type": "tap-postgres"
                 }
             ]
@@ -35,7 +33,6 @@
                     "id": "tap_three",
                     "name": "Source Three",
                     "owner": "somebody@transferwise.com",
-                    "sync_period": "0 3 * * *",
                     "type": "tap-mysql"
                 }
             ]
