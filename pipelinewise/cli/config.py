@@ -153,7 +153,6 @@ class Config(object):
                     "name": tap.get('name'),
                     "type": tap.get('type'),
                     "owner": tap.get('owner'),
-                    "sync_period": tap.get('sync_period'),
                     "enabled": True
                 })
 

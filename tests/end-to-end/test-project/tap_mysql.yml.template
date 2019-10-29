@@ -7,7 +7,6 @@ id: "mariadb_source"
 name: "MariaDB source test database"
 type: "tap-mysql"
 owner: "test-runner"
-sync_period: "0 * * * *"
 
 
 # ------------------------------------------------------------------------------

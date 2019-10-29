@@ -126,7 +126,6 @@ You can edit it with the text editor of your choice:
     name: "FX (Monolith)"
     type: "tap-mysql"
     owner: "somebody@transferwise.com"
-    sync_period: "*/15 * * * *"
 
     # Source connection details
     db_conn:
