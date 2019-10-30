@@ -7,7 +7,6 @@ id: "postgres_source"
 name: "PostgreSQL source test database"
 type: "tap-postgres"
 owner: "test-runner"
-sync_period: "0 * * * *"
 
 
 # ------------------------------------------------------------------------------
