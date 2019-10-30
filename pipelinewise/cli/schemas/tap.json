@@ -23,7 +23,7 @@
     },
     "table": {
       "type": "object",
-      "oneOf": [
+      "anyOf": [
         {
           "properties": {
             "table_name": {
