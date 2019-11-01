@@ -404,9 +404,9 @@ def get_tap_stream_id(tap, database_name, schema_name, table_name):
     pattern = get_tap_property(tap, 'tap_stream_id_pattern')
 
     return pattern \
-        .replace("{{database_name}}", database_name) \
-        .replace("{{schema_name}}", schema_name) \
-        .replace("{{table_name}}", table_name)
+        .replace("{{database_name}}", f"{database_name}") \
+        .replace("{{schema_name}}", f"{schema_name}") \
+        .replace("{{table_name}}", f"{table_name}")
 
 
 def get_tap_stream_name(tap, database_name, schema_name, table_name):
@@ -420,9 +420,9 @@ def get_tap_stream_name(tap, database_name, schema_name, table_name):
     pattern = get_tap_property(tap, 'tap_stream_name_pattern')
 
     return pattern \
-        .replace("{{database_name}}", "{}".format(database_name)) \
-        .replace("{{schema_name}}", "{}".format(schema_name)) \
-        .replace("{{table_name}}", "{}".format(table_name))
+        .replace("{{database_name}}", f"{database_name}") \
+        .replace("{{schema_name}}", f"{schema_name}") \
+        .replace("{{table_name}}", f"{table_name}")
 
 
 def get_tap_default_replication_method(tap):
