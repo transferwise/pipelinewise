@@ -7,6 +7,7 @@ import psycopg2
 import subprocess
 
 from dotenv import load_dotenv
+from pathlib import Path
 
 DIR = os.path.dirname(__file__)
 
@@ -129,15 +130,37 @@ class TestE2E(object):
         if exists"""
         if rc != 0 or stderr != "":
             failed_log = ""
+            failed_log_path = f"{log_path}.failed"
             # Load failed log file if exists
-            if os.path.isfile("{}.failed".format(log_path)):
-                with open(log_path, 'r') as file:
+            if os.path.isfile(failed_log_path):
+                with open(failed_log_path, 'r') as file:
                     failed_log = file.read()
 
             print(f"STDOUT: {stdout}\nSTDERR: {stderr}\nFAILED LOG: {failed_log}")
             assert False
 
-        assert True
+        # check success log file if log path defined
+        success_log_path = f"{log_path}.success"
+        if log_path and not os.path.isfile(success_log_path):
+            assert False
+        else:
+            assert True
+
+    def assert_state_file_valid(self, target_name, tap_name, log_path=None):
+        """Assert helper function to check if state file exists for a certain tap
+        for a certain target"""
+        state_file = Path(f"{Path.home()}/.pipelinewise/{target_name}/{tap_name}/state.json").resolve()
+        assert os.path.isfile(state_file)
+
+        # Check if state file content equals to last emitted state in log
+        if log_path:
+            success_log_path = f"{log_path}.success"
+            with open(success_log_path, 'r') as log_f:
+                last_state = \
+                    re.search(r'\nINFO STATE emitted from target: (.+\n)', '\n'.join(log_f.readlines())).groups()[-1]
+
+            with open(state_file, 'r') as state_f:
+                assert last_state == ''.join(state_f.readlines())
 
     @pytest.mark.dependency(name="import_config")
     def test_import_project(self):
@@ -151,15 +174,15 @@ class TestE2E(object):
     def test_replicate_mariadb_to_postgres(self):
         """Replicate data from MariaDB to Postgres DWH, check if return code is zero and success log file created"""
         [rc, stdout, stderr] = self.run_command("pipelinewise run_tap --tap mariadb_source --target postgres_dwh")
-        self.assert_command_success(rc, stdout, stderr)
-        assert os.path.isfile("{}.success".format(self.find_run_tap_log_file(stdout)))
+        log_file = self.find_run_tap_log_file(stdout)
+        self.assert_command_success(rc, stdout, stderr, log_file)
 
     @pytest.mark.dependency(depends=["import_config"])
     def test_replicate_postgres_to_postgres(self):
         """Replicate data from Postgres to Postgres DWH, check if return code is zero and success log file created"""
         [rc, stdout, stderr] = self.run_command("pipelinewise run_tap --tap postgres_source --target postgres_dwh")
-        self.assert_command_success(rc, stdout, stderr)
-        assert os.path.isfile("{}.success".format(self.find_run_tap_log_file(stdout)))
+        log_file = self.find_run_tap_log_file(stdout)
+        self.assert_command_success(rc, stdout, stderr, log_file)
 
     @pytest.mark.dependency(depends=["import_config"])
     def test_replicate_postgres_to_snowflake(self):
@@ -168,21 +191,15 @@ class TestE2E(object):
         tap_name = 'postgres_source_sf'
         target_name = 'snowflake'
 
+        # Run tap first time - fastsync should be triggered
         [rc, stdout, stderr] = self.run_command("pipelinewise run_tap --tap {} --target {}".format(tap_name,
                                                                                                    target_name))
-        self.assert_command_success(rc, stdout, stderr)
-        log_file = "{}.success".format(self.find_run_tap_log_file(stdout, 'singer'))
+        log_file = self.find_run_tap_log_file(stdout, 'fastsync')
+        self.assert_command_success(rc, stdout, stderr, log_file)
 
-        from pathlib import Path
-
-        state_file = Path("{}/.pipelinewise/{}/{}/state.json".format(str(Path.home()), target_name, tap_name)).resolve()
-
-        assert os.path.isfile(log_file)
-        assert os.path.isfile(state_file)
-
-        with open(log_file, 'r') as log_f:
-            last_state = \
-                re.search(r'\nINFO STATE emitted from target: (.+\n)', '\n'.join(log_f.readlines())).groups()[-1]
-
-            with open(state_file, 'r') as state_f:
-                assert last_state == ''.join(state_f.readlines())
+        # Run tap second time - singer should be triggered and state message should be emitted
+        [rc, stdout, stderr] = self.run_command("pipelinewise run_tap --tap {} --target {}".format(tap_name,
+                                                                                                   target_name))
+        log_file = self.find_run_tap_log_file(stdout, 'singer')
+        self.assert_command_success(rc, stdout, stderr, log_file)
+        self.assert_state_file_valid(target_name, tap_name, log_file)
