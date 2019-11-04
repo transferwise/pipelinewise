@@ -130,7 +130,7 @@ class TestE2E(object):
         if rc != 0 or stderr != "":
             failed_log = ""
             # Load failed log file if exists
-            if os.path.isfile("{}.success".format(log_path)):
+            if os.path.isfile("{}.failed".format(log_path)):
                 with open(log_path, 'r') as file:
                     failed_log = file.read()
 
