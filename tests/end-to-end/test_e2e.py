@@ -134,10 +134,8 @@ class TestE2E(object):
                 with open(log_path, 'r') as file:
                     failed_log = file.read()
 
-            if failed_log:
-                assert not "STDOUT: {}\nSTDERR: {}\nFAILED LOG: {}".format(str(stdout), str(stderr), failed_log)
-            else:
-                assert not "STDOUT: {}\nSTDERR: {}".format(str(stdout), str(stderr))
+            print(f"STDOUT: {stdout}\nSTDERR: {stderr}\nFAILED LOG: {failed_log}")
+            assert False
 
         assert True
 
