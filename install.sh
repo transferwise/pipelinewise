@@ -147,9 +147,6 @@ install_connector target-redshift
 
 # Capture end_time
 end_time=`date +%s`
-
-pip list
-
 echo
 echo "--------------------------------------------------------------------------"
 echo "PipelineWise installed successfully in $((end_time-start_time)) seconds"
