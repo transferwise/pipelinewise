@@ -29,7 +29,7 @@ setup(name='pipelinewise',
         'PyMySQL==0.7.11',
         'psycopg2==2.8.2',
         'boto3==1.9.33',
-        'snowflake-connector-python==2.0.*'
+        'snowflake-connector-python==2.0.3'
     ],
     extras_require={
         "test": [
