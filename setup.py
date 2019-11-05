@@ -29,15 +29,17 @@ setup(name='pipelinewise',
         'idna==2.7',
         'PyMySQL==0.7.11',
         'psycopg2==2.8.2',
-        'boto3==1.9.33',
-        'snowflake-connector-python==2.0.1'
+        'boto3==1.10.8',
+        'snowflake-connector-python==2.0.3'
     ],
     extras_require={
         "test": [
             "pytest==5.0.1",
             "pytest-dependency==0.4.0",
             "coverage==4.5.3",
-            "python-dotenv==0.10.3"
+            "python-dotenv==0.10.3",
+            "nose==1.3.7",
+            "mock==3.0.5"
         ]
     },
     entry_points='''
