@@ -345,8 +345,6 @@ class PipelineWise(object):
         return tap
 
     def merge_schemas(self, old_schema, new_schema):
-        schema_with_diff = new_schema
-
         if not old_schema:
             schema_with_diff = new_schema
         else:
@@ -498,7 +496,7 @@ class PipelineWise(object):
                 try:
                     stream_table_mdata_idx = [i for i, md in enumerate(stream["metadata"]) if md["breadcrumb"] == []][0]
                 except Exception:
-                    False
+                    pass
 
                 if tap_stream_sel:
                     self.logger.info(f"Mark {tap_stream_id} tap_stream_id as selected with properties {tap_stream_sel}")
@@ -591,10 +589,7 @@ class PipelineWise(object):
 
         # Generate and run the command to run the tap directly
         command = f"{tap_bin} --config {tap_config_file} --discover"
-        result = utils.run_command(command)
-
-        # Get output and errors from tap
-        rc, new_schema, output = result
+        rc, new_schema, output = utils.run_command(command)
 
         if rc != 0:
             return f"{target_id} - {tap_id}"
@@ -612,7 +607,7 @@ class PipelineWise(object):
         else:
             schema_with_diff = new_schema
 
-        # Make selection from selectection.json if exists
+        # Make selection from selection.json if exists
         try:
             schema_with_diff = self.make_default_selection(schema_with_diff, tap_selection_file)
             schema_with_diff = utils.delete_keys_from_dict(
@@ -1085,19 +1080,20 @@ class PipelineWise(object):
 
         # Import every tap from every target
         start_time = datetime.now()
-        for tk in config.targets.keys():
-            target = config.targets.get(tk)
+        for target in config.targets.values():
             total_targets += 1
             total_taps += len(target.get('taps'))
 
             with parallel_backend('threading', n_jobs=-1):
                 # Discover taps in parallel and return the list
                 #  of exception of the failed ones
-                discover_excs.extend(list(filter(None,
-                                                 Parallel(verbose=100)(delayed(self.discover_tap)(
-                                                     tap=tap,
-                                                     target=target
-                                                 ) for (tap) in target.get('taps')))))
+                discover_excs.extend(
+                    filter(None,
+                           Parallel(verbose=100)(delayed(self.discover_tap)(
+                               tap=tap,
+                               target=target
+                           ) for tap in target.get('taps')))
+                )
 
         # Log summary
         end_time = datetime.now()
