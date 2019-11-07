@@ -156,7 +156,8 @@
         "tap-s3-csv",
         "tap-snowflake",
         "tap-salesforce",
-        "tap-jira"
+        "tap-jira",
+        "tap-google-analytics"
       ]
     },
     "db_conn": {

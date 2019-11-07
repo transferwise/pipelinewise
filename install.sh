@@ -166,6 +166,7 @@ DEFAULT_CONNECTORS=(
     tap-salesforce
     tap-snowflake
     tap-zendesk
+    tap-google-analytics
     target-s3-csv
     target-snowflake
     target-redshift
