@@ -32,7 +32,7 @@ db_conn:
 # ------------------------------------------------------------------------------
 target: "postgres_dwh"                 # ID of the target connector where the data will be loaded
 batch_size_rows: 20000                 # Batch size for the stream to optimise load performance
-flush_all_streams: "True"              # target to flush all streams if any stream reaches batch_size_rows. Default False
+flush_all_streams: true              # target to flush all streams if any stream reaches batch_size_rows. Default false
 
 
 # ------------------------------------------------------------------------------
