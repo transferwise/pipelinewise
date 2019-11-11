@@ -3,7 +3,7 @@
 # General Properties
 # Doc: https://transferwise.github.io/pipelinewise/connectors/taps/postgres.html
 # ------------------------------------------------------------------------------
-id: "postgres_db"                      # Unique identifier of the tap
+id: "postgres_db_logical"              # Unique identifier of the tap
 name: "Sample Postgres Database"       # Name of the tap
 type: "tap-postgres"                   # !! THIS SHOULD NOT CHANGE !!
 owner: "somebody@foo.com"              # Data owner to contact
