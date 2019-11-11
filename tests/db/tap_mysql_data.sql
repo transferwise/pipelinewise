@@ -40,7 +40,8 @@ INSERT INTO `edgydata` VALUES
   (1, 'Lorem ipsum dolor sit amet'),
   (2, 'Thai: แผ่นดินฮั่นเสื่อมโทรมแสนสังเวช'),
   (3, 'Chinese: 和毛泽东 <<重上井冈山>>. 严永欣, 一九八八年.'),
-  (4, 'Special Characters: ["\\,''!@£$%^&*()]\\\\');
+  (4, 'Special Characters: ["\\,''!@£$%^&*()]\\\\'),
+  (5, '	');
 
 /*!40000 ALTER TABLE `edgydata` ENABLE KEYS */;
 UNLOCK TABLES;
