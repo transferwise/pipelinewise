@@ -32,42 +32,31 @@ db_conn:
 # ------------------------------------------------------------------------------
 target: "postgres_dwh"                 # ID of the target connector where the data will be loaded
 batch_size_rows: 20000                 # Batch size for the stream to optimise load performance
-flush_all_streams: "False"             # target to flush all streams if any stream reaches batch_size_rows. Default False
+flush_all_streams: "True"              # target to flush all streams if any stream reaches batch_size_rows. Default False
 
 
 # ------------------------------------------------------------------------------
+# LOG_BASED replication data
+#   requires wal2json plugin and other source adjustments
+#   LOG_BASED is the default replication_method
+#
 # Source to target Schema mapping
 # ------------------------------------------------------------------------------
 schemas:
-  - source_schema: "public"           # Source schema in postgres with tables
-    target_schema: "postgres_world"   # Target schema in the destination Data Warehouse
-    # target_schema_select_permissions: # Optional: Grant SELECT on schema and tables that created
-    #  - grp_read_only
+  - source_schema: "logical1"
+    target_schema: "postgres_world_logical1"
     tables:
-    # List of tables to replicate from Postgres to destination Data Warehouse
-    # Please check the Replication Strategies section in the documentation to understand the differences.
-      - table_name: "edgydata"
-        replication_method: "FULL_TABLE"  # INCREMENTAL, LOG_BASED or FULL_TABLE (Default LOG_BASED)
+      - table_name: "logical1_table1"
+        replication_method: "LOG_BASED"
+      - table_name: "logical1_table2"
+      - table_name: "logical1_edgydata"
 
-      - table_name: "country"
-        replication_method: "FULL_TABLE"
-
-      - table_name: "city"
-        replication_method: "INCREMENTAL"
-        replication_key: "id"
-        # transformations:                  # Optional: Load time transformations
-        #  - column: "population"           # Column to transform
-        #    type: "MASK-NUMBER"            # Transformation type
-
-      - table_name: "countrylanguage"
-        replication_method: "FULL_TABLE"
-
-  - source_schema: "public2"
-    target_schema: "postgres_world_2"
-
+  - source_schema: "logical2"
+    target_schema: "postgres_world_logical2"
     tables:
-      - table_name: "wearehere"
-        replication_method: "FULL_TABLE"
-      - table_name: "public2_edgydata"
-        replication_method: "INCREMENTAL"
-        replication_key: "cid"
+      - table_name: "logical2_table1"
+
+  - source_schema: "logical3"
+    target_schema: "postgres_world_logical3"
+    tables:
+      - table_name: "logical3_table1"
