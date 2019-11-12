@@ -41,7 +41,13 @@ INSERT INTO `edgydata` VALUES
   (2, 'Thai: แผ่นดินฮั่นเสื่อมโทรมแสนสังเวช'),
   (3, 'Chinese: 和毛泽东 <<重上井冈山>>. 严永欣, 一九八八年.'),
   (4, 'Special Characters: ["\\,''!@£$%^&*()]\\\\'),
-  (5, '	');
+  (5, '	'),
+  (6,'Enter	The
+Ninja'),
+  (7,'Liewe
+Maatjies'),
+  (8,'Liewe	Maatjies')
+;
 
 /*!40000 ALTER TABLE `edgydata` ENABLE KEYS */;
 UNLOCK TABLES;
