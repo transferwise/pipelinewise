@@ -1,1 +1,1 @@
-tap-zendesk-parallel==1.4.2
+tap-zendesk-parallel==1.4.6
