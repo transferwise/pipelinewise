@@ -57,6 +57,9 @@ class TestE2E(object):
             'TARGET_SNOWFLAKE_S3_KEY_PREFIX': os.environ.get('TARGET_SNOWFLAKE_S3_KEY_PREFIX'),
             'TARGET_SNOWFLAKE_STAGE': os.environ.get('TARGET_SNOWFLAKE_STAGE'),
             'TARGET_SNOWFLAKE_FILE_FORMAT': os.environ.get('TARGET_SNOWFLAKE_FILE_FORMAT'),
+            'TAP_S3_CSV_SOURCE_AWS_KEY': os.environ.get('TAP_S3_CSV_SOURCE_AWS_KEY'),
+            'TAP_S3_CSV_SOURCE_AWS_SECRET_ACCESS_KEY': os.environ.get('TAP_S3_CSV_SOURCE_AWS_SECRET_ACCESS_KEY'),
+            'TAP_S3_CSV_SOURCE_BUCKET': os.environ.get('TAP_S3_CSV_SOURCE_BUCKET'),
         }
 
         return env
@@ -79,6 +82,8 @@ class TestE2E(object):
 
     def clean_target_postgres(self):
         """Clean postgres_dwh"""
+        conn = None
+        cur = None
         try:
             conn = psycopg2.connect(host=self.env['DB_TARGET_POSTGRES_HOST'],
                                     port=self.env['DB_TARGET_POSTGRES_PORT'],
@@ -96,8 +101,11 @@ class TestE2E(object):
             cur.execute("DROP GROUP IF EXISTS group1;")
             cur.execute("CREATE GROUP group1;")
         finally:
-            cur.close()
-            conn.close()
+            if cur is not None:
+                cur.close()
+
+            if conn is not None:
+                conn.close()
 
     def run_command(self, command):
         """Run shell command and return returncode, stdout and stderr"""
@@ -189,6 +197,26 @@ class TestE2E(object):
         """Replicate data from Postgres to Snowflake, check if return code is zero and success log file created"""
 
         tap_name = 'postgres_source_sf'
+        target_name = 'snowflake'
+
+        # Run tap first time - fastsync should be triggered
+        [rc, stdout, stderr] = self.run_command("pipelinewise run_tap --tap {} --target {}".format(tap_name,
+                                                                                                   target_name))
+        log_file = self.find_run_tap_log_file(stdout, 'fastsync')
+        self.assert_command_success(rc, stdout, stderr, log_file)
+
+        # Run tap second time - singer should be triggered and state message should be emitted
+        [rc, stdout, stderr] = self.run_command("pipelinewise run_tap --tap {} --target {}".format(tap_name,
+                                                                                                   target_name))
+        log_file = self.find_run_tap_log_file(stdout, 'singer')
+        self.assert_command_success(rc, stdout, stderr, log_file)
+        self.assert_state_file_valid(target_name, tap_name, log_file)
+
+    @pytest.mark.dependency(depends=["import_config"])
+    def test_replicate_s3_to_snowflake(self):
+        """Replicate csv files from s3 to Snowflake, check if return code is zero and success log file created"""
+
+        tap_name = 'csv_on_s3'
         target_name = 'snowflake'
 
         # Run tap first time - fastsync should be triggered

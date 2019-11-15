@@ -68,18 +68,22 @@ def get_tables_from_properties(properties):
 
     for stream in properties.get("streams", tables):
         metadata = stream.get("metadata", [])
-        table_name = stream.get("table_name")
+        table_name = stream.get("table_name", stream['stream'])
 
         table_meta = next((i for i in metadata if type(i) == dict and len(i.get("breadcrumb", [])) == 0), {}).get("metadata")
-        selected = table_meta.get("selected")
+        selected = table_meta.get("selected", False)
         schema_name = table_meta.get("schema-name")
         db_name = table_meta.get("database-name")
 
-        if table_name and selected:            
-            tables.append("{}.{}".format(
-                schema_name or db_name,
-                table_name
-            ))
+        if table_name and selected:
+            if schema_name is not None or db_name is not None:
+                tables.append("{}.{}".format(
+                    schema_name or db_name,
+                    table_name
+                ))
+            else:
+                # Some tap types don't have db name nor schema name
+                tables.append(table_name)
 
     return tables
 
@@ -93,7 +97,7 @@ def get_bookmark_for_table(table, properties, db_engine, dbname=None):
     # Find table from properties and get bookmark based on replication method
     for stream in properties.get("streams", []):
         metadata = stream.get("metadata", [])
-        table_name = stream.get("table_name")
+        table_name = stream.get("table_name", stream['stream'])
 
         # Get table specific metadata i.e. replication method, replication key, etc.
         table_meta = next((i for i in metadata if type(i) == dict and len(i.get("breadcrumb", [])) == 0), {}).get("metadata")
@@ -102,7 +106,9 @@ def get_bookmark_for_table(table, properties, db_engine, dbname=None):
         replication_method = table_meta.get("replication-method")
         replication_key = table_meta.get("replication-key")
 
-        fully_qualified_table_name = "{}.{}".format(schema_name or db_name, table_name)
+        fully_qualified_table_name = "{}.{}".format(schema_name or db_name, table_name) \
+            if schema_name is not None or db_name is not None else table_name
+
         if (dbname is None or db_name == dbname) and fully_qualified_table_name == table:
             # Log based replication: get mysql binlog position
             if replication_method == "LOG_BASED":
@@ -220,8 +226,10 @@ def save_state_file(path, table, bookmark, dbname=None):
     table_dict = tablename_to_dict(table)
     if dbname:
         stream_id = "{}-{}-{}".format(dbname, table_dict.get('schema_name'), table_dict.get('table_name'))
+    elif table_dict['schema_name']:
+        stream_id = "{}-{}".format(table_dict['schema_name'], table_dict.get('table_name'))
     else:
-        stream_id = "{}-{}".format(table_dict.get('schema_name'), table_dict.get('table_name'))
+        stream_id = table_dict['table_name']
 
     # Do nothing if state path not defined
     if not path:
@@ -294,18 +302,23 @@ def parse_args(required_config_keys):
     args = parser.parse_args()
     if args.tap:
         args.tap = load_json(args.tap)
+
     if args.properties:
         args.properties = load_json(args.properties)
+
     if args.target:
         args.target = load_json(args.target)
+
     if args.transform:
         args.transform = load_json(args.transform)
     else:
         args.transform = {}
+
     if args.tables:
         args.tables = args.tables.split(',')
     else:
         args.tables = get_tables_from_properties(args.properties)
+
     if args.export_dir:
         args.export_dir = args.export_dir
     else:
@@ -315,4 +328,3 @@ def parse_args(required_config_keys):
     check_config(args.target, required_config_keys['target'])
 
     return args
-
