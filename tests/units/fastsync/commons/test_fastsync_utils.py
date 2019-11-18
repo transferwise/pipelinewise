@@ -1,7 +1,6 @@
 import os
 import pytest
 from unittest import TestCase
-from datetime import datetime
 from pipelinewise.fastsync.commons import utils
 
 RESOURCES_DIR = "{}/resources".format(os.path.dirname(__file__))

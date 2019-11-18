@@ -104,9 +104,8 @@ def sync_table(table_name, args):
         utils.grant_privilege(target_schema, grantees, snowflake.grant_select_on_schema)
 
     except Exception as exc:
-        raise exc
-        # utils.log("CRITICAL: {}".format(exc))
-        # return "{}: {}".format(table_name, exc)
+        utils.log("CRITICAL: {}".format(exc))
+        return "{}: {}".format(table_name, exc)
 
 
 def main_impl():
