@@ -2,6 +2,7 @@ import csv, sys, gzip, re
 
 import backoff
 import boto3
+from argparse import Namespace
 
 from .utils import log
 
@@ -45,13 +46,13 @@ class FastSyncTapS3Csv:
     def _find_table_spec_by_name(self, tap_config: Dict, table_name: str) -> Dict:
         return next(filter(lambda x: x['table_name'] == table_name, tap_config['tables']))
 
-    def copy_table(self, config: Dict, table_name: str, file_path: str) -> None:
+    def copy_table(self, table_name: str, file_path: str) -> None:
 
-        table_spec = self._find_table_spec_by_name(config, table_name)
+        table_spec = self._find_table_spec_by_name(self.connection_config, table_name)
 
-        modified_since = strptime_with_tz(config['start_date'])
+        modified_since = strptime_with_tz(self.connection_config['start_date'])
 
-        s3_files = S3Helper.get_input_files_for_table(config, table_spec, modified_since)
+        s3_files = S3Helper.get_input_files_for_table(self.connection_config, table_spec, modified_since)
 
         records = []
         headers = set()
@@ -59,7 +60,7 @@ class FastSyncTapS3Csv:
         max_last_modified = None
 
         for s3_file in s3_files:
-            self._get_file_records(config, s3_file['key'], table_spec, records, headers)
+            self._get_file_records(self.connection_config, s3_file['key'], table_spec, records, headers)
             if max_last_modified is None or max_last_modified < s3_file['last_modified']:
                 max_last_modified = s3_file['last_modified']
 
@@ -116,7 +117,7 @@ class FastSyncTapS3Csv:
             records_copied += 1
 
 
-    def map_column_types_to_target(self, filepath: str):
+    def map_column_types_to_target(self, filepath: str, table: str):
 
         csv_columns = self._get_table_columns(filepath)
 
@@ -125,7 +126,7 @@ class FastSyncTapS3Csv:
 
         return {
             "columns": mapped_columns,
-            "primary_key": None
+            "primary_key": self._get_primary_keys(table)
         }
 
     def _get_table_columns(self, table_name: str):
@@ -148,6 +149,15 @@ class FastSyncTapS3Csv:
         return {
             replication_key: self.tables_last_modified[table].isoformat()
         } if table in self.tables_last_modified else {}
+
+    def _get_primary_keys(self, table_name: str):
+        for table_o in self.connection_config['tables']:
+            if table_o['table_name'] == table_name:
+                if table_o.get('key_properties', False):
+                    return ','.join(table_o['key_properties'])
+                break
+
+        return None
 
 
 class S3Helper:

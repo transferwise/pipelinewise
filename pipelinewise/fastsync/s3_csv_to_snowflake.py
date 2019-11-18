@@ -62,8 +62,8 @@ def sync_table(table_name, args):
 
         target_schema = utils.get_target_schema(args.target, table_name)
 
-        s3_csv.copy_table(args.tap, table_name, filepath)
-        snowflake_types = s3_csv.map_column_types_to_target(filepath)
+        s3_csv.copy_table(table_name, filepath)
+        snowflake_types = s3_csv.map_column_types_to_target(filepath, table_name)
         snowflake_columns = snowflake_types.get("columns", [])
         primary_key = snowflake_types["primary_key"]
 
@@ -93,7 +93,6 @@ def sync_table(table_name, args):
         # Lock to ensure that only one process writes the same state file at a time
         lock.acquire()
         try:
-            print(table_name, bookmark)
             utils.save_state_file(args.state, table_name, bookmark)
         finally:
             lock.release()
@@ -102,6 +101,8 @@ def sync_table(table_name, args):
         grantees = utils.get_grantees(args.target, table_name)
         utils.grant_privilege(target_schema, grantees, snowflake.grant_usage_on_schema)
         utils.grant_privilege(target_schema, grantees, snowflake.grant_select_on_schema)
+
+        return True
 
     except Exception as exc:
         utils.log("CRITICAL: {}".format(exc))
@@ -131,7 +132,8 @@ def main_impl():
     # Start loading tables in parallel in spawning processes by
     # utilising all available CPU cores
     with multiprocessing.Pool(cpu_cores) as p:
-        table_sync_excs = list(filter(None, p.map(partial(sync_table, args=args), args.tables)))
+        table_sync_excs = list(filter(lambda x: not isinstance(x, bool),
+                                      p.map(partial(sync_table, args=args), args.tables)))
 
     # Refresh information_schema columns cache
     snowflake = FastSyncTargetSnowflake(args.target, args.transform)
