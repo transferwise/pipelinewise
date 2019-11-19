@@ -56,10 +56,13 @@ def tap_type_to_target_type(mysql_type, mysql_column_type):
         'longtext':'CHARACTER VARYING({})'.format(LONG_VARCHAR_LENGTH),
         'enum':'CHARACTER VARYING({})'.format(DEFAULT_VARCHAR_LENGTH),
         'int':'NUMERIC NULL',
+        'integer':'NUMERIC NULL',
         'tinyint':'BOOLEAN' if mysql_column_type == 'tinyint(1)' else 'NUMERIC NULL',
         'smallint':'NUMERIC NULL',
+        'mediumint':'NUMERIC NULL',
         'bigint':'NUMERIC NULL',
         'bit':'BOOLEAN',
+        'dec':'FLOAT',
         'decimal':'FLOAT',
         'double':'FLOAT',
         'float':'FLOAT',
@@ -68,6 +71,7 @@ def tap_type_to_target_type(mysql_type, mysql_column_type):
         'date':'TIMESTAMP WITHOUT TIME ZONE',
         'datetime':'TIMESTAMP WITHOUT TIME ZONE',
         'timestamp':'TIMESTAMP WITHOUT TIME ZONE',
+        'year':'NUMERIC NULL',
     }.get(mysql_type, 'CHARACTER VARYING({})'.format(DEFAULT_VARCHAR_LENGTH),)
 
 
