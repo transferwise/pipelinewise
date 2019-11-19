@@ -54,10 +54,13 @@ def tap_type_to_target_type(mysql_type, mysql_column_type):
         'longtext':'VARCHAR',
         'enum':'VARCHAR',
         'int':'NUMBER',
+        'integer':'NUMBER',
         'tinyint':'BOOLEAN' if mysql_column_type == 'tinyint(1)' else 'NUMBER',
         'smallint':'NUMBER',
+        'mediumint':'NUMBER',
         'bigint':'NUMBER',
         'bit':'BOOLEAN',
+        'dec':'FLOAT',
         'decimal':'FLOAT',
         'double':'FLOAT',
         'float':'FLOAT',
@@ -66,6 +69,7 @@ def tap_type_to_target_type(mysql_type, mysql_column_type):
         'date':'TIMESTAMP_NTZ',
         'datetime':'TIMESTAMP_NTZ',
         'timestamp':'TIMESTAMP_NTZ',
+        'year':'NUMBER',
     }.get(mysql_type, 'VARCHAR')
 
 
