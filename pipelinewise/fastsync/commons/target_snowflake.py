@@ -210,7 +210,8 @@ class FastSyncTargetSnowflake:
                 if table_dict['schema_name'] is not None else table_dict['table_name']
 
             if t.get('tap_stream_name') == tap_stream_name_by_table_name:
-                column = t.get('field_id')
+                # use safe field id in case the column to transform is has a name of a reserved word
+                column = t.get('safe_field_id')
                 transform_type = t.get('type')
                 if transform_type == 'SET-NULL':
                     trans_cols.append("{} = NULL".format(column))

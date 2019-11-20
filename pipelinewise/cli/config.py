@@ -2,6 +2,7 @@ import os
 import sys
 import logging
 
+from pipelinewise.fastsync.commons.utils import safe_column_name
 from . import utils
 
 
@@ -17,7 +18,6 @@ class Config(object):
         self.config_path = os.path.join(self.config_dir, "config.json")
 
         self.targets = []
-
 
     @classmethod
     def from_yamls(cls, config_dir, yaml_dir=".", vault_secret=None):
@@ -63,7 +63,8 @@ class Config(object):
             tap_id = tap_data['id']
             target_id = tap_data['target']
             if target_id not in targets:
-                config.logger.error(f"Can't find the target with the ID \"{target_id}\" but it's referenced in {yaml_file}")
+                config.logger.error(
+                    f"Can't find the target with the ID \"{target_id}\" but it's referenced in {yaml_file}")
                 sys.exit(1)
 
             # Add generated extra keys that not available in the YAML
@@ -80,23 +81,20 @@ class Config(object):
 
         # Final structure is ready
         config.targets = targets
-        
-        return config
 
+        return config
 
     def get_target_dir(self, target_id):
         '''
         Returns the absolute path of a target configuration directory
-        ''' 
+        '''
         return os.path.join(self.config_dir, target_id)
-
 
     def get_tap_dir(self, target_id, tap_id):
         '''
         Returns the absolute path of a tap configuration directory 
-        ''' 
+        '''
         return os.path.join(self.config_dir, target_id, tap_id)
-
 
     def get_connector_files(self, connector_dir):
         '''
@@ -111,7 +109,6 @@ class Config(object):
             'selection': os.path.join(connector_dir, 'selection.json'),
         }
 
-
     def save(self):
         '''
         Generating pipelinewise configuration directory layout on the disk.
@@ -119,7 +116,7 @@ class Config(object):
         The pipelinewise configuration is a group of JSON files organised
         into a common directory structure and usually deployed into
         ~/.pipelinewise
-        ''' 
+        '''
         self.logger.info("SAVING CONFIG")
         self.save_main_config_json()
 
@@ -132,7 +129,6 @@ class Config(object):
             for i, tap in enumerate(target['taps']):
                 extra_config_keys = utils.get_tap_extra_config_keys(tap)
                 self.save_tap_jsons(target, tap, extra_config_keys)
-
 
     def save_main_config_json(self):
         '''
@@ -174,12 +170,11 @@ class Config(object):
         # Save to JSON
         utils.save_json(main_config, self.config_path)
 
-
     def save_target_jsons(self, target):
-        '''
+        """
         Generating JSON config files for a singer target connector:
             1. config.json             :(Singer spec):  Tap connection details
-        '''
+        """
         target_dir = self.get_target_dir(target.get('id'))
         target_config_path = os.path.join(target_dir, "config.json")
         self.logger.info(f"SAVING TARGET JSONS to {target_config_path}")
@@ -190,7 +185,6 @@ class Config(object):
 
         # Save target config.json
         utils.save_json(target.get('db_conn'), target_config_path)
-
 
     def save_tap_jsons(self, target, tap, extra_config_keys={}):
         '''
@@ -254,8 +248,11 @@ class Config(object):
                 for trans in table.get('transformations', []):
                     transformations.append({
                         "tap_stream_name": utils.get_tap_stream_name(tap, tap_dbname, schema_name, table_name),
-                        "field_id": trans.get('column'),
-                        "type": trans.get('type'),
+                        "field_id": trans['column'],
+                        # Make column name safe by wrapping it in quotes, it's useful when a field_id is a reserved word
+                        # to be used by target snowflake in fastsync
+                        "safe_field_id": safe_column_name(trans['column']),
+                        "type": trans['type'],
                         "when": trans.get('when')
                     })
         tap_transformation = {
@@ -310,14 +307,15 @@ class Config(object):
             #
             # We can load the original object represented as JSON or string (data flattening off) or we can
             # flatten the schema and data by creating columns automatically. When 'data_flattening_max_level'
-            # is set to 0 then flattenning functionality is turned off.
+            # is set to 0 then flattening functionality is turned off.
             #
-            # The value can be set in mutliple place and evaluated in the following order:
+            #  The value can be set in mutliple place and evaluated in the following order:
             # ------------
             #   1: First we try to find it in the tap YAML
             #   2: Second we try to get the tap type specific default value
-            #   3: Othwerise we set flattening level to 0 (disabled)
-            "data_flattening_max_level": tap.get('data_flattening_max_level', utils.get_tap_property(tap, 'default_data_flattening_max_level') or 0)
+            #   3: Otherwise we set flattening level to 0 (disabled)
+            "data_flattening_max_level": tap.get('data_flattening_max_level',
+                                                 utils.get_tap_property(tap, 'default_data_flattening_max_level') or 0)
         })
 
         # Save the generated JSON files
