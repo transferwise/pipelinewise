@@ -4,7 +4,7 @@ import backoff
 import boto3
 from argparse import Namespace
 
-from .utils import log
+from .utils import log, safe_column_name
 
 from datetime import datetime
 from typing import Callable, Dict, Set, List, Optional
@@ -76,7 +76,8 @@ class FastSyncTapS3Csv:
             writer.writeheader()
             writer.writerows(records)
 
-    def _get_file_records(self, config: Dict, s3_path: str, table_spec: Dict, records: List[Dict], headers: Set) -> None:
+    def _get_file_records(self, config: Dict, s3_path: str, table_spec: Dict, records: List[Dict],
+                          headers: Set) -> None:
 
         bucket = config['bucket']
 
@@ -101,21 +102,22 @@ class FastSyncTapS3Csv:
             custom_columns = {
                 S3Helper.SDC_SOURCE_BUCKET_COLUMN: bucket,
                 S3Helper.SDC_SOURCE_FILE_COLUMN: s3_path,
-
-                # index zero, +1 for header row
                 S3Helper.SDC_SOURCE_LINENO_COLUMN: records_copied + 1,
                 '_SDC_EXTRACTED_AT': now_datetime,
                 '_SDC_BATCHED_AT': now_datetime,
                 '_SDC_DELETED_AT': None
             }
 
-            record = {**row, **custom_columns}
+            new_row = {}
+            for k, v in row.items():
+                new_row[safe_column_name(k)] = v
+
+            record = {**new_row, **custom_columns}
 
             records.append(record)
             headers.update(record.keys())
 
             records_copied += 1
-
 
     def map_column_types_to_target(self, filepath: str, table: str):
 
@@ -129,8 +131,14 @@ class FastSyncTapS3Csv:
             "primary_key": self._get_primary_keys(table)
         }
 
-    def _get_table_columns(self, table_name: str):
-        with gzip.open(table_name, 'rb') as f:
+    def _get_table_columns(self, csv_file_path: str) -> zip:
+        """
+        Read the csv file and tries to guess the the type of each column using messytables library.
+        The type can be 'Integer', 'Decimal', 'String' or 'Bool'
+        :param csv_file_path: path to the csv file with content in it
+        :return: a Zip object where each tuple has two elements: the first is the column name and the second is the type
+        """
+        with gzip.open(csv_file_path, 'rb') as f:
             table_set = CSVTableSet(f)
 
             row_set = table_set.tables[0]
@@ -143,18 +151,31 @@ class FastSyncTapS3Csv:
             types = type_guess(row_set.sample, strict=True)
             return zip(headers, types)
 
-    def fetch_current_incremental_key_pos(self, table: str, replication_key: Optional[str]='modified_since'):
+    def fetch_current_incremental_key_pos(self, table: str,
+                                          replication_key: Optional[str] = 'modified_since') -> Optional[Dict]:
+        """
+        Returns the last time a the table has been modified in ISO format.
+        :param table: table name
+        :param replication_key: Not needed as it's going to be overrided with `modified_since`
+        :return: Dict, e.g {'modified_since': '2019-11-01T07:50:06+00:00'} if the table exists, otherwise None
+        """
         replication_key = 'modified_since'
 
         return {
             replication_key: self.tables_last_modified[table].isoformat()
         } if table in self.tables_last_modified else {}
 
-    def _get_primary_keys(self, table_name: str):
+    def _get_primary_keys(self, table_name: str) -> Optional[str]:
+        """
+        Returns the primary keys specified in the tap config by key_properties
+        The keys are made safe by wrapping them in quotes in case one or more are reserved words.
+        :param table_name: table name
+        :return: the keys concatenated and separated by comma if keys are given, otherwise None
+        """
         for table_o in self.connection_config['tables']:
             if table_o['table_name'] == table_name:
                 if table_o.get('key_properties', False):
-                    return ','.join(table_o['key_properties'])
+                    return ','.join({safe_column_name(k) for k in table_o['key_properties']})
                 break
 
         return None

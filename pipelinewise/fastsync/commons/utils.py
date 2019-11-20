@@ -70,7 +70,8 @@ def get_tables_from_properties(properties):
         metadata = stream.get("metadata", [])
         table_name = stream.get("table_name", stream['stream'])
 
-        table_meta = next((i for i in metadata if type(i) == dict and len(i.get("breadcrumb", [])) == 0), {}).get("metadata")
+        table_meta = next((i for i in metadata if type(i) == dict and len(i.get("breadcrumb", [])) == 0), {}).get(
+            "metadata")
         selected = table_meta.get("selected", False)
         schema_name = table_meta.get("schema-name")
         db_name = table_meta.get("database-name")
@@ -100,7 +101,8 @@ def get_bookmark_for_table(table, properties, db_engine, dbname=None):
         table_name = stream.get("table_name", stream['stream'])
 
         # Get table specific metadata i.e. replication method, replication key, etc.
-        table_meta = next((i for i in metadata if type(i) == dict and len(i.get("breadcrumb", [])) == 0), {}).get("metadata")
+        table_meta = next((i for i in metadata if type(i) == dict and len(i.get("breadcrumb", [])) == 0), {}).get(
+            "metadata")
         db_name = table_meta.get("database-name")
         schema_name = table_meta.get("schema-name")
         replication_method = table_meta.get("replication-method")
@@ -149,7 +151,9 @@ def get_target_schema(target_config, table):
         target_schema = config_default_target_schema
 
     if not target_schema:
-        raise Exception("Target schema name not defined in config. Neither 'default_target_schema' (string) nor 'schema_mapping' (object) defines target schema for {} stream.".format(table))
+        raise Exception(
+            "Target schema name not defined in config. Neither 'default_target_schema' (string) nor 'schema_mapping' (object) defines target schema for {} stream.".format(
+                table))
 
     return target_schema
 
@@ -328,3 +332,7 @@ def parse_args(required_config_keys):
     check_config(args.target, required_config_keys['target'])
 
     return args
+
+
+def safe_column_name(name):
+    return f'"{name.upper()}"'

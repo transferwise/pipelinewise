@@ -54,6 +54,8 @@ schemas:
         transformations:
           - column: "email"
             type: "HASH"
+          - column: "group"
+            type: "HASH"
 
       - table_name: "countries"
         s3_csv_mapping:

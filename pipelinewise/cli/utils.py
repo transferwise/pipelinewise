@@ -365,9 +365,9 @@ def extract_log_attributes(log_file):
 
 
 def get_tap_property(tap, property_key):
-    '''
+    """
     Get a tap specific property value
-    '''
+    """
     tap_props_inst = tap_properties.get_tap_properties(tap)
     tap_props = tap_props_inst.get(tap.get('type'), tap_props_inst.get('DEFAULT', {}))
 
@@ -375,12 +375,12 @@ def get_tap_property(tap, property_key):
 
 
 def get_tap_property_by_tap_type(tap_type, property_key):
-    '''
+    """
     Get a tap specific property value by a tap type.
 
     Some attributes cannot derived only by tap type. These
     properties might not be returned as expected.
-    '''
+    """
     tap_props_inst = tap_properties.get_tap_properties()
     tap_props = tap_props_inst.get(tap_type, tap_props_inst.get('DEFAULT', {}))
 
@@ -388,19 +388,17 @@ def get_tap_property_by_tap_type(tap_type, property_key):
 
 
 def get_tap_extra_config_keys(tap):
-    '''
-    '''
     return get_tap_property(tap, 'tap_config_extras')
 
 
 def get_tap_stream_id(tap, database_name, schema_name, table_name):
-    '''
+    """
     Generate tap_stream_id in the same format as a specific
     tap generating it. They are not consistent.
 
     Stream id is the string that tha tap's discovery mode puts
     into the properties.json file
-    '''
+    """
     pattern = get_tap_property(tap, 'tap_stream_id_pattern')
 
     return pattern \
@@ -410,13 +408,13 @@ def get_tap_stream_id(tap, database_name, schema_name, table_name):
 
 
 def get_tap_stream_name(tap, database_name, schema_name, table_name):
-    '''
+    """
     Generate tap_stream_name in the same format as a specific
     tap generating it. They are not consistent.
 
     Stream name is the string that the tap puts into the output
     singer messages
-    '''
+    """
     pattern = get_tap_property(tap, 'tap_stream_name_pattern')
 
     return pattern \
