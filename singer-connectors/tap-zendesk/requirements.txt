@@ -1,1 +1,1 @@
-tap-zendesk-parallel==1.4.7
+pipelinewise-tap-zendesk==1.0.0
