@@ -36,9 +36,9 @@ class FastSyncTapS3Csv:
         self.tap_type_to_target_type = tap_type_to_target_type
         self.tables_last_modified = {}
 
-    def _find_table_spec_by_name(self, tap_config: Dict, table_name: str) -> Dict:
+    def _find_table_spec_by_name(self, table_name: str) -> Dict:
         # look in tables array for the full specs dict of given table
-        return next(filter(lambda x: x['table_name'] == table_name, tap_config['tables']))
+        return next(filter(lambda x: x['table_name'] == table_name, self.connection_config['tables']))
 
     def copy_table(self, table_name: str, file_path: str) -> None:
         """
@@ -51,7 +51,7 @@ class FastSyncTapS3Csv:
             raise Exception(f'Invalid file path: {file_path}')
 
         # find the specs of the table: search_pattern, key_properties ... etc
-        table_spec = self._find_table_spec_by_name(self.connection_config, table_name)
+        table_spec = self._find_table_spec_by_name(table_name)
 
         # extract the start_date from the specs
         modified_since = strptime_with_tz(self.connection_config['start_date'])
@@ -71,7 +71,7 @@ class FastSyncTapS3Csv:
         for s3_file in s3_files:
 
             # this function will add records to the `records` list passed to it and add to the `headers` set as well
-            self._get_file_records(self.connection_config, s3_file['key'], table_spec, records, headers)
+            self._get_file_records(s3_file['key'], table_spec, records, headers)
 
             # check if the current file has the most recent modification date
             if max_last_modified is None or max_last_modified < s3_file['last_modified']:
@@ -84,7 +84,8 @@ class FastSyncTapS3Csv:
         with gzip.open(file_path, 'wt') as gzfile:
 
             writer = csv.DictWriter(gzfile,
-                                    fieldnames=sorted(list(headers)), # we need to sort the headers so that copying into snowflake works
+                                    fieldnames=sorted(list(headers)),
+                                    # we need to sort the headers so that copying into snowflake works
                                     delimiter=',',
                                     quotechar='"',
                                     quoting=csv.QUOTE_MINIMAL)
@@ -93,9 +94,7 @@ class FastSyncTapS3Csv:
             # write all records at once
             writer.writerows(records)
 
-
-    def _get_file_records(self, config: Dict, s3_path: str, table_spec: Dict, records: List[Dict],
-                          headers: Set) -> None:
+    def _get_file_records(self, s3_path: str, table_spec: Dict, records: List[Dict], headers: Set) -> None:
         """
         Reads the file in s3_path and inserts the rows in records
         :param config: tap connection configuration
@@ -105,9 +104,9 @@ class FastSyncTapS3Csv:
         :param headers: set to update with any new column names
         :return: None
         """
-        bucket = config['bucket']
+        bucket = self.connection_config['bucket']
 
-        s3_file_handle = S3Helper.get_file_handle(config, s3_path)
+        s3_file_handle = S3Helper.get_file_handle(self.connection_config, s3_path)
 
         # We observed data whose field size exceeded the default maximum of
         # 131072. We believe the primary consequence of the following setting
@@ -176,7 +175,7 @@ class FastSyncTapS3Csv:
 
             row_set.register_processor(offset_processor(offset + 1))
 
-            types = type_guess(row_set.sample, strict=True)
+            types = [str(t) for t in type_guess(row_set.sample, strict=True)]
             return zip(headers, types)
 
     def fetch_current_incremental_key_pos(self, table: str,
@@ -207,6 +206,7 @@ class FastSyncTapS3Csv:
                 break
 
         return None
+
 
 # Majority of the code in the class below (S3Helper) is from
 # pipelinewise-tap-s3-csv since all AWS S3 operations don't need to change
