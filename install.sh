@@ -50,6 +50,11 @@ check_license() {
     fi
 }
 
+clean_virtualenvs() {
+    echo "Cleaning previous installations in $VENV_DIR"
+    rm -rf $VENV_DIR
+}
+
 make_virtualenv() {
     echo "Making Virtual Environment for [$1] in $VENV_DIR"
     python3 -m venv $VENV_DIR/$1
@@ -131,6 +136,11 @@ for arg in "$@"; do
         --connectors=*)
             CONNECTORS="${arg#*=}"
             shift
+            ;;
+        # Clean previous installation
+        --clean)
+            clean_virtualenvs
+            exit 0
             ;;
         *)
             echo "Invalid argument: $arg"
