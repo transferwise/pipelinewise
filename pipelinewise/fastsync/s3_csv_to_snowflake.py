@@ -6,8 +6,10 @@ import time
 
 import multiprocessing
 
+from typing import Union
 from datetime import datetime
 from functools import partial
+from argparse import Namespace
 
 from .commons import utils
 from .commons.tap_s3_csv import FastSyncTapS3Csv
@@ -49,20 +51,20 @@ def tap_type_to_target_type(csv_type):
     }.get(csv_type, 'VARCHAR')
 
 
-def sync_table(table_name, args):
+def sync_table(table_name: str, args: Namespace)->Union[bool, str]:
 
     s3_csv = FastSyncTapS3Csv(args.tap, tap_type_to_target_type)
     snowflake =  FastSyncTargetSnowflake(args.target, args.transform)
 
     try:
-        filename = "pipelinewise_fastsync_{}_{}_{}.csv.gz".format(args.tap['bucket'],
-                                                                  table_name,
+        filename = "pipelinewise_fastsync_{}_{}_{}.csv.gz".format(args.tap['bucket'], table_name,
                                                                   time.strftime("%Y%m%d-%H%M%S"))
         filepath = os.path.join(args.export_dir, filename)
 
         target_schema = utils.get_target_schema(args.target, table_name)
 
         s3_csv.copy_table(table_name, filepath)
+
         snowflake_types = s3_csv.map_column_types_to_target(filepath, table_name)
         snowflake_columns = snowflake_types.get("columns", [])
         primary_key = snowflake_types["primary_key"]
@@ -105,8 +107,8 @@ def sync_table(table_name, args):
         return True
 
     except Exception as exc:
-        utils.log("CRITICAL: {}".format(exc))
-        return "{}: {}".format(table_name, exc)
+        utils.log(f"CRITICAL: {exc}")
+        return f"{table_name}: {exc}"
 
 
 def main_impl():

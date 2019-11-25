@@ -1,42 +1,35 @@
-import csv, sys, gzip, re
-
-import backoff
+import csv
+import sys
+import gzip
+import re
 import boto3
-from argparse import Namespace
-
-from .utils import log, safe_column_name
 
 from datetime import datetime
+from time import struct_time
 from typing import Callable, Dict, Set, List, Optional
 from singer_encodings import csv as singer_encodings_csv
 from singer.utils import strptime_with_tz
-from time import struct_time
 from botocore.credentials import DeferredRefreshableCredentials
 from messytables import CSVTableSet, headers_guess, headers_processor, offset_processor, type_guess
-from botocore.exceptions import ClientError
 
-
-def retry_pattern():
-    return backoff.on_exception(backoff.expo,
-                                ClientError,
-                                max_tries=5,
-                                on_backoff=log_backoff_attempt,
-                                factor=10)
-
-
-def log_backoff_attempt(details):
-    log(f"Error detected communicating with Amazon, triggering backoff: {details.get('tries')} try")
+from .utils import log, safe_column_name, retry_pattern
 
 
 class FastSyncTapS3Csv:
 
     def __init__(self, connection_config: Dict, tap_type_to_target_type: Callable):
-
+        """
+        Constructor
+        :param connection_config: tap connection config
+        :param tap_type_to_target_type: callable that maps a tap type to target type
+        """
         try:
+            # Check if bucket can be accessed without credentials/assuming role
             list(S3Helper.list_files_in_bucket(connection_config['bucket'],
                                                connection_config.get('aws_endpoint_url', None)))
             log("I have direct access to the bucket without assuming the configured role.")
         except:
+            # Setup AWS session
             S3Helper.setup_aws_client(connection_config)
 
         self.connection_config = connection_config
@@ -44,41 +37,74 @@ class FastSyncTapS3Csv:
         self.tables_last_modified = {}
 
     def _find_table_spec_by_name(self, tap_config: Dict, table_name: str) -> Dict:
+        # look in tables array for the full specs dict of given table
         return next(filter(lambda x: x['table_name'] == table_name, tap_config['tables']))
 
     def copy_table(self, table_name: str, file_path: str) -> None:
+        """
+        Copies data from all csv files that match the search_pattern and into the csv file in file_path
+        :param table_name: Name of the table
+        :param file_path: Path of the gzip compressed csv file into which data is copied
+        :return: None
+        """
+        if not re.match(r'^.+\.csv\.gz$', file_path):
+            raise Exception(f'Invalid file path: {file_path}')
 
+        # find the specs of the table: search_pattern, key_properties ... etc
         table_spec = self._find_table_spec_by_name(self.connection_config, table_name)
 
+        # extract the start_date from the specs
         modified_since = strptime_with_tz(self.connection_config['start_date'])
 
+        # get all the files in the bucket that match the criteria and were modified after start date
         s3_files = S3Helper.get_input_files_for_table(self.connection_config, table_spec, modified_since)
 
+        # variable to hold all the records from all matching files
         records = []
+        # variable to hold the set of column names from all matching files
         headers = set()
 
+        # given that there might be several files matching the search pattern
+        # we want to keep the most recent date one of them was modified to use it as state bookmark
         max_last_modified = None
 
         for s3_file in s3_files:
+
+            # this function will add records to the `records` list passed to it and add to the `headers` set as well
             self._get_file_records(self.connection_config, s3_file['key'], table_spec, records, headers)
+
+            # check if the current file has the most recent modification date
             if max_last_modified is None or max_last_modified < s3_file['last_modified']:
                 max_last_modified = s3_file['last_modified']
 
+        # add the found last modified date to the dictionary
         self.tables_last_modified[table_name] = max_last_modified
 
+        # write to the given compressed csv file
         with gzip.open(file_path, 'wt') as gzfile:
 
             writer = csv.DictWriter(gzfile,
-                                    fieldnames=sorted(list(headers)),
+                                    fieldnames=sorted(list(headers)), # we need to sort the headers so that copying into snowflake works
                                     delimiter=',',
                                     quotechar='"',
                                     quoting=csv.QUOTE_MINIMAL)
+            # write the header
             writer.writeheader()
+            # write all records at once
             writer.writerows(records)
+
 
     def _get_file_records(self, config: Dict, s3_path: str, table_spec: Dict, records: List[Dict],
                           headers: Set) -> None:
-
+        """
+        Reads the file in s3_path and inserts the rows in records
+        :param config: tap connection configuration
+        :param s3_path: full path of file in S3 bucket
+        :param table_spec: dict of table with its specs
+        :param records: list into which to insert the rows from file
+        :param headers: set to update with any new column names
+        :return: None
+        """
         bucket = config['bucket']
 
         s3_file_handle = S3Helper.get_file_handle(config, s3_path)
@@ -109,6 +135,8 @@ class FastSyncTapS3Csv:
             }
 
             new_row = {}
+
+            # make all columns safe
             for k, v in row.items():
                 new_row[safe_column_name(k)] = v
 
@@ -180,7 +208,8 @@ class FastSyncTapS3Csv:
 
         return None
 
-
+# Majority of the code in the class below (S3Helper) is from
+# pipelinewise-tap-s3-csv since all AWS S3 operations don't need to change
 class S3Helper:
     SDC_SOURCE_BUCKET_COLUMN = "_sdc_source_bucket"
     SDC_SOURCE_FILE_COLUMN = "_sdc_source_file"
@@ -211,9 +240,9 @@ class S3Helper:
     @classmethod
     def get_input_files_for_table(cls, config: Dict, table_spec: Dict, modified_since: struct_time = None):
         bucket = config['bucket']
-
         prefix = table_spec.get('search_prefix')
         pattern = table_spec['search_pattern']
+
         try:
             matcher = re.compile(pattern)
         except re.error as e:

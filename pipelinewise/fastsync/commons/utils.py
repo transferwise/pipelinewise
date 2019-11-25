@@ -336,3 +336,17 @@ def parse_args(required_config_keys):
 
 def safe_column_name(name):
     return f'"{name.upper()}"'
+
+
+def retry_pattern():
+    import backoff
+    from botocore.exceptions import ClientError
+
+    return backoff.on_exception(backoff.expo,
+                                ClientError,
+                                max_tries=5,
+                                on_backoff=log_backoff_attempt,
+                                factor=10)
+
+def log_backoff_attempt(details):
+    log(f"Error detected communicating with Amazon, triggering backoff: {details.get('tries')} try")
