@@ -48,7 +48,7 @@ class S3CsvToSnowflake(unittest.TestCase):
                         with patch('pipelinewise.fastsync.s3_csv_to_snowflake.os') as os_mock:
                             utils_mock.get_target_schema.return_value = 'my-target-schema'
                             fastsync_s3_csv_mock.return_value.map_column_types_to_target.return_value = {
-                                'columns': ['id INTEGER','is_test SMALLINT', 'age INTEGER', 'name VARCHAR'],
+                                'columns': ['id INTEGER', 'is_test SMALLINT', 'age INTEGER', 'name VARCHAR'],
                                 'primary_key': 'id,name'
                             }
 
@@ -88,7 +88,6 @@ class S3CsvToSnowflake(unittest.TestCase):
 
                         utils_mock.get_target_schema.assert_called_once()
                         fastsync_s3_csv_mock.return_value.copy_table.assert_called_once()
-
 
     def test_main_impl_with_all_tables_synced_successfully_should_exit_normally(self):
         # mocks prep
