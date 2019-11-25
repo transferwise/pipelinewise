@@ -13,7 +13,7 @@ RUN alien -i /app/oracle-instantclient.rpm --scripts && rm -rf /app/oracle-insta
 COPY . /app
 
 RUN cd /app \
-    && ./install.sh --acceptlicenses --nousage --notestextras \
+    && ./install.sh --connectors=all --acceptlicenses --nousage --notestextras \
     && ln -s /root/.pipelinewise /app/.pipelinewise
 
 ENTRYPOINT ["/app/entrypoint.sh"]
