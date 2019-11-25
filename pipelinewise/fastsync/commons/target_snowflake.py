@@ -211,7 +211,8 @@ class FastSyncTargetSnowflake:
 
             if t.get('tap_stream_name') == tap_stream_name_by_table_name:
                 # use safe field id in case the column to transform is has a name of a reserved word
-                column = t.get('safe_field_id')
+                # fallback to field_id if the safe id doesn't exist
+                column = t.get('safe_field_id', t.get('field_id'))
                 transform_type = t.get('type')
                 if transform_type == 'SET-NULL':
                     trans_cols.append("{} = NULL".format(column))
