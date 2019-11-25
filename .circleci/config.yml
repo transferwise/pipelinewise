@@ -64,7 +64,7 @@ jobs:
             ./tests/db/tap_postgres_db.sh
       - run:
           name: Installing PipelineWise components and connectors
-          command: ./install.sh --acceptlicenses
+          command: ./install.sh --connectors=all --acceptlicenses
       - run:
           name: Run tests
           command: |

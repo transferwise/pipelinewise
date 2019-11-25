@@ -154,7 +154,7 @@ cat $SRC_DIR/motd
 
 # Install PipelineWise core components
 cd $SRC_DIR
-echo make_virtualenv pipelinewise
+make_virtualenv pipelinewise
 
 # Set default and extra singer connectors
 DEFAULT_CONNECTORS=(
