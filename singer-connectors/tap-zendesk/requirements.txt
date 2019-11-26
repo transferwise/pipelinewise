@@ -1,1 +1,1 @@
-tap-zendesk==1.4.2
+pipelinewise-tap-zendesk==1.0.0

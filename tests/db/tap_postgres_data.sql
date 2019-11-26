@@ -47,7 +47,12 @@ insert into edgydata (ctimentz, ctimetz, cjson, cjsonb, cvarchar) values
     (null, null, E'[{"key": "Value\'s One", "actions": []},{"key": "Value\U00000027s Two", "actions": []}]',
         E'[{"key": "Value\'s One", "actions": []},{"key": "Value\U00000027s Two", "actions": []}]',
         E'[{"key": "Value\'s One", "actions": []},{"key": "Value\U00000027s Two", "actions": []}]'),
-    (null, null, null, null,'	')
+    (null, null, null, null,'	'),
+    (null, null, null, null,'Enter	The
+Ninja'),
+    (null, null, null, null,'Liewe
+Maatjies'),
+    (null, null, null, null,'Liewe	Maatjies')
 ;
 
 COMMIT;
