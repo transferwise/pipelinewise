@@ -94,7 +94,10 @@
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Installation</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#getting-pipelinewise">Getting PipelineWise</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#running-in-docker">Running in Docker</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#installing-from-source">Installing from source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#installing-from-source">Installing from source</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#selecting-singer-connectors">Selecting singer connectors</a></li>
+</ul>
+</li>
 <li class="toctree-l2"><a class="reference internal" href="#cool-what-s-next">Cool, what’s Next?</a></li>
 </ul>
 </li>
@@ -239,10 +242,10 @@ $ <span class="nb">cd</span> ./pipelinewise
 $ docker build -t pipelinewise:latest .
 </pre></div>
 </div>
-<p>Building the image may take 5-10 minutes depending on your network connection. At the moment
-there is no official, pre-built image available to download on DockerHub. Once the image is
-ready, create an alias to the docker wrapper script so you can use the <code class="docutils literal notranslate"><span class="pre">pipelinewise</span></code>
-executable commands everywhere on your system:</p>
+<p>Building the image may take 5-10 minutes depending on your network connection. The output image will
+contain every supporter singer connectors. At the moment there is no official, pre-built image available
+to download on DockerHub. Once the image is ready, create an alias to the docker wrapper script so you can
+use the <code class="docutils literal notranslate"><span class="pre">pipelinewise</span></code> executable commands everywhere on your system:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ <span class="nb">alias</span> <span class="nv">pipelinewise</span><span class="o">=</span><span class="s2">&quot;</span><span class="k">$(</span><span class="nb">pwd</span><span class="k">)</span><span class="s2">/bin/pipelinewise-docker&quot;</span>
 </pre></div>
 </div>
@@ -267,12 +270,12 @@ Tap ID    Tap Type      Target ID     Target Type      Enabled    Status    Last
 PipelineWise CLI and every supported singer connectors into separated virtual environments:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ git clone https://github.com/transferwise/pipelinewise.git
 $ <span class="nb">cd</span> ./pipelinewise
-$ ./install.sh
+$ ./install.sh --connectors<span class="o">=</span>all
 </pre></div>
 </div>
 <p>Press <code class="docutils literal notranslate"><span class="pre">Y</span></code> to accept the license agreement of the required singer components. To automate
 the installation and accept every license agreement run <code class="docutils literal notranslate"><span class="pre">./install</span> <span class="pre">--acceptlicenses</span></code>.</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ ./install.sh
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ ./install.sh --connectors<span class="o">=</span>all
 
 <span class="o">(</span>...installation usually takes <span class="m">5</span>-10 minutes...<span class="o">)</span>
 
@@ -288,6 +291,19 @@ To start CLI:
 --------------------------------------------------------------------------
 </pre></div>
 </div>
+<div class="section" id="selecting-singer-connectors">
+<h3>Selecting singer connectors<a class="headerlink" href="#selecting-singer-connectors" title="Permalink to this headline">¶</a></h3>
+<p>You can install PipelineWise only with required connectors by using the <cite>–connectors=</cite> argument. For example if you
+need to replicate data only from MySQL and PostgreSQL into a Snowflake database you can install PipelineWise by
+running:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ ./install.sh --connectors<span class="o">=</span>tap-mysql,tap-postgres,target-snowflake
+</pre></div>
+</div>
+<p>Here’s the list of the singer connectors and if they are installed by default or not:</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>When <cite>–connectors=</cite> argument is not specified then only the default connectors will be installed.</p>
+</div>
 <p>Once the install script finished, you will need to activate the virtual environment
 with the Command Line Tools and set the <code class="docutils literal notranslate"><span class="pre">PIPELINEWISE_HOME</span></code> environment variable
 as it is displayed above at the end of the install script:</p>
@@ -302,6 +318,7 @@ Tap ID    Tap Type    Target ID    Target Type    Enabled    Status    Last Sync
 </div>
 <p>If you see that above output saying that you have 0 pipeline in the system then the Installation
 was successful.</p>
+</div>
 </div>
 <div class="section" id="cool-what-s-next">
 <h2>Cool, what’s Next?<a class="headerlink" href="#cool-what-s-next" title="Permalink to this headline">¶</a></h2>
