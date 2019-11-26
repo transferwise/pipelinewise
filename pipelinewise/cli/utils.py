@@ -502,6 +502,6 @@ def run_command(command, log_file=None, line_callback=None):
         stderr = x[1].decode('utf-8')
 
         if rc != 0:
-          logger.error(stderr)
+            logger.error(stderr)
 
         return [rc, stdout, stderr]

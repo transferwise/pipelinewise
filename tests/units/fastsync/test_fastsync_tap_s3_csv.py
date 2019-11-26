@@ -182,7 +182,8 @@ class TestFastSyncTapS3Csv(TestCase):
         self.assertIn(self.fs_tap_s3_csv._get_primary_keys('table 4'), ['"KEY_2","KEY_3"', '"KEY_3","KEY_2"'])
 
     def test_get_table_columns(self):
-        output = list(self.fs_tap_s3_csv._get_table_columns(f'{os.path.dirname(__file__)}/commons/resources/dummy_data.csv.gz'))
+        output = list(self.fs_tap_s3_csv._get_table_columns(
+            f'{os.path.dirname(__file__)}/commons/resources/dummy_data.csv.gz'))
 
         self.assertListEqual([
             ('Region', 'String'),
@@ -202,7 +203,8 @@ class TestFastSyncTapS3Csv(TestCase):
         ], output)
 
     def test_map_column_types_to_target(self):
-        output = self.fs_tap_s3_csv.map_column_types_to_target(f'{os.path.dirname(__file__)}/commons/resources/dummy_data.csv.gz', 'table 1')
+        output = self.fs_tap_s3_csv.map_column_types_to_target(
+            f'{os.path.dirname(__file__)}/commons/resources/dummy_data.csv.gz', 'table 1')
 
         self.assertDictEqual({
             'columns': [
