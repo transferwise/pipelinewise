@@ -120,7 +120,7 @@ class FastSyncTapMySql:
                 SELECT column_name,
                     data_type,
                     column_type,
-                    CONCAT('REPLACE(', safe_sql_value, ', \'\n\', \' \')') safe_sql_value
+                    CONCAT("REPLACE(", safe_sql_value, ", '\n', ' ')") safe_sql_value
                 FROM (SELECT column_name,
                             data_type,
                             column_type,
@@ -182,20 +182,26 @@ class FastSyncTapMySql:
                                     quoting=csv.QUOTE_MINIMAL)
 
                 while True:
-                    rows = cur.fetchmany(export_batch_rows)
+                    try:
+                        rows = cur.fetchmany(export_batch_rows)
 
-                    # No more rows to fetch, stop loop
-                    if not rows:
-                        break
+                        # No more rows to fetch, stop loop
+                        if not rows:
+                            break
 
-                    # Log export status
-                    exported_rows += len(rows)
-                    if (len(rows) == export_batch_rows):
-                        #Then we believe this to be just an interim batch and not the final one so report on progress
-                        utils.log("Exporting batch from {} to {} rows from {}...".format((exported_rows-export_batch_rows),exported_rows, table_name))
+                        # Log export status
+                        exported_rows += len(rows)
+                        if (len(rows) == export_batch_rows):
+                            #Then we believe this to be just an interim batch and not the final one so report on progress
+                            utils.log("Exporting batch from {} to {} rows from {}...".format((exported_rows-export_batch_rows),exported_rows, table_name))
 
-                    # Write rows to file
-                    for row in rows:
-                        writer.writerow(row)
+                        # Write rows to file
+                        for row in rows:
+                            writer.writerow(row)
+                    except Exception as e:
+                        utils.log('Error happened.')
+                        utils.log(row)
+                        utils.log(str(e), type(e))
+                        raise e
 
                 utils.log("Exported total of {} rows from {}...".format(exported_rows, table_name))
