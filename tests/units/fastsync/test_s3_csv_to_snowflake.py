@@ -13,7 +13,7 @@ class S3CsvToSnowflake(unittest.TestCase):
     ##      tap_type_to_target_type
     #######################################
     def test_tap_type_to_target_type_with_defined_tap_type_returns_equivalent_target_type(self):
-        self.assertEqual('SMALLINT', tap_type_to_target_type('Bool'))
+        self.assertEqual('BOOLEAN', tap_type_to_target_type('Bool'))
 
     def test_tap_type_to_target_type_with_undefined_tap_type_returns_VARCHAR(self):
         self.assertEqual('VARCHAR', tap_type_to_target_type('random-type'))
