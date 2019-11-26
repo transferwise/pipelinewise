@@ -300,6 +300,101 @@ running:</p>
 </pre></div>
 </div>
 <p>Here’s the list of the singer connectors and if they are installed by default or not:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 20%" />
+<col style="width: 29%" />
+<col style="width: 24%" />
+<col style="width: 27%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><strong>Connector</strong></p></td>
+<td><p><strong>Install Command</strong></p></td>
+<td><p><strong>Included in default install?</strong></p></td>
+<td><p><strong>Note</strong></p></td>
+</tr>
+<tr class="row-even"><td><p>all</p></td>
+<td><p>./install –connectors=all</p></td>
+<td></td>
+<td><p>Installs every supported connector</p></td>
+</tr>
+<tr class="row-odd"><td><p>tap-adwords</p></td>
+<td><p>./install –connectors=tap-adwords</p></td>
+<td><p>NO</p></td>
+<td></td>
+</tr>
+<tr class="row-even"><td><p>tap-jira</p></td>
+<td><p>./install –connectors=tap-jira</p></td>
+<td><p>YES</p></td>
+<td></td>
+</tr>
+<tr class="row-odd"><td><p>tap-kafka</p></td>
+<td><p>./install –connectors=tap-kafka</p></td>
+<td><p>YES</p></td>
+<td></td>
+</tr>
+<tr class="row-even"><td><p>tap-mysql</p></td>
+<td><p>./install –connectors=tap-mysql</p></td>
+<td><p>YES</p></td>
+<td></td>
+</tr>
+<tr class="row-odd"><td><p>tap-oracle</p></td>
+<td><p>./install –connectors=tap-oracle</p></td>
+<td><p>NO</p></td>
+<td></td>
+</tr>
+<tr class="row-even"><td><p>tap-postgres</p></td>
+<td><p>./install –connectors=tap-postgres</p></td>
+<td><p>YES</p></td>
+<td></td>
+</tr>
+<tr class="row-odd"><td><p>tap-s3-csv</p></td>
+<td><p>./install –connectors=tap-s3-csv</p></td>
+<td><p>YES</p></td>
+<td></td>
+</tr>
+<tr class="row-even"><td><p>tap-salesforce</p></td>
+<td><p>./install –connectors=tap-salesforce</p></td>
+<td><p>YES</p></td>
+<td></td>
+</tr>
+<tr class="row-odd"><td><p>tap-snowflake</p></td>
+<td><p>./install –connectors=tap-snowflake</p></td>
+<td><p>YES</p></td>
+<td></td>
+</tr>
+<tr class="row-even"><td><p>tap-zendesk</p></td>
+<td><p>./install –connectors=tap-zendesk</p></td>
+<td><p>YES</p></td>
+<td></td>
+</tr>
+<tr class="row-odd"><td><p>target-postgres</p></td>
+<td><p>./install –connectors=target-postgres</p></td>
+<td><p>NO</p></td>
+<td></td>
+</tr>
+<tr class="row-even"><td><p>target-s3-csv</p></td>
+<td><p>./install –connectors=target-s3-csv</p></td>
+<td><p>YES</p></td>
+<td></td>
+</tr>
+<tr class="row-odd"><td><p>target-redshift</p></td>
+<td><p>./install –connectors=target-redshift</p></td>
+<td><p>YES</p></td>
+<td></td>
+</tr>
+<tr class="row-even"><td><p>target-snowflake</p></td>
+<td><p>./install –connectors=target-snowflake</p></td>
+<td><p>YES</p></td>
+<td></td>
+</tr>
+<tr class="row-odd"><td><p>transform-field</p></td>
+<td><p>./install –connectors=transform-field</p></td>
+<td><p>YES</p></td>
+<td></td>
+</tr>
+</tbody>
+</table>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
 <p>When <cite>–connectors=</cite> argument is not specified then only the default connectors will be installed.</p>
