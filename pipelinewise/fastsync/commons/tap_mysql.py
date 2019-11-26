@@ -120,7 +120,7 @@ class FastSyncTapMySql:
                 SELECT column_name,
                     data_type,
                     column_type,
-                    CONCAT("REPLACE(", safe_sql_value, ", '\n', ' ')") safe_sql_value
+                    CONCAT('REPLACE(', safe_sql_value, ', \'\n\', \' \')') safe_sql_value
                 FROM (SELECT column_name,
                             data_type,
                             column_type,
