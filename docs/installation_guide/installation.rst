@@ -57,10 +57,10 @@ executable docker image:
     $ docker build -t pipelinewise:latest .
 
 
-Building the image may take 5-10 minutes depending on your network connection. At the moment
-there is no official, pre-built image available to download on DockerHub. Once the image is
-ready, create an alias to the docker wrapper script so you can use the ``pipelinewise``
-executable commands everywhere on your system:
+Building the image may take 5-10 minutes depending on your network connection. The output image will
+contain every supporter singer connectors. At the moment there is no official, pre-built image available
+to download on DockerHub. Once the image is ready, create an alias to the docker wrapper script so you can
+use the ``pipelinewise`` executable commands everywhere on your system:
 
 .. code-block:: bash
 
@@ -98,14 +98,14 @@ PipelineWise CLI and every supported singer connectors into separated virtual en
 
     $ git clone https://github.com/transferwise/pipelinewise.git
     $ cd ./pipelinewise
-    $ ./install.sh
+    $ ./install.sh --connectors=all
 
 Press ``Y`` to accept the license agreement of the required singer components. To automate
 the installation and accept every license agreement run ``./install --acceptlicenses``.
 
 .. code-block:: bash
 
-    $ ./install.sh
+    $ ./install.sh --connectors=all
 
     (...installation usually takes 5-10 minutes...)
 
@@ -119,6 +119,60 @@ the installation and accept every license agreement run ``./install --acceptlice
       $ pipelinewise status
 
     --------------------------------------------------------------------------
+
+Selecting singer connectors
+'''''''''''''''''''''''''''
+
+You can install PipelineWise only with required connectors by using the `--connectors=` argument. For example if you
+need to replicate data only from MySQL and PostgreSQL into a Snowflake database you can install PipelineWise by
+running:
+
+.. code-block:: bash
+
+    $ ./install.sh --connectors=tap-mysql,tap-postgres,target-snowflake
+
+Here’s the list of the singer connectors and if they are installed by default or not:
+
++----------------------------+-----------------------------------------+----------------------------------+---------------------------------------+
+| **Connector**              | **Install Command**                     | **Included in default install?** | **Note**                              |
++----------------------------+-----------------------------------------+----------------------------------+---------------------------------------+
+| all                        | ./install --connectors=all              |                                  | Installs every supported connector    |
++----------------------------+-----------------------------------------+----------------------------------+---------------------------------------+
+| tap-adwords                | ./install --connectors=tap-adwords      | NO                                |                                       |
++----------------------------+-----------------------------------------+----------------------------------+---------------------------------------+
+| tap-jira                   | ./install --connectors=tap-jira         | YES                              |                                       |
++----------------------------+-----------------------------------------+----------------------------------+---------------------------------------+
+| tap-kafka                  | ./install --connectors=tap-kafka        | YES                              |                                       |
++----------------------------+-----------------------------------------+----------------------------------+---------------------------------------+
+| tap-mysql                  | ./install --connectors=tap-mysql        | YES                              |                                       |
++----------------------------+-----------------------------------------+----------------------------------+---------------------------------------+
+| tap-oracle                 | ./install --connectors=tap-oracle       | NO                                |                                       |
++----------------------------+-----------------------------------------+----------------------------------+---------------------------------------+
+| tap-postgres               | ./install --connectors=tap-postgres     | YES                              |                                       |
++----------------------------+-----------------------------------------+----------------------------------+---------------------------------------+
+| tap-s3-csv                 | ./install --connectors=tap-s3-csv       | YES                              |                                       |
++----------------------------+-----------------------------------------+----------------------------------+---------------------------------------+
+| tap-salesforce             | ./install --connectors=tap-salesforce   | YES                              |                                       |
++----------------------------+-----------------------------------------+----------------------------------+---------------------------------------+
+| tap-snowflake              | ./install --connectors=tap-snowflake    | YES                              |                                       |
++----------------------------+-----------------------------------------+----------------------------------+---------------------------------------+
+| tap-zendesk                | ./install --connectors=tap-zendesk      | YES                              |                                       |
++----------------------------+-----------------------------------------+----------------------------------+---------------------------------------+
+| target-postgres            | ./install --connectors=target-postgres  | NO                               |                                       |
++----------------------------+-----------------------------------------+----------------------------------+---------------------------------------+
+| target-s3-csv              | ./install --connectors=target-s3-csv    | YES                              |                                       |
++----------------------------+-----------------------------------------+----------------------------------+---------------------------------------+
+| target-redshift            | ./install --connectors=target-redshift  | YES                              |                                       |
++----------------------------+-----------------------------------------+----------------------------------+---------------------------------------+
+| target-snowflake           | ./install --connectors=target-snowflake | YES                              |                                       |
++----------------------------+-----------------------------------------+----------------------------------+---------------------------------------+
+| transform-field            | ./install --connectors=transform-field  | YES                              |                                       |
++----------------------------+-----------------------------------------+----------------------------------+---------------------------------------+
+
+
+.. warning::
+
+    When `--connectors=` argument is not specified then only the default connectors will be installed.
 
 Once the install script finished, you will need to activate the virtual environment
 with the Command Line Tools and set the ``PIPELINEWISE_HOME`` environment variable

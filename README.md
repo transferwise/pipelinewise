@@ -105,9 +105,10 @@ $ docker exec -it pipelinewise_dev bash
 2. Run the install script that installs the PipelineWise CLI and every supported singer connectors into separated virtual environments:
    
     ```sh
-    $ ./install.sh
+    $ ./install.sh --connectors=all
     ```
-    Press `Y` to accept the license agreement of the required singer components. To automate the installation and accept every license agreement run `./install --acceptlicenses`)
+    Press `Y` to accept the license agreement of the required singer components. To automate the installation and accept every license agreement run `./install --acceptlicenses`
+    Use the optional `--connectors=...,...` argument to install only a specific list of singer connectors.
 
 3. To start CLI you need to activate the CLI virtual environment and has to set `PIPELINEWISE_HOME` environment variable:
    
