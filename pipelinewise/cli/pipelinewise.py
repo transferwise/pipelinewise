@@ -612,7 +612,7 @@ class PipelineWise(object):
         else:
             schema_with_diff = new_schema
 
-        # Make selection from selectection.json if exists
+        # Make selection from selection.json if exists
         try:
             schema_with_diff = self.make_default_selection(schema_with_diff, tap_selection_file)
             schema_with_diff = utils.delete_keys_from_dict(
@@ -625,6 +625,11 @@ class PipelineWise(object):
 
         except Exception as exc:
             return f"Cannot load selection JSON at {tap_selection_file}. {str(exc)}"
+
+        # Post import checks
+        post_import_errors = self._run_post_import_tap_checks(schema_with_diff, target)
+        if len(post_import_errors) > 0:
+            return f"Post import tap checks failed at {tap_id}. {post_import_errors}"
 
         # Save the new catalog into the tap
         try:
@@ -1195,3 +1200,38 @@ TAP RUN SUMMARY
             if log_file_to_write_summary:
                 with open(log_file_to_write_summary, "a") as f:
                     f.write(summary)
+
+    def _run_post_import_tap_checks(self, tap, target) -> list:
+        """
+            Run post import checks on a tap properties object.
+
+        :param tap_properties: tap properties object
+        :return: List of errors. If no error returns an empty list
+        """
+        errors = []
+
+        # Foreach stream (table) in the original properties
+        for stream_idx, stream in enumerate(tap.get("streams", tap)):
+            # Collect required properties from the properties file
+            tap_stream_id = stream.get("tap_stream_id")
+            metadata = stream.get("metadata", [])
+
+            # Collect further properties from the tap and target properties
+            table_meta = {}
+            for meta_idx, meta in enumerate(metadata):
+                if type(meta) == dict and len(meta.get("breadcrumb", [])) == 0:
+                    table_meta = meta.get("metadata")
+                    break
+
+            selected = table_meta.get("selected", False)
+            replication_method = table_meta.get("replication-method")
+            table_key_properties = table_meta.get("table-key-properties", [])
+            primary_key_required = target.get("primary_key_required", False)
+
+            # Check if primary key is set for INCREMENTAL and LOG_BASED replications
+            if (selected and replication_method in [self.INCREMENTAL, self.LOG_BASED] and
+                    len(table_key_properties) == 0 and primary_key_required):
+                errors.append(f'No primary key set for - {replication_method} {tap_stream_id}.')
+                break
+
+        return errors

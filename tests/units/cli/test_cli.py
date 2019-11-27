@@ -451,3 +451,28 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
                     pipelinewise.validate()
             else:
                 pipelinewise.validate()
+
+    def test_post_import_checks(self):
+        args = CliArgs()
+        pipelinewise = PipelineWise(args, CONFIG_DIR, VIRTUALENVS_DIR)
+        test_files_dir = "{}/resources/test_post_import_checks".format(os.path.dirname(__file__))
+
+        target_pk_required = cli.utils.load_json("{}/target_config_pk_required.json".format(test_files_dir))
+        target_pk_not_required = cli.utils.load_json("{}/target_config_pk_not_required.json".format(test_files_dir))
+        tap_with_pk = cli.utils.load_json("{}//tap_properties_with_pk.json".format(test_files_dir))
+        tap_with_no_pk_full_table = cli.utils.load_json("{}//tap_properties_with_no_pk_full_table.json".format(test_files_dir))
+        tap_with_no_pk_incremental = cli.utils.load_json("{}//tap_properties_with_no_pk_incremental.json".format(test_files_dir))
+        tap_with_no_pk_log_based = cli.utils.load_json("{}//tap_properties_with_no_pk_log_based.json".format(test_files_dir))
+        tap_with_no_pk_not_selected = cli.utils.load_json("{}//tap_properties_with_no_pk_not_selected.json".format(test_files_dir))
+
+        # Test scenarios when post import checks should pass
+        assert pipelinewise._run_post_import_tap_checks(tap_with_pk, target_pk_required) == []
+        assert pipelinewise._run_post_import_tap_checks(tap_with_pk, target_pk_not_required) == []
+        assert pipelinewise._run_post_import_tap_checks(tap_with_no_pk_full_table, target_pk_required) == []
+        assert pipelinewise._run_post_import_tap_checks(tap_with_no_pk_incremental, target_pk_not_required) == []
+        assert pipelinewise._run_post_import_tap_checks(tap_with_no_pk_log_based, target_pk_not_required) == []
+        assert pipelinewise._run_post_import_tap_checks(tap_with_no_pk_not_selected, target_pk_required) == []
+
+        # Test scenarios when post import checks should fail due to primary keys not exists
+        assert len(pipelinewise._run_post_import_tap_checks(tap_with_no_pk_incremental, target_pk_required)) == 1
+        assert len(pipelinewise._run_post_import_tap_checks(tap_with_no_pk_log_based, target_pk_required)) == 1
