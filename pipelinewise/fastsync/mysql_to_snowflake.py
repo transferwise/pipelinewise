@@ -80,7 +80,7 @@ def sync_table(table):
         target_schema = utils.get_target_schema(args.target, table)
 
         # Open connection and get binlog file position
-        mysql.open_connection()
+        mysql.open_connections()
 
         # Get bookmark - Binlog position or Incremental Key value
         bookmark = utils.get_bookmark_for_table(table, args.properties, mysql)
@@ -90,7 +90,7 @@ def sync_table(table):
         snowflake_types = mysql.map_column_types_to_target(table)
         snowflake_columns = snowflake_types.get("columns", [])
         primary_key = snowflake_types.get("primary_key")
-        mysql.close_connection()
+        mysql.close_connections()
 
         # Uploading to S3
         s3_key = snowflake.upload_to_s3(filepath, table)
