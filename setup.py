@@ -21,16 +21,18 @@ setup(name='pipelinewise',
         'argparse==1.4.0',
         'tabulate==0.8.2',
         'PyYAML==5.1.0',
-        'jsonschema==3.0.1',
         'ansible==2.7.13',
         'joblib==0.13.2',
-        
         'attrs==17.4.0',
         'idna==2.7',
         'PyMySQL==0.7.11',
         'psycopg2==2.8.2',
-        'boto3==1.10.8',
-        'snowflake-connector-python==2.0.3'
+        'snowflake-connector-python==2.0.3',
+        'singer-python==5.9.*',
+        'singer-encodings==0.0.*',
+        'python-dateutil<2.8.1',
+        'messytables==0.15.*',
+        'pytz==2018.4'
     ],
     extras_require={
         "test": [
@@ -49,6 +51,7 @@ setup(name='pipelinewise',
         postgres-to-snowflake=pipelinewise.fastsync.postgres_to_snowflake:main
         mysql-to-redshift=pipelinewise.fastsync.mysql_to_redshift:main
         postgres-to-redshift=pipelinewise.fastsync.postgres_to_redshift:main
+        s3-csv-to-snowflake=pipelinewise.fastsync.s3_csv_to_snowflake:main
     ''',
     packages=find_packages(exclude=['tests*']),
     package_data = {

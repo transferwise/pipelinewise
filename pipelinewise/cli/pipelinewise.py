@@ -436,19 +436,19 @@ class PipelineWise(object):
                             try:
                                 new_mdata["is-new"] = old_mdata["is-new"]
                             except Exception:
-                                False
+                                pass
 
                             # Copy is-modified flag from the old properties
                             try:
                                 new_mdata["is-modified"] = old_mdata["is-modified"]
                             except Exception:
-                                False
+                                pass
 
                             # Copy field selection from the old properties
                             try:
                                 new_mdata["selected"] = old_mdata["selected"]
                             except Exception:
-                                False
+                                pass
 
                             # Field exists and type is the same - Do nothing more in the schema
                             if new_field == old_field:
@@ -464,7 +464,7 @@ class PipelineWise(object):
                                     new_schema["streams"][new_stream_idx]["metadata"][new_field_mdata_idx]["metadata"][
                                         "is-new"] = False
                                 except Exception:
-                                    False
+                                    pass
 
                         # New field - Mark the field as new in the metadata
                         else:
@@ -474,7 +474,7 @@ class PipelineWise(object):
                                 new_schema["streams"][new_stream_idx]["metadata"][new_field_mdata_idx]["metadata"][
                                     "is-new"] = True
                             except Exception:
-                                False
+                                pass
 
             schema_with_diff = new_schema
 
@@ -498,7 +498,7 @@ class PipelineWise(object):
                 try:
                     stream_table_mdata_idx = [i for i, md in enumerate(stream["metadata"]) if md["breadcrumb"] == []][0]
                 except Exception:
-                    False
+                    pass
 
                 if tap_stream_sel:
                     self.logger.info(f"Mark {tap_stream_id} tap_stream_id as selected with properties {tap_stream_sel}")
@@ -895,7 +895,7 @@ class PipelineWise(object):
             {
                 "selected": True,
                 "target_type": ["target-snowflake", "target-redshift"],
-                "tap_type": ["tap-mysql", "tap-postgres"],
+                "tap_type": ["tap-mysql", "tap-postgres", 'tap-s3-csv'],
                 "initial_sync_required": True
             },
             create_fallback=True)
@@ -1141,6 +1141,7 @@ class PipelineWise(object):
               'replication_key_value' key created for INCREMENTAL tables
               'log_pos' key created by MySQL LOG_BASED tables
               'lsn' key created by PostgreSQL LOG_BASED tables
+              'modified_since' key created by CSV S3 tables
 
             FULL_TABLE replication method is taken as initial sync required
         :param replication_method: stream replication method
@@ -1152,7 +1153,8 @@ class PipelineWise(object):
                 (not (
                         'replication_key_value' in stream_bookmark or
                         'log_pos' in stream_bookmark or
-                        'lsn' in stream_bookmark
+                        'lsn' in stream_bookmark or
+                        'modified_since' in stream_bookmark # this is replication key for tap-s3-csv used by Singer
                 ))
         )
 

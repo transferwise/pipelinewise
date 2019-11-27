@@ -1,0 +1,683 @@
+{
+    "streams": [
+        {
+            "metadata": [
+                {
+                    "breadcrumb": [],
+                    "metadata": {
+                        "replication-key": "id",
+                        "replication-method": "INCREMENTAL",
+                        "selected": true,
+                        "table-key-properties": [
+                            "id"
+                        ]
+                    }
+                },
+                {
+                    "breadcrumb": [
+                        "properties",
+                        "id"
+                    ],
+                    "metadata": {
+                        "inclusion": "automatic"
+                    }
+                },
+                {
+                    "breadcrumb": [
+                        "properties",
+                        "candidate_id"
+                    ],
+                    "metadata": {
+                        "inclusion": "available"
+                    }
+                },
+                {
+                    "breadcrumb": [
+                        "properties",
+                        "applied_at"
+                    ],
+                    "metadata": {
+                        "inclusion": "available"
+                    }
+                },
+                {
+                    "breadcrumb": [
+                        "properties",
+                        "status"
+                    ],
+                    "metadata": {
+                        "inclusion": "available"
+                    }
+                },
+                {
+                    "breadcrumb": [
+                        "properties",
+                        "prospect"
+                    ],
+                    "metadata": {
+                        "inclusion": "available"
+                    }
+                },
+                {
+                    "breadcrumb": [
+                        "properties",
+                        "stage_id"
+                    ],
+                    "metadata": {
+                        "inclusion": "available"
+                    }
+                },
+                {
+                    "breadcrumb": [
+                        "properties",
+                        "source_id"
+                    ],
+                    "metadata": {
+                        "inclusion": "available"
+                    }
+                },
+                {
+                    "breadcrumb": [
+                        "properties",
+                        "referrer_id"
+                    ],
+                    "metadata": {
+                        "inclusion": "available"
+                    }
+                },
+                {
+                    "breadcrumb": [
+                        "properties",
+                        "rejected_at"
+                    ],
+                    "metadata": {
+                        "inclusion": "available"
+                    }
+                },
+                {
+                    "breadcrumb": [
+                        "properties",
+                        "rejected_by_id"
+                    ],
+                    "metadata": {
+                        "inclusion": "available"
+                    }
+                },
+                {
+                    "breadcrumb": [
+                        "properties",
+                        "rejection_reason_id"
+                    ],
+                    "metadata": {
+                        "inclusion": "available"
+                    }
+                },
+                {
+                    "breadcrumb": [
+                        "properties",
+                        "pipeline_percent"
+                    ],
+                    "metadata": {
+                        "inclusion": "available"
+                    }
+                },
+                {
+                    "breadcrumb": [
+                        "properties",
+                        "migrated"
+                    ],
+                    "metadata": {
+                        "inclusion": "available"
+                    }
+                },
+                {
+                    "breadcrumb": [
+                        "properties",
+                        "rejected_by"
+                    ],
+                    "metadata": {
+                        "inclusion": "available"
+                    }
+                },
+                {
+                    "breadcrumb": [
+                        "properties",
+                        "stage_name"
+                    ],
+                    "metadata": {
+                        "inclusion": "available"
+                    }
+                },
+                {
+                    "breadcrumb": [
+                        "properties",
+                        "job_post_id"
+                    ],
+                    "metadata": {
+                        "inclusion": "available"
+                    }
+                },
+                {
+                    "breadcrumb": [
+                        "properties",
+                        "prospect_pool"
+                    ],
+                    "metadata": {
+                        "inclusion": "available"
+                    }
+                },
+                {
+                    "breadcrumb": [
+                        "properties",
+                        "prospect_pool_stage"
+                    ],
+                    "metadata": {
+                        "inclusion": "available"
+                    }
+                },
+                {
+                    "breadcrumb": [
+                        "properties",
+                        "prospect_owner"
+                    ],
+                    "metadata": {
+                        "inclusion": "available"
+                    }
+                },
+                {
+                    "breadcrumb": [
+                        "properties",
+                        "created_at"
+                    ],
+                    "metadata": {
+                        "inclusion": "available"
+                    }
+                },
+                {
+                    "breadcrumb": [
+                        "properties",
+                        "updated_at"
+                    ],
+                    "metadata": {
+                        "inclusion": "available"
+                    }
+                },
+                {
+                    "breadcrumb": [
+                        "properties",
+                        "event_id"
+                    ],
+                    "metadata": {
+                        "inclusion": "available"
+                    }
+                },
+                {
+                    "breadcrumb": [
+                        "properties",
+                        "converted_prospect_application_id"
+                    ],
+                    "metadata": {
+                        "inclusion": "available"
+                    }
+                },
+                {
+                    "breadcrumb": [
+                        "properties",
+                        "_sdc_source_bucket"
+                    ],
+                    "metadata": {
+                        "inclusion": "available"
+                    }
+                },
+                {
+                    "breadcrumb": [
+                        "properties",
+                        "_sdc_source_file"
+                    ],
+                    "metadata": {
+                        "inclusion": "available"
+                    }
+                },
+                {
+                    "breadcrumb": [
+                        "properties",
+                        "_sdc_source_lineno"
+                    ],
+                    "metadata": {
+                        "inclusion": "available"
+                    }
+                },
+                {
+                    "breadcrumb": [
+                        "properties",
+                        "_sdc_extra"
+                    ],
+                    "metadata": {
+                        "inclusion": "available"
+                    }
+                }
+            ],
+            "schema": {
+                "properties": {
+                    "_sdc_extra": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array"
+                    },
+                    "_sdc_source_bucket": {
+                        "type": "string"
+                    },
+                    "_sdc_source_file": {
+                        "type": "string"
+                    },
+                    "_sdc_source_lineno": {
+                        "type": "integer"
+                    },
+                    "applied_at": {
+                        "type": [
+                            "null",
+                            "string"
+                        ]
+                    },
+                    "candidate_id": {
+                        "type": [
+                            "null",
+                            "integer",
+                            "string"
+                        ]
+                    },
+                    "converted_prospect_application_id": {
+                        "type": [
+                            "null",
+                            "integer",
+                            "string"
+                        ]
+                    },
+                    "created_at": {
+                        "type": [
+                            "null",
+                            "string"
+                        ]
+                    },
+                    "event_id": {
+                        "type": [
+                            "null",
+                            "string"
+                        ]
+                    },
+                    "id": {
+                        "type": [
+                            "null",
+                            "integer",
+                            "string"
+                        ]
+                    },
+                    "job_post_id": {
+                        "type": [
+                            "null",
+                            "integer",
+                            "string"
+                        ]
+                    },
+                    "migrated": {
+                        "type": [
+                            "null",
+                            "string"
+                        ]
+                    },
+                    "pipeline_percent": {
+                        "type": [
+                            "null",
+                            "number",
+                            "string"
+                        ]
+                    },
+                    "prospect": {
+                        "type": [
+                            "null",
+                            "string"
+                        ]
+                    },
+                    "prospect_owner": {
+                        "type": [
+                            "null",
+                            "integer",
+                            "string"
+                        ]
+                    },
+                    "prospect_pool": {
+                        "type": [
+                            "null",
+                            "string"
+                        ]
+                    },
+                    "prospect_pool_stage": {
+                        "type": [
+                            "null",
+                            "string"
+                        ]
+                    },
+                    "referrer_id": {
+                        "type": [
+                            "null",
+                            "integer",
+                            "string"
+                        ]
+                    },
+                    "rejected_at": {
+                        "type": [
+                            "null",
+                            "string"
+                        ]
+                    },
+                    "rejected_by": {
+                        "type": [
+                            "null",
+                            "string"
+                        ]
+                    },
+                    "rejected_by_id": {
+                        "type": [
+                            "null",
+                            "integer",
+                            "string"
+                        ]
+                    },
+                    "rejection_reason_id": {
+                        "type": [
+                            "null",
+                            "integer",
+                            "string"
+                        ]
+                    },
+                    "source_id": {
+                        "type": [
+                            "null",
+                            "integer",
+                            "string"
+                        ]
+                    },
+                    "stage_id": {
+                        "type": [
+                            "null",
+                            "integer",
+                            "string"
+                        ]
+                    },
+                    "stage_name": {
+                        "type": [
+                            "null",
+                            "string"
+                        ]
+                    },
+                    "status": {
+                        "type": [
+                            "null",
+                            "string"
+                        ]
+                    },
+                    "updated_at": {
+                        "type": [
+                            "null",
+                            "string"
+                        ]
+                    }
+                },
+                "type": "object"
+            },
+            "stream": "applications",
+            "tap_stream_id": "applications"
+        },
+        {
+            "metadata": [
+                {
+                    "breadcrumb": [],
+                    "metadata": {
+                        "replication-method": "FULL_TABLE",
+                        "selected": true,
+                        "table-key-properties": []
+                    }
+                },
+                {
+                    "breadcrumb": [
+                        "properties",
+                        "id"
+                    ],
+                    "metadata": {
+                        "inclusion": "available"
+                    }
+                },
+                {
+                    "breadcrumb": [
+                        "properties",
+                        "question"
+                    ],
+                    "metadata": {
+                        "inclusion": "available"
+                    }
+                },
+                {
+                    "breadcrumb": [
+                        "properties",
+                        "_sdc_source_bucket"
+                    ],
+                    "metadata": {
+                        "inclusion": "available"
+                    }
+                },
+                {
+                    "breadcrumb": [
+                        "properties",
+                        "_sdc_source_file"
+                    ],
+                    "metadata": {
+                        "inclusion": "available"
+                    }
+                },
+                {
+                    "breadcrumb": [
+                        "properties",
+                        "_sdc_source_lineno"
+                    ],
+                    "metadata": {
+                        "inclusion": "available"
+                    }
+                },
+                {
+                    "breadcrumb": [
+                        "properties",
+                        "_sdc_extra"
+                    ],
+                    "metadata": {
+                        "inclusion": "available"
+                    }
+                }
+            ],
+            "schema": {
+                "properties": {
+                    "_sdc_extra": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array"
+                    },
+                    "_sdc_source_bucket": {
+                        "type": "string"
+                    },
+                    "_sdc_source_file": {
+                        "type": "string"
+                    },
+                    "_sdc_source_lineno": {
+                        "type": "integer"
+                    },
+                    "id": {
+                        "type": [
+                            "null",
+                            "integer",
+                            "string"
+                        ]
+                    },
+                    "question": {
+                        "type": [
+                            "null",
+                            "string"
+                        ]
+                    }
+                },
+                "type": "object"
+            },
+            "stream": "candidate_survey_questions",
+            "tap_stream_id": "candidate_survey_questions"
+        },
+        {
+            "metadata": [
+                {
+                    "breadcrumb": [],
+                    "metadata": {
+                        "replication-method": "INCREMENTAL",
+                        "selected": true,
+                        "table-key-properties": [
+                            "id"
+                        ]
+                    }
+                },
+                {
+                    "breadcrumb": [
+                        "properties",
+                        "id"
+                    ],
+                    "metadata": {
+                        "inclusion": "automatic"
+                    }
+                },
+                {
+                    "breadcrumb": [
+                        "properties",
+                        "organization_id"
+                    ],
+                    "metadata": {
+                        "inclusion": "available"
+                    }
+                },
+                {
+                    "breadcrumb": [
+                        "properties",
+                        "name"
+                    ],
+                    "metadata": {
+                        "inclusion": "available"
+                    }
+                },
+                {
+                    "breadcrumb": [
+                        "properties",
+                        "created_at"
+                    ],
+                    "metadata": {
+                        "inclusion": "available"
+                    }
+                },
+                {
+                    "breadcrumb": [
+                        "properties",
+                        "updated_at"
+                    ],
+                    "metadata": {
+                        "inclusion": "available"
+                    }
+                },
+                {
+                    "breadcrumb": [
+                        "properties",
+                        "_sdc_source_bucket"
+                    ],
+                    "metadata": {
+                        "inclusion": "available"
+                    }
+                },
+                {
+                    "breadcrumb": [
+                        "properties",
+                        "_sdc_source_file"
+                    ],
+                    "metadata": {
+                        "inclusion": "available"
+                    }
+                },
+                {
+                    "breadcrumb": [
+                        "properties",
+                        "_sdc_source_lineno"
+                    ],
+                    "metadata": {
+                        "inclusion": "available"
+                    }
+                },
+                {
+                    "breadcrumb": [
+                        "properties",
+                        "_sdc_extra"
+                    ],
+                    "metadata": {
+                        "inclusion": "available"
+                    }
+                }
+            ],
+            "schema": {
+                "properties": {
+                    "_sdc_extra": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array"
+                    },
+                    "_sdc_source_bucket": {
+                        "type": "string"
+                    },
+                    "_sdc_source_file": {
+                        "type": "string"
+                    },
+                    "_sdc_source_lineno": {
+                        "type": "integer"
+                    },
+                    "created_at": {
+                        "type": [
+                            "null",
+                            "string"
+                        ]
+                    },
+                    "id": {
+                        "type": [
+                            "null",
+                            "integer",
+                            "string"
+                        ]
+                    },
+                    "name": {
+                        "type": [
+                            "null",
+                            "string"
+                        ]
+                    },
+                    "organization_id": {
+                        "type": [
+                            "null",
+                            "integer",
+                            "string"
+                        ]
+                    },
+                    "updated_at": {
+                        "type": [
+                            "null",
+                            "string"
+                        ]
+                    }
+                },
+                "type": "object"
+            },
+            "stream": "interviews",
+            "tap_stream_id": "interviews"
+        }
+    ]
+}
