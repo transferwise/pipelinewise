@@ -27,6 +27,8 @@ Fast Sync exists only between the following tap and target components:
 +----------------------------+----------------------------------+
 | :ref:`tap-postgres`        | **->** :ref:`target-snowflake`   |
 +----------------------------+----------------------------------+
+| :ref:`tap-s3-csv`          | **->** :ref:`target-snowflake`   |
++----------------------------+----------------------------------+
 | :ref:`tap-mysql`           | **->** :ref:`target-redshift`    |
 +----------------------------+----------------------------------+
 | :ref:`tap-postgres`        | **->** :ref:`target-redshift`    |
