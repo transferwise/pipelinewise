@@ -1,3 +1,34 @@
+0.11.1 (2019-11-28)
+-------------------
+
+- FastSync: Add fastsync support from S3-CSV to Snowflake
+- Add post import checks to detect tables with no primary key early
+- Add optional `--connectors` to the install script to install taps and targets selectively
+
+**Tap Zendesk**
+- Forked singer connector to `pipelinewise-tap-zendesk==1.0.0`
+    - Improved performance by getting data from Zendesk API in parallel
+
+**Tap Postgres**
+- Bump `pipelinewise-tap-postgres` to 1.3.0
+    - Add `max_run_seconds` configurable option
+    - Add `break_at_end_lsn` configurable option
+    - Only send feedback when lsn_comitted has increased
+
+**Tap Snowflake**
+- Bump `pipelinewise-tap-snowflake` to 1.0.5
+    - Bump `snowflake-connector-python` to 2.0.4
+
+**Tap Kafka**
+- Bump `pipelinewise-tap-kafka` to 1.0.2
+    - Add `encoding` configurable option
+
+**Target Redshift**
+- Bump `pipelinewise-target-redshift` to 1.1.0
+    - Emit new state message as soon as data flushed to Redshift
+    - Add `flush_all_streams` option
+    - Add `max_parallelism` option
+
 0.10.4 (2019-11-05)
 -------------------
 
