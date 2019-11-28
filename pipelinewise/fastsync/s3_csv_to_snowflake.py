@@ -47,7 +47,7 @@ def tap_type_to_target_type(csv_type):
         'Integer': 'INTEGER',
         'Decimal': 'NUMBER',
         'String': 'VARCHAR',
-        'Bool': 'BOOLEAN'
+        'Bool': 'VARCHAR' # The guess sometimes can be wrong, we'll use varchar for now.
     }.get(csv_type, 'VARCHAR')
 
 
