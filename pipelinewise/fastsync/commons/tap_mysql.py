@@ -207,6 +207,7 @@ class FastSyncTapMySql:
                     if not rows:
                         break
 
+
                     # Log export status
                     exported_rows += len(rows)
                     if (len(rows) == export_batch_rows):
