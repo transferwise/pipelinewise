@@ -5,6 +5,8 @@ import os
 import datetime
 import decimal
 
+from pymysql import InterfaceError, OperationalError
+
 from . import utils
 
 
@@ -16,7 +18,7 @@ class FastSyncTapMySql:
         self.tap_type_to_target_type = tap_type_to_target_type
 
 
-    def open_connection(self):
+    def open_connections(self):
         self.conn = pymysql.connect(
             # Fastsync is using bulk_sync_{host|port|user|password} values from the config by default
             # to avoid making heavy load on the primary source database when syncing large tables
@@ -44,27 +46,44 @@ class FastSyncTapMySql:
             cursorclass = pymysql.cursors.SSCursor
         )
 
+    def close_connections(self, silent=False):
+        try:
+            self.conn.close()
+            self.conn_unbuffered.close()
+        except Exception as e:
+            if not silent:
+                utils.log(e)
+                utils.log('Connections seem to be already closed.')
 
-    def close_connection(self):
-        self.conn.close()
-
-
-    def query(self, query, params=None, return_as_cursor=False):
+    def query(self, query, params=None, return_as_cursor=False, n_retry=1):
         utils.log("MYSQL - Running query: {}".format(query))
-        with self.conn as cur:
-            cur.execute(
-                query,
-                params
-            )
+        try:
+            with self.conn as cur:
+                cur.execute(
+                    query,
+                    params
+                )
 
-            if return_as_cursor:
-                return cur
+                if return_as_cursor:
+                    return cur
 
-            if cur.rowcount > 0:
-                return cur.fetchall()
+                if cur.rowcount > 0:
+                    return cur.fetchall()
+                else:
+                    return []
+        except (InterfaceError, OperationalError) as e:
+            utils.log(f"Exception happened during running a query. Number of retries: {n_retry}. {e}")
+            if n_retry > 0:
+                utils.log("Reopening the connections.")
+                self.close_connections(silent=True)
+                self.open_connections()
+                utils.log("Retrying to run a query.")
+                return self.query(query,
+                                  params=params,
+                                  return_as_cursor=return_as_cursor,
+                                  n_retry=n_retry - 1)
             else:
-                return []
-
+                raise e
 
     def fetch_current_log_pos(self):
         result = self.query("SHOW MASTER STATUS")
@@ -187,6 +206,7 @@ class FastSyncTapMySql:
                     # No more rows to fetch, stop loop
                     if not rows:
                         break
+
 
                     # Log export status
                     exported_rows += len(rows)
