@@ -44,10 +44,11 @@ def tap_type_to_target_type(csv_type):
     """Data type mapping from S3 csv to Snowflake"""
 
     return {
-        'Integer': 'INTEGER',
-        'Decimal': 'NUMBER',
-        'String': 'VARCHAR',
-        'Bool': 'VARCHAR' # The guess sometimes can be wrong, we'll use varchar for now.
+        'integer': 'INTEGER',
+        'number': 'NUMBER',
+        'string': 'VARCHAR',
+        'boolean': 'VARCHAR', # The guess sometimes can be wrong, we'll use varchar for now.
+        'date': 'VARCHAR' # The guess sometimes can be wrong, we'll use varchar for now.
     }.get(csv_type, 'VARCHAR')
 
 

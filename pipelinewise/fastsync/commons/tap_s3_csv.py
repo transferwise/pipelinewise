@@ -191,7 +191,7 @@ class FastSyncTapS3Csv:
 
             row_set.register_processor(offset_processor(offset + 1))
 
-            types = [str(t) for t in type_guess(row_set.sample, strict=True)]
+            types = list(map(jts.celltype_as_string, type_guess(row_set.sample, strict=True)))
             return zip(headers, types)
 
     def fetch_current_incremental_key_pos(self, table: str,
