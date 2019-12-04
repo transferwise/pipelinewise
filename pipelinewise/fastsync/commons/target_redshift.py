@@ -10,11 +10,23 @@ class FastSyncTargetRedshift:
     def __init__(self, connection_config, transformation_config = None):
         self.connection_config = connection_config
         self.transformation_config = transformation_config
-        self.s3 = boto3.client(
-          's3',
-          aws_access_key_id=self.connection_config['aws_access_key_id'],
-          aws_secret_access_key=self.connection_config['aws_secret_access_key']
-        )
+
+        aws_access_key_id = self.connection_config.get('aws_access_key_id')
+        aws_secret_access_key = self.connection_config.get('aws_secret_access_key')
+        aws_session_token = self.connection_config.get('aws_session_token')
+
+        # Conditionally pass keys as this seems to affect whether instance credentials are correctly loaded if the keys are None
+        if aws_access_key_id and aws_secret_access_key:
+            self.s3 = boto3.client(
+                's3',
+                aws_access_key_id=aws_access_key_id,
+                aws_secret_access_key=aws_secret_access_key,
+                aws_session_token=aws_session_token
+            )
+        else:
+            self.s3 = boto3.client(
+                's3'
+            )
 
 
     def open_connection(self):
@@ -96,30 +108,42 @@ class FastSyncTargetRedshift:
         table_dict = utils.tablename_to_dict(table_name)
         target_table = table_dict.get('table_name') if not is_temporary else table_dict.get('temp_table_name')
 
-        aws_access_key_id=self.connection_config['aws_access_key_id']
-        aws_secret_access_key=self.connection_config['aws_secret_access_key']
+        # Step 1: Generate copy credentials - prefer role if provided, otherwise use access and secret keys
+        copy_credentials = """
+                            iam_role '{aws_role_arn}'
+                        """.format(
+            aws_role_arn=self.connection_config['aws_redshift_copy_role_arn']) if self.connection_config.get(
+            "aws_redshift_copy_role_arn") else """
+                            ACCESS_KEY_ID '{aws_access_key_id}'
+                            SECRET_ACCESS_KEY '{aws_secret_access_key}'
+                            {aws_session_token}
+                        """.format(
+            aws_access_key_id=self.connection_config['aws_access_key_id'],
+            aws_secret_access_key=self.connection_config['aws_secret_access_key'],
+            aws_session_token="SESSION_TOKEN '{}'".format(
+                self.connection_config['aws_session_token']) if self.connection_config.get('aws_session_token') else '',
+        )
+
         bucket = self.connection_config['s3_bucket']
 
-        # Generate copy options - Override defaults if defined
+        # Step 2: Generate copy options - Override defaults from config.json if defined
         copy_options = self.connection_config.get('copy_options',"""
             EMPTYASNULL BLANKSASNULL TRIMBLANKS TRUNCATECOLUMNS
             TIMEFORMAT 'auto'
         """)
 
-        # Using the built-in CSV COPY option for fastsync
-        sql = """COPY {}.{} FROM 's3://{}/{}'            
-            ACCESS_KEY_ID '{}'
-            SECRET_ACCESS_KEY '{}'
-            {}
+        # Step3: Using the built-in CSV COPY option to load
+        sql = """COPY {schema}.{table} FROM 's3://{s3_bucket}/{s3_key}'
+            {copy_credentials}
+            {copy_options}
             CSV GZIP
         """.format(
-            target_schema,
-            target_table,
-            bucket,
-            s3_key,
-            aws_access_key_id,
-            aws_secret_access_key,
-            copy_options
+            schema=target_schema,
+            table=target_table,
+            s3_bucket=self.connection_config['s3_bucket'],
+            s3_key=s3_key,
+            copy_credentials=copy_credentials,
+            copy_options=copy_options
         )
         self.query(sql)
 
