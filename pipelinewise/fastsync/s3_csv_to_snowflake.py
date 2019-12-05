@@ -6,18 +6,22 @@ import time
 
 import multiprocessing
 
-from datetime import datetime, timedelta
+from typing import Union
+from datetime import datetime
+from functools import partial
+from argparse import Namespace
+
 from .commons import utils
-from .commons.tap_mysql import FastSyncTapMySql
+from .commons.tap_s3_csv import FastSyncTapS3Csv
 from .commons.target_snowflake import FastSyncTargetSnowflake
 
 
 REQUIRED_CONFIG_KEYS = {
     'tap': [
-        'host',
-        'port',
-        'user',
-        'password'
+        'aws_access_key_id',
+        'aws_secret_access_key',
+        'bucket',
+        'start_date'
     ],
     'target': [
         'account',
@@ -36,103 +40,81 @@ REQUIRED_CONFIG_KEYS = {
 lock = multiprocessing.Lock()
 
 
-def tap_type_to_target_type(mysql_type, mysql_column_type):
-    """Data type mapping from MySQL to Snowflake"""
+def tap_type_to_target_type(csv_type):
+    """Data type mapping from S3 csv to Snowflake"""
+
     return {
-        'char':'VARCHAR',
-        'varchar':'VARCHAR',
-        'binary':'VARCHAR',
-        'varbinary':'VARCHAR',
-        'blob':'VARCHAR',
-        'tinyblob':'VARCHAR',
-        'mediumblob':'VARCHAR',
-        'longblob':'VARCHAR',
-        'geometry':'VARCHAR',
-        'text':'VARCHAR',
-        'tinytext':'VARCHAR',
-        'mediumtext':'VARCHAR',
-        'longtext':'VARCHAR',
-        'enum':'VARCHAR',
-        'int':'NUMBER',
-        'tinyint':'BOOLEAN' if mysql_column_type == 'tinyint(1)' else 'NUMBER',
-        'smallint':'NUMBER',
-        'bigint':'NUMBER',
-        'bit':'BOOLEAN',
-        'decimal':'FLOAT',
-        'double':'FLOAT',
-        'float':'FLOAT',
-        'bool':'BOOLEAN',
-        'boolean':'BOOLEAN',
-        'date':'TIMESTAMP_NTZ',
-        'datetime':'TIMESTAMP_NTZ',
-        'timestamp':'TIMESTAMP_NTZ',
-    }.get(mysql_type, 'VARCHAR')
+        'Integer': 'INTEGER',
+        'Decimal': 'NUMBER',
+        'String': 'VARCHAR',
+        'Bool': 'VARCHAR' # The guess sometimes can be wrong, we'll use varchar for now.
+    }.get(csv_type, 'VARCHAR')
 
 
-def sync_table(table):
-    args = utils.parse_args(REQUIRED_CONFIG_KEYS)
-    mysql = FastSyncTapMySql(args.tap, tap_type_to_target_type)
-    snowflake = FastSyncTargetSnowflake(args.target, args.transform)
+def sync_table(table_name: str, args: Namespace)->Union[bool, str]:
+
+    s3_csv = FastSyncTapS3Csv(args.tap, tap_type_to_target_type)
+    snowflake =  FastSyncTargetSnowflake(args.target, args.transform)
 
     try:
-        filename = "pipelinewise_fastsync_{}_{}.csv.gz".format(table, time.strftime("%Y%m%d-%H%M%S"))
+        filename = "pipelinewise_fastsync_{}_{}_{}.csv.gz".format(args.tap['bucket'], table_name,
+                                                                  time.strftime("%Y%m%d-%H%M%S"))
         filepath = os.path.join(args.export_dir, filename)
-        target_schema = utils.get_target_schema(args.target, table)
 
-        # Open connection and get binlog file position
-        mysql.open_connections()
+        target_schema = utils.get_target_schema(args.target, table_name)
 
-        # Get bookmark - Binlog position or Incremental Key value
-        bookmark = utils.get_bookmark_for_table(table, args.properties, mysql)
+        s3_csv.copy_table(table_name, filepath)
 
-        # Exporting table data, get table definitions and close connection to avoid timeouts
-        mysql.copy_table(table, filepath)
-        snowflake_types = mysql.map_column_types_to_target(table)
+        snowflake_types = s3_csv.map_column_types_to_target(filepath, table_name)
         snowflake_columns = snowflake_types.get("columns", [])
-        primary_key = snowflake_types.get("primary_key")
-        mysql.close_connections()
+        primary_key = snowflake_types["primary_key"]
 
         # Uploading to S3
-        s3_key = snowflake.upload_to_s3(filepath, table)
+        s3_key = snowflake.upload_to_s3(filepath, table_name)
         os.remove(filepath)
 
         # Creating temp table in Snowflake
         snowflake.create_schema(target_schema)
-        snowflake.create_table(target_schema, table, snowflake_columns, primary_key, is_temporary=True)
+        snowflake.create_table(target_schema, table_name, snowflake_columns, primary_key,
+                               is_temporary=True, sort_columns=True)
 
         # Load into Snowflake table
-        snowflake.copy_to_table(s3_key, target_schema, table, is_temporary=True)
+        snowflake.copy_to_table(s3_key, target_schema, table_name, is_temporary=True, skip_csv_header=True)
 
         # Obfuscate columns
-        snowflake.obfuscate_columns(target_schema, table)
+        snowflake.obfuscate_columns(target_schema, table_name)
 
         # Create target table and swap with the temp table in Snowflake
-        snowflake.create_table(target_schema, table, snowflake_columns, primary_key)
-        snowflake.swap_tables(target_schema, table)
+        snowflake.create_table(target_schema, table_name, snowflake_columns, primary_key, sort_columns=True)
+        snowflake.swap_tables(target_schema, table_name)
+
+        # Get bookmark
+        bookmark = utils.get_bookmark_for_table(table_name, args.properties, s3_csv)
 
         # Save bookmark to singer state file
         # Lock to ensure that only one process writes the same state file at a time
         lock.acquire()
         try:
-            utils.save_state_file(args.state, table, bookmark)
+            utils.save_state_file(args.state, table_name, bookmark)
         finally:
             lock.release()
 
         # Table loaded, grant select on all tables in target schema
-        grantees = utils.get_grantees(args.target, table)
+        grantees = utils.get_grantees(args.target, table_name)
         utils.grant_privilege(target_schema, grantees, snowflake.grant_usage_on_schema)
         utils.grant_privilege(target_schema, grantees, snowflake.grant_select_on_schema)
 
+        return True
+
     except Exception as exc:
-        utils.log("CRITICAL: {}".format(exc))
-        return "{}: {}".format(table, exc)
+        utils.log(f"CRITICAL: {exc}")
+        return f"{table_name}: {exc}"
 
 
 def main_impl():
     args = utils.parse_args(REQUIRED_CONFIG_KEYS)
     cpu_cores = utils.get_cpu_cores()
     start_time = datetime.now()
-    table_sync_excs = []
 
     # Log start info
     utils.log("""
@@ -152,7 +134,8 @@ def main_impl():
     # Start loading tables in parallel in spawning processes by
     # utilising all available CPU cores
     with multiprocessing.Pool(cpu_cores) as p:
-        table_sync_excs = list(filter(None, p.map(sync_table, args.tables)))
+        table_sync_excs = list(filter(lambda x: not isinstance(x, bool),
+                                      p.map(partial(sync_table, args=args), args.tables)))
 
     # Refresh information_schema columns cache
     snowflake = FastSyncTargetSnowflake(args.target, args.transform)
@@ -188,4 +171,3 @@ def main():
     except Exception as exc:
         utils.log("CRITICAL: {}".format(exc))
         raise exc
-
