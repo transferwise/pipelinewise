@@ -183,6 +183,22 @@ if [[ -z $CONNECTORS ]]; then
     for i in ${DEFAULT_CONNECTORS[@]}; do
         install_connector $i
     done
+# Install Singer connectors
+install_connector tap-adwords
+install_connector tap-jira
+install_connector tap-kafka
+install_connector tap-mysql
+install_connector tap-postgres
+install_connector tap-s3-csv
+install_connector tap-salesforce
+install_connector tap-snowflake
+install_connector tap-zendesk
+install_connector target-s3-csv
+install_connector target-snowflake
+install_connector transform-field
+install_connector tap-oracle
+install_connector target-postgres
+install_connector target-redshift
 
 
 # Install every avaliable connectors if --connectors=all passed

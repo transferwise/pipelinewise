@@ -1,0 +1,1 @@
+pipelinewise-tap-google-analytics==1.0.0
