@@ -19,9 +19,9 @@ db_conn:
   dbname: "<DB_NAME>"                           # Redshift database name
 
   # We use an intermediate S3 to load data into Redshift
-  aws_access_key_id: "<ACCESS_KEY>"             # Plain string or vault encrypted
-  aws_secret_access_key: "<SECRET_ACCESS_KEY>"  # Plain string or vault encrypted
-  #aws_session_token: "<STS_TOKEN>"             # Optional: AWS STS token for temporary credentials
+  aws_access_key_id: "<ACCESS_KEY>"             # Optional: Plain string or vault encrypted. If not provided, it will be collected from AWS_ACCESS_KEY_ID env var
+  aws_secret_access_key: "<SECRET_ACCESS_KEY>"  # Optional: Plain string or vault encrypted. If not provided, it will be collected from AWS_SECRET_ACCESS_KEY env var
+  #aws_session_token: "<STS_TOKEN>"             # Optional: AWS STS token for temporary credentials. If not provided, it will be collected from AWS_SESSION_TOKEN env var
   #aws_redshift_copy_role_arn: "<ROLE_ARN>"     # Optional: AWS Role ARN to be used for the Redshift COPY operation.
                                                 #           Allow the user to use environment credentials and delegate the COPY command to a role
                                                 #           Used instead of the given AWS keys for the COPY operation if provided
