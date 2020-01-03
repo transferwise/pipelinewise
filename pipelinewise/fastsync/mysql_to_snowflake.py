@@ -6,7 +6,7 @@ import time
 
 import multiprocessing
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from .commons import utils
 from .commons.tap_mysql import FastSyncTapMySql
 from .commons.target_snowflake import FastSyncTargetSnowflake
@@ -41,8 +41,8 @@ def tap_type_to_target_type(mysql_type, mysql_column_type):
     return {
         'char':'VARCHAR',
         'varchar':'VARCHAR',
-        'binary':'VARCHAR',
-        'varbinary':'VARCHAR',
+        'binary':'BINARY',
+        'varbinary':'BINARY',
         'blob':'VARCHAR',
         'tinyblob':'VARCHAR',
         'mediumblob':'VARCHAR',
