@@ -36,10 +36,10 @@ class TestFastSyncTapS3Csv(TestCase):
 
         def tap_type_to_target_type(tap_type):
             return {
-                'Bool': 'smallint',
-                'Integer': 'number',
-                'Decimal': 'number',
-                'String': 'varchar'
+                'boolean': 'boolean',
+                'integer': 'number',
+                'number': 'number',
+                'string': 'varchar'
             }.get(tap_type, 'varchar')
 
         with patch('pipelinewise.fastsync.commons.tap_s3_csv.S3Helper') as s3_helper_mock:
@@ -170,36 +170,40 @@ class TestFastSyncTapS3Csv(TestCase):
         }, self.fs_tap_s3_csv.fetch_current_incremental_key_pos('table-x', 'key'))
 
     def test_get_primary_keys_with_table_that_has_no_keys_returns_none(self):
-        self.assertIsNone(self.fs_tap_s3_csv._get_primary_keys('table 1'))
+        self.assertIsNone(self.fs_tap_s3_csv._get_primary_keys({}))
 
     def test_get_primary_keys_with_table_that_has_empty_keys_list_returns_none(self):
-        self.assertIsNone(self.fs_tap_s3_csv._get_primary_keys('table 2'))
+        self.assertIsNone(self.fs_tap_s3_csv._get_primary_keys({'key_properties': []}))
 
     def test_get_primary_keys_with_table_that_has_1_key_returns_one_safe_key(self):
-        self.assertEqual('"KEY_1"', self.fs_tap_s3_csv._get_primary_keys('table 3'))
+        self.assertEqual('"KEY_1"', self.fs_tap_s3_csv._get_primary_keys({
+            'key_properties': ['key_1']
+        }))
 
     def test_get_primary_keys_with_table_that_has_2_keys_returns_concatenated_keys(self):
-        self.assertIn(self.fs_tap_s3_csv._get_primary_keys('table 4'), ['"KEY_2","KEY_3"', '"KEY_3","KEY_2"'])
+        self.assertIn(self.fs_tap_s3_csv._get_primary_keys({
+            'key_properties': ['key_2', 'key_3']
+        }), ['"KEY_2","KEY_3"', '"KEY_3","KEY_2"'])
 
     def test_get_table_columns(self):
         output = list(self.fs_tap_s3_csv._get_table_columns(
             f'{os.path.dirname(__file__)}/commons/resources/dummy_data.csv.gz'))
 
         self.assertListEqual([
-            ('Region', 'String'),
-            ('Country', 'String'),
-            ('Item Type', 'String'),
-            ('Sales Channel', 'String'),
-            ('Order Priority', 'String'),
-            ('Order Date', 'String'),
-            ('Order ID', 'Integer'),
-            ('Ship Date', 'String'),
-            ('Units Sold', 'Integer'),
-            ('Unit Price', 'Decimal'),
-            ('Unit Cost', 'Decimal'),
-            ('Total Revenue', 'Decimal'),
-            ('Total Cost', 'Decimal'),
-            ('Total Profit', 'Decimal'),
+            ('Region', 'string'),
+            ('Country', 'string'),
+            ('Item Type', 'string'),
+            ('Sales Channel', 'string'),
+            ('Order Priority', 'string'),
+            ('Order Date', 'string'),
+            ('Order ID', 'integer'),
+            ('Ship Date', 'string'),
+            ('Units Sold', 'integer'),
+            ('Unit Price', 'number'),
+            ('Unit Cost', 'number'),
+            ('Total Revenue', 'number'),
+            ('Total Cost', 'number'),
+            ('Total Profit', 'number'),
         ], output)
 
     def test_map_column_types_to_target(self):
