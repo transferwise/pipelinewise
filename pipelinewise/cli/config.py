@@ -315,7 +315,8 @@ class Config(object):
             #   2: Second we try to get the tap type specific default value
             #   3: Otherwise we set flattening level to 0 (disabled)
             "data_flattening_max_level": tap.get('data_flattening_max_level',
-                                                 utils.get_tap_property(tap, 'default_data_flattening_max_level') or 0)
+                                                 utils.get_tap_property(tap, 'default_data_flattening_max_level') or 0),
+            "validate_records": tap.get('validate_records', False)
         })
 
         # Save the generated JSON files
