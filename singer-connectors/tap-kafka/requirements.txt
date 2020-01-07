@@ -1,1 +1,1 @@
-pipelinewise-tap-kafka==1.0.2
+pipelinewise-tap-kafka==2.0.0
