@@ -12,7 +12,10 @@ setup(name='pipelinewise',
       long_description_content_type='text/markdown',
       author='TransferWise',
       url='https://github.com/transferwise/pipelinewise',
-      classifiers=['License :: OSI Approved :: Apache Software License', 'Programming Language :: Python :: 3 :: Only'],
+      classifiers=[
+          'License :: OSI Approved :: Apache Software License',
+          'Programming Language :: Python :: 3 :: Only'
+      ],
       install_requires=[
           'argparse==1.4.0',
           'tabulate==0.8.2',
@@ -52,5 +55,9 @@ setup(name='pipelinewise',
           ]
       },
       packages=find_packages(exclude=['tests*']),
-      package_data={'schemas': ['pipelinewise/cli/schemas/*.json']},
+      package_data={
+          'schemas': [
+              'pipelinewise/cli/schemas/*.json'
+          ]
+      },
       include_package_data=True)
