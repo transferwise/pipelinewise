@@ -1226,7 +1226,7 @@ TAP RUN SUMMARY
             selected = table_meta.get("selected", False)
             replication_method = table_meta.get("replication-method")
             table_key_properties = table_meta.get("table-key-properties", [])
-            primary_key_required = target.get("primary_key_required", False)
+            primary_key_required = target.get("primary_key_required", True)
 
             # Check if primary key is set for INCREMENTAL and LOG_BASED replications
             if (selected and replication_method in [self.INCREMENTAL, self.LOG_BASED] and
