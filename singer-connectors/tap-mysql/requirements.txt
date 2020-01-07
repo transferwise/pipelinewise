@@ -1,1 +1,1 @@
--e git+https://github.com/transferwise/pipelinewise-tap-mysql.git@support-binary-cols#egg=pipelinewise-tap-mysql
+pipelinewise-tap-mysql==1.1.1
