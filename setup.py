@@ -32,7 +32,7 @@ setup(name='pipelinewise',
           'python-dateutil<2.8.1',
           'messytables==0.15.*',
           'pytz==2018.4',
-          'pre-commit'
+          'pre-commit==1.21.0'
       ],
       extras_require={
           'test': [
