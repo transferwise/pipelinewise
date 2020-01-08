@@ -1,0 +1,32 @@
+# ------------------------------------------------------------------------------
+# General Properties
+# ------------------------------------------------------------------------------
+id: "snowflake"                        # Unique identifier of the target
+name: "Snowflake"                      # Name of the target
+type: "target-snowflake"               # !! THIS SHOULD NOT CHANGE !!
+
+
+# ------------------------------------------------------------------------------
+# Target - Data Warehouse connection details
+# ------------------------------------------------------------------------------
+db_conn:
+  account: "rt27428.eu-central-1"                          # Snowflake account
+  dbname: "analytics_db_test"                            # Snowflake database name
+  user: "circleci"                                # Snowflake user
+  password: "Circleci1"                        # Plain string or vault encrypted
+  warehouse: "load_wh"                      # Snowflake virtual warehouse
+
+  # We use an intermediate external stage on S3 to load data into Snowflake
+  aws_access_key_id: "AKIAJV5DVCTRL7CAEHJA"             # S3 - Plain string or vault encrypted
+  aws_secret_access_key: "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"  # S3 - Plain string or vault encrypted
+  s3_bucket: "tw-staging-analyticsdb-etl"                    # S3 external stbucket name
+  s3_key_prefix: "snowflake-imports-test/"           # Optional: S3 key prefix
+
+  # stage and file_format are pre-created objects in Snowflake that requires to load and
+  # merge data correctly from S3 to tables in one step without using temp tables
+  #  stage      : External stage object pointing to an S3 bucket
+  #  file_format: Named file format object used for bulk loading data from S3 into
+  #               snowflake tables.
+  stage: "pipelinewise.encrypted_etl_stage_test"
+  file_format: "pipelinewise.etl_stage_file_format"
+
