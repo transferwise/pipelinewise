@@ -189,24 +189,24 @@ class TestE2E:
         self.assert_command_success(returncode, stdout, stderr, log_file)
 
     @pytest.mark.dependency(depends=['import_config'])
-    def test_replicate_mariadb_to_snowflake(self):
+    def test_replicate_mariadb_to_sf(self):
         """Replicate data from MariaDB to Snowflake DWH, check if return code is zero and success log file created"""
 
         tap_name = 'mariadb_to_sf'
         target_name = 'snowflake'
 
         # Run tap first time - fastsync should be triggered
-        [rc, stdout,
+        [returncode, stdout,
          stderr] = self.run_command('pipelinewise run_tap --tap {} --target {}'.format(tap_name, target_name))
 
         log_file = self.find_run_tap_log_file(stdout, 'fastsync')
-        self.assert_command_success(rc, stdout, stderr, log_file)
+        self.assert_command_success(returncode, stdout, stderr, log_file)
 
         # Run tap second time - singer should be triggered and state message should be emitted
-        [rc, stdout,
+        [returncode, stdout,
          stderr] = self.run_command('pipelinewise run_tap --tap {} --target {}'.format(tap_name, target_name))
         log_file = self.find_run_tap_log_file(stdout, 'singer')
-        self.assert_command_success(rc, stdout, stderr, log_file)
+        self.assert_command_success(returncode, stdout, stderr, log_file)
 
         self.assert_state_file_valid(target_name, tap_name, log_file)
 
@@ -219,7 +219,7 @@ class TestE2E:
         self.assert_command_success(returncode, stdout, stderr, log_file)
 
     @pytest.mark.dependency(depends=['import_config'])
-    def test_replicate_pg_to_snowflake(self):
+    def test_replicate_pg_to_sf(self):
         """Replicate data from Postgres to Snowflake, check if return code is zero and success log file created"""
 
         tap_name = 'postgres_source_sf'
@@ -239,7 +239,7 @@ class TestE2E:
         self.assert_state_file_valid(target_name, tap_name, log_file)
 
     @pytest.mark.dependency(depends=['import_config'])
-    def test_replicate_s3_to_snowflake(self):
+    def test_replicate_s3_to_sf(self):
         """Replicate csv files from s3 to Snowflake, check if return code is zero and success log file created"""
 
         tap_name = 'csv_on_s3'

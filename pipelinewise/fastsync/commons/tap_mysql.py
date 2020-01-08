@@ -192,6 +192,7 @@ class FastSyncTapMySql:
 
         return {'columns': mapped_columns, 'primary_key': self.get_primary_key(table_name)}
 
+    # pylint: disable=too-many-locals
     def copy_table(self, table_name, path):
         """
         Export data from table to a zipped csv
