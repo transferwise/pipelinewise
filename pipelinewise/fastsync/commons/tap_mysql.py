@@ -251,7 +251,7 @@ class FastSyncTapMySql:
                                 stripped_utf8_elem = val.decode().rstrip('\x00').encode()
 
                                 # encode the stripped elem to binary hex and then to utf8 string
-                                row[ind] = codecs.encode(stripped_utf8_elem, 'hex').decode("utf-8")
+                                row[ind] = codecs.encode(stripped_utf8_elem, 'hex').decode('utf-8')
 
                         writer.writerow(row)
 
