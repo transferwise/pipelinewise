@@ -1165,7 +1165,7 @@ class PipelineWise:
                 Total targets to import        : %s
                 Total taps to import           : %s
                 Taps imported successfully     : %s
-                Taps failed to import          : $s
+                Taps failed to import          : %s
                 Runtime                        : %s
             -------------------------------------------------------
             """, total_targets, total_taps, total_taps - len(discover_excs), str(discover_excs), end_time - start_time)
