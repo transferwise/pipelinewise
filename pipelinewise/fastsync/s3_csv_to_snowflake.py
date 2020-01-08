@@ -14,23 +14,10 @@ from .commons.tap_s3_csv import FastSyncTapS3Csv
 from .commons.target_snowflake import FastSyncTargetSnowflake
 
 REQUIRED_CONFIG_KEYS = {
-    'tap': [
-        'aws_access_key_id',
-        'aws_secret_access_key',
-        'bucket',
-        'start_date'
-    ],
+    'tap': ['aws_access_key_id', 'aws_secret_access_key', 'bucket', 'start_date'],
     'target': [
-        'account',
-        'dbname',
-        'user',
-        'password',
-        'warehouse',
-        'aws_access_key_id',
-        'aws_secret_access_key',
-        's3_bucket',
-        'stage',
-        'file_format'
+        'account', 'dbname', 'user', 'password', 'warehouse', 'aws_access_key_id', 'aws_secret_access_key', 's3_bucket',
+        'stage', 'file_format'
     ]
 }
 

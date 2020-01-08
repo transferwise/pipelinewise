@@ -11,23 +11,10 @@ from .commons.tap_postgres import FastSyncTapPostgres
 from .commons.target_snowflake import FastSyncTargetSnowflake
 
 REQUIRED_CONFIG_KEYS = {
-    'tap': [
-        'host',
-        'port',
-        'user',
-        'password'
-    ],
+    'tap': ['host', 'port', 'user', 'password'],
     'target': [
-        'account',
-        'dbname',
-        'user',
-        'password',
-        'warehouse',
-        'aws_access_key_id',
-        'aws_secret_access_key',
-        's3_bucket',
-        'stage',
-        'file_format'
+        'account', 'dbname', 'user', 'password', 'warehouse', 'aws_access_key_id', 'aws_secret_access_key', 's3_bucket',
+        'stage', 'file_format'
     ]
 }
 

@@ -11,22 +11,8 @@ from .commons.tap_postgres import FastSyncTapPostgres
 from .commons.target_redshift import FastSyncTargetRedshift
 
 REQUIRED_CONFIG_KEYS = {
-    'tap': [
-        'host',
-        'port',
-        'user',
-        'password'
-    ],
-    'target': [
-        'host',
-        'port',
-        'user',
-        'password',
-        'dbname',
-        'aws_access_key_id',
-        'aws_secret_access_key',
-        's3_bucket'
-    ]
+    'tap': ['host', 'port', 'user', 'password'],
+    'target': ['host', 'port', 'user', 'password', 'dbname', 'aws_access_key_id', 'aws_secret_access_key', 's3_bucket']
 }
 
 DEFAULT_VARCHAR_LENGTH = 10000
