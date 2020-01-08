@@ -53,6 +53,7 @@ confidence=
 disable=wrong-import-order,
         broad-except,
         missing-module-docstring,
+        duplicate-code,  # not useful until a major code refactoring
 
 
 enable=import-error,
