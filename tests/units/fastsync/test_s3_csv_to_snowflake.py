@@ -7,7 +7,11 @@ from argparse import Namespace
 from pipelinewise.fastsync.s3_csv_to_snowflake import tap_type_to_target_type, sync_table, main_impl
 
 
+# pylint: disable=missing-function-docstring,invalid-name,no-self-use
 class S3CsvToSnowflake(unittest.TestCase):
+    """
+    Unit tests for fastsync s3 csv to snowflake
+    """
 
     #######################################
     ##      tap_type_to_target_type
@@ -21,20 +25,25 @@ class S3CsvToSnowflake(unittest.TestCase):
     #######################################
     ##      sync_table
     #######################################
+    # pylint: disable=unused-variable
     def test_sync_table_runs_successfully_returns_true(self):
-        ns = Namespace(**{
-            'tap': {
-                'bucket': 'testBucket'
-            },
-            'properties': {},
-            'target': {},
-            'transform': {},
-            'export_dir': '',
-            'state': '',
-
-        })
+        ns = Namespace(
+            **{
+                'tap': {
+                    'bucket': 'testBucket'
+                },
+                'properties': {},
+                'target': {},
+                'transform': {},
+                'export_dir': '',
+                'state': '',
+            })
 
         class LockMock():
+            """
+            Lock Mock
+            """
+
             def acquire(self):
                 print('Acquired lock')
 
@@ -66,6 +75,7 @@ class S3CsvToSnowflake(unittest.TestCase):
                             self.assertIsInstance(res, bool)
                             self.assertTrue(res)
 
+    # pylint: disable=unused-variable
     def test_sync_table_exception_on_copy_table_returns_failed_table_name_and_exception(self):
         ns = Namespace(**{
             'tap': {
@@ -89,6 +99,7 @@ class S3CsvToSnowflake(unittest.TestCase):
                         utils_mock.get_target_schema.assert_called_once()
                         fastsync_s3_csv_mock.return_value.copy_table.assert_called_once()
 
+    # pylint: disable=unused-variable
     def test_main_impl_with_all_tables_synced_successfully_should_exit_normally(self):
         # mocks prep
         with patch('pipelinewise.fastsync.s3_csv_to_snowflake.utils') as utils_mock:
@@ -124,6 +135,7 @@ class S3CsvToSnowflake(unittest.TestCase):
                         mock_enter.return_value.map.assert_called_once()
                         fastsync_target_sf_mock.return_value.cache_information_schema_columns.assert_called_once()
 
+    # pylint: disable=unused-variable
     def test_main_impl_with_one_table_fails_to_sync_should_exit_with_error(self):
         # mocks prep
         with patch('pipelinewise.fastsync.s3_csv_to_snowflake.utils') as utils_mock:
@@ -159,6 +171,7 @@ class S3CsvToSnowflake(unittest.TestCase):
                             utils_mock.get_cpu_cores.assert_called_once()
                             mock_enter.return_value.map.assert_called_once()
                             fastsync_target_sf_mock.return_value.cache_information_schema_columns.assert_called_once()
+
 
 if __name__ == '__main__':
     unittest.main()
