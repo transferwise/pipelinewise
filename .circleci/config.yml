@@ -84,7 +84,7 @@ jobs:
             . .virtualenvs/pipelinewise/bin/activate
             export PIPELINEWISE_HOME=$PWD
             mkdir test-reports
-            coverage run -m pytest --junitxml=test-reports/junit.xml
+            coverage run -m pytest -v --junitxml=test-reports/junit.xml
             coverage report
             coverage html -d coverage_html
       - store_test_results:
