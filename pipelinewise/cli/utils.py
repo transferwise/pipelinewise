@@ -18,8 +18,7 @@ from ansible.errors import AnsibleError
 from ansible.module_utils._text import to_text
 from ansible.module_utils.common._collections_compat import Mapping
 from ansible.parsing.dataloader import DataLoader
-from ansible.parsing.vault import (VaultLib, get_file_vault_secret,
-                                   is_encrypted_file)
+from ansible.parsing.vault import (VaultLib, get_file_vault_secret, is_encrypted_file)
 from ansible.parsing.yaml.loader import AnsibleLoader
 from ansible.parsing.yaml.objects import AnsibleVaultEncryptedUnicode
 
