@@ -1,139 +1,150 @@
-import pymysql
-import gzip
 import csv
-import os
 import datetime
 import decimal
+import gzip
 
+import pymysql
 from pymysql import InterfaceError, OperationalError
 
 from . import utils
 
 
 class FastSyncTapMySql:
+    """
+    Common functions for fastsync from a MySQL database
+    """
+
     def __init__(self, connection_config, tap_type_to_target_type):
         self.connection_config = connection_config
         self.connection_config['charset'] = connection_config.get('charset', 'utf8')
         self.connection_config['export_batch_rows'] = connection_config.get('export_batch_rows', 20000)
         self.tap_type_to_target_type = tap_type_to_target_type
-
+        self.conn = None
+        self.conn_unbuffered = None
 
     def open_connections(self):
+        """
+        Open connection
+        """
         self.conn = pymysql.connect(
             # Fastsync is using bulk_sync_{host|port|user|password} values from the config by default
             # to avoid making heavy load on the primary source database when syncing large tables
             #
             # If bulk_sync_{host|port|user|password} values are not defined in the config then it's
             # using the normal credentials to connect
-            host = self.connection_config.get('bulk_sync_host', self.connection_config['host']),
-            port = int(self.connection_config.get('bulk_sync_port', self.connection_config['port'])),
-            user = self.connection_config.get('bulk_sync_user', self.connection_config['user']),
-            password = self.connection_config.get('bulk_sync_password', self.connection_config['password']),
-            charset = self.connection_config['charset'],
-            cursorclass = pymysql.cursors.DictCursor
-        )
+            host=self.connection_config.get('bulk_sync_host', self.connection_config['host']),
+            port=int(self.connection_config.get('bulk_sync_port', self.connection_config['port'])),
+            user=self.connection_config.get('bulk_sync_user', self.connection_config['user']),
+            password=self.connection_config.get('bulk_sync_password', self.connection_config['password']),
+            charset=self.connection_config['charset'],
+            cursorclass=pymysql.cursors.DictCursor)
         self.conn_unbuffered = pymysql.connect(
             # Fastsync is using bulk_sync_{host|port|user|password} values from the config by default
             # to avoid making heavy load on the primary source database when syncing large tables
             #
             # If bulk_sync_{host|port|user|password} values are not defined in the config then it's
             # using the normal credentials to connect
-            host = self.connection_config.get('bulk_sync_host', self.connection_config['host']),
-            port = int(self.connection_config.get('bulk_sync_port', self.connection_config['port'])),
-            user = self.connection_config.get('bulk_sync_user', self.connection_config['user']),
-            password = self.connection_config.get('bulk_sync_password', self.connection_config['password']),
-            charset = self.connection_config['charset'],
-            cursorclass = pymysql.cursors.SSCursor
-        )
+            host=self.connection_config.get('bulk_sync_host', self.connection_config['host']),
+            port=int(self.connection_config.get('bulk_sync_port', self.connection_config['port'])),
+            user=self.connection_config.get('bulk_sync_user', self.connection_config['user']),
+            password=self.connection_config.get('bulk_sync_password', self.connection_config['password']),
+            charset=self.connection_config['charset'],
+            cursorclass=pymysql.cursors.SSCursor)
 
     def close_connections(self, silent=False):
+        """
+        Close connection
+        """
         try:
             self.conn.close()
             self.conn_unbuffered.close()
-        except Exception as e:
+        except Exception as exc:
             if not silent:
-                utils.log(e)
+                utils.log(exc)
                 utils.log('Connections seem to be already closed.')
 
     def query(self, query, params=None, return_as_cursor=False, n_retry=1):
-        utils.log("MYSQL - Running query: {}".format(query))
+        """
+        Run query
+        """
+        utils.log('MYSQL - Running query: {}'.format(query))
         try:
             with self.conn as cur:
-                cur.execute(
-                    query,
-                    params
-                )
+                cur.execute(query, params)
 
                 if return_as_cursor:
                     return cur
 
                 if cur.rowcount > 0:
                     return cur.fetchall()
-                else:
-                    return []
-        except (InterfaceError, OperationalError) as e:
-            utils.log(f"Exception happened during running a query. Number of retries: {n_retry}. {e}")
+
+                return []
+        except (InterfaceError, OperationalError) as exc:
+            utils.log(f'Exception happened during running a query. Number of retries: {n_retry}. {exc}')
             if n_retry > 0:
-                utils.log("Reopening the connections.")
+                utils.log('Reopening the connections.')
                 self.close_connections(silent=True)
                 self.open_connections()
-                utils.log("Retrying to run a query.")
-                return self.query(query,
-                                  params=params,
-                                  return_as_cursor=return_as_cursor,
-                                  n_retry=n_retry - 1)
-            else:
-                raise e
+                utils.log('Retrying to run a query.')
+                return self.query(query, params=params, return_as_cursor=return_as_cursor, n_retry=n_retry - 1)
+
+            raise exc
 
     def fetch_current_log_pos(self):
-        result = self.query("SHOW MASTER STATUS")
+        """
+        Get the actual binlog position in MySQL
+        """
+        result = self.query('SHOW MASTER STATUS')
         if len(result) == 0:
-            raise Exception("MySQL binary logging is not enabled.")
-        else:
-            binlog_pos = result[0]
+            raise Exception('MySQL binary logging is not enabled.')
 
-            return {
-                "log_file": binlog_pos.get('File'),
-                "log_pos": binlog_pos.get('Position'),
-                "version": binlog_pos.get('version', 1)
-            }
+        binlog_pos = result[0]
 
+        return {
+            'log_file': binlog_pos.get('File'),
+            'log_pos': binlog_pos.get('Position'),
+            'version': binlog_pos.get('version', 1)
+        }
 
+    # pylint: disable=invalid-name
     def fetch_current_incremental_key_pos(self, table, replication_key):
-        result = self.query("SELECT MAX({}) AS key_value FROM {}".format(replication_key, table))
+        """
+        Get the actual incremental key position in the table
+        """
+        result = self.query('SELECT MAX({}) AS key_value FROM {}'.format(replication_key, table))
         if len(result) == 0:
-            raise Exception("Cannot get replication key value for table: {}".format(table))
-        else:
-            mysql_key_value = result[0].get("key_value")
-            key_value = mysql_key_value
+            raise Exception('Cannot get replication key value for table: {}'.format(table))
 
-            # Convert msyql data/datetime format to JSON friendly values
-            if isinstance(mysql_key_value, datetime.datetime):
-                key_value = mysql_key_value.isoformat()
+        mysql_key_value = result[0].get('key_value')
+        key_value = mysql_key_value
 
-            elif isinstance(mysql_key_value, datetime.date):
-                key_value = mysql_key_value.isoformat() + 'T00:00:00'
+        # Convert msyql data/datetime format to JSON friendly values
+        if isinstance(mysql_key_value, datetime.datetime):
+            key_value = mysql_key_value.isoformat()
 
-            elif isinstance(mysql_key_value, decimal.Decimal):
-                key_value = float(mysql_key_value)
+        elif isinstance(mysql_key_value, datetime.date):
+            key_value = mysql_key_value.isoformat() + 'T00:00:00'
 
-            return {
-                "replication_key": replication_key,
-                "replication_key_value": key_value,
-                "version": 1
-            }
+        elif isinstance(mysql_key_value, decimal.Decimal):
+            key_value = float(mysql_key_value)
 
+        return {'replication_key': replication_key, 'replication_key_value': key_value, 'version': 1}
 
     def get_primary_key(self, table_name):
+        """
+        Get the primary key of a table
+        """
         sql = "SHOW KEYS FROM {} WHERE Key_name = 'PRIMARY'".format(table_name)
-        pk = self.query(sql)
-        if len(pk) > 0:
-            return pk[0].get('Column_name')
-        else:
-            return None
+        primary_key = self.query(sql)
+        if len(primary_key) > 0:
+            return primary_key[0].get('Column_name')
 
+        return None
 
     def get_table_columns(self, table_name):
+        """
+        Get MySQL table column details from information_schema
+        """
         table_dict = utils.tablename_to_dict(table_name)
         sql = """
                 SELECT column_name,
@@ -165,24 +176,29 @@ class FastSyncTapMySql:
             """.format(table_dict.get('schema_name'), table_dict.get('table_name'))
         return self.query(sql)
 
-
     def map_column_types_to_target(self, table_name):
+        """
+        Map MySQL columnn types to equivalent types in target
+        """
         mysql_columns = self.get_table_columns(table_name)
-        mapped_columns = ["{} {}".format(pc.get('column_name'), self.tap_type_to_target_type(pc.get('data_type'), pc.get('column_type'))) for pc in mysql_columns]
+        mapped_columns = [
+            '{} {}'.format(pc.get('column_name'),
+                           self.tap_type_to_target_type(pc.get('data_type'), pc.get('column_type')))
+            for pc in mysql_columns
+        ]
 
-        return {
-            "columns": mapped_columns,
-            "primary_key": self.get_primary_key(table_name)
-        }
-
+        return {'columns': mapped_columns, 'primary_key': self.get_primary_key(table_name)}
 
     def copy_table(self, table_name, path):
+        """
+        Export data from table to a zipped csv
+        """
         table_columns = self.get_table_columns(table_name)
         column_safe_sql_values = [c.get('safe_sql_value') for c in table_columns]
 
         # If self.get_table_columns returns zero row then table not exist
         if len(column_safe_sql_values) == 0:
-            raise Exception("{} table not found.".format(table_name))
+            raise Exception('{} table not found.'.format(table_name))
 
         sql = """SELECT {}
         ,CONVERT_TZ( NOW(),@@session.time_zone,'+00:00') AS _SDC_EXTRACTED_AT
@@ -195,10 +211,7 @@ class FastSyncTapMySql:
         with self.conn_unbuffered as cur:
             cur.execute(sql)
             with gzip.open(path, 'wt') as gzfile:
-                writer = csv.writer(gzfile,
-                                    delimiter=',',
-                                    quotechar='"',
-                                    quoting=csv.QUOTE_MINIMAL)
+                writer = csv.writer(gzfile, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
 
                 while True:
                     rows = cur.fetchmany(export_batch_rows)
@@ -207,15 +220,15 @@ class FastSyncTapMySql:
                     if not rows:
                         break
 
-
                     # Log export status
                     exported_rows += len(rows)
-                    if (len(rows) == export_batch_rows):
-                        #Then we believe this to be just an interim batch and not the final one so report on progress
-                        utils.log("Exporting batch from {} to {} rows from {}...".format((exported_rows-export_batch_rows),exported_rows, table_name))
+                    if len(rows) == export_batch_rows:
+                        # Then we believe this to be just an interim batch and not the final one so report on progress
+                        utils.log('Exporting batch from {} to {} rows from {}...'.format(
+                            (exported_rows - export_batch_rows), exported_rows, table_name))
 
                     # Write rows to file
                     for row in rows:
                         writer.writerow(row)
 
-                utils.log("Exported total of {} rows from {}...".format(exported_rows, table_name))
+                utils.log('Exported total of {} rows from {}...'.format(exported_rows, table_name))
