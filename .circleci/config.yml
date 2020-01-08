@@ -56,17 +56,27 @@ jobs:
     steps:
       - checkout
       - run:
-          name: Build source databases for integration tests
+          name: 'Build source databases for integration tests'
           command: |
             sudo apt-get update
             sudo apt install mariadb-client postgresql-client
             ./tests/db/tap_mysql_db.sh
             ./tests/db/tap_postgres_db.sh
       - run:
-          name: Installing PipelineWise components and connectors
+          name: 'Installing PipelineWise components and connectors'
           command: ./install.sh --connectors=all --acceptlicenses
       - run:
-          name: Run tests
+          name: 'Check formatting and do Pylinting'
+          command: |
+            . .virtualenvs/pipelinewise/bin/activate
+            pip install yapf unify pylint
+            echo "Check formatting and quotes..."
+            yapf pipelinewise/cli --recursive --diff -vv && unify pipelinewise/cli/*py
+            echo "Running pylint..."
+            pylint pipelinewise/cli
+
+      - run:
+          name: 'Run tests'
           command: |
             . .virtualenvs/pipelinewise/bin/activate
             export PIPELINEWISE_HOME=$PWD
