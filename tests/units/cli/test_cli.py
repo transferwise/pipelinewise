@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pipelinewise.cli as cli
 import pytest
-from cli_args import CliArgs
+from tests.units.cli.cli_args import CliArgs
 from pipelinewise.cli.pipelinewise import PipelineWise
 
 CONFIG_DIR = '{}/resources/sample_json_config'.format(os.path.dirname(__file__))
