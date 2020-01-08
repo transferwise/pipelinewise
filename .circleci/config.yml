@@ -35,6 +35,7 @@ references:
        # MariaDB service container image used as test source database (for tap-mysql)
       - image: mariadb:10.2.26
         name: db_mysql_source
+        command: --default-authentication-plugin=mysql_native_password --log-bin=mysql-bin --binlog-format=ROW
         environment:
           MYSQL_ROOT_PASSWORD: test
           MYSQL_USER: test

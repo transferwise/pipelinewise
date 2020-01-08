@@ -138,7 +138,7 @@ class FastSyncTargetSnowflake:
         if master_key != '':
             sql = """COPY INTO {}.{} FROM @{}/{}
                 FILE_FORMAT = (type='CSV' escape='\\x1e' escape_unenclosed_field='\\x1e' 
-                field_optionally_enclosed_by='\"' skip_header={} COMPRESSION='GZIP') 
+                field_optionally_enclosed_by='\"' skip_header={} COMPRESSION='GZIP' BINARY_FORMAT='HEX') 
             """.format(
                 target_schema,
                 target_table,
@@ -150,7 +150,7 @@ class FastSyncTargetSnowflake:
             sql = """COPY INTO {}.{} FROM 's3://{}/{}'
                 CREDENTIALS = (aws_key_id='{}' aws_secret_key='{}')
                 FILE_FORMAT = (type='CSV' escape='\\x1e' escape_unenclosed_field='\\x1e' 
-                field_optionally_enclosed_by='\"' skip_header={} COMPRESSION='GZIP')
+                field_optionally_enclosed_by='\"' skip_header={} COMPRESSION='GZIP' BINARY_FORMAT='HEX')
             """.format(
                 target_schema,
                 target_table,

@@ -189,8 +189,39 @@ INSERT INTO `weight_unit` VALUES (1,'1 kg pkg.',1,'2017-03-26 00:36:37','2017-03
 /*!40000 ALTER TABLE `weight_unit` ENABLE KEYS */;
 UNLOCK TABLES;
 
-/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
+-- Dump completed on 2017-03-26  2:01:31
 
+--
+-- Table structure for table `table_with_binary`
+--
+
+DROP TABLE IF EXISTS `table_with_binary`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `table_with_binary` (
+  `id` binary(50) PRIMARY KEY,
+  `data` varbinary(100),
+  `date_created` datetime DEFAULT CURRENT_TIMESTAMP,
+  `date_updated` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `table_with_binary`
+--
+
+LOCK TABLES `table_with_binary` WRITE;
+/*!40000 ALTER TABLE `table_with_binary` DISABLE KEYS */;
+INSERT INTO `table_with_binary`(id, data) VALUES
+                                            (BINARY ('1000'),BINARY('data1000')),
+                                            (BINARY('1001'), BINARY('data1001')),
+                                            (BINARY(1002), null),
+                                            (HEX (1003), HEX('data1003'))
+                                            ;
+/*!40000 ALTER TABLE `table_with_binary` ENABLE KEYS */;
+UNLOCK TABLES;
+
+/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
 /*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
 /*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
@@ -198,5 +229,3 @@ UNLOCK TABLES;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
-
--- Dump completed on 2017-03-26  2:01:31

@@ -68,5 +68,3 @@ schemas:
                                             # Important! Log based must be enabled in MySQL and
                                             #            requires config adjustments
                                             # Doc: https://transferwise.github.io/pipelinewise/connectors/taps/mysql.html
-
-
