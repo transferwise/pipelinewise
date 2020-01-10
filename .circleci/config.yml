@@ -70,9 +70,7 @@ jobs:
           name: 'Check code formatting and do pylinting'
           command: |
             . .virtualenvs/pipelinewise/bin/activate
-            pip install yapf unify pylint
-            echo "Checking code formatting..."
-            yapf pipelinewise tests --recursive --diff -vv
+            pip install unify pylint
             echo "Checking double quotes..."
             find pipelinewise tests -type f -name '*.py' | xargs unify --check-only
             echo "Running pylint..."
