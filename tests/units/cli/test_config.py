@@ -39,12 +39,9 @@ class TestConfig:
         # The target dictionary should contain every target and tap parsed from YAML files
         assert config.targets == {
             'test_snowflake_target': {
-                'id':
-                    'test_snowflake_target',
-                'name':
-                    'Test Target Connector',
-                'type':
-                    'target-snowflake',
+                'id': 'test_snowflake_target',
+                'name': 'Test Target Connector',
+                'type': 'target-snowflake',
                 'db_conn': {
                     'account': 'account',
                     'aws_access_key_id': 'access_key_id',
@@ -60,32 +57,21 @@ class TestConfig:
                     'warehouse': 'MY_WAREHOUSE'
                 },
                 'files': {
-                    'config':
-                        '{}/test_snowflake_target/config.json'.format(PIPELINEWISE_TEST_HOME),
+                    'config': '{}/test_snowflake_target/config.json'.format(PIPELINEWISE_TEST_HOME),
                     'inheritable_config':
                         '{}/test_snowflake_target/inheritable_config.json'.format(PIPELINEWISE_TEST_HOME),
-                    'properties':
-                        '{}/test_snowflake_target/properties.json'.format(PIPELINEWISE_TEST_HOME),
-                    'selection':
-                        '{}/test_snowflake_target/selection.json'.format(PIPELINEWISE_TEST_HOME),
-                    'state':
-                        '{}/test_snowflake_target/state.json'.format(PIPELINEWISE_TEST_HOME),
-                    'transformation':
-                        '{}/test_snowflake_target/transformation.json'.format(PIPELINEWISE_TEST_HOME)
+                    'properties': '{}/test_snowflake_target/properties.json'.format(PIPELINEWISE_TEST_HOME),
+                    'selection': '{}/test_snowflake_target/selection.json'.format(PIPELINEWISE_TEST_HOME),
+                    'state': '{}/test_snowflake_target/state.json'.format(PIPELINEWISE_TEST_HOME),
+                    'transformation': '{}/test_snowflake_target/transformation.json'.format(PIPELINEWISE_TEST_HOME)
                 },
                 'taps': [{
-                    'id':
-                        'mysql_sample',
-                    'name':
-                        'Sample MySQL Database',
-                    'type':
-                        'tap-mysql',
-                    'owner':
-                        'somebody@foo.com',
-                    'target':
-                        'test_snowflake_target',
-                    'batch_size_rows':
-                        20000,
+                    'id': 'mysql_sample',
+                    'name': 'Sample MySQL Database',
+                    'type': 'tap-mysql',
+                    'owner': 'somebody@foo.com',
+                    'target': 'test_snowflake_target',
+                    'batch_size_rows': 20000,
                     'db_conn': {
                         'dbname': '<DB_NAME>',
                         'host': '<HOST>',
@@ -109,10 +95,8 @@ class TestConfig:
                             '{}/test_snowflake_target/mysql_sample/transformation.json'.format(PIPELINEWISE_TEST_HOME)
                     },
                     'schemas': [{
-                        'source_schema':
-                            'my_db',
-                        'target_schema':
-                            'repl_my_db',
+                        'source_schema': 'my_db',
+                        'target_schema': 'repl_my_db',
                         'target_schema_select_permissions': ['grp_stats'],
                         'tables': [{
                             'table_name': 'table_one',

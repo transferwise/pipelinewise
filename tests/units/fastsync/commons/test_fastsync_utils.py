@@ -13,11 +13,19 @@ class MySqlMock:
     """
 
     def fetch_current_log_pos(self):
-        return {'log_file': 'mysqld-bin.000001', 'log_pos': '123456', 'version': 1}
+        return {
+            'log_file': 'mysqld-bin.000001',
+            'log_pos': '123456',
+            'version': 1
+        }
 
     #pylint: disable=unused-argument
     def fetch_current_incremental_key_pos(self, table, replication_key):
-        return {'replication_key': replication_key, 'replication_key_value': 123456, 'version': 1}
+        return {
+            'replication_key': replication_key,
+            'replication_key_value': 123456,
+            'version': 1
+        }
 
 
 class PostgresMock:
@@ -26,11 +34,18 @@ class PostgresMock:
     """
 
     def fetch_current_log_pos(self):
-        return {'lsn': '16/B374D848', 'version': 1}
+        return {
+            'lsn': '16/B374D848',
+            'version': 1
+        }
 
     #pylint: disable=unused-argument
     def fetch_current_incremental_key_pos(self, table, replication_key):
-        return {'replication_key': replication_key, 'replication_key_value': 123456, 'version': 1}
+        return {
+            'replication_key': replication_key,
+            'replication_key_value': 123456,
+            'version': 1
+        }
 
 
 class S3CsvMock:
@@ -40,7 +55,9 @@ class S3CsvMock:
 
     #pylint: disable=unused-argument
     def fetch_current_incremental_key_pos(self, table, replication_key):
-        return {'modified_since': '2019-11-15T07:39:44.171098'}
+        return {
+            'modified_since': '2019-11-15T07:39:44.171098'
+        }
 
 
 class TestFastSyncUtils(TestCase):
@@ -232,7 +249,10 @@ class TestFastSyncUtils(TestCase):
         assert utils.get_target_schema(target_config_with_schema_mapping, 'foo.foo') == 'foo'
 
         # If target schema exist in schema_mapping then should not use the default_target_schema
-        target_config = {'default_target_schema': 'target_schema', 'schema_mapping': {'foo': {'target_schema': 'foo'}}}
+        target_config = {
+            'default_target_schema': 'target_schema',
+            'schema_mapping': {'foo': {'target_schema': 'foo'}}
+        }
         assert utils.get_target_schema(target_config, 'foo.foo') == 'foo'
 
         # If target schema not exist in schema_mapping then should return the default_target_schema

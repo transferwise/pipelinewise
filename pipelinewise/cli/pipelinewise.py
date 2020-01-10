@@ -114,12 +114,7 @@ class PipelineWise:
             raise Exception(f'Cannot merge JSON files {dict_a} {dict_b} - {exc}')
 
     # pylint: disable=too-many-statements,too-many-branches,too-many-nested-blocks,too-many-locals,too-many-arguments
-    def create_filtered_tap_properties(self,
-                                       target_type,
-                                       tap_type,
-                                       tap_properties,
-                                       tap_state,
-                                       filters,
+    def create_filtered_tap_properties(self, target_type, tap_type, tap_properties, tap_state, filters,
                                        create_fallback=False):
         """
         Create a filtered version of tap properties file based on specific filter conditions.
@@ -202,13 +197,14 @@ class PipelineWise:
                 # Set the "selected" key to True if actual values meet the filter criteria
                 # Set the "selected" key to False if the actual values don't meet the filter criteria
                 # pylint: disable=too-many-boolean-expressions,bad-continuation
-                if ((f_selected is None or selected == f_selected) and
-                    (f_target_type is None or target_type in f_target_type) and
-                    (f_tap_type is None or tap_type in f_tap_type) and
-                    (f_replication_method is None or replication_method in f_replication_method) and
-                    (f_initial_sync_required is None or initial_sync_required == f_initial_sync_required)):
-                    self.logger.debug(
-                        """Filter condition(s) matched:
+                if (
+                        (f_selected is None or selected == f_selected) and
+                        (f_target_type is None or target_type in f_target_type) and
+                        (f_tap_type is None or tap_type in f_tap_type) and
+                        (f_replication_method is None or replication_method in f_replication_method) and
+                        (f_initial_sync_required is None or initial_sync_required == f_initial_sync_required)
+                ):
+                    self.logger.debug("""Filter condition(s) matched:
                         Table              : %s
                         Tap Stream ID      : %s
                         Selected           : %s
@@ -718,7 +714,11 @@ class PipelineWise:
         tap_dir = self.get_tap_dir(target_id, tap_id)
         log_dir = self.get_tap_log_dir(target_id, tap_id)
         connector_files = self.get_connector_files(tap_dir)
-        status = {'currentStatus': 'unknown', 'lastStatus': 'unknown', 'lastTimestamp': None}
+        status = {
+            'currentStatus': 'unknown',
+            'lastStatus': 'unknown',
+            'lastTimestamp': None
+        }
 
         # Tap exists but configuration not completed
         if not os.path.isfile(connector_files['config']):
@@ -750,7 +750,14 @@ class PipelineWise:
         targets = self.get_targets()
 
         tab_headers = [
-            'Tap ID', 'Tap Type', 'Target ID', 'Target Type', 'Enabled', 'Status', 'Last Sync', 'Last Sync Result'
+            'Tap ID',
+            'Tap Type',
+            'Target ID',
+            'Target Type',
+            'Enabled',
+            'Status',
+            'Last Sync',
+            'Last Sync Result'
         ]
         tab_body = []
         pipelines = 0
@@ -873,9 +880,15 @@ class PipelineWise:
             tap_transform_arg = f'--transform {tap_transformation}'
 
         tables_command = f'--tables {self.args.tables}' if self.args.tables else ''
-        command = ' '.join(
-            (f'  {fastsync_bin} ', f'--tap {tap_config}', f'--properties {tap_properties}', f'--state {tap_state}',
-             f'--target {target_config}', f'{tap_transform_arg}', f'{tables_command}'))
+        command = ' '.join((
+            f'  {fastsync_bin} ',
+            f'--tap {tap_config}',
+            f'--properties {tap_properties}',
+            f'--state {tap_state}',
+            f'--target {target_config}',
+            f'{tap_transform_arg}',
+            f'{tables_command}'
+        ))
 
         # Do not run if another instance is already running
         log_dir = os.path.dirname(self.tap_run_log_file)
@@ -952,18 +965,22 @@ class PipelineWise:
 
         # Create fastsync and singer specific filtered tap properties that contains only
         # the the tables that needs to be synced by the specific command
-        (tap_properties_fastsync, fastsync_stream_ids, tap_properties_singer,
-         singer_stream_ids) = self.create_filtered_tap_properties(
-             target_type,
-             tap_type,
-             tap_properties,
-             tap_state, {
-                 'selected': True,
-                 'target_type': ['target-snowflake', 'target-redshift'],
-                 'tap_type': ['tap-mysql', 'tap-postgres', 'tap-s3-csv'],
-                 'initial_sync_required': True
-             },
-             create_fallback=True)
+        (
+            tap_properties_fastsync,
+            fastsync_stream_ids,
+            tap_properties_singer,
+            singer_stream_ids
+        ) = self.create_filtered_tap_properties(
+            target_type,
+            tap_type,
+            tap_properties,
+            tap_state, {
+                'selected': True,
+                'target_type': ['target-snowflake', 'target-redshift'],
+                'tap_type': ['tap-mysql', 'tap-postgres', 'tap-s3-csv'],
+                'initial_sync_required': True
+            },
+            create_fallback=True)
 
         start_time = datetime.now()
         try:
@@ -971,8 +988,15 @@ class PipelineWise:
             if len(fastsync_stream_ids) > 0:
                 self.logger.info('Table(s) selected to sync by fastsync: %s', fastsync_stream_ids)
                 self.tap_run_log_file = os.path.join(log_dir, f'{target_id}-{tap_id}-{current_time}.fastsync.log')
-                self.run_tap_fastsync(tap_type, target_type, tap_config, tap_properties_fastsync, tap_state,
-                                      tap_transformation, cons_target_config)
+                self.run_tap_fastsync(
+                    tap_type,
+                    target_type,
+                    tap_config,
+                    tap_properties_fastsync,
+                    tap_state,
+                    tap_transformation,
+                    cons_target_config
+                )
             else:
                 self.logger.info('No table available that needs to be sync by fastsync')
 
@@ -980,8 +1004,14 @@ class PipelineWise:
             if len(singer_stream_ids) > 0:
                 self.logger.info('Table(s) selected to sync by singer: %s', singer_stream_ids)
                 self.tap_run_log_file = os.path.join(log_dir, f'{target_id}-{tap_id}-{current_time}.singer.log')
-                self.run_tap_singer(tap_type, tap_config, tap_properties_singer, tap_state, tap_transformation,
-                                    cons_target_config)
+                self.run_tap_singer(
+                    tap_type,
+                    tap_config,
+                    tap_properties_singer,
+                    tap_state,
+                    tap_transformation,
+                    cons_target_config
+                )
             else:
                 self.logger.info('No table available that needs to be sync by singer')
 
@@ -1060,8 +1090,15 @@ class PipelineWise:
         # sync_tables command always using fastsync
         try:
             self.tap_run_log_file = os.path.join(log_dir, f'{target_id}-{tap_id}-{current_time}.fastsync.log')
-            self.run_tap_fastsync(tap_type, target_type, tap_config, tap_properties, tap_state, tap_transformation,
-                                  cons_target_config)
+            self.run_tap_fastsync(
+                tap_type,
+                target_type,
+                tap_config,
+                tap_properties,
+                tap_state,
+                tap_transformation,
+                cons_target_config
+            )
 
         # Delete temp file if there is any
         except utils.RunCommandException as exc:
@@ -1147,12 +1184,11 @@ class PipelineWise:
             with parallel_backend('threading', n_jobs=-1):
                 # Discover taps in parallel and return the list
                 #  of exception of the failed ones
-                discover_excs.extend(
-                    list(
-                        filter(
-                            None,
-                            Parallel(verbose=100)(
-                                delayed(self.discover_tap)(tap=tap, target=target) for tap in target.get('taps')))))
+                discover_excs.extend(list(filter(None,
+                                                 Parallel(verbose=100)(delayed(self.discover_tap)(
+                                                     tap=tap,
+                                                     target=target
+                                                 ) for tap in target.get('taps')))))
 
         # Log summary
         end_time = datetime.now()
@@ -1168,7 +1204,13 @@ class PipelineWise:
                 Taps failed to import          : %s
                 Runtime                        : %s
             -------------------------------------------------------
-            """, total_targets, total_taps, total_taps - len(discover_excs), str(discover_excs), end_time - start_time)
+            """,
+            total_targets,
+            total_taps,
+            total_taps - len(discover_excs),
+            str(discover_excs),
+            end_time - start_time
+        )
         if len(discover_excs) > 0:
             sys.exit(1)
 
@@ -1201,10 +1243,11 @@ class PipelineWise:
         """
         return replication_method == self.FULL_TABLE or (
             (replication_method in [self.INCREMENTAL, self.LOG_BASED]) and
-            (not ('replication_key_value' in stream_bookmark or 'log_pos' in stream_bookmark or
-                  'lsn' in stream_bookmark or 'modified_since' in stream_bookmark
-                  # this is replication key for tap-s3-csv used by Singer
-                 )))
+            (not ('replication_key_value' in stream_bookmark or
+                  'log_pos' in stream_bookmark or
+                  'lsn' in stream_bookmark or
+                  'modified_since' in stream_bookmark  # this is replication key for tap-s3-csv used by Singer
+                  )))
 
     # pylint: disable=unused-argument
     def _exit_gracefully(self, sig, frame, exit_code=1):

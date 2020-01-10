@@ -11,8 +11,22 @@ from .commons.tap_mysql import FastSyncTapMySql
 from .commons.target_redshift import FastSyncTargetRedshift
 
 REQUIRED_CONFIG_KEYS = {
-    'tap': ['host', 'port', 'user', 'password'],
-    'target': ['host', 'port', 'user', 'password', 'dbname', 'aws_access_key_id', 'aws_secret_access_key', 's3_bucket']
+    'tap': [
+        'host',
+        'port',
+        'user',
+        'password'
+    ],
+    'target': [
+        'host',
+        'port',
+        'user',
+        'password',
+        'dbname',
+        'aws_access_key_id',
+        'aws_secret_access_key',
+        's3_bucket'
+    ]
 }
 
 DEFAULT_VARCHAR_LENGTH = 10000
@@ -134,7 +148,9 @@ def main_impl():
             Total tables selected to sync  : {}
             CPU cores                      : {}
         -------------------------------------------------------
-        """.format(args.tables, len(args.tables), cpu_cores))
+        """.format(args.tables,
+                   len(args.tables),
+                   cpu_cores))
 
     # Create target schemas sequentially, Redshift doesn't like it running in parallel
     redshift = FastSyncTargetRedshift(args.target, args.transform)
@@ -160,7 +176,10 @@ def main_impl():
             Runtime                        : {}
         -------------------------------------------------------
         """.format(len(args.tables),
-                   len(args.tables) - len(table_sync_excs), str(table_sync_excs), cpu_cores, end_time - start_time))
+                   len(args.tables) - len(table_sync_excs),
+                   str(table_sync_excs),
+                   cpu_cores,
+                   end_time - start_time))
     if len(table_sync_excs) > 0:
         sys.exit(1)
 

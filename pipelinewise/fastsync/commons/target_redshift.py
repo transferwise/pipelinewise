@@ -23,8 +23,12 @@ class FastSyncTargetRedshift:
 
     def open_connection(self):
         conn_string = "host='{}' dbname='{}' user='{}' password='{}' port='{}'".format(
-            self.connection_config['host'], self.connection_config['dbname'], self.connection_config['user'],
-            self.connection_config['password'], self.connection_config['port'])
+            self.connection_config['host'],
+            self.connection_config['dbname'],
+            self.connection_config['user'],
+            self.connection_config['password'],
+            self.connection_config['port']
+        )
 
         return psycopg2.connect(conn_string)
 
@@ -93,8 +97,7 @@ class FastSyncTargetRedshift:
         bucket = self.connection_config['s3_bucket']
 
         # Generate copy options - Override defaults if defined
-        copy_options = self.connection_config.get(
-            'copy_options', """
+        copy_options = self.connection_config.get('copy_options', """
             EMPTYASNULL BLANKSASNULL TRIMBLANKS TRUNCATECOLUMNS
             TIMEFORMAT 'auto'
         """)
@@ -105,7 +108,15 @@ class FastSyncTargetRedshift:
             SECRET_ACCESS_KEY '{}'
             {}
             CSV GZIP
-        """.format(target_schema, target_table, bucket, s3_key, aws_access_key_id, aws_secret_access_key, copy_options)
+        """.format(
+            target_schema,
+            target_table,
+            bucket,
+            s3_key,
+            aws_access_key_id,
+            aws_secret_access_key,
+            copy_options
+        )
         self.query(sql)
 
         utils.log('REDSHIFT - Deleting {} from S3...'.format(s3_key))

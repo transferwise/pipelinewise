@@ -83,8 +83,12 @@ class FastSyncTapPostgres:
         # Create replication slot dedicated connection
         # Always use Primary server for creating replication_slot
         primary_host_conn_string = "host='{}' port='{}' user='{}' password='{}' dbname='{}'".format(
-            self.connection_config['host'], self.connection_config['port'], self.connection_config['user'],
-            self.connection_config['password'], self.connection_config['dbname'])
+            self.connection_config['host'],
+            self.connection_config['port'],
+            self.connection_config['user'],
+            self.connection_config['password'],
+            self.connection_config['dbname']
+        )
         self.primary_host_conn = psycopg2.connect(primary_host_conn_string)
         # Set connection to autocommit
         self.primary_host_conn.autocommit = True
@@ -146,7 +150,10 @@ class FastSyncTapPostgres:
         file, index = current_lsn.split('/')
         lsn = (int(file, 16) << 32) + int(index, 16)
 
-        return {'lsn': lsn, 'version': 1}
+        return {
+            'lsn': lsn,
+            'version': 1
+        }
 
     # pylint: disable=invalid-name
     def fetch_current_incremental_key_pos(self, table, replication_key):
@@ -170,7 +177,11 @@ class FastSyncTapPostgres:
         elif isinstance(postgres_key_value, decimal.Decimal):
             key_value = float(postgres_key_value)
 
-        return {'replication_key': replication_key, 'replication_key_value': key_value, 'version': 1}
+        return {
+            'replication_key': replication_key,
+            'replication_key_value': key_value,
+            'version': 1
+        }
 
     def get_primary_key(self, table):
         """
@@ -225,7 +236,10 @@ class FastSyncTapPostgres:
         postgres_columns = self.get_table_columns(table_name)
         mapped_columns = ['{} {}'.format(pc[0], self.tap_type_to_target_type(pc[1])) for pc in postgres_columns]
 
-        return {'columns': mapped_columns, 'primary_key': self.get_primary_key(table_name)}
+        return {
+            'columns': mapped_columns,
+            'primary_key': self.get_primary_key(table_name)
+        }
 
     def copy_table(self, table_name, path):
         """

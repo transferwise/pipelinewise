@@ -87,7 +87,10 @@ class FastSyncTapMySql:
                 self.close_connections(silent=True)
                 self.open_connections()
                 utils.log('Retrying to run a query.')
-                return self.query(query, params=params, return_as_cursor=return_as_cursor, n_retry=n_retry - 1)
+                return self.query(query,
+                                  params=params,
+                                  return_as_cursor=return_as_cursor,
+                                  n_retry=n_retry - 1)
 
             raise exc
 
@@ -129,7 +132,11 @@ class FastSyncTapMySql:
         elif isinstance(mysql_key_value, decimal.Decimal):
             key_value = float(mysql_key_value)
 
-        return {'replication_key': replication_key, 'replication_key_value': key_value, 'version': 1}
+        return {
+            'replication_key': replication_key,
+            'replication_key_value': key_value,
+            'version': 1
+        }
 
     def get_primary_key(self, table_name):
         """
@@ -187,10 +194,12 @@ class FastSyncTapMySql:
         mapped_columns = [
             '{} {}'.format(pc.get('column_name'),
                            self.tap_type_to_target_type(pc.get('data_type'), pc.get('column_type')))
-            for pc in mysql_columns
-        ]
+            for pc in mysql_columns]
 
-        return {'columns': mapped_columns, 'primary_key': self.get_primary_key(table_name)}
+        return {
+            'columns': mapped_columns,
+            'primary_key': self.get_primary_key(table_name)
+        }
 
     # pylint: disable=too-many-locals
     def copy_table(self, table_name, path):
@@ -215,7 +224,10 @@ class FastSyncTapMySql:
         with self.conn_unbuffered as cur:
             cur.execute(sql)
             with gzip.open(path, 'wt') as gzfile:
-                writer = csv.writer(gzfile, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+                writer = csv.writer(gzfile,
+                                    delimiter=',',
+                                    quotechar='"',
+                                    quoting=csv.QUOTE_MINIMAL)
 
                 while True:
                     rows = cur.fetchmany(export_batch_rows)

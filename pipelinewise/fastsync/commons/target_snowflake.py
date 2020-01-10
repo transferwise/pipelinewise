@@ -67,7 +67,10 @@ class FastSyncTargetSnowflake:
 
             # Upload to s3
             # Send key and iv in the metadata, that will be required to decrypt and upload the encrypted file
-            metadata = {'x-amz-key': encryption_metadata.key, 'x-amz-iv': encryption_metadata.iv}
+            metadata = {
+                'x-amz-key': encryption_metadata.key,
+                'x-amz-iv': encryption_metadata.iv
+            }
             self.s3.upload_file(encrypted_file, bucket, s3_key, ExtraArgs={'Metadata': metadata})
 
             # Remove the uploaded encrypted file
@@ -90,27 +93,20 @@ class FastSyncTargetSnowflake:
         sql = 'DROP TABLE IF EXISTS {}.{}'.format(target_schema, target_table)
         self.query(sql)
 
-    def create_table(self,
-                     target_schema: str,
-                     table_name: str,
-                     columns: List[str],
-                     primary_key: str,
-                     is_temporary: bool = False,
-                     sort_columns=False):
+    def create_table(self, target_schema: str, table_name: str, columns: List[str], primary_key: str,
+                     is_temporary: bool = False, sort_columns=False):
 
         table_dict = utils.tablename_to_dict(table_name)
         target_table = table_dict.get('table_name') if not is_temporary else table_dict.get('temp_table_name')
 
         # skip the EXTRACTED, BATCHED and DELETED columns in case they exist because they gonna be added later
-        columns = [
-            c for c in columns if not (c.startswith(self.EXTRACTED_AT_COLUMN) or c.startswith(self.BATCHED_AT_COLUMN) or
-                                       c.startswith(self.DELETED_AT_COLUMN))
-        ]
+        columns = [c for c in columns if not (c.startswith(self.EXTRACTED_AT_COLUMN) or
+                                              c.startswith(self.BATCHED_AT_COLUMN) or
+                                              c.startswith(self.DELETED_AT_COLUMN))]
 
-        columns += [
-            f'{self.EXTRACTED_AT_COLUMN} TIMESTAMP_NTZ', f'{self.BATCHED_AT_COLUMN} TIMESTAMP_NTZ',
-            f'{self.DELETED_AT_COLUMN} VARCHAR'
-        ]
+        columns += [f'{self.EXTRACTED_AT_COLUMN} TIMESTAMP_NTZ',
+                    f'{self.BATCHED_AT_COLUMN} TIMESTAMP_NTZ',
+                    f'{self.DELETED_AT_COLUMN} VARCHAR']
 
         # We need the sort the columns for some taps( for now tap-s3-csv)
         # because later on when copying a csv file into Snowflake
@@ -221,8 +217,12 @@ class FastSyncTargetSnowflake:
                     trans_cols.append('{} = SHA2({}, 256)'.format(column, column))
                 elif 'HASH-SKIP-FIRST' in transform_type:
                     skip_first_n = transform_type[-1]
-                    trans_cols.append('{} = CONCAT(SUBSTRING({}, 1, {}), SHA2(SUBSTRING({}, {} + 1), 256))'.format(
-                        column, column, skip_first_n, column, skip_first_n))
+                    trans_cols.append(
+                        '{} = CONCAT(SUBSTRING({}, 1, {}), SHA2(SUBSTRING({}, {} + 1), 256))'.format(column,
+                                                                                                     column,
+                                                                                                     skip_first_n,
+                                                                                                     column,
+                                                                                                     skip_first_n))
                 elif transform_type == 'MASK-DATE':
                     trans_cols.append("{} = TO_CHAR({}::DATE,'YYYY-01-01')::DATE".format(column, column))
                 elif transform_type == 'MASK-NUMBER':

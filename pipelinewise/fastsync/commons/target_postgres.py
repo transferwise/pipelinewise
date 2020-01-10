@@ -16,8 +16,12 @@ class FastSyncTargetPostgres:
 
     def open_connection(self):
         conn_string = "host='{}' dbname='{}' user='{}' password='{}' port='{}'".format(
-            self.connection_config['host'], self.connection_config['dbname'], self.connection_config['user'],
-            self.connection_config['password'], self.connection_config['port'])
+            self.connection_config['host'],
+            self.connection_config['dbname'],
+            self.connection_config['user'],
+            self.connection_config['password'],
+            self.connection_config['port']
+        )
 
         return psycopg2.connect(conn_string)
 

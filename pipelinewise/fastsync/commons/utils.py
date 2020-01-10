@@ -259,7 +259,7 @@ def save_state_file(path, table, bookmark, dbname=None):
 
 
 def parse_args(required_config_keys):
-    '''Parse standard command-line args.
+    """Parse standard command-line args.
 
     --tap               Tap Config file
     --state             State file
@@ -272,21 +272,14 @@ def parse_args(required_config_keys):
     Returns the parsed args object from argparse. For each argument that
     point to JSON files (tap, state, properties, target, transform),
     we will automatically load and parse the JSON file.
-    '''
+    """
     parser = argparse.ArgumentParser()
-
     parser.add_argument('--tap', help='Tap Config file', required=True)
-
     parser.add_argument('--state', help='State file')
-
     parser.add_argument('--properties', help='Properties file')
-
     parser.add_argument('--target', help='Target Config file', required=True)
-
     parser.add_argument('--transform', help='Transformations Config file')
-
     parser.add_argument('--tables', help='Sync only specific tables')
-
     parser.add_argument('--export-dir', help='Temporary directory required for CSV exports')
 
     args = parser.parse_args()
@@ -329,7 +322,11 @@ def retry_pattern():
     import backoff
     from botocore.exceptions import ClientError
 
-    return backoff.on_exception(backoff.expo, ClientError, max_tries=5, on_backoff=log_backoff_attempt, factor=10)
+    return backoff.on_exception(backoff.expo,
+                                ClientError,
+                                max_tries=5,
+                                on_backoff=log_backoff_attempt,
+                                factor=10)
 
 
 def log_backoff_attempt(details):

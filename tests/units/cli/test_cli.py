@@ -161,8 +161,12 @@ class TestCli:
 
     def test_create_filtered_tap_props(self):
         """Test creating fastsync and singer specific properties file"""
-        (tap_properties_fastsync, fastsync_stream_ids, tap_properties_singer,
-         singer_stream_ids) = self.pipelinewise.create_filtered_tap_properties(
+        (
+            tap_properties_fastsync,
+            fastsync_stream_ids,
+            tap_properties_singer,
+            singer_stream_ids
+        ) = self.pipelinewise.create_filtered_tap_properties(
              target_type='target-snowflake',
              tap_type='tap-mysql',
              tap_properties='{}/resources/sample_json_config/target_one/tap_one/properties.json'.format(

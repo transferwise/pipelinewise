@@ -11,10 +11,23 @@ from .commons.tap_postgres import FastSyncTapPostgres
 from .commons.target_snowflake import FastSyncTargetSnowflake
 
 REQUIRED_CONFIG_KEYS = {
-    'tap': ['host', 'port', 'user', 'password'],
+    'tap': [
+        'host',
+        'port',
+        'user',
+        'password'
+    ],
     'target': [
-        'account', 'dbname', 'user', 'password', 'warehouse', 'aws_access_key_id', 'aws_secret_access_key', 's3_bucket',
-        'stage', 'file_format'
+        'account',
+        'dbname',
+        'user',
+        'password',
+        'warehouse',
+        'aws_access_key_id',
+        'aws_secret_access_key',
+        's3_bucket',
+        'stage',
+        'file_format'
     ]
 }
 
@@ -136,7 +149,9 @@ def main_impl():
             Total tables selected to sync  : {}
             CPU cores                      : {}
         -------------------------------------------------------
-        """.format(args.tables, len(args.tables), cpu_cores))
+        """.format(args.tables,
+                   len(args.tables),
+                   cpu_cores))
 
     # Start loading tables in parallel in spawning processes by
     # utilising all available CPU cores
@@ -161,7 +176,10 @@ def main_impl():
             Runtime                        : {}
         -------------------------------------------------------
         """.format(len(args.tables),
-                   len(args.tables) - len(table_sync_excs), str(table_sync_excs), cpu_cores, end_time - start_time))
+                   len(args.tables) - len(table_sync_excs),
+                   str(table_sync_excs),
+                   cpu_cores,
+                   end_time - start_time))
     if len(table_sync_excs) > 0:
         sys.exit(1)
 

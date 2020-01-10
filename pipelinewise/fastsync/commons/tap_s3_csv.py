@@ -15,7 +15,7 @@ from singer_encodings import csv as singer_encodings_csv
 from .utils import log, retry_pattern, safe_column_name
 
 
-#pylint: disable=missing-function-docstring,no-self-use
+# pylint: disable=missing-function-docstring,no-self-use
 class FastSyncTapS3Csv:
     """
     Common functions for fastsync from a S3 CSV
@@ -30,9 +30,8 @@ class FastSyncTapS3Csv:
         """
         try:
             # Check if bucket can be accessed without credentials/assuming role
-            list(
-                S3Helper.list_files_in_bucket(connection_config['bucket'],
-                                              connection_config.get('aws_endpoint_url', None)))
+            list(S3Helper.list_files_in_bucket(connection_config['bucket'],
+                                               connection_config.get('aws_endpoint_url', None)))
             log('I have direct access to the bucket without assuming the configured role.')
         except:
             # Setup AWS session
@@ -89,13 +88,12 @@ class FastSyncTapS3Csv:
         # write to the given compressed csv file
         with gzip.open(file_path, 'wt') as gzfile:
 
-            writer = csv.DictWriter(
-                gzfile,
-                fieldnames=sorted(list(headers)),
-                # we need to sort the headers so that copying into snowflake works
-                delimiter=',',
-                quotechar='"',
-                quoting=csv.QUOTE_MINIMAL)
+            writer = csv.DictWriter(gzfile,
+                                    fieldnames=sorted(list(headers)),
+                                    # we need to sort the headers so that copying into snowflake works
+                                    delimiter=',',
+                                    quotechar='"',
+                                    quoting=csv.QUOTE_MINIMAL)
             # write the header
             writer.writeheader()
             # write all records at once
@@ -178,7 +176,10 @@ class FastSyncTapS3Csv:
             else:
                 mapped_columns.append(f'{column_name} {self.tap_type_to_target_type(column_type)}')
 
-        return {'columns': mapped_columns, 'primary_key': self._get_primary_keys(specs)}
+        return {
+            'columns': mapped_columns,
+            'primary_key': self._get_primary_keys(specs)
+        }
 
     def _get_table_columns(self, csv_file_path: str) -> zip:
         """
@@ -201,8 +202,7 @@ class FastSyncTapS3Csv:
             return zip(headers, types)
 
     # pylint: disable=invalid-name
-    def fetch_current_incremental_key_pos(self,
-                                          table: str,
+    def fetch_current_incremental_key_pos(self, table: str,
                                           replication_key: Optional[str] = 'modified_since') -> Optional[Dict]:
         """
         Returns the last time a the table has been modified in ISO format.
@@ -247,7 +247,10 @@ class S3Helper:
             self._fetcher = fetcher
 
         def load(self):
-            return DeferredRefreshableCredentials(self._fetcher.fetch_credentials, self.METHOD)
+            return DeferredRefreshableCredentials(
+                self._fetcher.fetch_credentials,
+                self.METHOD
+            )
 
     @classmethod
     @retry_pattern()
@@ -256,7 +259,8 @@ class S3Helper:
         aws_secret_access_key = config['aws_secret_access_key']
 
         log('Attempting to create AWS session')
-        boto3.setup_default_session(aws_access_key_id=aws_access_key_id, aws_secret_access_key=aws_secret_access_key)
+        boto3.setup_default_session(aws_access_key_id=aws_access_key_id,
+                                    aws_secret_access_key=aws_secret_access_key)
 
     @classmethod
     def get_input_files_for_table(cls, config: Dict, table_spec: Dict, modified_since: struct_time = None):

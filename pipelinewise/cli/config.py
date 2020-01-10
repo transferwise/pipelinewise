@@ -237,14 +237,13 @@ class Config:
             for table in schema.get('tables', []):
                 table_name = table.get('table_name')
                 replication_method = table.get('replication_method', utils.get_tap_default_replication_method(tap))
-                selection.append(
-                    utils.delete_empty_keys({
-                        'tap_stream_id': utils.get_tap_stream_id(tap, tap_dbname, schema_name, table_name),
-                        'replication_method': replication_method,
+                selection.append(utils.delete_empty_keys({
+                    'tap_stream_id': utils.get_tap_stream_id(tap, tap_dbname, schema_name, table_name),
+                    'replication_method': replication_method,
 
-                        # Add replication_key only if replication_method is INCREMENTAL
-                        'replication_key': table.get('replication_key') if replication_method == 'INCREMENTAL' else None
-                    }))
+                    # Add replication_key only if replication_method is INCREMENTAL
+                    'replication_key': table.get('replication_key') if replication_method == 'INCREMENTAL' else None
+                }))
         tap_selection = {'selection': selection}
 
         # Generate tap transformation
@@ -263,7 +262,9 @@ class Config:
                         'type': trans['type'],
                         'when': trans.get('when')
                     })
-        tap_transformation = {'transformations': transformations}
+        tap_transformation = {
+            'transformations': transformations
+        }
 
         # Generate stream to schema mapping
         schema_mapping = {}
@@ -292,20 +293,13 @@ class Config:
 
         # Generate tap inheritable_config dict
         tap_inheritable_config = utils.delete_empty_keys({
-            'batch_size_rows':
-                tap.get('batch_size_rows'),
-            'hard_delete':
-                tap.get('hard_delete', True),
-            'flush_all_streams':
-                tap.get('flush_all_streams', False),
-            'primary_key_required':
-                tap.get('primary_key_required', True),
-            'default_target_schema':
-                tap.get('default_target_schema'),
-            'default_target_schema_select_permissions':
-                tap.get('default_target_schema_select_permissions'),
-            'schema_mapping':
-                schema_mapping,
+            'batch_size_rows': tap.get('batch_size_rows'),
+            'hard_delete': tap.get('hard_delete', True),
+            'flush_all_streams': tap.get('flush_all_streams', False),
+            'primary_key_required': tap.get('primary_key_required', True),
+            'default_target_schema': tap.get('default_target_schema'),
+            'default_target_schema_select_permissions': tap.get('default_target_schema_select_permissions'),
+            'schema_mapping': schema_mapping,
 
             # data_flattening_max_level
             # -------------------------
@@ -322,9 +316,8 @@ class Config:
             #   1: First we try to find it in the tap YAML
             #   2: Second we try to get the tap type specific default value
             #   3: Otherwise we set flattening level to 0 (disabled)
-            'data_flattening_max_level':
-                tap.get('data_flattening_max_level',
-                        utils.get_tap_property(tap, 'default_data_flattening_max_level') or 0)
+            'data_flattening_max_level': tap.get('data_flattening_max_level',
+                                                 utils.get_tap_property(tap, 'default_data_flattening_max_level') or 0)
         })
 
         # Save the generated JSON files
