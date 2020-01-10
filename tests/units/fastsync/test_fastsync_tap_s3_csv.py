@@ -145,8 +145,7 @@ class TestFastSyncTapS3Csv(TestCase):
                             '"ID"': 3,
                             '"GROUP"': 'B',
                         }
-                    ],
-                        records)
+                    ], records)
 
                     self.assertSetEqual(
                         {
