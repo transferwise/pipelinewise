@@ -76,12 +76,12 @@ def get_tap_properties(tap=None):
         },
         'tap-postgres': {
             'tap_config_extras': {
-                # PipelineWise doesn't support replicating from multiple
-                # databases and neither does pipelinewise-tap-postgres.
+                # Postgres can run multiple databases in the same PG instance.
                 #
-                # To avoid problems of loading two tables with the same name
-                # but from differnet dbs we force tap-postgres to filter only
-                # the db that's in scope
+                # To avoid table name collision problems when loading
+                # two tables with the same name but from two different postgres
+                # databases from the same PG instance we force tap-postgres to filter
+                # only the db that's in scope
                 'filter_dbs': tap.get('db_conn', {}).get('dbname') if tap else None
             },
             'tap_stream_id_pattern': '{{schema_name}}-{{table_name}}',
