@@ -562,30 +562,22 @@ class PipelineWise(object):
             self.logger.info(f"Testing tap connection ({target_id} - {tap_id}) PASSED")
 
     def discover_tap(self, tap=None, target=None):
-        # Define tap props
         if tap is None:
-            tap_id = self.tap.get('id')
-            tap_type = self.tap.get('type')
-            tap_config_file = self.tap.get('files', {}).get('config')
-            tap_properties_file = self.tap.get('files', {}).get('properties')
-            tap_selection_file = self.tap.get('files', {}).get('selection')
-            tap_bin = self.tap_bin
+            tap = self.tap
+        if target is None:
+            target = self.target
 
-        else:
-            tap_id = tap.get('id')
-            tap_type = tap.get('type')
-            tap_config_file = tap.get('files', {}).get('config')
-            tap_properties_file = tap.get('files', {}).get('properties')
-            tap_selection_file = tap.get('files', {}).get('selection')
-            tap_bin = self.get_connector_bin(tap_type)
+        # Define tap props
+        tap_id = tap.get('id')
+        tap_type = tap.get('type')
+        tap_config_file = tap.get('files', {}).get('config')
+        tap_properties_file = tap.get('files', {}).get('properties')
+        tap_selection_file = tap.get('files', {}).get('selection')
+        tap_bin = self.get_connector_bin(tap_type)
 
         # Define target props
-        if target is None:
-            target_id = self.target.get('id')
-            target_type = self.target.get('type')
-        else:
-            target_id = target.get('id')
-            target_type = target.get('type')
+        target_id = target.get('id')
+        target_type = target.get('type')
 
         self.logger.info(f"Discovering {tap_id} ({tap_type}) tap in {target_id} ({target_type}) target...")
 
