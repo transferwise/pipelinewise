@@ -229,6 +229,8 @@ class FastSyncTargetSnowflake:
                     trans_cols.append("{} = TO_CHAR({}::DATE,'YYYY-01-01')::DATE".format(column, column))
                 elif transform_type == 'MASK-NUMBER':
                     trans_cols.append("{} = 0".format(column))
+                elif transform_type == 'MASK-HIDDEN':
+                    trans_cols.append("{} = 'hidden'".format(column))
 
         # Generate and run UPDATE if at least one obfuscation rule found
         if len(trans_cols) > 0:
