@@ -1,5 +1,3 @@
-import pymysql
-import gzip
 import csv
 import datetime
 import decimal
@@ -243,7 +241,7 @@ class FastSyncTapMySql:
                         # Then we believe this to be just an interim batch and not the final one so report on progress
 
                         utils.log(
-                            "Exporting batch from {} to {} rows from {}...".format((exported_rows - export_batch_rows),
+                            'Exporting batch from {} to {} rows from {}...'.format((exported_rows - export_batch_rows),
                                                                                    exported_rows, table_name))
                     # Write rows to file in one go
                     writer.writerows(rows)

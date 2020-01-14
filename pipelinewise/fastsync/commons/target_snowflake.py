@@ -226,7 +226,7 @@ class FastSyncTargetSnowflake:
                 elif transform_type == 'MASK-DATE':
                     trans_cols.append("{} = TO_CHAR({}::DATE,'YYYY-01-01')::DATE".format(column, column))
                 elif transform_type == 'MASK-NUMBER':
-                    trans_cols.append("{} = 0".format(column))
+                    trans_cols.append('{} = 0'.format(column))
                 elif transform_type == 'MASK-HIDDEN':
                     trans_cols.append("{} = 'hidden'".format(column))
 
