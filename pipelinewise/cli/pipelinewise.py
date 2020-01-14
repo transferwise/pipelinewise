@@ -263,7 +263,7 @@ class PipelineWise(object):
         else:
             self.config = {}
 
-    def get_temp_dir(self,):
+    def get_temp_dir(self):
         """
         Returns the tap specific temp directory
         """
