@@ -34,11 +34,11 @@ The following transformations can be added optionally into the :ref:`yaml_config
 
 * **HASH-SKIP-FIRST-n**: Transforms string columns to hash skipping first n characters, e.g. HASH-SKIP-FIRST-2
 
-* **MASK-DATA**: Replaces the months and day parts of date columns to be always 1st of Jan
+* **MASK-DATE**: Replaces the months and day parts of date columns to be always 1st of Jan
 
 * **MASK-NUMBER**: Transforms any numeric column to zero
 
-* **MASK-HIDDEN**: Transforms any value to 'hidden'
+* **MASK-HIDDEN**: Transforms any string column value to 'hidden'
 
 
 .. _conditional_transformations:

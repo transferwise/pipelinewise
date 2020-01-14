@@ -1,4 +1,5 @@
-import codecs
+import pymysql
+import gzip
 import csv
 import datetime
 import decimal
@@ -166,7 +167,7 @@ class FastSyncTapMySql:
                             WHEN data_type IN ('blob', 'tinyblob', 'mediumblob', 'longblob', 'geometry')
                                     THEN concat('hex(', column_name, ')')
                             WHEN data_type IN ('binary', 'varbinary')
-                                    THEN COLUMN_NAME
+                                    THEN concat('hex(trim(trailing CHAR(0x00) from ',COLUMN_NAME,'))')
                             WHEN data_type IN ('bit')
                                     THEN concat('cast(`', column_name, '` AS unsigned)')
                             WHEN data_type IN ('datetime', 'timestamp', 'date')
@@ -240,32 +241,11 @@ class FastSyncTapMySql:
                     exported_rows += len(rows)
                     if len(rows) == export_batch_rows:
                         # Then we believe this to be just an interim batch and not the final one so report on progress
-                        utils.log('Exporting batch from {} to {} rows from {}...'.format(
-                            (exported_rows - export_batch_rows), exported_rows, table_name))
 
-                    # Write rows to file
-                    for row in rows:
-                        row = list(row)
-                        for ind, val in enumerate(row):
-                            if isinstance(val, bytes):
-                                # Removes all trailing '\x00' from the bytes Trailing zeroes in bytes is caused by
-                                # how BINARY type columns pads the inserted values, this doesn't happen when using
-                                # VARBINARY.
-                                #
-                                # ref: https://dev.mysql.com/doc/refman/8.0/en/binary-varbinary.html
-                                #
-                                # Leaving the trailing zeroes makes FT & Incremental behave differently than Binlog
-                                # and we end up with inconsistent state records.
-                                #
-                                # Example: for a binary value b'pk0'
-                                #   - Binlog would read it as b'pk0' then in HEX it would be b'706b30'
-                                #   - FT & Inc would read it as b'pk0\x00\x00\x00\x00....\x00' then in HEX
-                                #       it would be b'706b300000...0'
-                                stripped_utf8_elem = val.decode().rstrip('\x00').encode()
-
-                                # encode the stripped elem to binary hex and then to utf8 string
-                                row[ind] = codecs.encode(stripped_utf8_elem, 'hex').decode('utf-8')
-
-                        writer.writerow(row)
+                        utils.log(
+                            "Exporting batch from {} to {} rows from {}...".format((exported_rows - export_batch_rows),
+                                                                                   exported_rows, table_name))
+                    # Write rows to file in one go
+                    writer.writerows(rows)
 
                 utils.log('Exported total of {} rows from {}...'.format(exported_rows, table_name))
