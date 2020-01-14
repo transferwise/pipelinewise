@@ -216,7 +216,10 @@ INSERT INTO `table_with_binary`(id, data) VALUES
                                             (BINARY ('1000'),BINARY('data1000')),
                                             (BINARY('1001'), BINARY('data1001')),
                                             (BINARY(1002), null),
-                                            (HEX (1003), HEX('data1003'))
+                                            (HEX (1003), HEX('data1003')),
+                                            (0x39A19960D36D4355BCBC213E27638260,0x39A19960D36D4355BCBC213E27638260),
+                                            (0xDB7136A053724A38BDF18C37FA3450EE,0xDB7136A053724A38BDF18C37FA3450EE),
+                                            (0xCC27244FEE0544E1983224DF426E49FE,0xCC27244FEE0544E1983224DF426E49FE)
                                             ;
 /*!40000 ALTER TABLE `table_with_binary` ENABLE KEYS */;
 UNLOCK TABLES;
