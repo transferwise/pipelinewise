@@ -29,7 +29,7 @@ class S3CsvToSnowflake(unittest.TestCase):
             'properties': {},
             'target': {},
             'transform': {},
-            'export_dir': '',
+            'temp_dir': '',
             'state': '',
 
         })
@@ -74,7 +74,7 @@ class S3CsvToSnowflake(unittest.TestCase):
             'properties': {},
             'target': {},
             'transform': {},
-            'export_dir': '',
+            'temp_dir': '',
         })
 
         with patch('pipelinewise.fastsync.s3_csv_to_snowflake.FastSyncTapS3Csv') as fastsync_s3_csv_mock:
