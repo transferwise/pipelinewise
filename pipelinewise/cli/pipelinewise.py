@@ -618,8 +618,7 @@ class PipelineWise(object):
         except Exception as exc:
             return f"Cannot load selection JSON at {tap_selection_file}. {str(exc)}"
 
-        # 
-        checks
+        # Post import checks
         post_import_errors = self._run_post_import_tap_checks(schema_with_diff, target)
         if len(post_import_errors) > 0:
             return f"Post import tap checks failed in tap {tap_id}: {post_import_errors}"
