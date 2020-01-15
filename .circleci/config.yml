@@ -52,6 +52,7 @@ references:
 
 jobs:
   test:
+    working_directory: ~/pipelinewise
     <<: *container_config
 
     steps:
