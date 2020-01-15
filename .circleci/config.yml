@@ -90,7 +90,7 @@ jobs:
           at: ~/pipelinewise
       - run:
           name: Push and release the new version
-          command: k8s-deployment docker-build docker-push
+          command: ls -lah
           environment:
             DEPLOY_DOCKERFILE: ./Dockerfile
             DEPLOY_IMAGE_NAME: pipelinewise
