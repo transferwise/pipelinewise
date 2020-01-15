@@ -621,7 +621,7 @@ class PipelineWise(object):
         # Post import checks
         post_import_errors = self._run_post_import_tap_checks(schema_with_diff, target)
         if len(post_import_errors) > 0:
-            return f"Post import tap checks failed at {tap_id}. {post_import_errors}"
+            return f"Post import tap checks failed in tap {tap_id}: {post_import_errors}"
 
         # Save the new catalog into the tap
         try:
@@ -1223,7 +1223,7 @@ TAP RUN SUMMARY
             # Check if primary key is set for INCREMENTAL and LOG_BASED replications
             if (selected and replication_method in [self.INCREMENTAL, self.LOG_BASED] and
                     len(table_key_properties) == 0 and primary_key_required):
-                errors.append(f'No primary key set for - {replication_method} {tap_stream_id}.')
+                errors.append(f'No primary key set for {tap_stream_id} stream ({replication_method})')
                 break
 
         return errors
