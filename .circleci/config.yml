@@ -80,7 +80,7 @@ jobs:
       - store_artifacts:
           path: coverage_html
 
-  build-and-push-dockerr:
+  build-and-push-docker:
     docker:
       - image: docker.tw.ee/k8s-deployer:1
 
