@@ -82,7 +82,6 @@ jobs:
           path: coverage_html
 
   upload-docker:
-    working_directory: ~/pipelinewise/
     docker:
       - image: docker.tw.ee/k8s-deployer:1
 
@@ -93,7 +92,7 @@ jobs:
           at: ~/pipelinewise
       - run:
           name: Push and release the new version
-          command: ls -lah && pwd
+          command: k8s-deployment docker-build docker-push
           environment:
             DEPLOY_DOCKERFILE: ./Dockerfile
             DEPLOY_IMAGE_NAME: pipelinewise
