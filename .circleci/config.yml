@@ -120,7 +120,7 @@ workflows:
   build_and_test:
     jobs:
       #- test
-      - upload-docker
+      - upload-docker:
           context: artifactory-deploy
       #    requires:
       #      - test
