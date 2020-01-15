@@ -82,11 +82,12 @@ jobs:
           path: coverage_html
 
   upload-docker:
-    working_directory: ~/pipelinewise
+    working_directory: ~/pipelinewise/
     docker:
       - image: docker.tw.ee/k8s-deployer:1
 
     steps:
+      - checkout
       - setup_remote_docker
       - attach_workspace:
           at: ~/pipelinewise
