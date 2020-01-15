@@ -86,7 +86,7 @@ jobs:
     steps:
       - setup_remote_docker
       - attach_workspace:
-          at: ~
+          at: ~/
       - run:
           name: Push and release the new version
           command: ls -lah
