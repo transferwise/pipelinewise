@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import os
 import shutil
-import tempfile
 import signal
 import sys
 import logging
@@ -94,7 +93,9 @@ class PipelineWise(object):
             dictA.update(dictB)
 
             # Save the new dict as JSON into a temp file
-            tempfile_path = tempfile.mkstemp()[1]
+            tempfile_path = utils.create_temp_file(dir=self.get_temp_dir(),
+                                                   prefix='target_config_',
+                                                   suffix='.json')[1]
             utils.save_json(dictA, tempfile_path)
 
             return tempfile_path
@@ -228,10 +229,14 @@ class PipelineWise(object):
             # Fallback required: Save filtered and fallback properties JSON
             if create_fallback:
                 # Save to files: filtered and fallback properties
-                temp_properties_path = tempfile.mkstemp()[1]
+                temp_properties_path = utils.create_temp_file(dir=self.get_temp_dir(),
+                                                              prefix='properties_',
+                                                              suffix='.json')[1]
                 utils.save_json(properties, temp_properties_path)
 
-                temp_fallback_properties_path = tempfile.mkstemp()[1]
+                temp_fallback_properties_path = utils.create_temp_file(dir=self.get_temp_dir(),
+                                                                       prefix='properties_',
+                                                                       suffix='.json')[1]
                 utils.save_json(fallback_properties, temp_fallback_properties_path)
 
                 return temp_properties_path, filtered_tap_stream_ids, temp_fallback_properties_path, fallback_filtered_tap_stream_ids
@@ -239,7 +244,9 @@ class PipelineWise(object):
             # Fallback not required: Save only the filtered properties JSON
             else:
                 # Save eed to save
-                temp_properties_path = tempfile.mkstemp()[1]
+                temp_properties_path = utils.create_temp_file(dir=self.get_temp_dir(),
+                                                              prefix='properties_',
+                                                              suffix='.json')[1]
                 utils.save_json(properties, temp_properties_path)
 
                 return temp_properties_path, filtered_tap_stream_ids
@@ -255,6 +262,12 @@ class PipelineWise(object):
             self.config = config
         else:
             self.config = {}
+
+    def get_temp_dir(self):
+        """
+        Returns the tap specific temp directory
+        """
+        return os.path.join(self.config_dir, 'tmp')
 
     def get_tap_dir(self, target_id, tap_id):
         return os.path.join(self.config_dir, target_id, tap_id)
@@ -796,6 +809,7 @@ class PipelineWise(object):
             f"--properties {tap_properties}",
             f"--state {tap_state}",
             f"--target {target_config}",
+            f"--temp_dir {self.get_temp_dir()}",
             f"{tap_transform_arg}",
             f"{tables_command}"
         ))
