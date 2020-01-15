@@ -86,8 +86,8 @@ jobs:
 
     steps:
       - setup_remote_docker
-#      - attach_workspace:
-#          at: ~/pipelinewise
+      - attach_workspace:
+          at: ~/pipelinewise
       - run:
           name: Push and release the new version
           command: k8s-deployment docker-build docker-push
@@ -114,11 +114,11 @@ workflows:
   version: 2
   build_and_test:
     jobs:
-      #- test
+      - test
       - build-and-push-docker:
           context: artifactory-deploy-docker
-      #    requires:
-      #      - test
+          requires:
+            - test
       #    filters:
       #      branches:
       #        only:
