@@ -53,6 +53,7 @@ references:
 jobs:
   test:
     <<: *container_config
+    working_directory: ~/pipelinewise
 
     steps:
       - checkout
@@ -81,15 +82,17 @@ jobs:
           path: coverage_html
 
   upload-docker:
+    working_directory: ~/pipelinewise
     docker:
       - image: docker.tw.ee/k8s-deployer:1
+
     steps:
       - setup_remote_docker
       - attach_workspace:
-          at: ~/
+          at: ~/pipelinewise
       - run:
           name: Push and release the new version
-          command: ls -lah
+          command: ls -lah && pwd
           environment:
             DEPLOY_DOCKERFILE: ./Dockerfile
             DEPLOY_IMAGE_NAME: pipelinewise
