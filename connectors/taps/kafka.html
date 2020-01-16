@@ -239,72 +239,22 @@ owner: <span class="s2">&quot;somebody@foo.com&quot;</span>              <span c
 db_conn:
   group_id: <span class="s2">&quot;myGroupId&quot;</span>
   bootstrap_servers: <span class="s2">&quot;kafka1.foo.com:9092,kafka2.foo.com:9092,kafka3.foo.com:9092&quot;</span>
-  topic: <span class="s2">&quot;myTopic&quot;</span>
+  topic: <span class="s2">&quot;myKafkaTopic&quot;</span>
+
 
   <span class="c1"># --------------------------------------------------------------------------</span>
-  <span class="c1"># SCHEMA is a standard JSON Schema document that used for multiple purposes:</span>
-  <span class="c1">#</span>
-  <span class="c1"># 1. Validating kafka messages read from the stream</span>
-  <span class="c1"># 2. Creating destination table in Snowflake:</span>
-  <span class="c1">#        - Column names are flattened, using the &#39;__&#39; characters to</span>
-  <span class="c1">#          separate multi-level objects</span>
-  <span class="c1">#        - Snowflake column types will be generated from JSON schema types</span>
-  <span class="c1">#</span>
-  <span class="c1">#</span>
-  <span class="c1"># Sample Kafka message extracted from profileBehaviourStats topic:</span>
-  <span class="c1"># (The JSON Schema needs to be tailored for this sample JSON message)</span>
-  <span class="c1">#</span>
-  <span class="c1"># {</span>
-  <span class="c1">#   &quot;eventTime&quot;:1550564993738,</span>
-  <span class="c1">#   &quot;startingState&quot;:&quot;NEW&quot;,</span>
-  <span class="c1">#   &quot;ltvValueInGbp&quot;:1701.36,</span>
-  <span class="c1">#   &quot;ltvValueInEur&quot;:1919.7188620000002,</span>
-  <span class="c1">#   &quot;transferMetadata&quot;:{</span>
-  <span class="c1">#     &quot;transferId&quot;:63432435,</span>
-  <span class="c1">#     &quot;profileId&quot;:7623199,</span>
-  <span class="c1">#     &quot;userId&quot;:10523356,</span>
-  <span class="c1">#     &quot;currentState&quot;:&quot;NEW&quot;,</span>
-  <span class="c1">#     &quot;sourceCurrency&quot;:&quot;EUR&quot;,</span>
-  <span class="c1">#     &quot;targetCurrency&quot;:&quot;EUR&quot;,</span>
-  <span class="c1">#     &quot;invoiceValue&quot;:50.0,</span>
-  <span class="c1">#     &quot;invoiceValueInGbp&quot;:43.73,</span>
-  <span class="c1">#     &quot;invoiceValueInEur&quot;:50.0,</span>
-  <span class="c1">#     &quot;submitTime&quot;:1550564993000</span>
-  <span class="c1">#   }</span>
-  <span class="c1">#  }</span>
+  <span class="c1"># Optionally you can define primary key(s) from the kafka JSON messages.</span>
+  <span class="c1"># If primary keys defined then extra column(s) will be added to the output</span>
+  <span class="c1"># singer stream with the extracted values by JSONPath selectors.</span>
   <span class="c1"># --------------------------------------------------------------------------</span>
-  schema: <span class="s1">&#39;</span>
-<span class="s1">      {</span>
-<span class="s1">        &quot;properties&quot;: {</span>
-<span class="s1">          &quot;eventTime&quot;: {&quot;type&quot;: [&quot;number&quot;, &quot;null&quot;]},</span>
-<span class="s1">          &quot;startingState&quot;: {&quot;type&quot;: [&quot;string&quot;, &quot;null&quot;]},</span>
-<span class="s1">          &quot;ltvValueInGbp&quot;: {&quot;type&quot;: [&quot;number&quot;, &quot;null&quot;]},</span>
-<span class="s1">          &quot;ltvValueInEur&quot;: {&quot;type&quot;: [&quot;number&quot;, &quot;null&quot;]},</span>
-<span class="s1">          &quot;transferMetadata&quot;: {</span>
-<span class="s1">            &quot;type&quot;: &quot;object&quot;,</span>
-<span class="s1">            &quot;properties&quot;: {</span>
-<span class="s1">              &quot;transferId&quot;: {&quot;type&quot;: &quot;integer&quot;},</span>
-<span class="s1">              &quot;profileId&quot;: {&quot;type&quot;: [&quot;integer&quot;, &quot;null&quot;]},</span>
-<span class="s1">              &quot;userId&quot;: {&quot;type&quot;: [&quot;integer&quot;, &quot;null&quot;]},</span>
-<span class="s1">              &quot;currentState&quot;: {&quot;type&quot;: [&quot;string&quot;, &quot;null&quot;]},</span>
-<span class="s1">              &quot;sourceCurrency&quot;: {&quot;type&quot;: [&quot;string&quot;, &quot;null&quot;]},</span>
-<span class="s1">              &quot;targetCurrency&quot;: {&quot;type&quot;: [&quot;string&quot;, &quot;null&quot;]},</span>
-<span class="s1">              &quot;invoiceValue&quot;: {&quot;type&quot;: [&quot;number&quot;, &quot;null&quot;]},</span>
-<span class="s1">              &quot;invoiceValueInGbp&quot;: {&quot;type&quot;: [&quot;number&quot;, &quot;null&quot;]},</span>
-<span class="s1">              &quot;invoiceValueInEur&quot;: {&quot;type&quot;: [&quot;number&quot;, &quot;null&quot;]},</span>
-<span class="s1">              &quot;submitTime&quot;: {&quot;type&quot;: [&quot;integer&quot;, &quot;null&quot;]}</span>
-<span class="s1">            }</span>
-<span class="s1">          }</span>
-<span class="s1">        }</span>
-<span class="s1">      }&#39;</span>
+  primary_keys:
+     transfer_id: <span class="s2">&quot;</span>$<span class="s2">.transferMetadata.transferId&quot;</span>
 
   <span class="c1"># --------------------------------------------------------------------------</span>
-  <span class="c1"># One field from the kafka message will be the Primary Key of the target</span>
-  <span class="c1"># table. Selecting primary key is mandatory</span>
+  <span class="c1"># Stop listening the topic if no message after certain milliseconds.</span>
+  <span class="c1"># Default is 10 seconds</span>
   <span class="c1"># --------------------------------------------------------------------------</span>
-  primary_keys: <span class="s1">&#39;[&quot;transferMetadata__transferId&quot;]&#39;</span>
-
-  consumer_timeout_ms: <span class="m">5000</span>
+  <span class="c1">#consumer_timeout_ms: 10000</span>
 
 
 <span class="c1"># ------------------------------------------------------------------------------</span>
@@ -329,7 +279,7 @@ schemas:
     <span class="c1"># You can load data only from one kafka topic in one YAML file.</span>
     <span class="c1"># If you want load from multiple kafka topics, create another tap YAML similar to this file</span>
     tables:
-      - table_name: <span class="s2">&quot;kafka_topic&quot;</span>
+      - table_name: <span class="s2">&quot;my_kafka_topic&quot;</span>   <span class="c1"># target table name needs to match to the topic name in snake case format</span>
 
         <span class="c1"># OPTIONAL: Load time transformations</span>
         <span class="c1">#transformations:</span>
