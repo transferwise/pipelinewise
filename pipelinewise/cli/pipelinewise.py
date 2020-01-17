@@ -6,6 +6,7 @@ import sys
 import logging
 import json
 import copy
+import pidfile
 
 from datetime import datetime
 from typing import Dict
@@ -289,6 +290,7 @@ class PipelineWise(object):
             'state': os.path.join(connector_dir, 'state.json'),
             'transformation': os.path.join(connector_dir, 'transformation.json'),
             'selection': os.path.join(connector_dir, 'selection.json'),
+            'pidfile': os.path.join(connector_dir, 'pipelinewise.pid')
         }
 
     def get_targets(self):
@@ -908,37 +910,44 @@ class PipelineWise(object):
 
         start_time = datetime.now()
         try:
-            # Run fastsync for FULL_TABLE replication method
-            if len(fastsync_stream_ids) > 0:
-                self.logger.info(f"Table(s) selected to sync by fastsync: {fastsync_stream_ids}")
-                self.tap_run_log_file = os.path.join(log_dir, f"{target_id}-{tap_id}-{current_time}.fastsync.log")
-                self.run_tap_fastsync(
-                    tap_type,
-                    target_type,
-                    tap_config,
-                    tap_properties_fastsync,
-                    tap_state,
-                    tap_transformation,
-                    cons_target_config
-                )
-            else:
-                self.logger.info("No table available that needs to be sync by fastsync")
+            with pidfile.PIDFile(self.tap["files"]["pidfile"]):
+                # Run fastsync for FULL_TABLE replication method
+                if len(fastsync_stream_ids) > 0:
+                    self.logger.info(f"Table(s) selected to sync by fastsync: {fastsync_stream_ids}")
+                    self.tap_run_log_file = os.path.join(log_dir, f"{target_id}-{tap_id}-{current_time}.fastsync.log")
+                    self.run_tap_fastsync(
+                        tap_type,
+                        target_type,
+                        tap_config,
+                        tap_properties_fastsync,
+                        tap_state,
+                        tap_transformation,
+                        cons_target_config
+                    )
+                else:
+                    self.logger.info("No table available that needs to be sync by fastsync")
 
-            # Run singer tap for INCREMENTAL and LOG_BASED replication methods
-            if len(singer_stream_ids) > 0:
-                self.logger.info(f"Table(s) selected to sync by singer: {singer_stream_ids}")
-                self.tap_run_log_file = os.path.join(log_dir, f"{target_id}-{tap_id}-{current_time}.singer.log")
-                self.run_tap_singer(
-                    tap_type,
-                    tap_config,
-                    tap_properties_singer,
-                    tap_state,
-                    tap_transformation,
-                    cons_target_config
-                )
-            else:
-                self.logger.info("No table available that needs to be sync by singer")
+                # Run singer tap for INCREMENTAL and LOG_BASED replication methods
+                if len(singer_stream_ids) > 0:
+                    self.logger.info(f"Table(s) selected to sync by singer: {singer_stream_ids}")
+                    self.tap_run_log_file = os.path.join(log_dir, f"{target_id}-{tap_id}-{current_time}.singer.log")
+                    self.run_tap_singer(
+                        tap_type,
+                        tap_config,
+                        tap_properties_singer,
+                        tap_state,
+                        tap_transformation,
+                        cons_target_config
+                    )
+                else:
+                    self.logger.info("No table available that needs to be sync by singer")
 
+        except pidfile.AlreadyRunningError:
+            self.logger.error('Another instance of the is already running.')
+            utils.silentremove(cons_target_config)
+            utils.silentremove(tap_properties_fastsync)
+            utils.silentremove(tap_properties_singer)
+            sys.exit(1)
         # Delete temp files if there is any
         except utils.RunCommandException as exc:
             self.logger.error(exc)
@@ -958,6 +967,28 @@ class PipelineWise(object):
         utils.silentremove(tap_properties_fastsync)
         utils.silentremove(tap_properties_singer)
         self._print_tap_run_summary(self.STATUS_SUCCESS, start_time, datetime.now())
+
+    def stop_tap(self):
+        """
+        Stop running tap
+
+        The command finds the tap specific pidfile that was created by run_tap command and sends
+        a SIGINT to the process. The SIGINT signal triggers _exit_gracefully function automatically and
+        the tap stops running.
+        """
+        pidfile_path = self.tap["files"]["pidfile"]
+        try:
+            with open(pidfile_path) as pidf:
+                pid = pidf.read()
+                self.logger.info(f'Sending SIGINT to pid {pid}...')
+                os.kill(int(pid), signal.SIGINT)
+        except ProcessLookupError:
+            self.logger.error(f'Pid {pid} not found. Is the tap running on this machine? '
+                              f'Stopping taps remotely is not supported.')
+            sys.exit(1)
+        except FileNotFoundError:
+            self.logger.error(f'No pidfile found at {pidfile_path}. Tap does not seem to be running.')
+            sys.exit(1)
 
     def sync_tables(self):
         """
@@ -1011,17 +1042,22 @@ class PipelineWise(object):
 
         # sync_tables command always using fastsync
         try:
-            self.tap_run_log_file = os.path.join(log_dir, f"{target_id}-{tap_id}-{current_time}.fastsync.log")
-            self.run_tap_fastsync(
-                tap_type,
-                target_type,
-                tap_config,
-                tap_properties,
-                tap_state,
-                tap_transformation,
-                cons_target_config
-            )
+            with pidfile.PIDFile(self.tap["files"]["pidfile"]):
+                self.tap_run_log_file = os.path.join(log_dir, f"{target_id}-{tap_id}-{current_time}.fastsync.log")
+                self.run_tap_fastsync(
+                    tap_type,
+                    target_type,
+                    tap_config,
+                    tap_properties,
+                    tap_state,
+                    tap_transformation,
+                    cons_target_config
+                )
 
+        except pidfile.AlreadyRunningError:
+            self.logger.error('Another instance of the is already running.')
+            utils.silentremove(cons_target_config)
+            sys.exit(1)
         # Delete temp file if there is any
         except utils.RunCommandException as exc:
             self.logger.error(exc)
