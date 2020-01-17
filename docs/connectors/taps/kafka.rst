@@ -41,72 +41,22 @@ Example YAML for ``tap-kafka``:
     db_conn:
       group_id: "myGroupId"
       bootstrap_servers: "kafka1.foo.com:9092,kafka2.foo.com:9092,kafka3.foo.com:9092"
-      topic: "myTopic"
+      topic: "myKafkaTopic"
+
 
       # --------------------------------------------------------------------------
-      # SCHEMA is a standard JSON Schema document that used for multiple purposes:
-      #
-      # 1. Validating kafka messages read from the stream
-      # 2. Creating destination table in Snowflake:
-      #        - Column names are flattened, using the '__' characters to
-      #          separate multi-level objects
-      #        - Snowflake column types will be generated from JSON schema types
-      #
-      #
-      # Sample Kafka message extracted from profileBehaviourStats topic:
-      # (The JSON Schema needs to be tailored for this sample JSON message)
-      #
-      # {
-      #   "eventTime":1550564993738,
-      #   "startingState":"NEW",
-      #   "ltvValueInGbp":1701.36,
-      #   "ltvValueInEur":1919.7188620000002,
-      #   "transferMetadata":{
-      #     "transferId":63432435,
-      #     "profileId":7623199,
-      #     "userId":10523356,
-      #     "currentState":"NEW",
-      #     "sourceCurrency":"EUR",
-      #     "targetCurrency":"EUR",
-      #     "invoiceValue":50.0,
-      #     "invoiceValueInGbp":43.73,
-      #     "invoiceValueInEur":50.0,
-      #     "submitTime":1550564993000
-      #   }
-      #  }
+      # Optionally you can define primary key(s) from the kafka JSON messages.
+      # If primary keys defined then extra column(s) will be added to the output
+      # singer stream with the extracted values by JSONPath selectors.
       # --------------------------------------------------------------------------
-      schema: '
-          {
-            "properties": {
-              "eventTime": {"type": ["number", "null"]},
-              "startingState": {"type": ["string", "null"]},
-              "ltvValueInGbp": {"type": ["number", "null"]},
-              "ltvValueInEur": {"type": ["number", "null"]},
-              "transferMetadata": {
-                "type": "object",
-                "properties": {
-                  "transferId": {"type": "integer"},
-                  "profileId": {"type": ["integer", "null"]},
-                  "userId": {"type": ["integer", "null"]},
-                  "currentState": {"type": ["string", "null"]},
-                  "sourceCurrency": {"type": ["string", "null"]},
-                  "targetCurrency": {"type": ["string", "null"]},
-                  "invoiceValue": {"type": ["number", "null"]},
-                  "invoiceValueInGbp": {"type": ["number", "null"]},
-                  "invoiceValueInEur": {"type": ["number", "null"]},
-                  "submitTime": {"type": ["integer", "null"]}
-                }
-              }
-            }
-          }'
+      primary_keys:
+         transfer_id: "$.transferMetadata.transferId"
 
       # --------------------------------------------------------------------------
-      # One field from the kafka message will be the Primary Key of the target
-      # table. Selecting primary key is mandatory
+      # Stop listening the topic if no message after certain milliseconds.
+      # Default is 10 seconds
       # --------------------------------------------------------------------------
-      primary_keys: '["transferMetadata__transferId"]'
-
-      consumer_timeout_ms: 5000
+      #consumer_timeout_ms: 10000
 
 
     # ------------------------------------------------------------------------------
@@ -131,7 +81,7 @@ Example YAML for ``tap-kafka``:
         # You can load data only from one kafka topic in one YAML file.
         # If you want load from multiple kafka topics, create another tap YAML similar to this file
         tables:
-          - table_name: "kafka_topic"
+          - table_name: "my_kafka_topic"   # target table name needs to match to the topic name in snake case format
 
             # OPTIONAL: Load time transformations
             #transformations:                    

@@ -78,7 +78,7 @@ def sync_table(table):
 
     try:
         filename = "pipelinewise_fastsync_{}_{}.csv.gz".format(table, time.strftime("%Y%m%d-%H%M%S"))
-        filepath = os.path.join(args.export_dir, filename)
+        filepath = os.path.join(args.temp_dir, filename)
         target_schema = utils.get_target_schema(args.target, table)
 
         # Open connection and get binlog file position

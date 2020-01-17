@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import os
 import shutil
-import tempfile
 import signal
 import sys
 import logging
@@ -94,7 +93,9 @@ class PipelineWise(object):
             dictA.update(dictB)
 
             # Save the new dict as JSON into a temp file
-            tempfile_path = tempfile.mkstemp()[1]
+            tempfile_path = utils.create_temp_file(dir=self.get_temp_dir(),
+                                                   prefix='target_config_',
+                                                   suffix='.json')[1]
             utils.save_json(dictA, tempfile_path)
 
             return tempfile_path
@@ -228,10 +229,14 @@ class PipelineWise(object):
             # Fallback required: Save filtered and fallback properties JSON
             if create_fallback:
                 # Save to files: filtered and fallback properties
-                temp_properties_path = tempfile.mkstemp()[1]
+                temp_properties_path = utils.create_temp_file(dir=self.get_temp_dir(),
+                                                              prefix='properties_',
+                                                              suffix='.json')[1]
                 utils.save_json(properties, temp_properties_path)
 
-                temp_fallback_properties_path = tempfile.mkstemp()[1]
+                temp_fallback_properties_path = utils.create_temp_file(dir=self.get_temp_dir(),
+                                                                       prefix='properties_',
+                                                                       suffix='.json')[1]
                 utils.save_json(fallback_properties, temp_fallback_properties_path)
 
                 return temp_properties_path, filtered_tap_stream_ids, temp_fallback_properties_path, fallback_filtered_tap_stream_ids
@@ -239,7 +244,9 @@ class PipelineWise(object):
             # Fallback not required: Save only the filtered properties JSON
             else:
                 # Save eed to save
-                temp_properties_path = tempfile.mkstemp()[1]
+                temp_properties_path = utils.create_temp_file(dir=self.get_temp_dir(),
+                                                              prefix='properties_',
+                                                              suffix='.json')[1]
                 utils.save_json(properties, temp_properties_path)
 
                 return temp_properties_path, filtered_tap_stream_ids
@@ -255,6 +262,12 @@ class PipelineWise(object):
             self.config = config
         else:
             self.config = {}
+
+    def get_temp_dir(self):
+        """
+        Returns the tap specific temp directory
+        """
+        return os.path.join(self.config_dir, 'tmp')
 
     def get_tap_dir(self, target_id, tap_id):
         return os.path.join(self.config_dir, target_id, tap_id)
@@ -562,30 +575,22 @@ class PipelineWise(object):
             self.logger.info(f"Testing tap connection ({target_id} - {tap_id}) PASSED")
 
     def discover_tap(self, tap=None, target=None):
-        # Define tap props
         if tap is None:
-            tap_id = self.tap.get('id')
-            tap_type = self.tap.get('type')
-            tap_config_file = self.tap.get('files', {}).get('config')
-            tap_properties_file = self.tap.get('files', {}).get('properties')
-            tap_selection_file = self.tap.get('files', {}).get('selection')
-            tap_bin = self.tap_bin
+            tap = self.tap
+        if target is None:
+            target = self.target
 
-        else:
-            tap_id = tap.get('id')
-            tap_type = tap.get('type')
-            tap_config_file = tap.get('files', {}).get('config')
-            tap_properties_file = tap.get('files', {}).get('properties')
-            tap_selection_file = tap.get('files', {}).get('selection')
-            tap_bin = self.get_connector_bin(tap_type)
+        # Define tap props
+        tap_id = tap.get('id')
+        tap_type = tap.get('type')
+        tap_config_file = tap.get('files', {}).get('config')
+        tap_properties_file = tap.get('files', {}).get('properties')
+        tap_selection_file = tap.get('files', {}).get('selection')
+        tap_bin = self.get_connector_bin(tap_type)
 
         # Define target props
-        if target is None:
-            target_id = self.target.get('id')
-            target_type = self.target.get('type')
-        else:
-            target_id = target.get('id')
-            target_type = target.get('type')
+        target_id = target.get('id')
+        target_type = target.get('type')
 
         self.logger.info(f"Discovering {tap_id} ({tap_type}) tap in {target_id} ({target_type}) target...")
 
@@ -629,7 +634,7 @@ class PipelineWise(object):
         # Post import checks
         post_import_errors = self._run_post_import_tap_checks(schema_with_diff, target)
         if len(post_import_errors) > 0:
-            return f"Post import tap checks failed at {tap_id}. {post_import_errors}"
+            return f"Post import tap checks failed in tap {tap_id}: {post_import_errors}"
 
         # Save the new catalog into the tap
         try:
@@ -804,6 +809,7 @@ class PipelineWise(object):
             f"--properties {tap_properties}",
             f"--state {tap_state}",
             f"--target {target_config}",
+            f"--temp_dir {self.get_temp_dir()}",
             f"{tap_transform_arg}",
             f"{tables_command}"
         ))
@@ -1231,7 +1237,7 @@ TAP RUN SUMMARY
             # Check if primary key is set for INCREMENTAL and LOG_BASED replications
             if (selected and replication_method in [self.INCREMENTAL, self.LOG_BASED] and
                     len(table_key_properties) == 0 and primary_key_required):
-                errors.append(f'No primary key set for - {replication_method} {tap_stream_id}.')
+                errors.append(f'No primary key set for {tap_stream_id} stream ({replication_method})')
                 break
 
         return errors
