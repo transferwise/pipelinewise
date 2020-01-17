@@ -943,7 +943,7 @@ class PipelineWise(object):
                     self.logger.info("No table available that needs to be sync by singer")
 
         except pidfile.AlreadyRunningError:
-            self.logger.error('Another instance of the is already running.')
+            self.logger.error('Another instance of the tap is already running.')
             utils.silentremove(cons_target_config)
             utils.silentremove(tap_properties_fastsync)
             utils.silentremove(tap_properties_singer)
@@ -1055,7 +1055,7 @@ class PipelineWise(object):
                 )
 
         except pidfile.AlreadyRunningError:
-            self.logger.error('Another instance of the is already running.')
+            self.logger.error('Another instance of the tap is already running.')
             utils.silentremove(cons_target_config)
             sys.exit(1)
         # Delete temp file if there is any
