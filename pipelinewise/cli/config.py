@@ -84,6 +84,12 @@ class Config(object):
 
         return config
 
+    def get_temp_dir(self):
+        """
+        Returns the tap specific temp directory
+        """
+        return os.path.join(self.config_dir, 'tmp')
+
     def get_target_dir(self, target_id):
         '''
         Returns the absolute path of a target configuration directory
@@ -291,6 +297,7 @@ class Config(object):
 
         # Generate tap inheritable_config dict
         tap_inheritable_config = utils.delete_empty_keys({
+            "temp_dir": self.get_temp_dir(),
             "batch_size_rows": tap.get('batch_size_rows'),
             "hard_delete": tap.get('hard_delete', True),
             "flush_all_streams": tap.get('flush_all_streams', False),
@@ -315,7 +322,8 @@ class Config(object):
             #   2: Second we try to get the tap type specific default value
             #   3: Otherwise we set flattening level to 0 (disabled)
             "data_flattening_max_level": tap.get('data_flattening_max_level',
-                                                 utils.get_tap_property(tap, 'default_data_flattening_max_level') or 0)
+                                                 utils.get_tap_property(tap, 'default_data_flattening_max_level') or 0),
+            "validate_records": tap.get('validate_records', False)
         })
 
         # Save the generated JSON files

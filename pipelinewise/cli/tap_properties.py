@@ -102,7 +102,7 @@ def get_tap_properties(tap=None):
         'tap_stream_name_pattern': '{{table_name}}',
         'tap_catalog_argument': '--properties',
         'default_replication_method': 'LOG_BASED',
-        'default_data_flattening_max_level': 10
+        'default_data_flattening_max_level': 0
     },
 
     'tap-zendesk': {

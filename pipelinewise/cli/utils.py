@@ -8,6 +8,7 @@ import shlex
 import copy
 import re
 import logging
+import tempfile
 import jsonschema
 
 from subprocess import Popen, PIPE, STDOUT
@@ -505,3 +506,12 @@ def run_command(command, log_file=None, line_callback=None):
             logger.error(stderr)
 
         return [rc, stdout, stderr]
+
+
+def create_temp_file(suffix=None, prefix=None, dir=None, text=None):
+    """
+    Create temp file with parent directories if not exists
+    """
+    if dir:
+        os.makedirs(dir, exist_ok=True)
+    return tempfile.mkstemp(suffix, prefix, dir, text)
