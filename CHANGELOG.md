@@ -3,7 +3,8 @@
 
 - FastSync: Support BINARY and VARBINARY column types from MySQL sources
 - FastSync: Fixed an issue when `MASK-HIDDEN` type of transformations were not applied in Snowflake targets
-- Writing temporary files to `~/.pipelinewise/tmp` directory
+- Write temporary files to `~/.pipelinewise/tmp` directory
+- Add `stop_tap` command
 - Fixed an issue when post import Primary Keys check was not working correctly
 - Fixed an issue when `discover_tap` command sometimes was failing
 
@@ -24,7 +25,7 @@
 
 **Target Snowflake**
 - Bump `pipelinewise-target-snowflake` to 1.3.0
-    - Load binary data into Snowflake `BINARY` columns
+    - Load binary data into Snowflake `BINARY` column types
     - Adjust timestamps from taps automatically to the max allowed `9999-12-31 23:59:59` when it's required
     - Add `validate_record` optional parameter and default to False
     - Add `temp_dir` optional parameter to overwrite system defaults
