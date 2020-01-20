@@ -11,6 +11,7 @@
 **Tap MySQL**
 - Bump `pipelinewise-tap-mysql` to 1.1.3
     - Support to extract BINARY and VARBINARY column types
+    - Improved performance of reading data from MySQL binary log
     - Increase default session `wait_timeout` to 28800
     - Increase default session `innodb_lock_wait_timeout` to 3600
 
