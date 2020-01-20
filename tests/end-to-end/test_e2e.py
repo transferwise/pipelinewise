@@ -42,24 +42,31 @@ class TestE2E(object):
             with open(yaml_path, "w+") as file:
                 file.write(yaml)
 
+    def clean_tap_mysql(self):
+        """Clean mysql source"""
+        # Delete extra rows added by previous test
+        e2e_utils.run_query_tap_mysql(self.env, "DELETE FROM address where address_id >= 10000")
+        e2e_utils.run_query_tap_mysql(self.env, "DELETE FROM weight_unit where weight_unit_id >= 100")
+        e2e_utils.run_query_tap_mysql(self.env, "DELETE FROM area_code where area_code_id >= 100")
+
     def clean_target_postgres(self):
         """Clean postgres_dwh"""
         # Drop target schemas if exists
-        e2e_utils.run_query_postgres(self.env, "DROP SCHEMA IF EXISTS mysql_grp24 CASCADE")
-        e2e_utils.run_query_postgres(self.env, "DROP SCHEMA IF EXISTS postgres_world CASCADE")
+        e2e_utils.run_query_target_postgres(self.env, "DROP SCHEMA IF EXISTS mysql_grp24 CASCADE")
+        e2e_utils.run_query_target_postgres(self.env, "DROP SCHEMA IF EXISTS postgres_world CASCADE")
 
         # Create groups required for tests
-        e2e_utils.run_query_postgres(self.env, "DROP GROUP IF EXISTS group1")
-        e2e_utils.run_query_postgres(self.env, "CREATE GROUP group1")
+        e2e_utils.run_query_target_postgres(self.env, "DROP GROUP IF EXISTS group1")
+        e2e_utils.run_query_target_postgres(self.env, "CREATE GROUP group1")
 
         # Clean config directory
         shutil.rmtree(os.path.join(CONFIG_DIR, 'postgres_dwh'), ignore_errors=True)
 
     def clean_target_snowflake(self):
         """Clean snowflake"""
-        e2e_utils.run_query_snowflake(self.env, "DROP SCHEMA IF EXISTS mysql_grp24")
-        e2e_utils.run_query_snowflake(self.env, "DROP SCHEMA IF EXISTS postgres_world_sf")
-        e2e_utils.run_query_snowflake(self.env, "DROP SCHEMA IF EXISTS s3_feeds")
+        e2e_utils.run_query_target_snowflake(self.env, "DROP SCHEMA IF EXISTS mysql_grp24")
+        e2e_utils.run_query_target_snowflake(self.env, "DROP SCHEMA IF EXISTS postgres_world_sf")
+        e2e_utils.run_query_target_snowflake(self.env, "DROP SCHEMA IF EXISTS s3_feeds")
 
         # Clean config directory
         shutil.rmtree(os.path.join(CONFIG_DIR, 'snowflake'), ignore_errors=True)
@@ -119,6 +126,7 @@ class TestE2E(object):
     def test_import_project(self):
         """Import the YAML project with taps and target and do discovery mode to write the JSON files for singer
         connectors """
+        self.clean_tap_mysql()
         self.clean_target_postgres()
         self.clean_target_snowflake()
         [rc, stdout, stderr] = e2e_utils.run_command("pipelinewise import_config --dir {}".format(self.project_dir))
@@ -127,7 +135,56 @@ class TestE2E(object):
     @pytest.mark.dependency(depends=["import_config"])
     def test_replicate_mariadb_to_postgres(self):
         """Replicate data from MariaDB to Postgres DWH, check if return code is zero and success log file created"""
+
+        # Internal helper to compare row counts in source mysql and target postgres
+        def assert_row_count_equals_source_to_target():
+            row_counts_in_mysql = e2e_utils.run_query_tap_mysql(self.env, """
+            SELECT tbl, row_count
+              FROM (      SELECT 'address'     AS tbl, COUNT(*) AS row_count FROM address
+                    UNION SELECT 'area_code'   AS tbl, COUNT(*) AS row_count FROM area_code
+                    UNION SELECT 'order'       AS tbl, COUNT(*) AS row_count FROM `order`
+                    UNION SELECT 'weight_unit' AS tbl, COUNT(*) AS row_count FROM weight_unit) x
+             ORDER BY tbl, row_count
+            """)
+
+            row_counts_in_postgres = e2e_utils.run_query_target_postgres(self.env, """
+            SELECT tbl, row_count
+              FROM (      SELECT 'address'     AS tbl, COUNT(*) AS row_count FROM mysql_grp24.address
+                    UNION SELECT 'area_code'   AS tbl, COUNT(*) AS row_count FROM mysql_grp24.area_code
+                    UNION SELECT 'order'       AS tbl, COUNT(*) AS row_count FROM mysql_grp24.order
+                    UNION SELECT 'weight_unit' AS tbl, COUNT(*) AS row_count FROM mysql_grp24.weight_unit) x
+             ORDER BY tbl, row_count
+            """)
+
+            # Compare the results from source and target databases
+            assert row_counts_in_postgres == row_counts_in_mysql
+
+        # Run tap in the first time - Only singer should be triggered. Fastsync not available for target postgres
         self.assert_run_tap_success('mariadb_source', 'postgres_dwh', ['singer'])
+        assert_row_count_equals_source_to_target()
+
+        # Insert new rows to source table replicated by INCREMENTAL method
+        e2e_utils.run_query_tap_mysql(self.env, """
+        INSERT INTO address (
+            address_id, isActive, street_number, date_created, date_updated, supplier_supplier_id, zip_code_zip_code_id)
+          VALUES (100001, 1, '1234', now(), now(), 999, 999)
+        """)
+
+        # Insert new rows to source table replicated by FULL_TABLE method
+        e2e_utils.run_query_tap_mysql(self.env, """
+        INSERT INTO area_code (area_code_id, area_code, isActive, date_created, date_updated, provance_provance_id)
+          VALUES (101, '101', 1, now(), now(), 101)
+        """)
+
+        # Insert and delete rows to source table replicated by LOG_BASED method
+        e2e_utils.run_query_tap_mysql(self.env, """
+        INSERT INTO weight_unit (weight_unit_id, weight_unit_name, isActive, date_created, date_updated)
+             VALUES (101, 'New weight unit', 1, now(), now())
+        """)
+
+        # Run the tap again, check row counts to sure the new row loaded correctly
+        self.assert_run_tap_success('mariadb_source', 'postgres_dwh', ['singer'])
+        assert_row_count_equals_source_to_target()
 
     @pytest.mark.dependency(depends=["import_config"])
     def test_replicate_postgres_to_postgres(self):

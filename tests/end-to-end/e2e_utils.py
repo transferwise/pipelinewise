@@ -1,7 +1,10 @@
 import os
 import re
 import shlex
+import pickle
+import pymysql
 import psycopg2
+import psycopg2.extras
 import subprocess
 import snowflake.connector
 
@@ -47,6 +50,25 @@ def load_env():
 
     return env
 
+def convert_to_dict(columns, results):
+    """
+    This method converts the resultset from postgres to dictionary
+    interates the data and maps the columns to the values in result set and converts to dictionary
+    :param columns: List - column names return when query is executed
+    :param results: List / Tupple - result set from when query is executed
+    :return: list of dictionary- mapped with table column name and to its values
+    """
+
+    allResults = []
+    columns = [col.name for col in columns]
+    if type(results) is list:
+        for value in results:
+            allResults.append(dict(zip(columns, value)))
+        return allResults
+    elif type(results) is tuple:
+        allResults.append(dict(zip(columns, results)))
+        return allResults
+
 def find_run_tap_log_file(stdout, sync_engine=None):
     """Pipelinewise creates log file per running tap instances in a dynamically created directory:
         ~/.pipelinewise/<TARGET_ID>/<TAP_ID>/log
@@ -62,17 +84,25 @@ def find_run_tap_log_file(stdout, sync_engine=None):
 
     return pattern.search(stdout).group(1)
 
-def run_query_postgres(env, query):
+def run_query_target_postgres(env, query):
+    result_rows = []
     with psycopg2.connect(host=env['DB_TARGET_POSTGRES_HOST'],
                           port=env['DB_TARGET_POSTGRES_PORT'],
                           user=env['DB_TARGET_POSTGRES_USER'],
                           password=env['DB_TARGET_POSTGRES_PASSWORD'],
-                          database=env['DB_TARGET_POSTGRES_DB']) as conn:
+                          database=env['DB_TARGET_POSTGRES_DB'],
+                          cursor_factory=psycopg2.extras.DictCursor) as conn:
         conn.set_session(autocommit=True)
         with conn.cursor() as cur:
             cur.execute(query)
 
-def run_query_snowflake(env, query):
+            if cur.rowcount > 0:
+                result_rows = convert_to_dict(cur.description, cur.fetchall())
+
+    return result_rows
+
+def run_query_target_snowflake(env, query):
+    result_rows = []
     with snowflake.connector.connect(account=env['TARGET_SNOWFLAKE_ACCOUNT'],
                                      database=env['TARGET_SNOWFLAKE_DBNAME'],
                                      warehouse=env['TARGET_SNOWFLAKE_WAREHOUSE'],
@@ -81,6 +111,26 @@ def run_query_snowflake(env, query):
                                      autocommit=True) as conn:
         with conn.cursor() as cur:
             cur.execute(query)
+
+            if cur.rowcount > 0:
+                result_rows = cur.fetchall()
+
+    return result_rows
+
+def run_query_tap_mysql(env, query):
+    result_rows = []
+    with pymysql.connect(host=env['DB_TAP_MYSQL_HOST'],
+                         port=int(env['DB_TAP_MYSQL_PORT']),
+                         user=env['DB_TAP_MYSQL_USER'],
+                         password=env['DB_TAP_MYSQL_PASSWORD'],
+                         database=env['DB_TAP_MYSQL_DB'],
+                         cursorclass=pymysql.cursors.DictCursor) as cur:
+        cur.execute(query)
+
+        if cur.rowcount > 0:
+            result_rows = cur.fetchall()
+
+    return result_rows
 
 def run_command(command):
     """Run shell command and return returncode, stdout and stderr"""
