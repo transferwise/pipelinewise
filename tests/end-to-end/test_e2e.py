@@ -2,14 +2,18 @@ import os
 import re
 import glob
 import shlex
+import shutil
 import pytest
 import psycopg2
 import subprocess
+import snowflake.connector
 
 from dotenv import load_dotenv
 from pathlib import Path
 
 DIR = os.path.dirname(__file__)
+USER_HOME = os.path.expanduser('~')
+CONFIG_DIR = os.path.join(USER_HOME, '.pipelinewise')
 
 
 class TestE2E(object):
@@ -82,30 +86,40 @@ class TestE2E(object):
 
     def clean_target_postgres(self):
         """Clean postgres_dwh"""
-        conn = None
-        cur = None
-        try:
-            conn = psycopg2.connect(host=self.env['DB_TARGET_POSTGRES_HOST'],
-                                    port=self.env['DB_TARGET_POSTGRES_PORT'],
-                                    user=self.env['DB_TARGET_POSTGRES_USER'],
-                                    password=self.env['DB_TARGET_POSTGRES_PASSWORD'],
-                                    database=self.env['DB_TARGET_POSTGRES_DB'])
+        with psycopg2.connect(host=self.env['DB_TARGET_POSTGRES_HOST'],
+                              port=self.env['DB_TARGET_POSTGRES_PORT'],
+                              user=self.env['DB_TARGET_POSTGRES_USER'],
+                              password=self.env['DB_TARGET_POSTGRES_PASSWORD'],
+                              database=self.env['DB_TARGET_POSTGRES_DB']) as conn:
             conn.set_session(autocommit=True)
-            cur = conn.cursor()
+            with conn.cursor() as cur:
+                # Drop target schemas if exists
+                cur.execute("DROP SCHEMA IF EXISTS mysql_grp24 CASCADE;")
+                cur.execute("DROP SCHEMA IF EXISTS postgres_world CASCADE;")
 
-            # Drop target schemas if exists
-            cur.execute("DROP SCHEMA IF EXISTS mysql_grp24 CASCADE;")
-            cur.execute("DROP SCHEMA IF EXISTS postgres_world CASCADE;")
+                # Create groups required for tests
+                cur.execute("DROP GROUP IF EXISTS group1;")
+                cur.execute("CREATE GROUP group1;")
 
-            # Create groups required for tests
-            cur.execute("DROP GROUP IF EXISTS group1;")
-            cur.execute("CREATE GROUP group1;")
-        finally:
-            if cur is not None:
-                cur.close()
+        # Clean config directory
+        shutil.rmtree(os.path.join(CONFIG_DIR, 'postgres_dwh'), ignore_errors=True)
 
-            if conn is not None:
-                conn.close()
+    def clean_target_snowflake(self):
+        """Clean snowflake"""
+        with snowflake.connector.connect(account=self.env['TARGET_SNOWFLAKE_ACCOUNT'],
+                                         database=self.env['TARGET_SNOWFLAKE_DBNAME'],
+                                         warehouse=self.env['TARGET_SNOWFLAKE_WAREHOUSE'],
+                                         user=self.env['TARGET_SNOWFLAKE_USER'],
+                                         password=self.env['TARGET_SNOWFLAKE_PASSWORD'],
+                                         autocommit=True) as conn:
+            with conn.cursor() as cur:
+                # Drop target schemas if exists
+                cur.execute("DROP SCHEMA IF EXISTS mysql_grp24")
+                cur.execute("DROP SCHEMA IF EXISTS postgres_world_sf")
+                cur.execute("DROP SCHEMA IF EXISTS s3_feeds")
+
+        # Clean config directory
+        shutil.rmtree(os.path.join(CONFIG_DIR, 'snowflake'), ignore_errors=True)
 
     def run_command(self, command):
         """Run shell command and return returncode, stdout and stderr"""
@@ -163,93 +177,74 @@ class TestE2E(object):
         # Check if state file content equals to last emitted state in log
         if log_path:
             success_log_path = f"{log_path}.success"
+            state_in_log = None
             with open(success_log_path, 'r') as log_f:
-                last_state = \
-                    re.search(r'\nINFO STATE emitted from target: (.+\n)', '\n'.join(log_f.readlines())).groups()[-1]
+                state_log_pattern = re.search(r'\nINFO STATE emitted from target: (.+\n)', '\n'.join(log_f.readlines()))
+                if state_log_pattern:
+                    state_in_log = state_log_pattern.groups()[-1]
 
-            with open(state_file, 'r') as state_f:
-                assert last_state == ''.join(state_f.readlines())
+            # If the emitted state message exists in the log then compare it to the actual state file
+            if state_in_log:
+                with open(state_file, 'r') as state_f:
+                    assert state_in_log == ''.join(state_f.readlines())
+
+    def assert_run_tap_success(self, tap, target, sync_engines):
+        """Run a specific tap and make sure that it's using the correct sync engine,
+        finished successfully and state file created with the right content"""
+        [rc, stdout, stderr] = self.run_command("pipelinewise run_tap --tap {} --target {}".format(tap, target))
+        for sync_engine in sync_engines:
+            log_file = self.find_run_tap_log_file(stdout, sync_engine)
+            self.assert_command_success(rc, stdout, stderr, log_file)
+            self.assert_state_file_valid(target, tap, log_file)
 
     @pytest.mark.dependency(name="import_config")
     def test_import_project(self):
         """Import the YAML project with taps and target and do discovery mode to write the JSON files for singer
         connectors """
         self.clean_target_postgres()
+        self.clean_target_snowflake()
         [rc, stdout, stderr] = self.run_command("pipelinewise import_config --dir {}".format(self.project_dir))
         self.assert_command_success(rc, stdout, stderr)
 
     @pytest.mark.dependency(depends=["import_config"])
     def test_replicate_mariadb_to_postgres(self):
         """Replicate data from MariaDB to Postgres DWH, check if return code is zero and success log file created"""
-        [rc, stdout, stderr] = self.run_command("pipelinewise run_tap --tap mariadb_source --target postgres_dwh")
-        log_file = self.find_run_tap_log_file(stdout)
-        self.assert_command_success(rc, stdout, stderr, log_file)
-
-    @pytest.mark.dependency(depends=["import_config"])
-    def test_replicate_mariadb_to_snowflake(self):
-        """Replicate data from MariaDB to Snowflake DWH, check if return code is zero and success log file created"""
-
-        tap_name = 'mariadb_to_sf'
-        target_name = 'snowflake'
-
-        # Run tap first time - fastsync should be triggered
-        [rc, stdout, stderr] = self.run_command("pipelinewise run_tap --tap {} --target {}".format(tap_name,
-                                                                                                   target_name))
-
-        log_file = self.find_run_tap_log_file(stdout, 'fastsync')
-        self.assert_command_success(rc, stdout, stderr, log_file)
-
-        # Run tap second time - singer should be triggered and state message should be emitted
-        [rc, stdout, stderr] = self.run_command("pipelinewise run_tap --tap {} --target {}".format(tap_name,
-                                                                                                   target_name))
-        log_file = self.find_run_tap_log_file(stdout, 'singer')
-        self.assert_command_success(rc, stdout, stderr, log_file)
-
-        self.assert_state_file_valid(target_name, tap_name, log_file)
+        self.assert_run_tap_success('mariadb_source', 'postgres_dwh', ['singer'])
 
     @pytest.mark.dependency(depends=["import_config"])
     def test_replicate_postgres_to_postgres(self):
         """Replicate data from Postgres to Postgres DWH, check if return code is zero and success log file created"""
-        [rc, stdout, stderr] = self.run_command("pipelinewise run_tap --tap postgres_source --target postgres_dwh")
-        log_file = self.find_run_tap_log_file(stdout)
-        self.assert_command_success(rc, stdout, stderr, log_file)
+        self.assert_run_tap_success('postgres_source', 'postgres_dwh', ['singer'])
+
+    @pytest.mark.dependency(depends=["import_config"])
+    def test_replicate_mariadb_to_snowflake(self):
+        """Replicate data from MariaDB to Snowflake DWH, check if return code is zero and success log file created"""
+        tap, target = 'mariadb_to_sf', 'snowflake'
+
+        # Run tap first time - both fastsync and a singer should be triggered
+        self.assert_run_tap_success(tap, target, ['fastsync', 'singer'])
+
+        # Run tap second time - only singer should be triggered
+        self.assert_run_tap_success(tap, target, ['singer'])
 
     @pytest.mark.dependency(depends=["import_config"])
     def test_replicate_postgres_to_snowflake(self):
         """Replicate data from Postgres to Snowflake, check if return code is zero and success log file created"""
+        tap, target = 'postgres_source_sf', 'snowflake'
 
-        tap_name = 'postgres_source_sf'
-        target_name = 'snowflake'
+        # Run tap first time - both fastsync and a singer should be triggered
+        self.assert_run_tap_success(tap, target, ['fastsync', 'singer'])
 
-        # Run tap first time - fastsync should be triggered
-        [rc, stdout, stderr] = self.run_command("pipelinewise run_tap --tap {} --target {}".format(tap_name,
-                                                                                                   target_name))
-        log_file = self.find_run_tap_log_file(stdout, 'fastsync')
-        self.assert_command_success(rc, stdout, stderr, log_file)
-
-        # Run tap second time - singer should be triggered and state message should be emitted
-        [rc, stdout, stderr] = self.run_command("pipelinewise run_tap --tap {} --target {}".format(tap_name,
-                                                                                                   target_name))
-        log_file = self.find_run_tap_log_file(stdout, 'singer')
-        self.assert_command_success(rc, stdout, stderr, log_file)
-        self.assert_state_file_valid(target_name, tap_name, log_file)
+        # Run tap second time - only singer should be triggered
+        self.assert_run_tap_success(tap, target, ['singer'])
 
     @pytest.mark.dependency(depends=["import_config"])
     def test_replicate_s3_to_snowflake(self):
         """Replicate csv files from s3 to Snowflake, check if return code is zero and success log file created"""
+        tap, target = 'csv_on_s3', 'snowflake'
 
-        tap_name = 'csv_on_s3'
-        target_name = 'snowflake'
+        # Run tap first time - both fastsync and a singer should be triggered
+        self.assert_run_tap_success(tap, target, ['fastsync', 'singer'])
 
-        # Run tap first time - fastsync should be triggered
-        [rc, stdout, stderr] = self.run_command("pipelinewise run_tap --tap {} --target {}".format(tap_name,
-                                                                                                   target_name))
-        log_file = self.find_run_tap_log_file(stdout, 'fastsync')
-        self.assert_command_success(rc, stdout, stderr, log_file)
-
-        # Run tap second time - singer should be triggered and state message should be emitted
-        [rc, stdout, stderr] = self.run_command("pipelinewise run_tap --tap {} --target {}".format(tap_name,
-                                                                                                   target_name))
-        log_file = self.find_run_tap_log_file(stdout, 'singer')
-        self.assert_command_success(rc, stdout, stderr, log_file)
-        self.assert_state_file_valid(target_name, tap_name, log_file)
+        # Run tap second time - only singer should be triggered
+        self.assert_run_tap_success(tap, target, ['singer'])
