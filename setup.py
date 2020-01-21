@@ -32,7 +32,8 @@ setup(name='pipelinewise',
         'singer-encodings==0.0.*',
         'python-dateutil<2.8.1',
         'messytables==0.15.*',
-        'pytz==2018.4'
+        'pytz==2018.4',
+        'python-pidfile==3.0.0'
     ],
     extras_require={
         "test": [
