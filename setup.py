@@ -7,7 +7,7 @@ with open('README.md') as f:
       long_description = f.read()
 
 setup(name='pipelinewise',
-    version='0.11.5',
+    version='0.12.0',
     description='PipelineWise',
     long_description=long_description,
     long_description_content_type='text/markdown',
