@@ -69,7 +69,8 @@ class TestCli:
                 'properties': '/var/singer-connector/properties.json',
                 'state': '/var/singer-connector/state.json',
                 'transformation': '/var/singer-connector/transformation.json',
-                'selection': '/var/singer-connector/selection.json'
+                'selection': '/var/singer-connector/selection.json',
+                'pidfile': '/var/singer-connector/pipelinewise.pid'
             }
 
     def test_not_existing_config_dir(self):
@@ -355,6 +356,7 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
         exp_err_pattern = os.path.join(VIRTUALENVS_DIR, '/tap-mysql/bin/tap-mysql: No such file or directory')
         assert exp_err_pattern in stdout or exp_err_pattern in stderr
 
+
     def _test_command_run_tap(self):
         """Test run tap command"""
         args = CliArgs(target='target_one', tap='tap_one')
@@ -367,6 +369,18 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
             pipelinewise.run_tap()
         assert pytest_wrapped_e.type == SystemExit
         assert pytest_wrapped_e.value.code == 1
+
+    def test_command_stop_tap(self):
+        """Test stop tap command"""
+        args = CliArgs(target="target_one", tap="tap_one")
+        pipelinewise = PipelineWise(args, CONFIG_DIR, VIRTUALENVS_DIR)
+
+        # Tap is not running, pid file not exist, should exit with error
+        with pytest.raises(SystemExit) as pytest_wrapped_e:
+            pipelinewise.stop_tap()
+        assert pytest_wrapped_e.type == SystemExit
+        assert pytest_wrapped_e.value.code == 1
+
 
     def test_command_sync_tables(self):
         """Test run tap command"""

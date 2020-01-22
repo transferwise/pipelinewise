@@ -18,6 +18,7 @@ VENV_DIR = os.path.join(PIPELINEWISE_HOME, '.virtualenvs')
 COMMANDS = [
     'init',
     'run_tap',
+    'stop_tap',
     'discover_tap',
     'status',
     'test_tap_connection',
@@ -70,7 +71,7 @@ def main():
             print('You must specify a project name using the argument --name')
             sys.exit(1)
 
-    if args.command == 'discover_tap' or args.command == 'test_tap_connection' or args.command == 'run_tap':
+    if args.command in ['discover_tap', 'test_tap_connection', 'run_tap', 'stop_tap']:
         if args.tap == '*':
             print('You must specify a source name using the argument --tap')
             sys.exit(1)

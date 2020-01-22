@@ -6,7 +6,7 @@ with open('README.md') as f:
     LONG_DESCRIPTION = f.read()
 
 setup(name='pipelinewise',
-      version='0.11.5',
+      version='0.12.0',
       description='PipelineWise',
       long_description=LONG_DESCRIPTION,
       long_description_content_type='text/markdown',
@@ -32,6 +32,7 @@ setup(name='pipelinewise',
           'python-dateutil<2.8.1',
           'messytables==0.15.*',
           'pytz==2018.4',
+          'python-pidfile==3.0.0',
           'pre-commit==1.21.0'
       ],
       extras_require={

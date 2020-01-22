@@ -1,14 +1,15 @@
 """
 PipelineWise CLI - Pipelinewise class
 """
-import copy
-import json
-import logging
 import os
 import shutil
 import signal
 import sys
-import tempfile
+import logging
+import json
+import copy
+import pidfile
+
 from datetime import datetime
 from time import time
 from typing import Dict
@@ -92,8 +93,7 @@ class PipelineWise:
         for sig in [signal.SIGINT, signal.SIGTERM]:
             signal.signal(sig, self._exit_gracefully)
 
-    @classmethod
-    def create_consumable_target_config(cls, target_config, tap_inheritable_config):
+    def create_consumable_target_config(self, target_config, tap_inheritable_config):
         """
         Create consumable target config by appending "inheritable" config to the common target config
         """
@@ -106,7 +106,9 @@ class PipelineWise:
             dict_a.update(dict_b)
 
             # Save the new dict as JSON into a temp file
-            tempfile_path = tempfile.mkstemp()[1]
+            tempfile_path = utils.create_temp_file(dir=self.get_temp_dir(),
+                                                   prefix='target_config_',
+                                                   suffix='.json')[1]
             utils.save_json(dict_a, tempfile_path)
 
             return tempfile_path
@@ -243,10 +245,14 @@ class PipelineWise:
             # Fallback required: Save filtered and fallback properties JSON
             if create_fallback:
                 # Save to files: filtered and fallback properties
-                temp_properties_path = tempfile.mkstemp()[1]
+                temp_properties_path = utils.create_temp_file(dir=self.get_temp_dir(),
+                                                              prefix='properties_',
+                                                              suffix='.json')[1]
                 utils.save_json(properties, temp_properties_path)
 
-                temp_fallback_properties_path = tempfile.mkstemp()[1]
+                temp_fallback_properties_path = utils.create_temp_file(dir=self.get_temp_dir(),
+                                                                       prefix='properties_',
+                                                                       suffix='.json')[1]
                 utils.save_json(fallback_properties, temp_fallback_properties_path)
 
                 return temp_properties_path, \
@@ -255,7 +261,9 @@ class PipelineWise:
                        fallback_filtered_stream_ids
 
             # Fallback not required: Save only the filtered properties JSON
-            temp_properties_path = tempfile.mkstemp()[1]
+            temp_properties_path = utils.create_temp_file(dir=self.get_temp_dir(),
+                                                          prefix='properties_',
+                                                          suffix='.json')[1]
             utils.save_json(properties, temp_properties_path)
 
             return temp_properties_path, filtered_tap_stream_ids
@@ -274,6 +282,12 @@ class PipelineWise:
             self.config = config
         else:
             self.config = {}
+
+    def get_temp_dir(self):
+        """
+        Returns the tap specific temp directory
+        """
+        return os.path.join(self.config_dir, 'tmp')
 
     def get_tap_dir(self, target_id, tap_id):
         """
@@ -311,6 +325,7 @@ class PipelineWise:
             'state': os.path.join(connector_dir, 'state.json'),
             'transformation': os.path.join(connector_dir, 'transformation.json'),
             'selection': os.path.join(connector_dir, 'selection.json'),
+            'pidfile': os.path.join(connector_dir, 'pipelinewise.pid')
         }
 
     def get_targets(self):
@@ -689,7 +704,7 @@ class PipelineWise:
         # Post import checks
         post_import_errors = self._run_post_import_tap_checks(schema_with_diff, target)
         if len(post_import_errors) > 0:
-            return f'Post import tap checks failed at {tap_id}. {post_import_errors}'
+            return f'Post import tap checks failed in tap {tap_id}: {post_import_errors}'
 
         # Save the new catalog into the tap
         try:
@@ -878,6 +893,7 @@ class PipelineWise:
             f'--properties {tap_properties}',
             f'--state {tap_state}',
             f'--target {target_config}',
+            f'--temp_dir {self.get_temp_dir()}',
             f'{tap_transform_arg}',
             f'{tables_command}'
         ))
@@ -976,37 +992,44 @@ class PipelineWise:
 
         start_time = datetime.now()
         try:
-            # Run fastsync for FULL_TABLE replication method
-            if len(fastsync_stream_ids) > 0:
-                self.logger.info('Table(s) selected to sync by fastsync: %s', fastsync_stream_ids)
-                self.tap_run_log_file = os.path.join(log_dir, f'{target_id}-{tap_id}-{current_time}.fastsync.log')
-                self.run_tap_fastsync(
-                    tap_type,
-                    target_type,
-                    tap_config,
-                    tap_properties_fastsync,
-                    tap_state,
-                    tap_transformation,
-                    cons_target_config
-                )
-            else:
-                self.logger.info('No table available that needs to be sync by fastsync')
+            with pidfile.PIDFile(self.tap['files']['pidfile']):
+                # Run fastsync for FULL_TABLE replication method
+                if len(fastsync_stream_ids) > 0:
+                    self.logger.info('Table(s) selected to sync by fastsync: %s', fastsync_stream_ids)
+                    self.tap_run_log_file = os.path.join(log_dir, f'{target_id}-{tap_id}-{current_time}.fastsync.log')
+                    self.run_tap_fastsync(
+                        tap_type,
+                        target_type,
+                        tap_config,
+                        tap_properties_fastsync,
+                        tap_state,
+                        tap_transformation,
+                        cons_target_config
+                    )
+                else:
+                    self.logger.info('No table available that needs to be sync by fastsync')
 
-            # Run singer tap for INCREMENTAL and LOG_BASED replication methods
-            if len(singer_stream_ids) > 0:
-                self.logger.info('Table(s) selected to sync by singer: %s', singer_stream_ids)
-                self.tap_run_log_file = os.path.join(log_dir, f'{target_id}-{tap_id}-{current_time}.singer.log')
-                self.run_tap_singer(
-                    tap_type,
-                    tap_config,
-                    tap_properties_singer,
-                    tap_state,
-                    tap_transformation,
-                    cons_target_config
-                )
-            else:
-                self.logger.info('No table available that needs to be sync by singer')
+                # Run singer tap for INCREMENTAL and LOG_BASED replication methods
+                if len(singer_stream_ids) > 0:
+                    self.logger.info('Table(s) selected to sync by singer: %s', singer_stream_ids)
+                    self.tap_run_log_file = os.path.join(log_dir, f'{target_id}-{tap_id}-{current_time}.singer.log')
+                    self.run_tap_singer(
+                        tap_type,
+                        tap_config,
+                        tap_properties_singer,
+                        tap_state,
+                        tap_transformation,
+                        cons_target_config
+                    )
+                else:
+                    self.logger.info('No table available that needs to be sync by singer')
 
+        except pidfile.AlreadyRunningError:
+            self.logger.error('Another instance of the tap is already running.')
+            utils.silentremove(cons_target_config)
+            utils.silentremove(tap_properties_fastsync)
+            utils.silentremove(tap_properties_singer)
+            sys.exit(1)
         # Delete temp files if there is any
         except utils.RunCommandException as exc:
             self.logger.error(exc)
@@ -1026,6 +1049,28 @@ class PipelineWise:
         utils.silentremove(tap_properties_fastsync)
         utils.silentremove(tap_properties_singer)
         self._print_tap_run_summary(self.STATUS_SUCCESS, start_time, datetime.now())
+
+    def stop_tap(self):
+        """
+        Stop running tap
+
+        The command finds the tap specific pidfile that was created by run_tap command and sends
+        a SIGINT to the process. The SIGINT signal triggers _exit_gracefully function automatically and
+        the tap stops running.
+        """
+        pidfile_path = self.tap["files"]["pidfile"]
+        try:
+            with open(pidfile_path) as pidf:
+                pid = pidf.read()
+                self.logger.info('Sending SIGINT to pid %s...', pid)
+                os.kill(int(pid), signal.SIGINT)
+        except ProcessLookupError:
+            self.logger.error('Pid %s not found. Is the tap running on this machine? '
+                              'Stopping taps remotely is not supported.', pid)
+            sys.exit(1)
+        except FileNotFoundError:
+            self.logger.error('No pidfile found at %s. Tap does not seem to be running.', pidfile_path)
+            sys.exit(1)
 
     # pylint: disable=too-many-locals
     def sync_tables(self):
@@ -1081,17 +1126,22 @@ class PipelineWise:
 
         # sync_tables command always using fastsync
         try:
-            self.tap_run_log_file = os.path.join(log_dir, f'{target_id}-{tap_id}-{current_time}.fastsync.log')
-            self.run_tap_fastsync(
-                tap_type,
-                target_type,
-                tap_config,
-                tap_properties,
-                tap_state,
-                tap_transformation,
-                cons_target_config
-            )
+            with pidfile.PIDFile(self.tap['files']['pidfile']):
+                self.tap_run_log_file = os.path.join(log_dir, f'{target_id}-{tap_id}-{current_time}.fastsync.log')
+                self.run_tap_fastsync(
+                    tap_type,
+                    target_type,
+                    tap_config,
+                    tap_properties,
+                    tap_state,
+                    tap_transformation,
+                    cons_target_config
+                )
 
+        except pidfile.AlreadyRunningError:
+            self.logger.error('Another instance of the tap is already running.')
+            utils.silentremove(cons_target_config)
+            sys.exit(1)
         # Delete temp file if there is any
         except utils.RunCommandException as exc:
             self.logger.error(exc)
@@ -1316,7 +1366,7 @@ TAP RUN SUMMARY
             # Check if primary key is set for INCREMENTAL and LOG_BASED replications
             if (selected and replication_method in [self.INCREMENTAL, self.LOG_BASED] and
                     len(table_key_properties) == 0 and primary_key_required):
-                errors.append(f'No primary key set for - {replication_method} {tap_stream_id}.')
+                errors.append(f'No primary key set for {tap_stream_id} stream ({replication_method})')
                 break
 
         return errors

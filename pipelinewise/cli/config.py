@@ -91,6 +91,12 @@ class Config:
 
         return config
 
+    def get_temp_dir(self):
+        """
+        Returns the tap specific temp directory
+        """
+        return os.path.join(self.config_dir, 'tmp')
+
     def get_target_dir(self, target_id):
         """
         Returns the absolute path of a target configuration directory
@@ -293,6 +299,7 @@ class Config:
 
         # Generate tap inheritable_config dict
         tap_inheritable_config = utils.delete_empty_keys({
+            'temp_dir': self.get_temp_dir(),
             'batch_size_rows': tap.get('batch_size_rows'),
             'hard_delete': tap.get('hard_delete', True),
             'flush_all_streams': tap.get('flush_all_streams', False),

@@ -135,6 +135,7 @@ class TestConfig:
         config = cli.config.Config(PIPELINEWISE_TEST_HOME)
 
         # Target and tap directory should be g
+        assert config.get_temp_dir() == '{}/tmp'.format(PIPELINEWISE_TEST_HOME)
         assert config.get_target_dir('test-target-id') == '{}/test-target-id'.format(PIPELINEWISE_TEST_HOME)
         assert config.get_tap_dir('test-target-id',
                                   'test-tap-id') == '{}/test-target-id/test-tap-id'.format(PIPELINEWISE_TEST_HOME)

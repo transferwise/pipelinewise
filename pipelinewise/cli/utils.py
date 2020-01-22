@@ -9,6 +9,7 @@ import os
 import re
 import shlex
 import sys
+import tempfile
 from datetime import date, datetime
 from subprocess import PIPE, STDOUT, Popen
 
@@ -509,3 +510,13 @@ def run_command(command, log_file=None, line_callback=None):
         LOGGER.error(stderr)
 
     return [proc_rc, stdout, stderr]
+
+
+# pylint: disable=redefined-builtin
+def create_temp_file(suffix=None, prefix=None, dir=None, text=None):
+    """
+    Create temp file with parent directories if not exists
+    """
+    if dir:
+        os.makedirs(dir, exist_ok=True)
+    return tempfile.mkstemp(suffix, prefix, dir, text)

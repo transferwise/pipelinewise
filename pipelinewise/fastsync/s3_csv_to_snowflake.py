@@ -57,7 +57,7 @@ def sync_table(table_name: str, args: Namespace) -> Union[bool, str]:
     try:
         filename = 'pipelinewise_fastsync_{}_{}_{}.csv.gz'.format(args.tap['bucket'], table_name,
                                                                   time.strftime('%Y%m%d-%H%M%S'))
-        filepath = os.path.join(args.export_dir, filename)
+        filepath = os.path.join(args.temp_dir, filename)
 
         target_schema = utils.get_target_schema(args.target, table_name)
 

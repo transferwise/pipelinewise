@@ -267,7 +267,7 @@ def parse_args(required_config_keys):
     --target            Target Config file
     --transform         Transformations Config file
     --tables            Tables to sync. (Separated by comma)
-    --export-dir        Directory to create temporary csv exports. Defaults to current work dir.
+    --temp_dir          Directory to create temporary csv exports. Defaults to current work dir.
 
     Returns the parsed args object from argparse. For each argument that
     point to JSON files (tap, state, properties, target, transform),
@@ -281,6 +281,7 @@ def parse_args(required_config_keys):
     parser.add_argument('--transform', help='Transformations Config file')
     parser.add_argument('--tables', help='Sync only specific tables')
     parser.add_argument('--export-dir', help='Temporary directory required for CSV exports')
+    parser.add_argument('--temp_dir', help='Temporary directory required for CSV exports')
 
     args = parser.parse_args()
     if args.tap:
@@ -302,10 +303,10 @@ def parse_args(required_config_keys):
     else:
         args.tables = get_tables_from_properties(args.properties)
 
-    if args.export_dir:
-        args.export_dir = args.export_dir
+    if args.temp_dir:
+        args.temp_dir = args.temp_dir
     else:
-        args.export_dir = os.path.realpath('/tmp')
+        args.temp_dir = os.path.realpath('.')
 
     check_config(args.tap, required_config_keys['tap'])
     check_config(args.target, required_config_keys['target'])
