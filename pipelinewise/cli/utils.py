@@ -481,6 +481,7 @@ def run_command(command, log_file=None, line_callback=None):
                         decoded_line = line_callback(decoded_line)
 
                     stdout += decoded_line
+
                     logfile.write(decoded_line)
                     logfile.flush()
                 if proc.poll() is not None:
