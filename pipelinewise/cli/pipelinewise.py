@@ -1058,7 +1058,7 @@ class PipelineWise:
         a SIGINT to the process. The SIGINT signal triggers _exit_gracefully function automatically and
         the tap stops running.
         """
-        pidfile_path = self.tap["files"]["pidfile"]
+        pidfile_path = self.tap['files']['pidfile']
         try:
             with open(pidfile_path) as pidf:
                 pid = pidf.read()

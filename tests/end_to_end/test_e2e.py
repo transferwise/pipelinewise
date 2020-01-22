@@ -31,44 +31,44 @@ class TestE2E:
     def init_test_project_dir(self):
         """Load every YML template from test-project directory, replace the environment
         variables to real values and save as consumable YAML files"""
-        yml_templates = glob.glob("{}/*.yml.template".format(self.project_dir))
+        yml_templates = glob.glob(f'{self.project_dir}/*.yml.template')
         for template_path in yml_templates:
             with open(template_path, 'r') as file:
                 yaml = file.read()
 
                 # Replace environment variables with string replace. PyYAML can't do it automatically
                 for env_var in self.env:
-                    yaml = yaml.replace("${{{}}}".format(env_var), self.env[env_var])
+                    yaml = yaml.replace(f'${{{env_var}}}', self.env[env_var])
 
-            yaml_path = template_path.replace(".template", "")
-            with open(yaml_path, "w+") as file:
+            yaml_path = template_path.replace('.template', '')
+            with open(yaml_path, 'w+') as file:
                 file.write(yaml)
 
     def clean_tap_mysql(self):
         """Clean mysql source"""
         # Delete extra rows added by previous test
-        e2e_utils.run_query_tap_mysql(self.env, "DELETE FROM address where address_id >= 10000")
-        e2e_utils.run_query_tap_mysql(self.env, "DELETE FROM weight_unit where weight_unit_id >= 100")
-        e2e_utils.run_query_tap_mysql(self.env, "DELETE FROM area_code where area_code_id >= 100")
+        e2e_utils.run_query_tap_mysql(self.env, 'DELETE FROM address where address_id >= 10000')
+        e2e_utils.run_query_tap_mysql(self.env, 'DELETE FROM weight_unit where weight_unit_id >= 100')
+        e2e_utils.run_query_tap_mysql(self.env, 'DELETE FROM area_code where area_code_id >= 100')
 
     def clean_target_postgres(self):
         """Clean postgres_dwh"""
         # Drop target schemas if exists
-        e2e_utils.run_query_target_postgres(self.env, "DROP SCHEMA IF EXISTS mysql_grp24 CASCADE")
-        e2e_utils.run_query_target_postgres(self.env, "DROP SCHEMA IF EXISTS postgres_world CASCADE")
+        e2e_utils.run_query_target_postgres(self.env, 'DROP SCHEMA IF EXISTS mysql_grp24 CASCADE')
+        e2e_utils.run_query_target_postgres(self.env, 'DROP SCHEMA IF EXISTS postgres_world CASCADE')
 
         # Create groups required for tests
-        e2e_utils.run_query_target_postgres(self.env, "DROP GROUP IF EXISTS group1")
-        e2e_utils.run_query_target_postgres(self.env, "CREATE GROUP group1")
+        e2e_utils.run_query_target_postgres(self.env, 'DROP GROUP IF EXISTS group1')
+        e2e_utils.run_query_target_postgres(self.env, 'CREATE GROUP group1')
 
         # Clean config directory
         shutil.rmtree(os.path.join(CONFIG_DIR, 'postgres_dwh'), ignore_errors=True)
 
     def clean_target_snowflake(self):
         """Clean snowflake"""
-        e2e_utils.run_query_target_snowflake(self.env, "DROP SCHEMA IF EXISTS mysql_grp24")
-        e2e_utils.run_query_target_snowflake(self.env, "DROP SCHEMA IF EXISTS postgres_world_sf")
-        e2e_utils.run_query_target_snowflake(self.env, "DROP SCHEMA IF EXISTS s3_feeds")
+        e2e_utils.run_query_target_snowflake(self.env, 'DROP SCHEMA IF EXISTS mysql_grp24')
+        e2e_utils.run_query_target_snowflake(self.env, 'DROP SCHEMA IF EXISTS postgres_world_sf')
+        e2e_utils.run_query_target_snowflake(self.env, 'DROP SCHEMA IF EXISTS s3_feeds')
 
         # Clean config directory
         shutil.rmtree(os.path.join(CONFIG_DIR, 'snowflake'), ignore_errors=True)
@@ -78,19 +78,19 @@ class TestE2E:
         """Assert helper function to check if command finished successfully.
         In case of failure it logs stdout, stderr and content of the failed command log
         if exists"""
-        if return_code != 0 or stderr != "":
-            failed_log = ""
-            failed_log_path = f"{log_path}.failed"
+        if return_code != 0 or stderr != '':
+            failed_log = ''
+            failed_log_path = f'{log_path}.failed'
             # Load failed log file if exists
             if os.path.isfile(failed_log_path):
                 with open(failed_log_path, 'r') as file:
                     failed_log = file.read()
 
-            print(f"STDOUT: {stdout}\nSTDERR: {stderr}\nFAILED LOG: {failed_log}")
+            print(f'STDOUT: {stdout}\nSTDERR: {stderr}\nFAILED LOG: {failed_log}')
             assert False
 
         # check success log file if log path defined
-        success_log_path = f"{log_path}.success"
+        success_log_path = f'{log_path}.success'
         if log_path and not os.path.isfile(success_log_path):
             assert False
         else:
@@ -100,12 +100,12 @@ class TestE2E:
     def assert_state_file_valid(cls, target_name, tap_name, log_path=None):
         """Assert helper function to check if state file exists for a certain tap
         for a certain target"""
-        state_file = Path(f"{Path.home()}/.pipelinewise/{target_name}/{tap_name}/state.json").resolve()
+        state_file = Path(f'{Path.home()}/.pipelinewise/{target_name}/{tap_name}/state.json').resolve()
         assert os.path.isfile(state_file)
 
         # Check if state file content equals to last emitted state in log
         if log_path:
-            success_log_path = f"{log_path}.success"
+            success_log_path = f'{log_path}.success'
             state_in_log = None
             with open(success_log_path, 'r') as log_f:
                 state_log_pattern = re.search(r'\nINFO STATE emitted from target: (.+\n)', '\n'.join(log_f.readlines()))
@@ -126,7 +126,7 @@ class TestE2E:
             self.assert_command_success(return_code, stdout, stderr, log_file)
             self.assert_state_file_valid(target, tap, log_file)
 
-    @pytest.mark.dependency(name="import_config")
+    @pytest.mark.dependency(name='import_config')
     def test_import_project(self):
         """Import the YAML project with taps and target and do discovery mode to write the JSON files for singer
         connectors """
@@ -136,7 +136,7 @@ class TestE2E:
         [return_code, stdout, stderr] = e2e_utils.run_command(f'pipelinewise import_config --dir {self.project_dir}')
         self.assert_command_success(return_code, stdout, stderr)
 
-    @pytest.mark.dependency(depends=["import_config"])
+    @pytest.mark.dependency(depends=['import_config'])
     def test_replicate_mariadb_to_pg(self):
         """Replicate data from MariaDB to Postgres DWH, check if return code is zero and success log file created"""
 
@@ -190,12 +190,12 @@ class TestE2E:
         self.assert_run_tap_success('mariadb_source', 'postgres_dwh', ['singer'])
         assert_row_count_equals_source_to_target()
 
-    @pytest.mark.dependency(depends=["import_config"])
+    @pytest.mark.dependency(depends=['import_config'])
     def test_replicate_pg_to_pg(self):
         """Replicate data from Postgres to Postgres DWH, check if return code is zero and success log file created"""
         self.assert_run_tap_success('postgres_source', 'postgres_dwh', ['singer'])
 
-    @pytest.mark.dependency(depends=["import_config"])
+    @pytest.mark.dependency(depends=['import_config'])
     def test_replicate_mariadb_to_sf(self):
         """Replicate data from MariaDB to Snowflake DWH, check if return code is zero and success log file created"""
         tap, target = 'mariadb_to_sf', 'snowflake'
@@ -206,7 +206,7 @@ class TestE2E:
         # Run tap second time - only singer should be triggered
         self.assert_run_tap_success(tap, target, ['singer'])
 
-    @pytest.mark.dependency(depends=["import_config"])
+    @pytest.mark.dependency(depends=['import_config'])
     def test_replicate_pg_to_sf(self):
         """Replicate data from Postgres to Snowflake, check if return code is zero and success log file created"""
         tap, target = 'postgres_source_sf', 'snowflake'
@@ -217,7 +217,7 @@ class TestE2E:
         # Run tap second time - only singer should be triggered
         self.assert_run_tap_success(tap, target, ['singer'])
 
-    @pytest.mark.dependency(depends=["import_config"])
+    @pytest.mark.dependency(depends=['import_config'])
     def test_replicate_s3_to_sf(self):
         """Replicate csv files from s3 to Snowflake, check if return code is zero and success log file created"""
         tap, target = 'csv_on_s3', 'snowflake'

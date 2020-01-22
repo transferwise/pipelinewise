@@ -372,7 +372,7 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
 
     def test_command_stop_tap(self):
         """Test stop tap command"""
-        args = CliArgs(target="target_one", tap="tap_one")
+        args = CliArgs(target='target_one', tap='tap_one')
         pipelinewise = PipelineWise(args, CONFIG_DIR, VIRTUALENVS_DIR)
 
         # Tap is not running, pid file not exist, should exit with error

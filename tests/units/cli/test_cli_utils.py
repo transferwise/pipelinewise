@@ -338,13 +338,13 @@ class TestUtils:
         os.remove(temp_file)
 
         # Providing extra dir argument should create the target directory even if it's not exist
-        temp_file = cli.utils.create_temp_file(dir="./temp_dir_to_create_automatically/deep_temp_dir")[1]
+        temp_file = cli.utils.create_temp_file(dir='./temp_dir_to_create_automatically/deep_temp_dir')[1]
         assert os.path.isfile(temp_file)
         os.remove(temp_file)
 
         # Providing dir, suffix and prefix arguments should create the target_directory with custom prefix and suffix
-        temp_file = cli.utils.create_temp_file(dir="./temp_dir_to_create_automatically/deep_temp_dir",
-                                               suffix=".json",
-                                               prefix="pipelinewise_test_temp_file_")[1]
+        temp_file = cli.utils.create_temp_file(dir='./temp_dir_to_create_automatically/deep_temp_dir',
+                                               suffix='.json',
+                                               prefix='pipelinewise_test_temp_file_')[1]
         assert os.path.isfile(temp_file)
         os.remove(temp_file)

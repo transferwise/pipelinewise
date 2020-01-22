@@ -14,7 +14,7 @@ def load_env():
     """Load environment variables in priority order:
         1: Existing environment variables
         2: Docker compose .env environment variables"""
-    load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "../../dev-project/.env"))
+    load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '../../dev-project/.env'))
     env = {
         'DB_TAP_POSTGRES_HOST': os.environ.get('DB_TAP_POSTGRES_HOST'),
         'DB_TAP_POSTGRES_PORT': os.environ.get('DB_TAP_POSTGRES_PORT'),
@@ -79,9 +79,9 @@ def find_run_tap_log_file(stdout, sync_engine=None):
 
         The generated full path is logged to STDOUT when tap starting"""
     if sync_engine:
-        pattern = re.compile(r"Writing output into (.+\.{}\.log)".format(sync_engine))
+        pattern = re.compile(r'Writing output into (.+\.{}\.log)'.format(sync_engine))
     else:
-        pattern = re.compile(r"Writing output into (.+\.log)")
+        pattern = re.compile(r'Writing output into (.+\.log)')
 
     return pattern.search(stdout).group(1)
 
