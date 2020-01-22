@@ -1,13 +1,12 @@
 import os
 import re
 import shlex
-import pickle
-import pymysql
+import subprocess
+
 import psycopg2
 import psycopg2.extras
-import subprocess
+import pymysql
 import snowflake.connector
-
 from dotenv import load_dotenv
 
 
@@ -15,7 +14,7 @@ def load_env():
     """Load environment variables in priority order:
         1: Existing environment variables
         2: Docker compose .env environment variables"""
-    load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "../../dev-project/.env"))
+    load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '../../dev-project/.env'))
     env = {
         'DB_TAP_POSTGRES_HOST': os.environ.get('DB_TAP_POSTGRES_HOST'),
         'DB_TAP_POSTGRES_PORT': os.environ.get('DB_TAP_POSTGRES_PORT'),
@@ -50,6 +49,7 @@ def load_env():
 
     return env
 
+
 def convert_to_dict(columns, results):
     """
     This method converts the resultset from postgres to dictionary
@@ -59,15 +59,16 @@ def convert_to_dict(columns, results):
     :return: list of dictionary- mapped with table column name and to its values
     """
 
-    allResults = []
+    all_results = []
     columns = [col.name for col in columns]
-    if type(results) is list:
+    if isinstance(results, list):
         for value in results:
-            allResults.append(dict(zip(columns, value)))
-        return allResults
-    elif type(results) is tuple:
-        allResults.append(dict(zip(columns, results)))
-        return allResults
+            all_results.append(dict(zip(columns, value)))
+    elif isinstance(results, tuple):
+        all_results.append(dict(zip(columns, results)))
+
+    return all_results
+
 
 def find_run_tap_log_file(stdout, sync_engine=None):
     """Pipelinewise creates log file per running tap instances in a dynamically created directory:
@@ -78,13 +79,15 @@ def find_run_tap_log_file(stdout, sync_engine=None):
 
         The generated full path is logged to STDOUT when tap starting"""
     if sync_engine:
-        pattern = re.compile(r"Writing output into (.+\.{}\.log)".format(sync_engine))
+        pattern = re.compile(r'Writing output into (.+\.{}\.log)'.format(sync_engine))
     else:
-        pattern = re.compile(r"Writing output into (.+\.log)")
+        pattern = re.compile(r'Writing output into (.+\.log)')
 
     return pattern.search(stdout).group(1)
 
+
 def run_query_target_postgres(env, query):
+    """Run and SQL query in target postgres database"""
     result_rows = []
     with psycopg2.connect(host=env['DB_TARGET_POSTGRES_HOST'],
                           port=env['DB_TARGET_POSTGRES_PORT'],
@@ -101,7 +104,9 @@ def run_query_target_postgres(env, query):
 
     return result_rows
 
+
 def run_query_target_snowflake(env, query):
+    """Run and SQL query in target snowflake database"""
     result_rows = []
     with snowflake.connector.connect(account=env['TARGET_SNOWFLAKE_ACCOUNT'],
                                      database=env['TARGET_SNOWFLAKE_DBNAME'],
@@ -117,7 +122,9 @@ def run_query_target_snowflake(env, query):
 
     return result_rows
 
+
 def run_query_tap_mysql(env, query):
+    """Run and SQL query in tap mysql database"""
     result_rows = []
     with pymysql.connect(host=env['DB_TAP_MYSQL_HOST'],
                          port=int(env['DB_TAP_MYSQL_PORT']),
@@ -132,12 +139,13 @@ def run_query_tap_mysql(env, query):
 
     return result_rows
 
+
 def run_command(command):
     """Run shell command and return returncode, stdout and stderr"""
     proc = subprocess.Popen(shlex.split(command), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    x = proc.communicate()
-    rc = proc.returncode
-    stdout = x[0].decode('utf-8')
-    stderr = x[1].decode('utf-8')
+    proc_result = proc.communicate()
+    return_code = proc.returncode
+    stdout = proc_result[0].decode('utf-8')
+    stderr = proc_result[1].decode('utf-8')
 
-    return [rc, stdout, stderr]
+    return [return_code, stdout, stderr]
