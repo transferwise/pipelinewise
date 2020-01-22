@@ -464,23 +464,23 @@ def run_command(command, log_file=None, line_callback=None):
 
         # Start command
         proc = Popen(shlex.split(piped_command), stdout=PIPE, stderr=STDOUT)
-        f = open(log_file_running, "w+")
-        stdout = ''
-        while True:
-            line = proc.stdout.readline()
-            if line:
-                decoded_line = line.decode('utf-8')
 
-                if line_callback is not None:
-                    decoded_line = line_callback(decoded_line)
+        with open(log_file_running, "w+") as f:
+            stdout = ''
+            while True:
+                line = proc.stdout.readline()
+                if line:
+                    decoded_line = line.decode('utf-8')
 
-                stdout += decoded_line
-                f.write(decoded_line)
-                f.flush()
-            if proc.poll() is not None:
-                break
+                    if line_callback is not None:
+                        decoded_line = line_callback(decoded_line)
 
-        f.close()
+                    stdout += decoded_line
+                    f.write(decoded_line)
+                    f.flush()
+                if proc.poll() is not None:
+                    break
+
         rc = proc.poll()
         if rc != 0:
             # Add failed status to the log file name

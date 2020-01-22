@@ -75,9 +75,7 @@ class Config(object):
 
         # Link taps to targets
         for target_key in targets.keys():
-            for tap_key in taps.keys():
-                if taps.get(tap_key).get('target') == targets.get(target_key).get('id'):
-                    targets.get(target_key).get('taps').append(taps.get(tap_key))
+            targets[target_key]['taps'] = [tap for tap in taps.values() if tap['target'] == target_key]
 
         # Final structure is ready
         config.targets = targets
@@ -127,12 +125,11 @@ class Config(object):
         self.save_main_config_json()
 
         # Save every target config json
-        for target_key in self.targets.keys():
-            target = self.targets[target_key]
+        for target in self.targets.values():
             self.save_target_jsons(target)
 
             # Save every tap JSON files
-            for i, tap in enumerate(target['taps']):
+            for tap in target['taps']:
                 extra_config_keys = utils.get_tap_extra_config_keys(tap)
                 self.save_tap_jsons(target, tap, extra_config_keys)
 
