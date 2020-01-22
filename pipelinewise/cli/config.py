@@ -81,7 +81,7 @@ class Config:
             taps[tap_id] = tap_data
 
         # Link taps to targets
-        for target_key in targets
+        for target_key in targets:
             targets[target_key]['taps'] = [tap for tap in taps.values() if tap['target'] == target_key]
 
         # Final structure is ready
