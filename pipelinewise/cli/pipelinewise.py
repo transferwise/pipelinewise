@@ -702,7 +702,7 @@ class PipelineWise:
             return f'Cannot load selection JSON at {tap_selection_file}. {str(exc)}'
 
         # Post import checks
-        post_import_errors = self._run_post_import_tap_checks(tap, schema_with_diff, target)
+        post_import_errors = self._run_post_import_tap_checks(tap, schema_with_diff)
         if len(post_import_errors) > 0:
             return f'Post import tap checks failed in tap {tap_id}: {post_import_errors}'
 
@@ -1336,7 +1336,7 @@ TAP RUN SUMMARY
                     logfile.write(summary)
 
     # pylint: disable=unused-variable
-    def _run_post_import_tap_checks(self, tap, catalog, target) -> list:
+    def _run_post_import_tap_checks(self, tap, catalog) -> list:
         """
             Run post import checks on a tap properties object.
 

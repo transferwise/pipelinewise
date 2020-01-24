@@ -449,9 +449,9 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
         pipelinewise = PipelineWise(args, CONFIG_DIR, VIRTUALENVS_DIR)
         test_files_dir = '{}/resources/test_post_import_checks'.format(os.path.dirname(__file__))
 
-        target_pk_required = cli.utils.load_json('{}/target_config_pk_required.json'.format(test_files_dir))
-        target_pk_not_required = cli.utils.load_json('{}/target_config_pk_not_required.json'.format(test_files_dir))
-        target_pk_not_defined = cli.utils.load_json('{}/target_config_pk_not_defined.json'.format(test_files_dir))
+        tap_pk_required = cli.utils.load_json('{}/tap_config_pk_required.json'.format(test_files_dir))
+        tap_pk_not_required = cli.utils.load_json('{}/tap_config_pk_not_required.json'.format(test_files_dir))
+        tap_pk_not_defined = cli.utils.load_json('{}/tap_config_pk_not_defined.json'.format(test_files_dir))
         tap_with_pk = cli.utils.load_json('{}//tap_properties_with_pk.json'.format(test_files_dir))
         tap_with_no_pk_full_table = cli.utils.load_json(
             '{}//tap_properties_with_no_pk_full_table.json'.format(test_files_dir))
@@ -463,16 +463,16 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
             '{}//tap_properties_with_no_pk_not_selected.json'.format(test_files_dir))
 
         # Test scenarios when post import checks should pass
-        assert pipelinewise._run_post_import_tap_checks(tap_with_pk, target_pk_required) == []
-        assert pipelinewise._run_post_import_tap_checks(tap_with_pk, target_pk_not_required) == []
-        assert pipelinewise._run_post_import_tap_checks(tap_with_no_pk_full_table, target_pk_required) == []
-        assert pipelinewise._run_post_import_tap_checks(tap_with_no_pk_incremental, target_pk_not_required) == []
-        assert pipelinewise._run_post_import_tap_checks(tap_with_no_pk_log_based, target_pk_not_required) == []
-        assert pipelinewise._run_post_import_tap_checks(tap_with_no_pk_not_selected, target_pk_required) == []
-        assert pipelinewise._run_post_import_tap_checks(tap_with_no_pk_full_table, target_pk_not_defined) == []
+        assert pipelinewise._run_post_import_tap_checks(tap_pk_required, tap_with_pk) == []
+        assert pipelinewise._run_post_import_tap_checks(tap_pk_not_required, tap_with_pk) == []
+        assert pipelinewise._run_post_import_tap_checks(tap_pk_required, tap_with_no_pk_full_table) == []
+        assert pipelinewise._run_post_import_tap_checks(tap_pk_not_required, tap_with_no_pk_incremental) == []
+        assert pipelinewise._run_post_import_tap_checks(tap_pk_not_required, tap_with_no_pk_log_based) == []
+        assert pipelinewise._run_post_import_tap_checks(tap_pk_required, tap_with_no_pk_not_selected) == []
+        assert pipelinewise._run_post_import_tap_checks(tap_pk_not_defined, tap_with_no_pk_full_table) == []
 
         # Test scenarios when post import checks should fail due to primary keys not exists
-        assert len(pipelinewise._run_post_import_tap_checks(tap_with_no_pk_incremental, target_pk_required)) == 1
-        assert len(pipelinewise._run_post_import_tap_checks(tap_with_no_pk_log_based, target_pk_required)) == 1
-        assert len(pipelinewise._run_post_import_tap_checks(tap_with_no_pk_incremental, target_pk_not_defined)) == 1
-        assert len(pipelinewise._run_post_import_tap_checks(tap_with_no_pk_log_based, target_pk_not_defined)) == 1
+        assert len(pipelinewise._run_post_import_tap_checks(tap_pk_required, tap_with_no_pk_incremental)) == 1
+        assert len(pipelinewise._run_post_import_tap_checks(tap_pk_required, tap_with_no_pk_log_based)) == 1
+        assert len(pipelinewise._run_post_import_tap_checks(tap_pk_not_defined, tap_with_no_pk_incremental)) == 1
+        assert len(pipelinewise._run_post_import_tap_checks(tap_pk_not_defined, tap_with_no_pk_log_based)) == 1
