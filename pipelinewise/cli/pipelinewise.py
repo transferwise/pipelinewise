@@ -702,7 +702,7 @@ class PipelineWise:
             return f'Cannot load selection JSON at {tap_selection_file}. {str(exc)}'
 
         # Post import checks
-        post_import_errors = self._run_post_import_tap_checks(schema_with_diff, target)
+        post_import_errors = self._run_post_import_tap_checks(tap, schema_with_diff, target)
         if len(post_import_errors) > 0:
             return f'Post import tap checks failed in tap {tap_id}: {post_import_errors}'
 
@@ -1336,7 +1336,7 @@ TAP RUN SUMMARY
                     logfile.write(summary)
 
     # pylint: disable=unused-variable
-    def _run_post_import_tap_checks(self, tap, target) -> list:
+    def _run_post_import_tap_checks(self, tap, catalog, target) -> list:
         """
             Run post import checks on a tap properties object.
 
@@ -1346,7 +1346,7 @@ TAP RUN SUMMARY
         errors = []
 
         # Foreach stream (table) in the original properties
-        for stream_idx, stream in enumerate(tap.get('streams', tap)):
+        for stream_idx, stream in enumerate(catalog.get('streams', catalog)):
             # Collect required properties from the properties file
             tap_stream_id = stream.get('tap_stream_id')
             metadata = stream.get('metadata', [])
@@ -1361,7 +1361,7 @@ TAP RUN SUMMARY
             selected = table_meta.get('selected', False)
             replication_method = table_meta.get('replication-method')
             table_key_properties = table_meta.get('table-key-properties', [])
-            primary_key_required = target.get('primary_key_required', True)
+            primary_key_required = tap.get('primary_key_required', True)
 
             # Check if primary key is set for INCREMENTAL and LOG_BASED replications
             if (selected and replication_method in [self.INCREMENTAL, self.LOG_BASED] and
