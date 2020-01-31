@@ -1,1 +1,1 @@
-pipelinewise-transform-field==1.1.1
+pipelinewise-transform-field==1.1.2
