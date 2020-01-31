@@ -134,7 +134,7 @@ You can run any pipelinewise command at this point. Tutorials to create and run 
 To run unit tests:
 
 ```sh
-$ pytest --ignore tests/end-to-end
+$ pytest --ignore tests/end_to_end
 ```
 **Note**: End-to-end tests are ignored because it requires specific environment with source
 and target databases. You need to use the docker development environment to run end to end tests.
@@ -143,13 +143,13 @@ Read more details at [Developing with Docker](#developing-with-docker).
 To run unit tests and generate code coverage:
 
 ```
-$ coverage run -m pytest --ignore tests/end-to-end && coverage report
+$ coverage run -m pytest --ignore tests/end_to_end && coverage report
 ```
 
 To generate HTML coverage report.
 
 ```
-$ coverage run -m pytest --ignore tests/end-to-end && coverage html -d coverage_html
+$ coverage run -m pytest --ignore tests/end_to_end && coverage html -d coverage_html
 ```
 
 **Note**: The HTML report will be generated in `coverage_html/index.html`

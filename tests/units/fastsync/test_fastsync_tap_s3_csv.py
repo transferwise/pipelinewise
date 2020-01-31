@@ -6,7 +6,11 @@ from unittest.mock import patch, Mock
 from pipelinewise.fastsync.commons.tap_s3_csv import FastSyncTapS3Csv, S3Helper
 
 
+# pylint: disable=missing-function-docstring,protected-access,invalid-name
 class TestFastSyncTapS3Csv(TestCase):
+    """
+    Unit tests for fastsync common functions for tap s3 csv
+    """
 
     def setUp(self) -> None:
         self.maxDiff = None
@@ -16,19 +20,16 @@ class TestFastSyncTapS3Csv(TestCase):
             'start_date': '2000-01-01',
             'tables': [
                 {
-                    "table_name": 'table 1',
+                    'table_name': 'table 1',
                     'key_properties': None
-                },
-                {
-                    "table_name": 'table 2',
+                }, {
+                    'table_name': 'table 2',
                     'key_properties': []
-                },
-                {
-                    "table_name": 'table 3',
+                }, {
+                    'table_name': 'table 3',
                     'key_properties': ['key_1']
-                },
-                {
-                    "table_name": 'table 4',
+                }, {
+                    'table_name': 'table 4',
                     'key_properties': ['key_2', 'key_3']
                 }
             ]
@@ -56,8 +57,7 @@ class TestFastSyncTapS3Csv(TestCase):
                 {
                     'key': 'file_1.csv',
                     'last_modified': datetime.datetime.strptime('2001-07-13', '%Y-%m-%d')
-                },
-                {
+                }, {
                     'key': 'file_2.csv',
                     'last_modified': datetime.datetime.strptime('2001-10-05', '%Y-%m-%d')
                 }
@@ -94,13 +94,11 @@ class TestFastSyncTapS3Csv(TestCase):
                     {
                         'id': 1,
                         'group': 'A',
-                    },
-                    {
+                    }, {
                         'id': 2,
                         'group': 'A',
                         'test': True
-                    },
-                    {
+                    }, {
                         'id': 3,
                         'group': 'B',
                     }
@@ -127,8 +125,7 @@ class TestFastSyncTapS3Csv(TestCase):
                             '_SDC_DELETED_AT': None,
                             '"ID"': 1,
                             '"GROUP"': 'A',
-                        },
-                        {
+                        }, {
                             S3Helper.SDC_SOURCE_BUCKET_COLUMN: 'testBucket',
                             S3Helper.SDC_SOURCE_FILE_COLUMN: 's3 path 1',
                             S3Helper.SDC_SOURCE_LINENO_COLUMN: 2,
@@ -138,8 +135,7 @@ class TestFastSyncTapS3Csv(TestCase):
                             '"ID"': 2,
                             '"GROUP"': 'A',
                             '"TEST"': True,
-                        },
-                        {
+                        }, {
                             S3Helper.SDC_SOURCE_BUCKET_COLUMN: 'testBucket',
                             S3Helper.SDC_SOURCE_FILE_COLUMN: 's3 path 1',
                             S3Helper.SDC_SOURCE_LINENO_COLUMN: 3,
@@ -149,14 +145,15 @@ class TestFastSyncTapS3Csv(TestCase):
                             '"ID"': 3,
                             '"GROUP"': 'B',
                         }
-                    ],
-                        records)
+                    ], records)
 
-                    self.assertSetEqual({
-                        '"ID"', '"GROUP"', '"TEST"',
-                        S3Helper.SDC_SOURCE_LINENO_COLUMN, S3Helper.SDC_SOURCE_FILE_COLUMN,
-                        S3Helper.SDC_SOURCE_BUCKET_COLUMN, '_SDC_EXTRACTED_AT',
-                        '_SDC_BATCHED_AT', '_SDC_DELETED_AT'},
+                    self.assertSetEqual(
+                        {
+                            '"ID"', '"GROUP"', '"TEST"',
+                            S3Helper.SDC_SOURCE_LINENO_COLUMN, S3Helper.SDC_SOURCE_FILE_COLUMN,
+                            S3Helper.SDC_SOURCE_BUCKET_COLUMN, '_SDC_EXTRACTED_AT',
+                            '_SDC_BATCHED_AT', '_SDC_DELETED_AT'
+                        },
                         headers)
 
     def test_fetch_current_incremental_key_pos_with_no_tables_in_dictionary_returns_empty_dict(self):
@@ -165,9 +162,8 @@ class TestFastSyncTapS3Csv(TestCase):
     def test_fetch_current_incremental_key_pos_with_tables_in_dictionary_returns_empty_dict(self):
         dt = datetime.datetime.strptime('2019-11-21', '%Y-%m-%d')
         self.fs_tap_s3_csv.tables_last_modified['table-x'] = dt
-        self.assertEqual({
-            'modified_since': dt.isoformat()
-        }, self.fs_tap_s3_csv.fetch_current_incremental_key_pos('table-x', 'key'))
+        self.assertEqual({'modified_since': dt.isoformat()},
+                         self.fs_tap_s3_csv.fetch_current_incremental_key_pos('table-x', 'key'))
 
     def test_get_primary_keys_with_table_that_has_no_keys_returns_none(self):
         self.assertIsNone(self.fs_tap_s3_csv._get_primary_keys({}))
@@ -176,18 +172,15 @@ class TestFastSyncTapS3Csv(TestCase):
         self.assertIsNone(self.fs_tap_s3_csv._get_primary_keys({'key_properties': []}))
 
     def test_get_primary_keys_with_table_that_has_1_key_returns_one_safe_key(self):
-        self.assertEqual('"KEY_1"', self.fs_tap_s3_csv._get_primary_keys({
-            'key_properties': ['key_1']
-        }))
+        self.assertEqual('"KEY_1"', self.fs_tap_s3_csv._get_primary_keys({'key_properties': ['key_1']}))
 
     def test_get_primary_keys_with_table_that_has_2_keys_returns_concatenated_keys(self):
-        self.assertIn(self.fs_tap_s3_csv._get_primary_keys({
-            'key_properties': ['key_2', 'key_3']
-        }), ['"KEY_2","KEY_3"', '"KEY_3","KEY_2"'])
+        self.assertIn(self.fs_tap_s3_csv._get_primary_keys({'key_properties': ['key_2', 'key_3']}),
+                      ['"KEY_2","KEY_3"', '"KEY_3","KEY_2"'])
 
     def test_get_table_columns(self):
-        output = list(self.fs_tap_s3_csv._get_table_columns(
-            f'{os.path.dirname(__file__)}/commons/resources/dummy_data.csv.gz'))
+        output = list(
+            self.fs_tap_s3_csv._get_table_columns(f'{os.path.dirname(__file__)}/commons/resources/dummy_data.csv.gz'))
 
         self.assertListEqual([
             ('Region', 'string'),
