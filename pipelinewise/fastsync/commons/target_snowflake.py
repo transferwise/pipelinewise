@@ -49,7 +49,7 @@ class FastSyncTargetSnowflake:
                 else:
                     return []
 
-    def upload_to_s3(self, file, table):
+    def upload_to_s3(self, file, table, tmp_dir=None):
         bucket = self.connection_config['s3_bucket']
         s3_key_prefix = self.connection_config.get('s3_key_prefix', '')
         s3_key = "{}pipelinewise_{}_{}.csv.gz".format(s3_key_prefix, table, time.strftime("%Y%m%d-%H%M%S"))
@@ -68,7 +68,8 @@ class FastSyncTargetSnowflake:
             )
             encryption_metadata, encrypted_file = SnowflakeEncryptionUtil.encrypt_file(
                 encryption_material,
-                file
+                file,
+                tmp_dir=tmp_dir
             )
 
             # Upload to s3

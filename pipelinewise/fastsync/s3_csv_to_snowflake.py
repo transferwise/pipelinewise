@@ -71,7 +71,7 @@ def sync_table(table_name: str, args: Namespace)->Union[bool, str]:
         primary_key = snowflake_types["primary_key"]
 
         # Uploading to S3
-        s3_key = snowflake.upload_to_s3(filepath, table_name)
+        s3_key = snowflake.upload_to_s3(filepath, table_name, tmp_dir=args.temp_dir)
         os.remove(filepath)
 
         # Creating temp table in Snowflake
