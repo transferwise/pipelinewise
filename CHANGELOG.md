@@ -1,3 +1,12 @@
+0.12.1 (2020-01-31)
+-------------------
+
+- FastSync: Changed the default /tmp folder for snowflake encryption
+
+**Target Snowflake**
+- Bump `pipelinewise-target-snowflake` to 1.4.1
+    - Changed the default /tmp folder for encryption
+
 0.12.0 (2020-01-21)
 -------------------
 
