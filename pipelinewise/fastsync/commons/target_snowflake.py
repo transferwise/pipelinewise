@@ -48,7 +48,7 @@ class FastSyncTargetSnowflake:
 
                 return []
 
-    def upload_to_s3(self, file, table):
+    def upload_to_s3(self, file, table, tmp_dir=None):
         bucket = self.connection_config['s3_bucket']
         s3_key_prefix = self.connection_config.get('s3_key_prefix', '')
         s3_key = '{}pipelinewise_{}_{}.csv.gz'.format(s3_key_prefix, table, time.strftime('%Y%m%d-%H%M%S'))
@@ -60,10 +60,16 @@ class FastSyncTargetSnowflake:
         if master_key != '':
             # Encrypt the file
             utils.log('Encrypting file {}...'.format(file))
-            encryption_material = SnowflakeFileEncryptionMaterial(query_stage_master_key=master_key,
-                                                                  query_id='',
-                                                                  smk_id=0)
-            encryption_metadata, encrypted_file = SnowflakeEncryptionUtil.encrypt_file(encryption_material, file)
+            encryption_material = SnowflakeFileEncryptionMaterial(
+                query_stage_master_key=master_key,
+                query_id='',
+                smk_id=0
+            )
+            encryption_metadata, encrypted_file = SnowflakeEncryptionUtil.encrypt_file(
+                encryption_material,
+                file,
+                tmp_dir=tmp_dir
+            )
 
             # Upload to s3
             # Send key and iv in the metadata, that will be required to decrypt and upload the encrypted file

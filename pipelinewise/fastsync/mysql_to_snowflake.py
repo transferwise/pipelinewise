@@ -94,7 +94,7 @@ def sync_table(table):
         mysql.close_connections()
 
         # Uploading to S3
-        s3_key = snowflake.upload_to_s3(filepath, table)
+        s3_key = snowflake.upload_to_s3(filepath, table, tmp_dir=args.temp_dir)
         os.remove(filepath)
 
         # Creating temp table in Snowflake
