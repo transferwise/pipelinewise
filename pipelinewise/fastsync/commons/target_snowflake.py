@@ -59,7 +59,7 @@ class FastSyncTargetSnowflake:
         master_key = self.connection_config.get('client_side_encryption_master_key', '')
         if master_key != '':
             # Encrypt the file
-            utils.log("Encrypting file {}...".format(file))
+            utils.log('Encrypting file {}...'.format(file))
             encryption_material = SnowflakeFileEncryptionMaterial(
                 query_stage_master_key=master_key,
                 query_id='',
