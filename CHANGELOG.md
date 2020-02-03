@@ -1,3 +1,11 @@
+0.12.2 (2020-02-03)
+-------------------
+
+**Transform field**
+- Bump `pipelinewise-transform-field` to 1.1.2
+    - Make validation turned off by default.
+
+
 0.12.1 (2020-01-31)
 -------------------
 
