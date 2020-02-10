@@ -40,8 +40,8 @@ def tap_type_to_target_type(mysql_type, mysql_column_type):
     return {
         'char': 'VARCHAR',
         'varchar': 'VARCHAR',
-        'binary': 'VARCHAR',
-        'varbinary': 'VARCHAR',
+        'binary': 'BINARY',
+        'varbinary': 'BINARY',
         'blob': 'VARCHAR',
         'tinyblob': 'VARCHAR',
         'mediumblob': 'VARCHAR',
