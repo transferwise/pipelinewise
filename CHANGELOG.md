@@ -1,3 +1,9 @@
+0.12.3 (2020-02-19)
+-------------------
+
+**FastSync MySQL**
+    - Fix bug: map BINARY MySQL column to BINARY type IN SF
+    
 0.12.2 (2020-02-03)
 -------------------
 
