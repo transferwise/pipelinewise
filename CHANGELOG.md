@@ -1,3 +1,10 @@
+0.12.4 (2020-02-19)
+-------------------
+
+**Tap Jira**
+- Bump `tap-jira` to 2.0.0
+    - Update key property for stream users
+
 0.12.3 (2020-02-19)
 -------------------
 
