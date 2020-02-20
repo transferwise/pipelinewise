@@ -1,10 +1,13 @@
+import logging
 import psycopg2
 import psycopg2.extras
 
 from . import utils
 
+LOGGER = logging.getLogger(__name__)
 
-#pylint: disable=missing-function-docstring,no-self-use,too-many-arguments
+
+# pylint: disable=missing-function-docstring,no-self-use,too-many-arguments
 class FastSyncTargetPostgres:
     """
     Common functions for fastsync to Postgres
@@ -26,7 +29,7 @@ class FastSyncTargetPostgres:
         return psycopg2.connect(conn_string)
 
     def query(self, query, params=None):
-        utils.log('POSTGRES - Running query: {}'.format(query))
+        LOGGER.info('Running query: %s', query)
         with self.open_connection() as connection:
             with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
                 cur.execute(query, params)
@@ -51,7 +54,7 @@ class FastSyncTargetPostgres:
         table_dict = utils.tablename_to_dict(table_name)
         target_table = table_dict.get('table_name') if not is_temporary else table_dict.get('temp_table_name')
 
-        #if primary_key:
+        # if primary_key:
         # pylint: disable=using-constant-test
         if False:
             sql = """CREATE TABLE IF NOT EXISTS {}.{} ({}
@@ -70,7 +73,7 @@ class FastSyncTargetPostgres:
         self.query(sql)
 
     def copy_to_table(self, s3_key, target_schema, table_name, is_temporary):
-        utils.log('POSTGRES - Loading {} into Redshift...'.format(s3_key))
+        LOGGER.info('Loading %s into Redshift...', s3_key)
         table_dict = utils.tablename_to_dict(table_name)
         target_table = table_dict.get('table_name') if not is_temporary else table_dict.get('temp_table_name')
 
@@ -87,8 +90,7 @@ class FastSyncTargetPostgres:
         """.format(target_schema, target_table, bucket, s3_key, aws_access_key_id, aws_secret_access_key)
         self.query(sql)
 
-        utils.log('POSTGRES - Deleting {} from S3...'.format(s3_key))
-        #self.s3.delete_object(Bucket=bucket, Key=s3_key)
+        LOGGER.info('Deleting %s from S3...', s3_key)
 
     # grant_... functions are common functions called by utils.py: grant_privilege function
     # "to_group" is not used here but exists for compatibility reasons with other database types
@@ -118,7 +120,7 @@ class FastSyncTargetPostgres:
 
     # pylint: disable=duplicate-string-formatting-argument
     def obfuscate_columns(self, target_schema, table_name):
-        utils.log('POSTGRES - Applying obfuscation rules')
+        LOGGER.info('Applying obfuscation rules')
         table_dict = utils.tablename_to_dict(table_name)
         temp_table = table_dict.get('temp_table_name')
         transformations = self.transformation_config.get('transformations', [])

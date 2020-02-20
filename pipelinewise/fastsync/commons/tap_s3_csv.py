@@ -1,18 +1,22 @@
 import csv
 import gzip
+import logging
 import re
 import sys
+import boto3
+
 from datetime import datetime
 from time import struct_time
 from typing import Callable, Dict, List, Optional, Set
-
-import boto3
 from botocore.credentials import DeferredRefreshableCredentials
 from messytables import (CSVTableSet, headers_guess, headers_processor, jts, offset_processor, type_guess)
 from singer.utils import strptime_with_tz
 from singer_encodings import csv as singer_encodings_csv
 
-from .utils import log, retry_pattern, safe_column_name
+from .utils import retry_pattern
+from ...utils import safe_column_name
+
+LOGGER = logging.getLogger(__name__)
 
 
 # pylint: disable=missing-function-docstring,no-self-use
@@ -32,7 +36,7 @@ class FastSyncTapS3Csv:
             # Check if bucket can be accessed without credentials/assuming role
             list(S3Helper.list_files_in_bucket(connection_config['bucket'],
                                                connection_config.get('aws_endpoint_url', None)))
-            log('I have direct access to the bucket without assuming the configured role.')
+            LOGGER.info('I have direct access to the bucket without assuming the configured role.')
         except:
             # Setup AWS session
             S3Helper.setup_aws_client(connection_config)
@@ -258,7 +262,7 @@ class S3Helper:
         aws_access_key_id = config['aws_access_key_id']
         aws_secret_access_key = config['aws_secret_access_key']
 
-        log('Attempting to create AWS session')
+        LOGGER.info('Attempting to create AWS session')
         boto3.setup_default_session(aws_access_key_id=aws_access_key_id,
                                     aws_secret_access_key=aws_secret_access_key)
 
@@ -271,12 +275,12 @@ class S3Helper:
         try:
             matcher = re.compile(pattern)
         except re.error as exc:
-            raise ValueError(('search_pattern for table `{}` is not a valid regular '
+            raise ValueError((f'search_pattern for table `{table_spec["table_name"]}` is not a valid regular '
                               'expression. See '
-                              'https://docs.python.org/3.5/library/re.html#regular-expression-syntax').format(
-                                  table_spec['table_name']), pattern) from exc
+                              'https://docs.python.org/3.5/library/re.html#regular-expression-syntax'),
+                             pattern) from exc
 
-        log(f'Checking bucket "{bucket}" for keys matching "{pattern}"')
+        LOGGER.info('Checking bucket "%s" for keys matching "%s"', bucket, pattern)
 
         matched_files_count = 0
         unmatched_files_count = 0
@@ -287,14 +291,14 @@ class S3Helper:
             last_modified = s3_object['LastModified']
 
             if s3_object['Size'] == 0:
-                log(f'Skipping matched file "{key}" as it is empty')
+                LOGGER.info('Skipping file "%s" as it is empty', key)
                 unmatched_files_count += 1
                 continue
 
             if matcher.search(key):
                 matched_files_count += 1
                 if modified_since is None or modified_since < last_modified:
-                    log(f'Will download key "{key}" as it was last modified {last_modified}')
+                    LOGGER.info('Will download key "%s" as it was last modified %s', key, last_modified)
                     yield {'key': key, 'last_modified': last_modified}
             else:
                 unmatched_files_count += 1
@@ -303,11 +307,13 @@ class S3Helper:
                 # Are we skipping greater than 50% of the files?
                 # pylint: disable=old-division
                 if (unmatched_files_count / (matched_files_count + unmatched_files_count)) > 0.5:
-                    log(f'Found {matched_files_count} matching files and {unmatched_files_count} non-matching files. '
-                        'You should consider adding a `search_prefix` to the config '
-                        'or removing non-matching files from the bucket.')
+                    LOGGER.info('Found %s matching files and %s non-matching files. '
+                                'You should consider adding a `search_prefix` to the config '
+                                'or removing non-matching files from the bucket.',
+                                matched_files_count, unmatched_files_count)
                 else:
-                    log(f'Found {matched_files_count} matching files and {unmatched_files_count} non-matching files')
+                    LOGGER.info('Found %s matching files and %s non-matching files',
+                                matched_files_count, unmatched_files_count)
 
         if matched_files_count == 0:
             if prefix:
@@ -344,9 +350,9 @@ class S3Helper:
             yield from page.get('Contents', [])
 
         if s3_object_count > 0:
-            log(f'Found {s3_object_count} files.')
+            LOGGER.info('Found %s files.', s3_object_count)
         else:
-            log(f'Found no files for bucket "{bucket}" that match prefix "{search_prefix}"')
+            LOGGER.info('Found no files for bucket "%s" that match prefix "%s"', bucket, search_prefix)
 
     @classmethod
     @retry_pattern()

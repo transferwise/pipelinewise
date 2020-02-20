@@ -1,3 +1,4 @@
+import logging
 import os
 import time
 from typing import List
@@ -10,8 +11,12 @@ from snowflake.connector.remote_storage_util import \
 
 from . import utils
 
+LOGGER = logging.getLogger(__name__)
 
-#pylint: disable=missing-function-docstring,no-self-use,too-many-arguments
+# tone down snowflake connector logging level.
+logging.getLogger('snowflake.connector').setLevel(logging.WARNING)
+
+# pylint: disable=missing-function-docstring,no-self-use,too-many-arguments
 class FastSyncTargetSnowflake:
     """
     Common functions for fastsync to Redshift
@@ -38,7 +43,7 @@ class FastSyncTargetSnowflake:
                                            autocommit=True)
 
     def query(self, query, params=None):
-        utils.log('SNOWFLAKE - Running query: {}'.format(query))
+        LOGGER.debug('Running query: %s', query)
         with self.open_connection() as connection:
             with connection.cursor(snowflake.connector.DictCursor) as cur:
                 cur.execute(query, params)
@@ -53,13 +58,13 @@ class FastSyncTargetSnowflake:
         s3_key_prefix = self.connection_config.get('s3_key_prefix', '')
         s3_key = '{}pipelinewise_{}_{}.csv.gz'.format(s3_key_prefix, table, time.strftime('%Y%m%d-%H%M%S'))
 
-        utils.log('SNOWFLAKE - Uploading to S3 bucket: {}, local file: {}, S3 key: {}'.format(bucket, file, s3_key))
+        LOGGER.info('Uploading to S3 bucket: %s, local file: %s, S3 key: %s', bucket, file, s3_key)
 
         # Encrypt csv if client side encryption enabled
         master_key = self.connection_config.get('client_side_encryption_master_key', '')
         if master_key != '':
             # Encrypt the file
-            utils.log('Encrypting file {}...'.format(file))
+            LOGGER.info('Encrypting file %s...', file)
             encryption_material = SnowflakeFileEncryptionMaterial(
                 query_stage_master_key=master_key,
                 query_id='',
@@ -128,7 +133,7 @@ class FastSyncTargetSnowflake:
         self.query(sql)
 
     def copy_to_table(self, s3_key, target_schema, table_name, is_temporary, skip_csv_header=False):
-        utils.log('SNOWFLAKE - Loading {} into Snowflake...'.format(s3_key))
+        LOGGER.info('Loading %s into Snowflake...', s3_key)
         table_dict = utils.tablename_to_dict(table_name)
         target_table = table_dict.get('table_name') if not is_temporary else table_dict.get('temp_table_name')
 
@@ -165,7 +170,7 @@ class FastSyncTargetSnowflake:
 
         self.query(sql)
 
-        utils.log('SNOWFLAKE - Deleting {} from S3...'.format(s3_key))
+        LOGGER.info('Deleting %s from S3...', s3_key)
         self.s3.delete_object(Bucket=bucket, Key=s3_key)
 
     # grant_... functions are common functions called by utils.py: grant_privilege function
@@ -196,7 +201,7 @@ class FastSyncTargetSnowflake:
 
     # pylint: disable=duplicate-string-formatting-argument
     def obfuscate_columns(self, target_schema, table_name):
-        utils.log('SNOWFLAKE - Applying obfuscation rules')
+        LOGGER.info('Applying obfuscation rules')
         table_dict = utils.tablename_to_dict(table_name)
         temp_table = table_dict.get('temp_table_name')
         transformations = self.transformation_config.get('transformations', [])
@@ -262,7 +267,7 @@ class FastSyncTargetSnowflake:
 
         #  Cache table columns from information_schema
         for schema_name in schemas_to_cache:
-            utils.log('rebuilding information_schema cache for schema: {}'.format(schemas_to_cache))
+            LOGGER.info('rebuilding information_schema cache for schema: %s', schemas_to_cache)
 
             # Delete existing data about the current schema
             self.query("""

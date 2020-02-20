@@ -1,5 +1,5 @@
+import logging
 import time
-
 import boto3
 import psycopg2
 import psycopg2.extras
@@ -7,7 +7,10 @@ import psycopg2.extras
 from . import utils
 
 
-#pylint: disable=missing-function-docstring,no-self-use,too-many-arguments
+LOGGER = logging.getLogger(__name__)
+
+
+# pylint: disable=missing-function-docstring,no-self-use,too-many-arguments
 class FastSyncTargetRedshift:
     """
     Common functions for fastsync to Redshift
@@ -33,7 +36,7 @@ class FastSyncTargetRedshift:
         return psycopg2.connect(conn_string)
 
     def query(self, query, params=None):
-        utils.log('REDSHIFT - Running query: {}'.format(query))
+        LOGGER.info('Running query: %s', query)
         with self.open_connection() as connection:
             with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
                 cur.execute(query, params)
@@ -48,7 +51,7 @@ class FastSyncTargetRedshift:
         s3_key_prefix = self.connection_config.get('s3_key_prefix', '')
         s3_key = '{}pipelinewise_{}_{}.csv.gz'.format(s3_key_prefix, table, time.strftime('%Y%m%d-%H%M%S'))
 
-        utils.log('REDSHIFT - Uploading to S3 bucket: {}, local file: {}, S3 key: {}'.format(bucket, file, s3_key))
+        LOGGER.info('Uploading to S3 bucket: %s, local file: %s, S3 key: %s', bucket, file, s3_key)
 
         self.s3.upload_file(file, bucket, s3_key)
 
@@ -69,7 +72,6 @@ class FastSyncTargetRedshift:
         table_dict = utils.tablename_to_dict(table_name)
         target_table = table_dict.get('table_name') if not is_temporary else table_dict.get('temp_table_name')
 
-        #if primary_key:
         # pylint: disable=using-constant-test
         if False:
             sql = """CREATE TABLE IF NOT EXISTS {}.{} ({}
@@ -88,7 +90,7 @@ class FastSyncTargetRedshift:
         self.query(sql)
 
     def copy_to_table(self, s3_key, target_schema, table_name, is_temporary):
-        utils.log('REDSHIFT - Loading {} into Redshift...'.format(s3_key))
+        LOGGER.info('Loading %s into Redshift...', s3_key)
         table_dict = utils.tablename_to_dict(table_name)
         target_table = table_dict.get('table_name') if not is_temporary else table_dict.get('temp_table_name')
 
@@ -119,7 +121,7 @@ class FastSyncTargetRedshift:
         )
         self.query(sql)
 
-        utils.log('REDSHIFT - Deleting {} from S3...'.format(s3_key))
+        LOGGER.info('Deleting %s from S3...', s3_key)
         self.s3.delete_object(Bucket=bucket, Key=s3_key)
 
     def grant_select_on_table(self, target_schema, table_name, grantee, is_temporary, to_group=False):
@@ -146,7 +148,7 @@ class FastSyncTargetRedshift:
 
     # pylint: disable=duplicate-string-formatting-argument
     def obfuscate_columns(self, target_schema, table_name):
-        utils.log('REDSHIFT - Applying obfuscation rules')
+        LOGGER.info('Applying obfuscation rules')
         table_dict = utils.tablename_to_dict(table_name)
         temp_table = table_dict.get('temp_table_name')
         transformations = self.transformation_config.get('transformations', [])

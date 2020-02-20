@@ -1,10 +1,7 @@
 """
 PipelineWise CLI - Tap property details
 """
-import logging
 import random
-
-LOGGER = logging.getLogger('Pipelinewise CLI')
 
 
 def generate_tap_mysql_server_id():
