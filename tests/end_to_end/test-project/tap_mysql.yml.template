@@ -49,4 +49,4 @@ schemas:
         replication_method: "FULL_TABLE"
 
       - table_name: "weight_unit"
-        replication_method: "FULL_TABLE"
+        replication_method: "LOG_BASED"

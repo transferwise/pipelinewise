@@ -1,3 +1,66 @@
+0.12.4 (2020-02-19)
+-------------------
+
+**Tap Jira**
+- Bump `tap-jira` to 2.0.0
+    - Update key property for stream users
+
+0.12.3 (2020-02-19)
+-------------------
+
+**FastSync MySQL**
+    - Fix bug: map BINARY MySQL column to BINARY type IN SF
+    
+0.12.2 (2020-02-03)
+-------------------
+
+**Transform field**
+- Bump `pipelinewise-transform-field` to 1.1.2
+    - Make validation turned off by default.
+
+
+0.12.1 (2020-01-31)
+-------------------
+
+- FastSync: Changed the default /tmp folder for snowflake encryption
+
+**Target Snowflake**
+- Bump `pipelinewise-target-snowflake` to 1.4.1
+    - Changed the default /tmp folder for encryption
+
+0.12.0 (2020-01-21)
+-------------------
+
+- FastSync: Support BINARY and VARBINARY column types from MySQL sources
+- FastSync: Fixed an issue when `MASK-HIDDEN` type of transformations were not applied in Snowflake targets
+- Write temporary files to `~/.pipelinewise/tmp` directory
+- Add `stop_tap` command
+- Fixed an issue when post import Primary Keys check was not working correctly
+- Fixed an issue when `discover_tap` command sometimes was failing
+
+**Tap MySQL**
+- Bump `pipelinewise-tap-mysql` to 1.1.3
+    - Support to extract BINARY and VARBINARY column types
+    - Improved performance of reading data from MySQL binary log
+    - Increase default session `wait_timeout` to 28800
+    - Increase default session `innodb_lock_wait_timeout` to 3600
+
+**Tap S3 CSV**
+- Bump `pipelinewise-tap-s3-csv` to 1.0.7
+    - Improved column type guesser
+
+**Tap Kafka**
+- Bump `pipelinewise-tap-kafka` to 2.0.0
+    - Rewamp output schema, export the consumed JSON messages from Kafka topics to fixed columns
+    - Disable data flattening
+
+**Target Snowflake**
+- Bump `pipelinewise-target-snowflake` to 1.3.0
+    - Load binary data into Snowflake `BINARY` column types
+    - Adjust timestamps from taps automatically to the max allowed `9999-12-31 23:59:59` when it's required
+    - Add `validate_record` optional parameter and default to False
+    - Add `temp_dir` optional parameter to overwrite system defaults
+
 0.11.1 (2019-11-28)
 -------------------
 

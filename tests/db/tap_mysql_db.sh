@@ -25,6 +25,9 @@ fi
 export MYSQL_PWD=${DB_TAP_MYSQL_ROOT_PASSWORD}
 mysql --protocol TCP --host ${DB_TAP_MYSQL_HOST} --port ${DB_TAP_MYSQL_PORT} --user root -e "GRANT REPLICATION CLIENT, REPLICATION SLAVE ON *.* TO ${DB_TAP_MYSQL_USER}"
 
+# Grant insert privileges for testing
+mysql --protocol TCP --host ${DB_TAP_MYSQL_HOST} --port ${DB_TAP_MYSQL_PORT} --user root -e "GRANT INSERT ON *.* TO ${DB_TAP_MYSQL_USER}"
+
 # Download the sample database and build it
 export MYSQL_PWD=${DB_TAP_MYSQL_PASSWORD}
 mysql --protocol TCP --host ${DB_TAP_MYSQL_HOST} --port ${DB_TAP_MYSQL_PORT} --user ${DB_TAP_MYSQL_USER} ${DB_TAP_MYSQL_DB} < ${TEST_DB_SQL}

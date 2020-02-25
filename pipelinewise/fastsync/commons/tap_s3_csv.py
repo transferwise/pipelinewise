@@ -1,22 +1,31 @@
 import csv
-import sys
 import gzip
+import logging
 import re
+import sys
 import boto3
 
 from datetime import datetime
 from time import struct_time
-from typing import Callable, Dict, Set, List, Optional
-from singer_encodings import csv as singer_encodings_csv
-from singer.utils import strptime_with_tz
+from typing import Callable, Dict, List, Optional, Set
 from botocore.credentials import DeferredRefreshableCredentials
-from messytables import CSVTableSet, headers_guess, headers_processor, offset_processor, type_guess, jts
+from messytables import (CSVTableSet, headers_guess, headers_processor, jts, offset_processor, type_guess)
+from singer.utils import strptime_with_tz
+from singer_encodings import csv as singer_encodings_csv
 
-from .utils import log, safe_column_name, retry_pattern
+from .utils import retry_pattern
+from ...utils import safe_column_name
+
+LOGGER = logging.getLogger(__name__)
 
 
+# pylint: disable=missing-function-docstring,no-self-use
 class FastSyncTapS3Csv:
+    """
+    Common functions for fastsync from a S3 CSV
+    """
 
+    # pylint: disable=bare-except
     def __init__(self, connection_config: Dict, tap_type_to_target_type: Callable):
         """
         Constructor
@@ -27,7 +36,7 @@ class FastSyncTapS3Csv:
             # Check if bucket can be accessed without credentials/assuming role
             list(S3Helper.list_files_in_bucket(connection_config['bucket'],
                                                connection_config.get('aws_endpoint_url', None)))
-            log("I have direct access to the bucket without assuming the configured role.")
+            LOGGER.info('I have direct access to the bucket without assuming the configured role.')
         except:
             # Setup AWS session
             S3Helper.setup_aws_client(connection_config)
@@ -94,6 +103,7 @@ class FastSyncTapS3Csv:
             # write all records at once
             writer.writerows(records)
 
+    # pylint: disable=too-many-locals
     def _get_file_records(self, s3_path: str, table_spec: Dict, records: List[Dict], headers: Set) -> None:
         """
         Reads the file in s3_path and inserts the rows in records
@@ -117,8 +127,8 @@ class FastSyncTapS3Csv:
         # memory consumption but that's acceptable as well.
         csv.field_size_limit(sys.maxsize)
 
-        iterator = singer_encodings_csv.get_row_iterator(s3_file_handle._raw_stream,
-                                                         table_spec)  # pylint:disable=protected-access
+        # pylint:disable=protected-access
+        iterator = singer_encodings_csv.get_row_iterator(s3_file_handle._raw_stream, table_spec)
 
         records_copied = len(records)
 
@@ -136,6 +146,7 @@ class FastSyncTapS3Csv:
             new_row = {}
 
             # make all columns safe
+            # pylint: disable=invalid-name
             for k, v in row.items():
                 new_row[safe_column_name(k)] = v
 
@@ -167,11 +178,11 @@ class FastSyncTapS3Csv:
             if date_overrides and column_name in date_overrides:
                 mapped_columns.append(f"{column_name} 'timestamp_ntz'")
             else:
-                mapped_columns.append(f"{column_name} {self.tap_type_to_target_type(column_type)}")
+                mapped_columns.append(f'{column_name} {self.tap_type_to_target_type(column_type)}')
 
         return {
-            "columns": mapped_columns,
-            "primary_key": self._get_primary_keys(specs)
+            'columns': mapped_columns,
+            'primary_key': self._get_primary_keys(specs)
         }
 
     def _get_table_columns(self, csv_file_path: str) -> zip:
@@ -181,8 +192,8 @@ class FastSyncTapS3Csv:
         :param csv_file_path: path to the csv file with content in it
         :return: a Zip object where each tuple has two elements: the first is the column name and the second is the type
         """
-        with gzip.open(csv_file_path, 'rb') as f:
-            table_set = CSVTableSet(f)
+        with gzip.open(csv_file_path, 'rb') as csvfile:
+            table_set = CSVTableSet(csvfile)
 
             row_set = table_set.tables[0]
 
@@ -194,6 +205,7 @@ class FastSyncTapS3Csv:
             types = list(map(jts.celltype_as_string, type_guess(row_set.sample, strict=True)))
             return zip(headers, types)
 
+    # pylint: disable=invalid-name
     def fetch_current_incremental_key_pos(self, table: str,
                                           replication_key: Optional[str] = 'modified_since') -> Optional[Dict]:
         """
@@ -224,11 +236,15 @@ class FastSyncTapS3Csv:
 # Majority of the code in the class below (S3Helper) is from
 # pipelinewise-tap-s3-csv since all AWS S3 operations don't need to change
 class S3Helper:
-    SDC_SOURCE_BUCKET_COLUMN = "_sdc_source_bucket"
-    SDC_SOURCE_FILE_COLUMN = "_sdc_source_file"
-    SDC_SOURCE_LINENO_COLUMN = "_sdc_source_lineno"
+    """
+    S3 helper methods
+    """
+    SDC_SOURCE_BUCKET_COLUMN = '_sdc_source_bucket'
+    SDC_SOURCE_FILE_COLUMN = '_sdc_source_file'
+    SDC_SOURCE_LINENO_COLUMN = '_sdc_source_lineno'
 
-    class AssumeRoleProvider():
+    # pylint: disable=too-few-public-methods,missing-class-docstring
+    class AssumeRoleProvider:
         METHOD = 'assume-role'
 
         def __init__(self, fetcher):
@@ -246,7 +262,7 @@ class S3Helper:
         aws_access_key_id = config['aws_access_key_id']
         aws_secret_access_key = config['aws_secret_access_key']
 
-        log("Attempting to create AWS session")
+        LOGGER.info('Attempting to create AWS session')
         boto3.setup_default_session(aws_access_key_id=aws_access_key_id,
                                     aws_secret_access_key=aws_secret_access_key)
 
@@ -258,15 +274,13 @@ class S3Helper:
 
         try:
             matcher = re.compile(pattern)
-        except re.error as e:
-            raise ValueError(
-                ("search_pattern for table `{}` is not a valid regular "
-                 "expression. See "
-                 "https://docs.python.org/3.5/library/re.html#regular-expression-syntax").format(
-                    table_spec['table_name']),
-                pattern) from e
+        except re.error as exc:
+            raise ValueError((f'search_pattern for table `{table_spec["table_name"]}` is not a valid regular '
+                              'expression. See '
+                              'https://docs.python.org/3.5/library/re.html#regular-expression-syntax'),
+                             pattern) from exc
 
-        log(f'Checking bucket "{bucket}" for keys matching "{pattern}"')
+        LOGGER.info('Checking bucket "%s" for keys matching "%s"', bucket, pattern)
 
         matched_files_count = 0
         unmatched_files_count = 0
@@ -277,36 +291,36 @@ class S3Helper:
             last_modified = s3_object['LastModified']
 
             if s3_object['Size'] == 0:
-                log(f'Skipping matched file "{key}" as it is empty')
+                LOGGER.info('Skipping file "%s" as it is empty', key)
                 unmatched_files_count += 1
                 continue
 
             if matcher.search(key):
                 matched_files_count += 1
                 if modified_since is None or modified_since < last_modified:
-                    log(f'Will download key "{key}" as it was last modified {last_modified}')
+                    LOGGER.info('Will download key "%s" as it was last modified %s', key, last_modified)
                     yield {'key': key, 'last_modified': last_modified}
             else:
                 unmatched_files_count += 1
 
             if (unmatched_files_count + matched_files_count) % max_files_before_log == 0:
                 # Are we skipping greater than 50% of the files?
-                if 0.5 < (unmatched_files_count / (matched_files_count + unmatched_files_count)):
-                    log(
-                        f"Found {matched_files_count} matching files and {unmatched_files_count} non-matching files. "
-                        "You should consider adding a `search_prefix` to the config "
-                        "or removing non-matching files from the bucket.")
+                # pylint: disable=old-division
+                if (unmatched_files_count / (matched_files_count + unmatched_files_count)) > 0.5:
+                    LOGGER.info('Found %s matching files and %s non-matching files. '
+                                'You should consider adding a `search_prefix` to the config '
+                                'or removing non-matching files from the bucket.',
+                                matched_files_count, unmatched_files_count)
                 else:
-                    log(
-                        f"Found {matched_files_count} matching files and {unmatched_files_count} non-matching files")
+                    LOGGER.info('Found %s matching files and %s non-matching files',
+                                matched_files_count, unmatched_files_count)
 
-        if 0 == matched_files_count:
+        if matched_files_count == 0:
             if prefix:
-                raise Exception(
-                    'No files found in bucket "{}" that matches prefix "{}" and pattern "{}"'.format(bucket, prefix,
-                                                                                                     pattern))
-            else:
-                raise Exception('No files found in bucket "{}" that matches pattern "{}"'.format(bucket, pattern))
+                raise Exception('No files found in bucket "{}" that matches prefix "{}" and pattern "{}"'.format(
+                    bucket, prefix, pattern))
+
+            raise Exception('No files found in bucket "{}" that matches pattern "{}"'.format(bucket, pattern))
 
     @classmethod
     @retry_pattern()
@@ -335,10 +349,10 @@ class S3Helper:
             s3_object_count += len(page.get('Contents', []))
             yield from page.get('Contents', [])
 
-        if 0 < s3_object_count:
-            log(f"Found {s3_object_count} files.")
+        if s3_object_count > 0:
+            LOGGER.info('Found %s files.', s3_object_count)
         else:
-            log(f'Found no files for bucket "{bucket}" that match prefix "{search_prefix}"')
+            LOGGER.info('Found no files for bucket "%s" that match prefix "%s"', bucket, search_prefix)
 
     @classmethod
     @retry_pattern()

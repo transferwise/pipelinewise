@@ -57,28 +57,53 @@ jobs:
     steps:
       - checkout
       - run:
-          name: Build source databases for integration tests
+          name: 'Build source databases for integration tests'
           command: |
             sudo apt-get update
             sudo apt install mariadb-client postgresql-client
             ./tests/db/tap_mysql_db.sh
             ./tests/db/tap_postgres_db.sh
       - run:
-          name: Installing PipelineWise components and connectors
+          name: 'Installing PipelineWise components and connectors'
           command: ./install.sh --connectors=all --acceptlicenses
       - run:
-          name: Run tests
+          name: 'Check code formatting and do pylinting'
+          command: |
+            . .virtualenvs/pipelinewise/bin/activate
+            pip install unify pylint
+            echo "Checking double quotes..."
+            find pipelinewise tests -type f -name '*.py' | xargs unify --check-only
+            echo "Running pylint..."
+            pylint pipelinewise tests
+
+      - run:
+          name: 'Run tests'
           command: |
             . .virtualenvs/pipelinewise/bin/activate
             export PIPELINEWISE_HOME=$PWD
             mkdir test-reports
-            coverage run -m pytest --junitxml=test-reports/junit.xml
+            coverage run -m pytest -v --junitxml=test-reports/junit.xml
             coverage report
             coverage html -d coverage_html
       - store_test_results:
           path: test-reports
       - store_artifacts:
           path: coverage_html
+
+  build-and-push-docker:
+    docker:
+      - image: docker.tw.ee/k8s-deployer:1
+
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run:
+          name: Push and release the new version
+          command: k8s-deployment docker-build docker-push
+          environment:
+            DEPLOY_DOCKERFILE: ./Dockerfile
+            DEPLOY_IMAGE_NAME: pipelinewise
+            DEPLOY_SLACK_CHANNEL: '#analytics-db-updates'
 
   # For documentation deployment. You'll need the following environment vars
   # in your Circle CI settings, otherwise this will not work.
@@ -99,6 +124,14 @@ workflows:
   build_and_test:
     jobs:
       - test
+      - build-and-push-docker:
+          context: artifactory-deploy-docker
+          requires:
+            - test
+          filters:
+            branches:
+              only:
+                - master
 
   deploy_doc:
     jobs:
