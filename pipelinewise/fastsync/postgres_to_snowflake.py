@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-
+import logging
 import multiprocessing
 import os
 import sys
@@ -9,6 +9,8 @@ from datetime import datetime
 from .commons import utils
 from .commons.tap_postgres import FastSyncTapPostgres
 from .commons.target_snowflake import FastSyncTargetSnowflake
+
+LOGGER = logging.getLogger(__name__)
 
 REQUIRED_CONFIG_KEYS = {
     'tap': [
@@ -129,7 +131,7 @@ def sync_table(table):
         utils.grant_privilege(target_schema, grantees, snowflake.grant_select_on_schema)
 
     except Exception as exc:
-        utils.log('CRITICAL: {}'.format(exc))
+        LOGGER.critical(exc)
         return '{}: {}'.format(table, exc)
 
 
@@ -141,17 +143,15 @@ def main_impl():
     table_sync_excs = []
 
     # Log start info
-    utils.log("""
+    LOGGER.info("""
         -------------------------------------------------------
         STARTING SYNC
         -------------------------------------------------------
-            Tables selected to sync        : {}
-            Total tables selected to sync  : {}
-            CPU cores                      : {}
+            Tables selected to sync        : %s
+            Total tables selected to sync  : %s
+            CPU cores                      : %s
         -------------------------------------------------------
-        """.format(args.tables,
-                   len(args.tables),
-                   cpu_cores))
+        """, args.tables, len(args.tables), cpu_cores)
 
     # Start loading tables in parallel in spawning processes by
     # utilising all available CPU cores
@@ -164,22 +164,20 @@ def main_impl():
 
     # Log summary
     end_time = datetime.now()
-    utils.log("""
+    LOGGER.info("""
         -------------------------------------------------------
         SYNC FINISHED - SUMMARY
         -------------------------------------------------------
-            Total tables selected to sync  : {}
-            Tables loaded successfully     : {}
-            Exceptions during table sync   : {}
+            Total tables selected to sync  : %s
+            Tables loaded successfully     : %s
+            Exceptions during table sync   : %s
 
-            CPU cores                      : {}
-            Runtime                        : {}
+            CPU cores                      : %s
+            Runtime                        : %s
         -------------------------------------------------------
-        """.format(len(args.tables),
-                   len(args.tables) - len(table_sync_excs),
-                   str(table_sync_excs),
-                   cpu_cores,
-                   end_time - start_time))
+        """, len(args.tables), len(args.tables) - len(table_sync_excs), str(table_sync_excs),
+                cpu_cores, end_time - start_time)
+
     if len(table_sync_excs) > 0:
         sys.exit(1)
 
@@ -189,5 +187,5 @@ def main():
     try:
         main_impl()
     except Exception as exc:
-        utils.log('CRITICAL: {}'.format(exc))
+        LOGGER.critical(exc)
         raise exc

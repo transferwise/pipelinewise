@@ -10,11 +10,11 @@ import re
 import shlex
 import sys
 import tempfile
-from datetime import date, datetime
-from subprocess import PIPE, STDOUT, Popen
-
 import jsonschema
 import yaml
+
+from datetime import date, datetime
+from subprocess import PIPE, STDOUT, Popen
 from ansible.errors import AnsibleError
 from ansible.module_utils._text import to_text
 from ansible.module_utils.common._collections_compat import Mapping
@@ -25,7 +25,7 @@ from ansible.parsing.yaml.objects import AnsibleVaultEncryptedUnicode
 
 from . import tap_properties
 
-LOGGER = logging.getLogger('Pipelinewise CLI')
+LOGGER = logging.getLogger(__name__)
 
 
 class AnsibleJSONEncoder(json.JSONEncoder):

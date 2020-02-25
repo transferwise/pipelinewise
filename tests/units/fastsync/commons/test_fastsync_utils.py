@@ -383,13 +383,3 @@ class TestFastSyncUtils(TestCase):
 
         with pytest.raises(Exception):
             utils.check_config(config, required_keys)
-
-    def test_safe_column_name_case_1(self):
-        input_name = 'group'
-
-        self.assertEqual('"GROUP"', utils.safe_column_name(input_name))
-
-    def test_safe_column_name_case_2(self):
-        input_name = 'CA se'
-
-        self.assertEqual('"CA SE"', utils.safe_column_name(input_name))

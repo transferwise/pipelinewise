@@ -5,8 +5,7 @@ import logging
 import os
 import sys
 
-from pipelinewise.fastsync.commons.utils import safe_column_name
-
+from pipelinewise.utils import safe_column_name
 from . import utils
 
 
@@ -19,11 +18,10 @@ class Config:
 
         Initialising a configuration with an empty list of data flows
         """
-        self.logger = logging.getLogger('Pipelinewise CLI')
+        self.logger = logging.getLogger(__name__)
         self.config_dir = config_dir
         self.config_path = os.path.join(self.config_dir, 'config.json')
-
-        self.targets = []
+        self.targets = dict()
 
     @classmethod
     # pylint: disable=too-many-locals

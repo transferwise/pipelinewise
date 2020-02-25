@@ -2,11 +2,14 @@ import csv
 import datetime
 import decimal
 import gzip
-
+import logging
 import pymysql
+
 from pymysql import InterfaceError, OperationalError
 
 from . import utils
+
+LOGGER = logging.getLogger(__name__)
 
 
 class FastSyncTapMySql:
@@ -60,14 +63,14 @@ class FastSyncTapMySql:
             self.conn_unbuffered.close()
         except Exception as exc:
             if not silent:
-                utils.log(exc)
-                utils.log('Connections seem to be already closed.')
+                LOGGER.exception(exc)
+                LOGGER.info('Connections seem to be already closed.')
 
     def query(self, query, params=None, return_as_cursor=False, n_retry=1):
         """
         Run query
         """
-        utils.log('MYSQL - Running query: {}'.format(query))
+        LOGGER.info('Running query: %s', query)
         try:
             with self.conn as cur:
                 cur.execute(query, params)
@@ -80,12 +83,12 @@ class FastSyncTapMySql:
 
                 return []
         except (InterfaceError, OperationalError) as exc:
-            utils.log(f'Exception happened during running a query. Number of retries: {n_retry}. {exc}')
+            LOGGER.exception('Exception happened during running a query. Number of retries: %s. %s', n_retry, exc)
             if n_retry > 0:
-                utils.log('Reopening the connections.')
+                LOGGER.info('Reopening the connections.')
                 self.close_connections(silent=True)
                 self.open_connections()
-                utils.log('Retrying to run a query.')
+                LOGGER.info('Retrying to run a query.')
                 return self.query(query,
                                   params=params,
                                   return_as_cursor=return_as_cursor,
@@ -240,10 +243,10 @@ class FastSyncTapMySql:
                     if len(rows) == export_batch_rows:
                         # Then we believe this to be just an interim batch and not the final one so report on progress
 
-                        utils.log(
-                            'Exporting batch from {} to {} rows from {}...'.format((exported_rows - export_batch_rows),
-                                                                                   exported_rows, table_name))
+                        LOGGER.info(
+                            'Exporting batch from %s to %s rows from %s...', (exported_rows - export_batch_rows),
+                            exported_rows, table_name)
                     # Write rows to file in one go
                     writer.writerows(rows)
 
-                utils.log('Exported total of {} rows from {}...'.format(exported_rows, table_name))
+                LOGGER.info('Exported total of %s rows from %s...', exported_rows, table_name)
