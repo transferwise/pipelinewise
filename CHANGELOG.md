@@ -1,7 +1,10 @@
 0.13.0 (2020-02-26)
 -------------------
-- Logging refactoring to have structured logs
-
+**Logging refactoring** 
+    - Structured logs in Pipelinewise, FastSync and majority of plugins.
+    - Include a logging config file in Pipelinewise repository and package [here](./pipelinewise/logging.conf). 
+    - Ability to provide a custom logging config by setting the env variable `LOGGING_CONF_FILE` to be the 
+        path to the `.conf` file 
 
 0.12.4 (2020-02-19)
 -------------------
