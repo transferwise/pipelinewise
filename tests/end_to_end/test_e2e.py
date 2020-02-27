@@ -129,7 +129,7 @@ class TestE2E:
             self.assert_command_success(return_code, stdout, stderr, log_file)
             self.assert_state_file_valid(target, tap, log_file)
 
-    def assert_columns_are_accurate_for_table(self, table_name: str, columns: List[str]):
+    def assert_columns_are_in_table(self, table_name: str, columns: List[str]):
         """
         fetches the given table's columns from pipelinewise.columns and tests if every given column
         is in the result
@@ -225,7 +225,7 @@ class TestE2E:
 
         # Run tap second time - only singer should be triggered
         self.assert_run_tap_success(tap, target, ['singer'])
-        self.assert_columns_are_accurate_for_table('edgydata', ['C_VARCHAR', 'CASE', 'GROUP', 'ORDER' ])
+        self.assert_columns_are_in_table('edgydata', ['C_VARCHAR', 'CASE', 'GROUP', 'ORDER'])
 
     @pytest.mark.dependency(depends=['import_config'])
     def test_replicate_pg_to_sf(self):
