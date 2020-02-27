@@ -8,6 +8,7 @@ import pymysql
 from pymysql import InterfaceError, OperationalError
 
 from . import utils
+from ...utils import safe_column_name
 
 LOGGER = logging.getLogger(__name__)
 
@@ -166,9 +167,9 @@ class FastSyncTapMySql:
                             column_type,
                             CASE
                             WHEN data_type IN ('blob', 'tinyblob', 'mediumblob', 'longblob', 'geometry')
-                                    THEN concat('hex(', column_name, ')')
+                                    THEN concat('hex(`', column_name, '`)')
                             WHEN data_type IN ('binary', 'varbinary')
-                                    THEN concat('hex(trim(trailing CHAR(0x00) from ',COLUMN_NAME,'))')
+                                    THEN concat('hex(trim(trailing CHAR(0x00) from `',COLUMN_NAME,'`))')
                             WHEN data_type IN ('bit')
                                     THEN concat('cast(`', column_name, '` AS unsigned)')
                             WHEN data_type IN ('datetime', 'timestamp', 'date')
@@ -176,7 +177,7 @@ class FastSyncTapMySql:
                             WHEN column_type IN ('tinyint(1)')
                                     THEN concat('CASE WHEN `' , column_name , '` is null THEN null WHEN `' , column_name , '` = 0 THEN 0 ELSE 1 END')
                             WHEN column_name = 'raw_data_hash'
-                                    THEN concat('hex(', column_name, ')')
+                                    THEN concat('hex(`', column_name, '`)')
                             ELSE concat('cast(`', column_name, '` AS char CHARACTER SET utf8)')
                                 END AS safe_sql_value,
                             ordinal_position
@@ -190,17 +191,17 @@ class FastSyncTapMySql:
 
     def map_column_types_to_target(self, table_name):
         """
-        Map MySQL columnn types to equivalent types in target
+        Map MySQL column types to equivalent types in target
         """
         mysql_columns = self.get_table_columns(table_name)
         mapped_columns = [
-            '{} {}'.format(pc.get('column_name'),
+            '{} {}'.format(safe_column_name(pc.get('column_name')),
                            self.tap_type_to_target_type(pc.get('data_type'), pc.get('column_type')))
             for pc in mysql_columns]
 
         return {
             'columns': mapped_columns,
-            'primary_key': self.get_primary_key(table_name)
+            'primary_key': safe_column_name(self.get_primary_key(table_name))
         }
 
     # pylint: disable=too-many-locals
