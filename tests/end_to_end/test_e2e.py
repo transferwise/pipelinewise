@@ -3,6 +3,9 @@ import glob
 import shutil
 import pytest
 import re
+
+from typing import List
+
 from . import e2e_utils
 
 from pathlib import Path
@@ -126,6 +129,23 @@ class TestE2E:
             self.assert_command_success(return_code, stdout, stderr, log_file)
             self.assert_state_file_valid(target, tap, log_file)
 
+    def assert_columns_are_accurate_for_table(self, table_name: str, columns: List[str]):
+        """
+        fetches the given table's columns from pipelinewise.columns and tests if every given column
+        is in the result
+        Args:
+            table_name: table whose columns are to be fetched
+            columns: list of columns to check if there are in the table's columns
+
+        Returns:
+            None
+        """
+        sql = f'SELECT COLUMN_NAME from pipelinewise.columns where table_name=\'{table_name.upper()}\''
+
+        result = e2e_utils.run_query_target_snowflake(self.env, sql)
+        cols = [res[0] for res in result]
+        assert all([col in cols for col in columns])
+
     @pytest.mark.dependency(name='import_config')
     def test_import_project(self):
         """Import the YAML project with taps and target and do discovery mode to write the JSON files for singer
@@ -205,6 +225,7 @@ class TestE2E:
 
         # Run tap second time - only singer should be triggered
         self.assert_run_tap_success(tap, target, ['singer'])
+        self.assert_columns_are_accurate_for_table('edgydata', ['C_VARCHAR', 'CASE', 'GROUP', 'ORDER' ])
 
     @pytest.mark.dependency(depends=['import_config'])
     def test_replicate_pg_to_sf(self):

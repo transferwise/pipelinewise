@@ -24,9 +24,10 @@ DROP TABLE IF EXISTS `edgydata`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `edgydata` (
-  `c_id` int(11) NOT NULL AUTO_INCREMENT,
+  `order` int(11) PRIMARY KEY AUTO_INCREMENT,
   `c_varchar` varchar(128),
-  PRIMARY KEY (`c_id`)
+  `group` int,
+  `case` varchar(1)
 ) ENGINE=MyISAM AUTO_INCREMENT=1001 DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -37,16 +38,16 @@ CREATE TABLE `edgydata` (
 LOCK TABLES `edgydata` WRITE;
 /*!40000 ALTER TABLE `edgydata` DISABLE KEYS */;
 INSERT INTO `edgydata` VALUES
-  (1, 'Lorem ipsum dolor sit amet'),
-  (2, 'Thai: แผ่นดินฮั่นเสื่อมโทรมแสนสังเวช'),
-  (3, 'Chinese: 和毛泽东 <<重上井冈山>>. 严永欣, 一九八八年.'),
-  (4, 'Special Characters: ["\\,''!@£$%^&*()]\\\\'),
-  (5, '	'),
+  (1, 'Lorem ipsum dolor sit amet', 10, 'A'),
+  (2, 'Thai: แผ่นดินฮั่นเสื่อมโทรมแสนสังเวช', 20, 'A'),
+  (3, 'Chinese: 和毛泽东 <<重上井冈山>>. 严永欣, 一九八八年.', null, 'B'),
+  (4, 'Special Characters: ["\\,''!@£$%^&*()]\\\\', null, 'B'),
+  (5, '	', 20, 'B'),
   (6,'Enter	The
-Ninja'),
+Ninja', 10, 'A'),
   (7,'Liewe
-Maatjies'),
-  (8,'Liewe	Maatjies')
+Maatjies', 20, 'A'),
+  (8,'Liewe	Maatjies', 10, null)
 ;
 
 /*!40000 ALTER TABLE `edgydata` ENABLE KEYS */;
