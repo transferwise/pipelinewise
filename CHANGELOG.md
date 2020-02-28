@@ -1,3 +1,32 @@
+0.13.0 (2020-02-26)
+-------------------
+**Logging refactoring**:
+- Structured logs in Pipelinewise, FastSync and majority of plugins.
+- Include a logging config file in Pipelinewise repository and package [here](./pipelinewise/logging.conf). 
+- Ability to provide a custom logging config by setting the env variable `LOGGING_CONF_FILE` to be the 
+        path to the `.conf` file 
+
+0.12.4 (2020-02-19)
+-------------------
+
+**Tap Jira**
+- Bump `tap-jira` to 2.0.0
+    - Update key property for stream users
+
+0.12.3 (2020-02-19)
+-------------------
+
+**FastSync MySQL**
+    - Fix bug: map BINARY MySQL column to BINARY type IN SF
+    
+0.12.2 (2020-02-03)
+-------------------
+
+**Transform field**
+- Bump `pipelinewise-transform-field` to 1.1.2
+    - Make validation turned off by default.
+
+
 0.12.1 (2020-01-31)
 -------------------
 

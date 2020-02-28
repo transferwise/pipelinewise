@@ -1,17 +1,13 @@
 import argparse
-import datetime
 import json
 import multiprocessing
 import os
-import time
+import logging
+
+LOGGER = logging.getLogger(__name__)
 
 
-#pylint: disable=missing-function-docstring
-def log(message):
-    ts_str = datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d %H:%M:%S')
-    print('{} - {}'.format(ts_str, message))
-
-
+# pylint: disable=missing-function-docstring
 def get_cpu_cores():
     """Get CPU cores for multiprocessing"""
     try:
@@ -27,7 +23,7 @@ def load_json(path):
 
 
 def save_dict_to_json(path, data):
-    log('Saving new state file to {}'.format(path))
+    LOGGER.info('Saving new state file to %s', path)
     with open(path, 'w') as fil:
         fil.write(json.dumps(data))
 
@@ -314,10 +310,6 @@ def parse_args(required_config_keys):
     return args
 
 
-def safe_column_name(name):
-    return f'"{name.upper()}"'
-
-
 # pylint: disable=import-outside-toplevel
 def retry_pattern():
     import backoff
@@ -331,4 +323,4 @@ def retry_pattern():
 
 
 def log_backoff_attempt(details):
-    log(f"Error detected communicating with Amazon, triggering backoff: {details.get('tries')} try")
+    LOGGER.error('Error detected communicating with Amazon, triggering backoff: %s try', details.get('tries'))

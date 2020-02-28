@@ -343,18 +343,17 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
 3 pipeline(s)
 """
 
-    def test_command_discover_tap(self, capsys):
+    def test_command_discover_tap(self):
         """Test discover tap command"""
         args = CliArgs(target='target_one', tap='tap_one')
         pipelinewise = PipelineWise(args, CONFIG_DIR, VIRTUALENVS_DIR)
 
         # Running discovery mode should detect the tap type and path to the connector
         # Since the executable is not available in this test then it should fail
-        pipelinewise.discover_tap()
-        stdout, stderr = capsys.readouterr()
+        result = pipelinewise.discover_tap()
 
-        exp_err_pattern = os.path.join(VIRTUALENVS_DIR, '/tap-mysql/bin/tap-mysql: No such file or directory')
-        assert exp_err_pattern in stdout or exp_err_pattern in stderr
+        exp_err_pattern = '/tap-mysql/bin/tap-mysql: No such file or directory'
+        assert exp_err_pattern in result
 
 
     def _test_command_run_tap(self):

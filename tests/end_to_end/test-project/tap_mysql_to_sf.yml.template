@@ -36,5 +36,11 @@ schemas:
     target_schema: "mysql_grp24"
 
     tables:
-      - table_name: "table_with_binary"
+      - table_name: "table_with_binary" # This table has binary and varbinary columns
         replication_method: "LOG_BASED"
+
+      - table_name: "edgydata" # This table has SF reserved words as columns
+        replication_method: "LOG_BASED"
+        transformations:
+          - column: "case"
+            type: "HASH"

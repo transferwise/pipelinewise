@@ -2,6 +2,8 @@
 PipelineWise CLI
 """
 import argparse
+import copy
+import logging
 import os
 import sys
 
@@ -28,6 +30,45 @@ COMMANDS = [
     'validate',
     'encrypt_string',
 ]
+
+
+def __init_logger(log_file=None, debug=False):
+    """
+    Initialise logger and update its handlers and level accordingly
+    """
+    # get logger for pipelinewise
+    logger = logging.getLogger('pipelinewise')
+
+    # copy log configuration: level and formatter
+    level = logger.level
+    formatter = copy.deepcopy(logger.handlers[0].formatter)
+
+    # Create log file handler if required
+    if log_file and log_file != '*':
+        file_handler = logging.FileHandler(log_file)
+        file_handler.setLevel(level)
+        file_handler.setFormatter(formatter)
+
+        logger.addHandler(file_handler)
+
+    # Update log level if debug mode needed
+    if debug:
+        logger.setLevel(logging.DEBUG)
+
+        for handler in logger.handlers:
+            handler.setLevel(logging.DEBUG)
+
+            # Set log formatter and add file and line number in case of DEBUG level
+            str_format = 'time=%(asctime)s ' \
+                         'logger_name=%(name)s ' \
+                         'log_level=%(levelname)s ' \
+                         'process_name=%(processName)s ' \
+                         'file_name=%(filename)s ' \
+                         'line_no=(%(lineno)s) ' \
+                         'message=%(message)s'
+
+            new_formatter = logging.Formatter(str_format, formatter.datefmt)
+            handler.setFormatter(new_formatter)
 
 
 # pylint: disable=too-many-branches,too-many-statements
@@ -113,8 +154,10 @@ def main():
             print('You must specify a string to encrypt using the argument --string')
             sys.exit(1)
 
-    pipelinewise = PipelineWise(args, CONFIG_DIR, VENV_DIR)
-    getattr(pipelinewise, args.command)()
+    __init_logger(args.log, args.debug)
+
+    ppw_instance = PipelineWise(args, CONFIG_DIR, VENV_DIR)
+    getattr(ppw_instance, args.command)()
 
 
 if __name__ == '__main__':

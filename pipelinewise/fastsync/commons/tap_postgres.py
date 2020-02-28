@@ -1,11 +1,13 @@
 import datetime
 import decimal
 import gzip
-
+import logging
 import psycopg2
 import psycopg2.extras
 
 from . import utils
+
+LOGGER = logging.getLogger(__name__)
 
 
 class FastSyncTapPostgres:
@@ -51,7 +53,7 @@ class FastSyncTapPostgres:
         """
         Run query
         """
-        utils.log('POSTGRES - Running query: {}'.format(query))
+        LOGGER.info('Running query: %s', query)
         with self.conn as connection:
             with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
                 cur.execute(query, params)
@@ -65,7 +67,7 @@ class FastSyncTapPostgres:
         """
         Run query on the primary host
         """
-        utils.log('POSTGRES - Running query: {}'.format(query))
+        LOGGER.info('Running query: %s', query)
         with self.primary_host_conn as connection:
             with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
                 cur.execute(query, params)
@@ -258,6 +260,6 @@ class FastSyncTapPostgres:
         ,null
         FROM {}) TO STDOUT with CSV DELIMITER ','
         """.format(','.join(column_safe_sql_values), table_name)
-        utils.log('POSTGRES - Exporting data: {}'.format(sql))
+        LOGGER.info('Exporting data: %s', sql)
         with gzip.open(path, 'wt') as gzfile:
             self.curr.copy_expert(sql, gzfile, size=131072)

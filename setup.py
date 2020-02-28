@@ -6,7 +6,7 @@ with open('README.md') as f:
     LONG_DESCRIPTION = f.read()
 
 setup(name='pipelinewise',
-      version='0.12.1',
+      version='0.13.0',
       description='PipelineWise',
       long_description=LONG_DESCRIPTION,
       long_description_content_type='text/markdown',
@@ -20,14 +20,14 @@ setup(name='pipelinewise',
           'argparse==1.4.0',
           'tabulate==0.8.2',
           'PyYAML==5.1.0',
-          'ansible==2.7.13',
+          'ansible==2.7.16',
           'joblib==0.13.2',
           'attrs==17.4.0',
           'idna==2.7',
           'PyMySQL==0.7.11',
           'psycopg2==2.8.2',
           'snowflake-connector-python==2.0.3',
-          'singer-python==5.9.*',
+          'pipelinewise-singer-python==1.*',
           'singer-encodings==0.0.*',
           'python-dateutil<2.8.1',
           'messytables==0.15.*',
@@ -43,7 +43,8 @@ setup(name='pipelinewise',
               'python-dotenv==0.10.3',
               'nose==1.3.7',
               'mock==3.0.5',
-              'pylint==2.4.4'
+              'pylint==2.4.4',
+              'unify==0.5'
           ]
       },
       entry_points={
@@ -59,6 +60,9 @@ setup(name='pipelinewise',
       package_data={
           'schemas': [
               'pipelinewise/cli/schemas/*.json'
+          ],
+          'pipelinewise': [
+              'logging.conf'
           ]
       },
       include_package_data=True)

@@ -1,11 +1,11 @@
 """
 PipelineWise CLI - Pipelinewise class
 """
+import logging
 import os
 import shutil
 import signal
 import sys
-import logging
 import json
 import copy
 import pidfile
@@ -13,7 +13,6 @@ import pidfile
 from datetime import datetime
 from time import time
 from typing import Dict
-
 from joblib import Parallel, delayed, parallel_backend
 from tabulate import tabulate
 
@@ -31,46 +30,9 @@ class PipelineWise:
     STATUS_SUCCESS = 'SUCCESS'
     STATUS_FAILED = 'FAILED'
 
-    def __init_logger(self, logger_name, log_file=None):
-        """
-        Initialise logger
-        """
-        self.logger = logging.getLogger(logger_name)
-
-        # Default log level is less verbose
-        level = logging.INFO
-
-        # Increase log level if debug mode needed
-        if self.args.debug:
-            level = logging.DEBUG
-
-        # Set the log level
-        self.logger.setLevel(level)
-
-        # Set log formatter and add file and line number in case of DEBUG level
-        if level == logging.DEBUG:
-            str_format = '%(asctime)s %(processName)s %(levelname)s %(filename)s (%(lineno)s): %(message)s'
-        else:
-            str_format = '%(asctime)s %(levelname)s: %(message)s'
-        formatter = logging.Formatter(str_format, '%Y-%m-%d %H:%M:%S')
-
-        # Create console handler
-        streamhandler = logging.StreamHandler(sys.stdout)
-        streamhandler.setLevel(level)
-        streamhandler.setFormatter(formatter)
-        self.logger.addHandler(streamhandler)
-
-        # Create log file handler if required
-        if log_file and log_file != '*':
-            filehandler = logging.FileHandler(log_file)
-            filehandler.setLevel(level)
-            filehandler.setFormatter(formatter)
-            self.logger.addHandler(filehandler)
-
     def __init__(self, args, config_dir, venv_dir):
         self.args = args
-        self.__init_logger('Pipelinewise CLI', log_file=args.log)
-
+        self.logger = logging.getLogger(__name__)
         self.config_dir = config_dir
         self.venv_dir = venv_dir
         self.extra_log = args.extra_log
@@ -603,7 +565,7 @@ class PipelineWise:
             yaml_basename = os.path.basename(yaml)
             dst = os.path.join(project_dir, yaml_basename)
 
-            self.logger.info('  - Creating %s...', yaml_basename)
+            self.logger.info('Creating %s...', yaml_basename)
             shutil.copyfile(yaml, dst)
 
     def test_tap_connection(self):
@@ -673,7 +635,7 @@ class PipelineWise:
         returncode, new_schema, output = result
 
         if returncode != 0:
-            return f'{target_id} - {tap_id}'
+            return f'{target_id} - {tap_id}: {output}'
 
         # Convert JSON string to object
         try:
@@ -852,10 +814,6 @@ class PipelineWise:
                 # less than 2 sec apart.
                 state = line
 
-                # update line and return it
-                # for better readability in logs
-                return 'INFO STATE emitted from target: %s' % line
-
             return line
 
         def update_state_file_with_extra_log(line: str) -> str:
@@ -937,6 +895,7 @@ class PipelineWise:
                     replication are not using the singer components because
                     they are too slow to sync large tables.
         """
+
         tap_id = self.tap['id']
         tap_type = self.tap['type']
         target_id = self.target['id']
@@ -1032,7 +991,7 @@ class PipelineWise:
             sys.exit(1)
         # Delete temp files if there is any
         except utils.RunCommandException as exc:
-            self.logger.error(exc)
+            self.logger.exception(exc)
             utils.silentremove(cons_target_config)
             utils.silentremove(tap_properties_fastsync)
             utils.silentremove(tap_properties_singer)
@@ -1144,7 +1103,7 @@ class PipelineWise:
             sys.exit(1)
         # Delete temp file if there is any
         except utils.RunCommandException as exc:
-            self.logger.error(exc)
+            self.logger.exception(exc)
             utils.silentremove(cons_target_config)
             sys.exit(1)
         except Exception as exc:

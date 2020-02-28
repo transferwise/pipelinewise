@@ -20,7 +20,7 @@ class TestConfig:
         # config dir and path should be generated automatically
         assert config.config_dir == PIPELINEWISE_TEST_HOME
         assert config.config_path == '{}/config.json'.format(PIPELINEWISE_TEST_HOME)
-        assert config.targets == []
+        assert config.targets == {}
 
     def test_from_yamls(self):
         """Test creating Config object using YAML configuration directory as the input"""
