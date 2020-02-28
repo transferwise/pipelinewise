@@ -6,6 +6,7 @@ import psycopg2
 import psycopg2.extras
 
 from . import utils
+from ...utils import safe_column_name
 
 LOGGER = logging.getLogger(__name__)
 
@@ -218,10 +219,10 @@ class FastSyncTapPostgres:
                 column_name,
                 data_type,
                 CASE
-                    WHEN data_type = 'ARRAY' THEN 'array_to_json(' || column_name || ') AS ' || column_name
-                    WHEN udt_name = 'time' THEN 'replace(' || column_name || E'::varchar,\\\'24:00:00\\\',\\\'00:00:00\\\') AS ' || column_name
-                    WHEN udt_name = 'timetz' THEN 'replace((' || column_name || E' at time zone \'\'UTC\'\')::time::varchar,\\\'24:00:00\\\',\\\'00:00:00\\\') AS ' || column_name
-                    ELSE column_name
+                    WHEN data_type = 'ARRAY' THEN 'array_to_json("' || column_name || '") AS ' || column_name
+                    WHEN udt_name = 'time' THEN 'replace("' || column_name || E'"::varchar,\\\'24:00:00\\\',\\\'00:00:00\\\') AS ' || column_name
+                    WHEN udt_name = 'timetz' THEN 'replace(("' || column_name || E'" at time zone \'\'UTC\'\')::time::varchar,\\\'24:00:00\\\',\\\'00:00:00\\\') AS ' || column_name
+                    ELSE '"'||column_name||'"'
                 END AS safe_sql_value
                 FROM information_schema.columns
                 WHERE table_schema = '{}'
@@ -233,14 +234,15 @@ class FastSyncTapPostgres:
 
     def map_column_types_to_target(self, table_name):
         """
-        Map MySQL columnn types to equivalent types in target
+        Map MySQL column types to equivalent types in target
         """
         postgres_columns = self.get_table_columns(table_name)
-        mapped_columns = ['{} {}'.format(pc[0], self.tap_type_to_target_type(pc[1])) for pc in postgres_columns]
+        mapped_columns = ['{} {}'.format(safe_column_name(pc[0]),
+                                         self.tap_type_to_target_type(pc[1])) for pc in postgres_columns]
 
         return {
             'columns': mapped_columns,
-            'primary_key': self.get_primary_key(table_name)
+            'primary_key': safe_column_name(self.get_primary_key(table_name))
         }
 
     def copy_table(self, table_name, path):
