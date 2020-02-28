@@ -5475,7 +5475,7 @@ ANALYZE countrylanguage;
 DROP TABLE IF EXISTS public.table_with_reserved_words CASCADE;
 
 CREATE TABLE table_with_reserved_words (
-    increment integer primary key ,
+    increment serial primary key ,
     "in" time without time zone,
     "from" time with time zone,
     "order" varchar(1)
