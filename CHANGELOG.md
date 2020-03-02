@@ -1,3 +1,16 @@
+0.13.1 (2020-03-02)
+-------------------
+- Bump `ansible` to 2.7.16
+
+**FastSync MySQL**
+    - Handle reserved words in column names in FastSync from MySQL
+    - Fixed issue when `parallelism` and `parallelism_max` parameters were not used in tap YAML files
+
+**Tap Postgres**
+- Bump `tap-postgres` to 1.4.1
+    - Remove unused timestamps in log
+
+
 0.13.0 (2020-02-26)
 -------------------
 **Logging refactoring**:
