@@ -294,9 +294,9 @@ class Config:
         # Generate tap inheritable_config dict
         tap_inheritable_config = utils.delete_empty_keys({
             'temp_dir': self.get_temp_dir(),
-            'batch_size_rows': tap.get('batch_size_rows'),
+            'batch_size_rows': tap.get('batch_size_rows', 20000),
             'parallelism': tap.get('parallelism', 0),
-            'parallelism_max': tap.get('parallelism_max', 16),
+            'parallelism_max': tap.get('parallelism_max', 4),
             'hard_delete': tap.get('hard_delete', True),
             'flush_all_streams': tap.get('flush_all_streams', False),
             'primary_key_required': tap.get('primary_key_required', True),
