@@ -5489,3 +5489,16 @@ insert into public.table_with_reserved_words("in", "from", "order") values
 ('08:10:13', '21:00:00+0000', '3'),
 ('18:10:00', '21:00:40+0010', '1'),
 ('00:00:00', '13:00:00', null);
+
+
+DROP TABLE IF EXISTS public."ORDER" CASCADE;
+
+CREATE TABLE "ORDER"
+(
+    id serial primary key,
+    cvarchar varchar,
+    created_at timestamp default current_timestamp
+);
+
+
+insert into "ORDER" (cvarchar) values ('A'), ('B'), ('C'), ('D'), ('E'), ('F'), ('G');

@@ -101,7 +101,7 @@ class FastSyncTargetSnowflake:
         table_dict = utils.tablename_to_dict(table_name)
         target_table = table_dict.get('table_name') if not is_temporary else table_dict.get('temp_table_name')
 
-        sql = 'DROP TABLE IF EXISTS {}.{}'.format(target_schema, target_table)
+        sql = 'DROP TABLE IF EXISTS {}."{}"'.format(target_schema, target_table.upper())
         self.query(sql)
 
     def create_table(self, target_schema: str, table_name: str, columns: List[str], primary_key: str,
@@ -125,7 +125,7 @@ class FastSyncTargetSnowflake:
         if sort_columns:
             columns.sort()
 
-        sql = f"""CREATE OR REPLACE TABLE {target_schema}.{target_table} (
+        sql = f"""CREATE OR REPLACE TABLE {target_schema}."{target_table.upper()}" (
         {','.join(columns)}
         {f', PRIMARY KEY ({primary_key})' if primary_key else ''})
         """
@@ -143,24 +143,24 @@ class FastSyncTargetSnowflake:
 
         master_key = self.connection_config.get('client_side_encryption_master_key', '')
         if master_key != '':
-            sql = """COPY INTO {}.{} FROM @{}/{}
+            sql = """COPY INTO {}."{}" FROM @{}/{}
                 FILE_FORMAT = (type='CSV' escape='\\x1e' escape_unenclosed_field='\\x1e' 
                 field_optionally_enclosed_by='\"' skip_header={} COMPRESSION='GZIP' BINARY_FORMAT='HEX') 
             """.format(
                 target_schema,
-                target_table,
+                target_table.upper(),
                 self.connection_config['stage'],
                 s3_key,
                 int(skip_csv_header),
             )
         else:
-            sql = """COPY INTO {}.{} FROM 's3://{}/{}'
+            sql = """COPY INTO {}."{}" FROM 's3://{}/{}'
                 CREDENTIALS = (aws_key_id='{}' aws_secret_key='{}')
                 FILE_FORMAT = (type='CSV' escape='\\x1e' escape_unenclosed_field='\\x1e' 
                 field_optionally_enclosed_by='\"' skip_header={} COMPRESSION='GZIP' BINARY_FORMAT='HEX')
             """.format(
                 target_schema,
-                target_table,
+                target_table.upper(),
                 bucket,
                 s3_key,
                 aws_access_key_id,
@@ -182,7 +182,7 @@ class FastSyncTargetSnowflake:
         if role:
             table_dict = utils.tablename_to_dict(table_name)
             target_table = table_dict.get('table_name') if not is_temporary else table_dict.get('temp_table_name')
-            sql = 'GRANT SELECT ON {}.{} TO ROLE {}'.format(target_schema, target_table, role)
+            sql = 'GRANT SELECT ON {}."{}" TO ROLE {}'.format(target_schema, target_table.upper(), role)
             self.query(sql)
 
     # pylint: disable=unused-argument
@@ -217,7 +217,7 @@ class FastSyncTargetSnowflake:
             tap_stream_name_by_table_name = '{}-{}'.format(table_dict['schema_name'], table_dict['table_name']) \
                 if table_dict['schema_name'] is not None else table_dict['table_name']
 
-            if trans.get('tap_stream_name') == tap_stream_name_by_table_name:
+            if trans.get('tap_stream_name').lower() == tap_stream_name_by_table_name.lower():
                 # use safe field id in case the column to transform is has a name of a reserved word
                 # fallback to field_id if the safe id doesn't exist
                 column = trans.get('safe_field_id', trans.get('field_id'))
@@ -252,8 +252,12 @@ class FastSyncTargetSnowflake:
         temp_table = table_dict.get('temp_table_name')
 
         # Swap tables and drop the temp tamp
-        self.query('ALTER TABLE {}.{} SWAP WITH {}.{}'.format(schema, temp_table, schema, target_table))
-        self.query('DROP TABLE IF EXISTS {}.{}'.format(schema, temp_table))
+        self.query('ALTER TABLE {}."{}" SWAP WITH {}."{}"'.format(schema,
+                                                                  temp_table.upper(),
+                                                                  schema,
+                                                                  target_table.upper()))
+
+        self.query('DROP TABLE IF EXISTS {}."{}"'.format(schema, temp_table.upper()))
 
     # pylint: disable=invalid-name
     def cache_information_schema_columns(self, tables):

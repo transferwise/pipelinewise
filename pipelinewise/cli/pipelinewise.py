@@ -521,7 +521,7 @@ class PipelineWise:
                 tap_stream_id = stream.get('tap_stream_id')
                 tap_stream_sel = False
                 for sel in selection:
-                    if 'tap_stream_id' in sel and tap_stream_id == sel['tap_stream_id']:
+                    if 'tap_stream_id' in sel and tap_stream_id.lower() == sel['tap_stream_id'].lower():
                         tap_stream_sel = sel
 
                 # Find table specific metadata entries in the old and new streams
