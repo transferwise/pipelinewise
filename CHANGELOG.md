@@ -1,3 +1,9 @@
+0.13.2 (2020-03-02)
+-------------------
+
+**FastSync Postgres**
+    - Handle reserved words in column names in FastSync from PostgreSQL
+
 0.13.1 (2020-03-02)
 -------------------
 - Bump `ansible` to 2.7.16
@@ -9,7 +15,6 @@
 **Tap Postgres**
 - Bump `tap-postgres` to 1.4.1
     - Remove unused timestamps in log
-
 
 0.13.0 (2020-02-26)
 -------------------
