@@ -45,3 +45,10 @@ schemas:
 
       - table_name: "countrylanguage"
         replication_method: "FULL_TABLE"
+
+      - table_name: "table_with_reserved_words"
+        replication_method: "INCREMENTAL"
+        replication_key: "increment"
+        transformations:
+          - column: 'order'
+            type: 'HASH'
