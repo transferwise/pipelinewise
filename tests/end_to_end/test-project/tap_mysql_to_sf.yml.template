@@ -44,3 +44,6 @@ schemas:
         transformations:
           - column: "case"
             type: "HASH"
+
+      - table_name: "no_pk_table"
+        replication_method: "FULL_TABLE"

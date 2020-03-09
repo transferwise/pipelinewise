@@ -90,13 +90,12 @@ DROP TABLE IF EXISTS `area_code`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `area_code` (
-  `area_code_id` tinyint(4) NOT NULL AUTO_INCREMENT,
+  `area_code_id` tinyint(4) AUTO_INCREMENT PRIMARY KEY ,
   `area_code` smallint(3) NOT NULL,
   `isActive` tinyint(1) DEFAULT NULL,
   `date_created` datetime DEFAULT CURRENT_TIMESTAMP,
   `date_updated` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  `provance_provance_id` tinyint(4) NOT NULL,
-  PRIMARY KEY (`area_code_id`)
+  `provance_provance_id` tinyint(4) NOT NULL
 ) ENGINE=MyISAM AUTO_INCREMENT=39 DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -223,6 +222,31 @@ INSERT INTO `table_with_binary`(id, data) VALUES
                                             (0xCC27244FEE0544E1983224DF426E49FE,0xCC27244FEE0544E1983224DF426E49FE)
                                             ;
 /*!40000 ALTER TABLE `table_with_binary` ENABLE KEYS */;
+UNLOCK TABLES;
+
+
+--
+-- Table structure for table `no_pk_table`
+--
+
+DROP TABLE IF EXISTS `no_pk_table`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `no_pk_table` (
+  `id` tinyint(4) NOT NULL ,
+  `date_created` datetime DEFAULT CURRENT_TIMESTAMP,
+  `date_updated` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=MyISAM AUTO_INCREMENT=39 DEFAULT CHARSET=utf8;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `no_pk_table`
+--
+
+LOCK TABLES `no_pk_table` WRITE;
+/*!40000 ALTER TABLE `no_pk_table` DISABLE KEYS */;
+INSERT INTO `no_pk_table`(id) VALUES (1),(2),(3),(4),(5),(6),(7),(8),(9),(10),(11),(12),(13);
+/*!40000 ALTER TABLE `no_pk_table` ENABLE KEYS */;
 UNLOCK TABLES;
 
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
