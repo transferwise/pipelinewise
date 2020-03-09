@@ -163,7 +163,8 @@ class FastSyncTapPostgres:
         """
         Get the actual incremental key position in the table
         """
-        result = self.query('SELECT MAX({}) AS key_value FROM {}'.format(replication_key, table))
+        schema_name, table_name = table.split('.')
+        result = self.query(f'SELECT MAX({replication_key}) AS key_value FROM {schema_name}."{table_name}"')
         if len(result) == 0:
             raise Exception('Cannot get replication key value for table: {}'.format(table))
 
@@ -190,15 +191,17 @@ class FastSyncTapPostgres:
         """
         Get the primary key of a table
         """
+        schema_name, table_name = table.split('.')
+
         sql = """SELECT pg_attribute.attname
                     FROM pg_index, pg_class, pg_attribute, pg_namespace
                     WHERE
-                        pg_class.oid = '{}'::regclass AND
+                        pg_class.oid = '{}."{}"'::regclass AND
                         indrelid = pg_class.oid AND
                         pg_class.relnamespace = pg_namespace.oid AND
                         pg_attribute.attrelid = pg_class.oid AND
                         pg_attribute.attnum = any(pg_index.indkey)
-                    AND indisprimary""".format(table)
+                    AND indisprimary""".format(schema_name, table_name)
         primary_key = self.query(sql)
         if len(primary_key) > 0:
             return primary_key[0][0]
@@ -256,12 +259,15 @@ class FastSyncTapPostgres:
         if len(column_safe_sql_values) == 0:
             raise Exception('{} table not found.'.format(table_name))
 
+        schema_name, table_name = table_name.split('.')
+
+
         sql = """COPY (SELECT {}
         ,now() AT TIME ZONE 'UTC'
         ,now() AT TIME ZONE 'UTC'
         ,null
-        FROM {}) TO STDOUT with CSV DELIMITER ','
-        """.format(','.join(column_safe_sql_values), table_name)
+        FROM {}."{}") TO STDOUT with CSV DELIMITER ','
+        """.format(','.join(column_safe_sql_values), schema_name, table_name)
         LOGGER.info('Exporting data: %s', sql)
         with gzip.open(path, 'wt') as gzfile:
             self.curr.copy_expert(sql, gzfile, size=131072)
