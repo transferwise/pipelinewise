@@ -139,6 +139,10 @@ def main_impl():
         table_sync_excs = list(
             filter(lambda x: not isinstance(x, bool), proc.map(partial(sync_table, args=args), args.tables)))
 
+    # Clear information_schema columns cache
+    snowflake = FastSyncTargetSnowflake(args.target, args.transform)
+    snowflake.clear_information_schema_columns_cache(args.tables)
+
     # Log summary
     end_time = datetime.now()
     LOGGER.info("""
