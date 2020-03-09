@@ -1,8 +1,10 @@
 """
 Pipelinewise common utils between cli and fastsync
 """
+from typing import Optional
 
-def safe_column_name(name: str) -> str:
+
+def safe_column_name(name: Optional[str]) -> Optional[str]:
     """
     Makes column name safe by capitalizing and wrapping it in double quotes
     Args:
@@ -11,4 +13,7 @@ def safe_column_name(name: str) -> str:
     Returns:
         str: safe column name
     """
-    return f'"{name.upper()}"'
+    if name:
+        return f'"{name.upper()}"'
+
+    return name
