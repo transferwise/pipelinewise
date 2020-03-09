@@ -45,5 +45,5 @@ schemas:
           - column: "case"
             type: "HASH"
 
-      - table_name: "area_code"
+      - table_name: "no_pk_table"
         replication_method: "FULL_TABLE"
