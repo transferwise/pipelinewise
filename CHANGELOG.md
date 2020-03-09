@@ -1,3 +1,11 @@
+0.13.3 (2020-03-09)
+-------------------
+
+**FastSync Postgres & Mysql**
+    - fix "'NoneType' object has no attribute 'upper'" that happens when table has no PK.
+    - fix "Information schema query returned too much data".
+
+
 0.13.2 (2020-03-05)
 -------------------
 
