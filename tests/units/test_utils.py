@@ -23,5 +23,13 @@ class TestUtils(unittest.TestCase):
 
         self.assertEqual('"CA SE"', utils.safe_column_name(input_name))
 
+    def test_safe_column_name_case_name_is_null(self):
+        """
+        Given a null word, we should get null back
+        """
+        input_name = None
+
+        self.assertIsNone(utils.safe_column_name(input_name))
+
 if __name__ == '__main__':
     unittest.main()
