@@ -170,7 +170,8 @@ class S3CsvToSnowflake(unittest.TestCase):
                             utils_mock.parse_args.assert_called_once()
                             utils_mock.get_cpu_cores.assert_called_once()
                             mock_enter.return_value.map.assert_called_once()
-                            fastsync_target_sf_mock.return_value.clear_information_schema_columns_cache.assert_called_once()
+                            fastsync_target_sf_mock.return_value.clear_information_schema_columns_cache\
+                                .assert_called_once()
 
 
 if __name__ == '__main__':
