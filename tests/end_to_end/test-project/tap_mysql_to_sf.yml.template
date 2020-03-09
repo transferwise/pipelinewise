@@ -44,3 +44,6 @@ schemas:
         transformations:
           - column: "case"
             type: "HASH"
+
+      - table_name: "area_code"
+        replication_method: "FULL_TABLE"

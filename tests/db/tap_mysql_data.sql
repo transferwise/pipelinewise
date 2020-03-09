@@ -90,13 +90,12 @@ DROP TABLE IF EXISTS `area_code`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `area_code` (
-  `area_code_id` tinyint(4) NOT NULL AUTO_INCREMENT,
+  `area_code_id` tinyint(4) NOT NULL,
   `area_code` smallint(3) NOT NULL,
   `isActive` tinyint(1) DEFAULT NULL,
   `date_created` datetime DEFAULT CURRENT_TIMESTAMP,
   `date_updated` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  `provance_provance_id` tinyint(4) NOT NULL,
-  PRIMARY KEY (`area_code_id`)
+  `provance_provance_id` tinyint(4) NOT NULL
 ) ENGINE=MyISAM AUTO_INCREMENT=39 DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
