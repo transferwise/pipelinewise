@@ -114,7 +114,7 @@ class S3CsvToSnowflake(unittest.TestCase):
 
                         utils_mock.parse_args.return_value = ns
                         utils_mock.get_cpu_cores.return_value = 10
-                        fastsync_target_sf_mock.return_value.cache_information_schema_columns.return_value = None
+                        fastsync_target_sf_mock.return_value.clear_information_schema_columns_cache.return_value = None
 
                         mock_enter = Mock()
                         mock_enter.return_value.map.return_value = [True, True, True, True]
@@ -133,7 +133,7 @@ class S3CsvToSnowflake(unittest.TestCase):
                         utils_mock.parse_args.assert_called_once()
                         utils_mock.get_cpu_cores.assert_called_once()
                         mock_enter.return_value.map.assert_called_once()
-                        fastsync_target_sf_mock.return_value.cache_information_schema_columns.assert_called_once()
+                        fastsync_target_sf_mock.return_value.clear_information_schema_columns_cache.assert_called_once()
 
     # pylint: disable=unused-variable
     def test_main_impl_with_one_table_fails_to_sync_should_exit_with_error(self):
@@ -150,7 +150,7 @@ class S3CsvToSnowflake(unittest.TestCase):
 
                         utils_mock.parse_args.return_value = ns
                         utils_mock.get_cpu_cores.return_value = 10
-                        fastsync_target_sf_mock.return_value.cache_information_schema_columns.return_value = None
+                        fastsync_target_sf_mock.return_value.clear_information_schema_columns_cache.return_value = None
 
                         mock_enter = Mock()
                         mock_enter.return_value.map.return_value = [True, True, 'Critical: random error', True]
@@ -170,7 +170,8 @@ class S3CsvToSnowflake(unittest.TestCase):
                             utils_mock.parse_args.assert_called_once()
                             utils_mock.get_cpu_cores.assert_called_once()
                             mock_enter.return_value.map.assert_called_once()
-                            fastsync_target_sf_mock.return_value.cache_information_schema_columns.assert_called_once()
+                            fastsync_target_sf_mock.return_value.clear_information_schema_columns_cache\
+                                .assert_called_once()
 
 
 if __name__ == '__main__':
