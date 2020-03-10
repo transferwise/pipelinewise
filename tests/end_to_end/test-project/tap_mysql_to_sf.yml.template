@@ -1,0 +1,49 @@
+---
+
+# ------------------------------------------------------------------------------
+# General Properties
+# ------------------------------------------------------------------------------
+id: "mariadb_to_sf"
+name: "MariaDB source test database"
+type: "tap-mysql"
+owner: "test-runner"
+
+
+# ------------------------------------------------------------------------------
+# Source (Tap) - MySQL connection details
+# ------------------------------------------------------------------------------
+db_conn:
+  host: "${DB_TAP_MYSQL_HOST}"                  # PostgreSQL host
+  port: ${DB_TAP_MYSQL_PORT}                    # PostgreSQL port
+  user: "${DB_TAP_MYSQL_USER}"                  # PostgreSQL user
+  password: "${DB_TAP_MYSQL_PASSWORD}"          # Plain string or vault encrypted
+  dbname: "${DB_TAP_MYSQL_DB}"                  # PostgreSQL database name
+
+
+# ------------------------------------------------------------------------------
+# Destination (Target) - Target properties
+# Connection details should be in the relevant target YAML file
+# ------------------------------------------------------------------------------
+target: "snowflake"                 # ID of the target connector where the data will be loaded
+batch_size_rows: 20000                 # Batch size for the stream to optimise load performance
+
+
+# ------------------------------------------------------------------------------
+# Source to target Schema mapping
+# ------------------------------------------------------------------------------
+schemas:
+  - source_schema: "mysql_source_db"
+    target_schema: "mysql_grp24"
+
+    tables:
+      - table_name: "table_with_binary" # This table has binary and varbinary columns
+        replication_method: "LOG_BASED"
+
+      - table_name: "edgydata" # This table has SF reserved words as columns
+        replication_method: "LOG_BASED"
+        transformations:
+          - column: "case"
+            type: "HASH"
+
+      - table_name: "no_pk_table"
+        replication_method: "FULL_TABLE"

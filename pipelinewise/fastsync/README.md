@@ -1,5 +1,6 @@
-FastSync
---------
+# FastSync
+
+## Description
 
 Fast Sync is one of the Replication Methods that is functionally identical to Full Table
 replication but Fast Sync is bypassing the Singer Specification for optimised performance.
@@ -9,3 +10,11 @@ for days.
 
 PipelineWise detects automatically when Fast Sync gives better performance than the singer
 components and uses it automatically whenever it’s possible.
+
+## Supported tap-target routes
+
+* MySQL to Snowflake.
+* MySQL to Redshift
+* Postgres to Snowflake
+* Postgres to Redshift
+* S3 CSV to Snowflake

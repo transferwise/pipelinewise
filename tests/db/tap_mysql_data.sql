@@ -24,9 +24,10 @@ DROP TABLE IF EXISTS `edgydata`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `edgydata` (
-  `c_id` int(11) NOT NULL AUTO_INCREMENT,
+  `order` int(11) PRIMARY KEY AUTO_INCREMENT,
   `c_varchar` varchar(128),
-  PRIMARY KEY (`c_id`)
+  `group` int,
+  `case` varchar(1)
 ) ENGINE=MyISAM AUTO_INCREMENT=1001 DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -37,16 +38,16 @@ CREATE TABLE `edgydata` (
 LOCK TABLES `edgydata` WRITE;
 /*!40000 ALTER TABLE `edgydata` DISABLE KEYS */;
 INSERT INTO `edgydata` VALUES
-  (1, 'Lorem ipsum dolor sit amet'),
-  (2, 'Thai: แผ่นดินฮั่นเสื่อมโทรมแสนสังเวช'),
-  (3, 'Chinese: 和毛泽东 <<重上井冈山>>. 严永欣, 一九八八年.'),
-  (4, 'Special Characters: ["\\,''!@£$%^&*()]\\\\'),
-  (5, '	'),
+  (1, 'Lorem ipsum dolor sit amet', 10, 'A'),
+  (2, 'Thai: แผ่นดินฮั่นเสื่อมโทรมแสนสังเวช', 20, 'A'),
+  (3, 'Chinese: 和毛泽东 <<重上井冈山>>. 严永欣, 一九八八年.', null, 'B'),
+  (4, 'Special Characters: ["\\,''!@£$%^&*()]\\\\', null, 'B'),
+  (5, '	', 20, 'B'),
   (6,'Enter	The
-Ninja'),
+Ninja', 10, 'A'),
   (7,'Liewe
-Maatjies'),
-  (8,'Liewe	Maatjies')
+Maatjies', 20, 'A'),
+  (8,'Liewe	Maatjies', 10, null)
 ;
 
 /*!40000 ALTER TABLE `edgydata` ENABLE KEYS */;
@@ -89,13 +90,12 @@ DROP TABLE IF EXISTS `area_code`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `area_code` (
-  `area_code_id` tinyint(4) NOT NULL AUTO_INCREMENT,
+  `area_code_id` tinyint(4) AUTO_INCREMENT PRIMARY KEY ,
   `area_code` smallint(3) NOT NULL,
   `isActive` tinyint(1) DEFAULT NULL,
   `date_created` datetime DEFAULT CURRENT_TIMESTAMP,
   `date_updated` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  `provance_provance_id` tinyint(4) NOT NULL,
-  PRIMARY KEY (`area_code_id`)
+  `provance_provance_id` tinyint(4) NOT NULL
 ) ENGINE=MyISAM AUTO_INCREMENT=39 DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -189,8 +189,67 @@ INSERT INTO `weight_unit` VALUES (1,'1 kg pkg.',1,'2017-03-26 00:36:37','2017-03
 /*!40000 ALTER TABLE `weight_unit` ENABLE KEYS */;
 UNLOCK TABLES;
 
-/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
+-- Dump completed on 2017-03-26  2:01:31
 
+--
+-- Table structure for table `table_with_binary`
+--
+
+DROP TABLE IF EXISTS `table_with_binary`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `table_with_binary` (
+  `id` binary(50) PRIMARY KEY,
+  `data` varbinary(100),
+  `date_created` datetime DEFAULT CURRENT_TIMESTAMP,
+  `date_updated` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `table_with_binary`
+--
+
+LOCK TABLES `table_with_binary` WRITE;
+/*!40000 ALTER TABLE `table_with_binary` DISABLE KEYS */;
+INSERT INTO `table_with_binary`(id, data) VALUES
+                                            (BINARY ('1000'),BINARY('data1000')),
+                                            (BINARY('1001'), BINARY('data1001')),
+                                            (BINARY(1002), null),
+                                            (HEX (1003), HEX('data1003')),
+                                            (0x39A19960D36D4355BCBC213E27638260,0x39A19960D36D4355BCBC213E27638260),
+                                            (0xDB7136A053724A38BDF18C37FA3450EE,0xDB7136A053724A38BDF18C37FA3450EE),
+                                            (0xCC27244FEE0544E1983224DF426E49FE,0xCC27244FEE0544E1983224DF426E49FE)
+                                            ;
+/*!40000 ALTER TABLE `table_with_binary` ENABLE KEYS */;
+UNLOCK TABLES;
+
+
+--
+-- Table structure for table `no_pk_table`
+--
+
+DROP TABLE IF EXISTS `no_pk_table`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `no_pk_table` (
+  `id` tinyint(4) NOT NULL ,
+  `date_created` datetime DEFAULT CURRENT_TIMESTAMP,
+  `date_updated` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=MyISAM AUTO_INCREMENT=39 DEFAULT CHARSET=utf8;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `no_pk_table`
+--
+
+LOCK TABLES `no_pk_table` WRITE;
+/*!40000 ALTER TABLE `no_pk_table` DISABLE KEYS */;
+INSERT INTO `no_pk_table`(id) VALUES (1),(2),(3),(4),(5),(6),(7),(8),(9),(10),(11),(12),(13);
+/*!40000 ALTER TABLE `no_pk_table` ENABLE KEYS */;
+UNLOCK TABLES;
+
+/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
 /*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
 /*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
@@ -198,5 +257,3 @@ UNLOCK TABLES;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
-
--- Dump completed on 2017-03-26  2:01:31

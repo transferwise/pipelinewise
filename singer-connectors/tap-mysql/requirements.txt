@@ -1,1 +1,1 @@
-pipelinewise-tap-mysql==1.0.6
+pipelinewise-tap-mysql==1.2.0

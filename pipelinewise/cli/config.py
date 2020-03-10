@@ -1,47 +1,52 @@
+"""
+PipelineWise CLI - Configuration class
+"""
+import logging
 import os
 import sys
-import logging
 
+from pipelinewise.utils import safe_column_name
 from . import utils
 
 
-class Config(object):
+class Config:
+    """PipelineWise Configuration Class"""
+
     def __init__(self, config_dir):
-        '''
+        """
         Class Constructor
 
         Initialising a configuration with an empty list of data flows
-        '''
-        self.logger = logging.getLogger('Pipelinewise CLI')
+        """
+        self.logger = logging.getLogger(__name__)
         self.config_dir = config_dir
-        self.config_path = os.path.join(self.config_dir, "config.json")
-
-        self.targets = []
-
+        self.config_path = os.path.join(self.config_dir, 'config.json')
+        self.targets = dict()
 
     @classmethod
-    def from_yamls(cls, config_dir, yaml_dir=".", vault_secret=None):
-        '''
+    # pylint: disable=too-many-locals
+    def from_yamls(cls, config_dir, yaml_dir='.', vault_secret=None):
+        """
         Class Constructor
 
         Initialising a configuration from YAML files.
 
         Pipelinewise can import and generate singer configurations files
         from human friendly easy to understand YAML files.
-        '''
+        """
         config = cls(config_dir)
         targets = {}
         taps = {}
 
-        config.logger.info(f"Searching YAML config files in {yaml_dir}")
+        config.logger.info('Searching YAML config files in %s', yaml_dir)
         tap_yamls, target_yamls = utils.get_tap_target_names(yaml_dir)
 
-        target_schema = utils.load_schema("target")
-        tap_schema = utils.load_schema("tap")
+        target_schema = utils.load_schema('target')
+        tap_schema = utils.load_schema('tap')
 
-        # Load every target yaml into targets dictionary        
+        # Load every target yaml into targets dictionary
         for yaml_file in target_yamls:
-            config.logger.info(f"LOADING TARGET: {yaml_file}")
+            config.logger.info('LOADING TARGET: %s', yaml_file)
             target_data = utils.load_yaml(os.path.join(yaml_dir, yaml_file), vault_secret)
             utils.validate(instance=target_data, schema=target_schema)
 
@@ -56,14 +61,15 @@ class Config(object):
 
         # Load every tap yaml into targets dictionary
         for yaml_file in tap_yamls:
-            config.logger.info(f"LOADING TAP: {yaml_file}")
+            config.logger.info('LOADING TAP: %s', yaml_file)
             tap_data = utils.load_yaml(os.path.join(yaml_dir, yaml_file), vault_secret)
             utils.validate(instance=tap_data, schema=tap_schema)
 
             tap_id = tap_data['id']
             target_id = tap_data['target']
             if target_id not in targets:
-                config.logger.error(f"Can't find the target with the ID \"{target_id}\" but it's referenced in {yaml_file}")
+                config.logger.error("Can't find the target with the ID \"%s\" but it's referenced in %s", target_id,
+                                    yaml_file)
                 sys.exit(1)
 
             # Add generated extra keys that not available in the YAML
@@ -73,35 +79,37 @@ class Config(object):
             taps[tap_id] = tap_data
 
         # Link taps to targets
-        for target_key in targets.keys():
-            for tap_key in taps.keys():
-                if taps.get(tap_key).get('target') == targets.get(target_key).get('id'):
-                    targets.get(target_key).get('taps').append(taps.get(tap_key))
+        for target_key in targets:
+            targets[target_key]['taps'] = [tap for tap in taps.values() if tap['target'] == target_key]
 
         # Final structure is ready
         config.targets = targets
-        
+
         return config
 
+    def get_temp_dir(self):
+        """
+        Returns the tap specific temp directory
+        """
+        return os.path.join(self.config_dir, 'tmp')
 
     def get_target_dir(self, target_id):
-        '''
+        """
         Returns the absolute path of a target configuration directory
-        ''' 
+        """
         return os.path.join(self.config_dir, target_id)
 
-
     def get_tap_dir(self, target_id, tap_id):
-        '''
-        Returns the absolute path of a tap configuration directory 
-        ''' 
+        """
+        Returns the absolute path of a tap configuration directory
+        """
         return os.path.join(self.config_dir, target_id, tap_id)
 
-
-    def get_connector_files(self, connector_dir):
-        '''
+    @staticmethod
+    def get_connector_files(connector_dir):
+        """
         Returns the absolute paths of a tap/target configuration files
-        '''
+        """
         return {
             'config': os.path.join(connector_dir, 'config.json'),
             'inheritable_config': os.path.join(connector_dir, 'inheritable_config.json'),
@@ -111,61 +119,56 @@ class Config(object):
             'selection': os.path.join(connector_dir, 'selection.json'),
         }
 
-
     def save(self):
-        '''
+        """
         Generating pipelinewise configuration directory layout on the disk.
 
         The pipelinewise configuration is a group of JSON files organised
         into a common directory structure and usually deployed into
         ~/.pipelinewise
-        ''' 
-        self.logger.info("SAVING CONFIG")
+        """
+        self.logger.info('SAVING CONFIG')
         self.save_main_config_json()
 
         # Save every target config json
-        for target_key in self.targets.keys():
-            target = self.targets[target_key]
+        for target in self.targets.values():
             self.save_target_jsons(target)
 
             # Save every tap JSON files
-            for i, tap in enumerate(target['taps']):
+            for tap in target['taps']:
                 extra_config_keys = utils.get_tap_extra_config_keys(tap)
                 self.save_tap_jsons(target, tap, extra_config_keys)
 
-
     def save_main_config_json(self):
-        '''
+        """
         Generating pipelinewise main config.json file
 
         This is in the main config directory, usually at ~/.pipelinewise/config.json
         and has the list of targets and its taps with some basic information.
-        '''
-        self.logger.info(f"SAVING MAIN CONFIG JSON to {self.config_path}")
+        """
+        self.logger.info('SAVING MAIN CONFIG JSON to %s', self.config_path)
         targets = []
 
         # Generate dictionary for config.json
-        for tk in self.targets.keys():
+        for key in self.targets:
             taps = []
-            for tap in self.targets[tk].get('taps'):
+            for tap in self.targets[key].get('taps'):
                 taps.append({
-                    "id": tap.get('id'),
-                    "name": tap.get('name'),
-                    "type": tap.get('type'),
-                    "owner": tap.get('owner'),
-                    "enabled": True
+                    'id': tap.get('id'),
+                    'name': tap.get('name'),
+                    'type': tap.get('type'),
+                    'owner': tap.get('owner'),
+                    'enabled': True
                 })
 
             targets.append({
-                "id": self.targets[tk].get('id'),
-                "name": self.targets[tk].get('name'),
-                "status": "ready",
-                "type": self.targets[tk].get('type'),
-                "taps": taps
+                'id': self.targets[key].get('id'),
+                'name': self.targets[key].get('name'),
+                'status': 'ready',
+                'type': self.targets[key].get('type'),
+                'taps': taps
             })
-        main_config = {
-            "targets": targets
-        }
+        main_config = {'targets': targets}
 
         # Create config dir if not exists
         if not os.path.exists(self.config_dir):
@@ -174,15 +177,14 @@ class Config(object):
         # Save to JSON
         utils.save_json(main_config, self.config_path)
 
-
     def save_target_jsons(self, target):
-        '''
+        """
         Generating JSON config files for a singer target connector:
             1. config.json             :(Singer spec):  Tap connection details
-        '''
+        """
         target_dir = self.get_target_dir(target.get('id'))
-        target_config_path = os.path.join(target_dir, "config.json")
-        self.logger.info(f"SAVING TARGET JSONS to {target_config_path}")
+        target_config_path = os.path.join(target_dir, 'config.json')
+        self.logger.info('SAVING TARGET JSONS to %s', target_config_path)
 
         # Create target dir if not exists
         if not os.path.exists(target_dir):
@@ -191,9 +193,9 @@ class Config(object):
         # Save target config.json
         utils.save_json(target.get('db_conn'), target_config_path)
 
-
-    def save_tap_jsons(self, target, tap, extra_config_keys={}):
-        '''
+    # pylint: disable=too-many-locals
+    def save_tap_jsons(self, target, tap, extra_config_keys=None):
+        """
         Generating JSON config files for a singer tap connector:
             1. config.json             :(Singer spec):  Tap connection details
             2. properties.json         :(Singer spec):  Tap schema properties (generated)
@@ -205,17 +207,18 @@ class Config(object):
                                                         singer target connector that
                                                         pipelinewise will pass at run time
             6. transformation.json     :(Pipelinewise): Column transformations between the
-                                                        tap and target 
-        '''
-        target_dir = self.get_target_dir(target.get('id'))
+                                                        tap and target
+        """
+        if extra_config_keys is None:
+            extra_config_keys = {}
         tap_dir = self.get_tap_dir(target.get('id'), tap.get('id'))
-        self.logger.info(f"SAVING TAP JSONS to {tap_dir}")
+        self.logger.info('SAVING TAP JSONS to %s', tap_dir)
 
         # Define tap JSON file paths
-        tap_config_path = os.path.join(tap_dir, "config.json")
-        tap_selection_path = os.path.join(tap_dir, "selection.json")
-        tap_transformation_path = os.path.join(tap_dir, "transformation.json")
-        tap_inheritable_config_path = os.path.join(tap_dir, "inheritable_config.json")
+        tap_config_path = os.path.join(tap_dir, 'config.json')
+        tap_selection_path = os.path.join(tap_dir, 'selection.json')
+        tap_transformation_path = os.path.join(tap_dir, 'transformation.json')
+        tap_inheritable_config_path = os.path.join(tap_dir, 'inheritable_config.json')
 
         # Create tap dir if not exists
         if not os.path.exists(tap_dir):
@@ -235,15 +238,13 @@ class Config(object):
                 table_name = table.get('table_name')
                 replication_method = table.get('replication_method', utils.get_tap_default_replication_method(tap))
                 selection.append(utils.delete_empty_keys({
-                    "tap_stream_id": utils.get_tap_stream_id(tap, tap_dbname, schema_name, table_name),
-                    "replication_method": replication_method,
+                    'tap_stream_id': utils.get_tap_stream_id(tap, tap_dbname, schema_name, table_name),
+                    'replication_method': replication_method,
 
                     # Add replication_key only if replication_method is INCREMENTAL
-                    "replication_key": table.get('replication_key') if replication_method == 'INCREMENTAL' else None
+                    'replication_key': table.get('replication_key') if replication_method == 'INCREMENTAL' else None
                 }))
-        tap_selection = {
-            "selection": selection
-        }
+        tap_selection = {'selection': selection}
 
         # Generate tap transformation
         transformations = []
@@ -253,13 +254,16 @@ class Config(object):
                 table_name = table.get('table_name')
                 for trans in table.get('transformations', []):
                     transformations.append({
-                        "tap_stream_name": utils.get_tap_stream_name(tap, tap_dbname, schema_name, table_name),
-                        "field_id": trans.get('column'),
-                        "type": trans.get('type'),
-                        "when": trans.get('when')
+                        'tap_stream_name': utils.get_tap_stream_name(tap, tap_dbname, schema_name, table_name),
+                        'field_id': trans['column'],
+                        # Make column name safe by wrapping it in quotes, it's useful when a field_id is a reserved word
+                        # to be used by target snowflake in fastsync
+                        'safe_field_id': safe_column_name(trans['column']),
+                        'type': trans['type'],
+                        'when': trans.get('when')
                     })
         tap_transformation = {
-            "transformations": transformations
+            'transformations': transformations
         }
 
         # Generate stream to schema mapping
@@ -267,11 +271,11 @@ class Config(object):
         for schema in tap.get('schemas', []):
             source_schema = schema.get('source_schema')
             target_schema = schema.get('target_schema')
-            target_schema_select_permissions = schema.get('target_schema_select_permissions', [])
+            target_schema_select_perms = schema.get('target_schema_select_permissions', [])
 
             schema_mapping[source_schema] = {
-                "target_schema": target_schema,
-                "target_schema_select_permissions": target_schema_select_permissions
+                'target_schema': target_schema,
+                'target_schema_select_permissions': target_schema_select_perms
             }
 
             # Schema mapping can include list of indices to create. Some target components
@@ -287,20 +291,18 @@ class Config(object):
             if indices:
                 schema_mapping[source_schema]['indices'] = indices
 
-        # Schema mapping is ready
-        tap_schema_mapping = {
-            "schema_mapping": schema_mapping
-        }
-
         # Generate tap inheritable_config dict
         tap_inheritable_config = utils.delete_empty_keys({
-            "batch_size_rows": tap.get('batch_size_rows'),
-            "hard_delete": tap.get('hard_delete', True),
-            "flush_all_streams": tap.get('flush_all_streams', False),
-            "primary_key_required": tap.get('primary_key_required', True),
-            "default_target_schema": tap.get('default_target_schema'),
-            "default_target_schema_select_permissions": tap.get('default_target_schema_select_permissions'),
-            "schema_mapping": schema_mapping,
+            'temp_dir': self.get_temp_dir(),
+            'batch_size_rows': tap.get('batch_size_rows', 20000),
+            'parallelism': tap.get('parallelism', 0),
+            'parallelism_max': tap.get('parallelism_max', 4),
+            'hard_delete': tap.get('hard_delete', True),
+            'flush_all_streams': tap.get('flush_all_streams', False),
+            'primary_key_required': tap.get('primary_key_required', True),
+            'default_target_schema': tap.get('default_target_schema'),
+            'default_target_schema_select_permissions': tap.get('default_target_schema_select_permissions'),
+            'schema_mapping': schema_mapping,
 
             # data_flattening_max_level
             # -------------------------
@@ -310,14 +312,16 @@ class Config(object):
             #
             # We can load the original object represented as JSON or string (data flattening off) or we can
             # flatten the schema and data by creating columns automatically. When 'data_flattening_max_level'
-            # is set to 0 then flattenning functionality is turned off.
+            # is set to 0 then flattening functionality is turned off.
             #
-            # The value can be set in mutliple place and evaluated in the following order:
+            #  The value can be set in mutliple place and evaluated in the following order:
             # ------------
             #   1: First we try to find it in the tap YAML
             #   2: Second we try to get the tap type specific default value
-            #   3: Othwerise we set flattening level to 0 (disabled)
-            "data_flattening_max_level": tap.get('data_flattening_max_level', utils.get_tap_property(tap, 'default_data_flattening_max_level') or 0)
+            #   3: Otherwise we set flattening level to 0 (disabled)
+            'data_flattening_max_level': tap.get('data_flattening_max_level',
+                                                 utils.get_tap_property(tap, 'default_data_flattening_max_level') or 0),
+            'validate_records': tap.get('validate_records', False)
         })
 
         # Save the generated JSON files
