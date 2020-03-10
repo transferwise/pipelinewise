@@ -207,17 +207,17 @@ class FastSyncTapS3Csv:
 
     # pylint: disable=invalid-name
     def fetch_current_incremental_key_pos(self, table: str,
-                                          replication_key: Optional[str] = 'modified_since') -> Optional[Dict]:
+                                          reproduction_key: Optional[str] = 'modified_since') -> Optional[Dict]:
         """
         Returns the last time a the table has been modified in ISO format.
         :param table: table name
-        :param replication_key: Not needed as it's going to be overrided with `modified_since`
+        :param reproduction_key: Not needed as it's going to be overrided with `modified_since`
         :return: Dict, e.g {'modified_since': '2019-11-01T07:50:06+00:00'} if the table exists, otherwise None
         """
-        replication_key = 'modified_since'
+        reproduction_key = 'modified_since'
 
         return {
-            replication_key: self.tables_last_modified[table].isoformat()
+            reproduction_key: self.tables_last_modified[table].isoformat()
         } if table in self.tables_last_modified else {}
 
     def _get_primary_keys(self, table_specs: Dict) -> Optional[str]:

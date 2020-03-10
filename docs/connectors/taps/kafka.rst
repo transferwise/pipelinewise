@@ -13,11 +13,11 @@ Connecting to Kafka
   This section of the documentation is work in progress.
 
 
-Configuring what to replicate
+Configuring what to reproduce
 '''''''''''''''''''''''''''''
 
 PipelineWise configures every tap with a common structured YAML file format.
-A sample YAML for Kafka replication can be generated into a project directory by
+A sample YAML for Kafka reproduction can be generated into a project directory by
 following the steps in the :ref:`generating_pipelines` section.
 
 Example YAML for ``tap-kafka``:
@@ -65,7 +65,7 @@ Example YAML for ``tap-kafka``:
     # ------------------------------------------------------------------------------
     target: "snowflake"                       # ID of the target connector where the data will be loaded
     batch_size_rows: 20000                    # Batch size for the stream to optimise load performance
-    default_target_schema: "kafka"            # Target schema where the data will be loaded 
+    default_target_schema: "kafka"            # Target schema where the data will be loaded
     default_target_schema_select_permission:  # Optional: Grant SELECT on schema and tables that created
       - grp_stats
 
@@ -77,13 +77,13 @@ Example YAML for ``tap-kafka``:
       - source_schema: "kafka"             # This is mandatory, but can be anything in this tap type
         target_schema: "kafka"             # Target schema in the destination Data Warehouse
 
-        # Kafka topic to replicate into destination Data Warehouse
+        # Kafka topic to reproduce into destination Data Warehouse
         # You can load data only from one kafka topic in one YAML file.
         # If you want load from multiple kafka topics, create another tap YAML similar to this file
         tables:
           - table_name: "my_kafka_topic"   # target table name needs to match to the topic name in snake case format
 
             # OPTIONAL: Load time transformations
-            #transformations:                    
+            #transformations:
             #  - column: "last_name"            # Column to transform
             #    type: "SET-NULL"               # Transformation type

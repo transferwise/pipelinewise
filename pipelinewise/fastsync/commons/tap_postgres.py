@@ -83,8 +83,8 @@ class FastSyncTapPostgres:
         """
         Get the actual wal position in Postgres
         """
-        # Create replication slot dedicated connection
-        # Always use Primary server for creating replication_slot
+        # Create reproduction slot dedicated connection
+        # Always use Primary server for creating reproduction_slot
         primary_host_conn_string = "host='{}' port='{}' user='{}' password='{}' dbname='{}'".format(
             self.connection_config['host'],
             self.connection_config['port'],
@@ -114,21 +114,21 @@ class FastSyncTapPostgres:
         if (version >= 90400) and (version < 90421):
             raise Exception('PostgreSQL upgrade required to minor version 9.4.21')
         if version < 90400:
-            raise Exception('Logical replication not supported before PostgreSQL 9.4')
+            raise Exception('Logical reproduction not supported before PostgreSQL 9.4')
 
-        # Create replication slot, ignore error if already exists
+        # Create reproduction slot, ignore error if already exists
         try:
             result = self.primary_host_query(
-                "SELECT * FROM pg_create_logical_replication_slot('pipelinewise_{}', 'wal2json')".format(
+                "SELECT * FROM pg_create_logical_reproduction_slot('pipelinewise_{}', 'wal2json')".format(
                     self.connection_config['dbname'].lower()))
         except Exception as exc:
-            # ERROR: replication slot "stitch_{}" already exists SQL state: 42710
+            # ERROR: reproduction slot "stitch_{}" already exists SQL state: 42710
             if exc.pgcode == '42710':
                 pass
             else:
                 raise exc
 
-        # Close replication slot dedicated connection
+        # Close reproduction slot dedicated connection
         self.primary_host_conn.close()
 
         # is replica_host set ?
@@ -139,7 +139,7 @@ class FastSyncTapPostgres:
             elif version >= 90400:
                 result = self.query('SELECT pg_last_xlog_replay_location() AS current_lsn')
             else:
-                raise Exception('Logical replication not supported before PostgreSQL 9.4')
+                raise Exception('Logical reproduction not supported before PostgreSQL 9.4')
         else:
             # Get current lsn from primary host
             if version >= 100000:
@@ -147,7 +147,7 @@ class FastSyncTapPostgres:
             elif version >= 90400:
                 result = self.query('SELECT pg_current_xlog_location() AS current_lsn')
             else:
-                raise Exception('Logical replication not supported before PostgreSQL 9.4')
+                raise Exception('Logical reproduction not supported before PostgreSQL 9.4')
 
         current_lsn = result[0].get('current_lsn')
         file, index = current_lsn.split('/')
@@ -159,14 +159,14 @@ class FastSyncTapPostgres:
         }
 
     # pylint: disable=invalid-name
-    def fetch_current_incremental_key_pos(self, table, replication_key):
+    def fetch_current_incremental_key_pos(self, table, reproduction_key):
         """
         Get the actual incremental key position in the table
         """
         schema_name, table_name = table.split('.')
-        result = self.query(f'SELECT MAX({replication_key}) AS key_value FROM {schema_name}."{table_name}"')
+        result = self.query(f'SELECT MAX({reproduction_key}) AS key_value FROM {schema_name}."{table_name}"')
         if len(result) == 0:
-            raise Exception('Cannot get replication key value for table: {}'.format(table))
+            raise Exception('Cannot get reproduction key value for table: {}'.format(table))
 
         postgres_key_value = result[0].get('key_value')
         key_value = postgres_key_value
@@ -182,8 +182,8 @@ class FastSyncTapPostgres:
             key_value = float(postgres_key_value)
 
         return {
-            'replication_key': replication_key,
-            'replication_key_value': key_value,
+            'reproduction_key': reproduction_key,
+            'reproduction_key_value': key_value,
             'version': 1
         }
 

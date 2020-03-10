@@ -114,13 +114,13 @@ class FastSyncTapMySql:
         }
 
     # pylint: disable=invalid-name
-    def fetch_current_incremental_key_pos(self, table, replication_key):
+    def fetch_current_incremental_key_pos(self, table, reproduction_key):
         """
         Get the actual incremental key position in the table
         """
-        result = self.query('SELECT MAX({}) AS key_value FROM {}'.format(replication_key, table))
+        result = self.query('SELECT MAX({}) AS key_value FROM {}'.format(reproduction_key, table))
         if len(result) == 0:
-            raise Exception('Cannot get replication key value for table: {}'.format(table))
+            raise Exception('Cannot get reproduction key value for table: {}'.format(table))
 
         mysql_key_value = result[0].get('key_value')
         key_value = mysql_key_value
@@ -136,8 +136,8 @@ class FastSyncTapMySql:
             key_value = float(mysql_key_value)
 
         return {
-            'replication_key': replication_key,
-            'replication_key_value': key_value,
+            'reproduction_key': reproduction_key,
+            'reproduction_key_value': key_value,
             'version': 1
         }
 

@@ -3,7 +3,7 @@
 [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/pipelinewise-tap-mysql.svg)](https://pypi.org/project/pipelinewise-tap-mysql/)
 [![License: Apache2](https://img.shields.io/badge/License-Apache2-yellow.svg)](https://opensource.org/licenses/Apache-2.0)
 
-PipelineWise is a Data Pipeline Framework using the [Singer.io](https://www.singer.io/) specification to ingest and replicate data from various sources to various destinations.
+PipelineWise is a Data Pipeline Framework using the [Singer.io](https://www.singer.io/) specification to ingest and reproduce data from various sources to various destinations.
 Documentation is available at https://transferwise.github.io/pipelinewise/
 
 ![Logo](docs/img/pipelinewise-diagram-circle-bold.png)
@@ -11,10 +11,10 @@ Documentation is available at https://transferwise.github.io/pipelinewise/
 
 ## Features
 
-* **Built with ELT in mind**: PipelineWise fits into the ELT landscape but does not do traditional ETL. PipelineWise ingests data first into DWH in the original format and the “transformation” shifts to the end of the data pipeline. Load time transformations are still supported but complex mapping and joins have to be done once the data is replicated into the Data Warehouse.
-* **Replication Methods**: CDC (Log Based), Key-Based Incremental and Full Table snapshots
+* **Built with ELT in mind**: PipelineWise fits into the ELT landscape but does not do traditional ETL. PipelineWise ingests data first into DWH in the original format and the “transformation” shifts to the end of the data pipeline. Load time transformations are still supported but complex mapping and joins have to be done once the data is reproduced into the Data Warehouse. We have taken to call this process "Reproduction"
+* **Reproduction Methods**: CDC (Log Based), Key-Based Incremental and Full Table snapshots
 * **Managed Schema Changes**: When source data changes, PipelineWise detects the change and alters the schema in your DWH automatically
-* **Load time transformations**: Ideal place to obfuscate, mask or filter sensitive data that should never be replicated in the Data Warehouse
+* **Load time transformations**: Ideal place to obfuscate, mask or filter sensitive data that should never be reproduced in the Data Warehouse
 * **YAML based configuration**: Data pipelines are defined as YAML files, ensuring that the entire configuration is kept under version control
 * **Lightweight**: No daemons or database setup are required
 * **Extensible**: PipelineWise is using [Singer.io](https://www.singer.io/) compatible taps and target connectors. New connectors can be added to PipelineWise with relatively small effort
@@ -37,15 +37,15 @@ consumes data from taps and do something with it, like load it into a file, API 
 
 | Type      | Name       | Latest Version | Description                                          |
 |-----------|------------|----------------|------------------------------------------------------|
-| Tap       | **[Postgres](https://github.com/transferwise/pipelinewise-tap-postgres)** | [![PyPI version](https://badge.fury.io/py/pipelinewise-tap-postgres.svg)](https://badge.fury.io/py/pipelinewise-tap-postgres) | Extracts data from PostgreSQL databases. Supporting Log-Based Inremental, Key-Based Incremental and Full Table replications |
-| Tap       | **[MySQL](https://github.com/transferwise/pipelinewise-tap-mysql)** | [![PyPI version](https://badge.fury.io/py/pipelinewise-tap-mysql.svg)](https://badge.fury.io/py/pipelinewise-tap-mysql) | Extracts data from MySQL databases. Supporting Log-Based Inremental, Key-Based Incremental and Full Table replications |
-| Tap       | **[Oracle](https://github.com/transferwise/pipelinewise-tap-oracle)** | [![PyPI version](https://badge.fury.io/py/pipelinewise-tap-oracle.svg)](https://badge.fury.io/py/pipelinewise-tap-oracle) | Extracts data from Oracle databases. Supporting Log-Based Inremental, Key-Based Incremental and Full Table replications |
+| Tap       | **[Postgres](https://github.com/transferwise/pipelinewise-tap-postgres)** | [![PyPI version](https://badge.fury.io/py/pipelinewise-tap-postgres.svg)](https://badge.fury.io/py/pipelinewise-tap-postgres) | Extracts data from PostgreSQL databases. Supporting Log-Based Inremental, Key-Based Incremental and Full Table reproduction |
+| Tap       | **[MySQL](https://github.com/transferwise/pipelinewise-tap-mysql)** | [![PyPI version](https://badge.fury.io/py/pipelinewise-tap-mysql.svg)](https://badge.fury.io/py/pipelinewise-tap-mysql) | Extracts data from MySQL databases. Supporting Log-Based Inremental, Key-Based Incremental and Full Table reproduction |
+| Tap       | **[Oracle](https://github.com/transferwise/pipelinewise-tap-oracle)** | [![PyPI version](https://badge.fury.io/py/pipelinewise-tap-oracle.svg)](https://badge.fury.io/py/pipelinewise-tap-oracle) | Extracts data from Oracle databases. Supporting Log-Based Inremental, Key-Based Incremental and Full Table reproduction |
 | Tap       | **[Kafka](https://github.com/transferwise/pipelinewise-tap-kafka)** | [![PyPI version](https://badge.fury.io/py/pipelinewise-tap-kafka.svg)](https://badge.fury.io/py/pipelinewise-tap-kafka) | Extracts data from Kafka topics |
 | Tap       | **[AdWords](https://github.com/singer-io/tap-adwords)** | [![PyPI version](https://badge.fury.io/py/tap-adwords.svg)](https://badge.fury.io/py/tap-adwords) | Extracts data Google Ads API (former Google Adwords) using OAuth and support incremental loading based on input state |
 | Tap       | **[S3 CSV](https://github.com/transferwise/pipelinewise-tap-s3-csv)** | [![PyPI version](https://badge.fury.io/py/pipelinewise-tap-s3-csv.svg)](https://badge.fury.io/py/pipelinewise-tap-s3-csv) | Extracts data from S3 csv files (currently a fork of tap-s3-csv because we wanted to use our own auth method) |
-| Tap       | **[Zendesk](https://github.com/singer-io/tap-zendesk)** | [![PyPI version](https://badge.fury.io/py/tap-zendesk.svg)](https://badge.fury.io/py/tap-zendesk) | Extracts data from Zendesk using OAuth and Key-Based incremental replications |
-| Tap       | **[Snowflake](https://github.com/transferwise/pipelinewise-tap-snowflake)** | [![PyPI version](https://badge.fury.io/py/pipelinewise-tap-snowflake.svg)](https://badge.fury.io/py/pipelinewise-tap-snowflake) | Extracts data from Snowflake databases. Supporting Key-Based Incremental and Full Table replications |
-| Tap       | **[Salesforce](https://github.com/singer-io/tap-salesforce)** | [![PyPI version](https://badge.fury.io/py/tap-salesforce.svg)](https://badge.fury.io/py/tap-zendesk) | Extracts data from Salesforce database using BULK and REST extraction API with Key-Based incremental replications |
+| Tap       | **[Zendesk](https://github.com/singer-io/tap-zendesk)** | [![PyPI version](https://badge.fury.io/py/tap-zendesk.svg)](https://badge.fury.io/py/tap-zendesk) | Extracts data from Zendesk using OAuth and Key-Based incremental reproduction |
+| Tap       | **[Snowflake](https://github.com/transferwise/pipelinewise-tap-snowflake)** | [![PyPI version](https://badge.fury.io/py/pipelinewise-tap-snowflake.svg)](https://badge.fury.io/py/pipelinewise-tap-snowflake) | Extracts data from Snowflake databases. Supporting Key-Based Incremental and Full Table reproduction |
+| Tap       | **[Salesforce](https://github.com/singer-io/tap-salesforce)** | [![PyPI version](https://badge.fury.io/py/tap-salesforce.svg)](https://badge.fury.io/py/tap-zendesk) | Extracts data from Salesforce database using BULK and REST extraction API with Key-Based incremental reproduction |
 | Tap       | **[Jira](https://github.com/singer-io/tap-jira)** | [![PyPI version](https://badge.fury.io/py/tap-jira.svg)](https://badge.fury.io/py/tap-jira) | Extracts data from Atlassian Jira using Base auth or OAuth credentials |
 | Target    | **[Postgres](https://github.com/transferwise/pipelinewise-target-postgres)** | [![PyPI version](https://badge.fury.io/py/pipelinewise-target-postgres.svg)](https://badge.fury.io/py/pipelinewise-target-postgres) | Loads data from any tap into PostgreSQL database |
 | Target    | **[Redshift](https://github.com/transferwise/pipelinewise-target-redshift)** | [![PyPI version](https://badge.fury.io/py/pipelinewise-target-redshift.svg)](https://badge.fury.io/py/pipelinewise-target-redshift) | Loads data from any tap into Amazon Redshift Data Warehouse |
@@ -75,7 +75,7 @@ recommended method of start using PipelineWise.
 
     ```sh
     $ pipelinewise status
-    
+
     Tap ID    Tap Type      Target ID     Target Type      Enabled    Status    Last Sync    Last Sync Result
     --------  ------------  ------------  ---------------  ---------  --------  -----------  ------------------
     0 pipeline(s)
@@ -83,7 +83,7 @@ recommended method of start using PipelineWise.
 
 You can run any pipelinewise command at this point. Tutorials to create and run pipelines is at https://transferwise.github.io/pipelinewise/installation_guide/creating_pipelines.html .
 
-**PS**: 
+**PS**:
 
 For the tests to work, run the commands inside a PipelineWise container.
 To create, start and get a bash shell in the container:
@@ -103,7 +103,7 @@ $ docker exec -it pipelinewise_dev bash
     * postgresql
 
 2. Run the install script that installs the PipelineWise CLI and every supported singer connectors into separated virtual environments:
-   
+
     ```sh
     $ ./install.sh --connectors=all
     ```
@@ -111,7 +111,7 @@ $ docker exec -it pipelinewise_dev bash
     Use the optional `--connectors=...,...` argument to install only a specific list of singer connectors.
 
 3. To start CLI you need to activate the CLI virtual environment and has to set `PIPELINEWISE_HOME` environment variable:
-   
+
     ```sh
     $ source {ACTUAL_ABSOLUTE_PATH}/.virtualenvs/pipelinewise/bin/activate
     $ export PIPELINEWISE_HOME={ACTUAL_ABSOLUTE_PATH}
@@ -123,7 +123,7 @@ $ docker exec -it pipelinewise_dev bash
 
     ```sh
     $ pipelinewise status
-    
+
     Tap ID    Tap Type      Target ID     Target Type      Enabled    Status    Last Sync    Last Sync Result
     --------  ------------  ------------  ---------------  ---------  --------  -----------  ------------------
     0 pipeline(s)

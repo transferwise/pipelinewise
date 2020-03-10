@@ -10,7 +10,7 @@ Snowflake setup requirements
 
 .. warning::
 
-  You need to create two objects in a Snowflake schema before start replicating data to Snowflake:
+  You need to create two objects in a Snowflake schema before start reproducing data to Snowflake:
    * **Named External Stage**: to upload the CSV files to S3 and to MERGE data into snowflake tables.
    * **Named File Format**: to run MERGE/COPY commands and to parse the CSV files correctly
 
@@ -40,7 +40,7 @@ Snowflake setup requirements
 Snowflake database.
 
 
-Configuring where to replicate data
+Configuring where to reproduce data
 '''''''''''''''''''''''''''''''''''
 
 PipelineWise configures every target with a common structured YAML file format.
@@ -84,7 +84,7 @@ Example YAML for target-snowflake:
       #               snowflake tables.
       stage: "<SCHEMA>.<STAGE_OBJECT_NAME>"
       file_format: "<SCHEMA>.<FILE_FORMAT_OBJECT_NAME>"
-      
+
       # Optional: Client Side Encryption
       # The same master key has to be added to the external stage object created in snowflake
       #client_side_encryption_master_key: "<MASTER_KEY"> # Plain string or vault encrypted

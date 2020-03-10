@@ -20,10 +20,10 @@ class MySqlMock:
         }
 
     #pylint: disable=unused-argument
-    def fetch_current_incremental_key_pos(self, table, replication_key):
+    def fetch_current_incremental_key_pos(self, table, reproduction_key):
         return {
-            'replication_key': replication_key,
-            'replication_key_value': 123456,
+            'reproduction_key': reproduction_key,
+            'reproduction_key_value': 123456,
             'version': 1
         }
 
@@ -40,10 +40,10 @@ class PostgresMock:
         }
 
     #pylint: disable=unused-argument
-    def fetch_current_incremental_key_pos(self, table, replication_key):
+    def fetch_current_incremental_key_pos(self, table, reproduction_key):
         return {
-            'replication_key': replication_key,
-            'replication_key_value': 123456,
+            'reproduction_key': reproduction_key,
+            'reproduction_key_value': 123456,
             'version': 1
         }
 
@@ -54,7 +54,7 @@ class S3CsvMock:
     """
 
     #pylint: disable=unused-argument
-    def fetch_current_incremental_key_pos(self, table, replication_key):
+    def fetch_current_incremental_key_pos(self, table, reproduction_key):
         return {
             'modified_since': '2019-11-15T07:39:44.171098'
         }
@@ -167,8 +167,8 @@ class TestFastSyncUtils(TestCase):
 
         # MySQL: mysql_source_db.address is INCREMENTAL
         assert utils.get_bookmark_for_table('mysql_source_db.address', mysql_properties, MySqlMock()) == {
-            'replication_key': 'date_updated',
-            'replication_key_value': 123456,
+            'reproduction_key': 'date_updated',
+            'reproduction_key_value': 123456,
             'version': 1
         }
 
@@ -191,8 +191,8 @@ class TestFastSyncUtils(TestCase):
                                             postgres_properties,
                                             PostgresMock(),
                                             dbname='postgres_source_db') == {
-                                                'replication_key': 'id',
-                                                'replication_key_value': 123456,
+                                                'reproduction_key': 'id',
+                                                'reproduction_key_value': 123456,
                                                 'version': 1
                                             }
 

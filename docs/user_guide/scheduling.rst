@@ -9,7 +9,7 @@ package but any task scheduler that can run Unix CLI commands can trigger Pipeli
 jobs to run. Both Single Server and :ref:`multi_server_cluster` installations are achievable.
 
 
-Let's say you have 5 microservice databases that you want to replicate to Amazon Redshift
+Let's say you have 5 microservice databases that you want to reproduce to Amazon Redshift
 and ``pipelinewise status`` output looks like this:
 
 .. code-block:: bash
@@ -43,12 +43,12 @@ PipelineWise is tested and can run with at least the following
 schedulers:
 
 * `Unix Cron <https://en.wikipedia.org/wiki/Cron/>`_ Unix Cron - This is the simplest option
-  for a single server installation. 
+  for a single server installation.
 
 * `Cronicle <https://github.com/jhuckaby/Cronicle/>`_ - Cronicle is a reasonably good and
   relatively simple tool to schedule PipelineWise jobs in both Single Server and Multi-Server
   cluster installations.
-  
+
 * `Apache Airflow <https://airflow.apache.org/>`_ - Airflow is a robust and mature tool to
   schedule and monitor workflows.
 

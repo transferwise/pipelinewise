@@ -5,7 +5,7 @@ Running Pipelines
 =================
 
 First get a list of the available pipelines by running ``pipelinewise status`` command. If you followed the steps at
-:ref:`example_replication_mysql_to_snowflake` then you should see this output:
+:ref:`example_reproduction_mysql_to_snowflake` then you should see this output:
 
 .. code-block:: bash
 
@@ -30,7 +30,7 @@ to run by IDs. In the above example we need to run ``pipelinewise run_tap --tap 
 
 
 The pipeline should start running, it will detect automatically if initial sync or incremental load
-is required, when was the last time when it was running and will replicate every change since the last run.
+is required, when was the last time when it was running and will reproduce every change since the last run.
 Once it's successfully finished the data is available in the target database and PipelineWise will update
 the internal state file with the bookmark for the next run.
 

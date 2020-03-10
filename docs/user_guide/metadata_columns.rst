@@ -16,8 +16,8 @@ column prefix ``_SDC_``:
 * ``_SDC_BATCHED_AT``: Timestamp when the record was batched to load into target
 
 * ``_SDC_DELETED_AT``: Timestamp when the record delete event was received from source.
-  
-For example if you replicate a table that has three columns in source ``COLUMN_ONE``,
+
+For example if you reproduce a table that has three columns in source ``COLUMN_ONE``,
 ``COLUMN_TWO`` and ``COLUMN_THREE`` then typically you find ``_SDC_`` metadata columns
 at the end of the table:
 
@@ -39,12 +39,12 @@ at the end of the table:
   in source do not get deleted in target.
 
   Please note that **Hard Delete** mode is enabled by default for every target connector,
-  which means that every record that was deleted in source will be deleted in the replicated
-  target database as well. Please also note that Only :ref:`log_based` replication method
+  which means that every record that was deleted in source will be deleted in the reproduced
+  target database as well. Please also note that Only :ref:`log_based` reproduction method
   detects delete row events.
 
   To turn off **Hard Delete** mode add ``hard_delete: False`` to the target :ref:`targets_list`
   YAML config file. In this case when a deleted row captured in source then
   ``_SDC_DELETED_AT`` column will only get flagged and not get deleted in the target.
-  Please also note that Only :ref:`log_based` replication method detects delete row events.
+  Please also note that Only :ref:`log_based` reproduction method detects delete row events.
 

@@ -200,9 +200,9 @@ class Config:
             1. config.json             :(Singer spec):  Tap connection details
             2. properties.json         :(Singer spec):  Tap schema properties (generated)
             3. state.json              :(Singer spec):  Bookmark for incremental and log_based
-                                                        replications
+                                                        reproductions
 
-            4. selection.json          :(Pipelinewise): List of streams/tables to replicate
+            4. selection.json          :(Pipelinewise): List of streams/tables to reproduce
             5. inheritabel_config.json :(Pipelinewise): Extra config keys for the linked
                                                         singer target connector that
                                                         pipelinewise will pass at run time
@@ -236,13 +236,13 @@ class Config:
             schema_name = schema.get('source_schema')
             for table in schema.get('tables', []):
                 table_name = table.get('table_name')
-                replication_method = table.get('replication_method', utils.get_tap_default_replication_method(tap))
+                reproduction_method = table.get('reproduction_method', utils.get_tap_default_reproduction_method(tap))
                 selection.append(utils.delete_empty_keys({
                     'tap_stream_id': utils.get_tap_stream_id(tap, tap_dbname, schema_name, table_name),
-                    'replication_method': replication_method,
+                    'reproduction_method': reproduction_method,
 
-                    # Add replication_key only if replication_method is INCREMENTAL
-                    'replication_key': table.get('replication_key') if replication_method == 'INCREMENTAL' else None
+                    # Add reproduction_key only if reproduction_method is INCREMENTAL
+                    'reproduction_key': table.get('reproduction_key') if reproduction_method == 'INCREMENTAL' else None
                 }))
         tap_selection = {'selection': selection}
 

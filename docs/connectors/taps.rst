@@ -4,7 +4,7 @@
 Taps (Data Sources)
 -------------------
 
-PipelineWise can replicate data from the following data sources:
+PipelineWise can reproduce data from the following data sources:
 
 
 .. container:: tile-wrapper

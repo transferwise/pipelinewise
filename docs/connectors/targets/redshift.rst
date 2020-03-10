@@ -7,12 +7,12 @@ Target Redshift
 Amazon Redshift setup requirements
 ''''''''''''''''''''''''''''''''''
 
-Configuring PostgreSQL as a replication target is straightforward.
+Configuring PostgreSQL as a reproduction target is straightforward.
 You need to have a user with permissions to create new schemas and
-tables in an Redshift database and you can replicate data from all the
+tables in an Redshift database and you can reproduce data from all the
 supported :ref:`taps_list`.
 
-Configuring where to replicate data
+Configuring where to reproduce data
 '''''''''''''''''''''''''''''''''''
 
 PipelineWise configures every target with a common structured YAML file format.

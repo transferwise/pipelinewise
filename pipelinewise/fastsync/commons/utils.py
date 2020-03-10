@@ -85,34 +85,34 @@ def get_tables_from_properties(properties):
 
 def get_bookmark_for_table(table, properties, db_engine, dbname=None):
     """Get actual bookmark for a specific table used for LOG_BASED or INCREMENTAL
-    replications
+    reproductions
     """
     bookmark = {}
 
-    # Find table from properties and get bookmark based on replication method
+    # Find table from properties and get bookmark based on reproduction method
     for stream in properties.get('streams', []):
         metadata = stream.get('metadata', [])
         table_name = stream.get('table_name', stream['stream'])
 
-        # Get table specific metadata i.e. replication method, replication key, etc.
+        # Get table specific metadata i.e. reproduction method, reproduction key, etc.
         table_meta = next((i for i in metadata if isinstance(i, dict) and len(i.get('breadcrumb', [])) == 0),
                           {}).get('metadata')
         db_name = table_meta.get('database-name')
         schema_name = table_meta.get('schema-name')
-        replication_method = table_meta.get('replication-method')
-        replication_key = table_meta.get('replication-key')
+        reproduction_method = table_meta.get('reproduction-method')
+        reproduction_key = table_meta.get('reproduction-key')
 
         fully_qualified_table_name = '{}.{}'.format(schema_name or db_name, table_name) \
             if schema_name is not None or db_name is not None else table_name
 
         if (dbname is None or db_name == dbname) and fully_qualified_table_name == table:
-            # Log based replication: get mysql binlog position
-            if replication_method == 'LOG_BASED':
+            # Log based reproduction: get mysql binlog position
+            if reproduction_method == 'LOG_BASED':
                 bookmark = db_engine.fetch_current_log_pos()
 
-            # Key based incremental replication: Get max replication key from source
-            elif replication_method == 'INCREMENTAL':
-                bookmark = db_engine.fetch_current_incremental_key_pos(fully_qualified_table_name, replication_key)
+            # Key based incremental reproduction: Get max reproduction key from source
+            elif reproduction_method == 'INCREMENTAL':
+                bookmark = db_engine.fetch_current_incremental_key_pos(fully_qualified_table_name, reproduction_key)
 
             break
 

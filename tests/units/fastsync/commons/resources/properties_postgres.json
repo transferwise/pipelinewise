@@ -7,8 +7,8 @@
                     "metadata": {
                         "database-name": "postgres_source_db",
                         "is-view": false,
-                        "replication-key": "id",
-                        "replication-method": "INCREMENTAL",
+                        "reproduction-key": "id",
+                        "reproduction-method": "INCREMENTAL",
                         "row-count": 4079,
                         "schema-name": "public",
                         "selected": true,
@@ -186,7 +186,7 @@
                     "metadata": {
                         "database-name": "postgres_source_db",
                         "is-view": false,
-                        "replication-method": "FULL_TABLE",
+                        "reproduction-method": "FULL_TABLE",
                         "row-count": 239,
                         "schema-name": "public",
                         "selected": true,
@@ -549,7 +549,7 @@
                     "metadata": {
                         "database-name": "postgres_source_db",
                         "is-view": false,
-                        "replication-method": "LOG_BASED",
+                        "reproduction-method": "LOG_BASED",
                         "row-count": 984,
                         "schema-name": "public",
                         "table-key-properties": [

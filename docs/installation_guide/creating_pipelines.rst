@@ -5,7 +5,7 @@ Creating Pipelines
 ==================
 
 Pipelines define how the data should flow from source system to target. It defines the data source
-credentials, the data that needs to be captured, replication methods, load time transformations,
+credentials, the data that needs to be captured, reproduction methods, load time transformations,
 destination database credentials, source to target mapping, grants etc.
 
 Pipelines are expressed in YAML format and have a minimum of syntax, which intentionally tries
@@ -59,19 +59,19 @@ postfixes.
 
 Once you renamed the files that you need, edit the YAML files with your favourite text
 editor. Follow the instructions in the files to set database credentials, connection
-details, select tables to replicate, define source to target schema mapping or add load
-time transformations. Check the :ref:`example_replication_mysql_to_snowflake` section
+details, select tables to reproduce, define source to target schema mapping or add load
+time transformations. Check the :ref:`example_reproduction_mysql_to_snowflake` section
 for a real life example.
 
 Once you configured the YAML files you can go to :ref:`import_project_from_yaml` section.
 
-.. _example_replication_mysql_to_snowflake:
+.. _example_reproduction_mysql_to_snowflake:
 
-Example replication from MySQL to Snowflake
+Example reproduction from MySQL to Snowflake
 -------------------------------------------
 
-In this example we will replicate three tables from a MySQL database into a Snowflake Data Warehouse,
-using a mix of :ref:`full_table`, :ref:`incremental` and :ref:`log_based` replication methods.
+In this example we will reproduce three tables from a MySQL database into a Snowflake Data Warehouse,
+using a mix of :ref:`full_table`, :ref:`incremental` and :ref:`log_based` reproduction methods.
 We will need the ``tap_mysql_mariadb.yml`` and ``target_snowflake.yml``:
 
 .. code-block:: bash
@@ -133,24 +133,24 @@ You can edit it with the text editor of your choice:
       port: 10602
       user: "my_user"
       password: "<PASSWORD>"                  # Plain string or Vault Encrypted password
-      
+
     target: "snowflake_test"                  # Target ID, should match the id from target_snowflake.yml
     batch_size_rows: 100000                   # Batch size for the stream to optimise load performance
 
     # Source to Destination Schema mapping
     schemas:
-      - source_schema: "fx"                   # You can replicate from multiple schemas
+      - source_schema: "fx"                   # You can reproduce from multiple schemas
           target_schema: "fx_clear"           # Target schema in snowflake
           target_schema_select_permissions:   # Grant permission once the table created
             - grp_power
-          tables:                             # List Tables to replicate
+          tables:                             # List Tables to reproduce
             - table_name: "table_one"
-              replication_method: FULL_TABLE  # 1) FULL_TABLE replication
+              reproduction_method: FULL_TABLE  # 1) FULL_TABLE reproduction
             - table_name: "table_two"         #
-              replication_method: LOG_BASED   # 2) LOG_BASED replication
+              reproduction_method: LOG_BASED   # 2) LOG_BASED reproduction
             - table_name: "table_three"       #
-              replication_method: INCREMENTAL # 3) INCREMENTAL replication
-              replication_key: "updated_at"   #    Incremental load needs replication key
+              reproduction_method: INCREMENTAL # 3) INCREMENTAL reproduction
+              reproduction_key: "updated_at"   #    Incremental load needs reproduction key
 
 
 .. _import_project_from_yaml:
@@ -180,7 +180,7 @@ When you are happy with the configuration you need to import it with the :ref:`c
 At this point PipelineWise will connect to and analyse every source database, discovering
 tables, columns and data types and will generate the required JSON files for the singer taps and
 targets into ``~/.pipelinewise``. PipelineWise will use this directory internally to keep
-tracking the state files for :ref:`incremental` and :ref:`log_based` replications
+tracking the state files for :ref:`incremental` and :ref:`log_based` reproductions
 (aka. bookmarks) and this will be the directory where the log files will be created.
 Normally you will need to go into ``~/.pipelinewise`` only when you want to access the
 log files.
@@ -200,4 +200,4 @@ Congratulations! At this point you have successfully created your first pipeline
 ready to run. You may want you can create a new git repository and push the ``pipelinewise_samples``
 directory to keep everything under version control.
 
-Now you can head to the :ref:`running_pipelines` section to run the pipelines and to start replicating data.
+Now you can head to the :ref:`running_pipelines` section to run the pipelines and to start reproducing data.

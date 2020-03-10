@@ -7,8 +7,8 @@
                     "metadata": {
                         "database-name": "mysql_source_db",
                         "is-view": false,
-                        "replication-key": "date_updated",
-                        "replication-method": "INCREMENTAL",
+                        "reproduction-key": "date_updated",
+                        "reproduction-method": "INCREMENTAL",
                         "row-count": 1000,
                         "selected": true,
                         "selected-by-default": false,
@@ -162,7 +162,7 @@
                     "metadata": {
                         "database-name": "mysql_source_db",
                         "is-view": false,
-                        "replication-method": "FULL_TABLE",
+                        "reproduction-method": "FULL_TABLE",
                         "row-count": 38,
                         "selected-by-default": false,
                         "table-key-properties": [
@@ -1330,7 +1330,7 @@
                     "metadata": {
                         "database-name": "mysql_source_db",
                         "is-view": false,
-                        "replication-method": "LOG_BASED",
+                        "reproduction-method": "LOG_BASED",
                         "row-count": 300,
                         "selected": true,
                         "selected-by-default": false,
@@ -2181,7 +2181,7 @@
                     "metadata": {
                         "database-name": "mysql_source_db",
                         "is-view": false,
-                        "replication-method": "FULL_TABLE",
+                        "reproduction-method": "FULL_TABLE",
                         "row-count": 24,
                         "selected": true,
                         "selected-by-default": false,

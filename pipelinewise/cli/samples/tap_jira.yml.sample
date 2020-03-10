@@ -34,7 +34,7 @@ db_conn:
 # ------------------------------------------------------------------------------
 target: "snowflake"                       # ID of the target connector where the data will be loaded
 batch_size_rows: 20000                    # Batch size for the stream to optimise load performance
-default_target_schema: "jira"             # Target schema where the data will be loaded 
+default_target_schema: "jira"             # Target schema where the data will be loaded
 #default_target_schema_select_permission:  # Optional: Grant SELECT on schema and tables that created
 #  - grp_power
 
@@ -49,11 +49,11 @@ schemas:
     target_schema_select_permissions:   # Optional: Grant SELECT on schema and tables that created
       - grp_stats
 
-    # List of Jira tables to replicate into destination Data Warehouse
-    # Tap-Jira will use the best incremental strategies automatically to replicate data
+    # List of Jira tables to reproduce into destination Data Warehouse
+    # Tap-Jira will use the best incremental strategies automatically to reproduce data
     tables:
 
-      # Tables replicated incrementally
+      # Tables reproduce incrementally
       - table_name: "changelogs"
       - table_name: "issues"
       - table_name: "issue_comments"
@@ -61,13 +61,13 @@ schemas:
       - table_name: "worklogs"
 
         # OPTIONAL: Load time transformations - you can add it to any table
-        #transformations:                    
+        #transformations:
         #  - column: "some_column_to_transform" # Column to transform
         #    type: "SET-NULL"                   # Transformation type
 
-      # FULL_TABLE replicated tables
-      # JIRA Cloud REST API doesn't provide reasonable replication keys for these tables.
-      # Replicating these tables can run longer. Please consider this when scheduling the tap.
+      # FULL_TABLE reproduce tables
+      # JIRA Cloud REST API doesn't provide reasonable reproduction keys for these tables.
+      # Reproducing these tables can run longer. Please consider this when scheduling the tap.
       - table_name: "projects"
       - table_name: "project_categories"
       - table_name: "project_types"
@@ -75,4 +75,4 @@ schemas:
       - table_name: "roles"
       - table_name: "users"
       - table_name: "versions"
-      
+

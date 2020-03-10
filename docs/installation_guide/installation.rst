@@ -77,7 +77,7 @@ Check if the installation was successfully by running the ``pipelinewise status`
     --------  ------------  ------------  ---------------  ---------  --------  -----------  ------------------
     0 pipeline(s)
 
-From this point, you can go to the :ref:`creating_pipelines` section to create pipelines and to start replicating data.
+From this point, you can go to the :ref:`creating_pipelines` section to create pipelines and to start reproducing data.
 
 
 .. _building_from_source:
@@ -124,7 +124,7 @@ Selecting singer connectors
 '''''''''''''''''''''''''''
 
 You can install PipelineWise only with required connectors by using the `--connectors=` argument. For example if you
-need to replicate data only from MySQL and PostgreSQL into a Snowflake database you can install PipelineWise by
+need to reproduce data only from MySQL and PostgreSQL into a Snowflake database you can install PipelineWise by
 running:
 
 .. code-block:: bash
@@ -194,4 +194,4 @@ was successful.
 Cool, what's Next?
 ------------------
 
-From this point, you can go to the :ref:`creating_pipelines` section to create pipelines and to start replicating data.
+From this point, you can go to the :ref:`creating_pipelines` section to create pipelines and to start reproducing data.

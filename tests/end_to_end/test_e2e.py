@@ -157,8 +157,8 @@ class TestE2E:
         self.assert_command_success(return_code, stdout, stderr)
 
     @pytest.mark.dependency(depends=['import_config'])
-    def test_replicate_mariadb_to_pg(self):
-        """Replicate data from MariaDB to Postgres DWH, check if return code is zero and success log file created"""
+    def test_reproduce_mariadb_to_pg(self):
+        """Reproduce data from MariaDB to Postgres DWH, check if return code is zero and success log file created"""
 
         # Internal helper to compare row counts in source mysql and target postgres
         def assert_row_count_equals_source_to_target():
@@ -187,20 +187,20 @@ class TestE2E:
         self.assert_run_tap_success('mariadb_source', 'postgres_dwh', ['singer'])
         assert_row_count_equals_source_to_target()
 
-        # Insert new rows to source table replicated by INCREMENTAL method
+        # Insert new rows to source table reproduced by INCREMENTAL method
         e2e_utils.run_query_tap_mysql(self.env, """
         INSERT INTO address (
             address_id, isActive, street_number, date_created, date_updated, supplier_supplier_id, zip_code_zip_code_id)
           VALUES (100001, 1, '1234', now(), now(), 999, 999)
         """)
 
-        # Insert new rows to source table replicated by FULL_TABLE method
+        # Insert new rows to source table reproduced by FULL_TABLE method
         e2e_utils.run_query_tap_mysql(self.env, """
         INSERT INTO area_code (area_code_id, area_code, isActive, date_created, date_updated, provance_provance_id)
           VALUES (101, '101', 1, now(), now(), 101)
         """)
 
-        # Insert and delete rows to source table replicated by LOG_BASED method
+        # Insert and delete rows to source table reproduced by LOG_BASED method
         e2e_utils.run_query_tap_mysql(self.env, """
         INSERT INTO weight_unit (weight_unit_id, weight_unit_name, isActive, date_created, date_updated)
              VALUES (101, 'New weight unit', 1, now(), now())
@@ -211,13 +211,13 @@ class TestE2E:
         assert_row_count_equals_source_to_target()
 
     @pytest.mark.dependency(depends=['import_config'])
-    def test_replicate_pg_to_pg(self):
-        """Replicate data from Postgres to Postgres DWH, check if return code is zero and success log file created"""
+    def test_reproduce_pg_to_pg(self):
+        """Reproduce data from Postgres to Postgres DWH, check if return code is zero and success log file created"""
         self.assert_run_tap_success('postgres_source', 'postgres_dwh', ['singer'])
 
     @pytest.mark.dependency(depends=['import_config'])
-    def test_replicate_mariadb_to_sf(self):
-        """Replicate data from MariaDB to Snowflake DWH, check if return code is zero and success log file created"""
+    def test_reproduce_mariadb_to_sf(self):
+        """Reproduce data from MariaDB to Snowflake DWH, check if return code is zero and success log file created"""
         tap, target = 'mariadb_to_sf', 'snowflake'
 
         # Run tap first time - both fastsync and a singer should be triggered
@@ -228,8 +228,8 @@ class TestE2E:
         self.assert_columns_are_in_table('edgydata', ['C_VARCHAR', 'CASE', 'GROUP', 'ORDER'])
 
     @pytest.mark.dependency(depends=['import_config'])
-    def test_replicate_pg_to_sf(self):
-        """Replicate data from Postgres to Snowflake, check if return code is zero and success log file created"""
+    def test_reproduce_pg_to_sf(self):
+        """Reproduce data from Postgres to Snowflake, check if return code is zero and success log file created"""
         tap, target = 'postgres_source_sf', 'snowflake'
 
         # Run tap first time - both fastsync and a singer should be triggered
@@ -239,8 +239,8 @@ class TestE2E:
         self.assert_run_tap_success(tap, target, ['singer'])
 
     @pytest.mark.dependency(depends=['import_config'])
-    def test_replicate_s3_to_sf(self):
-        """Replicate csv files from s3 to Snowflake, check if return code is zero and success log file created"""
+    def test_reproduce_s3_to_sf(self):
+        """Reproduce csv files from s3 to Snowflake, check if return code is zero and success log file created"""
         tap, target = 'csv_on_s3', 'snowflake'
 
         # Run tap first time - both fastsync and a singer should be triggered

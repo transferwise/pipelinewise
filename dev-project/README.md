@@ -8,7 +8,7 @@ The local development environment comes with the following containers and compon
 * MariaDB test source database with test data (for tap-mysql)
 * Postgres test source database with test data (for tap-postgres)
 * Postgres test target data warehouse (for target-postgres)
-* Test Project that replicates data from MariaDB and Postgres databases into a Postgres Data Warehouse
+* Test Project that reproduces data from MariaDB and Postgres databases into a Postgres Data Warehouse
 
 ## How to use
 
@@ -37,8 +37,8 @@ Import the dev project:
 $ pipelinewise import --dir /opt/pipelinewise/dev-project/pipelinewise-config
 ```
 
-Check the status, you should see two pipelines. One is replicating data from MariaDB to Postgres DWH and
-another replicating from Postgres to the same Postgres DWH:
+Check the status, you should see two pipelines. One is reproducing data from MariaDB to Postgres DWH and
+another reproducing from Postgres to the same Postgres DWH:
 
 ```sh
 $ pipelinewise status
@@ -50,11 +50,11 @@ mariadb   tap-mysql     postgres_dwh  target-postgres  True       ready         
 2 pipeline(s)
 ```
 
-**Note**: To configure the list of tables to replicate, replication methods, load time transformations, etc.,
+**Note**: To configure the list of tables to reproduce, reproduction methods, load time transformations, etc.,
 edit the YAML files in the `dev-project` directory. Don't forget to re-import the project with
 `pipelinewise import --dir dev-project` when making changes in the YAML files.
 
-To start replicating data from source MariaDB to target Postgres DWH:
+To start reproducing data from source MariaDB to target Postgres DWH:
 
 ```sh
 $ pipelinewise run_tap --tap mariadb_db --target postgres_dwh
@@ -62,10 +62,10 @@ $ pipelinewise run_tap --tap mariadb_db --target postgres_dwh
 
 **Note**: Log files are generated at each run at `~/.pipelinewise/postgres_dwh/mariadb_db/log/`.
 State file with incremental and log based positions generated at `~/.pipelinewise/postgres_dwh/mariadb_db/state.json`.
-Next time when running the same command, the incrementally and log based (CDC) replicated tables
-will capture the changes starting from the previously replicated position.
+Next time when running the same command, the incrementally and log based (CDC) reproduced tables
+will capture the changes starting from the previously reproduced position.
 
-To start replicating data from source Postgres to target Postgres DWH:
+To start reproducing data from source Postgres to target Postgres DWH:
 
 ```sh
 $ pipelinewise run_tap --tap postgres_db --target postgres_dwh
@@ -73,8 +73,8 @@ $ pipelinewise run_tap --tap postgres_db --target postgres_dwh
 
 **Note**: Log files are generated at each run at `~/.pipelinewise/postgres_dwh/postgres_db/log/`
 State file with incremental and log based positions generated at `~/.pipelinewise/postgres_dwh/postgres_db/state.json`.
-Next time when running the same command, the incrementally and log based (CDC) replicated tables
-will capture the changes starting from the previously replicated position.
+Next time when running the same command, the incrementally and log based (CDC) reproduced tables
+will capture the changes starting from the previously reproduced position.
 
 If you want to connect to any of the test databases by a db client (CLI, MySQL Workbench, pgAdmin, intelliJ, DataGrip, etc.),
 check the `.env` file in the main folder of the repository for the credentials.

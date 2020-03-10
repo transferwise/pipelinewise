@@ -12,11 +12,11 @@ Connecting to Snowflake
   This section of the documentation is work in progress.
 
 
-Configuring what to replicate
+Configuring what to reproduce
 '''''''''''''''''''''''''''''
 
 PipelineWise configures every tap with a common structured YAML file format.
-A sample YAML for Snowflake replication can be generated into a project directory by
+A sample YAML for Snowflake reproduction can be generated into a project directory by
 following the steps in the :ref:`generating_pipelines` section.
 
 Example YAML for tap-snowflake:
@@ -65,25 +65,25 @@ Example YAML for tap-snowflake:
       - source_schema: "SCHEMA_1"          # Source schema (aka. database) in Snowflake with tables
         target_schema: "REPL_SCHEMA_1"     # Target schema in the destination Data Warehouse
 
-        # List of tables to replicate from Snowflake to a destination
+        # List of tables to reproduce from Snowflake to a destination
         #
-        # Please check the Replication Strategies section in the documentation to understand the differences.
-        # For LOG_BASED replication method you might need to adjust the source mysql/ mariadb configuration.
+        # Please check the Reproduction Strategies section in the documentation to understand the differences.
+        # For LOG_BASED reproduction method you might need to adjust the source mysql/ mariadb configuration.
         tables:
           - table_name: "TABLE_ONE"
-            replication_method: "INCREMENTAL"   # One of INCREMENTAL or FULL_TABLE
-            replication_key: "last_update"      # Important: Incremental load always needs replication key
+            reproduction_method: "INCREMENTAL"   # One of INCREMENTAL or FULL_TABLE
+            reproduction_key: "last_update"      # Important: Incremental load always needs reproduction key
 
             # OPTIONAL: Load time transformations
-            #transformations:                    
+            #transformations:
             #  - column: "last_name"            # Column to transform
             #    type: "SET-NULL"               # Transformation type
 
           # You can add as many tables as you need...
           - table_name: "table_two"
-            replication_method: "FULL_TABLE"
+            reproduction_method: "FULL_TABLE"
 
       # You can add as many schemas as you need...
-      # Uncomment this if you want replicate tables from multiple schemas
-      #- source_schema: "SCHEMA_2" 
+      # Uncomment this if you want reproduce tables from multiple schemas
+      #- source_schema: "SCHEMA_2"
       #  target_schema: "REPL_SCHEMA_2"

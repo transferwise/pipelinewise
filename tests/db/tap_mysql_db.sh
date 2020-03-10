@@ -1,6 +1,6 @@
 #!/bin/bash -e
 #
-# Building a test MySQL database for integration testing of tap-mysql 
+# Building a test MySQL database for integration testing of tap-mysql
 # The sample database available at https://github.com/ikostan/RESTAURANT-DATABASE
 PWD="$(dirname "$0")"
 
@@ -20,10 +20,10 @@ if [[ -z "${DB_TAP_MYSQL_HOST}" || -z "${DB_TAP_MYSQL_PORT}" || -z "${DB_TAP_MYS
     exit 1
 fi
 
-# Grant Replication client and replication slave privileges that
-# requires for LOG_BASED CDC replication
+# Grant Reproduction client and reproduction slave privileges that
+# requires for LOG_BASED CDC reproduction
 export MYSQL_PWD=${DB_TAP_MYSQL_ROOT_PASSWORD}
-mysql --protocol TCP --host ${DB_TAP_MYSQL_HOST} --port ${DB_TAP_MYSQL_PORT} --user root -e "GRANT REPLICATION CLIENT, REPLICATION SLAVE ON *.* TO ${DB_TAP_MYSQL_USER}"
+mysql --protocol TCP --host ${DB_TAP_MYSQL_HOST} --port ${DB_TAP_MYSQL_PORT} --user root -e "GRANT REPRODUCTION CLIENT, REPRODUCTION SLAVE ON *.* TO ${DB_TAP_MYSQL_USER}"
 
 # Grant insert privileges for testing
 mysql --protocol TCP --host ${DB_TAP_MYSQL_HOST} --port ${DB_TAP_MYSQL_PORT} --user root -e "GRANT INSERT ON *.* TO ${DB_TAP_MYSQL_USER}"

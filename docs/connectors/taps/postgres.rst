@@ -10,25 +10,25 @@ PostgreSQL setup requirements
 
 *(Section based on Stitch documentation)*
 
-**Step 1: Check if you have all the required credentials for replicating data from PostgreSQL**
+**Step 1: Check if you have all the required credentials for reproducing data from PostgreSQL**
 
 * ``CREATEROLE`` or ``SUPERUSER`` privilege - Either permission is required to create a database user for PipelineWise.
 
 **Step 2. Create a PipelineWise database user**
 
 Next, you’ll create a dedicated database user for PipelineWise. Create a new user and grant the required permissions
-on the database, schema and tables that you want to replicate:
+on the database, schema and tables that you want to reproduce:
 
     * ``CREATE USER pipelinewise WITH ENCRYPTED PASSWORD '<password>'``
     * ``GRANT CONNECT ON DATABASE <database_name> TO pipelinewise``
     * ``GRANT USAGE ON SCHEMA <schema_name> TO pipelinewise``
     * ``GRANT SELECT ON ALL TABLES IN SCHEMA <schema_name> TO pipelinewise``
 
-**Step 3: Configure Log-based Incremental Replication**
+**Step 3: Configure Log-based Incremental Reproduction**
 
 .. note::
 
-  This step is only required if you use :ref:`log_based` replication method.
+  This step is only required if you use :ref:`log_based` reproduction method.
 
 .. warning::
 
@@ -47,11 +47,11 @@ on the database, schema and tables that you want to replicate:
 
     * PostgreSQL 9.4.21
 
-  * **A connection to the master instance.** Log-based replication will only work by connecting to the master instance.
+  * **A connection to the master instance.** Log-based reproduction will only work by connecting to the master instance.
 
 **Step 3.1: Install the wal2json plugin**
 
-To use :ref:`log_based` for your PostgreSQL integration, you must install the `wal2json <https://github.com/eulerto/wal2json>`_ plugin. The wal2json plugin outputs JSON objects for logical decoding, which Stitch then uses to perform Log-based Replication.
+To use :ref:`log_based` for your PostgreSQL integration, you must install the `wal2json <https://github.com/eulerto/wal2json>`_ plugin. The wal2json plugin outputs JSON objects for logical decoding, which Stitch then uses to perform Log-based Reproduction.
 
 Steps for installing the plugin vary depending on your operating system. Instructions for each operating system type are in the wal2json’s GitHub repository:
 
@@ -68,37 +68,37 @@ Locate the database configuration file (usually ``postgresql.conf``) and define 
 .. code-block:: bash
 
     wal_level=logical
-    max_replication_slots=5
+    max_reproduction_slots=5
     max_wal_senders=5
 
-**Note**: For ``max_replication_slots`` and ``max_wal_senders``, we’re defaulting to a value of 5.
+**Note**: For ``max_reproduction_slots`` and ``max_wal_senders``, we’re defaulting to a value of 5.
 This should be sufficient unless you have a large number of read replicas connected to the master instance.
 
 **Step 3.3: Restart the PostgreSQL service**
 
 Restart your PostgreSQL service to ensure the changes take effect.
 
-**Step 3.4: Create a replication slot**
+**Step 3.4: Create a reproduction slot**
 
-Next, you’ll create a dedicated logical replication slot for Stitch. In PostgreSQL, a logical replication
+Next, you’ll create a dedicated logical reproduction slot for Stitch. In PostgreSQL, a logical reproduction
 slot represents a stream of database changes that can then be replayed to a client in the order they were
 made on the original server. Each slot streams a sequence of changes from a single database.
 
-**Note**: Replication slots are specific to a given database in a cluster. If you want to connect
-multiple databases - whether in one integration or several - you’ll need to create a replication slot
+**Note**: Reproduction slots are specific to a given database in a cluster. If you want to connect
+multiple databases - whether in one integration or several - you’ll need to create a reproduction slot
 for each database.
 
 1. Log into the master database as a superuser.
 
-2. Using the ``wal2json`` plugin, create a logical replication slot:
+2. Using the ``wal2json`` plugin, create a logical reproduction slot:
 
 .. code-block:: bash
 
     SELECT *
-    FROM pg_create_logical_replication_slot('pipelinewise_<database_name>', 'wal2json');
+    FROM pg_create_logical_reproduction_slot('pipelinewise_<database_name>', 'wal2json');
 
-3. Log in as the PipelineWise user and verify you can read from the replication slot,
-replacing ``pipelinewise_<database_name>`` with the name of the replication slot:
+3. Log in as the PipelineWise user and verify you can read from the reproduction slot,
+replacing ``pipelinewise_<database_name>`` with the name of the reproduction slot:
 
 .. code-block:: bash
 
@@ -108,11 +108,11 @@ replacing ``pipelinewise_<database_name>`` with the name of the replication slot
 **Note**: ``wal2json`` is required to use :ref:`log_based` in Stitch for PostgreSQL-backed databases.
 
 
-Configuring what to replicate
+Configuring what to reproduce
 '''''''''''''''''''''''''''''
 
 PipelineWise configures every tap with a common structured YAML file format.
-A sample YAML for Postgres replication can be generated into a project directory by
+A sample YAML for Postgres reproduction can be generated into a project directory by
 following the steps in the :ref:`generating_pipelines` section.
 
 Example YAML for ``tap-postgres``:
@@ -162,25 +162,25 @@ Example YAML for ``tap-postgres``:
         target_schema_select_permissions:  # Optional: Grant SELECT on schema and tables that created
           - grp_stats
 
-        # List of tables to replicate from Postgres to destination Data Warehouse
+        # List of tables to reproduce from Postgres to destination Data Warehouse
         #
-        # Please check the Replication Strategies section in the documentation to understand the differences.
-        # For LOG_BASED replication method you might need to adjust the source mysql/ mariadb configuration.
+        # Please check the Reproduction Strategies section in the documentation to understand the differences.
+        # For LOG_BASED reproduction method you might need to adjust the source mysql/ mariadb configuration.
         tables:
           - table_name: "table_one"
-            replication_method: "INCREMENTAL"   # One of INCREMENTAL, LOG_BASED and FULL_TABLE
-            replication_key: "last_update"      # Important: Incremental load always needs replication key
+            reproduction_method: "INCREMENTAL"   # One of INCREMENTAL, LOG_BASED and FULL_TABLE
+            reproduction_key: "last_update"      # Important: Incremental load always needs reproduction key
 
             # OPTIONAL: Load time transformations
-            #transformations:                    
+            #transformations:
             #  - column: "last_name"            # Column to transform
             #    type: "SET-NULL"               # Transformation type
 
           # You can add as many tables as you need...
           - table_name: "table_two"
-            replication_method: "LOG_BASED"     # Important! Log based must be enabled in MySQL
+            reproduction_method: "LOG_BASED"     # Important! Log based must be enabled in MySQL
 
       # You can add as many schemas as you need...
-      # Uncomment this if you want replicate tables from multiple schemas
-      #- source_schema: "another_schema_in_postgres" 
+      # Uncomment this if you want reproduce tables from multiple schemas
+      #- source_schema: "another_schema_in_postgres"
       #  target_schema: "another

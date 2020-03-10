@@ -5,7 +5,7 @@ Transformations
 ---------------
 
 PipelineWise can perform row level load time transformations between tap and target components
-and makes and ideal place to obfuscate, mask or filter sensitive data that should never be replicated in the Data Warehouse.
+and makes and ideal place to obfuscate, mask or filter sensitive data that should never be reproduced in the Data Warehouse.
 
 
 .. warning::
@@ -58,7 +58,7 @@ Example
 '''''''
 
 Load Time transformations needs to be defined in the tables section
-in the :ref:`yaml_configuration`: 
+in the :ref:`yaml_configuration`:
 
 .. code-block:: bash
 
@@ -66,8 +66,8 @@ in the :ref:`yaml_configuration`:
     ...
     tables:
       - table_name: "audit_log"
-        replication_method: "INCREMENTAL"
-        replication_key: "id"
+        reproduction_method: "INCREMENTAL"
+        reproduction_key: "id"
         transformations:
           - column: "column_1"
             type: "SET-NULL"

@@ -18,7 +18,7 @@ db_conn:
   bucket: "${TAP_S3_CSV_SOURCE_BUCKET}"                            # S3 Bucket name
   start_date: "2000-01-01"                      # File before this data will be excluded
 
- 
+
 # ------------------------------------------------------------------------------
 # Destination (Target) - Target properties
 # Connection details should be in the relevant target YAML file
@@ -42,13 +42,13 @@ primary_key_required: False             # Optional: in case you want to load tab
 schemas:
   - source_schema: "s3_feeds" # This is mandatory, but can be anything in this tap type
     target_schema: "s3_feeds" # Target schema in the destination Data Warehouse
-    
+
     # List of CSV files to destination tables
     tables:
 
       # Every file in S3 bucket that matches the search pattern will be loaded into this table
       - table_name: "people"
-        replication_method: "FULL_TABLE"
+        reproduction_method: "FULL_TABLE"
         s3_csv_mapping:
           search_pattern: "^greenhouse/mock_data_1.csv$"
         transformations:

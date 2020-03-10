@@ -16,7 +16,7 @@ Variables:
   * **TAP_ID**: Unique identifier of the tap. This is the ``id`` property from a :ref:`taps_list` YAML.
   * **DATE**: Date when the tap started in ``YYYYMMDD`` format
   * **TIME**: Time when the tap started in ``HH24MMSS`` format
-  * **SYNC_ENGINE**: One of ``singer`` or ``fastsync``. Check :ref:`replication_methods` and :ref:`fast_sync_main` section for further details.
+  * **SYNC_ENGINE**: One of ``singer`` or ``fastsync``. Check :ref:`reproduction_methods` and :ref:`fast_sync_main` section for further details.
   * **STATUS**: One of ``running``, ``failed`` or ``success``
 
 

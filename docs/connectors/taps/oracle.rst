@@ -21,28 +21,28 @@ Oracle setup requirements
 **Step 1. Create a PipelineWise database user**
 
 You’ll create a dedicated database user for PipelineWise. Create a new user and grant the required permissions
-on the database, schema and tables that you want to replicate:
+on the database, schema and tables that you want to reproduce:
 
     * ``CREATE USER pipelinewise IDENTIFIEDBY <password>``
     * ``GRANT CONNECT TO pipelinewise``
     * ``GRANT CREATE SESSION TO pipelinewise``
     * ``GRANT UNLIMITED TABLESPACE TO TO pipelinewise``
     * ``GRANT USAGE ON SCHEMA <schema_name> TO pipelinewise``
-    * ``GRANT SELECT ON <schema_name>.<table_name> TO pipelinewise`` (Repeat this grant on every table that you want to replicate)
+    * ``GRANT SELECT ON <schema_name>.<table_name> TO pipelinewise`` (Repeat this grant on every table that you want to reproduce)
 
 
-**Step 2: Check if you have all the required credentials for replicating data from Oracle**
+**Step 2: Check if you have all the required credentials for reproducing data from Oracle**
 
 Access to ``V$DATABASE`` and ``V_$THREAD`` performance views.
 These are required to verify setting configuration while setting up your Oracle database and to
 retrieve the database’s Oracle System ID.
 
 
-**Step 3: Configure Log-based Incremental Replication with LogMiner**
+**Step 3: Configure Log-based Incremental Reproduction with LogMiner**
 
 .. note::
 
-  This step is only required if you use :ref:`log_based` replication method.
+  This step is only required if you use :ref:`log_based` reproduction method.
 
 **Step 3.1: Verify the database's current archiving mode**
 
@@ -89,7 +89,7 @@ for more info about this parameter.
 
 **Note**: Alternatively to enable supplemental logging at the table level, run
 ``ALTER TABLE <SCHEMA_NAME>.<TABLE_NAME> ADD SUPPLEMENTAL LOG DATA (ALL) COLUMNS``
-for every table you want to replicate.
+for every table you want to reproduce.
 
 
 Verify that supplemental logging was successfully enabled by running the following query:
@@ -103,23 +103,23 @@ If the returned value is ``YES`` or ``IMPLICIT``, supplemental logging is enable
 
 .. warning::
 
-    If you want to use Log-based Incremental Replication, you’ll also need to
+    If you want to use Log-based Incremental Reproduction, you’ll also need to
     **grant additional permissions** to the ``pipelinewise`` user:
 
     * ``GRANT EXECUTE_CATALOG_ROLE TO PIPELINEWISE``
 
     * ``GRANT SELECT ANY TRANSACTION TO PIPELINEWISE``
-    
+
     * ``GRANT SELECT ANY DICTIONARY TO PIPELINEWISE``
-    
+
     * ``GRANT EXECUTE ON DBMS_LOGMNR TO PIPELINEWISE``
-    
+
     * ``GRANT EXECUTE ON DBMS_LOGMNR_D TO PIPELINEWISE``
-    
+
     * ``GRANT SELECT ON SYS.V_$DATABASE TO PIPELINEWISE``
-    
+
     * ``GRANT SELECT ON SYS.V_$ARCHIVED_LOG TO PIPELINEWISE``
-    
+
     * ``GRANT SELECT ON SYS.V_$LOGMNR_CONTENTS TO PIPELINEWISE``
 
     **If you’re using version 12 of Oracle**, you’ll also need to grant the
@@ -128,11 +128,11 @@ If the returned value is ``YES`` or ``IMPLICIT``, supplemental logging is enable
     * ``GRANT LOGMINING TO PIPELINEWISE``
 
 
-Configuring what to replicate
+Configuring what to reproduce
 '''''''''''''''''''''''''''''
 
 PipelineWise configures every tap with a common structured YAML file format.
-A sample YAML for Oracle replication can be generated into a project directory by
+A sample YAML for Oracle reproduction can be generated into a project directory by
 following the steps in the :ref:`generating_pipelines` section.
 
 Example YAML for ``tap-oracle``:
@@ -182,25 +182,25 @@ Example YAML for ``tap-oracle``:
         target_schema_select_permissions:  # Optional: Grant SELECT on schema and tables that created
           - grp_stats
 
-        # List of tables to replicate from Oracle to destination Data Warehouse
+        # List of tables to reproduce from Oracle to destination Data Warehouse
         #
-        # Please check the Replication Strategies section in the documentation to understand the differences.
-        # For LOG_BASED replication method you might need to adjust the source Oracle database.
+        # Please check the Reproduction Strategies section in the documentation to understand the differences.
+        # For LOG_BASED reproduction method you might need to adjust the source Oracle database.
         tables:
           - table_name: "TABLE_ONE"
-            replication_method: "INCREMENTAL"   # One of INCREMENTAL, LOG_BASED and FULL_TABLE
-            replication_key: "LAST_UPDATE"      # Important: Incremental load always needs replication key
+            reproduction_method: "INCREMENTAL"   # One of INCREMENTAL, LOG_BASED and FULL_TABLE
+            reproduction_key: "LAST_UPDATE"      # Important: Incremental load always needs reproduction key
 
             # OPTIONAL: Load time transformations
-            #transformations:                    
+            #transformations:
             #  - column: "last_name"            # Column to transform
             #    type: "SET-NULL"               # Transformation type
 
           # You can add as many tables as you need...
           - table_name: "TABLE_TWO"
-            replication_method: "LOG_BASED"     # Important! Log based must be enabled in Oracle
+            reproduction_method: "LOG_BASED"     # Important! Log based must be enabled in Oracle
 
       # You can add as many schemas as you need...
-      # Uncommend this if you want replicate tables from multiple schemas
+      # Uncommend this if you want reproduce tables from multiple schemas
       #- source_schema: "another_schema_in_oracle"
       #  target_schema: "another

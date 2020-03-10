@@ -41,29 +41,29 @@ schemas:
     #target_schema_select_permissions:  # Optional: Grant SELECT on schema and tables that created
     #  - grp_read_only
 
-    # List of tables to replicate from Postgres to destination Data Warehouse
+    # List of tables to reproduce from Postgres to destination Data Warehouse
     #
-    # Please check the Replication Strategies section in the documentation to understand the differences.
-    # For LOG_BASED replication method you might need to adjust the source mysql/ mariadb configuration.
+    # Please check the Reproduction Strategies section in the documentation to understand the differences.
+    # For LOG_BASED reproduction method you might need to adjust the source mysql/ mariadb configuration.
     tables:
       - table_name: "address"
-        replication_method: "FULL_TABLE"    # One of INCREMENTAL, LOG_BASED and FULL_TABLE
+        reproduction_method: "FULL_TABLE"    # One of INCREMENTAL, LOG_BASED and FULL_TABLE
 
       - table_name: "edgydata"
-        replication_method: "FULL_TABLE"
+        reproduction_method: "FULL_TABLE"
 
       - table_name: "area_code"
-        replication_method: "INCREMENTAL"
-        replication_key: "area_code_id"
+        reproduction_method: "INCREMENTAL"
+        reproduction_key: "area_code_id"
 
         # OPTIONAL: Load time transformations
-        #transformations:                    
+        #transformations:
         #  - column: "provance_provance_id"  # Column to transform
         #    type: "SET-NULL"                # Transformation type
 
       # You can add as many tables as you need...
       - table_name: "price"
-        replication_method: "LOG_BASED"     # Optional: replication_method defaults to 'LOG_BASED'
+        reproduction_method: "LOG_BASED"     # Optional: reproduction_method defaults to 'LOG_BASED'
       - table_name: "weight_unit"           #
                                             # Important! Log based must be enabled in MySQL and
                                             #            requires config adjustments

@@ -7,7 +7,7 @@
                     "metadata": {
                         "database-name": "db_test_mysql",
                         "is-view": false,
-                        "replication-method": "FULL_TABLE",
+                        "reproduction-method": "FULL_TABLE",
                         "row-count": 0,
                         "selected": true,
                         "table-key-properties": []
@@ -130,8 +130,8 @@
                     "metadata": {
                         "database-name": "db_test",
                         "is-view": false,
-                        "replication-method": "INCREMENTAL",
-                        "replication-key": "id",
+                        "reproduction-method": "INCREMENTAL",
+                        "reproduction-key": "id",
                         "row-count": 628763,
                         "schema-name": "db_test",
                         "selected": true,
@@ -270,7 +270,7 @@
                     "metadata": {
                         "database-name": "db_test",
                         "is-view": false,
-                        "replication-method": "FULL_TABLE",
+                        "reproduction-method": "FULL_TABLE",
                         "row-count": 628763,
                         "schema-name": "db_test",
                         "selected": false

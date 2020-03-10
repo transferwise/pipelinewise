@@ -12,11 +12,11 @@ Connecting to Salesforce
   This section of the documentation is work in progress.
 
 
-Configuring what to replicate
+Configuring what to reproduce
 '''''''''''''''''''''''''''''
 
 PipelineWise configures every tap with a common structured YAML file format.
-A sample YAML for Salesforce replication can be generated into a project directory by
+A sample YAML for Salesforce reproduction can be generated into a project directory by
 following the steps in the :ref:`generating_pipelines` section.
 
 Example YAML for tap-salesforce:
@@ -71,14 +71,14 @@ Example YAML for tap-salesforce:
       - source_schema: "salesforce"           # This is mandatory, but can be anything in this tap type
         target_schema: "salesforce"           # Target schema in the destination Data Warehouse
 
-        # List of Salesforce tables to replicate into destination Data Warehouse
-        # Tap-Salesforce will use the best incremental strategies automatically to replicate data
+        # List of Salesforce tables to reproduce into destination Data Warehouse
+        # Tap-Salesforce will use the best incremental strategies automatically to reproduce data
         #
-        # Tap-Salesforce currently supports the replication of the majority of Salesforce objects,
+        # Tap-Salesforce currently supports the reproduction of the majority of Salesforce objects,
         # with the exception of those listed in the Unsupported Objects row of this table at
         # https://www.stitchdata.com/docs/integrations/saas/salesforce#bulk-vs-rest-api
         #
-        # 
+        #
         # This section will only cover a few of the most popular tables Salesforce integration offers.
         # See the Salesforce Object Reference guide for info on objects not listed here, including the
         # fields available in each object at https://resources.docs.salesforce.com/sfdc/pdf/object_reference.pdf
@@ -90,7 +90,7 @@ Example YAML for tap-salesforce:
           - table_name: "User"
 
             # OPTIONAL: Load time transformations
-            #transformations:                    
+            #transformations:
             #  - column: "last_name"            # Column to transform
             #    type: "SET-NULL"               # Transformation type
 

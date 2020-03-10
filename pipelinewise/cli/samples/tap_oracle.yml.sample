@@ -41,25 +41,25 @@ schemas:
     target_schema_select_permissions:  # Optional: Grant SELECT on schema and tables that created
       - grp_stats
 
-    # List of tables to replicate from Oracle to destination Data Warehouse
+    # List of tables to reproduce from Oracle to destination Data Warehouse
     #
-    # Please check the Replication Strategies section in the documentation to understand the differences.
-    # For LOG_BASED replication method you might need to adjust the source Oracle database.
+    # Please check the Reproduction Strategies section in the documentation to understand the differences.
+    # For LOG_BASED reproduction method you might need to adjust the source Oracle database.
     tables:
       - table_name: "TABLE_ONE"
-        replication_method: "INCREMENTAL"   # One of INCREMENTAL, LOG_BASED and FULL_TABLE
-        replication_key: "LAST_UPDATE"      # Important: Incremental load always needs replication key
+        reproduction_method: "INCREMENTAL"   # One of INCREMENTAL, LOG_BASED and FULL_TABLE
+        reproduction_key: "LAST_UPDATE"      # Important: Incremental load always needs reproduction key
 
         # OPTIONAL: Load time transformations
-        #transformations:                    
+        #transformations:
         #  - column: "last_name"            # Column to transform
         #    type: "SET-NULL"               # Transformation type
 
       # You can add as many tables as you need...
       - table_name: "TABLE_TWO"
-        replication_method: "LOG_BASED"     # Important! Log based must be enabled in Oracle
+        reproduction_method: "LOG_BASED"     # Important! Log based must be enabled in Oracle
 
   # You can add as many schemas as you need...
-  # Uncommend this if you want replicate tables from multiple schemas
-  #- source_schema: "ANOTHER_SCHEMA_IN_ORACLE" 
+  # Uncommend this if you want reproduce tables from multiple schemas
+  #- source_schema: "ANOTHER_SCHEMA_IN_ORACLE"
   #  target_schema: "another"

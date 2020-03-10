@@ -4,7 +4,7 @@
 Targets (Destinations)
 ----------------------
 
-PipelineWise can replicate data from every supported :ref:`taps_list` into the following destinations:
+PipelineWise can reproduce data from every supported :ref:`taps_list` into the following destinations:
 
 
 .. container:: tile-wrapper
@@ -45,7 +45,7 @@ PipelineWise can replicate data from every supported :ref:`taps_list` into the f
           .. image:: ../img/s3-logo.png
              :target: targets/s3_csv.html
 
-        :ref:`target-s3-csv` 
+        :ref:`target-s3-csv`
 
 
 Configuring the targets

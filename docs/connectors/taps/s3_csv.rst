@@ -5,11 +5,11 @@ Tap S3 CSV
 -----------
 
 
-Configuring what to replicate
+Configuring what to reproduce
 '''''''''''''''''''''''''''''
 
 PipelineWise configures every tap with a common structured YAML file format.
-A sample YAML for S3 CSV replication can be generated into a project directory by
+A sample YAML for S3 CSV reproduction can be generated into a project directory by
 following the steps in the :ref:`generating_pipelines` section.
 
 Example YAML for ``tap-s3-csv``:
@@ -37,14 +37,14 @@ Example YAML for ``tap-s3-csv``:
       bucket: "my-bucket"                           # S3 Bucket name
       start_date: "2000-01-01"                      # File before this data will be excluded
 
-    
+
     # ------------------------------------------------------------------------------
     # Destination (Target) - Target properties
     # Connection details should be in the relevant target YAML file
     # ------------------------------------------------------------------------------
     target: "snowflake"                       # ID of the target connector where the data will be loaded
     batch_size_rows: 20000                    # Batch size for the stream to optimise load performance
-    default_target_schema: "s3_feeds"         # Target schema where the data will be loaded 
+    default_target_schema: "s3_feeds"         # Target schema where the data will be loaded
     default_target_schema_select_permission:  # Optional: Grant SELECT on schema and tables that created
       - grp_power
     # primary_key_required: False             # Optional: in case you want to load tables without key
@@ -61,7 +61,7 @@ Example YAML for ``tap-s3-csv``:
     schemas:
       - source_schema: "s3_feeds" # This is mandatory, but can be anything in this tap type
         target_schema: "s3_feeds" # Target schema in the destination Data Warehouse
-        
+
         # List of CSV files to destination tables
         tables:
 
@@ -74,7 +74,7 @@ Example YAML for ``tap-s3-csv``:
               delimiter: ","                           # Optional. Default: ','
 
             # OPTIONAL: Load time transformations
-            #transformations:                    
+            #transformations:
             #  - column: "last_name"            # Column to transform
             #    type: "SET-NULL"               # Transformation type
 

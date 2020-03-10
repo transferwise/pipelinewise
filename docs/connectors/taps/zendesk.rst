@@ -5,11 +5,11 @@ Tap Zendesk
 -----------
 
 
-Configuring what to replicate
+Configuring what to reproduce
 '''''''''''''''''''''''''''''
 
 PipelineWise configures every tap with a common structured YAML file format.
-A sample YAML for Zendesk replication can be generated into a project directory by
+A sample YAML for Zendesk reproduction can be generated into a project directory by
 following the steps in the :ref:`generating_pipelines` section.
 
 Example YAML for tap-zendesk:
@@ -42,7 +42,7 @@ Example YAML for tap-zendesk:
     # ------------------------------------------------------------------------------
     target: "snowflake"                       # ID of the target connector where the data will be loaded
     batch_size_rows: 20000                    # Batch size for the stream to optimise load performance
-    default_target_schema: "zendesk"          # Target schema where the data will be loaded 
+    default_target_schema: "zendesk"          # Target schema where the data will be loaded
     default_target_schema_select_permission:  # Optional: Grant SELECT on schema and tables that created
       - grp_power
 
@@ -54,8 +54,8 @@ Example YAML for tap-zendesk:
       - source_schema: "zendesk"           # This is mandatory, but can be anything in this tap type
         target_schema: "zendesk"           # Target schema in the destination Data Warehouse
 
-        # List of Zendesk tables to replicate into destination Data Warehouse
-        # Tap-Zendesk will use the best incremental strategies automatically to replicate data
+        # List of Zendesk tables to reproduce into destination Data Warehouse
+        # Tap-Zendesk will use the best incremental strategies automatically to reproduce data
         tables:
           - table_name: "group_memberships"
           - table_name: "groups"
@@ -71,6 +71,6 @@ Example YAML for tap-zendesk:
           - table_name: "users"
 
             # OPTIONAL: Load time transformations
-            #transformations:                    
+            #transformations:
             #  - column: "last_name"            # Column to transform
             #    type: "SET-NULL"               # Transformation type

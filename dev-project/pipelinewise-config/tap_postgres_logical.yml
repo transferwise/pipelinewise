@@ -36,9 +36,9 @@ flush_all_streams: true              # target to flush all streams if any stream
 
 
 # ------------------------------------------------------------------------------
-# LOG_BASED replication data
+# LOG_BASED reproduction data
 #   requires wal2json plugin and other source adjustments
-#   LOG_BASED is the default replication_method
+#   LOG_BASED is the default reproduction_method
 #
 # Source to target Schema mapping
 # ------------------------------------------------------------------------------
@@ -47,7 +47,7 @@ schemas:
     target_schema: "postgres_world_logical1"
     tables:
       - table_name: "logical1_table1"
-        replication_method: "LOG_BASED"
+        reproduction_method: "LOG_BASED"
       - table_name: "logical1_table2"
       - table_name: "logical1_edgydata"
 

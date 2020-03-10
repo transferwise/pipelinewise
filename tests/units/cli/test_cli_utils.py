@@ -281,10 +281,10 @@ class TestUtils:
                                              'dummy_table') == 'dummy_schema-dummy_table'
 
         # MySQL stream_name should be formatted as {{schema_name}}-{{table_name}}
-        assert cli.utils.get_tap_default_replication_method(tap) == 'LOG_BASED'
+        assert cli.utils.get_tap_default_reproduction_method(tap) == 'LOG_BASED'
 
         # Get property value by tap type
-        assert cli.utils.get_tap_property_by_tap_type('tap-mysql', 'default_replication_method') == 'LOG_BASED'
+        assert cli.utils.get_tap_property_by_tap_type('tap-mysql', 'default_reproduction_method') == 'LOG_BASED'
 
     def test_run_command(self):
         """Test run command functions

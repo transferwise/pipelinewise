@@ -51,7 +51,7 @@ services:
     image: debezium/postgres:12-alpine
     container_name: pipelinewise_dev_postgres_source
     # Making some logical decoding adjustments
-    command: -c "wal_level=logical" -c "max_replication_slots=5" -c "max_wal_senders=5"
+    command: -c "wal_level=logical" -c "max_reproduction_slots=5" -c "max_wal_senders=5"
     ports:
       - ${DB_TAP_POSTGRES_PORT_ON_HOST}:${DB_TAP_POSTGRES_PORT}
     environment:

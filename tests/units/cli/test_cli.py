@@ -234,14 +234,14 @@ class TestCli:
         # Update catalog selection
         tap_one_with_selection = self.pipelinewise.make_default_selection(tap_one_catalog, tap_one_selection_file)
 
-        # Table one has to be selected with LOG_BASED replication method
+        # Table one has to be selected with LOG_BASED reproduction method
         assert tap_one_with_selection['streams'][0]['metadata'][0]['metadata']['selected'] is True
-        assert tap_one_with_selection['streams'][0]['metadata'][0]['metadata']['replication-method'] == 'LOG_BASED'
+        assert tap_one_with_selection['streams'][0]['metadata'][0]['metadata']['reproduction-method'] == 'LOG_BASED'
 
-        # Table two has to be selected with INCREMENTAL replication method
+        # Table two has to be selected with INCREMENTAL reproduction method
         assert tap_one_with_selection['streams'][1]['metadata'][0]['metadata']['selected'] is True
-        assert tap_one_with_selection['streams'][1]['metadata'][0]['metadata']['replication-method'] == 'INCREMENTAL'
-        assert tap_one_with_selection['streams'][1]['metadata'][0]['metadata']['replication-key'] == 'id'
+        assert tap_one_with_selection['streams'][1]['metadata'][0]['metadata']['reproduction-method'] == 'INCREMENTAL'
+        assert tap_one_with_selection['streams'][1]['metadata'][0]['metadata']['reproduction-key'] == 'id'
 
         # Table three should not be selected
         assert tap_one_with_selection['streams'][2]['metadata'][0]['metadata']['selected'] is False
@@ -421,10 +421,10 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
         test_validate_command_dir = f'{os.path.dirname(__file__)}/resources/test_validate_command'
 
         test_cases = [{
-            'dir': 'missing_replication_key_incremental',
+            'dir': 'missing_reproduction_key_incremental',
             'exception': True
         }, {
-            'dir': 'missing_replication_key',
+            'dir': 'missing_reproduction_key',
             'exception': False
         }, {
             'dir': 'invalid_target',

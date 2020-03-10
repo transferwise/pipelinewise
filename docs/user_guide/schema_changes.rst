@@ -31,7 +31,7 @@ renamed by adding a timestamp to column name and a new column with the new data
 type will be added to the table.
 
 For example if the data type of ``COLUMN_THREE`` changes from ``INTEGER`` to ``VARCHAR``
-PipelineWise will replicate data in this order:
+PipelineWise will reproduce data in this order:
 
 1. Before changing data type ``COLUMN_THREE`` is ``INTEGER`` just like in in source table:
 
@@ -39,11 +39,11 @@ PipelineWise will replicate data in this order:
 | **COLUMN_ONE** | **COLUMN_TWO** | **COLUMN_THREE** |
 |                |                |   (INTEGER)      |
 +----------------+----------------+------------------+
-| text           | text           | 1                | 
+| text           | text           | 1                |
 +----------------+----------------+------------------+
-| text           | text           | 2                | 
+| text           | text           | 2                |
 +----------------+----------------+------------------+
-| text           | text           | 3                | 
+| text           | text           | 3                |
 +----------------+----------------+------------------+
 
 2. After the data type change ``COLUMN_THREE_20190812_1520`` remains ``INTEGER`` with
@@ -62,7 +62,7 @@ data only after the change.
 +----------------+----------------+--------------------------------+------------------+
 | text           | text           |                                | 444-ABC          |
 +----------------+----------------+--------------------------------+------------------+
-| text           | text           |                                | 555-DEF          | 
+| text           | text           |                                | 555-DEF          |
 +----------------+----------------+--------------------------------+------------------+
 
 .. warning::

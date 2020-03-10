@@ -29,7 +29,7 @@
             "table_name": {
               "type": "string"
             },
-            "replication_method": {
+            "reproduction_method": {
               "type": "string",
               "enum": [
                 "FULL_TABLE",
@@ -55,13 +55,13 @@
             "table_name": {
               "type": "string"
             },
-            "replication_method": {
+            "reproduction_method": {
               "type": "string",
               "enum": [
                 "INCREMENTAL"
               ]
             },
-            "replication_key": {
+            "reproduction_key": {
               "type": "string"
             },
             "transformations": {
@@ -76,7 +76,7 @@
           },
           "required": [
             "table_name",
-            "replication_key"
+            "reproduction_key"
           ]
         }
       ]

@@ -1,12 +1,12 @@
 {
     "selection": [
         {
-            "replication_method": "LOG_BASED",
+            "reproduction_method": "LOG_BASED",
             "tap_stream_id": "db_test_mysql-table_one"
         },
         {
-            "replication_method": "INCREMENTAL",
-            "replication_key": "id",
+            "reproduction_method": "INCREMENTAL",
+            "reproduction_key": "id",
             "tap_stream_id": "db_test_mysql-table_two"
         }
     ]

@@ -12,7 +12,7 @@ Loading data to S3 in CSV file format is straightforward. You need to have
 access to an S3 bucket and you can generate data files on S3 from all the
 supported :ref:`taps_list`.
 
-Configuring where to replicate data
+Configuring where to reproduce data
 '''''''''''''''''''''''''''''''''''
 
 PipelineWise configures every target with a common structured YAML file format.

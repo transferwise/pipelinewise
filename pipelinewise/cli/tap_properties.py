@@ -68,7 +68,7 @@ def get_tap_properties(tap=None):
             'tap_stream_id_pattern': '{{schema_name}}-{{table_name}}',
             'tap_stream_name_pattern': '{{schema_name}}-{{table_name}}',
             'tap_catalog_argument': '--properties',
-            'default_replication_method': 'LOG_BASED',
+            'default_reproduction_method': 'LOG_BASED',
             'default_data_flattening_max_level': 0
         },
         'tap-postgres': {
@@ -84,7 +84,7 @@ def get_tap_properties(tap=None):
             'tap_stream_id_pattern': '{{schema_name}}-{{table_name}}',
             'tap_stream_name_pattern': '{{schema_name}}-{{table_name}}',
             'tap_catalog_argument': '--properties',
-            'default_replication_method': 'LOG_BASED',
+            'default_reproduction_method': 'LOG_BASED',
             'default_data_flattening_max_level': 0
         },
         'tap-oracle': {
@@ -92,7 +92,7 @@ def get_tap_properties(tap=None):
             'tap_stream_id_pattern': '{{schema_name}}-{{table_name}}',
             'tap_stream_name_pattern': '{{schema_name}}-{{table_name}}',
             'tap_catalog_argument': '--catalog',
-            'default_replication_method': 'LOG_BASED',
+            'default_reproduction_method': 'LOG_BASED',
             'default_data_flattening_max_level': 0
         },
         'tap-kafka': {
@@ -102,7 +102,7 @@ def get_tap_properties(tap=None):
             'tap_stream_id_pattern': '{{table_name}}',
             'tap_stream_name_pattern': '{{table_name}}',
             'tap_catalog_argument': '--properties',
-            'default_replication_method': 'LOG_BASED',
+            'default_reproduction_method': 'LOG_BASED',
             'default_data_flattening_max_level': 0
         },
         'tap-zendesk': {
@@ -114,7 +114,7 @@ def get_tap_properties(tap=None):
             'tap_stream_id_pattern': '{{table_name}}',
             'tap_stream_name_pattern': '{{table_name}}',
             'tap_catalog_argument': '--catalog',
-            'default_replication_method': 'INCREMENTAL',
+            'default_reproduction_method': 'INCREMENTAL',
             'default_data_flattening_max_level': 10
         },
         'tap-adwords': {
@@ -122,7 +122,7 @@ def get_tap_properties(tap=None):
             'tap_stream_id_pattern': '{{table_name}}',
             'tap_stream_name_pattern': '{{table_name}}',
             'tap_catalog_argument': '--catalog',
-            'default_replication_method': 'INCREMENTAL',
+            'default_reproduction_method': 'INCREMENTAL',
             'default_data_flattening_max_level': 0
         },
         'tap-jira': {
@@ -132,7 +132,7 @@ def get_tap_properties(tap=None):
             'tap_stream_id_pattern': '{{table_name}}',
             'tap_stream_name_pattern': '{{table_name}}',
             'tap_catalog_argument': '--properties',
-            'default_replication_method': 'INCREMENTAL',
+            'default_reproduction_method': 'INCREMENTAL',
             'default_data_flattening_max_level': 0
         },
         'tap-s3-csv': {
@@ -142,12 +142,12 @@ def get_tap_properties(tap=None):
             'tap_stream_id_pattern': '{{table_name}}',
             'tap_stream_name_pattern': '{{table_name}}',
             'tap_catalog_argument': '--properties',
-            'default_replication_method': 'INCREMENTAL',
+            'default_reproduction_method': 'INCREMENTAL',
             'default_data_flattening_max_level': 0
         },
         'tap-snowflake': {
             'tap_config_extras': {
-                # PipelineWise doesn't support replicating from multiple
+                # PipelineWise doesn't support reproducing from multiple
                 # databases by one tap but tap-postgres does.
                 #
                 # To avoid problems of loading two tables with the same name
@@ -158,7 +158,7 @@ def get_tap_properties(tap=None):
             'tap_stream_id_pattern': '{{database_name}}-{{schema_name}}-{{table_name}}',
             'tap_stream_name_pattern': '{{schema_name}}-{{table_name}}',
             'tap_catalog_argument': '--properties',
-            'default_replication_method': 'INCREMENTAL',
+            'default_reproduction_method': 'INCREMENTAL',
             'default_data_flattening_max_level': 0
         },
         'tap-salesforce': {
@@ -168,7 +168,7 @@ def get_tap_properties(tap=None):
             'tap_stream_id_pattern': '{{table_name}}',
             'tap_stream_name_pattern': '{{table_name}}',
             'tap_catalog_argument': '--properties',
-            'default_replication_method': 'INCREMENTAL',
+            'default_reproduction_method': 'INCREMENTAL',
             'default_data_flattening_max_level': 10
         },
 
@@ -178,7 +178,7 @@ def get_tap_properties(tap=None):
             'tap_stream_id_pattern': '{{schema_name}}-{{table_name}}',
             'tap_stream_name_pattern': '{{schema_name}}-{{table_name}}',
             'tap_catalog_argument': '--catalog',
-            'default_replication_method': 'LOG_BASED',
+            'default_reproduction_method': 'LOG_BASED',
             'default_data_flattening_max_level': 0
         },
     }

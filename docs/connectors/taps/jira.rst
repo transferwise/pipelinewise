@@ -4,11 +4,11 @@
 Tap Jira
 --------
 
-Configuring what to replicate
+Configuring what to reproduce
 '''''''''''''''''''''''''''''
 
 PipelineWise configures every tap with a common structured YAML file format.
-A sample YAML for Jira replication can be generated into a project directory by
+A sample YAML for Jira reproduction can be generated into a project directory by
 following the steps in the :ref:`generating_pipelines` section.
 
 Example YAML for ``tap-jira``:
@@ -51,7 +51,7 @@ Example YAML for ``tap-jira``:
     # ------------------------------------------------------------------------------
     target: "snowflake"                       # ID of the target connector where the data will be loaded
     batch_size_rows: 20000                    # Batch size for the stream to optimise load performance
-    default_target_schema: "jira"             # Target schema where the data will be loaded 
+    default_target_schema: "jira"             # Target schema where the data will be loaded
     default_target_schema_select_permission:  # Optional: Grant SELECT on schema and tables that created
       - grp_power
 
@@ -65,11 +65,11 @@ Example YAML for ``tap-jira``:
         target_schema_select_permissions:   # Optional: Grant SELECT on schema and tables that created
           - grp_stats
 
-        # List of Jira tables to replicate into destination Data Warehouse
-        # Tap-Jira will use the best incremental strategies automatically to replicate data
+        # List of Jira tables to reproduce into destination Data Warehouse
+        # Tap-Jira will use the best incremental strategies automatically to reproduce data
         tables:
 
-          # Tables replicated incrementally
+          # Tables reproduced incrementally
           - table_name: "changelogs"
           - table_name: "issues"
           - table_name: "issue_comments"
@@ -77,13 +77,13 @@ Example YAML for ``tap-jira``:
           - table_name: "worklogs"
 
             # OPTIONAL: Load time transformations - you can add it to any table
-            #transformations:                    
+            #transformations:
             #  - column: "some_column_to_transform" # Column to transform
             #    type: "SET-NULL"                   # Transformation type
 
-          # FULL_TABLE replicated tables
-          # JIRA Cloud REST API doesn't provide reasonable replication keys for these tables.
-          # Replicating these tables can run longer. Please consider this when scheduling the tap.
+          # FULL_TABLE reproduced tables
+          # JIRA Cloud REST API doesn't provide reasonable reproduction keys for these tables.
+          # Reproducing these tables can run longer. Please consider this when scheduling the tap.
           - table_name: "projects"
           - table_name: "project_categories"
           - table_name: "project_types"

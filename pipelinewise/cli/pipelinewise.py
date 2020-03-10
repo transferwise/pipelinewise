@@ -98,7 +98,7 @@ class PipelineWise:
         f_selected = filters.get('selected', None)
         f_target_type = filters.get('target_type', None)
         f_tap_type = filters.get('tap_type', None)
-        f_replication_method = filters.get('replication_method', None)
+        f_reproduction_method = filters.get('reproduction_method', None)
         f_initial_sync_required = filters.get('initial_sync_required', None)
 
         # Lists of tables that meet and don't meet the filter criteria
@@ -138,7 +138,7 @@ class PipelineWise:
                     raise Exception(f'Missing metadata in stream {tap_stream_id}')
 
                 selected = table_meta.get('selected', False)
-                replication_method = table_meta.get('replication-method', None)
+                reproduction_method = table_meta.get('reproduction-method', None)
 
                 # Detect if initial sync is required. Look into the state file, get the bookmark
                 # for the current stream (table) and if valid bookmark doesn't exist then
@@ -154,7 +154,7 @@ class PipelineWise:
                 else:
                     stream_bookmark = bookmarks[tap_stream_id]
 
-                    if self._is_initial_sync_required(replication_method, stream_bookmark):
+                    if self._is_initial_sync_required(reproduction_method, stream_bookmark):
                         initial_sync_required = True
 
                 # Compare actual values to the filter conditions.
@@ -165,16 +165,16 @@ class PipelineWise:
                         (f_selected is None or selected == f_selected) and
                         (f_target_type is None or target_type in f_target_type) and
                         (f_tap_type is None or tap_type in f_tap_type) and
-                        (f_replication_method is None or replication_method in f_replication_method) and
+                        (f_reproduction_method is None or reproduction_method in f_reproduction_method) and
                         (f_initial_sync_required is None or initial_sync_required == f_initial_sync_required)
                 ):
                     self.logger.debug("""Filter condition(s) matched:
                         Table              : %s
                         Tap Stream ID      : %s
                         Selected           : %s
-                        Replication Method : %s
+                        Reproduction Method : %s
                         Init Sync Required : %s
-                    """, table_name, tap_stream_id, selected, replication_method, initial_sync_required)
+                    """, table_name, tap_stream_id, selected, reproduction_method, initial_sync_required)
 
                     # Filter condition matched: mark table as selected to sync
                     properties['streams'][stream_idx]['metadata'][meta_idx]['metadata']['selected'] = True
@@ -185,7 +185,7 @@ class PipelineWise:
                     # the fallback properties as well if the table is selected in the original properties.
                     # Otherwise, mark it as not selected
                     if create_fallback:
-                        if new_stream and replication_method in [self.INCREMENTAL, self.LOG_BASED]:
+                        if new_stream and reproduction_method in [self.INCREMENTAL, self.LOG_BASED]:
                             fallback_properties['streams'][stream_idx]['metadata'][meta_idx]['metadata'][
                                 'selected'] = True
                             if selected:
@@ -414,19 +414,19 @@ class PipelineWise:
                     except Exception:
                         pass
 
-                    # Copy replication method from the old stream
+                    # Copy reproduction method from the old stream
                     try:
                         new_schema['streams'][new_stream_idx]['metadata'][new_stream_table_mdata_idx]['metadata'][
-                            'replication-method'] = old_stream['metadata'][old_stream_table_mdata_idx]['metadata'][
-                                'replication-method']
+                            'reproduction-method'] = old_stream['metadata'][old_stream_table_mdata_idx]['metadata'][
+                                'reproduction-method']
                     except Exception:
                         pass
 
-                    # Copy replication key from the old stream
+                    # Copy reproduction key from the old stream
                     try:
                         new_schema['streams'][new_stream_idx]['metadata'][new_stream_table_mdata_idx]['metadata'][
-                            'replication-key'] = old_stream['metadata'][old_stream_table_mdata_idx]['metadata'][
-                                'replication-key']
+                            'reproduction-key'] = old_stream['metadata'][old_stream_table_mdata_idx]['metadata'][
+                                'reproduction-key']
                     except Exception:
                         pass
 
@@ -534,12 +534,12 @@ class PipelineWise:
                     self.logger.info('Mark %s tap_stream_id as selected with properties %s', tap_stream_id,
                                      tap_stream_sel)
                     schema['streams'][stream_idx]['metadata'][stream_table_mdata_idx]['metadata']['selected'] = True
-                    if 'replication_method' in tap_stream_sel:
+                    if 'reproduction_method' in tap_stream_sel:
                         schema['streams'][stream_idx]['metadata'][stream_table_mdata_idx]['metadata'][
-                            'replication-method'] = tap_stream_sel['replication_method']
-                    if 'replication_key' in tap_stream_sel:
+                            'reproduction-method'] = tap_stream_sel['reproduction_method']
+                    if 'reproduction_key' in tap_stream_sel:
                         schema['streams'][stream_idx]['metadata'][stream_table_mdata_idx]['metadata'][
-                            'replication-key'] = tap_stream_sel['replication_key']
+                            'reproduction-key'] = tap_stream_sel['reproduction_key']
                 else:
                     self.logger.info('Mark %s tap_stream_id as not selected', tap_stream_id)
                     schema['streams'][stream_idx]['metadata'][stream_table_mdata_idx]['metadata']['selected'] = False
@@ -885,14 +885,14 @@ class PipelineWise:
                     Native and optimised component to sync table from a
                     specific type of tap into a specific type of target.
                     This command will be used automatically when FULL_TABLE
-                    replication method selected or when initial sync is required.
+                    reproduction method selected or when initial sync is required.
 
             2. Singer Taps and Targets:
                     Dynamic components following the singer specification to
                     sync tables from multiple sources to multiple targets.
                     This command will be used automatically when INCREMENTAL
-                    and LOG_BASED replication method selected. FULL_TABLE
-                    replication are not using the singer components because
+                    and LOG_BASED reproduction method selected. FULL_TABLE
+                    reproduction are not using the singer components because
                     they are too slow to sync large tables.
         """
 
@@ -952,7 +952,7 @@ class PipelineWise:
         start_time = datetime.now()
         try:
             with pidfile.PIDFile(self.tap['files']['pidfile']):
-                # Run fastsync for FULL_TABLE replication method
+                # Run fastsync for FULL_TABLE reproduction method
                 if len(fastsync_stream_ids) > 0:
                     self.logger.info('Table(s) selected to sync by fastsync: %s', fastsync_stream_ids)
                     self.tap_run_log_file = os.path.join(log_dir, f'{target_id}-{tap_id}-{current_time}.fastsync.log')
@@ -968,7 +968,7 @@ class PipelineWise:
                 else:
                     self.logger.info('No table available that needs to be sync by fastsync')
 
-                # Run singer tap for INCREMENTAL and LOG_BASED replication methods
+                # Run singer tap for INCREMENTAL and LOG_BASED reproduction methods
                 if len(singer_stream_ids) > 0:
                     self.logger.info('Table(s) selected to sync by singer: %s', singer_stream_ids)
                     self.tap_run_log_file = os.path.join(log_dir, f'{target_id}-{tap_id}-{current_time}.singer.log')
@@ -1165,8 +1165,8 @@ class PipelineWise:
         #
         # Run every tap in discovery mode to generate the singer specific
         # properties.json files for the taps. The properties file than
-        # updated to replicate only the tables that is defined in the YAML
-        # files and to use the required replication methods
+        # updated to reproduce only the tables that is defined in the YAML
+        # files and to use the required reproduction methods
         #
         # The tap Discovery mode needs to connect to each source databases and
         # doing that sequentially is slow. For a better performance we do it
@@ -1225,29 +1225,29 @@ class PipelineWise:
         print(yaml_text)
         print('Encryption successful')
 
-    def _is_initial_sync_required(self, replication_method: str, stream_bookmark: Dict) -> bool:
+    def _is_initial_sync_required(self, reproduction_method: str, stream_bookmark: Dict) -> bool:
         """
             Detects if a stream needs initial sync or not.
             Initial sync is required for INCREMENTAL and LOG_BASED tables
             where the state file has no valid bookmark.
 
             Valid bookmark keys:
-              'replication_key_value' key created for INCREMENTAL tables
+              'reproduction_key_value' key created for INCREMENTAL tables
               'log_pos' key created by MySQL LOG_BASED tables
               'lsn' key created by PostgreSQL LOG_BASED tables
               'modified_since' key created by CSV S3 tables
 
-            FULL_TABLE replication method is taken as initial sync required
-        :param replication_method: stream replication method
+            FULL_TABLE reproduction method is taken as initial sync required
+        :param reproduction_method: stream reproduction method
         :param stream_bookmark: stream state bookmark
         :return: Boolean, True if needs initial sync, False otherwise
         """
-        return replication_method == self.FULL_TABLE or (
-            (replication_method in [self.INCREMENTAL, self.LOG_BASED]) and
-            (not ('replication_key_value' in stream_bookmark or
+        return reproduction_method == self.FULL_TABLE or (
+            (reproduction_method in [self.INCREMENTAL, self.LOG_BASED]) and
+            (not ('reproduction_key_value' in stream_bookmark or
                   'log_pos' in stream_bookmark or
                   'lsn' in stream_bookmark or
-                  'modified_since' in stream_bookmark  # this is replication key for tap-s3-csv used by Singer
+                  'modified_since' in stream_bookmark  # this is reproduction key for tap-s3-csv used by Singer
                   )))
 
     # pylint: disable=unused-argument
@@ -1318,14 +1318,14 @@ TAP RUN SUMMARY
                     break
 
             selected = table_meta.get('selected', False)
-            replication_method = table_meta.get('replication-method')
+            reproduction_method = table_meta.get('reproduction-method')
             table_key_properties = table_meta.get('table-key-properties', [])
             primary_key_required = tap.get('primary_key_required', True)
 
-            # Check if primary key is set for INCREMENTAL and LOG_BASED replications
-            if (selected and replication_method in [self.INCREMENTAL, self.LOG_BASED] and
+            # Check if primary key is set for INCREMENTAL and LOG_BASED reproduction
+            if (selected and reproduction_method in [self.INCREMENTAL, self.LOG_BASED] and
                     len(table_key_properties) == 0 and primary_key_required):
-                errors.append(f'No primary key set for {tap_stream_id} stream ({replication_method})')
+                errors.append(f'No primary key set for {tap_stream_id} stream ({reproduction_method})')
                 break
 
         return errors

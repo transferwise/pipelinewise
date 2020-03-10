@@ -10,7 +10,7 @@ MySQL setup requirements
 
 *(Section based on Stitch documentation)*
 
-**Step 1: Check if you have all the required credentials for replicating data from MySQL**
+**Step 1: Check if you have all the required credentials for reproducing data from MySQL**
 
 * ``CREATE USER`` or ``INSERT`` privilege (for the mysql database) - The ``CREATE USER`` privilege is required to create a database user for PipelineWise.
 
@@ -24,12 +24,12 @@ MySQL setup requirements
 
 .. note::
 
-  This step is only required if you use :ref:`log_based` replication method.
+  This step is only required if you use :ref:`log_based` reproduction method.
 
 
 .. warning::
 
-  To use binlog replication, your MySQL database must be running MySQL version 5.6.2 or greater.
+  To use binlog reproduction, your MySQL database must be running MySQL version 5.6.2 or greater.
 
 1. Log into your MySQL server.
 
@@ -57,9 +57,9 @@ MySQL setup requirements
 A few things to note:
 
   * ``log_bin`` doesn't have to be ``mysql-binlog`` - this value can be anything. Additionally, if ``log_bin`` already has an entry (which you checked in step one), you don’t need to change it.
-  
+
   * Use either ``expire_log_days`` or ``binlog_expire_logs_seconds``, not both
-  
+
   * Setting ``log_slave_updates`` is only required if you are connecting a read replica. This isn’t required for master instances.
 
 
@@ -70,16 +70,16 @@ A few things to note:
 
 Next, you’ll create a dedicated database user for PipelineWise. The user needs to have:
 
-    * ``SELECT`` privileges on the database and every table that you want to replicate.
+    * ``SELECT`` privileges on the database and every table that you want to reproduce.
 
-    *  If using :ref:`log_based`, you'll also need to grant ``REPLICATION CLIENT`` and ``REPLICATION SLAVE`` privileges.
+    *  If using :ref:`log_based`, you'll also need to grant ``REPRODUCTION CLIENT`` and ``REPRODUCTION SLAVE`` privileges.
 
 
-Configuring what to replicate
+Configuring what to reproduce
 '''''''''''''''''''''''''''''
 
 PipelineWise configures every tap with a common structured YAML file format.
-A sample YAML for MySQL replication can be generated into a project directory by
+A sample YAML for MySQL reproduction can be generated into a project directory by
 following the steps in the :ref:`generating_pipelines` section.
 
 Example YAML for ``tap-mysql``:
@@ -131,26 +131,26 @@ Example YAML for ``tap-mysql``:
       target_schema_select_permissions:  # Optional: Grant SELECT on schema and tables that created
         - grp_stats
 
-      # List of tables to replicate from Postgres to destination Data Warehouse
+      # List of tables to reproduce from Postgres to destination Data Warehouse
       #
-      # Please check the Replication Strategies section in the documentation to understand the differences.
-      # For LOG_BASED replication method you might need to adjust the source mysql/ mariadb configuration.
+      # Please check the Reproduction Strategies section in the documentation to understand the differences.
+      # For LOG_BASED reproduction method you might need to adjust the source mysql/ mariadb configuration.
       tables:
         - table_name: "table_one"
-          replication_method: "INCREMENTAL"   # One of INCREMENTAL, LOG_BASED and FULL_TABLE
-          replication_key: "last_update"      # Important: Incremental load always needs replication key
+          reproduction_method: "INCREMENTAL"   # One of INCREMENTAL, LOG_BASED and FULL_TABLE
+          reproduction_key: "last_update"      # Important: Incremental load always needs reproduction key
 
           # OPTIONAL: Load time transformations
-          #transformations:                    
+          #transformations:
           #  - column: "last_name"            # Column to transform
           #    type: "SET-NULL"               # Transformation type
 
         # You can add as many tables as you need...
         - table_name: "table_two"
-          replication_method: "LOG_BASED"     # Important! Log based must be enabled in MySQL
+          reproduction_method: "LOG_BASED"     # Important! Log based must be enabled in MySQL
 
     # You can add as many schemas as you need...
-    # Uncomment this if you want replicate tables from multiple schemas
-    #- source_schema: "another_schema_in_mysql" 
+    # Uncomment this if you want reproduce tables from multiple schemas
+    #- source_schema: "another_schema_in_mysql"
     #  target_schema: "another
 
