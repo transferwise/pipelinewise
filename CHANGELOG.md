@@ -221,8 +221,8 @@ Doc-only changes
 
 **Tap Postgres**
 - Bump tap-postgres to 1.1.5
-    - Lowercase pg_reproduction slot name
-- FastSync: Lowercase pg_reproduction slot name
+    - Lowercase pg_replication slot name
+- FastSync: Lowercase pg_replication slot name
 
 **Target Redshift**
 - Bump pipelinewise-target-redshift to 1.0.5
