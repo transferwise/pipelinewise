@@ -23,7 +23,7 @@ fi
 # Grant Reproduction client and reproduction slave privileges that
 # requires for LOG_BASED CDC reproduction
 export MYSQL_PWD=${DB_TAP_MYSQL_ROOT_PASSWORD}
-mysql --protocol TCP --host ${DB_TAP_MYSQL_HOST} --port ${DB_TAP_MYSQL_PORT} --user root -e "GRANT REPRODUCTION CLIENT, REPRODUCTION SLAVE ON *.* TO ${DB_TAP_MYSQL_USER}"
+mysql --protocol TCP --host ${DB_TAP_MYSQL_HOST} --port ${DB_TAP_MYSQL_PORT} --user root -e "GRANT REPLICATION CLIENT, REPLICATION SLAVE ON *.* TO ${DB_TAP_MYSQL_USER}"
 
 # Grant insert privileges for testing
 mysql --protocol TCP --host ${DB_TAP_MYSQL_HOST} --port ${DB_TAP_MYSQL_PORT} --user root -e "GRANT INSERT ON *.* TO ${DB_TAP_MYSQL_USER}"
