@@ -72,7 +72,7 @@ Next, you’ll create a dedicated database user for PipelineWise. The user needs
 
     * ``SELECT`` privileges on the database and every table that you want to reproduce.
 
-    *  If using :ref:`log_based`, you'll also need to grant ``REPRODUCTION CLIENT`` and ``REPRODUCTION SLAVE`` privileges.
+    *  If using :ref:`log_based`, you'll also need to grant ``REPLICATION CLIENT`` and ``REPLICATION SLAVE`` privileges.
 
 
 Configuring what to reproduce
