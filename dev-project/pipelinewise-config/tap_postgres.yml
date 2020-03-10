@@ -44,27 +44,27 @@ schemas:
     # List of tables to reproduce from Postgres to destination Data Warehouse
     # Please check the Reproduction Strategies section in the documentation to understand the differences.
       - table_name: "edgydata"
-        reproduction_method: "FULL_TABLE"  # INCREMENTAL, LOG_BASED or FULL_TABLE (Default LOG_BASED)
+        replication_method: "FULL_TABLE"  # INCREMENTAL, LOG_BASED or FULL_TABLE (Default LOG_BASED)
 
       - table_name: "country"
-        reproduction_method: "FULL_TABLE"
+        replication_method: "FULL_TABLE"
 
       - table_name: "city"
-        reproduction_method: "INCREMENTAL"
+        replication_method: "INCREMENTAL"
         reproduction_key: "id"
         # transformations:                  # Optional: Load time transformations
         #  - column: "population"           # Column to transform
         #    type: "MASK-NUMBER"            # Transformation type
 
       - table_name: "countrylanguage"
-        reproduction_method: "FULL_TABLE"
+        replication_method: "FULL_TABLE"
 
   - source_schema: "public2"
     target_schema: "postgres_world_2"
 
     tables:
       - table_name: "wearehere"
-        reproduction_method: "FULL_TABLE"
+        replication_method: "FULL_TABLE"
       - table_name: "public2_edgydata"
-        reproduction_method: "INCREMENTAL"
+        replication_method: "INCREMENTAL"
         reproduction_key: "cid"

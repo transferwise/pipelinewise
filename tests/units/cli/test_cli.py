@@ -236,11 +236,11 @@ class TestCli:
 
         # Table one has to be selected with LOG_BASED reproduction method
         assert tap_one_with_selection['streams'][0]['metadata'][0]['metadata']['selected'] is True
-        assert tap_one_with_selection['streams'][0]['metadata'][0]['metadata']['reproduction-method'] == 'LOG_BASED'
+        assert tap_one_with_selection['streams'][0]['metadata'][0]['metadata']['replication-method'] == 'LOG_BASED'
 
         # Table two has to be selected with INCREMENTAL reproduction method
         assert tap_one_with_selection['streams'][1]['metadata'][0]['metadata']['selected'] is True
-        assert tap_one_with_selection['streams'][1]['metadata'][0]['metadata']['reproduction-method'] == 'INCREMENTAL'
+        assert tap_one_with_selection['streams'][1]['metadata'][0]['metadata']['replication-method'] == 'INCREMENTAL'
         assert tap_one_with_selection['streams'][1]['metadata'][0]['metadata']['reproduction-key'] == 'id'
 
         # Table three should not be selected

@@ -39,11 +39,11 @@ schemas:
 
     tables:
       - table_name: "city"
-        reproduction_method: "INCREMENTAL"
+        replication_method: "INCREMENTAL"
         reproduction_key: "id"
 
       - table_name: "country"
-        reproduction_method: "FULL_TABLE"
+        replication_method: "FULL_TABLE"
 
       - table_name: "countrylanguage"
-        reproduction_method: "FULL_TABLE"
+        replication_method: "FULL_TABLE"

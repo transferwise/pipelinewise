@@ -6,7 +6,7 @@
                     "breadcrumb": [],
                     "metadata": {
                         "reproduction-key": "id",
-                        "reproduction-method": "INCREMENTAL",
+                        "replication-method": "INCREMENTAL",
                         "selected": true,
                         "table-key-properties": [
                             "id"
@@ -434,7 +434,7 @@
                 {
                     "breadcrumb": [],
                     "metadata": {
-                        "reproduction-method": "FULL_TABLE",
+                        "replication-method": "FULL_TABLE",
                         "selected": true,
                         "table-key-properties": []
                     }
@@ -535,7 +535,7 @@
                 {
                     "breadcrumb": [],
                     "metadata": {
-                        "reproduction-method": "INCREMENTAL",
+                        "replication-method": "INCREMENTAL",
                         "selected": true,
                         "table-key-properties": [
                             "id"

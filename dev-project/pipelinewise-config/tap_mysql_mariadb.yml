@@ -47,13 +47,13 @@ schemas:
     # For LOG_BASED reproduction method you might need to adjust the source mysql/ mariadb configuration.
     tables:
       - table_name: "address"
-        reproduction_method: "FULL_TABLE"    # One of INCREMENTAL, LOG_BASED and FULL_TABLE
+        replication_method: "FULL_TABLE"    # One of INCREMENTAL, LOG_BASED and FULL_TABLE
 
       - table_name: "edgydata"
-        reproduction_method: "FULL_TABLE"
+        replication_method: "FULL_TABLE"
 
       - table_name: "area_code"
-        reproduction_method: "INCREMENTAL"
+        replication_method: "INCREMENTAL"
         reproduction_key: "area_code_id"
 
         # OPTIONAL: Load time transformations
@@ -63,7 +63,7 @@ schemas:
 
       # You can add as many tables as you need...
       - table_name: "price"
-        reproduction_method: "LOG_BASED"     # Optional: reproduction_method defaults to 'LOG_BASED'
+        replication_method: "LOG_BASED"     # Optional: replication_method defaults to 'LOG_BASED'
       - table_name: "weight_unit"           #
                                             # Important! Log based must be enabled in MySQL and
                                             #            requires config adjustments

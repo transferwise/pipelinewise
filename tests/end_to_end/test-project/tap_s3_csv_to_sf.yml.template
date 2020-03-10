@@ -48,7 +48,7 @@ schemas:
 
       # Every file in S3 bucket that matches the search pattern will be loaded into this table
       - table_name: "people"
-        reproduction_method: "FULL_TABLE"
+        replication_method: "FULL_TABLE"
         s3_csv_mapping:
           search_pattern: "^greenhouse/mock_data_1.csv$"
         transformations:

@@ -4,7 +4,7 @@
 Fast Sync
 ---------
 
-**Fast Sync** is one of the :ref:`reproduction_methods` that is functionally identical to :ref:`full_table`
+**Fast Sync** is one of the :ref:`replication_methods` that is functionally identical to :ref:`full_table`
 reproduction but Fast Sync is bypassing the `Singer Specification <https://github.com/singer-io/getting-started/blob/master/docs/SPEC.md>`_
 for optimised performance. Primary use case of Fast Sync is initial sync or to resync large tables
 with hundreds of millions of rows where singer component would usually be running for long hours or

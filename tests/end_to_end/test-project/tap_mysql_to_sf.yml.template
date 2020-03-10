@@ -37,13 +37,13 @@ schemas:
 
     tables:
       - table_name: "table_with_binary" # This table has binary and varbinary columns
-        reproduction_method: "LOG_BASED"
+        replication_method: "LOG_BASED"
 
       - table_name: "edgydata" # This table has SF reserved words as columns
-        reproduction_method: "LOG_BASED"
+        replication_method: "LOG_BASED"
         transformations:
           - column: "case"
             type: "HASH"
 
       - table_name: "no_pk_table"
-        reproduction_method: "FULL_TABLE"
+        replication_method: "FULL_TABLE"

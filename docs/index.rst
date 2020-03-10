@@ -206,7 +206,7 @@ Content
    :caption: Concept
 
    concept/singer
-   concept/reproduction_methods
+   concept/replication_methods
    concept/fastsync
 
 .. toctree::

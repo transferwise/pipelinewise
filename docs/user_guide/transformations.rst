@@ -66,7 +66,7 @@ in the :ref:`yaml_configuration`:
     ...
     tables:
       - table_name: "audit_log"
-        reproduction_method: "INCREMENTAL"
+        replication_method: "INCREMENTAL"
         reproduction_key: "id"
         transformations:
           - column: "column_1"

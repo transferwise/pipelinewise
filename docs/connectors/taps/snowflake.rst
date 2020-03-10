@@ -71,7 +71,7 @@ Example YAML for tap-snowflake:
         # For LOG_BASED reproduction method you might need to adjust the source mysql/ mariadb configuration.
         tables:
           - table_name: "TABLE_ONE"
-            reproduction_method: "INCREMENTAL"   # One of INCREMENTAL or FULL_TABLE
+            replication_method: "INCREMENTAL"   # One of INCREMENTAL or FULL_TABLE
             reproduction_key: "last_update"      # Important: Incremental load always needs reproduction key
 
             # OPTIONAL: Load time transformations
@@ -81,7 +81,7 @@ Example YAML for tap-snowflake:
 
           # You can add as many tables as you need...
           - table_name: "table_two"
-            reproduction_method: "FULL_TABLE"
+            replication_method: "FULL_TABLE"
 
       # You can add as many schemas as you need...
       # Uncomment this if you want reproduce tables from multiple schemas

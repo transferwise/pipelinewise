@@ -46,7 +46,7 @@ Adding new tap
   | **tap_catalog_argument**                     | The catalog CLI argument of the tap. This is usually ``--properties`` for old styled singer taps and ``--catalog`` for new styled      |
   |                                              | singer taps.                                                                                                                           |
   +----------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------+
-  | **default_reproduction_method**               | Reproduction method to use when not specified in :ref:`yaml_configuration`                                                              |
+  | **default_replication_method**               | Reproduction method to use when not specified in :ref:`yaml_configuration`                                                              |
   +----------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------+
   | **default_data_flattening_max_level**        | Set to 0 if auto data flattening is not required. Data flattening is usually required for taps that extracting data from APIs in JSON  |
   |                                              | messages.                                                                                                                              |

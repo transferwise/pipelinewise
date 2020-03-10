@@ -145,11 +145,11 @@ You can edit it with the text editor of your choice:
             - grp_power
           tables:                             # List Tables to reproduce
             - table_name: "table_one"
-              reproduction_method: FULL_TABLE  # 1) FULL_TABLE reproduction
+              replication_method: FULL_TABLE  # 1) FULL_TABLE reproduction
             - table_name: "table_two"         #
-              reproduction_method: LOG_BASED   # 2) LOG_BASED reproduction
+              replication_method: LOG_BASED   # 2) LOG_BASED reproduction
             - table_name: "table_three"       #
-              reproduction_method: INCREMENTAL # 3) INCREMENTAL reproduction
+              replication_method: INCREMENTAL # 3) INCREMENTAL reproduction
               reproduction_key: "updated_at"   #    Incremental load needs reproduction key
 
 

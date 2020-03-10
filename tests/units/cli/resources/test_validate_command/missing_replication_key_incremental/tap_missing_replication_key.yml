@@ -47,7 +47,7 @@ schemas:
     # For LOG_BASED reproduction method you might need to adjust the source mysql/ mariadb configuration.
     tables:
       - table_name: "table_one"
-        reproduction_method: "INCREMENTAL"   # One of INCREMENTAL, LOG_BASED and FULL_TABLE
+        replication_method: "INCREMENTAL"   # One of INCREMENTAL, LOG_BASED and FULL_TABLE
 
   # You can add as many schemas as you need...
   # Uncommend this if you want reproduce tables from multiple schemas

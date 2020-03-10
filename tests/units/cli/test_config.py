@@ -100,11 +100,11 @@ class TestConfig:
                         'target_schema_select_permissions': ['grp_stats'],
                         'tables': [{
                             'table_name': 'table_one',
-                            'reproduction_method': 'INCREMENTAL',
+                            'replication_method': 'INCREMENTAL',
                             'reproduction_key': 'last_update'
                         }, {
                             'table_name': 'table_two',
-                            'reproduction_method': 'LOG_BASED'
+                            'replication_method': 'LOG_BASED'
                         }]
                     }]
                 }]

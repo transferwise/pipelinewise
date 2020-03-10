@@ -1,7 +1,7 @@
 {
     "selection": [
         {
-            "reproduction_method": "LOG_BASED",
+            "replication_method": "LOG_BASED",
             "tap_stream_id": "db_test_postgres-public-table_two"
         }
     ]

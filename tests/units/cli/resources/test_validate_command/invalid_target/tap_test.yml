@@ -47,10 +47,10 @@ schemas:
     # For LOG_BASED reproduction method you might need to adjust the source mysql/ mariadb configuration.
     tables:
       - table_name: "table_one"
-        reproduction_method: "FULL_TABLE"   # One of INCREMENTAL, LOG_BASED and FULL_TABLE
+        replication_method: "FULL_TABLE"   # One of INCREMENTAL, LOG_BASED and FULL_TABLE
 
       - table_name: "table_two"
-        reproduction_method: "LOG_BASED"     # Important! Log based must be enabled in MySQL
+        replication_method: "LOG_BASED"     # Important! Log based must be enabled in MySQL
 
   # You can add as many schemas as you need...
   # Uncommend this if you want reproduce tables from multiple schemas

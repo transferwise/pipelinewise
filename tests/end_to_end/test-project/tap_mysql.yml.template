@@ -39,14 +39,14 @@ schemas:
 
     tables:
       - table_name: "address"
-        reproduction_method: "INCREMENTAL"
+        replication_method: "INCREMENTAL"
         reproduction_key: "date_updated"
 
       - table_name: "area_code"
-        reproduction_method: "FULL_TABLE"
+        replication_method: "FULL_TABLE"
 
       - table_name: "order"
-        reproduction_method: "FULL_TABLE"
+        replication_method: "FULL_TABLE"
 
       - table_name: "weight_unit"
-        reproduction_method: "LOG_BASED"
+        replication_method: "LOG_BASED"

@@ -99,7 +99,7 @@ def get_bookmark_for_table(table, properties, db_engine, dbname=None):
                           {}).get('metadata')
         db_name = table_meta.get('database-name')
         schema_name = table_meta.get('schema-name')
-        reproduction_method = table_meta.get('reproduction-method')
+        replication_method = table_meta.get('replication-method')
         reproduction_key = table_meta.get('reproduction-key')
 
         fully_qualified_table_name = '{}.{}'.format(schema_name or db_name, table_name) \
@@ -107,11 +107,11 @@ def get_bookmark_for_table(table, properties, db_engine, dbname=None):
 
         if (dbname is None or db_name == dbname) and fully_qualified_table_name == table:
             # Log based reproduction: get mysql binlog position
-            if reproduction_method == 'LOG_BASED':
+            if replication_method == 'LOG_BASED':
                 bookmark = db_engine.fetch_current_log_pos()
 
             # Key based incremental reproduction: Get max reproduction key from source
-            elif reproduction_method == 'INCREMENTAL':
+            elif replication_method == 'INCREMENTAL':
                 bookmark = db_engine.fetch_current_incremental_key_pos(fully_qualified_table_name, reproduction_key)
 
             break
