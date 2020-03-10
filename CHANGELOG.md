@@ -1,9 +1,19 @@
+0.14.0 (2020-03-10)
+-------------------
+
+**FastSync Postgres**
+- Support reserved words as table names.
+
+**Install script**
+- update script to search full name plugins.
+
+
 0.13.3 (2020-03-09)
 -------------------
 
 **FastSync Postgres & Mysql**
-    - fix "'NoneType' object has no attribute 'upper'" that happens when table has no PK.
-    - fix "Information schema query returned too much data".
+- fix "'NoneType' object has no attribute 'upper'" that happens when table has no PK.
+- fix "Information schema query returned too much data".
 
 
 0.13.2 (2020-03-05)
