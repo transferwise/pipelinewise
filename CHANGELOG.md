@@ -1,9 +1,23 @@
+0.14.0 (2020-03-10)
+-------------------
+
+**FastSync Postgres**
+- Support reserved words as table names.
+
+**Install script**
+- update script to search full name plugins.
+
+**Tap Postgres**
+- Bump `pipelinewise-tap-postgres` to 1.5.1
+    - Support per session wal_sender_timeout
+
+
 0.13.3 (2020-03-09)
 -------------------
 
 **FastSync Postgres & Mysql**
-    - fix "'NoneType' object has no attribute 'upper'" that happens when table has no PK.
-    - fix "Information schema query returned too much data".
+- fix "'NoneType' object has no attribute 'upper'" that happens when table has no PK.
+- fix "Information schema query returned too much data".
 
 
 0.13.2 (2020-03-05)
@@ -28,9 +42,9 @@
 -------------------
 **Logging refactoring**:
 - Structured logs in Pipelinewise, FastSync and majority of plugins.
-- Include a logging config file in Pipelinewise repository and package [here](./pipelinewise/logging.conf). 
-- Ability to provide a custom logging config by setting the env variable `LOGGING_CONF_FILE` to be the 
-        path to the `.conf` file 
+- Include a logging config file in Pipelinewise repository and package [here](./pipelinewise/logging.conf).
+- Ability to provide a custom logging config by setting the env variable `LOGGING_CONF_FILE` to be the
+        path to the `.conf` file
 
 0.12.4 (2020-02-19)
 -------------------
@@ -44,7 +58,7 @@
 
 **FastSync MySQL**
     - Fix bug: map BINARY MySQL column to BINARY type IN SF
-    
+
 0.12.2 (2020-02-03)
 -------------------
 
