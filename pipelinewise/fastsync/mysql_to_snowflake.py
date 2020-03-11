@@ -153,10 +153,6 @@ def main_impl():
     with multiprocessing.Pool(cpu_cores) as proc:
         table_sync_excs = list(filter(None, proc.map(sync_table, args.tables)))
 
-    # Clear information_schema columns cache
-    snowflake = FastSyncTargetSnowflake(args.target, args.transform)
-    snowflake.clear_information_schema_columns_cache(args.tables)
-
     # Log summary
     end_time = datetime.now()
     LOGGER.info("""

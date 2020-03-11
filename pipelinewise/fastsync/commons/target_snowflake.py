@@ -258,23 +258,3 @@ class FastSyncTargetSnowflake:
                                                                   target_table.upper()))
 
         self.query('DROP TABLE IF EXISTS {}."{}"'.format(schema, temp_table.upper()))
-
-    # pylint: disable=invalid-name
-    def clear_information_schema_columns_cache(self, tables):
-        pipelinewise_schema = utils.tablename_to_dict(self.connection_config['stage'])['schema_name']
-        schemas_to_clear_in_cache = utils.get_target_schemas(self.connection_config, tables)
-
-        # Create an empty cache table if not exists
-        self.query("""
-            CREATE TABLE IF NOT EXISTS {}.columns (table_schema VARCHAR, table_name VARCHAR, column_name VARCHAR, data_type VARCHAR)
-        """.format(pipelinewise_schema))
-
-        #  Clear table columns from information_schema cache
-        for schema_name in schemas_to_clear_in_cache:
-            LOGGER.info('Clearing information_schema cache for schema: %s', schema_name)
-
-            # Delete existing data about the current schema
-            self.query("""
-                DELETE FROM {}.columns
-                WHERE LOWER(table_schema) = '{}'
-            """.format(pipelinewise_schema, schema_name.lower()))
