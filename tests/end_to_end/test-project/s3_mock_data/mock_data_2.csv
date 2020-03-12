@@ -1,0 +1,1001 @@
+id,country,city,currency,language
+1,Dominican Republic,Juncalito Abajo,Peso,Latvian
+2,Greece,Skiáthos,Euro,Maltese
+3,Tanzania,Matai,Shilling,Dzongkha
+4,Russia,Obninsk,Ruble,Pashto
+5,Uzbekistan,G’uzor,Som,Swahili
+6,China,Beiqi,Yuan Renminbi,French
+7,Japan,Toyokawa,Yen,Spanish
+8,Canada,Wolfville,Dollar,Luxembourgish
+9,Argentina,Plaza Huincul,Peso,Zulu
+10,Thailand,Santi Suk,Baht,Kannada
+11,Moldova,Bender,Leu,Gagauz
+12,Micronesia,Moch,Dollar,Kashmiri
+13,Bangladesh,Nālchiti,Taka,Somali
+14,Ukraine,Slatyne,Hryvnia,Estonian
+15,Portugal,Corga,Euro,Italian
+16,Philippines,Divisoria,Peso,Punjabi
+17,New Zealand,Waitangi,Dollar,Filipino
+18,France,Bègles,Euro,Catalan
+19,Portugal,Quintas,Euro,Yiddish
+20,Northern Mariana Islands,Saipan,Dollar,Korean
+21,Panama,Narganá,Balboa,Malayalam
+22,Indonesia,Golomunta,Rupiah,Polish
+23,United States,Van Nuys,Dollar,Bengali
+24,Russia,Sarov,Ruble,Georgian
+25,Argentina,Rada Tilly,Peso,Estonian
+26,United Arab Emirates,Umm al Qaywayn,Dirham,Kashmiri
+27,China,Quankou,Yuan Renminbi,Macedonian
+28,Palestinian Territory,Khallat ad Dār,Shekel,Oriya
+29,Serbia,Tršić,Dinar,Dhivehi
+30,China,Damu,Yuan Renminbi,Kashmiri
+31,Norway,Oslo,Krone,Hebrew
+32,China,Liangguang,Yuan Renminbi,Māori
+33,Latvia,Zelmeņi,Euro,Lithuanian
+34,Reunion,Le Port,Euro,Assamese
+35,Japan,Ujiie,Yen,Kannada
+36,Philippines,Lunao,Peso,Dari
+37,China,Huangtang,Yuan Renminbi,Burmese
+38,China,Fenghui,Yuan Renminbi,Hindi
+39,Ukraine,Slatyne,Hryvnia,Finnish
+40,Slovakia,Bratislava,Euro,Maltese
+41,Poland,Nasielsk,Zloty,Somali
+42,Thailand,Tha Luang,Baht,Chinese
+43,Cuba,Matanzas,Peso,Tswana
+44,Philippines,Cawayan,Peso,Thai
+45,China,Huanglong,Yuan Renminbi,Bengali
+46,Canada,Hudson,Dollar,Gagauz
+47,Brazil,Senhor do Bonfim,Real,Tok Pisin
+48,Russia,Osa,Ruble,Bulgarian
+49,Indonesia,Jepuro,Rupiah,Pashto
+50,Serbia,Valjevo,Dinar,Portuguese
+51,Philippines,Santa Barbara,Peso,Hiri Motu
+52,Indonesia,Caringin,Rupiah,Irish Gaelic
+53,France,Vernon,Euro,Polish
+54,China,Wuhu,Yuan Renminbi,New Zealand Sign Language
+55,France,La Valette-du-Var,Euro,Dari
+56,Brazil,Castanhal,Real,Zulu
+57,Indonesia,Sumberagung,Rupiah,Chinese
+58,China,Leye,Yuan Renminbi,Bosnian
+59,Russia,Sernovodsk,Ruble,Bulgarian
+60,South Africa,Newlands,Rand,Somali
+61,China,Jiangbu,Yuan Renminbi,Dhivehi
+62,Iran,Āshkhāneh,Rial,Icelandic
+63,Czech Republic,Bohdalov,Koruna,French
+64,China,Hangbu,Yuan Renminbi,Kannada
+65,China,Chendong,Yuan Renminbi,Assamese
+66,Russia,Leninsk,Ruble,Tajik
+67,Indonesia,Kadipaten,Rupiah,Mongolian
+68,Panama,Guadalupe,Balboa,Hindi
+69,China,Longsha,Yuan Renminbi,Thai
+70,Brazil,Coroatá,Real,Telugu
+71,Philippines,Payao,Peso,English
+72,Indonesia,Mertani,Rupiah,Swedish
+73,China,Jiaodai,Yuan Renminbi,Amharic
+74,France,Narbonne,Euro,German
+75,Portugal,Cortes,Euro,Kurdish
+76,China,Dapo,Yuan Renminbi,Latvian
+77,China,Yuewan,Yuan Renminbi,Haitian Creole
+78,China,Jiutai,Yuan Renminbi,Finnish
+79,Kazakhstan,Turar Ryskulov,Tenge,Hiri Motu
+80,China,Huangzhai,Yuan Renminbi,Luxembourgish
+81,Indonesia,Bantul,Rupiah,Punjabi
+82,South Africa,Tzaneen,Rand,Gagauz
+83,China,Liulang,Yuan Renminbi,Portuguese
+84,South Korea,Gumi,Won,Hiri Motu
+85,China,Xingguo,Yuan Renminbi,Armenian
+86,Philippines,Del Rosario,Peso,Dutch
+87,Indonesia,Pasirputih,Rupiah,Maltese
+88,Indonesia,Krajan Satu,Rupiah,Pashto
+89,Peru,Ccatca,Sol,Croatian
+90,Sweden,Växjö,Krona,Bengali
+91,Jordan,Al Azraq ash Shamālī,Dinar,Hindi
+92,Panama,Nueva Gorgona,Balboa,Malagasy
+93,Philippines,Plaridel,Peso,West Frisian
+94,Ukraine,Nikita,Hryvnia,Guaraní
+95,China,Tangchijie,Yuan Renminbi,Tamil
+96,French Polynesia,Vaitape,Franc,Portuguese
+97,Indonesia,Oehaunu,Rupiah,Tetum
+98,China,Huizhai,Yuan Renminbi,Fijian
+99,Canada,L'Assomption,Dollar,Macedonian
+100,China,Yingzai,Yuan Renminbi,Armenian
+101,Indonesia,Suwaluh,Rupiah,Korean
+102,Cyprus,Ergates,Euro,Albanian
+103,Vietnam,Tân Châu,Dong,Papiamento
+104,Argentina,Villa Atamisqui,Peso,German
+105,Indonesia,Cikayas,Rupiah,Bulgarian
+106,South Africa,Kokstad,Rand,Tetum
+107,Uzbekistan,Bŭka,Som,Kyrgyz
+108,Philippines,Nangka,Peso,Latvian
+109,Indonesia,Sumberjeruk,Rupiah,Norwegian
+110,Brazil,Arroio do Meio,Real,Mongolian
+111,China,Dengzishan,Yuan Renminbi,Georgian
+112,Peru,Chacapalpa,Sol,Dzongkha
+113,Russia,Starotitarovskaya,Ruble,Malayalam
+114,Peru,Huacrapuquio,Sol,Tswana
+115,Brazil,Pirapora,Real,Romanian
+116,Peru,Mollepampa,Sol,Hindi
+117,China,Linshi,Yuan Renminbi,Portuguese
+118,Portugal,Cabanas de Viriato,Euro,Pashto
+119,Indonesia,Matango,Rupiah,Danish
+120,China,Dongtian,Yuan Renminbi,Somali
+121,Kosovo,Gjilan,Euro,Czech
+122,China,Wangchang,Yuan Renminbi,Bosnian
+123,Kenya,Isiolo,Shilling,Persian
+124,Indonesia,Sudikampir,Rupiah,Portuguese
+125,Indonesia,Tajan,Rupiah,Tswana
+126,Mongolia,Зуунмод,Tugrik,Bosnian
+127,Peru,Caspisapa,Sol,Chinese
+128,Argentina,Añatuya,Peso,Bislama
+129,Uzbekistan,Qorao’zak,Som,Hungarian
+130,Norway,Kristiansand S,Krone,German
+131,Indonesia,Krajan,Rupiah,West Frisian
+132,Indonesia,Seso,Rupiah,Dzongkha
+133,Brazil,Juazeiro do Norte,Real,Portuguese
+134,Indonesia,Karangkedawung,Rupiah,Belarusian
+135,China,Zhenkou,Yuan Renminbi,Marathi
+136,Colombia,Angostura,Peso,Hungarian
+137,Vietnam,Cần Giờ,Dong,Luxembourgish
+138,Chad,Am Djarass,Franc,Quechua
+139,Indonesia,Banjar Medura,Rupiah,Sotho
+140,France,Dijon,Euro,Bulgarian
+141,Philippines,Kabacan,Peso,Punjabi
+142,China,Chuanshan,Yuan Renminbi,Malay
+143,United States,Albany,Dollar,Kannada
+144,Philippines,Cabatuan,Peso,Assamese
+145,Syria,Al Ghāriyah,Pound,Lithuanian
+146,Norway,Kristiansand S,Krone,Bislama
+147,Russia,Udobnaya,Ruble,Malayalam
+148,Brazil,Buritama,Real,Northern Sotho
+149,Portugal,Constance,Euro,Hindi
+150,United States,Buffalo,Dollar,Assamese
+151,Philippines,Lumbayan,Peso,Dutch
+152,Panama,Guabito,Balboa,Catalan
+153,Vietnam,Tiên Lãng,Dong,Hebrew
+154,Croatia,Jastrebarsko,Kuna,Irish Gaelic
+155,Indonesia,Margoyoso,Rupiah,Lithuanian
+156,Norway,Stavanger,Krone,Kashmiri
+157,China,Erong,Yuan Renminbi,Dhivehi
+158,Peru,Conchamarca,Sol,Hebrew
+159,China,Shengrenjian,Yuan Renminbi,Belarusian
+160,Norway,Elverum,Krone,West Frisian
+161,Indonesia,Gadingrejo,Rupiah,Belarusian
+162,Malta,L-Iklin,Euro,Nepali
+163,Norway,Bergen,Krone,Kannada
+164,Croatia,Vukojevci,Kuna,Afrikaans
+165,China,Huixing,Yuan Renminbi,Nepali
+166,Indonesia,Salinggara,Rupiah,Lao
+167,Ukraine,Kuteynykove,Hryvnia,Guaraní
+168,Poland,Osiek,Zloty,Armenian
+169,Chad,Moussoro,Franc,West Frisian
+170,Ukraine,Znomenka,Hryvnia,Dhivehi
+171,Thailand,Ko Chan,Baht,New Zealand Sign Language
+172,Angola,Mbanza Congo,Kwanza,Lao
+173,Brazil,Novo Cruzeiro,Real,Macedonian
+174,Spain,Elx/Elche,Euro,Norwegian
+175,China,Chakou,Yuan Renminbi,Filipino
+176,China,Hadabei,Yuan Renminbi,Malayalam
+177,France,Vitrolles,Euro,Fijian
+178,United States,Great Neck,Dollar,Nepali
+179,Brazil,Várzea Paulista,Real,Malagasy
+180,China,Louta,Yuan Renminbi,Papiamento
+181,Somalia,Burao,Shilling,Kurdish
+182,Iraq,Al Başrah,Dinar,Latvian
+183,China,Hongxi,Yuan Renminbi,Tok Pisin
+184,Indonesia,Wotan,Rupiah,Pashto
+185,Brazil,Irecê,Real,Swedish
+186,Brazil,São Domingos do Maranhão,Real,Norwegian
+187,China,Shanghu,Yuan Renminbi,Punjabi
+188,Malaysia,Kuala Lumpur,Ringgit,Azeri
+189,Portugal,Boucinhas,Euro,Persian
+190,China,Longmen,Yuan Renminbi,Romanian
+191,Sweden,Halmstad,Krona,Fijian
+192,Philippines,Tungol,Peso,Haitian Creole
+193,Panama,San Francisco,Balboa,Latvian
+194,China,Wudabao,Yuan Renminbi,Khmer
+195,Montenegro,Žabljak,Euro,Kurdish
+196,United States,Harrisburg,Dollar,Nepali
+197,Indonesia,Somba,Rupiah,Fijian
+198,Philippines,Tikiw,Peso,Romanian
+199,France,Marseille,Euro,Lao
+200,China,Xagqu,Yuan Renminbi,Tetum
+201,Poland,Pierzchnica,Zloty,Dzongkha
+202,Indonesia,Krajan,Rupiah,Finnish
+203,Philippines,Buyuan,Peso,Macedonian
+204,Philippines,Rotunda,Peso,Burmese
+205,China,Zhuangxing,Yuan Renminbi,Albanian
+206,Brazil,Jandaia do Sul,Real,French
+207,Indonesia,Punggurharjo,Rupiah,Mongolian
+208,Philippines,Guihing Proper,Peso,Luxembourgish
+209,Indonesia,Lunyuk Ode,Rupiah,Haitian Creole
+210,Poland,Sidzina,Zloty,Dari
+211,Mexico,Arroyo Seco,Peso,Spanish
+212,Sweden,Bandhagen,Krona,Burmese
+213,Indonesia,Cikadongdong,Rupiah,English
+214,Indonesia,Mulyadadi,Rupiah,Czech
+215,China,Dengmu,Yuan Renminbi,Norwegian
+216,China,Honghualiangzi,Yuan Renminbi,Dhivehi
+217,Brazil,Garibaldi,Real,Latvian
+218,Honduras,Quebrada Larga,Lempira,Yiddish
+219,China,Jiaowei,Yuan Renminbi,Icelandic
+220,China,Maying,Yuan Renminbi,Indonesian
+221,United States,Norwalk,Dollar,Polish
+222,Indonesia,Kadujajar,Rupiah,Kashmiri
+223,Indonesia,Lawesigalagala Timur,Rupiah,Irish Gaelic
+224,Brazil,Salgado,Real,Maltese
+225,Poland,Bejsce,Zloty,Dutch
+226,Mexico,Francisco J Mujica,Peso,Dutch
+227,Indonesia,Kamalaputi,Rupiah,Mongolian
+228,Indonesia,Jalanbaru,Rupiah,Macedonian
+229,Portugal,Amorim,Euro,Tamil
+230,Brazil,Salto,Real,Zulu
+231,China,Jiuxian,Yuan Renminbi,Khmer
+232,France,Hagondange,Euro,Gagauz
+233,China,Dongying,Yuan Renminbi,Finnish
+234,Portugal,Fonte Boa da Brincosa,Euro,Pashto
+235,China,Zhongyuan,Yuan Renminbi,English
+236,Czech Republic,Albrechtice,Koruna,Burmese
+237,Indonesia,Munse,Rupiah,Kyrgyz
+238,Spain,Malaga,Euro,Tetum
+239,Indonesia,Banjar Delodrurung,Rupiah,New Zealand Sign Language
+240,Philippines,San Emilio,Peso,Māori
+241,Peru,Asquipata,Sol,Kashmiri
+242,Portugal,Cochadas,Euro,Spanish
+243,Philippines,Tagakpan,Peso,Czech
+244,Finland,Nurmo,Euro,Afrikaans
+245,Somalia,Waajid,Shilling,Macedonian
+246,Poland,Siepraw,Zloty,Tetum
+247,Russia,Syktyvkar,Ruble,Dzongkha
+248,China,Tanzhou,Yuan Renminbi,Korean
+249,Argentina,Goya,Peso,Bosnian
+250,Pakistan,Ārifwāla,Rupee,Kashmiri
+251,Maldives,Fuvahmulah,Rufiyaa,Bulgarian
+252,Vietnam,Thị Trấn Nho Quan,Dong,Kannada
+253,Belarus,Vishnyeva,Ruble,Punjabi
+254,Indonesia,Karangsembung,Rupiah,Catalan
+255,Colombia,Maní,Peso,Malay
+256,China,Hechun,Yuan Renminbi,Malayalam
+257,China,Changgai,Yuan Renminbi,Montenegrin
+258,Indonesia,Wairinding,Rupiah,Gagauz
+259,Portugal,Lordelo,Euro,Malay
+260,Indonesia,Kertasari,Rupiah,Greek
+261,Portugal,Corujeira,Euro,Gujarati
+262,Armenia,Gyumri,Dram,Spanish
+263,Portugal,Atães,Euro,Tamil
+264,China,Sanyantang,Yuan Renminbi,Nepali
+265,Slovenia,Komenda,Euro,Zulu
+266,Malaysia,Kangar,Ringgit,Persian
+267,Philippines,Kalamangog,Peso,Hungarian
+268,China,Jiangna,Yuan Renminbi,Finnish
+269,United States,Milwaukee,Dollar,Moldovan
+270,Greece,Kalí Vrýsi,Euro,Norwegian
+271,Russia,Ufa,Ruble,Khmer
+272,Colombia,Belalcazar,Peso,Malagasy
+273,China,Lingdangge,Yuan Renminbi,Quechua
+274,Syria,Sahnaiya,Pound,Korean
+275,China,Huocheng,Yuan Renminbi,Czech
+276,Greece,Rodotópi,Euro,Montenegrin
+277,Russia,Slobodskoy,Ruble,Bulgarian
+278,Russia,Koshki,Ruble,Maltese
+279,Canada,Danville,Dollar,Lithuanian
+280,China,Hengling,Yuan Renminbi,Swedish
+281,Luxembourg,Strassen,Euro,Spanish
+282,Greece,Gýtheio,Euro,Italian
+283,Indonesia,Campraksanta,Rupiah,Malagasy
+284,Indonesia,Pringgoboyo,Rupiah,Lao
+285,United States,Erie,Dollar,Icelandic
+286,China,Jiang’an,Yuan Renminbi,Tswana
+287,United States,Portland,Dollar,Telugu
+288,United States,Daytona Beach,Dollar,Khmer
+289,Brazil,Pôsto Fiscal Rolim de Moura,Real,Aymara
+290,Croatia,Gradići,Kuna,Hungarian
+291,Indonesia,Sampangbitung,Rupiah,Ndebele
+292,Indonesia,Cibolang,Rupiah,Japanese
+293,Lithuania,Mazeikiai,Litas,Romanian
+294,South Korea,Yeoju,Won,Portuguese
+295,Indonesia,Kedungbang,Rupiah,German
+296,Peru,Huachos,Sol,Malay
+297,Mexico,Santa Rosa,Peso,Latvian
+298,China,Shiyaogou,Yuan Renminbi,Swedish
+299,Sweden,Boliden,Krona,Estonian
+300,China,Huidong,Yuan Renminbi,West Frisian
+301,China,Zhugentan,Yuan Renminbi,Fijian
+302,Philippines,La Paz,Peso,Pashto
+303,Nigeria,Damaturu,Naira,Korean
+304,Bulgaria,Malko Tŭrnovo,Lev,Hebrew
+305,Indonesia,Dinititi,Rupiah,German
+306,Latvia,Riga,Euro,Kashmiri
+307,China,Jiangya,Yuan Renminbi,Albanian
+308,China,Zhaozhen,Yuan Renminbi,Dhivehi
+309,Armenia,Tsaghkahovit,Dram,Haitian Creole
+310,China,Lianhua,Yuan Renminbi,Kurdish
+311,Indonesia,Mojomulyokrajan,Rupiah,Malagasy
+312,Colombia,Morales,Peso,Gujarati
+313,Russia,Urus-Martan,Ruble,Italian
+314,France,Argentan,Euro,Finnish
+315,Japan,Fukuyama,Yen,Maltese
+316,Russia,Gribanovskiy,Ruble,Dari
+317,Ukraine,Nyzhni Petrivtsi,Hryvnia,Tswana
+318,China,Hetai,Yuan Renminbi,Bosnian
+319,Lithuania,Virbalis,Litas,Swedish
+320,Russia,Timashëvsk,Ruble,Latvian
+321,Portugal,Cercal,Euro,Mongolian
+322,Thailand,Fao Rai,Baht,Italian
+323,Bulgaria,Chavdar,Lev,Sotho
+324,Pakistan,Tando Muhammad Khān,Rupee,Hiri Motu
+325,Portugal,Mealhada,Euro,Maltese
+326,China,Mengcheng Chengguanzhen,Yuan Renminbi,Aymara
+327,Syria,Hisya,Pound,Indonesian
+328,Philippines,Ipil,Peso,Tswana
+329,Russia,Mayma,Ruble,West Frisian
+330,Mexico,Vicente Guerrero,Peso,Korean
+331,Iran,Javānrūd,Rial,Malay
+332,Ukraine,Pohrebyshche,Hryvnia,Tsonga
+333,Central African Republic,Bimbo,Franc,Bengali
+334,United States,Saint Petersburg,Dollar,Amharic
+335,Japan,Kasukabe,Yen,Kurdish
+336,Madagascar,Manakara,Ariary,Kyrgyz
+337,Russia,Yershov,Ruble,Bulgarian
+338,Japan,Takahagi,Yen,Bulgarian
+339,China,Heshui,Yuan Renminbi,Malay
+340,Bulgaria,Panagyurishte,Lev,Māori
+341,Luxembourg,Septfontaines,Euro,Belarusian
+342,Portugal,Mouquim,Euro,Dhivehi
+343,Armenia,Gandzak,Dram,Mongolian
+344,China,Jiujiang,Yuan Renminbi,Khmer
+345,Kenya,Embu,Shilling,Thai
+346,Kazakhstan,Ognevka,Tenge,Malay
+347,Ukraine,Kobleve,Hryvnia,Fijian
+348,Ivory Coast,Toumodi,Franc,Kazakh
+349,China,Yangying,Yuan Renminbi,Burmese
+350,Ecuador,Naranjito,Dollar,Montenegrin
+351,China,Fenchen,Yuan Renminbi,Hindi
+352,Philippines,Tabango,Peso,Afrikaans
+353,China,Leluo,Yuan Renminbi,Hindi
+354,Nigeria,Sabon Gari-Nangere,Naira,Gujarati
+355,French Polynesia,Arue,Franc,Malayalam
+356,Russia,Synya,Ruble,Icelandic
+357,China,Gyangkar,Yuan Renminbi,Kyrgyz
+358,Tajikistan,Istaravshan,Somoni,Romanian
+359,Venezuela,Tinaco,Bolivar,Danish
+360,Vietnam,Văn Điển,Dong,Dutch
+361,Peru,Juli,Sol,Kashmiri
+362,Indonesia,Bungkulan,Rupiah,Swedish
+363,Albania,Krrabë,Lek,Danish
+364,France,Lorient,Euro,Tok Pisin
+365,Brazil,Paranapanema,Real,Kashmiri
+366,China,Jianshe,Yuan Renminbi,Punjabi
+367,Indonesia,Cigaleuh Kulon,Rupiah,Papiamento
+368,China,Lian,Yuan Renminbi,Tamil
+369,Indonesia,Lai Lai Bisi Kopan,Rupiah,Chinese
+370,Guatemala,Patulul,Quetzal,Malay
+371,Philippines,Pandan,Peso,Yiddish
+372,Indonesia,Tanjungjaya,Rupiah,Papiamento
+373,Ukraine,Pidvynohradiv,Hryvnia,Czech
+374,Indonesia,Cilated,Rupiah,Dzongkha
+375,Indonesia,Keboncau,Rupiah,Assamese
+376,Mexico,San Francisco,Peso,Bengali
+377,France,Cergy-Pontoise,Euro,Malayalam
+378,Philippines,Siay,Peso,French
+379,Canada,Digby,Dollar,Tsonga
+380,Brazil,Breves,Real,Kurdish
+381,Brazil,Regente Feijó,Real,Ndebele
+382,China,Tianfen,Yuan Renminbi,English
+383,Thailand,Lang Suan,Baht,Sotho
+384,China,Hualong,Yuan Renminbi,Dari
+385,Japan,Takahama,Yen,West Frisian
+386,Finland,Hämeenkoski,Euro,Malayalam
+387,Russia,Kamenka,Ruble,Telugu
+388,China,Fenglin,Yuan Renminbi,Northern Sotho
+389,France,Fresnes,Euro,Swahili
+390,Portugal,Erada,Euro,Malay
+391,Indonesia,Banyuurip,Rupiah,Marathi
+392,Indonesia,Talibura,Rupiah,Korean
+393,China,Jianping,Yuan Renminbi,Montenegrin
+394,Chile,Pitrufquén,Peso,Lithuanian
+395,China,Xinshichang,Yuan Renminbi,Lithuanian
+396,Brazil,São Paulo,Real,Malay
+397,Philippines,Aramayuan,Peso,Tetum
+398,Sweden,Bagarmossen,Krona,Polish
+399,Philippines,Haligue,Peso,Malay
+400,Czech Republic,Vacov,Koruna,Hiri Motu
+401,Indonesia,Dahu Satu,Rupiah,Portuguese
+402,Argentina,Intendente Alvear,Peso,Romanian
+403,China,Xiaodukou,Yuan Renminbi,Dari
+404,Indonesia,Boncis,Rupiah,Italian
+405,China,Maqiu,Yuan Renminbi,Malagasy
+406,Iraq,Koysinceq,Dinar,Sotho
+407,Guatemala,Monjas,Quetzal,Bulgarian
+408,Philippines,Plaridel,Peso,Malagasy
+409,Russia,Anzhero-Sudzhensk,Ruble,Gagauz
+410,Philippines,Bualan,Peso,Assamese
+411,China,Xianlong,Yuan Renminbi,Somali
+412,China,Tawa,Yuan Renminbi,Haitian Creole
+413,Russia,Moshenskoye,Ruble,Dzongkha
+414,Kenya,Malikisi,Shilling,Yiddish
+415,Russia,Saratov,Ruble,French
+416,Mongolia,Buyant,Tugrik,Portuguese
+417,Russia,Tulyushka,Ruble,Quechua
+418,Indonesia,Kuncen,Rupiah,Northern Sotho
+419,Colombia,La Unión,Peso,Greek
+420,China,Guangning,Yuan Renminbi,Telugu
+421,Ghana,Savelugu,Cedi,Polish
+422,Russia,Vagonoremont,Ruble,Kyrgyz
+423,China,Shangyi,Yuan Renminbi,Estonian
+424,Czech Republic,Vlkoš,Koruna,Guaraní
+425,Austria,Sankt Andrä-Höch,Euro,Kannada
+426,Nepal,Rājbirāj,Rupee,Maltese
+427,Russia,Kholmsk,Ruble,Tajik
+428,China,Longquan,Yuan Renminbi,Quechua
+429,Brazil,Arroio Grande,Real,Tajik
+430,Cambodia,Kampong Speu,Riels,Spanish
+431,Russia,Velikiye Luki,Ruble,Māori
+432,France,Perpignan,Euro,Korean
+433,China,Xinlong,Yuan Renminbi,Punjabi
+434,Indonesia,Cibiru,Rupiah,Chinese
+435,Russia,Tungor,Ruble,Japanese
+436,France,Marignane,Euro,Dari
+437,China,Huangling,Yuan Renminbi,Greek
+438,Armenia,Aghavnatun,Dram,Malay
+439,Indonesia,Tulungrejo,Rupiah,Malagasy
+440,United States,Denver,Dollar,Tswana
+441,Portugal,Baguim do Monte,Euro,Malayalam
+442,China,Wanglinkou,Yuan Renminbi,Kashmiri
+443,Indonesia,Kondangrege,Rupiah,Azeri
+444,Russia,Novyy Uoyan,Ruble,Armenian
+445,Russia,Verkhniy Lomov,Ruble,German
+446,Philippines,Kitcharao,Peso,Marathi
+447,France,Paris 18,Euro,Czech
+448,China,Lanxi,Yuan Renminbi,Telugu
+449,Switzerland,Basel,Franc,Guaraní
+450,France,Mâcon,Euro,Estonian
+451,Portugal,Santa Maria da Feira,Euro,Dari
+452,Azerbaijan,Geoktschai,Manat,Tswana
+453,Indonesia,Sulang Tengah,Rupiah,Tetum
+454,Indonesia,Watublapi,Rupiah,Burmese
+455,China,Baixi,Yuan Renminbi,Kazakh
+456,Portugal,Ferreiros,Euro,Nepali
+457,China,Qiaozhuang,Yuan Renminbi,Ndebele
+458,China,Zhongxin,Yuan Renminbi,Guaraní
+459,Indonesia,Watulumbung,Rupiah,Swati
+460,China,Kax,Yuan Renminbi,Spanish
+461,Afghanistan,Rabāţ-e Sangī-ye Pā’īn,Afghani,Sotho
+462,Indonesia,Nanggorak,Rupiah,Bosnian
+463,Canada,Sutton,Dollar,Moldovan
+464,Poland,Korsze,Zloty,Czech
+465,Brazil,Perdões,Real,Kashmiri
+466,China,Hudong,Yuan Renminbi,Burmese
+467,China,Hualin,Yuan Renminbi,Azeri
+468,Bolivia,Yacuíba,Boliviano,Papiamento
+469,Norway,Bergen,Krone,Norwegian
+470,United States,Reston,Dollar,Kyrgyz
+471,Brazil,Oeiras,Real,English
+472,Colombia,Mariquita,Peso,Tetum
+473,Russia,Tolbazy,Ruble,Korean
+474,China,Fengdian,Yuan Renminbi,Armenian
+475,China,Qingshan,Yuan Renminbi,Irish Gaelic
+476,China,Daixi,Yuan Renminbi,Khmer
+477,Czech Republic,Rousínov,Koruna,Finnish
+478,Brazil,Itabira,Real,Romanian
+479,Russia,Koygorodok,Ruble,Hindi
+480,Brazil,Nova Era,Real,Kurdish
+481,Bosnia and Herzegovina,Zborište,Marka,Spanish
+482,Chile,Talcahuano,Peso,Maltese
+483,Philippines,Lumatil,Peso,Lao
+484,Philippines,Aurora,Peso,New Zealand Sign Language
+485,North Korea,Musan-ŭp,Won,Georgian
+486,Zimbabwe,Insiza,Dollar,Pashto
+487,Indonesia,Campor,Rupiah,Sotho
+488,Indonesia,Pagelaran,Rupiah,Latvian
+489,Bulgaria,Koynare,Lev,Tajik
+490,China,Wolong,Yuan Renminbi,Indonesian
+491,Lithuania,Lazdijai,Litas,Dutch
+492,China,Xinghua,Yuan Renminbi,Kazakh
+493,Democratic Republic of the Congo,Kalemie,Franc,Tsonga
+494,Morocco,Kenitra,Dirham,French
+495,Canada,Grande Cache,Dollar,Persian
+496,Canada,Fredericton,Dollar,Croatian
+497,Philippines,Anda,Peso,French
+498,Bolivia,San Pedro,Boliviano,Azeri
+499,Russia,Shakhty,Ruble,Oriya
+500,China,Ziyang,Yuan Renminbi,Luxembourgish
+501,France,Gennevilliers,Euro,Danish
+502,Ukraine,Manyava,Hryvnia,Chinese
+503,Jamaica,Port Antonio,Dollar,Hebrew
+504,Malaysia,Alor Setar,Ringgit,Marathi
+505,Philippines,Caibiran,Peso,Tamil
+506,Mongolia,Buyant,Tugrik,Albanian
+507,Indonesia,Bantawora,Rupiah,Tamil
+508,United States,El Paso,Dollar,Hebrew
+509,China,Ji’an,Yuan Renminbi,French
+510,Finland,Kaskinen,Euro,Albanian
+511,Philippines,Pagatin,Peso,Estonian
+512,Bosnia and Herzegovina,Gornja Koprivna,Marka,Bulgarian
+513,Indonesia,Selaparang Timur,Rupiah,Assamese
+514,Palestinian Territory,Mardā,Shekel,Northern Sotho
+515,Thailand,Tha Yang,Baht,Burmese
+516,China,Nianqiao,Yuan Renminbi,Northern Sotho
+517,Brazil,Itumbiara,Real,Norwegian
+518,Philippines,Gabi,Peso,Assamese
+519,Panama,Bejuco,Balboa,Italian
+520,China,Rongxiang,Yuan Renminbi,Finnish
+521,France,Chantilly,Euro,Portuguese
+522,France,Montpellier,Euro,Mongolian
+523,Poland,Garwolin,Zloty,Kyrgyz
+524,China,Shenjing,Yuan Renminbi,Nepali
+525,Ecuador,Yaguachi Nuevo,Dollar,Mongolian
+526,Brazil,Floresta,Real,Indonesian
+527,Brazil,Caeté,Real,Oriya
+528,China,Qinghe,Yuan Renminbi,Northern Sotho
+529,Thailand,Ban Chang,Baht,Bengali
+530,Russia,Devitsa,Ruble,Tamil
+531,Israel,Nazareth,Shekel,Kurdish
+532,France,Lille,Euro,Kazakh
+533,Peru,Palca,Sol,Ndebele
+534,Sweden,Skellefteå,Krona,Latvian
+535,China,Shekou,Yuan Renminbi,Latvian
+536,Indonesia,Babakanlapang,Rupiah,Greek
+537,Philippines,Busay,Peso,Indonesian
+538,Sweden,Västervik,Krona,Malay
+539,Indonesia,Daleman,Rupiah,Malay
+540,France,Bastia,Euro,Hebrew
+541,Indonesia,Pasembon,Rupiah,Korean
+542,Thailand,Ban Na San,Baht,Yiddish
+543,China,Zhangfang,Yuan Renminbi,Telugu
+544,China,Tongshan,Yuan Renminbi,Māori
+545,China,Sanbaishan,Yuan Renminbi,Kashmiri
+546,Macedonia,Morani,Denar,Mongolian
+547,Indonesia,Trambalan,Rupiah,Amharic
+548,Portugal,Fonte da Aldeia,Euro,Bulgarian
+549,Poland,Lgota Wielka,Zloty,Kashmiri
+550,China,Bahaodi,Yuan Renminbi,Punjabi
+551,Malaysia,Alor Setar,Ringgit,Haitian Creole
+552,United Kingdom,Linton,Pound,Khmer
+553,Peru,Zaña,Sol,Catalan
+554,Philippines,Luna,Peso,Sotho
+555,Indonesia,Desa Margaluyu,Rupiah,Marathi
+556,Russia,Smolyaninovo,Ruble,Kannada
+557,China,Jinpanling,Yuan Renminbi,Māori
+558,France,Blaye,Euro,Quechua
+559,Indonesia,Barajalan,Rupiah,Lao
+560,China,Beigang,Yuan Renminbi,Moldovan
+561,China,Nanxing,Yuan Renminbi,Albanian
+562,Egypt,Kousa,Pound,Kannada
+563,Portugal,Vale de Touros,Euro,Arabic
+564,Ivory Coast,Séguéla,Franc,Greek
+565,Venezuela,Caraballeda,Bolivar,Estonian
+566,France,Saint-Étienne-du-Rouvray,Euro,Tamil
+567,Philippines,Sison,Peso,Portuguese
+568,Russia,Rayevskiy,Ruble,Kashmiri
+569,China,Jiaze,Yuan Renminbi,Thai
+570,Poland,Brusy,Zloty,Tetum
+571,Brazil,Franca,Real,Tajik
+572,China,Dongcheng,Yuan Renminbi,Moldovan
+573,Brazil,Bauru,Real,Telugu
+574,Mauritius,Saint Pierre,Rupee,Khmer
+575,Belarus,Byerazino,Ruble,Punjabi
+576,United States,Cedar Rapids,Dollar,Polish
+577,Poland,Husów,Zloty,Irish Gaelic
+578,France,Nancy,Euro,Catalan
+579,Thailand,Bang Khon Thi,Baht,Afrikaans
+580,China,Gaohu,Yuan Renminbi,Tamil
+581,Namibia,Ongandjera,Dollar,Italian
+582,China,Dayuanhuizu,Yuan Renminbi,Punjabi
+583,Sudan,El Fasher,Pound,Icelandic
+584,China,Xi’an,Yuan Renminbi,Tsonga
+585,China,Shencun,Yuan Renminbi,Maltese
+586,China,Honggang,Yuan Renminbi,Burmese
+587,Armenia,Kasakh,Dram,Italian
+588,Spain,Ferrol,Euro,Maltese
+589,Sweden,Kungsbacka,Krona,Malay
+590,China,Zhonggang,Yuan Renminbi,Tajik
+591,Iran,Borūjerd,Rial,Polish
+592,Russia,Pokrovka,Ruble,Tsonga
+593,Georgia,Gulrip’shi,Lari,Thai
+594,Malaysia,Kuala Lumpur,Ringgit,Mongolian
+595,Thailand,Ang Thong,Baht,Gagauz
+596,China,Shuangjiang,Yuan Renminbi,Spanish
+597,China,Liangkou,Yuan Renminbi,Romanian
+598,Philippines,Pagsabangan,Peso,Assamese
+599,Croatia,Suhopolje,Kuna,Zulu
+600,Venezuela,Caramuca,Bolivar,Icelandic
+601,Czech Republic,Liběšice,Koruna,Tetum
+602,Indonesia,Riang Tengah,Rupiah,Norwegian
+603,Russia,Shar’ya,Ruble,Bosnian
+604,Dominican Republic,Esperanza,Peso,Bosnian
+605,Colombia,Cali,Peso,Dzongkha
+606,Marshall Islands,Ebaye,Dollar,Luxembourgish
+607,Poland,Bojadła,Zloty,Dhivehi
+608,Czech Republic,Zborovice,Koruna,Oriya
+609,China,Dongzha,Yuan Renminbi,Romanian
+610,Czech Republic,Horní Počaply,Koruna,Romanian
+611,China,Pumaqangtang,Yuan Renminbi,Khmer
+612,Belgium,Mons,Euro,Armenian
+613,Japan,Hobaramachi,Yen,Macedonian
+614,Chile,Corral,Peso,Hindi
+615,Greece,Skalánion,Euro,Luxembourgish
+616,Slovenia,Cankova,Euro,Somali
+617,France,Rennes,Euro,Romanian
+618,Indonesia,Pakapasan Ilir,Rupiah,Papiamento
+619,Poland,Niemodlin,Zloty,Montenegrin
+620,Mexico,El Mirador,Peso,Swahili
+621,China,Shangfang,Yuan Renminbi,Swati
+622,Philippines,Buenavista,Peso,Georgian
+623,Ukraine,Komsomol’s’ke,Hryvnia,Nepali
+624,Russia,Krasnomayskiy,Ruble,English
+625,Philippines,Pinagsibaan,Peso,Kurdish
+626,Indonesia,Sukamulya,Rupiah,Tok Pisin
+627,Greece,Sérvia,Euro,Ndebele
+628,Portugal,Colos,Euro,Chinese
+629,Brazil,Aragarças,Real,Dzongkha
+630,Armenia,Archis,Dram,Dutch
+631,Indonesia,Mauponggo,Rupiah,Kannada
+632,Indonesia,Karangarjo,Rupiah,Tswana
+633,Brazil,Santa Rita do Sapucaí,Real,Zulu
+634,Benin,Tanguiéta,Franc,Dari
+635,South Africa,Mthatha,Rand,Armenian
+636,Pakistan,Mānānwāla,Rupee,Irish Gaelic
+637,Afghanistan,Asadābād,Afghani,Afrikaans
+638,Thailand,Sung Noen,Baht,Tetum
+639,Palestinian Territory,Baytīn,Shekel,Albanian
+640,Philippines,Masantol,Peso,Irish Gaelic
+641,Peru,Mangas,Sol,Afrikaans
+642,North Korea,Kapsan-ŭp,Won,Arabic
+643,China,Lantang,Yuan Renminbi,Yiddish
+644,China,Wupu,Yuan Renminbi,Georgian
+645,Brazil,Porto Feliz,Real,Dutch
+646,Nigeria,Lagos,Naira,French
+647,China,Nanzhihui,Yuan Renminbi,Maltese
+648,Kazakhstan,Balyqshy,Tenge,Maltese
+649,China,Liucheng,Yuan Renminbi,Lao
+650,Germany,Hamburg,Euro,Icelandic
+651,Mongolia,Öldziyt,Tugrik,Bosnian
+652,Philippines,Bayanan,Peso,Mongolian
+653,Indonesia,Sungai Raya,Rupiah,Bulgarian
+654,China,Liuheng,Yuan Renminbi,Maltese
+655,Indonesia,Jambesari,Rupiah,Luxembourgish
+656,Poland,Skaryszew,Zloty,Assamese
+657,Peru,Mungui,Sol,Amharic
+658,Greece,Filothéi,Euro,Maltese
+659,Indonesia,Bagusan,Rupiah,Māori
+660,China,Dongshentou,Yuan Renminbi,New Zealand Sign Language
+661,Bosnia and Herzegovina,Popovi,Marka,French
+662,Indonesia,Blimbing,Rupiah,Greek
+663,China,Shaliangzi,Yuan Renminbi,French
+664,Mongolia,Tsagaandörvölj,Tugrik,Assamese
+665,Brazil,Igaraçu do Tietê,Real,Hiri Motu
+666,Indonesia,Pulau Tiga,Rupiah,Nepali
+667,Indonesia,Salinggara,Rupiah,Icelandic
+668,Brazil,Ibiúna,Real,Bengali
+669,Iraq,Khāliş,Dinar,French
+670,Indonesia,Loga,Rupiah,Italian
+671,Thailand,Wiphawadi,Baht,Aymara
+672,Indonesia,Nyapar,Rupiah,Bulgarian
+673,Russia,Soldato-Aleksandrovskoye,Ruble,Burmese
+674,China,Zhouling,Yuan Renminbi,Portuguese
+675,Ukraine,Kivsharivka,Hryvnia,Dzongkha
+676,China,Lidun,Yuan Renminbi,Czech
+677,Philippines,Biga,Peso,Lithuanian
+678,Peru,Olmos,Sol,Māori
+679,Russia,Kashin,Ruble,Kyrgyz
+680,Greece,Agía Varvára,Euro,Hungarian
+681,Slovenia,Kisovec,Euro,Chinese
+682,Peru,Huallanca,Sol,Ndebele
+683,Azerbaijan,Lankaran,Manat,Tajik
+684,Portugal,Eiriz,Euro,Kyrgyz
+685,Paraguay,San Cosme y Damián,Guarani,Tajik
+686,China,Xianchiyu,Yuan Renminbi,Bengali
+687,Czech Republic,Světlá nad Sázavou,Koruna,Yiddish
+688,China,Yushu,Yuan Renminbi,Indonesian
+689,Indonesia,Malausma Kidul,Rupiah,Papiamento
+690,Mexico,Buenos Aires,Peso,Macedonian
+691,France,Châtillon,Euro,Burmese
+692,Democratic Republic of the Congo,Mbanza-Ngungu,Franc,Zulu
+693,Cameroon,Edéa,Franc,Japanese
+694,Portugal,Igreja,Euro,Filipino
+695,Greece,Ílion,Euro,Kannada
+696,Brazil,Cachoeiras de Macacu,Real,Kyrgyz
+697,Indonesia,Tenggong,Rupiah,Northern Sotho
+698,Costa Rica,Quesada,Colon,Dhivehi
+699,Argentina,Oberá,Peso,Bengali
+700,China,Gulonggang,Yuan Renminbi,Amharic
+701,China,Xinglong,Yuan Renminbi,Yiddish
+702,Russia,Glubokiy,Ruble,Telugu
+703,Russia,Strelka,Ruble,Tamil
+704,China,Jishi,Yuan Renminbi,Hungarian
+705,Canada,Neebing,Dollar,Sotho
+706,Uruguay,Los Cerrillos,Peso,Amharic
+707,Brazil,Riolândia,Real,Sotho
+708,Kazakhstan,Shalqīya,Tenge,Croatian
+709,Indonesia,Oebaki,Rupiah,Azeri
+710,Tunisia,Al Ḩammāmāt,Dinar,Malayalam
+711,Belarus,Parychy,Ruble,Haitian Creole
+712,China,Pandi,Yuan Renminbi,Montenegrin
+713,Indonesia,Sukamaju,Rupiah,Malayalam
+714,China,Zhaocun,Yuan Renminbi,Malagasy
+715,Greece,Xilópolis,Euro,Moldovan
+716,China,Siqian,Yuan Renminbi,Finnish
+717,China,Sujiatun,Yuan Renminbi,Czech
+718,China,Leiwang,Yuan Renminbi,English
+719,France,Sens,Euro,Tamil
+720,Indonesia,Kebon Tengah,Rupiah,Swati
+721,Venezuela,Curiapo,Bolivar,Quechua
+722,Yemen,Ḩabūr,Rial,Maltese
+723,Ukraine,Orikhiv,Hryvnia,Sotho
+724,Poland,Bierawa,Zloty,Tsonga
+725,Canada,Gravelbourg,Dollar,Punjabi
+726,Canada,Fort McMurray,Dollar,Amharic
+727,Luxembourg,Boevange-sur-Attert,Euro,Croatian
+728,Indonesia,Ciparakan,Rupiah,Tajik
+729,China,Qijing,Yuan Renminbi,Yiddish
+730,Philippines,Lapu-Lapu City,Peso,Swedish
+731,Serbia,Kladovo,Dinar,Dari
+732,Serbia,Banatsko Veliko Selo,Dinar,Moldovan
+733,China,Huangyuan Chengguanzhen,Yuan Renminbi,Marathi
+734,China,Qiakeri,Yuan Renminbi,Danish
+735,France,Paris 16,Euro,Amharic
+736,Croatia,Dubrava,Kuna,Northern Sotho
+737,Sweden,Enköping,Krona,Kyrgyz
+738,Brazil,Recreio,Real,Dhivehi
+739,Tunisia,Skhira,Dinar,Japanese
+740,Iceland,Álftanes,Krona,Tswana
+741,Thailand,Non Suwan,Baht,Irish Gaelic
+742,Zimbabwe,Mount Darwin,Dollar,Chinese
+743,Paraguay,Mbocayaty,Guarani,Hungarian
+744,Indonesia,Cipasung,Rupiah,Tetum
+745,Argentina,Tintina,Peso,Bengali
+746,Lesotho,Leribe,Loti,Italian
+747,Indonesia,Trucuk,Rupiah,Afrikaans
+748,China,Xiaohe,Yuan Renminbi,Lithuanian
+749,Poland,Szczerców,Zloty,Chinese
+750,Poland,Wińsko,Zloty,German
+751,China,Wangshi,Yuan Renminbi,Macedonian
+752,China,Dongtou,Yuan Renminbi,Norwegian
+753,Sweden,Sölvesborg,Krona,Croatian
+754,Liechtenstein,Planken,Franc,Icelandic
+755,Kazakhstan,Energeticheskiy,Tenge,Greek
+756,Portugal,Vila Nova,Euro,Lithuanian
+757,Russia,Pytalovo,Ruble,Kurdish
+758,Finland,Liperi,Euro,French
+759,Argentina,Daireaux,Peso,Kyrgyz
+760,China,Langkou,Yuan Renminbi,Filipino
+761,Philippines,Baquero Norte,Peso,Thai
+762,Portugal,Rana,Euro,Maltese
+763,Panama,Alto de la Estancia,Balboa,Czech
+764,Sweden,Övertorneå,Krona,Italian
+765,China,Zhongjiapu,Yuan Renminbi,Norwegian
+766,Finland,Kuhmo,Euro,Icelandic
+767,China,Qümong,Yuan Renminbi,Punjabi
+768,Slovenia,Sv. Trojica v Slov. Goricah,Euro,Tswana
+769,United States,Inglewood,Dollar,Burmese
+770,Tunisia,Monastir,Dinar,Northern Sotho
+771,China,Nanjing,Yuan Renminbi,Icelandic
+772,Greece,Markópoulo,Euro,Dzongkha
+773,Ethiopia,Dabat,Birr,Swati
+774,Russia,Korfovskiy,Ruble,Tamil
+775,Ukraine,Kodyma,Hryvnia,Catalan
+776,Ukraine,Brody,Hryvnia,Indonesian
+777,Japan,Utsunomiya-shi,Yen,Romanian
+778,Pakistan,Thāru Shāh,Rupee,Afrikaans
+779,Poland,Szlachta,Zloty,English
+780,Indonesia,Sungaiduri,Rupiah,Danish
+781,Colombia,Belén de Umbría,Peso,Croatian
+782,Lesotho,Mohale’s Hoek,Loti,Marathi
+783,Chile,Tomé,Peso,New Zealand Sign Language
+784,Japan,Ōiso,Yen,Quechua
+785,Morocco,Oued Zem,Dirham,Albanian
+786,Morocco,Tirhanimîne,Dirham,Dzongkha
+787,Portugal,Maganha,Euro,Arabic
+788,Hong Kong,Hong Kong,Dollar,Tsonga
+789,China,Daweishan,Yuan Renminbi,English
+790,Syria,Sulūk,Pound,Gujarati
+791,China,Huangqiao,Yuan Renminbi,Icelandic
+792,Cuba,Pinar del Río,Peso,Malayalam
+793,Brazil,Bagé,Real,Bulgarian
+794,China,Boyu,Yuan Renminbi,Kazakh
+795,Ecuador,Guaranda,Dollar,Hebrew
+796,Indonesia,Sudimoro,Rupiah,Armenian
+797,Indonesia,Ankola,Rupiah,Swahili
+798,China,Laiyang,Yuan Renminbi,Fijian
+799,Panama,Cusapín,Balboa,Hindi
+800,Morocco,Taliouine,Dirham,Lao
+801,Martinique,Fort-de-France,Euro,Burmese
+802,Japan,Miki,Yen,Yiddish
+803,Colombia,Samacá,Peso,Norwegian
+804,Indonesia,Madur,Rupiah,Moldovan
+805,Senegal,Nguékhokh,Franc,Dzongkha
+806,Philippines,Bulan,Peso,Zulu
+807,Brazil,Pirassununga,Real,Nepali
+808,Ethiopia,Debark’,Birr,Italian
+809,Uganda,Njeru,Shilling,Malay
+810,Sweden,Emmaboda,Krona,Gagauz
+811,China,Yanzhou,Yuan Renminbi,Hiri Motu
+812,China,Rizhao,Yuan Renminbi,Spanish
+813,Argentina,Saladas,Peso,Hindi
+814,China,Chixi,Yuan Renminbi,Somali
+815,Poland,Sietesz,Zloty,Lao
+816,Nigeria,Awka,Naira,Finnish
+817,Belarus,Il’ya,Ruble,Māori
+818,Macedonia,Skopje,Denar,Zulu
+819,France,Meudon,Euro,Papiamento
+820,Japan,Shimada,Yen,Bengali
+821,Papua New Guinea,Vanimo,Kina,New Zealand Sign Language
+822,China,Yangsi,Yuan Renminbi,Malay
+823,China,Beizi,Yuan Renminbi,Papiamento
+824,Kazakhstan,Ülken,Tenge,Guaraní
+825,Kazakhstan,Petropavlovsk,Tenge,Tswana
+826,Philippines,Tomingad,Peso,Belarusian
+827,China,Gaoqiao,Yuan Renminbi,Danish
+828,Lithuania,Ukmerge,Litas,Catalan
+829,Greece,Néa Ankhíalos,Euro,Punjabi
+830,China,Shalang,Yuan Renminbi,Hebrew
+831,Russia,Novonukutskiy,Ruble,Korean
+832,China,Zhoutian,Yuan Renminbi,Catalan
+833,Philippines,Bangan-Oda,Peso,Yiddish
+834,Indonesia,Sindangsari,Rupiah,Malayalam
+835,Indonesia,Gunung Sugih,Rupiah,Amharic
+836,Brazil,Balsas,Real,Malagasy
+837,Philippines,Langob,Peso,Malay
+838,Laos,Mounlapamôk,Kip,Northern Sotho
+839,Belgium,Ninove,Euro,Telugu
+840,Bangladesh,Mehendiganj,Taka,English
+841,Colombia,Riosucio,Peso,Ndebele
+842,Indonesia,Krajan Dua Patempuran,Rupiah,Malay
+843,Poland,Wąwolnica,Zloty,Tok Pisin
+844,Germany,Rostock,Euro,Aymara
+845,Brazil,Grajaú,Real,Malayalam
+846,Russia,Pereyaslovskaya,Ruble,Korean
+847,Czech Republic,Proboštov,Koruna,Kannada
+848,Faroe Islands,Tvøroyri,Krone,Pashto
+849,Montserrat,Brades,Dollar,West Frisian
+850,Russia,Vol’no-Nadezhdinskoye,Ruble,Finnish
+851,Indonesia,Paya Dapur,Rupiah,Oriya
+852,China,Huangben,Yuan Renminbi,French
+853,Peru,Yarabamba,Sol,Nepali
+854,China,Shifang,Yuan Renminbi,Dhivehi
+855,Poland,Szlachta,Zloty,Japanese
+856,China,Liangdang Chengguanzhen,Yuan Renminbi,Estonian
+857,China,Yangjia,Yuan Renminbi,Georgian
+858,China,Qingquan,Yuan Renminbi,Armenian
+859,France,Mulhouse,Euro,Hungarian
+860,Russia,Leninogorsk,Ruble,Luxembourgish
+861,Russia,Gorno-Altaysk,Ruble,Chinese
+862,Indonesia,Kampunglistrik,Rupiah,Portuguese
+863,Philippines,Naga,Peso,German
+864,Indonesia,Banakaja,Rupiah,Spanish
+865,Indonesia,Temperak,Rupiah,Punjabi
+866,United States,Sacramento,Dollar,Swedish
+867,Russia,Pyshchug,Ruble,Czech
+868,Palestinian Territory,Ar Ramāḑīn,Shekel,Kurdish
+869,Indonesia,Puutuga,Rupiah,Norwegian
+870,Philippines,Panalo-on,Peso,Quechua
+871,France,Lunéville,Euro,Bulgarian
+872,Mexico,Benito Juarez,Peso,Bosnian
+873,Indonesia,Banjar Jagasatru,Rupiah,Norwegian
+874,Argentina,Gobernador Ingeniero Valentín Virasoro,Peso,Pashto
+875,Mexico,Guadalupe,Peso,Bosnian
+876,Bhutan,Lhuentse,Ngultrum,Swedish
+877,Nigeria,Ijero-Ekiti,Naira,Khmer
+878,Japan,Tsurusaki,Yen,German
+879,China,Xianghe,Yuan Renminbi,Hungarian
+880,Russia,Iset’,Ruble,Maltese
+881,Thailand,Thap Khlo,Baht,Tamil
+882,Portugal,Gaio,Euro,Zulu
+883,Brazil,Bela Vista do Paraíso,Real,Northern Sotho
+884,Indonesia,Lembung Tengah,Rupiah,Somali
+885,Nigeria,Misau,Naira,Swahili
+886,Belarus,Parychy,Ruble,Persian
+887,Zimbabwe,Mazowe,Dollar,Latvian
+888,Brazil,Ribeirão Pires,Real,Tamil
+889,Canada,Chambly,Dollar,Amharic
+890,Sweden,Hagfors,Krona,Estonian
+891,Portugal,Torre,Euro,Polish
+892,Azerbaijan,Nardaran,Manat,Bosnian
+893,China,Yuexi,Yuan Renminbi,French
+894,Cyprus,Famagusta,Euro,Georgian
+895,Afghanistan,Deh-e Now,Afghani,Lao
+896,China,Bangxi,Yuan Renminbi,Belarusian
+897,Philippines,Manolo Fortich,Peso,Armenian
+898,Poland,Powidz,Zloty,Malay
+899,China,Heshan,Yuan Renminbi,Croatian
+900,Indonesia,Sampir,Rupiah,West Frisian
+901,Poland,Janowice,Zloty,Sotho
+902,Indonesia,Labuhantanggabesar,Rupiah,Hindi
+903,Sweden,Sandviken,Krona,Finnish
+904,Indonesia,Sumbermanggis,Rupiah,Tsonga
+905,France,Périgny,Euro,French
+906,Ghana,Tarkwa,Cedi,Telugu
+907,China,Partang,Yuan Renminbi,Fijian
+908,China,Hualong,Yuan Renminbi,Tsonga
+909,Indonesia,Cikajang,Rupiah,Malagasy
+910,United States,Young America,Dollar,French
+911,Portugal,Longos,Euro,Oriya
+912,Venezuela,La Quebrada,Bolivar,Swahili
+913,Poland,Chyżne,Zloty,Swati
+914,Ukraine,Navariya,Hryvnia,Gagauz
+915,Russia,Ryazhsk,Ruble,Swedish
+916,Russia,Belyye Berega,Ruble,Greek
+917,Greece,Íos,Euro,New Zealand Sign Language
+918,Canada,Grand Bank,Dollar,Greek
+919,Japan,Kyoto,Yen,Gagauz
+920,France,Marseille,Euro,Punjabi
+921,Mongolia,Bayshint,Tugrik,Hiri Motu
+922,Russia,Lyubim,Ruble,Swedish
+923,Afghanistan,Sangar Sarāy,Afghani,Finnish
+924,Tunisia,Jendouba,Dinar,Bosnian
+925,Sweden,Halmstad,Krona,Hebrew
+926,China,Macha,Yuan Renminbi,Georgian
+927,Greece,Langádhia,Euro,French
+928,Thailand,Bang Lamung,Baht,Fijian
+929,Uruguay,Colonia Nicolich,Peso,Gujarati
+930,France,Lyon,Euro,Hungarian
+931,Mexico,Benito Juarez,Peso,Albanian
+932,Croatia,Vrbovec,Kuna,Italian
+933,France,Mâcon,Euro,Afrikaans
+934,China,Baiyang,Yuan Renminbi,Norwegian
+935,Venezuela,Maturín,Bolivar,Spanish
+936,China,Xixi,Yuan Renminbi,Oriya
+937,Philippines,Panacan,Peso,Montenegrin
+938,Philippines,Tapon,Peso,Czech
+939,Guatemala,Salamá,Quetzal,Tswana
+940,Iran,Gīvī,Rial,Danish
+941,China,Xiangba,Yuan Renminbi,Catalan
+942,Russia,Udomlya,Ruble,Estonian
+943,China,Heping,Yuan Renminbi,Kyrgyz
+944,Denmark,København,Krone,Filipino
+945,Netherlands,Zeewolde,Euro,Zulu
+946,China,Zhushan,Yuan Renminbi,Oriya
+947,Marshall Islands,Jabat,Dollar,Korean
+948,China,Huquan,Yuan Renminbi,Spanish
+949,Syria,‘Irbīn,Pound,Catalan
+950,Germany,Berlin,Euro,Spanish
+951,Brazil,Coromandel,Real,Bislama
+952,France,Le Havre,Euro,Mongolian
+953,Peru,Végueta,Sol,Lao
+954,Sweden,Örebro,Krona,English
+955,Philippines,Sabang,Peso,Nepali
+956,Philippines,Camias,Peso,Swati
+957,China,Pingshi,Yuan Renminbi,Lao
+958,Japan,Wakkanai,Yen,Pashto
+959,China,Xuancheng,Yuan Renminbi,Hebrew
+960,France,Cernay,Euro,Arabic
+961,Bulgaria,Sŭedinenie,Lev,Lithuanian
+962,Indonesia,Bayan,Rupiah,Amharic
+963,Portugal,Castanheira,Euro,Polish
+964,China,Chencai,Yuan Renminbi,Finnish
+965,China,Xiakouyi,Yuan Renminbi,French
+966,Ukraine,Tsarychanka,Hryvnia,Māori
+967,Armenia,Shenavan,Dram,Irish Gaelic
+968,China,Yaosai,Yuan Renminbi,Azeri
+969,Ukraine,Ropcha,Hryvnia,Japanese
+970,Philippines,Villaviciosa,Peso,Quechua
+971,Argentina,Concepción,Peso,Afrikaans
+972,China,Gaofeng,Yuan Renminbi,Yiddish
+973,Honduras,Lucerna,Lempira,Korean
+974,Poland,Węgrzce Wielkie,Zloty,Thai
+975,China,Chikeng,Yuan Renminbi,French
+976,Russia,Suzdal’,Ruble,Mongolian
+977,Indonesia,Sadabumi,Rupiah,Hiri Motu
+978,Australia,Strawberry Hills,Dollar,Portuguese
+979,Netherlands,Tilburg,Euro,German
+980,Czech Republic,Hořice,Koruna,Portuguese
+981,Peru,Yamango,Sol,Catalan
+982,Russia,Ust’-Izhora,Ruble,English
+983,Indonesia,Pekalongan,Rupiah,Nepali
+984,New Zealand,Waihi Beach,Dollar,Latvian
+985,Sweden,Umeå,Krona,Tok Pisin
+986,Brazil,Caetité,Real,Amharic
+987,Vietnam,Sơn Tây,Dong,Oriya
+988,China,Duodaoshi,Yuan Renminbi,Albanian
+989,Canada,Jasper Park Lodge,Dollar,Malagasy
+990,Ukraine,Khorostkiv,Hryvnia,Tetum
+991,Poland,Bardo,Zloty,Lao
+992,Thailand,Non Suwan,Baht,Guaraní
+993,Russia,Sukhobezvodnoye,Ruble,Malay
+994,Pakistan,Kot Sultan,Rupee,Malay
+995,Afghanistan,Now Zād,Afghani,Estonian
+996,Thailand,Ban Bueng,Baht,Estonian
+997,Jordan,Amman,Dinar,French
+998,Philippines,Puerto Princesa,Peso,Assamese
+999,Sudan,Al Fūlah,Pound,West Frisian
+1000,Portugal,Amieirinha,Euro,Italian
