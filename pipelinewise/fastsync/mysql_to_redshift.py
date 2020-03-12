@@ -130,7 +130,7 @@ def sync_table(table):
         utils.grant_privilege(target_schema, grantees, redshift.grant_select_on_schema)
 
     except Exception as exc:
-        LOGGER.critical(exc)
+        LOGGER.exception(exc)
         return '{}: {}'.format(table, exc)
 
 

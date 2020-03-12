@@ -112,7 +112,7 @@ def sync_table(table_name: str, args: Namespace) -> Union[bool, str]:
         return True
 
     except Exception as exc:
-        LOGGER.critical(exc)
+        LOGGER.exception(exc)
         return f'{table_name}: {exc}'
 
 
