@@ -11,9 +11,9 @@ Documentation is available at https://transferwise.github.io/pipelinewise/
 
 ## Features
 
-* **Built with ELT in mind**: PipelineWise fits into the ELT landscape but does not do traditional ETL. PipelineWise ingests data first into DWH in the original format and the “transformation” shifts to the end of the data pipeline. Load time transformations are still supported but complex mapping and joins have to be done once the data is replicated into the Data Warehouse.
-* **Replication Methods**: CDC (Log Based), Key-Based Incremental and Full Table snapshots
-* **Managed Schema Changes**: When source data changes, PipelineWise detects the change and alters the schema in your DWH automatically
+* **Built with ELT in mind**: PipelineWise fits into the ELT landscape and is not a traditional ETL tool. PipelineWise aims to reproduce the data from the source to an Analytics-Data-Store in as close to the original format as possible. Some minor load time transformations are supported but complex mapping and joins have to be done in the Analytics-Data-Store to extract meaning.
+
+* **Managed Schema Changes**: When source data changes, PipelineWise detects the change and alters the schema in your Analytics-Data-Store automatically
 * **Load time transformations**: Ideal place to obfuscate, mask or filter sensitive data that should never be replicated in the Data Warehouse
 * **YAML based configuration**: Data pipelines are defined as YAML files, ensuring that the entire configuration is kept under version control
 * **Lightweight**: No daemons or database setup are required
@@ -75,7 +75,7 @@ recommended method of start using PipelineWise.
 
     ```sh
     $ pipelinewise status
-    
+
     Tap ID    Tap Type      Target ID     Target Type      Enabled    Status    Last Sync    Last Sync Result
     --------  ------------  ------------  ---------------  ---------  --------  -----------  ------------------
     0 pipeline(s)
@@ -83,7 +83,7 @@ recommended method of start using PipelineWise.
 
 You can run any pipelinewise command at this point. Tutorials to create and run pipelines is at https://transferwise.github.io/pipelinewise/installation_guide/creating_pipelines.html .
 
-**PS**: 
+**PS**:
 
 For the tests to work, run the commands inside a PipelineWise container.
 To create, start and get a bash shell in the container:
@@ -103,7 +103,7 @@ $ docker exec -it pipelinewise_dev bash
     * postgresql
 
 2. Run the install script that installs the PipelineWise CLI and every supported singer connectors into separated virtual environments:
-   
+
     ```sh
     $ ./install.sh --connectors=all
     ```
@@ -111,7 +111,7 @@ $ docker exec -it pipelinewise_dev bash
     Use the optional `--connectors=...,...` argument to install only a specific list of singer connectors.
 
 3. To start CLI you need to activate the CLI virtual environment and has to set `PIPELINEWISE_HOME` environment variable:
-   
+
     ```sh
     $ source {ACTUAL_ABSOLUTE_PATH}/.virtualenvs/pipelinewise/bin/activate
     $ export PIPELINEWISE_HOME={ACTUAL_ABSOLUTE_PATH}
@@ -123,7 +123,7 @@ $ docker exec -it pipelinewise_dev bash
 
     ```sh
     $ pipelinewise status
-    
+
     Tap ID    Tap Type      Target ID     Target Type      Enabled    Status    Last Sync    Last Sync Result
     --------  ------------  ------------  ---------------  ---------  --------  -----------  ------------------
     0 pipeline(s)
