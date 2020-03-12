@@ -51,6 +51,8 @@ schemas:
         replication_method: "FULL_TABLE"
         s3_csv_mapping:
           search_pattern: "^greenhouse/mock_data_1.csv$"
+          date_overrides:
+            - birth_date
         transformations:
           - column: "email"
             type: "HASH"

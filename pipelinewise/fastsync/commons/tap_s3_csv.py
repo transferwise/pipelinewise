@@ -171,12 +171,12 @@ class FastSyncTapS3Csv:
         # use timestamp as a type instead if column is set in date_overrides configuration
         mapped_columns = []
         date_overrides = None if 'date_overrides' not in specs \
-            else {[safe_column_name(c) for c in specs['date_overrides']]}
+            else set([safe_column_name(c) for c in specs['date_overrides']])
 
         for column_name, column_type in csv_columns:
 
             if date_overrides and column_name in date_overrides:
-                mapped_columns.append(f"{column_name} 'timestamp_ntz'")
+                mapped_columns.append(f"{column_name} timestamp_ntz")
             else:
                 mapped_columns.append(f'{column_name} {self.tap_type_to_target_type(column_type)}')
 
