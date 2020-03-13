@@ -45,7 +45,7 @@ def tap_type_to_target_type(csv_type):
 
     return {
         'integer': 'INTEGER',
-        'number': 'NUMBER',
+        'number': 'FLOAT',
         'string': 'VARCHAR',
         'boolean': 'VARCHAR',  # The guess sometimes can be wrong, we'll use varchar for now.
         'date': 'VARCHAR'  # The guess sometimes can be wrong, we'll use varchar for now.
