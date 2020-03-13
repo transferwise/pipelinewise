@@ -140,7 +140,7 @@ class TestE2E:
         Returns:
             None
         """
-        sql = f'SELECT COLUMN_NAME from pipelinewise.columns where table_name=\'{table_name.upper()}\''
+        sql = f'SELECT COLUMN_NAME from information_schema.columns where table_name=\'{table_name.upper()}\''
 
         result = e2e_utils.run_query_target_snowflake(self.env, sql)
         cols = [res[0] for res in result]
