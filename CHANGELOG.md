@@ -4,8 +4,8 @@
 **FastSync S3-csv to Snowflake**
 - Fix bug when `date_overrides` is present.
 
-**Cache**
-- Remove PIPELINEWISE.COLUMNS cache table in FS and singer target-snowflake.
+**FastSync and singer target-snowflake**
+- Remove PIPELINEWISE.COLUMNS cache table.
 
 
 0.14.0 (2020-03-10)
