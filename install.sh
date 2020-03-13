@@ -59,20 +59,30 @@ make_virtualenv() {
     echo "Making Virtual Environment for [$1] in $VENV_DIR"
     python3 -m venv $VENV_DIR/$1
     source $VENV_DIR/$1/bin/activate
-    python3 -m pip install --upgrade pip
+    python3 -m pip install --upgrade pip setuptools pip-tools
+
     if [ -f "requirements.txt" ]; then
-        python3 -m pip install -r requirements.txt
-    fi
-    if [ -f "setup.py" ]; then
-        PIP_ARGS=
+      pip-compile - --output-file=- < requirements.txt > safe_requirements.txt
+
+    elif [ -f "setup.py" ]; then
         if [[ ! $NO_TEST_EXTRAS == "YES" ]]; then
             PIP_ARGS=$PIP_ARGS"[test]"
+            python3 -m pip install -e .$PIP_ARGS
         fi
-
-        python3 -m pip install -e .$PIP_ARGS
+        pip-compile --output-file=- > safe_requirements.txt
     fi
 
+    python3 -m pip install -r safe_requirements.txt
+
+    echo ""
+    echo "===== Checking dependencies for conflict ..."
+    python3 -m pip check # check for dependency incompatibilites
+    status=$?
+    [ $status -eq 0 ] && echo "No conflicts" || exit 1
+    echo ""
+
     check_license $1
+    rm -f safe_requirements.txt
     deactivate
 }
 
