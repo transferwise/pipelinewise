@@ -1,3 +1,13 @@
+0.14.2 (2020-03-19)
+-------------------
+
+**Singer transformation**
+- Transform without trimming make tranformation consistent between FastSync and Singer.
+
+**tap-snowflake**
+- Remove PIPELINEWISE.COLUMNS cache table.
+
+
 0.14.1 (2020-03-13)
 -------------------
 
