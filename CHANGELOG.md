@@ -2,7 +2,7 @@
 -------------------
 
 **Singer transformation**
-- Transform without trimming make tranformation consistent between FastSync and Singer.
+- Make tranformation consistent between FastSync and Singer by updating transform-field to transform without trimming.
 
 **tap-snowflake**
 - Remove PIPELINEWISE.COLUMNS cache table.
