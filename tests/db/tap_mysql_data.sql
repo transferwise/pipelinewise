@@ -249,6 +249,28 @@ INSERT INTO `no_pk_table`(id) VALUES (1),(2),(3),(4),(5),(6),(7),(8),(9),(10),(1
 /*!40000 ALTER TABLE `no_pk_table` ENABLE KEYS */;
 UNLOCK TABLES;
 
+--
+-- Table structure for table `FULL`
+--
+
+DROP TABLE IF EXISTS `full`;
+CREATE TABLE `full` (
+    begin int auto_increment primary key,
+    end INT
+)
+ENGINE=MyISAM AUTO_INCREMENT=0 DEFAULT CHARSET=utf8;
+
+--
+-- Dumping data for table `full`
+--
+
+LOCK TABLES `full` WRITE;
+/*!40000 ALTER TABLE `full` DISABLE KEYS */;
+INSERT INTO `full`(end) VALUES (10),(9),(8),(7),(6),(30),(11);
+/*!40000 ALTER TABLE `full` ENABLE KEYS */;
+UNLOCK TABLES;
+
+
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
 /*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;

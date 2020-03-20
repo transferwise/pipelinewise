@@ -47,3 +47,7 @@ schemas:
 
       - table_name: "no_pk_table"
         replication_method: "FULL_TABLE"
+
+      - table_name: "full" # This table has a reserved word as a name, full is reserved in both Mysql and Snowflake
+        replication_method: "INCREMENTAL"
+        replication_key: "begin"

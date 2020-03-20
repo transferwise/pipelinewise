@@ -223,6 +223,11 @@ class TestE2E:
         # Run tap first time - both fastsync and a singer should be triggered
         self.assert_run_tap_success(tap, target, ['fastsync', 'singer'])
 
+        # Insert new rows to source table replicated by INCREMENTAL method
+        e2e_utils.run_query_tap_mysql(self.env, """
+            INSERT INTO `full`(end) VALUES (33),(34),(35),(36),(66),(20),(1);
+        """)
+
         # Run tap second time - only singer should be triggered
         self.assert_run_tap_success(tap, target, ['singer'])
         self.assert_columns_are_in_table('edgydata', ['C_VARCHAR', 'CASE', 'GROUP', 'ORDER'])
