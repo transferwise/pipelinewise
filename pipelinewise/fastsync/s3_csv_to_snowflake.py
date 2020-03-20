@@ -65,6 +65,7 @@ def sync_table(table_name: str, args: Namespace) -> Union[bool, str]:
         target_schema = utils.get_target_schema(args.target, table_name)
 
         s3_csv.copy_table(table_name, filepath)
+        size_bytes = os.path.getsize(filepath)
 
         snowflake_types = s3_csv.map_column_types_to_target(filepath, table_name)
         snowflake_columns = snowflake_types.get('columns', [])
@@ -84,7 +85,7 @@ def sync_table(table_name: str, args: Namespace) -> Union[bool, str]:
                                sort_columns=True)
 
         # Load into Snowflake table
-        snowflake.copy_to_table(s3_key, target_schema, table_name, is_temporary=True, skip_csv_header=True)
+        snowflake.copy_to_table(s3_key, target_schema, table_name, size_bytes, is_temporary=True, skip_csv_header=True)
 
         # Obfuscate columns
         snowflake.obfuscate_columns(target_schema, table_name)

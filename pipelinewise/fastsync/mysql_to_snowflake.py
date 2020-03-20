@@ -89,6 +89,7 @@ def sync_table(table):
 
         # Exporting table data, get table definitions and close connection to avoid timeouts
         mysql.copy_table(table, filepath)
+        size_bytes = os.path.getsize(filepath)
         snowflake_types = mysql.map_column_types_to_target(table)
         snowflake_columns = snowflake_types.get('columns', [])
         primary_key = snowflake_types.get('primary_key')
@@ -103,7 +104,7 @@ def sync_table(table):
         snowflake.create_table(target_schema, table, snowflake_columns, primary_key, is_temporary=True)
 
         # Load into Snowflake table
-        snowflake.copy_to_table(s3_key, target_schema, table, is_temporary=True)
+        snowflake.copy_to_table(s3_key, target_schema, table, size_bytes, is_temporary=True)
 
         # Obfuscate columns
         snowflake.obfuscate_columns(target_schema, table)
