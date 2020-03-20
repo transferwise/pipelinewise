@@ -21,7 +21,7 @@ class FastSyncTapMySql:
     def __init__(self, connection_config, tap_type_to_target_type):
         self.connection_config = connection_config
         self.connection_config['charset'] = connection_config.get('charset', 'utf8')
-        self.connection_config['export_batch_rows'] = connection_config.get('export_batch_rows', 20000)
+        self.connection_config['export_batch_rows'] = connection_config.get('export_batch_rows', 50000)
         self.tap_type_to_target_type = tap_type_to_target_type
         self.conn = None
         self.conn_unbuffered = None
