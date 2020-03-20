@@ -31,6 +31,8 @@ services:
       DB_TARGET_POSTGRES_DB: ${DB_TARGET_POSTGRES_DB}
     volumes:
       - ../:/opt/pipelinewise
+      # don't create container specific .virtualenvs files on host
+      - /opt/pipelinewise/dev-project/.virtualenvs/
       # mount pipelinewise pipe configuration directory to host for ease of troubleshooting
       - .pipelinewise:/root/.pipelinewise
 
