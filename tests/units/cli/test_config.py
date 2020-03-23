@@ -130,6 +130,29 @@ class TestConfig:
         assert pytest_wrapped_e.type == SystemExit
         assert pytest_wrapped_e.value.code == 1
 
+
+    def test_from_invalid_yamls_fails(self):
+        """
+        Test creating Config object using invalid YAML configuration
+        directory should fail due to duplicate targets
+        """
+
+        # TODO: Make behaviours consistent.
+        #   In some cases it raise exception in some other cases it does exit
+
+        # Initialising Config object with a not existing directory should raise an exception
+        with pytest.raises(Exception):
+            cli.config.Config.from_yamls(PIPELINEWISE_TEST_HOME, 'not-existing-yaml-config-directory')
+
+        # Initialising config object with a tap that's referencing an unknown target should exit
+        yaml_config_dir = f'{os.path.dirname(__file__)}/resources/test_invalid_yaml_config_with_duplicate_targets'
+        vault_secret = f'{os.path.dirname(__file__)}/resources/vault-secret.txt'
+
+        with pytest.raises(SystemExit) as pytest_wrapped_e:
+            cli.config.Config.from_yamls(PIPELINEWISE_TEST_HOME, yaml_config_dir, vault_secret)
+        assert pytest_wrapped_e.type == SystemExit
+        assert pytest_wrapped_e.value.code == 1
+
     def test_getters(self):
         """Test Config getter functions"""
         config = cli.config.Config(PIPELINEWISE_TEST_HOME)
