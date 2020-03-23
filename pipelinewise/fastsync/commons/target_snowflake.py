@@ -1,5 +1,6 @@
 import logging
 import os
+import json
 import time
 from typing import List
 
@@ -132,10 +133,12 @@ class FastSyncTargetSnowflake:
 
         self.query(sql)
 
-    def copy_to_table(self, s3_key, target_schema, table_name, is_temporary, skip_csv_header=False):
+    # pylint: disable=too-many-locals
+    def copy_to_table(self, s3_key, target_schema, table_name, size_bytes, is_temporary, skip_csv_header=False):
         LOGGER.info('Loading %s into Snowflake...', s3_key)
         table_dict = utils.tablename_to_dict(table_name)
         target_table = table_dict.get('table_name') if not is_temporary else table_dict.get('temp_table_name')
+        inserts = 0
 
         aws_access_key_id = self.connection_config['aws_access_key_id']
         aws_secret_access_key = self.connection_config['aws_secret_access_key']
@@ -168,7 +171,15 @@ class FastSyncTargetSnowflake:
                 int(skip_csv_header),
             )
 
-        self.query(sql)
+        # Get number of inserted records - COPY does insert only
+        results = self.query(sql)
+        if len(results) > 0:
+            inserts = results[0].get('rows_loaded', 0)
+
+        LOGGER.info('Loading into %s."%s": %s',
+                    target_schema,
+                    target_table.upper(),
+                    json.dumps({'inserts': inserts, 'updates': 0, 'size_bytes': size_bytes}))
 
         LOGGER.info('Deleting %s from S3...', s3_key)
         self.s3.delete_object(Bucket=bucket, Key=s3_key)
