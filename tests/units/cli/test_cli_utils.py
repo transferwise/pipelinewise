@@ -322,7 +322,7 @@ class TestUtils:
 
     def test_get_tap_target_names(self):
         """Test get tap and target yamls"""
-        expected_tap_names = {'tap_test.yml', 'tap_2test.yml'}
+        expected_tap_names = {'tap_test.yml', 'tap_2test.yml', 'tap_valid.yaml'}
         expected_target_names = {'target_test.yml'}
         tap_names, target_names = cli.utils.get_tap_target_names(f'{os.path.dirname(__file__)}'
                                                                  f'/resources/test_tap_target_names')

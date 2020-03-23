@@ -158,10 +158,11 @@ def get_tap_target_names(yaml_dir):
         yaml_dir (str): Path to the directory, which contains taps and targets files with .yml extension.
 
     Returns:
-        (tap_yamls, target_yamls): tap_yamls is a list of names inside yaml_dir with "tap_*.yml" pattern.
-                                   target_yamls is a list of names inside yaml_dir with "target_*.yml" pattern.
+        (tap_yamls, target_yamls): tap_yamls is a list of names inside yaml_dir with "tap_*.y(a)ml" pattern.
+                                   target_yamls is a list of names inside yaml_dir with "target_*.y(a)ml" pattern.
     """
-    yamls = [f for f in os.listdir(yaml_dir) if os.path.isfile(os.path.join(yaml_dir, f)) and f.endswith('.yml')]
+    yamls = [f for f in os.listdir(yaml_dir) if os.path.isfile(os.path.join(yaml_dir, f))
+             and (f.endswith('.yml') or f.endswith('.yaml'))]
     target_yamls = set(filter(lambda y: y.startswith('target_'), yamls))
     tap_yamls = set(filter(lambda y: y.startswith('tap_'), yamls))
 
