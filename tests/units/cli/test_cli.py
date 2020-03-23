@@ -416,30 +416,47 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
         # Delete test log file
         os.remove('{}.terminated'.format(pipelinewise.tap_run_log_file))
 
-    def test_validate_command(self):
-        """Test validate command"""
-        test_validate_command_dir = f'{os.path.dirname(__file__)}/resources/test_validate_command'
+    def test_validate_command_1(self):
+        """Test validate command should fail because of missing replication key for incremental"""
+        test_validate_command_dir = \
+            f'{os.path.dirname(__file__)}/resources/test_validate_command/missing_replication_key_incremental'
 
-        test_cases = [{
-            'dir': 'missing_replication_key_incremental',
-            'exception': True
-        }, {
-            'dir': 'missing_replication_key',
-            'exception': False
-        }, {
-            'dir': 'invalid_target',
-            'exception': True
-        }]
+        args = CliArgs(dir=test_validate_command_dir)
+        pipelinewise = PipelineWise(args, CONFIG_DIR, VIRTUALENVS_DIR)
 
-        for test_case in test_cases:
-            args = CliArgs(dir=f'{test_validate_command_dir}/{test_case["dir"]}')
-            pipelinewise = PipelineWise(args, CONFIG_DIR, VIRTUALENVS_DIR)
+        with pytest.raises(SystemExit):
+            pipelinewise.validate()
 
-            if test_case['exception']:
-                with pytest.raises(SystemExit):
-                    pipelinewise.validate()
-            else:
-                pipelinewise.validate()
+    def test_validate_command_2(self):
+        """Test validate command should succeed"""
+        test_validate_command_dir = \
+            f'{os.path.dirname(__file__)}/resources/test_validate_command/missing_replication_key'
+
+        args = CliArgs(dir=test_validate_command_dir)
+        pipelinewise = PipelineWise(args, CONFIG_DIR, VIRTUALENVS_DIR)
+
+        pipelinewise.validate()
+
+    def test_validate_command_3(self):
+        """Test validate command should fail because of invalid target in tap config"""
+        test_validate_command_dir = f'{os.path.dirname(__file__)}/resources/test_validate_command/invalid_target'
+
+        args = CliArgs(dir=test_validate_command_dir)
+        pipelinewise = PipelineWise(args, CONFIG_DIR, VIRTUALENVS_DIR)
+
+        with pytest.raises(SystemExit):
+            pipelinewise.validate()
+
+    def test_validate_command_4(self):
+        """Test validate command should fail because of duplicate targets"""
+        test_validate_command_dir = \
+            f'{os.path.dirname(__file__)}/resources/test_validate_command/test_yaml_config_two_targets'
+
+        args = CliArgs(dir=test_validate_command_dir)
+        pipelinewise = PipelineWise(args, CONFIG_DIR, VIRTUALENVS_DIR)
+
+        with pytest.raises(SystemExit):
+            pipelinewise.validate()
 
     # pylint: disable=protected-access
     def test_post_import_checks(self):

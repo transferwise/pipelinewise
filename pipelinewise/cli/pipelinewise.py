@@ -1128,25 +1128,36 @@ class PipelineWise:
         vault_secret = self.args.secret
 
         target_ids = set()
-        # Validate target json schemas
+        # Validate target json schemas and that no duplicate IDs exist
         for yaml_file in target_yamls:
             self.logger.info('Started validating %s', yaml_file)
             loaded_yaml = utils.load_yaml(os.path.join(yaml_dir, yaml_file), vault_secret)
             utils.validate(loaded_yaml, target_schema)
+
+            if loaded_yaml['id'] in target_ids:
+                self.logger.error('Duplicate target found "%s"', loaded_yaml['id'])
+                sys.exit(1)
+
             target_ids.add(loaded_yaml['id'])
             self.logger.info('Finished validating %s', yaml_file)
 
-        # Validate tap json schemas and check that every tap has valid 'target'
+        tap_ids = set()
+        # Validate tap json schemas, check that every tap has valid 'target' and that no duplicate IDs exist
         for yaml_file in tap_yamls:
             self.logger.info('Started validating %s', yaml_file)
             loaded_yaml = utils.load_yaml(os.path.join(yaml_dir, yaml_file), vault_secret)
             utils.validate(loaded_yaml, tap_schema)
+
+            if loaded_yaml['id'] in tap_ids:
+                self.logger.error('Duplicate tap found "%s"', loaded_yaml['id'])
+                sys.exit(1)
 
             if loaded_yaml['target'] not in target_ids:
                 self.logger.error("Can'f find the target with the ID '%s' referenced in '%s'. Available target IDs: %s",
                                   loaded_yaml['target'], yaml_file, target_ids)
                 sys.exit(1)
 
+            tap_ids.add(loaded_yaml['id'])
             self.logger.info('Finished validating %s', yaml_file)
 
         self.logger.info('Validation successful')

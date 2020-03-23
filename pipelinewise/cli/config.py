@@ -53,6 +53,12 @@ class Config:
             # Add generated extra keys that not available in the YAML
             target_id = target_data['id']
 
+            # Check if a target with same ID already exists
+            # exit with error, otherwise, we would override the previous one and that would go unnoticed.
+            if target_id in targets:
+                config.logger.error('Duplicate target found "%s"', target_id)
+                sys.exit(1)
+
             target_data['files'] = config.get_connector_files(config.get_target_dir(target_id))
             target_data['taps'] = []
 
@@ -66,6 +72,13 @@ class Config:
             utils.validate(instance=tap_data, schema=tap_schema)
 
             tap_id = tap_data['id']
+
+            # Check if a tap with same ID already exists
+            # exit with error, otherwise, we would override the previous one and that would go unnoticed.
+            if tap_id in taps:
+                config.logger.error('Duplicate tap found "%s"', tap_id)
+                sys.exit(1)
+
             target_id = tap_data['target']
             if target_id not in targets:
                 config.logger.error("Can't find the target with the ID \"%s\" but it's referenced in %s", target_id,
