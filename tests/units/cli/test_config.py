@@ -193,7 +193,8 @@ class TestConfig:
         main_config_json = '{}/config.json'.format(json_config_dir)
         target_config_json = '{}/test_snowflake_target/config.json'.format(json_config_dir)
         tap_config_json = '{}/test_snowflake_target/mysql_sample/config.json'.format(json_config_dir)
-        tap_inheritable_config_json = '{}/test_snowflake_target/mysql_sample/inheritable_config.json'.format(json_config_dir)
+        tap_inheritable_config_json = '{}/test_snowflake_target/mysql_sample/inheritable_config.json'.format(
+            json_config_dir)
         tap_selection_json = '{}/test_snowflake_target/mysql_sample/selection.json'.format(json_config_dir)
         tap_transformation_json = '{}/test_snowflake_target/mysql_sample/transformation.json'.format(json_config_dir)
 
@@ -212,7 +213,7 @@ class TestConfig:
                             'name': 'Sample MySQL Database',
                             'owner': 'somebody@foo.com',
                             'enabled': True,
-                         }
+                        }
                     ]
                 }]
         }
@@ -262,9 +263,10 @@ class TestConfig:
             'parallelism': 0,
             'parallelism_max': 4,
             'primary_key_required': True,
-            'schema_mapping': {'my_db': {
-                'target_schema': 'repl_my_db',
-                'target_schema_select_permissions': ['grp_stats']
+            'schema_mapping': {
+                'my_db': {
+                    'target_schema': 'repl_my_db',
+                    'target_schema_select_permissions': ['grp_stats']
                 }
             },
             'temp_dir': './pipelinewise-test-config/tmp',
