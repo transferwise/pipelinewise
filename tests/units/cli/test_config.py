@@ -190,14 +190,88 @@ class TestConfig:
         config.save()
 
         # Check if every required JSON file created, both for target and tap
-        assert os.path.isfile('{}/config.json'.format(json_config_dir)) is True
-        assert os.path.isfile('{}/test_snowflake_target/config.json'.format(json_config_dir)) is True
-        assert os.path.isfile('{}/test_snowflake_target/mysql_sample/config.json'.format(json_config_dir)) is True
-        assert os.path.isfile(
-            '{}/test_snowflake_target/mysql_sample/inheritable_config.json'.format(json_config_dir)) is True
-        assert os.path.isfile('{}/test_snowflake_target/mysql_sample/selection.json'.format(json_config_dir)) is True
-        assert os.path.isfile(
-            '{}/test_snowflake_target/mysql_sample/transformation.json'.format(json_config_dir)) is True
+        main_config_json = '{}/config.json'.format(json_config_dir)
+        target_config_json = '{}/test_snowflake_target/config.json'.format(json_config_dir)
+        tap_config_json = '{}/test_snowflake_target/mysql_sample/config.json'.format(json_config_dir)
+        tap_inheritable_config_json = '{}/test_snowflake_target/mysql_sample/inheritable_config.json'.format(
+            json_config_dir)
+        tap_selection_json = '{}/test_snowflake_target/mysql_sample/selection.json'.format(json_config_dir)
+        tap_transformation_json = '{}/test_snowflake_target/mysql_sample/transformation.json'.format(json_config_dir)
+
+        # Check content of the generated JSON files
+        assert cli.utils.load_json(main_config_json) == {
+            'targets':
+                [{
+                    'id': 'test_snowflake_target',
+                    'type': 'target-snowflake',
+                    'name': 'Test Target Connector',
+                    'status': 'ready',
+                    'taps': [
+                        {
+                            'id': 'mysql_sample',
+                            'type': 'tap-mysql',
+                            'name': 'Sample MySQL Database',
+                            'owner': 'somebody@foo.com',
+                            'enabled': True,
+                        }
+                    ]
+                }]
+        }
+        assert cli.utils.load_json(target_config_json) == {
+            'account': 'account',
+            'aws_access_key_id': 'access_key_id',
+            'aws_secret_access_key': 'secret_access_key',
+            'client_side_encryption_master_key': 'master_key',
+            'dbname': 'foo_db',
+            'file_format': 'foo_file_format',
+            'password': 'secret',
+            's3_bucket': 's3_bucket',
+            's3_key_prefix': 's3_prefix/',
+            'stage': 'foo_stage',
+            'user': 'user',
+            'warehouse': 'MY_WAREHOUSE'
+        }
+        assert cli.utils.load_json(tap_config_json) == {
+            'dbname': '<DB_NAME>',
+            'host': '<HOST>',
+            'port': 3306,
+            'user': '<USER>',
+            'password': '<PASSWORD>',
+            'server_id': cli.utils.load_json(tap_config_json)['server_id']
+        }
+        assert cli.utils.load_json(tap_selection_json) == {
+            'selection': [
+                {
+                    'replication_key': 'last_update',
+                    'replication_method': 'INCREMENTAL',
+                    'tap_stream_id': 'my_db-table_one'
+                },
+                {
+                    'replication_method': 'LOG_BASED',
+                    'tap_stream_id': 'my_db-table_two'
+                }
+            ]
+        }
+        assert cli.utils.load_json(tap_transformation_json) == {
+            'transformations': []
+        }
+        assert cli.utils.load_json(tap_inheritable_config_json) == {
+            'batch_size_rows': 20000,
+            'data_flattening_max_level': 0,
+            'flush_all_streams': False,
+            'hard_delete': True,
+            'parallelism': 0,
+            'parallelism_max': 4,
+            'primary_key_required': True,
+            'schema_mapping': {
+                'my_db': {
+                    'target_schema': 'repl_my_db',
+                    'target_schema_select_permissions': ['grp_stats']
+                }
+            },
+            'temp_dir': './pipelinewise-test-config/tmp',
+            'validate_records': False
+        }
 
         # Delete the generated JSON config directory
         shutil.rmtree(json_config_dir)
