@@ -270,7 +270,8 @@ class TestConfig:
                 }
             },
             'temp_dir': './pipelinewise-test-config/tmp',
-            'validate_records': False
+            'validate_records': False,
+            'add_metadata_columns': False
         }
 
         # Delete the generated JSON config directory
