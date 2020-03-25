@@ -1,3 +1,26 @@
+0.14.3 (2020-03-25)
+-------------------
+- Support tap/target config files with `.yaml` extension when importing config
+- Fixed dependency conflict in install script
+- Fixed an issue when `add_metadata_columns` was not defined in `inheritable_config.json`
+
+**FastSync**
+- From MySQL: Increased default batch size to 50.000 rows when fastsync exporting data from MySQL tables
+- To Snowflake: Log inserts, updates and csv file sizes in the same format to target-snowflake connector
+
+**Tap Kafka**
+- Bump `pipelinewise-tap-kafka` to 2.1.1
+    - Commit offset from the state file and not from the consumed messages
+
+**Tap Snowflake**
+- Bump `pipelinewise-tap-snowflake` to 1.1.2
+    - Fixed some dependency conflicts
+
+**Target Snowflake**
+- Bump `pipelinewise-target-snowflake` to 1.6.2
+    - Log inserts, updates and csv file sizes in a more consumable format
+
+
 0.14.2 (2020-03-19)
 -------------------
 
