@@ -4,13 +4,10 @@
 Tap Kafka
 ---------
 
-
-Connecting to Kafka
-'''''''''''''''''''
-
-.. warning::
-
-  This section of the documentation is work in progress.
+Messages from kafka topics are extracted into the following fields:
+* `message_timestamp`: Populated from the Kafka message metadata
+* `message`: The original and full kafka message
+* Dynamic primary key columns: (Optional) Fields extracted from the Kafka JSON messages by JSONPath selector(s).
 
 
 Configuring what to replicate
