@@ -190,4 +190,4 @@ class FastSyncTargetRedshift:
 
         # Swap tables and drop the temp tamp
         self.query('DROP TABLE IF EXISTS {}.{}'.format(schema, target_table))
-        self.query('ALTER TABLE {}.{} RENAME TO {}'.format(schema, temp_table, target_table))
+        self.query('ALTER TABLE {}.{} RENAME TO "{}"'.format(schema, temp_table, target_table))
