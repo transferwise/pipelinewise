@@ -124,6 +124,7 @@
 <li class="toctree-l2"><a class="reference internal" href="oracle.html">Tap Oracle</a></li>
 <li class="toctree-l2"><a class="reference internal" href="s3_csv.html">Tap S3 CSV</a></li>
 <li class="toctree-l2 current"><a class="current reference internal" href="#">Tap Kafka</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#consuming-kafka-messages">Consuming Kafka messages</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#configuring-what-to-replicate">Configuring what to replicate</a></li>
 </ul>
 </li>
@@ -208,15 +209,20 @@
             
   <div class="section" id="tap-kafka">
 <span id="id1"></span><h1>Tap Kafka<a class="headerlink" href="#tap-kafka" title="Permalink to this headline">¶</a></h1>
-<p>Messages from kafka topics are extracted into the following fields:
-* <cite>message_timestamp</cite>: Timestamp extracted from the kafka metadata
-* <cite>message_offset</cite>: Offset extracted from the kafka metadata
-* <cite>message_partition</cite>: Partition extracted from the kafka metadata
-* <cite>message</cite>: The original and full kafka message
-* Dynamic primary key columns: (Optional) Fields extracted from the Kafka JSON messages by JSONPath selector(s).</p>
-<p>Tap Kafka saved consumed messages into a local disk storage and sends quick commit message to Kafka after every
-consumed message. A batching mechanism keeps maintaining of deleting and flushing messages from this local storage
+<p>Messages from kafka topics are extracted into the following fields:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">MESSAGE_TIMESTAMP</span></code>: Timestamp extracted from the kafka metadata</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">MESSAGE_OFFSET</span></code>: Offset extracted from the kafka metadata</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">MESSAGE_PARTITION</span></code>: Partition extracted from the kafka metadata</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">MESSAGE</span></code>: The original and full kafka message</p></li>
+<li><p><cite>Dynamic primary key columns</cite>: (Optional) Fields extracted from the Kafka JSON messages by JSONPath selector(s).</p></li>
+</ul>
+<div class="section" id="consuming-kafka-messages">
+<h2>Consuming Kafka messages<a class="headerlink" href="#consuming-kafka-messages" title="Permalink to this headline">¶</a></h2>
+<p>Tap Kafka saves consumed messages into a local disk storage and sends commit messages to Kafka after every
+consumed message. A batching mechanism keeps maintaining of deleting and flushing messages from the local storage
 and sends singer compatible messages in small batches to standard output.</p>
+</div>
 <div class="section" id="configuring-what-to-replicate">
 <h2>Configuring what to replicate<a class="headerlink" href="#configuring-what-to-replicate" title="Permalink to this headline">¶</a></h2>
 <p>PipelineWise configures every tap with a common structured YAML file format.

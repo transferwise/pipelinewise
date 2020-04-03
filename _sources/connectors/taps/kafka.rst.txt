@@ -5,14 +5,18 @@ Tap Kafka
 ---------
 
 Messages from kafka topics are extracted into the following fields:
-* `message_timestamp`: Timestamp extracted from the kafka metadata
-* `message_offset`: Offset extracted from the kafka metadata
-* `message_partition`: Partition extracted from the kafka metadata
-* `message`: The original and full kafka message
-* Dynamic primary key columns: (Optional) Fields extracted from the Kafka JSON messages by JSONPath selector(s).
 
-Tap Kafka saved consumed messages into a local disk storage and sends quick commit message to Kafka after every
-consumed message. A batching mechanism keeps maintaining of deleting and flushing messages from this local storage
+* ``MESSAGE_TIMESTAMP``: Timestamp extracted from the kafka metadata
+* ``MESSAGE_OFFSET``: Offset extracted from the kafka metadata
+* ``MESSAGE_PARTITION``: Partition extracted from the kafka metadata
+* ``MESSAGE``: The original and full kafka message
+* `Dynamic primary key columns`: (Optional) Fields extracted from the Kafka JSON messages by JSONPath selector(s).
+
+Consuming Kafka messages
+''''''''''''''''''''''''
+
+Tap Kafka saves consumed messages into a local disk storage and sends commit messages to Kafka after every
+consumed message. A batching mechanism keeps maintaining of deleting and flushing messages from the local storage
 and sends singer compatible messages in small batches to standard output.
 
 
