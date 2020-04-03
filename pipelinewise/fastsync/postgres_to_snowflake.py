@@ -25,8 +25,6 @@ REQUIRED_CONFIG_KEYS = {
         'user',
         'password',
         'warehouse',
-        'aws_access_key_id',
-        'aws_secret_access_key',
         's3_bucket',
         'stage',
         'file_format'

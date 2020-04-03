@@ -32,8 +32,10 @@ class FastSyncTargetSnowflake:
         self.connection_config = connection_config
         self.transformation_config = transformation_config
         self.s3 = boto3.client('s3',
-                               aws_access_key_id=self.connection_config['aws_access_key_id'],
-                               aws_secret_access_key=self.connection_config['aws_secret_access_key'])
+                               aws_access_key_id=self.connection_config.get('aws_access_key_id'),
+                               aws_secret_access_key=self.connection_config.get('aws_secret_access_key'),
+                               aws_session_token=self.connection_config.get('aws_session_token')
+                               )
 
     def open_connection(self):
         return snowflake.connector.connect(user=self.connection_config['user'],
@@ -139,37 +141,18 @@ class FastSyncTargetSnowflake:
         table_dict = utils.tablename_to_dict(table_name)
         target_table = table_dict.get('table_name') if not is_temporary else table_dict.get('temp_table_name')
         inserts = 0
-
-        aws_access_key_id = self.connection_config['aws_access_key_id']
-        aws_secret_access_key = self.connection_config['aws_secret_access_key']
         bucket = self.connection_config['s3_bucket']
 
-        master_key = self.connection_config.get('client_side_encryption_master_key', '')
-        if master_key != '':
-            sql = """COPY INTO {}."{}" FROM @{}/{}
+        sql = """COPY INTO {}."{}" FROM @{}/{}
                 FILE_FORMAT = (type='CSV' escape='\\x1e' escape_unenclosed_field='\\x1e' 
                 field_optionally_enclosed_by='\"' skip_header={} COMPRESSION='GZIP' BINARY_FORMAT='HEX') 
-            """.format(
-                target_schema,
-                target_table.upper(),
-                self.connection_config['stage'],
-                s3_key,
-                int(skip_csv_header),
-            )
-        else:
-            sql = """COPY INTO {}."{}" FROM 's3://{}/{}'
-                CREDENTIALS = (aws_key_id='{}' aws_secret_key='{}')
-                FILE_FORMAT = (type='CSV' escape='\\x1e' escape_unenclosed_field='\\x1e' 
-                field_optionally_enclosed_by='\"' skip_header={} COMPRESSION='GZIP' BINARY_FORMAT='HEX')
-            """.format(
-                target_schema,
-                target_table.upper(),
-                bucket,
-                s3_key,
-                aws_access_key_id,
-                aws_secret_access_key,
-                int(skip_csv_header),
-            )
+                """.format(
+                    target_schema,
+                    target_table.upper(),
+                    self.connection_config['stage'],
+                    s3_key,
+                    int(skip_csv_header),
+                )
 
         # Get number of inserted records - COPY does insert only
         results = self.query(sql)
