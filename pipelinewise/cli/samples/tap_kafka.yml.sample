@@ -27,11 +27,14 @@ db_conn:
      transfer_id: "$.transferMetadata.transferId"
 
   # --------------------------------------------------------------------------
-  # Stop listening the topic if no message after certain milliseconds.
-  # Default is 10 seconds
+  # Kafka Consumer optional parameters
   # --------------------------------------------------------------------------
-  #consumer_timeout_ms: 10000
-
+  #max_runtime_ms: 300000                   # The maximum time for the tap to collect new messages from Kafka topic.
+  #consumer_timeout_ms: 10000               # Number of milliseconds to block during message iteration before raising StopIteration
+  #session_timeout_ms: 30000                # The timeout used to detect failures when using Kafka’s group management facilities.
+  #heartbeat_interval_ms: 10000             # The expected time in milliseconds between heartbeats to the consumer coordinator when using Kafka’s group management facilities.
+  #max_poll_interval_ms: 300000             # The maximum delay between invocations of poll() when using consumer group management.
+  #local_store_dir: ./tap-kafka-local-store # Path to the local store with consumed kafka messages
 
 # ------------------------------------------------------------------------------
 # Destination (Target) - Target properties
