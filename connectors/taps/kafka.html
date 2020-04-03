@@ -65,7 +65,7 @@
             
             
               <div class="version">
-                0.12.0
+                0.15.0
               </div>
             
           
@@ -124,7 +124,6 @@
 <li class="toctree-l2"><a class="reference internal" href="oracle.html">Tap Oracle</a></li>
 <li class="toctree-l2"><a class="reference internal" href="s3_csv.html">Tap S3 CSV</a></li>
 <li class="toctree-l2 current"><a class="current reference internal" href="#">Tap Kafka</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#connecting-to-kafka">Connecting to Kafka</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#configuring-what-to-replicate">Configuring what to replicate</a></li>
 </ul>
 </li>
@@ -209,13 +208,15 @@
             
   <div class="section" id="tap-kafka">
 <span id="id1"></span><h1>Tap Kafka<a class="headerlink" href="#tap-kafka" title="Permalink to this headline">¶</a></h1>
-<div class="section" id="connecting-to-kafka">
-<h2>Connecting to Kafka<a class="headerlink" href="#connecting-to-kafka" title="Permalink to this headline">¶</a></h2>
-<div class="admonition warning">
-<p class="admonition-title">Warning</p>
-<p>This section of the documentation is work in progress.</p>
-</div>
-</div>
+<p>Messages from kafka topics are extracted into the following fields:
+* <cite>message_timestamp</cite>: Timestamp extracted from the kafka metadata
+* <cite>message_offset</cite>: Offset extracted from the kafka metadata
+* <cite>message_partition</cite>: Partition extracted from the kafka metadata
+* <cite>message</cite>: The original and full kafka message
+* Dynamic primary key columns: (Optional) Fields extracted from the Kafka JSON messages by JSONPath selector(s).</p>
+<p>Tap Kafka saved consumed messages into a local disk storage and sends quick commit message to Kafka after every
+consumed message. A batching mechanism keeps maintaining of deleting and flushing messages from this local storage
+and sends singer compatible messages in small batches to standard output.</p>
 <div class="section" id="configuring-what-to-replicate">
 <h2>Configuring what to replicate<a class="headerlink" href="#configuring-what-to-replicate" title="Permalink to this headline">¶</a></h2>
 <p>PipelineWise configures every tap with a common structured YAML file format.
@@ -251,11 +252,14 @@ db_conn:
      transfer_id: <span class="s2">&quot;</span>$<span class="s2">.transferMetadata.transferId&quot;</span>
 
   <span class="c1"># --------------------------------------------------------------------------</span>
-  <span class="c1"># Stop listening the topic if no message after certain milliseconds.</span>
-  <span class="c1"># Default is 10 seconds</span>
+  <span class="c1"># Kafka Consumer optional parameters</span>
   <span class="c1"># --------------------------------------------------------------------------</span>
-  <span class="c1">#consumer_timeout_ms: 10000</span>
-
+  <span class="c1">#max_runtime_ms: 300000                   # The maximum time for the tap to collect new messages from Kafka topic.</span>
+  <span class="c1">#consumer_timeout_ms: 10000               # Number of milliseconds to block during message iteration before raising StopIteration</span>
+  <span class="c1">#session_timeout_ms: 30000                # The timeout used to detect failures when using Kafka’s group management facilities.</span>
+  <span class="c1">#heartbeat_interval_ms: 10000             # The expected time in milliseconds between heartbeats to the consumer coordinator when using Kafka’s group management facilities.</span>
+  <span class="c1">#max_poll_interval_ms: 300000             # The maximum delay between invocations of poll() when using consumer group management.</span>
+  <span class="c1">#local_store_dir: ./tap-kafka-local-store # Path to the local store with consumed kafka messages</span>
 
 <span class="c1"># ------------------------------------------------------------------------------</span>
 <span class="c1"># Destination (Target) - Target properties</span>
@@ -277,7 +281,7 @@ schemas:
 
     <span class="c1"># Kafka topic to replicate into destination Data Warehouse</span>
     <span class="c1"># You can load data only from one kafka topic in one YAML file.</span>
-    <span class="c1"># If you want load from multiple kafka topics, create another tap YAML similar to this file</span>
+    <span class="c1"># If you want load from multiple kafka topics, create another tap YAML similar to this file</span>
     tables:
       - table_name: <span class="s2">&quot;my_kafka_topic&quot;</span>   <span class="c1"># target table name needs to match to the topic name in snake case format</span>
 
@@ -310,7 +314,7 @@ schemas:
 
   <div role="contentinfo">
     <p>
-        &copy; Copyright 2019, TransferWise Ltd.
+        &copy; Copyright 2020, TransferWise Ltd.
 
     </p>
   </div>
