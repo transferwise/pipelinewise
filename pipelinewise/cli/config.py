@@ -149,7 +149,7 @@ class Config:
 
             # Save every tap JSON files
             for tap in target['taps']:
-                extra_config_keys = utils.get_tap_extra_config_keys(tap)
+                extra_config_keys = utils.get_tap_extra_config_keys(tap, self.get_temp_dir())
                 self.save_tap_jsons(target, tap, extra_config_keys)
 
     def save_main_config_json(self):

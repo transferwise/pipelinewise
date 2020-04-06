@@ -54,7 +54,7 @@ def generate_tap_s3_csv_to_table_mappings(tap):
 # every supported tap we need to normalise the naming differences to
 # implement common functions that work smoothly with every tap.
 # i.e. stream selection, transformations, etc.
-def get_tap_properties(tap=None):
+def get_tap_properties(tap=None, temp_dir=None):
     """
     Returns the full dictionary of every tap properties
     """
@@ -97,6 +97,7 @@ def get_tap_properties(tap=None):
         },
         'tap-kafka': {
             'tap_config_extras': {
+                'local_store_dir': temp_dir,
                 'encoding': 'utf-8'
             },
             'tap_stream_id_pattern': '{{table_name}}',
