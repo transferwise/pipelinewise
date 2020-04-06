@@ -286,6 +286,13 @@ class TestUtils:
         # Get property value by tap type
         assert cli.utils.get_tap_property_by_tap_type('tap-mysql', 'default_replication_method') == 'LOG_BASED'
 
+        # Kafka encoding and parameterised local_store_dir should be added as default extra config keys
+        tap = cli.utils.load_yaml('{}/resources/tap-valid-kafka.yml'.format(os.path.dirname(__file__)))
+        assert cli.utils.get_tap_extra_config_keys(tap, temp_dir='/my/temp/dir') == {
+            'local_store_dir': '/my/temp/dir',
+            'encoding': 'utf-8'
+        }
+
     def test_run_command(self):
         """Test run command functions
 
