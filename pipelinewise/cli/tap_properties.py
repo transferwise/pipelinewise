@@ -46,6 +46,42 @@ def generate_tap_s3_csv_to_table_mappings(tap):
     return s3_csv_tables
 
 
+def generate_tables_list(tap, as_string=False):
+    """
+    Generating table names from tap YAMLs in <SCHEMA_NAME>.<TABLE_NAME> format.
+    Some tap configurations are required to specify list of tables.
+
+    Example output as list:
+        "tables": [
+            "MY_SCHEMA.MY_TABLE_1",
+            "MY_SCHEMA.MY_TABLE_2"
+        ]
+
+    Example output as comma separated string that compatible with tap-snowflake tap
+        "tables": "MY_SCHEMA.MY_TABLE_1,MY_SCHEMA.MY_TABLE_2"
+    """
+    tables_list = []
+
+    # Using the input tap YAML we can generate the required config.json
+    schemas = tap.get('schemas', []) if tap else None
+    if schemas:
+        for schema in schemas:
+            tables = schema.get('tables', [])
+            for table in tables:
+                schema_name = schema['source_schema']
+                table_name = table['table_name']
+
+                # Append table name with schema prefix
+                tables_list.append(f'{schema_name}.{table_name}')
+
+    # Return as comma separated string
+    if as_string:
+        return ','.join(tables_list)
+
+    # Return as list
+    return tables_list
+
+
 # Taps are implemented by different persons and teams without
 # common naming convention and structures in the tap specific
 # properties.json.
@@ -148,13 +184,8 @@ def get_tap_properties(tap=None, temp_dir=None):
         },
         'tap-snowflake': {
             'tap_config_extras': {
-                # PipelineWise doesn't support replicating from multiple
-                # databases by one tap but tap-postgres does.
-                #
-                # To avoid problems of loading two tables with the same name
-                # but from differnet dbs we force tap-postgres to filter only
-                # the db that's in scope
-                'filter_dbs': tap.get('db_conn', {}).get('dbname') if tap else None
+                # Adding only the required list of tables to avoid long running discovery mode
+                'tables': generate_tables_list(tap, as_string=True)
             },
             'tap_stream_id_pattern': '{{database_name}}-{{schema_name}}-{{table_name}}',
             'tap_stream_name_pattern': '{{schema_name}}-{{table_name}}',

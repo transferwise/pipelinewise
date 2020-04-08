@@ -264,33 +264,40 @@ class TestUtils:
 
     def test_tap_properties(self):
         """Test tap property getter functions"""
-        tap = cli.utils.load_yaml('{}/resources/tap-valid-mysql.yml'.format(os.path.dirname(__file__)))
+        tap_mysql = cli.utils.load_yaml('{}/resources/tap-valid-mysql.yml'.format(os.path.dirname(__file__)))
 
         # Every tap should have catalog argument --properties or --catalog
-        tap_catalog_argument = cli.utils.get_tap_property(tap, 'tap_catalog_argument')
+        tap_catalog_argument = cli.utils.get_tap_property(tap_mysql, 'tap_catalog_argument')
         assert tap_catalog_argument in ['--catalog', '--properties']
 
         # Every tap should have extra_config_keys defined in dict
-        assert isinstance(cli.utils.get_tap_extra_config_keys(tap), dict) is True
+        assert isinstance(cli.utils.get_tap_extra_config_keys(tap_mysql), dict) is True
 
         # MySQL stream_id should be formatted as {{schema_name}}-{{table_name}}
-        assert cli.utils.get_tap_stream_id(tap, 'dummy_db', 'dummy_schema', 'dummy_table') == 'dummy_schema-dummy_table'
+        assert cli.utils.get_tap_stream_id(tap_mysql, 'dummy_db', 'dummy_schema', 'dummy_table') == \
+               'dummy_schema-dummy_table'
 
         # MySQL stream_name should be formatted as {{schema_name}}-{{table_name}}
-        assert cli.utils.get_tap_stream_name(tap, 'dummy_db', 'dummy_schema',
+        assert cli.utils.get_tap_stream_name(tap_mysql, 'dummy_db', 'dummy_schema',
                                              'dummy_table') == 'dummy_schema-dummy_table'
 
         # MySQL stream_name should be formatted as {{schema_name}}-{{table_name}}
-        assert cli.utils.get_tap_default_replication_method(tap) == 'LOG_BASED'
+        assert cli.utils.get_tap_default_replication_method(tap_mysql) == 'LOG_BASED'
 
         # Get property value by tap type
         assert cli.utils.get_tap_property_by_tap_type('tap-mysql', 'default_replication_method') == 'LOG_BASED'
 
         # Kafka encoding and parameterised local_store_dir should be added as default extra config keys
-        tap = cli.utils.load_yaml('{}/resources/tap-valid-kafka.yml'.format(os.path.dirname(__file__)))
-        assert cli.utils.get_tap_extra_config_keys(tap, temp_dir='/my/temp/dir') == {
+        tap_kafka = cli.utils.load_yaml('{}/resources/tap-valid-kafka.yml'.format(os.path.dirname(__file__)))
+        assert cli.utils.get_tap_extra_config_keys(tap_kafka, temp_dir='/my/temp/dir') == {
             'local_store_dir': '/my/temp/dir',
             'encoding': 'utf-8'
+        }
+
+        # Snwoflake tables list should be added to tap_config_extras
+        tap_snowflake = cli.utils.load_yaml('{}/resources/tap-valid-snowflake.yml'.format(os.path.dirname(__file__)))
+        assert cli.utils.get_tap_extra_config_keys(tap_snowflake) == {
+            'tables': 'SCHEMA_1.TABLE_ONE,SCHEMA_1.TABLE_TWO'
         }
 
     def test_run_command(self):
