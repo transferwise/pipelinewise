@@ -44,7 +44,7 @@ schemas:
         replication_key: "last_update"      # Important: Incremental load always needs replication key
 
         # OPTIONAL: Load time transformations
-        #transformations:                    
+        #transformations:
         #  - column: "last_name"            # Column to transform
         #    type: "SET-NULL"               # Transformation type
 

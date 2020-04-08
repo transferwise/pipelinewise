@@ -43,10 +43,6 @@ Example YAML for tap-snowflake:
       user: "<USER>"                       # Snowflake user
       password: "<PASSWORD>"               # Plain string or vault encrypted
       warehouse: "<WAREHOUSE>"             # Snowflake warehouse
-      #filter_dbs: "<DBNAME"               # Optional: Scan only the required dbs
-      #filter_schemas: "SCHEMA_1,SCHEMA_2" # Optional: Scan only the required schemas
-                                          #           to improve the performance of
-                                          #           data extraction
 
 
     # ------------------------------------------------------------------------------
@@ -68,7 +64,6 @@ Example YAML for tap-snowflake:
         # List of tables to replicate from Snowflake to a destination
         #
         # Please check the Replication Strategies section in the documentation to understand the differences.
-        # For LOG_BASED replication method you might need to adjust the source mysql/ mariadb configuration.
         tables:
           - table_name: "TABLE_ONE"
             replication_method: "INCREMENTAL"   # One of INCREMENTAL or FULL_TABLE
@@ -80,7 +75,7 @@ Example YAML for tap-snowflake:
             #    type: "SET-NULL"               # Transformation type
 
           # You can add as many tables as you need...
-          - table_name: "table_two"
+          - table_name: "TABLE_TWO"
             replication_method: "FULL_TABLE"
 
       # You can add as many schemas as you need...
