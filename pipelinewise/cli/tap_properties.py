@@ -68,12 +68,11 @@ def generate_tables_list(tap, as_string=False):
         for schema in schemas:
             tables = schema.get('tables', [])
             for table in tables:
-                schema_name = schema.get('source_schema')
-                table_name = table.get('table_name')
-                fqdn = f'{schema_name}.{table_name}'
+                schema_name = schema['source_schema']
+                table_name = table['table_name']
 
-                # Append fully qualified table name
-                tables_list.append(fqdn)
+                # Append table name with schema prefix
+                tables_list.append(f'{schema_name}.{table_name}')
 
     # Return as comma separated string
     if as_string:
