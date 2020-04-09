@@ -1,3 +1,23 @@
+0.15.0 (2020-04-09)
+-------------------
+**FastSync**
+- To Snowflake: Support for IAM roles, AWS Session Tokens and to pass credentials as environment variables
+
+**Tap Kafka**
+- Bump `pipelinewise-tap-kafka` to 3.0.0
+    - Add local storage of consumed messages and instant commit kafka offsets
+    - Add more configurable options: `consumer_timeout_ms`, `session_timeout_ms`, `heartbeat_interval_ms`, `max_poll_interval_ms`
+    - Add two new fixed output columns: `MESSAGE_PARTITION` and `MESSAGE_OFFSET`
+
+**Tap Snowflake**
+- Bump `pipelinewise-tap-snowflake` to 2.0.0
+    - Discover only the required tables to avoid issues when too many tables in the database causing `SHOW COLUMNS` column to return more than the maximum 10000 rows
+
+**Target Snowflake**
+- Bump `pipelinewise-target-snowflake` to 1.6.3
+    - Generate compressed CSV files by default. Optionally can be disabled by the `no_compression` config option
+
+
 0.14.3 (2020-03-25)
 -------------------
 - Support tap/target config files with `.yaml` extension when importing config
