@@ -125,9 +125,10 @@ def get_tap_properties(tap=None, temp_dir=None):
         },
         'tap-zuora': {
             'tap_config_extras': {
-                # 'rate_limit': 1000,
-                # 'max_workers': 10,
-                # 'batch_size': 50
+                'username': tap.get('db_conn', {}).get('username') if tap else None,
+                'password': tap.get('db_conn', {}).get('password') if tap else None,
+                'start_date': tap.get('db_conn', {}).get('start_date') if tap else None,
+                'api_type': tap.get('db_conn', {}).get('api_type') if tap else None
             },
             'tap_stream_id_pattern': '{{table_name}}',
             'tap_stream_name_pattern': '{{table_name}}',
