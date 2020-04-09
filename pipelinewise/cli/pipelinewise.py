@@ -624,7 +624,7 @@ class PipelineWise:
         target_id = target.get('id')
         target_type = target.get('type')
 
-        self.logger.info('Discovering %s (%s) tap in {%s (%s) target...', tap_id, tap_type, target_id, target_type)
+        self.logger.info('Discovering %s (%s) tap in %s (%s) target...', tap_id, tap_type, target_id, target_type)
 
         # Generate and run the command to run the tap directly
         command = f'{tap_bin} --config {tap_config_file} --discover'
