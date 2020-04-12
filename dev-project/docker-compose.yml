@@ -29,7 +29,6 @@ services:
       DB_TARGET_POSTGRES_USER: ${DB_TARGET_POSTGRES_USER}
       DB_TARGET_POSTGRES_PASSWORD: ${DB_TARGET_POSTGRES_PASSWORD}
       DB_TARGET_POSTGRES_DB: ${DB_TARGET_POSTGRES_DB}
-
     volumes:
       - ../:/opt/pipelinewise
       # don't create container specific .virtualenvs files on host
@@ -42,13 +41,14 @@ services:
       - db_postgres_source
       - db_mysql_source
       - db_postgres_dwh
-
+    networks:
+      - pipelinewise_network
 
   ### TAP (Data source) containers
   # PostgreSQL service container used as test source database
   # Using Debezium image with wal2json plugin for logical decoding
   db_postgres_source:
-    image: debezium/postgres:11-alpine
+    image: debezium/postgres:12-alpine
     container_name: pipelinewise_dev_postgres_source
     # Making some logical decoding adjustments
     command: -c "wal_level=logical" -c "max_replication_slots=5" -c "max_wal_senders=5"
@@ -58,6 +58,8 @@ services:
       POSTGRES_USER: ${DB_TAP_POSTGRES_USER}
       POSTGRES_PASSWORD: ${DB_TAP_POSTGRES_PASSWORD}
       POSTGRES_DB: ${DB_TAP_POSTGRES_DB}
+    networks:
+      - pipelinewise_network
 
   # MySQL service container used as test source database
   db_mysql_source:
@@ -71,6 +73,8 @@ services:
       MYSQL_USER: ${DB_TAP_MYSQL_USER}
       MYSQL_PASSWORD: ${DB_TAP_MYSQL_PASSWORD}
       MYSQL_DATABASE: ${DB_TAP_MYSQL_DB}
+    networks:
+      - pipelinewise_network
 
   ### Target containers
   # PostgreSQL service container used as test target database
@@ -83,10 +87,12 @@ services:
       POSTGRES_USER: ${DB_TARGET_POSTGRES_USER}
       POSTGRES_PASSWORD: ${DB_TARGET_POSTGRES_PASSWORD}
       POSTGRES_DB: ${DB_TARGET_POSTGRES_DB}
+    networks:
+      - pipelinewise_network
 
 networks:
-  default:
-    driver: bridge
+  pipelinewise_network:
     ipam:
+      driver: default
       config:
-      - subnet: 192.168.55.0/24
+        - subnet: 192.168.56.0/24

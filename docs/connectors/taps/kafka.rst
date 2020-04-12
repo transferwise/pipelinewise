@@ -4,13 +4,20 @@
 Tap Kafka
 ---------
 
+Messages from kafka topics are extracted into the following fields:
 
-Connecting to Kafka
-'''''''''''''''''''
+* ``MESSAGE_TIMESTAMP``: Timestamp extracted from the kafka metadata
+* ``MESSAGE_OFFSET``: Offset extracted from the kafka metadata
+* ``MESSAGE_PARTITION``: Partition extracted from the kafka metadata
+* ``MESSAGE``: The original and full kafka message
+* `Dynamic primary key columns`: (Optional) Fields extracted from the Kafka JSON messages by JSONPath selector(s).
 
-.. warning::
+Consuming Kafka messages
+''''''''''''''''''''''''
 
-  This section of the documentation is work in progress.
+Tap Kafka saves consumed messages into a local disk storage and sends commit messages to Kafka after every
+consumed message. A batching mechanism keeps maintaining of deleting and flushing messages from the local storage
+and sends singer compatible messages in small batches to standard output.
 
 
 Configuring what to replicate
@@ -41,73 +48,26 @@ Example YAML for ``tap-kafka``:
     db_conn:
       group_id: "myGroupId"
       bootstrap_servers: "kafka1.foo.com:9092,kafka2.foo.com:9092,kafka3.foo.com:9092"
-      topic: "myTopic"
+      topic: "myKafkaTopic"
+
 
       # --------------------------------------------------------------------------
-      # SCHEMA is a standard JSON Schema document that used for multiple purposes:
-      #
-      # 1. Validating kafka messages read from the stream
-      # 2. Creating destination table in Snowflake:
-      #        - Column names are flattened, using the '__' characters to
-      #          separate multi-level objects
-      #        - Snowflake column types will be generated from JSON schema types
-      #
-      #
-      # Sample Kafka message extracted from profileBehaviourStats topic:
-      # (The JSON Schema needs to be tailored for this sample JSON message)
-      #
-      # {
-      #   "eventTime":1550564993738,
-      #   "startingState":"NEW",
-      #   "ltvValueInGbp":1701.36,
-      #   "ltvValueInEur":1919.7188620000002,
-      #   "transferMetadata":{
-      #     "transferId":63432435,
-      #     "profileId":7623199,
-      #     "userId":10523356,
-      #     "currentState":"NEW",
-      #     "sourceCurrency":"EUR",
-      #     "targetCurrency":"EUR",
-      #     "invoiceValue":50.0,
-      #     "invoiceValueInGbp":43.73,
-      #     "invoiceValueInEur":50.0,
-      #     "submitTime":1550564993000
-      #   }
-      #  }
+      # Optionally you can define primary key(s) from the kafka JSON messages.
+      # If primary keys defined then extra column(s) will be added to the output
+      # singer stream with the extracted values by JSONPath selectors.
       # --------------------------------------------------------------------------
-      schema: '
-          {
-            "properties": {
-              "eventTime": {"type": ["number", "null"]},
-              "startingState": {"type": ["string", "null"]},
-              "ltvValueInGbp": {"type": ["number", "null"]},
-              "ltvValueInEur": {"type": ["number", "null"]},
-              "transferMetadata": {
-                "type": "object",
-                "properties": {
-                  "transferId": {"type": "integer"},
-                  "profileId": {"type": ["integer", "null"]},
-                  "userId": {"type": ["integer", "null"]},
-                  "currentState": {"type": ["string", "null"]},
-                  "sourceCurrency": {"type": ["string", "null"]},
-                  "targetCurrency": {"type": ["string", "null"]},
-                  "invoiceValue": {"type": ["number", "null"]},
-                  "invoiceValueInGbp": {"type": ["number", "null"]},
-                  "invoiceValueInEur": {"type": ["number", "null"]},
-                  "submitTime": {"type": ["integer", "null"]}
-                }
-              }
-            }
-          }'
+      primary_keys:
+         transfer_id: "$.transferMetadata.transferId"
 
       # --------------------------------------------------------------------------
-      # One field from the kafka message will be the Primary Key of the target
-      # table. Selecting primary key is mandatory
+      # Kafka Consumer optional parameters
       # --------------------------------------------------------------------------
-      primary_keys: '["transferMetadata__transferId"]'
-
-      consumer_timeout_ms: 5000
-
+      #max_runtime_ms: 300000                   # The maximum time for the tap to collect new messages from Kafka topic.
+      #consumer_timeout_ms: 10000               # Number of milliseconds to block during message iteration before raising StopIteration
+      #session_timeout_ms: 30000                # The timeout used to detect failures when using Kafka’s group management facilities.
+      #heartbeat_interval_ms: 10000             # The expected time in milliseconds between heartbeats to the consumer coordinator when using Kafka’s group management facilities.
+      #max_poll_interval_ms: 300000             # The maximum delay between invocations of poll() when using consumer group management.
+      #local_store_dir: ./tap-kafka-local-store # Path to the local store with consumed kafka messages
 
     # ------------------------------------------------------------------------------
     # Destination (Target) - Target properties
@@ -115,7 +75,7 @@ Example YAML for ``tap-kafka``:
     # ------------------------------------------------------------------------------
     target: "snowflake"                       # ID of the target connector where the data will be loaded
     batch_size_rows: 20000                    # Batch size for the stream to optimise load performance
-    default_target_schema: "kafka"            # Target schema where the data will be loaded 
+    default_target_schema: "kafka"            # Target schema where the data will be loaded
     default_target_schema_select_permission:  # Optional: Grant SELECT on schema and tables that created
       - grp_stats
 
@@ -129,11 +89,11 @@ Example YAML for ``tap-kafka``:
 
         # Kafka topic to replicate into destination Data Warehouse
         # You can load data only from one kafka topic in one YAML file.
-        # If you want load from multiple kafka topics, create another tap YAML similar to this file
+        # If you want load from multiple kafka topics, create another tap YAML similar to this file
         tables:
-          - table_name: "kafka_topic"
+          - table_name: "my_kafka_topic"   # target table name needs to match to the topic name in snake case format
 
             # OPTIONAL: Load time transformations
-            #transformations:                    
+            #transformations:
             #  - column: "last_name"            # Column to transform
             #    type: "SET-NULL"               # Transformation type

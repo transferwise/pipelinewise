@@ -20,7 +20,7 @@ test-reports/
 .state.json
 
 # Generated test yamls
-tests/end-to-end/test-project/*.yml
+tests/end_to_end/test-project/*.yml
 
 # Dev project
 dev-project/.pipelinewise

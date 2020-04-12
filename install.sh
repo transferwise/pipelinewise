@@ -18,9 +18,9 @@ check_license() {
 
     echo
     echo "Checking license..."
-    PKG_NAME=`pip-licenses | grep $1 | awk '{print $1}'`
-    PKG_VERSION=`pip-licenses | grep $1 | awk '{print $2}'`
-    PKG_LICENSE=`pip-licenses --from mixed | grep $1 | awk '{for (i=1; i<=NF-2; i++) $i = $(i+2); NF-=2; print}'`
+    PKG_NAME=`pip-licenses | grep "$1[[:space:]]" | awk '{print $1}'`
+    PKG_VERSION=`pip-licenses | grep "$1[[:space:]]" | awk '{print $2}'`
+    PKG_LICENSE=`pip-licenses --from mixed | grep "$1[[:space:]]" | awk '{for (i=1; i<=NF-2; i++) $i = $(i+2); NF-=2; print}'`
 
     # Any License Agreement that is not Apache Software License (2.0) has to be accepted
     MAIN_LICENSE="Apache Software License"
@@ -59,7 +59,8 @@ make_virtualenv() {
     echo "Making Virtual Environment for [$1] in $VENV_DIR"
     python3 -m venv $VENV_DIR/$1
     source $VENV_DIR/$1/bin/activate
-    python3 -m pip install --upgrade pip
+    python3 -m pip install --upgrade pip setuptools
+
     if [ -f "requirements.txt" ]; then
         python3 -m pip install -r requirements.txt
     fi
@@ -71,6 +72,10 @@ make_virtualenv() {
 
         python3 -m pip install -e .$PIP_ARGS
     fi
+
+    echo ""
+    echo "===== Checking dependencies for conflict ..."
+    python3 -m pip check && echo "No conflicts" || exit 1
 
     check_license $1
     deactivate
@@ -105,7 +110,7 @@ print_installed_connectors() {
 
     for i in `ls $VENV_DIR`; do
         source $VENV_DIR/$i/bin/activate
-        VERSION=`python3 -m pip list | grep $i | awk '{print $2}'`
+        VERSION=`python3 -m pip list | grep "$i[[:space:]]" | awk '{print $2}'`
         printf "%-20s %s\n" $i "$VERSION"
     done
 

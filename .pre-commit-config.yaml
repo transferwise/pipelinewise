@@ -1,0 +1,13 @@
+repos:
+-   repo: https://github.com/pre-commit/mirrors-yapf
+    rev: v0.29.0
+    hooks:
+    - id: yapf
+-   repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v2.4.0
+    hooks:
+    - id: double-quote-string-fixer
+-   repo: https://github.com/pre-commit/mirrors-pylint
+    rev: v2.4.4
+    hooks:
+    - id: pylint

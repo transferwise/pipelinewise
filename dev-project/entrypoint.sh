@@ -19,7 +19,7 @@ cd dev-project
 ../tests/db/tap_postgres_db.sh
 
 # Install PipelineWise in the container
-../install.sh --acceptlicenses --nousage
+../install.sh --acceptlicenses --nousage --connectors=all
 if [[ $? != 0 ]]; then
     echo
     echo "ERROR: Docker container not started. Failed to install one or more PipelineWise components."

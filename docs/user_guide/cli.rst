@@ -51,6 +51,18 @@ Run a specific pipeline
 :--extra_log: Optional: Copy logging into PipelineWise logger to see tap run logs at runtime in STDOUT
 
 
+.. _cli_stop_tap:
+
+stop_tap
+""""""""
+
+Stop running a specific pipeline
+
+:--target: Target connector id
+
+:--tap: Tap connector id
+
+
 .. _cli_discover_tap:
 
 discover_tap
