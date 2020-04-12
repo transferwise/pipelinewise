@@ -44,10 +44,14 @@ Example YAML for target-redshift:
       dbname: "<DB_NAME>"                           # Redshift database name
 
       # We use an intermediate S3 to load data into Redshift
-      aws_access_key_id: "<ACCESS_KEY>"             # S3 - Plain string or vault encrypted
-      aws_secret_access_key: "<SECRET_ACCESS_KEY>"  # S3 - Plain string or vault encrypted
+      aws_access_key_id: "<ACCESS_KEY>"             # Optional: Plain string or vault encrypted. If not provided, it will be collected from AWS_ACCESS_KEY_ID env var
+      aws_secret_access_key: "<SECRET_ACCESS_KEY>"  # Optional: Plain string or vault encrypted. If not provided, it will be collected from AWS_SECRET_ACCESS_KEY env var
+      #aws_session_token: "<STS_TOKEN>"             # Optional: AWS STS token for temporary credentials. If not provided, it will be collected from AWS_SESSION_TOKEN env var
+      #aws_redshift_copy_role_arn: "<ROLE_ARN>"     # Optional: AWS Role ARN to be used for the Redshift COPY operation.
+                                                    #           Allow the user to use environment credentials and delegate the COPY command to a role
+                                                    #           Used instead of the given AWS keys for the COPY operation if provided
       s3_bucket: "<BUCKET_NAME>"                    # S3 external bucket name
-      s3_key_prefix: "redshift-imports/"            # Optional: S3 key prefix
+      s3_key_prefix: "redshift-imports/"            # Optional: S3 key prefix
 
       # Optional: Overrides the default COPY options to load data into Redshift
       #           The values below are the defaults and fit for purpose for most cases.
