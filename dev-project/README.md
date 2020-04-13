@@ -18,7 +18,7 @@ Go to the main folder of the repository (the parent of this one) and To create l
 
 ```sh
 $ cd dev-project/
-$ docker-compose up --build
+$ docker-compose --env-file .env.template up --build
 ```
 
 Wait until `PipelineWise Dev environment is ready in Docker container(s).` message. At the first run this can
