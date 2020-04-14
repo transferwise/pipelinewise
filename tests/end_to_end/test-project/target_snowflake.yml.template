@@ -1,3 +1,5 @@
+---
+
 # ------------------------------------------------------------------------------
 # General Properties
 # ------------------------------------------------------------------------------
@@ -10,11 +12,11 @@ type: "target-snowflake"               # !! THIS SHOULD NOT CHANGE !!
 # Target - Data Warehouse connection details
 # ------------------------------------------------------------------------------
 db_conn:
-  account: "${TARGET_SNOWFLAKE_ACCOUNT}"                          # Snowflake account
-  dbname: "${TARGET_SNOWFLAKE_DBNAME}"                            # Snowflake database name
-  user: "${TARGET_SNOWFLAKE_USER}"                                # Snowflake user
-  password: "${TARGET_SNOWFLAKE_PASSWORD}"                        # Plain string or vault encrypted
-  warehouse: "${TARGET_SNOWFLAKE_WAREHOUSE}"                      # Snowflake virtual warehouse
+  account: "${TARGET_SNOWFLAKE_ACCOUNT}"        # Snowflake account
+  dbname: "${TARGET_SNOWFLAKE_DBNAME}"          # Snowflake database name
+  user: "${TARGET_SNOWFLAKE_USER}"              # Snowflake user
+  password: "${TARGET_SNOWFLAKE_PASSWORD}"      # Plain string or vault encrypted
+  warehouse: "${TARGET_SNOWFLAKE_WAREHOUSE}"    # Snowflake virtual warehouse
 
   # We use an intermediate external stage on S3 to load data into Snowflake
   aws_access_key_id: "${TARGET_SNOWFLAKE_AWS_ACCESS_KEY}"             # S3 - Plain string or vault encrypted

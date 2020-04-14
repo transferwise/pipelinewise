@@ -12,8 +12,8 @@ type: "target-postgres"                # !! THIS SHOULD NOT CHANGE !!
 # Target - Data Warehouse connection details
 # ------------------------------------------------------------------------------
 db_conn:
-  host: "${DB_TARGET_POSTGRES_HOST}"                  # PostgreSQL host
-  port: ${DB_TARGET_POSTGRES_PORT}                    # PostgreSQL port
-  user: "${DB_TARGET_POSTGRES_USER}"                  # PostgreSQL user
-  password: "${DB_TARGET_POSTGRES_PASSWORD}"          # Plain string or vault encrypted
-  dbname: "${DB_TARGET_POSTGRES_DB}"                  # PostgreSQL database name
+  host: "${TARGET_POSTGRES_HOST}"           # PostgreSQL host
+  port: ${TARGET_POSTGRES_PORT}             # PostgreSQL port
+  user: "${TARGET_POSTGRES_USER}"           # PostgreSQL user
+  password: "${TARGET_POSTGRES_PASSWORD}"   # Plain string or vault encrypted
+  dbname: "${TARGET_POSTGRES_DB}"           # PostgreSQL database name

@@ -3,21 +3,21 @@
 # ------------------------------------------------------------------------------
 # General Properties
 # ------------------------------------------------------------------------------
-id: "postgres_to_pg"
-name: "PostgreSQL source test database"
-type: "tap-postgres"
+id: "mariadb_to_pg"
+name: "MariaDB source test database"
+type: "tap-mysql"
 owner: "test-runner"
 
 
 # ------------------------------------------------------------------------------
-# Source (Tap) - PostgreSQL connection details
+# Source (Tap) - MySQL connection details
 # ------------------------------------------------------------------------------
 db_conn:
-  host: "${TAP_POSTGRES_HOST}"          # PostgreSQL host
-  port: ${TAP_POSTGRES_PORT}            # PostgreSQL port
-  user: "${TAP_POSTGRES_USER}"          # PostgreSQL user
-  password: "${TAP_POSTGRES_PASSWORD}"  # Plain string or vault encrypted
-  dbname: "${TAP_POSTGRES_DB}"          # PostgreSQL database name
+  host: "${TAP_MYSQL_HOST}"             # MySQL host
+  port: ${TAP_MYSQL_PORT}               # MySQL port
+  user: "${TAP_MYSQL_USER}"             # MySQL user
+  password: "${TAP_MYSQL_PASSWORD}"     # Plain string or vault encrypted
+  dbname: "${TAP_MYSQL_DB}"             # MySQL database name
 
 
 # ------------------------------------------------------------------------------
@@ -32,18 +32,21 @@ batch_size_rows: 20000                 # Batch size for the stream to optimise l
 # Source to target Schema mapping
 # ------------------------------------------------------------------------------
 schemas:
-  - source_schema: "public"
-    target_schema: "postgres_world"
+  - source_schema: "mysql_source_db"
+    target_schema: "mysql_grp24"
     target_schema_select_permissions:
       - group1
 
     tables:
-      - table_name: "city"
+      - table_name: "address"
         replication_method: "INCREMENTAL"
-        replication_key: "id"
+        replication_key: "date_updated"
 
-      - table_name: "country"
+      - table_name: "area_code"
         replication_method: "FULL_TABLE"
 
-      - table_name: "countrylanguage"
+      - table_name: "order"
         replication_method: "FULL_TABLE"
+
+      - table_name: "weight_unit"
+        replication_method: "LOG_BASED"

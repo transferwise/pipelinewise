@@ -3,7 +3,7 @@
 # ------------------------------------------------------------------------------
 # General Properties
 # ------------------------------------------------------------------------------
-id: "postgres_to_pg"
+id: "postgres_to_rs"
 name: "PostgreSQL source test database"
 type: "tap-postgres"
 owner: "test-runner"
@@ -24,8 +24,8 @@ db_conn:
 # Destination (Target) - Target properties
 # Connection details should be in the relevant target YAML file
 # ------------------------------------------------------------------------------
-target: "postgres_dwh"                 # ID of the target connector where the data will be loaded
-batch_size_rows: 20000                 # Batch size for the stream to optimise load performance
+target: "redshift"                    # ID of the target connector where the data will be loaded
+batch_size_rows: 1000                 # Batch size for the stream to optimise load performance
 
 
 # ------------------------------------------------------------------------------
@@ -33,9 +33,7 @@ batch_size_rows: 20000                 # Batch size for the stream to optimise l
 # ------------------------------------------------------------------------------
 schemas:
   - source_schema: "public"
-    target_schema: "postgres_world"
-    target_schema_select_permissions:
-      - group1
+    target_schema: "postgres_world_sf"
 
     tables:
       - table_name: "city"
@@ -47,3 +45,17 @@ schemas:
 
       - table_name: "countrylanguage"
         replication_method: "FULL_TABLE"
+
+      - table_name: "order"
+        replication_method: "INCREMENTAL"
+        replication_key: "created_at"
+        transformations:
+          - column: 'cvarchar'
+            type: 'MASK-HIDDEN'
+
+      - table_name: "table_with_reserved_words"
+        replication_method: "INCREMENTAL"
+        replication_key: "increment"
+        transformations:
+          - column: 'order'
+            type: 'HASH'
