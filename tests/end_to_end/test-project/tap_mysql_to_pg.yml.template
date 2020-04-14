@@ -34,8 +34,6 @@ batch_size_rows: 20000                 # Batch size for the stream to optimise l
 schemas:
   - source_schema: "mysql_source_db"
     target_schema: "mysql_grp24"
-    target_schema_select_permissions:
-      - group1
 
     tables:
       - table_name: "address"
