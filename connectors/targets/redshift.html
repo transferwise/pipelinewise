@@ -238,10 +238,14 @@ db_conn:
   dbname: <span class="s2">&quot;&lt;DB_NAME&gt;&quot;</span>                           <span class="c1"># Redshift database name</span>
 
   <span class="c1"># We use an intermediate S3 to load data into Redshift</span>
-  aws_access_key_id: <span class="s2">&quot;&lt;ACCESS_KEY&gt;&quot;</span>             <span class="c1"># S3 - Plain string or vault encrypted</span>
-  aws_secret_access_key: <span class="s2">&quot;&lt;SECRET_ACCESS_KEY&gt;&quot;</span>  <span class="c1"># S3 - Plain string or vault encrypted</span>
+  aws_access_key_id: <span class="s2">&quot;&lt;ACCESS_KEY&gt;&quot;</span>             <span class="c1"># Optional: Plain string or vault encrypted. If not provided, it will be collected from AWS_ACCESS_KEY_ID env var</span>
+  aws_secret_access_key: <span class="s2">&quot;&lt;SECRET_ACCESS_KEY&gt;&quot;</span>  <span class="c1"># Optional: Plain string or vault encrypted. If not provided, it will be collected from AWS_SECRET_ACCESS_KEY env var</span>
+  <span class="c1">#aws_session_token: &quot;&lt;STS_TOKEN&gt;&quot;             # Optional: AWS STS token for temporary credentials. If not provided, it will be collected from AWS_SESSION_TOKEN env var</span>
+  <span class="c1">#aws_redshift_copy_role_arn: &quot;&lt;ROLE_ARN&gt;&quot;     # Optional: AWS Role ARN to be used for the Redshift COPY operation.</span>
+                                                <span class="c1">#           Allow the user to use environment credentials and delegate the COPY command to a role</span>
+                                                <span class="c1">#           Used instead of the given AWS keys for the COPY operation if provided</span>
   s3_bucket: <span class="s2">&quot;&lt;BUCKET_NAME&gt;&quot;</span>                    <span class="c1"># S3 external bucket name</span>
-  s3_key_prefix: <span class="s2">&quot;redshift-imports/&quot;</span>            <span class="c1"># Optional: S3 key prefix</span>
+  s3_key_prefix: <span class="s2">&quot;redshift-imports/&quot;</span>            <span class="c1"># Optional: S3 key prefix</span>
 
   <span class="c1"># Optional: Overrides the default COPY options to load data into Redshift</span>
   <span class="c1">#           The values below are the defaults and fit for purpose for most cases.</span>
