@@ -3,7 +3,7 @@
 # ------------------------------------------------------------------------------
 # General Properties
 # ------------------------------------------------------------------------------
-id: "mariadb_source"
+id: "mariadb_to_rs"
 name: "MariaDB source test database"
 type: "tap-mysql"
 owner: "test-runner"
@@ -13,18 +13,18 @@ owner: "test-runner"
 # Source (Tap) - MySQL connection details
 # ------------------------------------------------------------------------------
 db_conn:
-  host: "${DB_TAP_MYSQL_HOST}"                  # PostgreSQL host
-  port: ${DB_TAP_MYSQL_PORT}                    # PostgreSQL port
-  user: "${DB_TAP_MYSQL_USER}"                  # PostgreSQL user
-  password: "${DB_TAP_MYSQL_PASSWORD}"          # Plain string or vault encrypted
-  dbname: "${DB_TAP_MYSQL_DB}"                  # PostgreSQL database name
+  host: "${TAP_MYSQL_HOST}"             # MySQL host
+  port: ${TAP_MYSQL_PORT}               # MySQL port
+  user: "${TAP_MYSQL_USER}"             # MySQL user
+  password: "${TAP_MYSQL_PASSWORD}"     # Plain string or vault encrypted
+  dbname: "${TAP_MYSQL_DB}"             # MySQL database name
 
 
 # ------------------------------------------------------------------------------
 # Destination (Target) - Target properties
 # Connection details should be in the relevant target YAML file
 # ------------------------------------------------------------------------------
-target: "postgres_dwh"                 # ID of the target connector where the data will be loaded
+target: "redshift"                     # ID of the target connector where the data will be loaded
 batch_size_rows: 20000                 # Batch size for the stream to optimise load performance
 
 
@@ -34,19 +34,20 @@ batch_size_rows: 20000                 # Batch size for the stream to optimise l
 schemas:
   - source_schema: "mysql_source_db"
     target_schema: "mysql_grp24"
-    target_schema_select_permissions:
-      - group1
 
     tables:
-      - table_name: "address"
-        replication_method: "INCREMENTAL"
-        replication_key: "date_updated"
-
-      - table_name: "area_code"
-        replication_method: "FULL_TABLE"
-
-      - table_name: "order"
-        replication_method: "FULL_TABLE"
-
-      - table_name: "weight_unit"
+      - table_name: "table_with_binary" # This table has binary and varbinary columns
         replication_method: "LOG_BASED"
+
+      #- table_name: "edgydata" # This table has SF reserved words as columns
+      #  replication_method: "LOG_BASED"
+      #  transformations:
+      #    - column: "case"
+      #      type: "HASH"
+
+      - table_name: "no_pk_table"
+        replication_method: "FULL_TABLE"
+
+      #- table_name: "full" # This table has a reserved word as a name, full is reserved in both Mysql and Snowflake
+      #  replication_method: "INCREMENTAL"
+      #  replication_key: "begin"

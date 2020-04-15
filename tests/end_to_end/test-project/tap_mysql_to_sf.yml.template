@@ -13,11 +13,11 @@ owner: "test-runner"
 # Source (Tap) - MySQL connection details
 # ------------------------------------------------------------------------------
 db_conn:
-  host: "${DB_TAP_MYSQL_HOST}"                  # PostgreSQL host
-  port: ${DB_TAP_MYSQL_PORT}                    # PostgreSQL port
-  user: "${DB_TAP_MYSQL_USER}"                  # PostgreSQL user
-  password: "${DB_TAP_MYSQL_PASSWORD}"          # Plain string or vault encrypted
-  dbname: "${DB_TAP_MYSQL_DB}"                  # PostgreSQL database name
+  host: "${TAP_MYSQL_HOST}"             # MySQL host
+  port: ${TAP_MYSQL_PORT}               # MySQL port
+  user: "${TAP_MYSQL_USER}"             # MySQL user
+  password: "${TAP_MYSQL_PASSWORD}"     # Plain string or vault encrypted
+  dbname: "${TAP_MYSQL_DB}"             # MySQL database name
 
 
 # ------------------------------------------------------------------------------

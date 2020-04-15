@@ -5,24 +5,24 @@ references:
       # Main python container
       - image: circleci/python:3.7.4
         environment:
-          DB_TAP_MYSQL_HOST: db_mysql_source
-          DB_TAP_MYSQL_PORT: 3306
-          DB_TAP_MYSQL_ROOT_PASSWORD: test
-          DB_TAP_MYSQL_USER: test
-          DB_TAP_MYSQL_PASSWORD: test
-          DB_TAP_MYSQL_DB: mysql_source_db
+          TAP_MYSQL_HOST: db_mysql_source
+          TAP_MYSQL_PORT: 3306
+          TAP_MYSQL_ROOT_PASSWORD: test
+          TAP_MYSQL_USER: test
+          TAP_MYSQL_PASSWORD: test
+          TAP_MYSQL_DB: mysql_source_db
 
-          DB_TAP_POSTGRES_HOST: db_postgres_source
-          DB_TAP_POSTGRES_PORT: 5432
-          DB_TAP_POSTGRES_USER: test
-          DB_TAP_POSTGRES_PASSWORD: test
-          DB_TAP_POSTGRES_DB: postgres_source_db
+          TAP_POSTGRES_HOST: db_postgres_source
+          TAP_POSTGRES_PORT: 5432
+          TAP_POSTGRES_USER: test
+          TAP_POSTGRES_PASSWORD: test
+          TAP_POSTGRES_DB: postgres_source_db
 
-          DB_TARGET_POSTGRES_HOST: db_postgres_dwh
-          DB_TARGET_POSTGRES_PORT: 5432
-          DB_TARGET_POSTGRES_USER: test
-          DB_TARGET_POSTGRES_PASSWORD: test
-          DB_TARGET_POSTGRES_DB: postgres_dwh
+          TARGET_POSTGRES_HOST: db_postgres_dwh
+          TARGET_POSTGRES_PORT: 5432
+          TARGET_POSTGRES_USER: test
+          TARGET_POSTGRES_PASSWORD: test
+          TARGET_POSTGRES_DB: postgres_dwh
 
       # PostgreSQL service container image used as test source database (for tap-postgres)
       - image: postgres:11.4

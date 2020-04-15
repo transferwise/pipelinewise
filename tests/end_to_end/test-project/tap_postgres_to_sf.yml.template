@@ -3,7 +3,7 @@
 # ------------------------------------------------------------------------------
 # General Properties
 # ------------------------------------------------------------------------------
-id: "postgres_source_sf"
+id: "postgres_to_sf"
 name: "PostgreSQL source test database"
 type: "tap-postgres"
 owner: "test-runner"
@@ -13,11 +13,11 @@ owner: "test-runner"
 # Source (Tap) - PostgreSQL connection details
 # ------------------------------------------------------------------------------
 db_conn:
-  host: "${DB_TAP_POSTGRES_HOST}"                  # PostgreSQL host
-  port: ${DB_TAP_POSTGRES_PORT}                    # PostgreSQL port
-  user: "${DB_TAP_POSTGRES_USER}"                  # PostgreSQL user
-  password: "${DB_TAP_POSTGRES_PASSWORD}"          # Plain string or vault encrypted
-  dbname: "${DB_TAP_POSTGRES_DB}"                  # PostgreSQL database name
+  host: "${TAP_POSTGRES_HOST}"          # PostgreSQL host
+  port: ${TAP_POSTGRES_PORT}            # PostgreSQL port
+  user: "${TAP_POSTGRES_USER}"          # PostgreSQL user
+  password: "${TAP_POSTGRES_PASSWORD}"  # Plain string or vault encrypted
+  dbname: "${TAP_POSTGRES_DB}"          # PostgreSQL database name
 
 
 # ------------------------------------------------------------------------------
