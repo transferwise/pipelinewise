@@ -1,3 +1,4 @@
+import os
 import logging
 import time
 import boto3
@@ -20,9 +21,31 @@ class FastSyncTargetRedshift:
     def __init__(self, connection_config, transformation_config=None):
         self.connection_config = connection_config
         self.transformation_config = transformation_config
-        self.s3 = boto3.client('s3',
-                               aws_access_key_id=self.connection_config['aws_access_key_id'],
-                               aws_secret_access_key=self.connection_config['aws_secret_access_key'])
+
+        aws_access_key_id = self.connection_config.get('aws_access_key_id') or os.environ.get('AWS_ACCESS_KEY_ID')
+        aws_secret_access_key = self.connection_config.get('aws_secret_access_key') or \
+                                os.environ.get('AWS_SECRET_ACCESS_KEY')
+        aws_session_token = self.connection_config.get('aws_session_token') or os.environ.get('AWS_SESSION_TOKEN')
+
+        # Init S3 client
+        # Conditionally pass keys as this seems to affect whether instance credentials
+        # are correctly loaded if the keys are None
+        if aws_access_key_id and aws_secret_access_key:
+            aws_session = boto3.session.Session(
+                aws_access_key_id=aws_access_key_id,
+                aws_secret_access_key=aws_secret_access_key,
+                aws_session_token=aws_session_token
+            )
+            credentials = aws_session.get_credentials().get_frozen_credentials()
+
+            # Explicitly set credentials to those fetched from Boto so we can re-use them in COPY SQL if necessary
+            self.connection_config['aws_access_key_id'] = credentials.access_key
+            self.connection_config['aws_secret_access_key'] = credentials.secret_key
+            self.connection_config['aws_session_token'] = credentials.token
+        else:
+            aws_session = boto3.session.Session()
+
+        self.s3 = aws_session.client('s3')
 
     def open_connection(self):
         conn_string = "host='{}' dbname='{}' user='{}' password='{}' port='{}'".format(
@@ -36,7 +59,7 @@ class FastSyncTargetRedshift:
         return psycopg2.connect(conn_string)
 
     def query(self, query, params=None):
-        LOGGER.info('Running query: %s', query)
+        LOGGER.debug('Running query: %s', query)
         with self.open_connection() as connection:
             with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
                 cur.execute(query, params)
@@ -94,35 +117,45 @@ class FastSyncTargetRedshift:
         table_dict = utils.tablename_to_dict(table_name)
         target_table = table_dict.get('table_name') if not is_temporary else table_dict.get('temp_table_name')
 
-        aws_access_key_id = self.connection_config['aws_access_key_id']
-        aws_secret_access_key = self.connection_config['aws_secret_access_key']
-        bucket = self.connection_config['s3_bucket']
+        # Step 1: Generate copy credentials - prefer role if provided, otherwise use access and secret keys
+        copy_credentials = """
+            iam_role '{aws_role_arn}'
+        """.format(aws_role_arn=self.connection_config['aws_redshift_copy_role_arn']) \
+            if self.connection_config.get('aws_redshift_copy_role_arn') else """
+            ACCESS_KEY_ID '{aws_access_key_id}'
+            SECRET_ACCESS_KEY '{aws_secret_access_key}'
+            {aws_session_token}
+        """.format(
+            aws_access_key_id=self.connection_config['aws_access_key_id'],
+            aws_secret_access_key=self.connection_config['aws_secret_access_key'],
+            aws_session_token="SESSION_TOKEN '{}'".format(self.connection_config['aws_session_token']) \
+                if self.connection_config.get('aws_session_token') else '',
+        )
 
-        # Generate copy options - Override defaults if defined
+        # Step 2: Generate copy options - Override defaults from config.json if defined
         copy_options = self.connection_config.get('copy_options', """
             EMPTYASNULL BLANKSASNULL TRIMBLANKS TRUNCATECOLUMNS
             TIMEFORMAT 'auto'
         """)
 
-        # Using the built-in CSV COPY option for fastsync
-        sql = """COPY {}.{} FROM 's3://{}/{}'
-            ACCESS_KEY_ID '{}'
-            SECRET_ACCESS_KEY '{}'
-            {}
+        # Step3: Using the built-in CSV COPY option to load
+        copy_sql = """COPY {schema}.{table} FROM 's3://{s3_bucket}/{s3_key}'
+            {copy_credentials}
+            {copy_options}
             CSV GZIP
         """.format(
-            target_schema,
-            target_table,
-            bucket,
-            s3_key,
-            aws_access_key_id,
-            aws_secret_access_key,
-            copy_options
+            schema=target_schema,
+            table=target_table,
+            s3_bucket=self.connection_config['s3_bucket'],
+            s3_key=s3_key,
+            copy_credentials=copy_credentials,
+            copy_options=copy_options
         )
-        self.query(sql)
+
+        self.query(copy_sql)
 
         LOGGER.info('Deleting %s from S3...', s3_key)
-        self.s3.delete_object(Bucket=bucket, Key=s3_key)
+        self.s3.delete_object(Bucket=self.connection_config['s3_bucket'], Key=s3_key)
 
     def grant_select_on_table(self, target_schema, table_name, grantee, is_temporary, to_group=False):
         # Grant role is not mandatory parameter, do nothing if not specified

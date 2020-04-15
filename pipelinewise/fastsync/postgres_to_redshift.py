@@ -26,8 +26,6 @@ REQUIRED_CONFIG_KEYS = {
         'user',
         'password',
         'dbname',
-        'aws_access_key_id',
-        'aws_secret_access_key',
         's3_bucket'
     ]
 }
