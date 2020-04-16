@@ -157,7 +157,7 @@
         "tap-snowflake",
         "tap-salesforce",
         "tap-jira",
-	"tap-zuora"
+        "tap-zuora"
       ]
     },
     "db_conn": {
