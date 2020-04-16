@@ -1,188 +1,188 @@
 {
-    "definitions": {
-        "schema": {
-            "type": "object",
-            "properties": {
-                "source_schema": {
-                    "type": "string"
-                },
-                "target_schema": {
-                    "type": "string"
-                },
-                "tables": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/table"
-                    }
-                }
-            },
-            "required": [
-                "source_schema",
-                "target_schema"
-            ]
+  "definitions": {
+    "schema": {
+      "type": "object",
+      "properties": {
+        "source_schema": {
+          "type": "string"
         },
-        "table": {
-            "type": "object",
-            "anyOf": [{
-                    "properties": {
-                        "table_name": {
-                            "type": "string"
-                        },
-                        "replication_method": {
-                            "type": "string",
-                            "enum": [
-                                "FULL_TABLE",
-                                "LOG_BASED"
-                            ]
-                        },
-                        "transformations": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/transformation"
-                            }
-                        },
-                        "s3_csv_mapping:": {
-                            "$ref": "#/definitions/s3_csv_mapping"
-                        }
-                    },
-                    "required": [
-                        "table_name"
-                    ]
-                },
-                {
-                    "properties": {
-                        "table_name": {
-                            "type": "string"
-                        },
-                        "replication_method": {
-                            "type": "string",
-                            "enum": [
-                                "INCREMENTAL"
-                            ]
-                        },
-                        "replication_key": {
-                            "type": "string"
-                        },
-                        "transformations": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/transformation"
-                            }
-                        },
-                        "s3_csv_mapping:": {
-                            "$ref": "#/definitions/s3_csv_mapping"
-                        }
-                    },
-                    "required": [
-                        "table_name",
-                        "replication_key"
-                    ]
-                }
-            ]
+        "target_schema": {
+          "type": "string"
         },
-        "transformation": {
-            "type": "object",
-            "properties": {
-                "column": {
-                    "type": "string"
-                },
-                "type": {
-                    "type": "string",
-                    "enum": [
-                        "SET-NULL",
-                        "HASH",
-                        "HASH-SKIP-FIRST-1",
-                        "HASH-SKIP-FIRST-2",
-                        "HASH-SKIP-FIRST-3",
-                        "HASH-SKIP-FIRST-4",
-                        "HASH-SKIP-FIRST-5",
-                        "HASH-SKIP-FIRST-6",
-                        "HASH-SKIP-FIRST-7",
-                        "HASH-SKIP-FIRST-8",
-                        "HASH-SKIP-FIRST-9",
-                        "MASK-DATE",
-                        "MASK-NUMBER",
-                        "MASK-HIDDEN"
-                    ]
-                }
-            },
-            "required": [
-                "column",
-                "type"
-            ]
-        },
-        "s3_csv_mapping": {
-            "type": "object",
-            "properties": {
-                "search_prefix": {
-                    "type": "string"
-                },
-                "search_pattern": {
-                    "type": "string"
-                },
-                "key_properties": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "delimiter": {
-                    "type": "string"
-                }
-            },
-            "required": [
-                "search_pattern"
-            ]
+        "tables": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/table"
+          }
         }
+      },
+      "required": [
+        "source_schema",
+        "target_schema"
+      ]
     },
-    "type": "object",
-    "properties": {
-        "id": {
-            "type": "string"
+    "table": {
+      "type": "object",
+      "anyOf": [
+        {
+          "properties": {
+            "table_name": {
+              "type": "string"
+            },
+            "replication_method": {
+              "type": "string",
+              "enum": [
+                "FULL_TABLE",
+                "LOG_BASED"
+              ]
+            },
+            "transformations": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/transformation"
+              }
+            },
+            "s3_csv_mapping:": {
+              "$ref": "#/definitions/s3_csv_mapping"
+            }
+          },
+          "required": [
+            "table_name"
+          ]
         },
-        "name": {
-            "type": "string"
+        {
+          "properties": {
+            "table_name": {
+              "type": "string"
+            },
+            "replication_method": {
+              "type": "string",
+              "enum": [
+                "INCREMENTAL"
+              ]
+            },
+            "replication_key": {
+              "type": "string"
+            },
+            "transformations": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/transformation"
+              }
+            },
+            "s3_csv_mapping:": {
+              "$ref": "#/definitions/s3_csv_mapping"
+            }
+          },
+          "required": [
+            "table_name",
+            "replication_key"
+          ]
+        }
+      ]
+    },
+    "transformation": {
+      "type": "object",
+      "properties": {
+        "column": {
+          "type": "string"
         },
         "type": {
-            "type": "string",
-            "enum": [
-                "tap-postgres",
-                "tap-mysql",
-                "tap-oracle",
-                "tap-adwords",
-                "tap-zendesk",
-                "tap-zuora",
-                "tap-kafka",
-                "tap-s3-csv",
-                "tap-snowflake",
-                "tap-salesforce",
-                "tap-jira"
-            ]
-        },
-        "db_conn": {
-            "type": "object"
-        },
-        "target": {
-            "type": "string"
-        },
-        "batch_size_rows": {
-            "type": "integer",
-            "minimum": 1000,
-            "maximum": 500000
-        },
-        "schemas": {
-            "type": "array",
-            "items": {
-                "$ref": "#/definitions/schema"
-            }
+          "type": "string",
+          "enum": [
+            "SET-NULL",
+            "HASH",
+            "HASH-SKIP-FIRST-1",
+            "HASH-SKIP-FIRST-2",
+            "HASH-SKIP-FIRST-3",
+            "HASH-SKIP-FIRST-4",
+            "HASH-SKIP-FIRST-5",
+            "HASH-SKIP-FIRST-6",
+            "HASH-SKIP-FIRST-7",
+            "HASH-SKIP-FIRST-8",
+            "HASH-SKIP-FIRST-9",
+            "MASK-DATE",
+            "MASK-NUMBER",
+            "MASK-HIDDEN"
+          ]
         }
+      },
+      "required": [
+        "column",
+        "type"
+      ]
     },
-    "required": [
-        "id",
-        "name",
-        "type",
-        "db_conn",
-        "target",
-        "schemas"
-    ]
+    "s3_csv_mapping": {
+      "type": "object",
+      "properties": {
+        "search_prefix": {
+          "type": "string"
+        },
+        "search_pattern": {
+          "type": "string"
+        },
+        "key_properties": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "delimiter": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "search_pattern"
+      ]
+    }
+  },
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "tap-postgres",
+        "tap-mysql",
+        "tap-oracle",
+        "tap-adwords",
+        "tap-zendesk",
+        "tap-kafka",
+        "tap-s3-csv",
+        "tap-snowflake",
+        "tap-salesforce",
+        "tap-jira"
+      ]
+    },
+    "db_conn": {
+      "type": "object"
+    },
+    "target": {
+      "type": "string"
+    },
+    "batch_size_rows": {
+      "type": "integer",
+      "minimum": 1000,
+      "maximum": 500000
+    },
+    "schemas": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/schema"
+      }
+    }
+  },
+  "required": [
+    "id",
+    "name",
+    "type",
+    "db_conn",
+    "target",
+    "schemas"
+  ]
 }
