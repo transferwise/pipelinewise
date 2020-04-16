@@ -1,2 +1,1 @@
-# tap-zuora==1.1.12
-git+https://github.com/OTA-Insight/tap-zuora.git@ppw
+pipelinewise-tap-zuora==1.0.0

@@ -22,12 +22,16 @@ Documentation is available at https://transferwise.github.io/pipelinewise/
 
 ## Table of Contents
 
-- [Connectors](#connectors)
+- [PipelineWise](#pipelinewise)
+  - [Features](#features)
+  - [Table of Contents](#table-of-contents)
+  - [Connectors](#connectors)
     - [Running from docker](#running-from-docker)
     - [Building from source](#building-from-source)
-- [Developing with Docker](#developing-with-docker)
-- [Links](#links)
-- [License](#license)
+  - [Developing with Docker](#developing-with-docker)
+  - [Contribution](#contribution)
+  - [Links](#links)
+  - [License](#license)
 
 
 ## Connectors
@@ -45,7 +49,8 @@ consumes data from taps and do something with it, like load it into a file, API 
 | Tap       | **[S3 CSV](https://github.com/transferwise/pipelinewise-tap-s3-csv)** | [![PyPI version](https://badge.fury.io/py/pipelinewise-tap-s3-csv.svg)](https://badge.fury.io/py/pipelinewise-tap-s3-csv) | Extracts data from S3 csv files (currently a fork of tap-s3-csv because we wanted to use our own auth method) |
 | Tap       | **[Zendesk](https://github.com/singer-io/tap-zendesk)** | [![PyPI version](https://badge.fury.io/py/tap-zendesk.svg)](https://badge.fury.io/py/tap-zendesk) | Extracts data from Zendesk using OAuth and Key-Based incremental replications |
 | Tap       | **[Snowflake](https://github.com/transferwise/pipelinewise-tap-snowflake)** | [![PyPI version](https://badge.fury.io/py/pipelinewise-tap-snowflake.svg)](https://badge.fury.io/py/pipelinewise-tap-snowflake) | Extracts data from Snowflake databases. Supporting Key-Based Incremental and Full Table replications |
-| Tap       | **[Salesforce](https://github.com/singer-io/tap-salesforce)** | [![PyPI version](https://badge.fury.io/py/tap-salesforce.svg)](https://badge.fury.io/py/tap-zendesk) | Extracts data from Salesforce database using BULK and REST extraction API with Key-Based incremental replications |
+| Tap       | **[Salesforce](https://github.com/singer-io/tap-salesforce)** | [![PyPI version](https://badge.fury.io/py/tap-salesforce.svg)](https://badge.fury.io/py/tap-salesforce) | Extracts data from Salesforce database using BULK and REST extraction API with Key-Based incremental replications |
+| Tap       | **[Zuora](https://github.com/singer-io/tap-zuora)** | [![PyPI version](https://badge.fury.io/py/tap-zuora.svg)](https://badge.fury.io/py/tap-zuora) | Extracts data from Zuora database using AQAA and REST extraction API with Key-Based incremental replications |
 | Tap       | **[Jira](https://github.com/singer-io/tap-jira)** | [![PyPI version](https://badge.fury.io/py/tap-jira.svg)](https://badge.fury.io/py/tap-jira) | Extracts data from Atlassian Jira using Base auth or OAuth credentials |
 | Target    | **[Postgres](https://github.com/transferwise/pipelinewise-target-postgres)** | [![PyPI version](https://badge.fury.io/py/pipelinewise-target-postgres.svg)](https://badge.fury.io/py/pipelinewise-target-postgres) | Loads data from any tap into PostgreSQL database |
 | Target    | **[Redshift](https://github.com/transferwise/pipelinewise-target-redshift)** | [![PyPI version](https://badge.fury.io/py/pipelinewise-target-redshift.svg)](https://badge.fury.io/py/pipelinewise-target-redshift) | Loads data from any tap into Amazon Redshift Data Warehouse |

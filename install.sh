@@ -179,6 +179,7 @@ DEFAULT_CONNECTORS=(
 EXTRA_CONNECTORS=(
     tap-adwords
     tap-oracle
+    tap-zuora
     target-postgres
 )
 
