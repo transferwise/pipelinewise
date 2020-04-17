@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Tap Jira &mdash; PipelineWise  documentation</title>
+  <title>Tap Zuora &mdash; PipelineWise  documentation</title>
   
 
   
@@ -17,7 +17,7 @@
   
   
   
-    <link rel="canonical" href="https://docs.ansible.com/ansible/latest/connectors/taps/jira.html"/>
+    <link rel="canonical" href="https://docs.ansible.com/ansible/latest/connectors/taps/zuora.html"/>
   
 
   
@@ -40,8 +40,8 @@
   <link rel="stylesheet" href="../../_static/css/custom.css" type="text/css" />
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
-    <link rel="next" title="Tap Zuora" href="zuora.html" />
-    <link rel="prev" title="Tap Zendesk" href="zendesk.html" /> 
+    <link rel="next" title="Targets (Destinations)" href="../targets.html" />
+    <link rel="prev" title="Tap Jira" href="jira.html" /> 
 </head>
 
 <body class="wy-body-for-nav">
@@ -127,11 +127,12 @@
 <li class="toctree-l2"><a class="reference internal" href="snowflake.html">Tap Snowflake</a></li>
 <li class="toctree-l2"><a class="reference internal" href="salesforce.html">Tap Salesforce</a></li>
 <li class="toctree-l2"><a class="reference internal" href="zendesk.html">Tap Zendesk</a></li>
-<li class="toctree-l2 current"><a class="current reference internal" href="#">Tap Jira</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="jira.html">Tap Jira</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Tap Zuora</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#connecting-to-zuora">Connecting to Zuora</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#configuring-what-to-replicate">Configuring what to replicate</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="zuora.html">Tap Zuora</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../targets.html">Targets (Destinations)</a></li>
@@ -188,13 +189,13 @@
         
           <li><a href="../taps.html">Taps (Data Sources)</a> &raquo;</li>
         
-      <li>Tap Jira</li>
+      <li>Tap Zuora</li>
     
     
       <li class="wy-breadcrumbs-aside">
         
             
-            <a href="../../_sources/connectors/taps/jira.rst.txt" rel="nofollow"> View page source</a>
+            <a href="../../_sources/connectors/taps/zuora.rst.txt" rel="nofollow"> View page source</a>
           
         
       </li>
@@ -207,42 +208,48 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
             
-  <div class="section" id="tap-jira">
-<span id="id1"></span><h1>Tap Jira<a class="headerlink" href="#tap-jira" title="Permalink to this headline">¶</a></h1>
+  <div class="section" id="tap-zuora">
+<span id="id1"></span><h1>Tap Zuora<a class="headerlink" href="#tap-zuora" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="connecting-to-zuora">
+<h2>Connecting to Zuora<a class="headerlink" href="#connecting-to-zuora" title="Permalink to this headline">¶</a></h2>
+</div>
 <div class="section" id="configuring-what-to-replicate">
 <h2>Configuring what to replicate<a class="headerlink" href="#configuring-what-to-replicate" title="Permalink to this headline">¶</a></h2>
 <p>PipelineWise configures every tap with a common structured YAML file format.
-A sample YAML for Jira replication can be generated into a project directory by
+A sample YAML for Zuora replication can be generated into a project directory by
 following the steps in the <a class="reference internal" href="../../installation_guide/creating_pipelines.html#generating-pipelines"><span class="std std-ref">Generating Sample Pipelines</span></a> section.</p>
-<p>Example YAML for <code class="docutils literal notranslate"><span class="pre">tap-jira</span></code>:</p>
+<p>Example YAML for tap-zuora:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>---
 
 <span class="c1"># ------------------------------------------------------------------------------</span>
 <span class="c1"># General Properties</span>
 <span class="c1"># ------------------------------------------------------------------------------</span>
-id: <span class="s2">&quot;jira&quot;</span>                             <span class="c1"># Unique identifier of the tap</span>
-name: <span class="s2">&quot;Jira&quot;</span>                           <span class="c1"># Name of the tap</span>
-type: <span class="s2">&quot;tap-jira&quot;</span>                       <span class="c1"># !! THIS SHOULD NOT CHANGE !!</span>
+id: <span class="s2">&quot;zuora&quot;</span>                       <span class="c1"># Unique identifier of the tap</span>
+name: <span class="s2">&quot;Sample data on Zuora&quot;</span>      <span class="c1"># Name of the tap</span>
+type: <span class="s2">&quot;tap-zuora&quot;</span>                 <span class="c1"># !! THIS SHOULD NOT CHANGE !!</span>
 owner: <span class="s2">&quot;somebody@foo.com&quot;</span>              <span class="c1"># Data owner to contact</span>
 
 
 <span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="c1"># Source (Tap) - Jira connection details</span>
+<span class="c1"># Source (Tap) - Zuora connection details</span>
+<span class="c1">#</span>
+<span class="c1"># The client_id and client_secret keys are your OAuth Salesforce App secrets.</span>
+<span class="c1"># The refresh_token is a secret created during the OAuth flow. For more info on</span>
+<span class="c1"># the Salesforce OAuth flow, visit the Salesforce documentation at</span>
+<span class="c1"># https://developer.salesforce.com/docs/atlas.en-us.api_rest.meta/api_rest/intro_understanding_web_server_oauth_flow.htm</span>
+<span class="c1">#</span>
+<span class="c1"># api_type to use extracting data from Zuora. This can be AQUA or REST.</span>
+<span class="c1"># Further details about API types at https://www.stitchdata.com/docs/integrations/saas/zuora#rest-vs-aqua-api</span>
 <span class="c1"># ------------------------------------------------------------------------------</span>
 db_conn:
-  <span class="c1"># Method 1: Base authentication</span>
-  base_url: <span class="s2">&quot;https://&lt;your_domain&gt;.atlassian.net&quot;</span>  <span class="c1"># the URL where your Jira installation can be found</span>
-  username: <span class="s2">&quot;&lt;USERNAME&gt;&quot;</span>
-  password: <span class="s2">&quot;&lt;PASSWORD&gt;&quot;</span>                            <span class="c1"># Plain string or vault encrypted</span>
+  username: <span class="s2">&quot;&lt;USERNAME&gt;&quot;</span>                  <span class="c1"># Zuora username</span>
+  password: <span class="s2">&quot;&lt;PASSWORD&gt;&quot;</span>                  <span class="c1"># Zuora password</span>
+  partner_id: <span class="s2">&quot;&lt;PARTNER_ID&gt;&quot;</span>              <span class="c1"># In case of using the AQUA api, a partner id is required</span>
+  start_date: <span class="s2">&quot;2019-01-01T00:00:00Z&quot;</span>      <span class="c1"># Bound on api queries when searching for records</span>
+  api_type: <span class="s2">&quot;AQUA&quot;</span>                        <span class="c1"># Zuora API Type: AQUA or REST</span>
+  sandbox: <span class="s2">&quot;true&quot;</span>                         <span class="c1"># Determines which api location to call</span>
+  european: <span class="s2">&quot;true&quot;</span>                        <span class="c1"># Determines which api location to call</span>
 
-  <span class="c1"># Method 2: OAuth authentication</span>
-  <span class="c1">#oauth_client_secret: &quot;&lt;oauth-client-secret&gt;&quot;     # Plain string or vault encrypted</span>
-  <span class="c1">#oauth_client_id: &quot;&lt;oauth-client-id&gt;&quot;</span>
-  <span class="c1">#access_token: &quot;&lt;access-token&gt;&quot;                   # Plain string or vault encrypted</span>
-  <span class="c1">#cloud_id: &quot;&lt;cloud-id&gt;&quot;</span>
-  <span class="c1">#refresh_token: &quot;&lt;refresh-token&gt;&quot;                 # Plain string or vault encrypted</span>
-
-  start_date: <span class="s2">&quot;2010-01-01&quot;</span>  <span class="c1"># specifies the date at which the tap will begin pulling data</span>
 
 
 <span class="c1"># ------------------------------------------------------------------------------</span>
@@ -251,7 +258,7 @@ db_conn:
 <span class="c1"># ------------------------------------------------------------------------------</span>
 target: <span class="s2">&quot;snowflake&quot;</span>                       <span class="c1"># ID of the target connector where the data will be loaded</span>
 batch_size_rows: <span class="m">20000</span>                    <span class="c1"># Batch size for the stream to optimise load performance</span>
-default_target_schema: <span class="s2">&quot;jira&quot;</span>             <span class="c1"># Target schema where the data will be loaded</span>
+default_target_schema: <span class="s2">&quot;zuora&quot;</span>       <span class="c1"># Target schema where the data will be loaded</span>
 default_target_schema_select_permission:  <span class="c1"># Optional: Grant SELECT on schema and tables that created</span>
   - grp_power
 
@@ -260,37 +267,32 @@ default_target_schema_select_permission:  <span class="c1"># Optional: Grant SEL
 <span class="c1"># Source to target Schema mapping</span>
 <span class="c1"># ------------------------------------------------------------------------------</span>
 schemas:
-  - source_schema: <span class="s2">&quot;jira&quot;</span>               <span class="c1"># This is mandatory, but can be anything in this tap type</span>
-    target_schema: <span class="s2">&quot;jira&quot;</span>               <span class="c1"># Target schema in the destination Data Warehouse</span>
-    target_schema_select_permissions:   <span class="c1"># Optional: Grant SELECT on schema and tables that created</span>
-      - grp_stats
+  - source_schema: <span class="s2">&quot;zuora&quot;</span>           <span class="c1"># This is mandatory, but can be anything in this tap type</span>
+    target_schema: <span class="s2">&quot;zuora&quot;</span>           <span class="c1"># Target schema in the destination Data Warehouse</span>
+    default_target_schema_select_permission:  <span class="c1"># Optional: Grant SELECT on schema and tables that created</span>
+    - grp_power
 
-    <span class="c1"># List of Jira tables to replicate into destination Data Warehouse</span>
-    <span class="c1"># Tap-Jira will use the best incremental strategies automatically to replicate data</span>
+
+    <span class="c1"># List of Zuora tables to replicate into destination Data Warehouse</span>
+    <span class="c1"># Tap-Zuora will default to FULL_TABLE replication, but supports INCREMENTAL replication, which is recommended</span>
+    <span class="c1">#</span>
+    <span class="c1"># The available object types (and their replication keys to use, if supported) which are supported are listed on</span>
+    <span class="c1"># https://www.stitchdata.com/docs/integrations/saas/zuora#zuora-entity-relationships</span>
+    <span class="c1">#</span>
+    <span class="c1"># Unsupported objects to replicate are listed on</span>
+    <span class="c1"># https://www.stitchdata.com/docs/integrations/saas/zuora#unsupported-objects</span>
+    <span class="c1">#</span>
     tables:
+      - table_name: <span class="s2">&quot;Account&quot;</span>
+        replication_method: <span class="s2">&quot;INCREMENTAL&quot;</span>
+        replication_key: <span class="s2">&quot;updatedDate&quot;</span>
+      - table_name: <span class="s2">&quot;BillingRun&quot;</span>
+        replication_method: <span class="s2">&quot;FULL_TABLE&quot;</span>
 
-      <span class="c1"># Tables replicated incrementally</span>
-      - table_name: <span class="s2">&quot;changelogs&quot;</span>
-      - table_name: <span class="s2">&quot;issues&quot;</span>
-      - table_name: <span class="s2">&quot;issue_comments&quot;</span>
-      - table_name: <span class="s2">&quot;issue_transitions&quot;</span>
-      - table_name: <span class="s2">&quot;worklogs&quot;</span>
-
-        <span class="c1"># OPTIONAL: Load time transformations - you can add it to any table</span>
+        <span class="c1"># OPTIONAL: Load time transformations</span>
         <span class="c1">#transformations:</span>
-        <span class="c1">#  - column: &quot;some_column_to_transform&quot; # Column to transform</span>
-        <span class="c1">#    type: &quot;SET-NULL&quot;                   # Transformation type</span>
-
-      <span class="c1"># FULL_TABLE replicated tables</span>
-      <span class="c1"># JIRA Cloud REST API doesn&#39;t provide reasonable replication keys for these tables.</span>
-      <span class="c1"># Replicating these tables can run longer. Please consider this when scheduling the tap.</span>
-      - table_name: <span class="s2">&quot;projects&quot;</span>
-      - table_name: <span class="s2">&quot;project_categories&quot;</span>
-      - table_name: <span class="s2">&quot;project_types&quot;</span>
-      - table_name: <span class="s2">&quot;resolutions&quot;</span>
-      - table_name: <span class="s2">&quot;roles&quot;</span>
-      - table_name: <span class="s2">&quot;users&quot;</span>
-      - table_name: <span class="s2">&quot;versions&quot;</span>
+        <span class="c1">#  - column: &quot;last_name&quot;            # Column to transform</span>
+        <span class="c1">#    type: &quot;SET-NULL&quot;               # Transformation type</span>
 </pre></div>
 </div>
 </div>
@@ -304,10 +306,10 @@ schemas:
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
-        <a href="zuora.html" class="btn btn-neutral float-right" title="Tap Zuora" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+        <a href="../targets.html" class="btn btn-neutral float-right" title="Targets (Destinations)" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
       
       
-        <a href="zendesk.html" class="btn btn-neutral float-left" title="Tap Zendesk" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+        <a href="jira.html" class="btn btn-neutral float-left" title="Tap Jira" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
       
     </div>
   
