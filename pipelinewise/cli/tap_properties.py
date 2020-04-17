@@ -123,6 +123,19 @@ def get_tap_properties(tap=None, temp_dir=None):
             'default_replication_method': 'LOG_BASED',
             'default_data_flattening_max_level': 0
         },
+        'tap-zuora': {
+            'tap_config_extras': {
+                'username': tap.get('db_conn', {}).get('username') if tap else None,
+                'password': tap.get('db_conn', {}).get('password') if tap else None,
+                'start_date': tap.get('db_conn', {}).get('start_date') if tap else None,
+                'api_type': tap.get('db_conn', {}).get('api_type') if tap else None
+            },
+            'tap_stream_id_pattern': '{{table_name}}',
+            'tap_stream_name_pattern': '{{table_name}}',
+            'tap_catalog_argument': '--catalog',
+            'default_replication_method': 'FULL_TABLE',
+            'default_data_flattening_max_level': 10
+        },
         'tap-oracle': {
             'tap_config_extras': {},
             'tap_stream_id_pattern': '{{schema_name}}-{{table_name}}',

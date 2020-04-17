@@ -54,15 +54,17 @@ Adding new tap
   | **tap_config_extras**                        | Anything else that's required in the tap ``config.json`` to run. This can be static or dynamically generated values at runtime.        |
   +----------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------+  
 
-3. Add your tap to the `singer-connectors <https://github.com/transferwise/pipelinewise/tree/master/singer-connectors>`_ directory.
+3. Add your tap id to the allowed values in `tap.json <https://github.com/transferwise/pipelinewise/blob/master/pipelinewise/cli/schemas/tap.json#L149>`_
+
+4. Add your tap to the `singer-connectors <https://github.com/transferwise/pipelinewise/tree/master/singer-connectors>`_ directory.
    The new directory should have only one ``requirements.txt`` file with a reference and version of the tap in PyPI.
    Some taps are forks of the community versions and customised to PipelineWise. If new fork or project required in PyPI please
    mention this the PR. The TransferWise team will create the PyPi package.
 
-4. Document your tap in the :ref:`taps_list` section with some YAML examples.
+5. Document your tap in the :ref:`taps_list` section with some YAML examples.
    The editable documentation is at `GitHub Taps in RST format <https://github.com/transferwise/pipelinewise/tree/master/docs/connectors/taps>`_.
 
-5. Send a Pull Request to the `PipelineWise Github Repository <https://github.com/transferwise/pipelinewise>`_.
+6. Send a Pull Request to the `PipelineWise Github Repository <https://github.com/transferwise/pipelinewise>`_.
 
 
 Adding new target
