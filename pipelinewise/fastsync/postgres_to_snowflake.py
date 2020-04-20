@@ -17,7 +17,9 @@ REQUIRED_CONFIG_KEYS = {
         'host',
         'port',
         'user',
-        'password'
+        'password',
+        'dbname',
+        'tap_id'    # tap_id is required to generate unique replication slot names
     ],
     'target': [
         'account',

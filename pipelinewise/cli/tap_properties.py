@@ -109,13 +109,8 @@ def get_tap_properties(tap=None, temp_dir=None):
         },
         'tap-postgres': {
             'tap_config_extras': {
-                # Postgres can run multiple databases in the same PG instance.
-                #
-                # To avoid table name collision problems when loading
-                # two tables with the same name but from two different postgres
-                # databases from the same PG instance we force tap-postgres to filter
-                # only the db that's in scope
-                'filter_dbs': tap.get('db_conn', {}).get('dbname') if tap else None
+                # Set tap_id to locate the corresponding replication slot
+                'tap_id': tap['id'] if tap else None,
             },
             'tap_stream_id_pattern': '{{schema_name}}-{{table_name}}',
             'tap_stream_name_pattern': '{{schema_name}}-{{table_name}}',
