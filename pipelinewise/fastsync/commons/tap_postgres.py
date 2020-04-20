@@ -96,6 +96,7 @@ class FastSyncTapPostgres:
 
                 return []
 
+    # pylint: disable=no-member
     def create_replication_slot(self):
         """
         Create replication slot on the primary host
@@ -119,7 +120,7 @@ class FastSyncTapPostgres:
                                                                 tap_id=self.connection_config['tap_id'])
 
             # Backward compatibility: try to locate existing v15 slot first. PPW <= 0.15.0
-            v15_slots = self.primary_host_query(f"SELECT * FROM pg_replication_slots"
+            v15_slots = self.primary_host_query(f'SELECT * FROM pg_replication_slots'
                                                 " WHERE slot_name = '{slot_name_v15}'")
             if len(v15_slots) >= 0:
                 slot_name = slot_name_v15
@@ -129,7 +130,6 @@ class FastSyncTapPostgres:
             # Create the replication host
             self.primary_host_query(f"SELECT * FROM pg_create_logical_replication_slot('{slot_name}'")
         except Exception as exc:
-            # If
             # ERROR: replication slot already exists SQL state: 42710
             if exc.pgcode == '42710':
                 pass
