@@ -24,7 +24,7 @@ db_conn:
 # Destination (Target) - Target properties
 # Connection details should be in the relevant target YAML file
 # ------------------------------------------------------------------------------
-target: "snowflake"                 # ID of the target connector where the data will be loaded
+target: "snowflake"                    # ID of the target connector where the data will be loaded
 batch_size_rows: 20000                 # Batch size for the stream to optimise load performance
 
 
@@ -33,7 +33,7 @@ batch_size_rows: 20000                 # Batch size for the stream to optimise l
 # ------------------------------------------------------------------------------
 schemas:
   - source_schema: "mysql_source_db"
-    target_schema: "mysql_grp24"
+    target_schema: "ppw_e2e_mysql_to_snowflake"
 
     tables:
       - table_name: "table_with_binary" # This table has binary and varbinary columns
@@ -51,3 +51,6 @@ schemas:
       - table_name: "full" # This table has a reserved word as a name, full is reserved in both Mysql and Snowflake
         replication_method: "INCREMENTAL"
         replication_key: "begin"
+
+      - table_name: "table with space and UPPERCase" # This table has space and mixed upper and lowercase characters
+        replication_method: "LOG_BASED"

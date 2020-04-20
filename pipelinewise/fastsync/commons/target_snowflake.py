@@ -143,7 +143,7 @@ class FastSyncTargetSnowflake:
         inserts = 0
         bucket = self.connection_config['s3_bucket']
 
-        sql = """COPY INTO {}."{}" FROM @{}/{}
+        sql = """COPY INTO {}."{}" FROM '@{}/{}'
                 FILE_FORMAT = (type='CSV' escape='\\x1e' escape_unenclosed_field='\\x1e' 
                 field_optionally_enclosed_by='\"' skip_header={} COMPRESSION='GZIP' BINARY_FORMAT='HEX') 
                 """.format(
