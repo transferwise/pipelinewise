@@ -24,8 +24,8 @@ db_conn:
 # Destination (Target) - Target properties
 # Connection details should be in the relevant target YAML file
 # ------------------------------------------------------------------------------
-target: "snowflake"                 # ID of the target connector where the data will be loaded
-batch_size_rows: 1000                 # Batch size for the stream to optimise load performance
+target: "snowflake"                    # ID of the target connector where the data will be loaded
+batch_size_rows: 1000                  # Batch size for the stream to optimise load performance
 
 
 # ------------------------------------------------------------------------------
@@ -33,7 +33,7 @@ batch_size_rows: 1000                 # Batch size for the stream to optimise lo
 # ------------------------------------------------------------------------------
 schemas:
   - source_schema: "public"
-    target_schema: "postgres_world_sf"
+    target_schema: "ppw_e2e_postgres_to_snowflake"
 
     tables:
       - table_name: "city"
@@ -46,16 +46,23 @@ schemas:
       - table_name: "countrylanguage"
         replication_method: "FULL_TABLE"
 
-      - table_name: "order"
+      - table_name: "order" # This table has a reserved word as a name, full is reserved in both Mysql and Snowflake
         replication_method: "INCREMENTAL"
         replication_key: "created_at"
         transformations:
           - column: 'cvarchar'
             type: 'MASK-HIDDEN'
 
-      - table_name: "table_with_reserved_words"
+      - table_name: "table_with_reserved_words" # This table has SF reserved words as columns
         replication_method: "INCREMENTAL"
         replication_key: "increment"
         transformations:
           - column: 'order'
             type: 'HASH'
+
+      # Enable this table only when a new pipelinewise-tap-postgres released to PyPI
+      #
+      # tap-postgres has an issue when LOG_BASED replicating tables with spaces
+      #    Bugfix PR: https://github.com/transferwise/pipelinewise-tap-postgres/pull/49
+      #- table_name: "table with space and UPPERCase" # This table has space and mixed upper and lowercase characters
+      #  replication_method: "LOG_BASED"

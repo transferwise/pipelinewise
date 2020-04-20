@@ -145,7 +145,9 @@ class FastSyncTapMySql:
         """
         Get the primary key of a table
         """
-        sql = "SHOW KEYS FROM {} WHERE Key_name = 'PRIMARY'".format(table_name)
+        table_dict = utils.tablename_to_dict(table_name)
+        sql = "SHOW KEYS FROM `{}`.`{}` WHERE Key_name = 'PRIMARY'".format(table_dict['schema_name'],
+                                                                           table_dict['table_name'])
         primary_key = self.query(sql)
         if len(primary_key) > 0:
             return primary_key[0].get('Column_name')
@@ -216,12 +218,15 @@ class FastSyncTapMySql:
         if len(column_safe_sql_values) == 0:
             raise Exception('{} table not found.'.format(table_name))
 
+        table_dict = utils.tablename_to_dict(table_name)
         sql = """SELECT {}
         ,CONVERT_TZ( NOW(),@@session.time_zone,'+00:00') AS _SDC_EXTRACTED_AT
         ,CONVERT_TZ( NOW(),@@session.time_zone,'+00:00') AS _SDC_BATCHED_AT
         ,null AS _SDC_DELETED_AT
-        FROM {}
-        """.format(','.join(column_safe_sql_values), table_name)
+        FROM `{}`.`{}`
+        """.format(','.join(column_safe_sql_values),
+                   table_dict['schema_name'],
+                   table_dict['table_name'])
         export_batch_rows = self.connection_config['export_batch_rows']
         exported_rows = 0
         with self.conn_unbuffered as cur:

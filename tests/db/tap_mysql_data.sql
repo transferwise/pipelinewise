@@ -271,6 +271,28 @@ INSERT INTO `full`(end) VALUES (10),(9),(8),(7),(6),(30),(11);
 UNLOCK TABLES;
 
 
+--
+-- Table structure for table `TABLE WITH SPACE and UPPERCASE`
+--
+
+DROP TABLE IF EXISTS `table with space and UPPERCase`;
+CREATE TABLE `table with space and UPPERCase` (
+    begin int auto_increment primary key,
+    end INT
+)
+ENGINE=MyISAM AUTO_INCREMENT=0 DEFAULT CHARSET=utf8;
+
+--
+-- Dumping data for table `table with space and UPPERCase`
+--
+
+LOCK TABLES `table with space and UPPERCase` WRITE;
+/*!40000 ALTER TABLE `table with space and UPPERCase` DISABLE KEYS */;
+INSERT INTO `table with space and UPPERCase`(end) VALUES (10),(9),(8),(7),(6),(30),(11);
+/*!40000 ALTER TABLE `table with space and UPPERCase` ENABLE KEYS */;
+UNLOCK TABLES;
+
+
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
 /*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;

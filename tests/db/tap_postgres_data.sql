@@ -5502,3 +5502,16 @@ CREATE TABLE "ORDER"
 
 
 insert into "ORDER" (cvarchar) values ('A'), ('B'), ('C'), ('D'), ('E'), ('F'), ('G');
+
+
+DROP TABLE IF EXISTS public."table with space and UPPERCase" CASCADE;
+
+CREATE TABLE "table with space and UPPERCase"
+(
+    id serial primary key,
+    cvarchar varchar,
+    created_at timestamp default current_timestamp
+);
+
+
+insert into "table with space and UPPERCase" (cvarchar) values ('A'), ('B'), ('C'), ('D'), ('E'), ('F'), ('G');
