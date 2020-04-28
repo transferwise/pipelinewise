@@ -17,7 +17,7 @@ Features
 
 - **Built with ELT in mind**: PipelineWise fits into the ELT landscape and is not a traditional ETL tool. PipelineWise aims to reproduce the data from the source to an Analytics-Data-Store in as close to the original format as possible. Some minor load time transformations are supported but complex mapping and joins have to be done in the Analytics-Data-Store to extract meaning.
 - **Lightweight**: No daemons or database setup are required
-- **Replication Methods**: CDC (Log Based), Key-Based Incremental and Full Table snapshots
+- **Replication Methods**: Log-Based (CDC), Key-Based Incremental and Full Table snapshots
 - **Managed Schema Changes**: When source data changes, PipelineWise detects the change and alters the schema in your Analytics-Data-Store automatically
 - **Load time transformations**: Ideal place to obfuscate, mask or filter sensitive data that should never be replicated in the Data Warehouse
 - **YAML based configuration**: Data pipelines are defined as YAML files, ensuring that the entire configuration is kept under version control

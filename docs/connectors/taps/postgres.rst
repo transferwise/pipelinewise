@@ -37,6 +37,8 @@ on the database, schema and tables that you want to replicate:
   * **PostgreSQL databases running PostgreSQL versions 9.4.x or greater.**
   * **To avoid a critical PostgreSQL bug, use at least one of the following minor versions**
 
+    * PostgreSQL 12.0
+
     * PostgreSQL 11.2
 
     * PostgreSQL 10.7
