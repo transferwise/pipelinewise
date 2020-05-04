@@ -43,7 +43,7 @@ class TestFastSyncTargetSnowflake:
     def test_create_schema(self):
         """Validate if create schema queries generated correctly"""
         self.snowflake.create_schema('new_schema')
-        assert self.snowflake.executed_queries == ["CREATE SCHEMA IF NOT EXISTS new_schema"]
+        assert self.snowflake.executed_queries == ['CREATE SCHEMA IF NOT EXISTS new_schema']
 
     def test_drop_table(self):
         """Validate if drop table queries generated correctly"""
