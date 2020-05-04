@@ -1,8 +1,7 @@
-import pytest
 from unittest import TestCase
 from pipelinewise.fastsync.commons.tap_postgres import FastSyncTapPostgres
 
-
+# pylint: disable=invalid-name,no-self-use
 class TestFastSyncTapPostgres(TestCase):
     """
     Unit tests for fastsync tap postgres
