@@ -128,10 +128,9 @@ class FastSyncTargetSnowflake:
         if sort_columns:
             columns.sort()
 
-        sql = f"""CREATE OR REPLACE TABLE {target_schema}."{target_table.upper()}" (
-        {','.join(columns)}
-        {f', PRIMARY KEY ({primary_key})' if primary_key else ''})
-        """
+        sql = f'CREATE OR REPLACE TABLE {target_schema}."{target_table.upper()}" (' \
+              f'{",".join(columns)}' \
+              f'{f", PRIMARY KEY ({primary_key}))" if primary_key else ")"}'
 
         self.query(sql)
 
@@ -143,16 +142,11 @@ class FastSyncTargetSnowflake:
         inserts = 0
         bucket = self.connection_config['s3_bucket']
 
-        sql = """COPY INTO {}."{}" FROM '@{}/{}'
-                FILE_FORMAT = (type='CSV' escape='\\x1e' escape_unenclosed_field='\\x1e' 
-                field_optionally_enclosed_by='\"' skip_header={} COMPRESSION='GZIP' BINARY_FORMAT='HEX') 
-                """.format(
-                    target_schema,
-                    target_table.upper(),
-                    self.connection_config['stage'],
-                    s3_key,
-                    int(skip_csv_header),
-                )
+        stage = self.connection_config['stage']
+        sql = f'COPY INTO {target_schema}."{target_table.upper()}" FROM \'@{stage}/{s3_key}\'' \
+              f' FILE_FORMAT = (type=\'CSV\' escape=\'\\x1e\' escape_unenclosed_field=\'\\x1e\'' \
+              f' field_optionally_enclosed_by=\'\"\' skip_header={int(skip_csv_header)}' \
+              f' compression=\'GZIP\' binary_format=\'HEX\')'
 
         # Get number of inserted records - COPY does insert only
         results = self.query(sql)
