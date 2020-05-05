@@ -141,16 +141,16 @@ class FastSyncTapMySql:
             'version': 1
         }
 
-    def get_primary_key(self, table_name):
+    def get_primary_keys(self, table_name):
         """
         Get the primary key of a table
         """
         table_dict = utils.tablename_to_dict(table_name)
         sql = "SHOW KEYS FROM `{}`.`{}` WHERE Key_name = 'PRIMARY'".format(table_dict['schema_name'],
                                                                            table_dict['table_name'])
-        primary_key = self.query(sql)
-        if len(primary_key) > 0:
-            return primary_key[0].get('Column_name')
+        pk_specs = self.query(sql)
+        if len(pk_specs) > 0:
+            return ','.join({safe_column_name(k.get('Column_name')) for k in pk_specs})
 
         return None
 
@@ -203,7 +203,7 @@ class FastSyncTapMySql:
 
         return {
             'columns': mapped_columns,
-            'primary_key': safe_column_name(self.get_primary_key(table_name))
+            'primary_key': self.get_primary_keys(table_name)
         }
 
     # pylint: disable=too-many-locals

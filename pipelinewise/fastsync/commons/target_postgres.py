@@ -57,7 +57,7 @@ class FastSyncTargetPostgres:
         sql = 'DROP TABLE IF EXISTS {}."{}"'.format(target_schema, target_table.lower())
         self.query(sql)
 
-    def create_table(self, target_schema: str, table_name: str, columns: List[str], primary_key: str,
+    def create_table(self, target_schema: str, table_name: str, columns: List[str], primary_key: List[str],
                      is_temporary: bool = False, sort_columns=False):
 
         table_dict = utils.tablename_to_dict(table_name)
@@ -78,9 +78,11 @@ class FastSyncTargetPostgres:
         if sort_columns:
             columns.sort()
 
+        sql_columns = ",".join(columns).lower()
+        sql_primary_keys = ",".join(primary_key).lower() if primary_key else None
         sql = f'CREATE TABLE IF NOT EXISTS {target_schema}."{target_table.lower()}" (' \
-              f'{",".join(columns).lower()}' \
-              f'{f", PRIMARY KEY ({primary_key.lower()}))" if primary_key else ")"}'
+              f'{sql_columns}' \
+              f'{f", PRIMARY KEY ({sql_primary_keys}))" if primary_key else ")"}'
 
         self.query(sql)
 

@@ -236,7 +236,7 @@ class FastSyncTapPostgres:
             'version': 1
         }
 
-    def get_primary_key(self, table):
+    def get_primary_keys(self, table):
         """
         Get the primary key of a table
         """
@@ -251,9 +251,9 @@ class FastSyncTapPostgres:
                         pg_attribute.attrelid = pg_class.oid AND
                         pg_attribute.attnum = any(pg_index.indkey)
                     AND indisprimary""".format(schema_name, table_name)
-        primary_key = self.query(sql)
-        if len(primary_key) > 0:
-            return primary_key[0][0]
+        pk_specs = self.query(sql)
+        if len(pk_specs) > 0:
+            return ','.join({safe_column_name(k[0]) for k in pk_specs})
 
         return None
 
@@ -294,7 +294,7 @@ class FastSyncTapPostgres:
 
         return {
             'columns': mapped_columns,
-            'primary_key': safe_column_name(self.get_primary_key(table_name))
+            'primary_key': self.get_primary_keys(table_name)
         }
 
     def copy_table(self, table_name, path):

@@ -107,7 +107,7 @@ class FastSyncTargetSnowflake:
         sql = 'DROP TABLE IF EXISTS {}."{}"'.format(target_schema, target_table.upper())
         self.query(sql)
 
-    def create_table(self, target_schema: str, table_name: str, columns: List[str], primary_key: str,
+    def create_table(self, target_schema: str, table_name: str, columns: List[str], primary_key: List[str],
                      is_temporary: bool = False, sort_columns=False):
 
         table_dict = utils.tablename_to_dict(table_name)
@@ -128,9 +128,11 @@ class FastSyncTargetSnowflake:
         if sort_columns:
             columns.sort()
 
+        sql_columns = ",".join(columns)
+        sql_primary_keys = ",".join(primary_key) if primary_key else None
         sql = f'CREATE OR REPLACE TABLE {target_schema}."{target_table.upper()}" (' \
-              f'{",".join(columns)}' \
-              f'{f", PRIMARY KEY ({primary_key}))" if primary_key else ")"}'
+              f'{sql_columns}' \
+              f'{f", PRIMARY KEY ({sql_primary_keys}))" if primary_key else ")"}'
 
         self.query(sql)
 

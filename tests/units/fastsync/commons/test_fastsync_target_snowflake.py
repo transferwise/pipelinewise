@@ -69,7 +69,7 @@ class TestFastSyncTargetSnowflake:
                                     table_name='test_table',
                                     columns=['"ID" INTEGER',
                                              '"TXT" VARCHAR'],
-                                    primary_key='"ID"')
+                                    primary_key=['"ID"'])
         assert self.snowflake.executed_queries == [
             'CREATE OR REPLACE TABLE test_schema."TEST_TABLE" ('
             '"ID" INTEGER,"TXT" VARCHAR,'
@@ -85,7 +85,7 @@ class TestFastSyncTargetSnowflake:
                                     columns=['"ID" INTEGER',
                                              '"TXT" VARCHAR',
                                              '"SELECT" VARCHAR'],
-                                    primary_key='"ID"')
+                                    primary_key=['"ID"'])
         assert self.snowflake.executed_queries == [
             'CREATE OR REPLACE TABLE test_schema."ORDER" ('
             '"ID" INTEGER,"TXT" VARCHAR,"SELECT" VARCHAR,'
@@ -100,7 +100,7 @@ class TestFastSyncTargetSnowflake:
                                     table_name='TABLE with SPACE',
                                     columns=['"ID" INTEGER',
                                              '"COLUMN WITH SPACE" CHARACTER VARYING'],
-                                    primary_key='"ID"')
+                                    primary_key=['"ID"'])
         assert self.snowflake.executed_queries == [
             'CREATE OR REPLACE TABLE test_schema."TABLE WITH SPACE" ('
             '"ID" INTEGER,"COLUMN WITH SPACE" CHARACTER VARYING,'
@@ -108,6 +108,22 @@ class TestFastSyncTargetSnowflake:
             '_SDC_BATCHED_AT TIMESTAMP_NTZ,'
             '_SDC_DELETED_AT VARCHAR'
             ', PRIMARY KEY ("ID"))']
+
+        # Create table with composite primary key
+        self.snowflake.executed_queries = []
+        self.snowflake.create_table(target_schema='test_schema',
+                                    table_name='TABLE with SPACE',
+                                    columns=['"ID" INTEGER',
+                                             '"NUM" INTEGER',
+                                             '"COLUMN WITH SPACE" CHARACTER VARYING'],
+                                    primary_key=['"ID", "NUM"'])
+        assert self.snowflake.executed_queries == [
+            'CREATE OR REPLACE TABLE test_schema."TABLE WITH SPACE" ('
+            '"ID" INTEGER,"NUM" INTEGER,"COLUMN WITH SPACE" CHARACTER VARYING,'
+            '_SDC_EXTRACTED_AT TIMESTAMP_NTZ,'
+            '_SDC_BATCHED_AT TIMESTAMP_NTZ,'
+            '_SDC_DELETED_AT VARCHAR'
+            ', PRIMARY KEY ("ID", "NUM"))']
 
         # Create table with no primary key
         self.snowflake.executed_queries = []
