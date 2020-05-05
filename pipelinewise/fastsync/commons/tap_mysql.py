@@ -150,7 +150,7 @@ class FastSyncTapMySql:
                                                                            table_dict['table_name'])
         pk_specs = self.query(sql)
         if len(pk_specs) > 0:
-            [safe_column_name(k.get('Column_name')) for k in pk_specs]
+            return [safe_column_name(k.get('Column_name')) for k in pk_specs]
 
         return None
 
