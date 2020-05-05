@@ -128,8 +128,8 @@ class FastSyncTargetSnowflake:
         if sort_columns:
             columns.sort()
 
-        sql_columns = ",".join(columns)
-        sql_primary_keys = ",".join(primary_key) if primary_key else None
+        sql_columns = ','.join(columns)
+        sql_primary_keys = ','.join(primary_key) if primary_key else None
         sql = f'CREATE OR REPLACE TABLE {target_schema}."{target_table.upper()}" (' \
               f'{sql_columns}' \
               f'{f", PRIMARY KEY ({sql_primary_keys}))" if primary_key else ")"}'

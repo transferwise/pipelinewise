@@ -78,8 +78,8 @@ class FastSyncTargetPostgres:
         if sort_columns:
             columns.sort()
 
-        sql_columns = ",".join(columns).lower()
-        sql_primary_keys = ",".join(primary_key).lower() if primary_key else None
+        sql_columns = ','.join(columns).lower()
+        sql_primary_keys = ','.join(primary_key).lower() if primary_key else None
         sql = f'CREATE TABLE IF NOT EXISTS {target_schema}."{target_table.lower()}" (' \
               f'{sql_columns}' \
               f'{f", PRIMARY KEY ({sql_primary_keys}))" if primary_key else ")"}'
