@@ -220,7 +220,7 @@ class FastSyncTapS3Csv:
             replication_key: self.tables_last_modified[table].isoformat()
         } if table in self.tables_last_modified else {}
 
-    def _get_primary_keys(self, table_specs: Dict) -> Optional[str]:
+    def _get_primary_keys(self, table_specs: Dict) -> Optional[List]:
         """
         Returns the primary keys specified in the tap config by key_properties
         The keys are made safe by wrapping them in quotes in case one or more are reserved words.
@@ -228,7 +228,7 @@ class FastSyncTapS3Csv:
         :return: the keys concatenated and separated by comma if keys are given, otherwise None
         """
         if table_specs.get('key_properties', False):
-            return ','.join({safe_column_name(k) for k in table_specs['key_properties']})
+            return [safe_column_name(k) for k in table_specs['key_properties']]
 
         return None
 
