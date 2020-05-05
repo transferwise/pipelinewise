@@ -174,13 +174,13 @@ DEFAULT_CONNECTORS=(
     target-s3-csv
     target-snowflake
     target-redshift
+    target-postgres
     transform-field
 )
 EXTRA_CONNECTORS=(
     tap-adwords
     tap-oracle
     tap-zuora
-    target-postgres
 )
 
 # Install only the default connectors if --connectors argument not passed
