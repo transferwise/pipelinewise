@@ -172,11 +172,11 @@ class TestFastSyncTapS3Csv(TestCase):
         self.assertIsNone(self.fs_tap_s3_csv._get_primary_keys({'key_properties': []}))
 
     def test_get_primary_keys_with_table_that_has_1_key_returns_one_safe_key(self):
-        self.assertEqual('"KEY_1"', self.fs_tap_s3_csv._get_primary_keys({'key_properties': ['key_1']}))
+        self.assertEqual(['"KEY_1"'], self.fs_tap_s3_csv._get_primary_keys({'key_properties': ['key_1']}))
 
     def test_get_primary_keys_with_table_that_has_2_keys_returns_concatenated_keys(self):
         self.assertIn(self.fs_tap_s3_csv._get_primary_keys({'key_properties': ['key_2', 'key_3']}),
-                      ['"KEY_2","KEY_3"', '"KEY_3","KEY_2"'])
+                      [['"KEY_2"', '"KEY_3"'], ['"KEY_3"', '"KEY_2"']])
 
     def test_get_table_columns(self):
         output = list(
