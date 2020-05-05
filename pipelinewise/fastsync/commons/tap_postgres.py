@@ -253,7 +253,7 @@ class FastSyncTapPostgres:
                     AND indisprimary""".format(schema_name, table_name)
         pk_specs = self.query(sql)
         if len(pk_specs) > 0:
-            return ','.join({safe_column_name(k[0]) for k in pk_specs})
+            [safe_column_name(k[0]) for k in pk_specs]
 
         return None
 
