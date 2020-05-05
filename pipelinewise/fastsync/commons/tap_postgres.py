@@ -121,17 +121,17 @@ class FastSyncTapPostgres:
 
             # Backward compatibility: try to locate existing v15 slot first. PPW <= 0.15.0
             v15_slots = self.primary_host_query(f'SELECT * FROM pg_replication_slots'
-                                                " WHERE slot_name = '{slot_name_v15}'")
-            if len(v15_slots) >= 0:
+                                                f" WHERE slot_name = '{slot_name_v15}'")
+            if len(v15_slots) > 0:
                 slot_name = slot_name_v15
             else:
                 slot_name = slot_name_v16
 
             # Create the replication host
-            self.primary_host_query(f"SELECT * FROM pg_create_logical_replication_slot('{slot_name}'")
+            self.primary_host_query(f"SELECT * FROM pg_create_logical_replication_slot('{slot_name}', 'wal2json')")
         except Exception as exc:
             # ERROR: replication slot already exists SQL state: 42710
-            if exc.pgcode == '42710':
+            if hasattr(exc, 'pgcode') and exc.pgcode == '42710':
                 pass
             else:
                 raise exc
