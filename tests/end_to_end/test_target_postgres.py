@@ -41,7 +41,7 @@ class TestTargetPostgres:
         [return_code, stdout, stderr] = tasks.run_command(f'pipelinewise import_config --dir {self.project_dir}')
         assertions.assert_command_success(return_code, stdout, stderr)
 
-    # pylint: disable=fixme
+    # pylint: disable=fixme,no-self-use
     @pytest.mark.dependency(depends=['import_config'])
     def test_replicate_mariadb_to_pg(self):
         """Replicate data from MariaDB to Postgres DWH
@@ -50,7 +50,7 @@ class TestTargetPostgres:
         # TODO - Real and more complex e2e tests will be added here
         assert True
 
-    # pylint: disable=fixme
+    # pylint: disable=fixme,no-self-use
     @pytest.mark.dependency(depends=['import_config'])
     def test_replicate_pg_to_pg(self):
         """Replicate data from Postgres to Postgres DWH, check if return code is zero and success log file created"""
