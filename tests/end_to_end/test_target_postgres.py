@@ -41,6 +41,7 @@ class TestTargetPostgres:
         [return_code, stdout, stderr] = tasks.run_command(f'pipelinewise import_config --dir {self.project_dir}')
         assertions.assert_command_success(return_code, stdout, stderr)
 
+    # pylint: disable=fixme
     @pytest.mark.dependency(depends=['import_config'])
     def test_replicate_mariadb_to_pg(self):
         """Replicate data from MariaDB to Postgres DWH
@@ -53,6 +54,7 @@ class TestTargetPostgres:
         assertions.assert_run_tap_success('mariadb_to_pg', 'postgres_dwh', ['fastsync', 'singer'])
         assertions.assert_tap_mysql_row_count_equals(run_query_tap_mysql, run_query_target_postgres)
 
+    # pylint: disable=fixme
     @pytest.mark.dependency(depends=['import_config'])
     def test_replicate_pg_to_pg(self):
         """Replicate data from Postgres to Postgres DWH, check if return code is zero and success log file created"""
