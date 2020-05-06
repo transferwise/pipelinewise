@@ -52,7 +52,7 @@ class TestFastSyncTargetPostgres:
                                    table_name='test_table',
                                    columns=['"id" INTEGER',
                                             '"txt" CHARACTER VARYING'],
-                                   primary_key='"id"')
+                                   primary_key=['"id"'])
         assert self.postgres.executed_queries == [
             'CREATE TABLE IF NOT EXISTS test_schema."test_table" ('
             '"id" integer,"txt" character varying,'
@@ -68,7 +68,7 @@ class TestFastSyncTargetPostgres:
                                    columns=['"id" INTEGER',
                                             '"txt" CHARACTER VARYING',
                                             '"SELECT" CHARACTER VARYING'],
-                                   primary_key='"id"')
+                                   primary_key=['"id"'])
         assert self.postgres.executed_queries == [
             'CREATE TABLE IF NOT EXISTS test_schema."order" ('
             '"id" integer,"txt" character varying,"select" character varying,'
@@ -83,7 +83,7 @@ class TestFastSyncTargetPostgres:
                                    table_name='TABLE with SPACE',
                                    columns=['"id" INTEGER',
                                             '"column_with space" CHARACTER VARYING'],
-                                   primary_key='"id"')
+                                   primary_key=['"id"'])
         assert self.postgres.executed_queries == [
             'CREATE TABLE IF NOT EXISTS test_schema."table with space" ('
             '"id" integer,"column_with space" character varying,'
@@ -91,6 +91,22 @@ class TestFastSyncTargetPostgres:
             '_sdc_batched_at timestamp without time zone,'
             '_sdc_deleted_at character varying'
             ', PRIMARY KEY ("id"))']
+
+        # Create table with composite primary key
+        self.postgres.executed_queries = []
+        self.postgres.create_table(target_schema='test_schema',
+                                   table_name='TABLE with SPACE',
+                                   columns=['"id" INTEGER',
+                                            '"num" INTEGER',
+                                            '"column_with space" CHARACTER VARYING'],
+                                   primary_key=['"id"', '"num"'])
+        assert self.postgres.executed_queries == [
+            'CREATE TABLE IF NOT EXISTS test_schema."table with space" ('
+            '"id" integer,"num" integer,"column_with space" character varying,'
+            '_sdc_extracted_at timestamp without time zone,'
+            '_sdc_batched_at timestamp without time zone,'
+            '_sdc_deleted_at character varying'
+            ', PRIMARY KEY ("id","num"))']
 
         # Create table with no primary key
         self.postgres.executed_queries = []
