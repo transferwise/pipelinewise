@@ -50,7 +50,7 @@ class TestTargetPostgres:
         run_query_target_postgres = self.e2e.run_query_target_postgres
 
         # Run tap in the first time
-        assertions.assert_run_tap_success('mariadb_to_pg', ['fastsync', 'singer'])
+        assertions.assert_run_tap_success('mariadb_to_pg', 'postgres_dwh', ['fastsync', 'singer'])
         assertions.assert_tap_mysql_row_count_equals(run_query_tap_mysql, run_query_target_postgres)
 
     @pytest.mark.dependency(depends=['import_config'])
