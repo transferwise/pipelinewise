@@ -13,14 +13,14 @@ owner: "somebody@foo.com"              # Data owner to contact
 # Source (Tap) - MySQL/ MariaDB connection details
 # ------------------------------------------------------------------------------
 db_conn:
-  host: "db_mysql_source"              # MySQL/ MariaDB host
-  port: 3306                           # MySQL/ MariaDB port
-  user: "pipelinewise"                 # MySQL/ MariaDB user
-  password: "secret"                   # Plain string or vault encrypted
+  host: "db_mysql_source"
+  port: 3306                            # MySQL/ MariaDB port
+  user: "pipelinewise"                  # MySQL/ MariaDB user
+  password: "secret"                    # Plain string or vault encrypted
   dbname: "mysql_source_db"             # MySQL/ MariaDB database name
-  #filter_dbs: "schema1,schema2"       # Optional: Scan only the required schemas
-                                       #           to improve the performance of
-                                       #           data extraction
+  #filter_dbs: "schema1,schema2"        # Optional: Scan only the required schemas
+                                        #           to improve the performance of
+                                        #           data extraction
 
 
 # ------------------------------------------------------------------------------
@@ -36,35 +36,52 @@ batch_size_rows: 20000                 # Batch size for the stream to optimise l
 # ------------------------------------------------------------------------------
 schemas:
 
-  - source_schema: "mysql_source_db"   # Source schema (aka. database) in MySQL/ MariaDB with tables
-    target_schema: "mysql_grp24"       # Target schema in the destination Data Warehouse
+  - source_schema: "mysql_source_db"    # Source schema (aka. database) in MySQL/ MariaDB with tables
+    target_schema: "ppw_dev_tap_mysql"  # Target schema in the destination Data Warehouse
     #target_schema_select_permissions:  # Optional: Grant SELECT on schema and tables that created
     #  - grp_read_only
 
-    # List of tables to replicate from Postgres to destination Data Warehouse
+    # List of tables to replicate from MySQL/MariaDB to destination Data Warehouse
     #
     # Please check the Replication Strategies section in the documentation to understand the differences.
     # For LOG_BASED replication method you might need to adjust the source mysql/ mariadb configuration.
     tables:
-      - table_name: "address"
-        replication_method: "FULL_TABLE"    # One of INCREMENTAL, LOG_BASED and FULL_TABLE
+      ### Table with LOG_BASED replication
+      - table_name: "weight_unit"
+        replication_method: "LOG_BASED"   # One of INCREMENTAL, LOG_BASED and FULL_TABLE. (Default: LOG_BASED)
+                                          # Important! Log based must be enabled in MySQL and
+                                          #            requires config adjustments
+                                          # Doc: https://transferwise.github.io/pipelinewise/connectors/taps/mysql.html
 
-      - table_name: "edgydata"
+      ### Table with INCREMENTAL replication
+      - table_name: "address"
+        replication_method: "INCREMENTAL"
+        replication_key: "date_updated"
+
+      ### Table with FULL_TABLE replication
+      - table_name: "order"
         replication_method: "FULL_TABLE"
 
-      - table_name: "area_code"
+      ### Table with no primary key
+      - table_name: "no_pk_table"
+        replication_method: "FULL_TABLE"
+
+      ### Table with binary and varbinary columns
+      - table_name: "table_with_binary"
+        replication_method: "LOG_BASED"
+
+      ### Table with reserved words and columns and special characters
+      - table_name: "edgydata"
+        replication_method: "LOG_BASED"
+        transformations:                # OPTIONAL: Load time transformations
+          - column: "case"              # Column to transform
+            type: "HASH"                # Transformation type
+
+      ### Table with reserved word
+      - table_name: "full"
         replication_method: "INCREMENTAL"
-        replication_key: "area_code_id"
+        replication_key: "begin"
 
-        # OPTIONAL: Load time transformations
-        #transformations:                    
-        #  - column: "provance_provance_id"  # Column to transform
-        #    type: "SET-NULL"                # Transformation type
-
-      # You can add as many tables as you need...
-      - table_name: "price"
-        replication_method: "LOG_BASED"     # Optional: replication_method defaults to 'LOG_BASED'
-      - table_name: "weight_unit"           #
-                                            # Important! Log based must be enabled in MySQL and
-                                            #            requires config adjustments
-                                            # Doc: https://transferwise.github.io/pipelinewise/connectors/taps/mysql.html
+      ### Table with space and mixed upper and lowercase characters
+      - table_name: "table with space and UPPERCase"
+        replication_method: "LOG_BASED"

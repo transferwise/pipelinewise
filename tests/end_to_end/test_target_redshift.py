@@ -1,9 +1,9 @@
 import os
 import pytest
 
-from .env import E2EEnv
-from . import tasks
-from . import assertions
+from .helpers import tasks
+from .helpers import assertions
+from .helpers.env import E2EEnv
 
 DIR = os.path.dirname(__file__)
 
