@@ -143,9 +143,8 @@ def main_impl():
         """, args.tables, len(args.tables), cpu_cores)
 
     # Create target schemas sequentially, Postgres doesn't like it running in parallel
-    postgres = FastSyncTargetPostgres(args.target, args.transform)
-    for target_schema in utils.get_target_schemas(args.target, args.tables):
-        postgres.create_schema(target_schema)
+    postgres_target = FastSyncTargetPostgres(args.target, args.transform)
+    postgres_target.create_schemas(args.tables)
 
     # Start loading tables in parallel in spawning processes by
     # utilising all available CPU cores
