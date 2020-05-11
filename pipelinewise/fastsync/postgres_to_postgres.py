@@ -97,7 +97,6 @@ def sync_table(table):
         postgres.close_connection()
 
         # Creating temp table in Postgres
-        postgres_target.create_schema(target_schema)
         postgres_target.drop_table(target_schema, table, is_temporary=True)
         postgres_target.create_table(target_schema, table, postgres_target_columns, primary_key, is_temporary=True)
 
@@ -146,6 +145,10 @@ def main_impl():
             CPU cores                      : %s
         -------------------------------------------------------
         """, args.tables, len(args.tables), cpu_cores)
+
+    # Create target schemas sequentially, Postgres doesn't like it running in parallel
+    postgres_target = FastSyncTargetPostgres(args.target, args.transform)
+    postgres_target.create_schemas(args.tables)
 
     # Start loading tables in parallel in spawning processes by
     # utilising all available CPU cores
