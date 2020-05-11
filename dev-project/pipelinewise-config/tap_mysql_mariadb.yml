@@ -83,5 +83,5 @@ schemas:
         replication_key: "begin"
 
       ### Table with space and mixed upper and lowercase characters
-      - table_name: "table with space and UPPERCase"
+      - table_name: "table_with_space and UPPERCase"
         replication_method: "LOG_BASED"
