@@ -50,6 +50,11 @@ class FastSyncTargetPostgres:
         sql = 'CREATE SCHEMA IF NOT EXISTS {}'.format(schema)
         self.query(sql)
 
+    def create_schemas(self, tables):
+        schemas = utils.get_target_schemas(self.connection_config, tables)
+        for schema in schemas:
+            self.create_schema(schema)
+
     def drop_table(self, target_schema, table_name, is_temporary=False):
         table_dict = utils.tablename_to_dict(table_name)
         target_table = table_dict.get('table_name') if not is_temporary else table_dict.get('temp_table_name')
