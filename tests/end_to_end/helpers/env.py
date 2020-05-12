@@ -338,7 +338,7 @@ class E2EEnv:
     def setup_tap_s3_csv(self):
         """Upload test input files to S3 to be prapared for test run"""
         mock_data_1 = os.path.join(DIR, '..', 'test-project', 's3_mock_data', 'mock_data_1.csv')
-        mock_data_2 = os.path.join(DIR, '..', 'test-project', 's3_mock_data', 'mock_data_1.csv')
+        mock_data_2 = os.path.join(DIR, '..', 'test-project', 's3_mock_data', 'mock_data_2.csv')
 
         bucket = self._get_conn_env_var('TAP_S3_CSV', 'BUCKET')
         s3 = boto3.client('s3',
