@@ -55,7 +55,8 @@ setup(name='pipelinewise',
               'mysql-to-postgres=pipelinewise.fastsync.mysql_to_postgres:main',
               'postgres-to-postgres=pipelinewise.fastsync.postgres_to_postgres:main',
               's3-csv-to-snowflake=pipelinewise.fastsync.s3_csv_to_snowflake:main',
-              's3-csv-to-postgres=pipelinewise.fastsync.s3_csv_to_postgres:main'
+              's3-csv-to-postgres=pipelinewise.fastsync.s3_csv_to_postgres:main',
+              's3-csv-to-redshift=pipelinewise.fastsync.s3_csv_to_redshift:main'
           ]
       },
       packages=find_packages(exclude=['tests*']),

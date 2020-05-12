@@ -90,6 +90,11 @@ class FastSyncTargetRedshift:
         sql = 'CREATE SCHEMA IF NOT EXISTS {}'.format(schema)
         self.query(sql)
 
+    def create_schemas(self, tables):
+        schemas = utils.get_target_schemas(self.connection_config, tables)
+        for schema in schemas:
+            self.create_schema(schema)
+
     def drop_table(self, target_schema, table_name, is_temporary=False):
         table_dict = utils.tablename_to_dict(table_name)
         target_table = table_dict.get('table_name') if not is_temporary else table_dict.get('temp_table_name')
@@ -126,7 +131,7 @@ class FastSyncTargetRedshift:
 
         self.query(sql)
 
-    def copy_to_table(self, s3_key, target_schema, table_name, size_bytes, is_temporary):
+    def copy_to_table(self, s3_key, target_schema, table_name, size_bytes, is_temporary, skip_csv_header=False):
         LOGGER.info('Loading %s into Redshift...', s3_key)
         table_dict = utils.tablename_to_dict(table_name)
         target_table = table_dict.get('table_name') if not is_temporary else table_dict.get('temp_table_name')
@@ -149,8 +154,8 @@ class FastSyncTargetRedshift:
         )
 
         # Step 2: Generate copy options - Override defaults from config.json if defined
-        copy_options = self.connection_config.get('copy_options', """
-            EMPTYASNULL BLANKSASNULL TRIMBLANKS TRUNCATECOLUMNS
+        copy_options = self.connection_config.get('copy_options', f"""
+            EMPTYASNULL BLANKSASNULL TRIMBLANKS TRUNCATECOLUMNS IGNOREHEADER {int(skip_csv_header)}
             TIMEFORMAT 'auto'
         """)
 
@@ -216,17 +221,17 @@ class FastSyncTargetRedshift:
                 column = trans.get('field_id')
                 transform_type = trans.get('type')
                 if transform_type == 'SET-NULL':
-                    trans_cols.append('{} = NULL'.format(column))
+                    trans_cols.append('"{}" = NULL'.format(column))
                 elif transform_type == 'HASH':
-                    trans_cols.append('{} = FUNC_SHA1({})'.format(column, column))
+                    trans_cols.append('"{}" = FUNC_SHA1("{}")'.format(column, column))
                 elif 'HASH-SKIP-FIRST' in transform_type:
                     skip_first_n = transform_type[-1]
-                    trans_cols.append('{} = CONCAT(SUBSTRING({}, 1, {}), FUNC_SHA1(SUBSTRING({}, {} + 1)))'.format(
+                    trans_cols.append('"{}" = CONCAT(SUBSTRING("{}", 1, {}), FUNC_SHA1(SUBSTRING("{}", {} + 1)))'.format(
                         column, column, skip_first_n, column, skip_first_n))
                 elif transform_type == 'MASK-DATE':
-                    trans_cols.append("{} = TO_CHAR({}::DATE, 'YYYY-01-01')::DATE".format(column, column))
+                    trans_cols.append('"{}" = TO_CHAR("{}"::DATE, \'YYYY-01-01\')::DATE'.format(column, column))
                 elif transform_type == 'MASK-NUMBER':
-                    trans_cols.append('{} = 0'.format(column))
+                    trans_cols.append('"{}" = 0'.format(column))
 
         # Generate and run UPDATE if at least one obfuscation rule found
         if len(trans_cols) > 0:
