@@ -226,8 +226,8 @@ class FastSyncTargetRedshift:
                     trans_cols.append('"{}" = FUNC_SHA1("{}")'.format(column, column))
                 elif 'HASH-SKIP-FIRST' in transform_type:
                     skip_first_n = transform_type[-1]
-                    trans_cols.append('"{}" = CONCAT(SUBSTRING("{}", 1, {}), FUNC_SHA1(SUBSTRING("{}", {} + 1)))'.format(
-                        column, column, skip_first_n, column, skip_first_n))
+                    trans_cols.append('"{}" = CONCAT(SUBSTRING("{}", 1, {}), FUNC_SHA1(SUBSTRING("{}", {} + 1)))'
+                                      .format(column, column, skip_first_n, column, skip_first_n))
                 elif transform_type == 'MASK-DATE':
                     trans_cols.append('"{}" = TO_CHAR("{}"::DATE, \'YYYY-01-01\')::DATE'.format(column, column))
                 elif transform_type == 'MASK-NUMBER':
