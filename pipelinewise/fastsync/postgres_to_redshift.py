@@ -95,6 +95,7 @@ def sync_table(table):
 
         # Exporting table data, get table definitions and close connection to avoid timeouts
         postgres.copy_table(table, filepath)
+        size_bytes = os.path.getsize(filepath)
         redshift_types = postgres.map_column_types_to_target(table)
         redshift_columns = redshift_types.get('columns', [])
         primary_key = redshift_types.get('primary_key')
@@ -109,7 +110,7 @@ def sync_table(table):
         redshift.create_table(target_schema, table, redshift_columns, primary_key, is_temporary=True)
 
         # Load into Redshift table
-        redshift.copy_to_table(s3_key, target_schema, table, is_temporary=True)
+        redshift.copy_to_table(s3_key, target_schema, table, size_bytes, is_temporary=True)
 
         # Obfuscate columns
         redshift.obfuscate_columns(target_schema, table)
