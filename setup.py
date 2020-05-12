@@ -47,13 +47,15 @@ setup(name='pipelinewise',
       },
       entry_points={
           'console_scripts': [
-              'pipelinewise=pipelinewise.cli:main', 'mysql-to-snowflake=pipelinewise.fastsync.mysql_to_snowflake:main',
+              'pipelinewise=pipelinewise.cli:main',
+              'mysql-to-snowflake=pipelinewise.fastsync.mysql_to_snowflake:main',
               'postgres-to-snowflake=pipelinewise.fastsync.postgres_to_snowflake:main',
               'mysql-to-redshift=pipelinewise.fastsync.mysql_to_redshift:main',
               'postgres-to-redshift=pipelinewise.fastsync.postgres_to_redshift:main',
               'mysql-to-postgres=pipelinewise.fastsync.mysql_to_postgres:main',
               'postgres-to-postgres=pipelinewise.fastsync.postgres_to_postgres:main',
-              's3-csv-to-snowflake=pipelinewise.fastsync.s3_csv_to_snowflake:main'
+              's3-csv-to-snowflake=pipelinewise.fastsync.s3_csv_to_snowflake:main',
+              's3-csv-to-postgres=pipelinewise.fastsync.s3_csv_to_postgres:main'
           ]
       },
       packages=find_packages(exclude=['tests*']),
