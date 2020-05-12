@@ -24,7 +24,7 @@ db_conn:
 # Destination (Target) - Target properties
 # Connection details should be in the relevant target YAML file
 # ------------------------------------------------------------------------------
-target: "postgres_dwh"                 # ID of the target connector where the data will be loaded
+target: "postgres_dwh"                 # ID of the target connector where the data will be loadqed
 batch_size_rows: 20000                 # Batch size for the stream to optimise load performance
 
 
@@ -32,16 +32,72 @@ batch_size_rows: 20000                 # Batch size for the stream to optimise l
 # Source to target Schema mapping
 # ------------------------------------------------------------------------------
 schemas:
+
+  ### SOURCE SCHEMA 1: public
   - source_schema: "public"
-    target_schema: "postgres_world"
+    target_schema: "ppw_e2e_tap_postgres"
 
     tables:
+
+      ### Table with INCREMENTAL replication
       - table_name: "city"
         replication_method: "INCREMENTAL"
         replication_key: "id"
 
+      ### Table with FULL_TABLE replication
       - table_name: "country"
         replication_method: "FULL_TABLE"
 
-      - table_name: "countrylanguage"
+      ### Table with no primary key
+      - table_name: "no_pk_table"
         replication_method: "FULL_TABLE"
+
+      ### Table with reserved words and columns and special characters
+      - table_name: "edgydata"
+        replication_method: "INCREMENTAL"
+        replication_key: "cid"
+
+      ### Table with reserved word
+      - table_name: "order"
+        replication_method: "INCREMENTAL"
+        replication_key: "id"
+
+      ### Table with space and mixed upper and lowercase characters
+      - table_name: "table_with_space and UPPERCase"
+        replication_method: "FULL_TABLE"
+
+      ### Table with space and mixed upper and lowercase characters
+      - table_name: "table_with_reserved_words"
+        replication_method: "FULL_TABLE"
+
+
+  ### SOURCE SCHEMA 2: public2
+  - source_schema: "public2"
+    target_schema: "ppw_e2e_tap_postgres_public2"
+
+    tables:
+      ### Table with FULL_TABLE replication
+      - table_name: "wearehere"
+        replication_method: "FULL_TABLE"
+
+      ### Table with reserved words and columns and special characters
+      - table_name: "public2_edgydata"
+        replication_method: "INCREMENTAL"
+        replication_key: "cid"
+
+  # Logical replication is currently disabled in end to end
+  ### SOURCE SCHEMA 3: logical 1
+  #- source_schema: "logical1"
+  #  target_schema: "ppw_e2e_tap_postgres_logical1"
+  #
+  #  tables:
+  #    - table_name: "logical1_table1"
+  #      replication_method: "LOG_BASED"
+  #    - table_name: "logical1_table2"
+  #    - table_name: "logical1_edgydata"
+
+  ### SOURCE SCHEMA 4: logical2
+  #- source_schema: "logical2"
+  #  target_schema: "ppw_e2e_tap_postgres_logical2"
+  #  tables:
+  #    - table_name: "logical2_table1"

@@ -2,6 +2,7 @@ import os
 import re
 import glob
 import shutil
+import subprocess
 
 from dotenv import load_dotenv
 from . import db
@@ -38,9 +39,9 @@ class E2EEnv:
             docker dev/test environment. Some connectors are optional, basically the ones
             which are not open sourced hence NOT included in the docker dev/test env.
 
-        If optional connector properties are not defined in ../../dev/project/.env then
+        If optional connector properties are not defined in ../../../dev/project/.env then
         the related test cases will be skipped."""
-        load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '../../dev-project/.env'))
+        load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '../../../dev-project/.env'))
         self.env = {
             # ------------------------------------------------------------------
             # Tap Postgres is a REQUIRED test connector and test database with test data available
@@ -72,7 +73,7 @@ class E2EEnv:
             },
             # ------------------------------------------------------------------
             # Tap S3 CSV is an OPTIONAL test connector and it requires credentials to a real S3 bucket.
-            # To run the related tests add real S3 credentials to ../../dev-project/.env
+            # To run the related tests add real S3 credentials to ../../../dev-project/.env
             # ------------------------------------------------------------------
             'TAP_S3_CSV': {
                 'optional': True,
@@ -99,7 +100,7 @@ class E2EEnv:
             # ------------------------------------------------------------------
             # Target Snowflake is an OPTIONAL test connector because it's not open sourced and not part of
             # the docker environment.
-            # To run the related test cases add real Snowflake credentials to ../../dev-project/.env
+            # To run the related test cases add real Snowflake credentials to ../../../dev-project/.env
             # ------------------------------------------------------------------
             'TARGET_SNOWFLAKE': {
                 'optional': True,
@@ -127,7 +128,7 @@ class E2EEnv:
             # ------------------------------------------------------------------
             # Target Redshift is an OPTIONAL test connector because it's not open sourced and not part of
             # the docker environment.
-            # To run the related test cases add real Amazon Redshift credentials to ../../dev-project/.env
+            # To run the related test cases add real Amazon Redshift credentials to ../../../dev-project/.env
             # ------------------------------------------------------------------
             'TARGET_REDSHIFT': {
                 'optional': True,
@@ -254,6 +255,11 @@ class E2EEnv:
                     except OSError:
                         pass
 
+    @staticmethod
+    def _run_command(args):
+        """Run a command in a subprocess"""
+        subprocess.run(args, check=True)
+
     # -------------------------------------------------------------------------
     # Database functions to run queries in source and target databases
     # -------------------------------------------------------------------------
@@ -266,7 +272,6 @@ class E2EEnv:
                                      user=self._get_conn_env_var('TAP_POSTGRES', 'USER'),
                                      password=self._get_conn_env_var('TAP_POSTGRES', 'PASSWORD'),
                                      database=self._get_conn_env_var('TAP_POSTGRES', 'DB'))
-
 
     def run_query_target_postgres(self, query):
         """Run and SQL query in target postgres database"""
@@ -317,19 +322,16 @@ class E2EEnv:
 
     def setup_tap_mysql(self):
         """Clean mysql source database and prepare for test run
-        Creating initial tables is defined in Docker entrypoint.sh
-        Delete every line that not part of the test dataset"""
-        self.run_query_tap_mysql('DELETE FROM address where address_id >= 10000')
-        self.run_query_tap_mysql('DELETE FROM weight_unit where weight_unit_id >= 100')
-        self.run_query_tap_mysql('DELETE FROM area_code where area_code_id >= 100')
+        Creating initial tables is defined in Docker entrypoint.sh"""
+        db_script = os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..', 'db', 'tap_mysql_db.sh')
+        self._run_command(db_script)
 
     # pylint: disable=unnecessary-pass
     def setup_tap_postgres(self):
         """Clean postgres source database and prepare for test run
-        Creating initial tables is defined in Docker entrypoint.sh
-        Delete every line that not part of the test dataset
-        This function not yet implemented"""
-        pass
+        Creating initial tables is defined in Docker entrypoint.sh"""
+        db_script = os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..', 'db', 'tap_postgres_db.sh')
+        self._run_command(db_script)
 
     # pylint: disable=unnecessary-pass
     def setup_tap_s3_csv(self):
@@ -340,27 +342,37 @@ class E2EEnv:
 
     def setup_target_postgres(self):
         """Clean postgres target database and prepare for test run"""
-        self.run_query_target_postgres('DROP SCHEMA IF EXISTS mysql_grp24 CASCADE')
-        self.run_query_target_postgres('DROP SCHEMA IF EXISTS postgres_world CASCADE')
-        self.run_query_target_postgres('DROP SCHEMA IF EXISTS s3_feeds CASCADE')
+        self.run_query_target_postgres('CREATE EXTENSION IF NOT EXISTS pgcrypto')
+        self.run_query_target_postgres('DROP SCHEMA IF EXISTS ppw_e2e_tap_postgres CASCADE')
+        self.run_query_target_postgres('DROP SCHEMA IF EXISTS ppw_e2e_tap_postgres_public2 CASCADE')
+        self.run_query_target_postgres('DROP SCHEMA IF EXISTS ppw_e2e_tap_postgres_logical1 CASCADE')
+        self.run_query_target_postgres('DROP SCHEMA IF EXISTS ppw_e2e_tap_postgres_logical2 CASCADE')
+        self.run_query_target_postgres('DROP SCHEMA IF EXISTS ppw_e2e_tap_mysql CASCADE')
+        self.run_query_target_postgres('DROP SCHEMA IF EXISTS ppw_e2e_tap_s3_csv CASCADE')
 
         # Clean config directory
         shutil.rmtree(os.path.join(CONFIG_DIR, 'postgres_dwh'), ignore_errors=True)
 
     def setup_target_redshift(self):
         """Clean redshift target database and prepare for test run"""
-        self.run_query_target_redshift('DROP SCHEMA IF EXISTS mysql_grp24 CASCADE')
-        self.run_query_target_redshift('DROP SCHEMA IF EXISTS postgres_world CASCADE')
-        self.run_query_target_redshift('DROP SCHEMA IF EXISTS s3_feeds CASCADE')
+        self.run_query_target_redshift('DROP SCHEMA IF EXISTS ppw_e2e_tap_postgres CASCADE')
+        self.run_query_target_redshift('DROP SCHEMA IF EXISTS ppw_e2e_tap_postgres_public2 CASCADE')
+        self.run_query_target_redshift('DROP SCHEMA IF EXISTS ppw_e2e_tap_postgres_logical1 CASCADE')
+        self.run_query_target_redshift('DROP SCHEMA IF EXISTS ppw_e2e_tap_postgres_logical2 CASCADE')
+        self.run_query_target_redshift('DROP SCHEMA IF EXISTS ppw_e2e_tap_mysql CASCADE')
+        self.run_query_target_redshift('DROP SCHEMA IF EXISTS ppw_e2e_tap_s3_csv CASCADE')
 
         # Clean config directory
         shutil.rmtree(os.path.join(CONFIG_DIR, 'redshift'), ignore_errors=True)
 
     def setup_target_snowflake(self):
         """Clean snowflake target database and prepare for test run"""
-        self.run_query_target_snowflake('DROP SCHEMA IF EXISTS mysql_grp24 CASCADE')
-        self.run_query_target_snowflake('DROP SCHEMA IF EXISTS postgres_world CASCADE')
-        self.run_query_target_snowflake('DROP SCHEMA IF EXISTS s3_feeds CASCADE')
+        self.run_query_target_snowflake('DROP SCHEMA IF EXISTS ppw_e2e_tap_postgres CASCADE')
+        self.run_query_target_snowflake('DROP SCHEMA IF EXISTS ppw_e2e_tap_postgres_public2 CASCADE')
+        self.run_query_target_snowflake('DROP SCHEMA IF EXISTS ppw_e2e_tap_postgres_logical1 CASCADE')
+        self.run_query_target_snowflake('DROP SCHEMA IF EXISTS ppw_e2e_tap_postgres_logical2 CASCADE')
+        self.run_query_target_snowflake('DROP SCHEMA IF EXISTS ppw_e2e_tap_mysql CASCADE')
+        self.run_query_target_snowflake('DROP SCHEMA IF EXISTS ppw_e2e_tap_s3_csv CASCADE')
 
         # Clean config directory
         shutil.rmtree(os.path.join(CONFIG_DIR, 'snowflake'), ignore_errors=True)

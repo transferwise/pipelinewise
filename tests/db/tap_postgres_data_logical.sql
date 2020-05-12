@@ -1,6 +1,6 @@
 -- create fresh replication slot
-SELECT pg_drop_replication_slot('pipelinewise_postgres_source_db');
-SELECT slot_name, lsn, lsn - '0/0'::pg_lsn as lsn FROM pg_create_logical_replication_slot('pipelinewise_postgres_source_db', 'wal2json');
+--SELECT pg_drop_replication_slot('pipelinewise_postgres_source_db_postgres_to_pg');
+--SELECT slot_name, lsn, lsn - '0/0'::pg_lsn as lsn FROM pg_create_logical_replication_slot('pipelinewise_postgres_source_db_postgres_to_pg', 'wal2json');
 
 -- create structures
 DROP SCHEMA IF EXISTS logical1 CASCADE;

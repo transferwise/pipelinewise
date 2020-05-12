@@ -12,8 +12,8 @@ type: "target-postgres"                # !! THIS SHOULD NOT CHANGE !!
 # Target - Data Warehouse connection details
 # ------------------------------------------------------------------------------
 db_conn:
-  host: "db_postgres_dwh"                 # Postgres host
-  port: 5432                              # Postgres port
+  host: "db_postgres_dwh"
+  port: 5433                              # Postgres port
   user: "pipelinewise"                    # Postgres user
   password: "secret"                      # Plain string or vault encrypted
   dbname: "postgres_dwh"                  # Postgres database name

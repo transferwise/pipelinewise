@@ -33,18 +33,42 @@ batch_size_rows: 20000                 # Batch size for the stream to optimise l
 # ------------------------------------------------------------------------------
 schemas:
   - source_schema: "mysql_source_db"
-    target_schema: "mysql_grp24"
+    target_schema: "ppw_e2e_tap_mysql"
 
     tables:
+      ### Table with LOG_BASED replication
+      - table_name: "weight_unit"
+        replication_method: "LOG_BASED"
+
+      ### Table with INCREMENTAL replication
       - table_name: "address"
         replication_method: "INCREMENTAL"
         replication_key: "date_updated"
 
-      - table_name: "area_code"
-        replication_method: "FULL_TABLE"
-
+      ### Table with FULL_TABLE replication
       - table_name: "order"
         replication_method: "FULL_TABLE"
 
-      - table_name: "weight_unit"
+      ### Table with no primary key
+      - table_name: "no_pk_table"
+        replication_method: "FULL_TABLE"
+
+      ### Table with binary and varbinary columns
+      - table_name: "table_with_binary"
+        replication_method: "LOG_BASED"
+
+      ### Table with reserved words and columns and special characters
+      - table_name: "edgydata"
+        replication_method: "LOG_BASED"
+        transformations:
+          - column: "case"
+            type: "HASH"
+
+      ### Table with reserved word
+      - table_name: "full"
+        replication_method: "INCREMENTAL"
+        replication_key: "begin"
+
+      ### Table with space and mixed upper and lowercase characters
+      - table_name: "table_with_space and UPPERCase"
         replication_method: "LOG_BASED"

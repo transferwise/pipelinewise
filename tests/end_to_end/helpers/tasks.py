@@ -2,6 +2,7 @@ import re
 import shlex
 import subprocess
 
+
 def run_command(command):
     """Run shell command and return returncode, stdout and stderr"""
     proc = subprocess.Popen(shlex.split(command), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -11,6 +12,7 @@ def run_command(command):
     stderr = proc_result[1].decode('utf-8')
 
     return [return_code, stdout, stderr]
+
 
 def find_run_tap_log_file(stdout, sync_engine=None):
     """Pipelinewise creates log file per running tap instances in a dynamically created directory:
