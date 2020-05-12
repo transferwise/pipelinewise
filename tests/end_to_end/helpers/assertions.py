@@ -118,6 +118,11 @@ def _map_tap_to_target_functions(tap_query_runner_fn: callable, target_query_run
         'run_query_target_snowflake': {
             'target_sql_get_cols_fn': db.sql_get_columns_snowflake,
             'target_sql_dynamic_row_count_fn': db.sql_dynamic_row_count_snowflake,
+        },
+        # target-redshift specific attributes and functions
+        'run_query_target_redshift': {
+            'target_sql_get_cols_fn': db.sql_get_columns_redshift,
+            'target_sql_dynamic_row_count_fn': db.sql_dynamic_row_count_redshift,
         }
     }
 

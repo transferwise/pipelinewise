@@ -369,6 +369,10 @@ class E2EEnv:
         self.run_query_target_redshift('DROP SCHEMA IF EXISTS ppw_e2e_tap_postgres_logical2 CASCADE')
         self.run_query_target_redshift('DROP SCHEMA IF EXISTS ppw_e2e_tap_mysql CASCADE')
         self.run_query_target_redshift('DROP SCHEMA IF EXISTS ppw_e2e_tap_s3_csv CASCADE')
+        self.run_query_target_redshift('DROP SCHEMA IF EXISTS ppw_e2e_helper CASCADE')
+        self.run_query_target_redshift('CREATE SCHEMA ppw_e2e_helper')
+        self.run_query_target_redshift('CREATE TABLE ppw_e2e_helper.dual (dummy VARCHAR)')
+        self.run_query_target_redshift('INSERT INTO ppw_e2e_helper.dual VALUES (\'X\')')
 
         # Clean config directory
         shutil.rmtree(os.path.join(CONFIG_DIR, 'redshift'), ignore_errors=True)

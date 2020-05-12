@@ -105,6 +105,35 @@ def sql_get_columns_snowflake(schemas: list) -> str:
     ORDER BY table_name"""
 
 
+def sql_get_columns_redshift(schemas: list) -> str:
+    """Generates an SQL command that gives the list of columns of every table
+    in a specific schema from a Redshift database"""
+    sql_schemas = ', '.join(f"'{schema}'" for schema in schemas)
+    return f"""
+    SELECT table_name, LISTAGG(column_name, ',') WITHIN GROUP (ORDER BY column_name)
+    FROM (
+        SELECT
+            TRIM(c.relname) table_name, a.attname column_name
+        FROM
+            pg_type t,
+            pg_attribute a,
+            pg_class c,
+            pg_namespace ns,
+            (SELECT TOP 1 1 FROM ppw_e2e_helper.dual)
+        WHERE
+                t.oid=a.atttypid
+          AND a.attrelid = c.oid
+          AND c.relnamespace = ns.oid
+          AND t.typname NOT IN ('oid','xid','tid','cid')
+          AND a.attname not in ('deletexid', 'insertxid')
+          AND c.reltype != 0
+          AND ns.nspname IN ({sql_schemas})
+        )
+    GROUP BY table_name
+    ORDER BY table_name
+    """
+
+
 def sql_dynamic_row_count_mysql(schemas: list) -> str:
     """Generates ans SQL statement that counts the number of rows in
     every table in a specific schema(s) in a mysql database"""
@@ -160,5 +189,24 @@ def sql_dynamic_row_count_snowflake(schemas: list) -> str:
                           table_schema, '."', table_name, '"'),
                       ' UNION '),
            ' ORDER BY tbl')
+      FROM table_list
+    """
+
+
+def sql_dynamic_row_count_redshift(schemas: list) -> str:
+    """Generates an SQL statement that counts the number of rows in
+    every table in a specific schema(s) in a Redshift database"""
+    sql_schemas = ', '.join(f"'{schema}'" for schema in schemas)
+
+    return f"""
+    WITH table_list AS (
+        SELECT schemaname, tablename
+          FROM pg_tables
+              ,(SELECT top 1 1 FROM ppw_e2e_helper.dual)
+         WHERE schemaname IN ({sql_schemas}))
+    SELECT LISTAGG(
+             'SELECT ''' || LOWER(tablename) || ''' tbl, COUNT(*) row_count FROM ' || schemaname || '."' || tablename || '"',
+             ' UNION ') WITHIN GROUP ( ORDER BY tablename )
+           || 'ORDER BY tbl'
       FROM table_list
     """
