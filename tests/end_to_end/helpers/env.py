@@ -1,6 +1,7 @@
 import os
 import re
 import glob
+import boto3
 import shutil
 import subprocess
 
@@ -9,6 +10,7 @@ from . import db
 
 USER_HOME = os.path.expanduser('~')
 CONFIG_DIR = os.path.join(USER_HOME, '.pipelinewise')
+DIR = os.path.dirname(os.path.realpath(__file__))
 
 
 class E2EEnv:
@@ -41,7 +43,7 @@ class E2EEnv:
 
         If optional connector properties are not defined in ../../../dev/project/.env then
         the related test cases will be skipped."""
-        load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '../../../dev-project/.env'))
+        load_dotenv(dotenv_path=os.path.join(DIR, '..', '..', '..', 'dev-project', '.env'))
         self.env = {
             # ------------------------------------------------------------------
             # Tap Postgres is a REQUIRED test connector and test database with test data available
@@ -323,22 +325,28 @@ class E2EEnv:
     def setup_tap_mysql(self):
         """Clean mysql source database and prepare for test run
         Creating initial tables is defined in Docker entrypoint.sh"""
-        db_script = os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..', 'db', 'tap_mysql_db.sh')
+        db_script = os.path.join(DIR, '..', '..', 'db', 'tap_mysql_db.sh')
         self._run_command(db_script)
 
     # pylint: disable=unnecessary-pass
     def setup_tap_postgres(self):
         """Clean postgres source database and prepare for test run
         Creating initial tables is defined in Docker entrypoint.sh"""
-        db_script = os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', '..', 'db', 'tap_postgres_db.sh')
+        db_script = os.path.join(DIR, '..', '..', 'db', 'tap_postgres_db.sh')
         self._run_command(db_script)
 
-    # pylint: disable=unnecessary-pass
     def setup_tap_s3_csv(self):
-        """Clean files on S3 and prepare for initial test run
-        Upload required files
-        This function not yet implemented"""
-        pass
+        """Upload test input files to S3 to be prapared for test run"""
+        mock_data_1 = os.path.join(DIR, '..', 'test-project', 's3_mock_data', 'mock_data_1.csv')
+        mock_data_2 = os.path.join(DIR, '..', 'test-project', 's3_mock_data', 'mock_data_1.csv')
+
+        bucket = self._get_conn_env_var('TAP_S3_CSV', 'BUCKET')
+        s3 = boto3.client('s3',
+                          aws_access_key_id=self._get_conn_env_var('TAP_S3_CSV', 'AWS_KEY'),
+                          aws_secret_access_key=self._get_conn_env_var('TAP_S3_CSV', 'AWS_SECRET_ACCESS_KEY'))
+
+        s3.upload_file(mock_data_1, bucket, 'ppw_e2e_tap_s3_csv/mock_data_1.csv')
+        s3.upload_file(mock_data_2, bucket, 'ppw_e2e_tap_s3_csv/mock_data_2.csv')
 
     def setup_target_postgres(self):
         """Clean postgres target database and prepare for test run"""

@@ -44,6 +44,7 @@ class TestTargetSnowflake:
         # Setup and clean source and target databases
         self.e2e.setup_tap_mysql()
         self.e2e.setup_tap_postgres()
+        self.e2e.setup_tap_s3_csv()
         self.e2e.setup_target_snowflake()
 
         # Import project
