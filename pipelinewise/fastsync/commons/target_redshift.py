@@ -178,8 +178,9 @@ class FastSyncTargetRedshift:
         if grantee:
             table_dict = utils.tablename_to_dict(table_name)
             target_table = table_dict.get('table_name') if not is_temporary else table_dict.get('temp_table_name')
-            sql = 'GRANT SELECT ON {}."{}" TO {} {}'.format(target_schema, target_table.upper(), 'GROUP' if to_group else '',
-                                                          grantee)
+            sql = 'GRANT SELECT ON {}."{}" TO {} {}'.format(target_schema,
+                                                            target_table.upper(), 'GROUP' if to_group else '',
+                                                            grantee)
             self.query(sql)
 
     def grant_usage_on_schema(self, target_schema, grantee, to_group=False):
