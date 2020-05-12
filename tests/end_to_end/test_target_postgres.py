@@ -100,8 +100,8 @@ class TestTargetPostgres:
         assertions.assert_all_columns_exist(self.run_query_tap_postgres, self.e2e.run_query_target_postgres)
 
     @pytest.mark.dependency(depends=['import_config'])
-    def test_replicate_s3_to_sf(self):
-        """Replicate csv files from s3 to Snowflake, check if return code is zero and success log file created"""
+    def test_replicate_s3_to_pg(self):
+        """Replicate csv files from s3 to Postgres"""
         # Skip tap_s3_csv related test if required env vars not provided
         if not self.e2e.env['TAP_S3_CSV']['is_configured']:
             pytest.skip('Tap S3 CSV environment variables are not provided')
