@@ -74,7 +74,7 @@ def tap_type_to_target_type(pg_type):
     }.get(pg_type, 'CHARACTER VARYING({})'.format(DEFAULT_VARCHAR_LENGTH))
 
 
-# pylint: disable=inconsistent-return-statements
+# pylint: disable=inconsistent-return-statements,too-many-locals
 def sync_table(table):
     """Sync one table"""
     args = utils.parse_args(REQUIRED_CONFIG_KEYS)
