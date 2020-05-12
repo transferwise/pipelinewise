@@ -59,12 +59,16 @@ def run_query_redshift(query, host, port, user, password, database):
 
 def sql_get_columns_for_table(table_schema: str, table_name: str) -> list:
     """Generate an SQL command that returns the list of column of a specific
-    table. Compatible with MySQL/ MariaDB/ Postgres and Snowflake"""
+    table. Compatible with MySQL/ MariaDB/ Postgres and Snowflake
+
+    table_schema and table_name can be lowercase and uppercase strings.
+    It's using the IN clause to avoid transforming the entire
+    information_schema.columns table"""
     return f"""
     SELECT column_name
       FROM information_schema.columns
-     WHERE table_schema = '{table_schema.upper()}'
-       AND table_name = '{table_name.upper()}'"""
+     WHERE table_schema IN ('{table_schema.upper()}', '{table_schema.lower()}')
+       AND table_name IN ('{table_name.upper()}', '{table_name.lower()}')"""
 
 
 def sql_get_columns_mysql(schemas: list) -> str:

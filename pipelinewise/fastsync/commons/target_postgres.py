@@ -92,7 +92,7 @@ class FastSyncTargetPostgres:
         self.query(sql)
 
     def copy_to_table(self, filepath, target_schema: str, table_name: str, size_bytes: int,
-                      is_temporary: bool = False):
+                      is_temporary: bool = False, skip_csv_header: bool = False):
         LOGGER.info('Loading %s into Postgres...', filepath)
         table_dict = utils.tablename_to_dict(table_name)
         target_table = table_dict.get('table_name') if not is_temporary else table_dict.get('temp_table_name')
@@ -102,7 +102,7 @@ class FastSyncTargetPostgres:
                 inserts = 0
 
                 copy_sql = f"""COPY {target_schema}."{target_table.lower()}"
-                FROM STDIN WITH (FORMAT CSV, ESCAPE '"')
+                FROM STDIN WITH (FORMAT CSV, HEADER {'TRUE' if skip_csv_header else 'FALSE'}, ESCAPE '"')
                 """
 
                 with gzip.open(filepath, 'rb') as file:
