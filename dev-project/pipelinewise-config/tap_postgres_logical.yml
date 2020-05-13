@@ -14,6 +14,10 @@ owner: "somebody@foo.com"              # Data owner to contact
 # ------------------------------------------------------------------------------
 db_conn:
   host: "db_postgres_source"
+  logical_poll_total_seconds: 3        # seconds before exiting if no changes received from source
+                                       #    Warning: this can cause a tap to exit before receiving any
+                                       #    data, because PostgreSQL can take a long time to find the
+                                       #    position of the start lsn in the wal file.
   port: 5432                           # PostgreSQL port
   user: "pipelinewise"                 # PostfreSQL user
   password: "secret"                   # Plain string or vault encrypted
