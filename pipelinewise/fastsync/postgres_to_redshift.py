@@ -159,8 +159,7 @@ def main_impl():
 
     # Create target schemas sequentially, Redshift doesn't like it running in parallel
     redshift = FastSyncTargetRedshift(args.target, args.transform)
-    for target_schema in utils.get_target_schemas(args.target, args.tables):
-        redshift.create_schema(target_schema)
+    redshift.create_schemas(args.tables)
 
     # Start loading tables in parallel in spawning processes by
     # utilising all available CPU cores
