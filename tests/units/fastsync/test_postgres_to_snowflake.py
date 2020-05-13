@@ -1,20 +1,20 @@
 import unittest
 from . import assertions
 
-from pipelinewise.fastsync.s3_csv_to_snowflake import tap_type_to_target_type, sync_table, main_impl
+from pipelinewise.fastsync.postgres_to_snowflake import tap_type_to_target_type, sync_table, main_impl
 
-PACKAGE_IN_SCOPE = 'pipelinewise.fastsync.s3_csv_to_snowflake'
-TAP = 'FastSyncTapS3Csv'
+PACKAGE_IN_SCOPE = 'pipelinewise.fastsync.postgres_to_snowflake'
+TAP = 'FastSyncTapPostgres'
 TARGET = 'FastSyncTargetSnowflake'
 
 
 # pylint: disable=missing-function-docstring,invalid-name,no-self-use
 class S3CsvToPostgres(unittest.TestCase):
     """
-    Unit tests for fastsync s3 csv to snowflake
+    Unit tests for fastsync postgres to snowflake
     """
     def test_tap_type_to_target_type_with_defined_tap_type_returns_equivalent_target_type(self):
-        self.assertEqual('INTEGER', tap_type_to_target_type('integer'))
+        self.assertEqual('NUMBER', tap_type_to_target_type('serial'))
 
     def test_tap_type_to_target_type_with_undefined_tap_type_returns_CHARACTER_VARYING(self):
         self.assertEqual('VARCHAR', tap_type_to_target_type('random-type'))
