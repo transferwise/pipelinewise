@@ -3,7 +3,10 @@ import logging
 import os
 import sys
 import time
+from functools import partial
+from argparse import Namespace
 import multiprocessing
+from typing import Union
 
 from datetime import datetime
 from .commons import utils
@@ -67,10 +70,8 @@ def tap_type_to_target_type(mysql_type, mysql_column_type):
     }.get(mysql_type, 'VARCHAR')
 
 
-# pylint: disable=inconsistent-return-statements
-def sync_table(table):
+def sync_table(table: str, args: Namespace) -> Union[bool, str]:
     """Sync one table"""
-    args = utils.parse_args(REQUIRED_CONFIG_KEYS)
     mysql = FastSyncTapMySql(args.tap, tap_type_to_target_type)
     snowflake = FastSyncTargetSnowflake(args.target, args.transform)
 
@@ -124,6 +125,8 @@ def sync_table(table):
         utils.grant_privilege(target_schema, grantees, snowflake.grant_usage_on_schema)
         utils.grant_privilege(target_schema, grantees, snowflake.grant_select_on_schema)
 
+        return True
+
     except Exception as exc:
         LOGGER.exception(exc)
         return '{}: {}'.format(table, exc)
@@ -150,7 +153,8 @@ def main_impl():
     # Start loading tables in parallel in spawning processes by
     # utilising all available CPU cores
     with multiprocessing.Pool(cpu_cores) as proc:
-        table_sync_excs = list(filter(None, proc.map(sync_table, args.tables)))
+        table_sync_excs = list(
+            filter(lambda x: not isinstance(x, bool), proc.map(partial(sync_table, args=args), args.tables)))
 
     # Log summary
     end_time = datetime.now()
