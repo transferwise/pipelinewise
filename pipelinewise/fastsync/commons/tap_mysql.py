@@ -22,6 +22,7 @@ class FastSyncTapMySql:
         self.connection_config = connection_config
         self.connection_config['charset'] = connection_config.get('charset', 'utf8')
         self.connection_config['export_batch_rows'] = connection_config.get('export_batch_rows', 50000)
+        self.connection_config['session_sqls'] = connection_config.get('session_sqls')
         self.tap_type_to_target_type = tap_type_to_target_type
         self.conn = None
         self.conn_unbuffered = None
@@ -54,6 +55,22 @@ class FastSyncTapMySql:
             password=self.connection_config.get('bulk_sync_password', self.connection_config['password']),
             charset=self.connection_config['charset'],
             cursorclass=pymysql.cursors.SSCursor)
+
+        # Set session variables by running a list of SQLs which is defined
+        # in the optional session_sqls connection parameters
+        self.run_session_sqls(self.conn)
+        self.run_session_sqls(self.conn_unbuffered)
+
+    def run_session_sqls(self, conn):
+        """
+        Run list of SQLs from the "session_sqls" optional connection parameter
+        """
+        session_sqls = self.connection_config['session_sqls']
+
+        if session_sqls and isinstance(session_sqls, list):
+            for sql in session_sqls:
+                with conn as cur:
+                    cur.execute(sql)
 
     def close_connections(self, silent=False):
         """
