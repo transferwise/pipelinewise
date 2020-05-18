@@ -301,6 +301,11 @@ db_conn:
                                        <span class="c1">#           data extraction</span>
   <span class="c1">#export_batch_rows                   # Optional: Number of rows to export from MySQL</span>
                                        <span class="c1">#           in one batch. Default is 20000.</span>
+  <span class="c1">#session_sqls:                       # Optional: Run SQLs to set session variables</span>
+  <span class="c1">#  - SET @@session.time_zone=&quot;+0:00&quot;             # when the connection made</span>
+  <span class="c1">#  - SET @@session.wait_timeout=28800            # Defaults to the values listed here</span>
+  <span class="c1">#  - SET @@session.net_read_timeout=3600</span>
+  <span class="c1">#  - SET @@session.innodb_lock_wait_timeout=3600</span>
 
 
 <span class="c1"># ------------------------------------------------------------------------------</span>
