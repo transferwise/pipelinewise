@@ -74,13 +74,19 @@ class FastSyncTapMySql:
         """
         session_sqls = self.connection_config.get('session_sqls', DEFAULT_SESSION_SQLS)
 
+        warnings = []
         if session_sqls and isinstance(session_sqls, list):
             for sql in session_sqls:
                 try:
                     self.query(sql)
                     self.query(sql, self.conn_unbuffered)
                 except pymysql.err.InternalError:
-                    LOGGER.info('Could not set session variable: %s', sql)
+                    warnings.append(f'Could not set session variable: {sql}')
+
+        if warnings:
+            LOGGER.warning('Encountered non-fatal errors when configuring session that could impact performance:')
+        for warning in warnings:
+            LOGGER.warning(warning)
 
     def close_connections(self, silent=False):
         """
