@@ -90,7 +90,7 @@ class TestTargetSnowflake:
         #  INCREMENTAL
         self.run_query_tap_postgres('INSERT INTO public.city (id, name, countrycode, district, population) '
                                     "VALUES (4080, 'Bath', 'GBR', 'England', 88859)")
-        self.run_query_tap_postgres("UPDATE public.edgydata SET "
+        self.run_query_tap_postgres('UPDATE public.edgydata SET '
                                     "cjson = json '{\"data\": 1234}', "
                                     "cjsonb = jsonb '{\"data\": 2345}', "
                                     "cvarchar = 'Liewe Maatjies UPDATED' WHERE cid = 23")
