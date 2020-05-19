@@ -21,6 +21,10 @@
     - Add optional `session_sqls` connection parameter
     - Support MySQL `JSON` column type
 
+**Tap Oracle**
+- Bump `pipelinewise-tap-oracle` to 1.0.1
+    - Fixed an issue when output messages were not compatible with `pipelinewise-transform-field` component
+
 **Target Snowflake**
 - Bump `pipelinewise-target-snowflake` to 1.6.4
     - Fix loading tables with space in the name
