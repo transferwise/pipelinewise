@@ -1,3 +1,44 @@
+0.16.0 (2020-05-19)
+-------------------
+- Support reserved words as table and column names across every component, including fastsync and singer executables
+- Support loading tables with space in the name
+- Add tap-zuora
+- Switch to `psycopg-binary` 2.8.5 in every component, including fastsync and singer executables
+
+**FastSync**
+- Fixed an issue when composite primary keys not created correctly by fastsync
+- Create database specific unique replication slot names from tap-postgres
+- Fixed an issue when parallel running `CREATE SCHEMA IF NOT EXISTS` commands caused deadlock in PG
+- Support fastsync between tap-mysql, tap-postgres, tap-s3-csv to target-snowflake, target-postgres and target-redshift
+
+**Tap Postgres**
+- Bump `pipelinewise-tap-postgres` to 1.6.2
+    - Fixed issue when `JSON` type not converted to dictionary
+    - Fixed an issue when existing replication slot not found
+
+**Tap MySQL**
+- Bump `pipelinewise-tap-mysql` to 1.3.0
+    - Add optional `session_sqls` connection parameter
+    - Support MySQL `JSON` column type
+
+**Tap Oracle**
+- Bump `pipelinewise-tap-oracle` to 1.0.1
+    - Fixed an issue when output messages were not compatible with `pipelinewise-transform-field` component
+
+**Target Snowflake**
+- Bump `pipelinewise-target-snowflake` to 1.6.4
+    - Fix loading tables with space in the name
+
+**Target Postgres**
+- Bump `pipelinewise-target-postgres` to 2.0.0
+    - Implement missing and equivalent features of `pipelinewise-target-snowflake`
+    - Full changelog at https://github.com/transferwise/pipelinewise-target-postgres/blob/master/CHANGELOG.md#200-2020-05-02
+
+**Target Redshift**
+- Bump `pipelinewise-target-redshift` to 2.0.0
+    - Implement missing and equivalent features of `pipelinewise-target-snowflake`
+    - Full changelog at https://github.com/transferwise/pipelinewise-target-redshift/blob/master/CHANGELOG.md#140-2019-05-11
+
 0.15.0 (2020-04-09)
 -------------------
 **FastSync**
