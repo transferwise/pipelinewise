@@ -24,6 +24,12 @@ references:
           TARGET_POSTGRES_PASSWORD: test
           TARGET_POSTGRES_DB: postgres_dwh
 
+          TAP_MONGODB_HOST: mongodb_source
+          TAP_MONGODB_PORT: 27017
+          TAP_MONGODB_USER: mongoUser
+          TAP_MONGODB_PASSWORD: Password1
+          TAP_MONGODB_DB: test
+
       # PostgreSQL service container image used as test source database (for tap-postgres)
       - image: postgres:11.4
         name: db_postgres_source
@@ -50,6 +56,13 @@ references:
           POSTGRES_PASSWORD: test
           POSTGRES_DB: postgres_dwh
 
+      - image: "mongo:4.2-bionic"
+        name: "mongodb_source"
+        environment:
+          MONGO_INITDB_ROOT_USERNAME: mongoUser
+          MONGO_INITDB_ROOT_PASSWORD: Password1
+          MONGO_INITDB_DATABASE: test
+        command: [mongod]
 jobs:
   test:
     <<: *container_config
@@ -60,12 +73,13 @@ jobs:
           name: 'Build source databases for integration tests'
           command: |
             sudo apt-get update
-            sudo apt install mariadb-client postgresql-client
+            sudo apt install mariadb-client postgresql-client mongo-tools
             ./tests/db/tap_mysql_db.sh
             ./tests/db/tap_postgres_db.sh
+            ./tests/db/tap_mongodb.sh
       - run:
           name: 'Installing PipelineWise components and connectors'
-          command: ./install.sh --connectors=all --acceptlicenses
+          command: ./install.sh --acceptlicenses --connectors=target-snowflake,target-postgres,tap-mysql,tap-postgres,tap-mongodb,transform-field,tap-s3-csv
       - run:
           name: 'Check code formatting and do pylinting'
           command: |

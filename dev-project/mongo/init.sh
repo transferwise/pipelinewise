@@ -6,13 +6,13 @@ mongo -u $MONGO_INITDB_ROOT_USERNAME -p $MONGO_INITDB_ROOT_PASSWORD --authentica
   rs.initiate({
     _id: "rs0",
     members: [
-      {_id: 0, host: "db_mongo_source:27017"}
+      {_id: 0, host: "127.0.0.1:27017"}
     ]
   });
 
   cfg=rs.conf();
-  cfg.members[0].host="db_mongo_source:27017";
-  rs.reconfig(cfg);//
+  cfg.members[0].host="$MONGO_REPLICA_HOST:27017";
+  rs.reconfig(cfg);
 
   use admin;
 
