@@ -335,6 +335,13 @@ class E2EEnv:
         db_script = os.path.join(DIR, '..', '..', 'db', 'tap_postgres_db.sh')
         self._run_command(db_script)
 
+    def setup_tap_mongodb(self):
+        """Clean postgres source database and prepare for test run
+        Creating initial tables is defined in Docker entrypoint.sh"""
+        db_script = os.path.join(DIR, '..', '..', 'db', 'tap_mongodb.sh')
+        self._run_command(db_script)
+
+
     def setup_tap_s3_csv(self):
         """Upload test input files to S3 to be prapared for test run"""
         mock_data_1 = os.path.join(DIR, '..', 'test-project', 's3_mock_data', 'mock_data_1.csv')

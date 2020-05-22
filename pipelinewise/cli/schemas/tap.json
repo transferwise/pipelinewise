@@ -148,6 +148,7 @@
       "type": "string",
       "enum": [
         "tap-postgres",
+        "tap-mongodb",
         "tap-mysql",
         "tap-oracle",
         "tap-adwords",
