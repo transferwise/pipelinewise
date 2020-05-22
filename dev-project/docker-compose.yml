@@ -29,6 +29,14 @@ services:
       TARGET_POSTGRES_USER: ${TARGET_POSTGRES_USER}
       TARGET_POSTGRES_PASSWORD: ${TARGET_POSTGRES_PASSWORD}
       TARGET_POSTGRES_DB: ${TARGET_POSTGRES_DB}
+
+      TAP_MONGODB_HOST: db_mongo_source
+      TAP_MONGODB_PORT: ${TAP_MONGODB_PORT}
+      TAP_MONGODB_USER: ${TAP_MONGODB_USER}
+      TAP_MONGODB_PASSWORD: ${TAP_MONGODB_PASSWORD}
+      TAP_MONGODB_DB: ${TAP_MONGODB_DB}
+      TAP_MONGODB_ROOT_USER: ${TAP_MONGODB_ROOT_USER}
+      TAP_MONGODB_ROOT_PASSWORD: ${TAP_MONGODB_ROOT_PASSWORD}
     volumes:
       - ../:/opt/pipelinewise
       # don't create container specific .virtualenvs files on host
@@ -41,6 +49,7 @@ services:
       - db_postgres_source
       - db_mysql_source
       - db_postgres_dwh
+      - db_mongo_source
     networks:
       - pipelinewise_network
 
@@ -73,6 +82,23 @@ services:
       MYSQL_USER: ${TAP_MYSQL_USER}
       MYSQL_PASSWORD: ${TAP_MYSQL_PASSWORD}
       MYSQL_DATABASE: ${TAP_MYSQL_DB}
+    networks:
+      - pipelinewise_network
+
+  db_mongo_source:
+    container_name: "pipelinewise_dev_mongodb_source"
+    image: "mongo:4.2-bionic"
+    ports:
+      - ${TAP_MONGODB_PORT_ON_HOST}:${TAP_MONGODB_PORT}
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${TAP_MONGODB_ROOT_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${TAP_MONGODB_ROOT_PASSWORD}
+      MONGO_INITDB_DATABASE: ${TAP_MONGODB_DB}
+      MONGO_USERNAME: ${TAP_MONGODB_USER}
+      MONGO_PASSWORD: ${TAP_MONGODB_PASSWORD}
+    volumes:
+      - ./mongo/init.sh:/docker-entrypoint-initdb.d/init.sh
+    command: [mongod, --replSet, rs0]
     networks:
       - pipelinewise_network
 
