@@ -37,7 +37,9 @@ Next, you’ll create a dedicated user for PipelineWise. The user needs to have:
 * ``find`` & ``changeStream`` privileges on the every collection that you want to replicate.
 
 Example:
-.. code-block:: javascript
+
+
+.. code-block:: js
 
 	db.createRole({
 
@@ -92,13 +94,13 @@ Example YAML for ``tap-mongodb``:
 	# Source (Tap) - Mongo connection details
 	# ------------------------------------------------------------------------------
 	db_conn:
-		host: "mongodb_source_host1,mongodb_source_host2,mongodb_source_host3"    # Mongodb host(s)
-		port: 27017                           									# Mongodb port
-		user: "PipelineWiseUser"                  								# Mongodb user
-		password: "mY_VerY_StRonG_PaSSwoRd"                 						# Mongodb plain string or vault encrypted
-		auth_database: "admin"            										# Mongodb database to authenticate on
-		dbname: "my_db"           												# Mongodb database name to sync from
-		replica_set: "my_replica_set"        										# Optional, Mongodb replica set name, default null
+		host: "mongodb_host1,mongodb_host2,mongodb_host3" 	# Mongodb host(s)
+		port: 27017                           			# Mongodb port
+		user: "PipelineWiseUser"                  		# Mongodb user
+		password: "mY_VerY_StRonG_PaSSwoRd"                 	# Mongodb plain string or vault encrypted
+		auth_database: "admin"            			# Mongodb database to authenticate on
+		dbname: "my_db"           				# Mongodb database name to sync from
+		replica_set: "my_replica_set"        			# Optional, Mongodb replica set name, default null
 
 	# ------------------------------------------------------------------------------
 	# Destination (Target) - Target properties
@@ -111,7 +113,7 @@ Example YAML for ``tap-mongodb``:
 	# Source to target Schema mapping
 	# ------------------------------------------------------------------------------
 	schemas:
-	  	- source_schema: "my_db"						# Same name as dbname
+	  	- source_schema: "my_db"			# Same name as dbname
 		  target_schema: "ppw_e2e_tap_mongodb"		# Name of target schema to load to
 
 		  # List of collections to sync
