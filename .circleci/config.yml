@@ -3,7 +3,7 @@ references:
   container_config: &container_config
     docker:
       # Main python container
-      - image: circleci/python:3.7.4
+      - image: circleci/python:3.7.7
         environment:
           TAP_MYSQL_HOST: db_mysql_source
           TAP_MYSQL_PORT: 3306
@@ -113,7 +113,7 @@ jobs:
   # GH_TOKEN (the personal Git token with pushes enabled)
   deploy-doc:
     docker:
-      - image: circleci/python:3.7.4
+      - image: circleci/python:3.7.7
     working_directory: ~/gh_doc_automation
     steps:
       - checkout
