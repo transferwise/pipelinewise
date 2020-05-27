@@ -7,6 +7,7 @@ from .helpers.env import E2EEnv
 
 DIR = os.path.dirname(__file__)
 TAP_MARIADB_ID = 'mariadb_to_pg'
+TAP_MONGODB_ID = 'tap_mongo'
 TAP_POSTGRES_ID = 'postgres_to_pg'
 TAP_S3_CSV_ID = 's3_csv_to_pg'
 TARGET_ID = 'postgres_dwh'
@@ -46,6 +47,7 @@ class TestTargetPostgres:
         self.e2e.setup_tap_postgres()
         if self.e2e.env['TAP_S3_CSV']['is_configured']:
             self.e2e.setup_tap_s3_csv()
+        self.e2e.setup_tap_mongodb()
         self.e2e.setup_target_postgres()
 
         # Import project
@@ -123,4 +125,17 @@ class TestTargetPostgres:
 
         # 2. Run tap second time - both fastsync and a singer should be triggered
         assertions.assert_run_tap_success(TAP_S3_CSV_ID, TARGET_ID, ['fastsync', 'singer'])
+        assert_columns_exist()
+
+    @pytest.mark.dependency(depends=['import_config'])
+    def test_replicate_mongodb_to_pg(self):
+        """Replicate mongodb to Postgres"""
+
+        def assert_columns_exist():
+            """Helper inner function to test if every table and column exists in target snowflake"""
+            assertions.assert_cols_in_table(self.run_query_target_postgres, 'ppw_e2e_tap_mongodb', 'listings',
+                                            ['_id', 'document', '_sdc_deleted_at'])
+
+        # Run tap first time - singer should be triggered
+        assertions.assert_run_tap_success(TAP_MONGODB_ID, TARGET_ID, ['singer'])
         assert_columns_exist()

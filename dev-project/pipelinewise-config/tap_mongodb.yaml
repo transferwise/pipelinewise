@@ -1,0 +1,40 @@
+---
+
+# ------------------------------------------------------------------------------
+# General Properties
+# ------------------------------------------------------------------------------
+id: "tap_mongo"
+name: "MongoDB source test database"
+type: "tap-mongodb"
+owner: "test-runner"
+
+
+# ------------------------------------------------------------------------------
+# Source (Tap) - Mongo connection details
+# ------------------------------------------------------------------------------
+db_conn:
+  host: "db_mongo_source"               # Mongodb host
+  port: 27017                           # Mongodb port
+  user: "pipelinewise"                  # Mongodb user
+  password: "secret"                    # Mongodb plain string or vault encrypted
+  auth_database: "admin"            # Mongodb database to authenticate on
+  dbname: "mongo_source_db"           # Mongodb database name to sync from
+  replica_set: "rs0"        # Mongodb replica set name, default null
+
+# ------------------------------------------------------------------------------
+# Destination (Target) - Target properties
+# Connection details should be in the relevant target YAML file
+# ------------------------------------------------------------------------------
+target: "postgres_dwh"                   # ID of the target connector where the data will be loaded
+batch_size_rows: 1000                  # Batch size for the stream to optimise load performance
+
+# ------------------------------------------------------------------------------
+# Source to target Schema mapping
+# ------------------------------------------------------------------------------
+schemas:
+  - source_schema: "mongo_source_db"
+    target_schema: "mongodb_sync"
+
+    tables:
+      - table_name: "listings"
+        replication_method: "FULL_TABLE"

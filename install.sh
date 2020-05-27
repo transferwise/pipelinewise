@@ -175,7 +175,8 @@ DEFAULT_CONNECTORS=(
     target-snowflake
     target-redshift
     target-postgres
-    transform-field
+    transform-field,
+    tap-mongodb,
 )
 EXTRA_CONNECTORS=(
     tap-adwords

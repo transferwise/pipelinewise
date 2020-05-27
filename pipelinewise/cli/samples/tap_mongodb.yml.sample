@@ -1,0 +1,54 @@
+---
+
+# ------------------------------------------------------------------------------
+# General Properties
+# ------------------------------------------------------------------------------
+id: "mongodb"
+name: "MongoDB source database"
+type: "tap-mongodb"
+owner: "somebody@foo.com"
+
+
+# ------------------------------------------------------------------------------
+# Source (Tap) - Mongo connection details
+# ------------------------------------------------------------------------------
+db_conn:
+  host: "<db host>"               					# Mongodb host, if multiple hosts, list the hosts separated by comma
+  auth_database: "<authentication db name>"         # the Mongodb database name to authenticate on
+  dbname: "<sync db name>"           				# Mongodb database name to sync from
+  username: "<USERNAME>"							# User with read roles
+  password: "<PASSWORD>"                            # Plain string or vault encrypted
+  password: "secret"                    			# Mongodb plain string or vault encrypted
+  replica_set: "<replicaSet name>"        		# Mongodb replica set name, default null
+
+# ------------------------------------------------------------------------------
+# Destination (Target) - Target properties
+# Connection details should be in the relevant target YAML file
+# ------------------------------------------------------------------------------
+target: "snowflake"                   				# ID of the target connector where the data will be loaded
+batch_size_rows: 1000                  				# Batch size for the stream to optimise load performance
+default_target_schema: "<sync db name>"             # Optional: Default target schema where the data will be loaded
+#default_target_schema_select_permission:  			# Optional: Grant SELECT on schema and tables that created
+#  - grp_power
+
+# ------------------------------------------------------------------------------
+# Source to target Schema mapping
+# ------------------------------------------------------------------------------
+schemas:
+  - source_schema: "<dbname>"    				# Must be same name as dbname
+    target_schema: "<target schema name>"     	# schema where the data will be loaded
+    target_schema_select_permissions:  			# Optional: Grant SELECT on schema and tables that created
+      - grp_stats
+
+ 	# Available replication methods: FULL_TABLE & LOG_BASED
+    # Default replicayion method is LOG_BASED
+    tables:
+      - table_name: "table1"
+        replication_method: "FULL_TABLE"
+
+		# OPTIONAL: Load time transformations
+        #transformations:
+        #  - column: "last_name"            # Column to transform
+        #    type: "SET-NULL"               # Transformation type
+
+ 	  - table_name: "table2"
