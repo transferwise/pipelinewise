@@ -49,6 +49,7 @@ consumes data from taps and do something with it, like load it into a file, API 
 | Tap       | **[S3 CSV](https://github.com/transferwise/pipelinewise-tap-s3-csv)** | [![PyPI version](https://badge.fury.io/py/pipelinewise-tap-s3-csv.svg)](https://badge.fury.io/py/pipelinewise-tap-s3-csv) | Extracts data from S3 csv files (currently a fork of tap-s3-csv because we wanted to use our own auth method) |
 | Tap       | **[Zendesk](https://github.com/singer-io/tap-zendesk)** | [![PyPI version](https://badge.fury.io/py/tap-zendesk.svg)](https://badge.fury.io/py/tap-zendesk) | Extracts data from Zendesk using OAuth and Key-Based incremental replications |
 | Tap       | **[Snowflake](https://github.com/transferwise/pipelinewise-tap-snowflake)** | [![PyPI version](https://badge.fury.io/py/pipelinewise-tap-snowflake.svg)](https://badge.fury.io/py/pipelinewise-tap-snowflake) | Extracts data from Snowflake databases. Supporting Key-Based Incremental and Full Table replications |
+| Tap       | **[MongoDB](https://github.com/transferwise/pipelinewise-tap-mongodb)** | [![PyPI version](https://badge.fury.io/py/pipelinewise-tap-mongodb.svg)](https://badge.fury.io/py/pipelinewise-tap-mongodb) | Extracts data from MongoDB databases. Supporting Log-Based, Key-Based Incremental and Full Table replications |
 | Tap       | **[Salesforce](https://github.com/singer-io/tap-salesforce)** | [![PyPI version](https://badge.fury.io/py/tap-salesforce.svg)](https://badge.fury.io/py/tap-salesforce) | Extracts data from Salesforce database using BULK and REST extraction API with Key-Based incremental replications |
 | Tap       | **[Zuora](https://github.com/transferwise/pipelinewise-tap-zuora)** | [![PyPI version](https://badge.fury.io/py/pipelinewise-tap-zuora.svg)](https://badge.fury.io/py/pipelinewise-tap-zuora) | Extracts data from Zuora database using AQAA and REST extraction API with Key-Based incremental replications |
 | Tap       | **[Jira](https://github.com/singer-io/tap-jira)** | [![PyPI version](https://badge.fury.io/py/tap-jira.svg)](https://badge.fury.io/py/tap-jira) | Extracts data from Atlassian Jira using Base auth or OAuth credentials |
@@ -86,7 +87,7 @@ recommended method of start using PipelineWise.
     0 pipeline(s)
     ```
 
-You can run any pipelinewise command at this point. Tutorials to create and run pipelines is at https://transferwise.github.io/pipelinewise/installation_guide/creating_pipelines.html .
+You can run any pipelinewise command at this point. Tutorials to create and run pipelines is at [creating pipelines](https://transferwise.github.io/pipelinewise/installation_guide/creating_pipelines.html).
 
 **PS**:
 
@@ -134,7 +135,7 @@ $ docker exec -it pipelinewise_dev bash
     0 pipeline(s)
     ```
 
-You can run any pipelinewise command at this point. Tutorials to create and run pipelines is at https://transferwise.github.io/pipelinewise/installation_guide/creating_pipelines.html .
+You can run any pipelinewise command at this point. Tutorials to create and run pipelines is at [creating pipelines](https://transferwise.github.io/pipelinewise/installation_guide/creating_pipelines.html).
 
 To run unit tests:
 
