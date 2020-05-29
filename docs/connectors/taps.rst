@@ -123,7 +123,7 @@ PipelineWise can replicate data from the following data sources:
         .. container:: img-hover-zoom
 
           .. image:: ../img/google-analytics-logo.png
-             :target: taps/google-analytics.html
+             :target: taps/google_analytics.html
 
         :ref:`tap-google-analytics`
 
