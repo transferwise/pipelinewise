@@ -90,16 +90,10 @@ recommended method of start using PipelineWise.
 
 You can run any pipelinewise command at this point. Tutorials to create and run pipelines is at https://transferwise.github.io/pipelinewise/installation_guide/creating_pipelines.html .
 
-**PS**:
+**Running tests**:
 
-For the tests to work, run the commands inside a PipelineWise container.
-To create, start and get a bash shell in the container:
-
-```sh
-$ docker-compose up -d pipelinewise
-$ docker exec -it pipelinewise_dev bash
-```
-
+* To run unit tests, follow the instructions in the [Building from source](#building-from-source) section.
+* To run integration and unit tests, follow the instructions in the [Developing with Docker](#developing-with-docker) section.
 
 ### Building from source
 
@@ -138,14 +132,11 @@ $ docker exec -it pipelinewise_dev bash
 
 You can run any pipelinewise command at this point. Tutorials to create and run pipelines is at https://transferwise.github.io/pipelinewise/installation_guide/creating_pipelines.html .
 
-To run unit tests:
+**To run unit tests**:
 
 ```sh
 $ pytest --ignore tests/end_to_end
 ```
-**Note**: End-to-end tests are ignored because it requires specific environment with source
-and target databases. You need to use the docker development environment to run end to end tests.
-Read more details at [Developing with Docker](#developing-with-docker).
 
 To run unit tests and generate code coverage:
 
@@ -161,13 +152,16 @@ $ coverage run -m pytest --ignore tests/end_to_end && coverage html -d coverage_
 
 **Note**: The HTML report will be generated in `coverage_html/index.html`
 
+**To run integration and end to end tests**:
+
+To run integration and end-to-end tests you need to use the [Docker Development Environment](dev-project/README.md). This will spin up a pre-configured PipelineWise project with pre-configured source and target databases in several docker containers which is required for the end-to-end test cases.
 
 ## Developing with Docker
 
 If you have [Docker](https://www.docker.com/) and [Docker Compose](https://docs.docker.com/compose/) installed,
 you can create a local development environment that includes not only the PipelineWise executables but a
 pre-configured development project as well with some databases as source and targets for a more convenient
-development experience.
+development experience and to run integration and end to end tests.
 
 For further instructions about setting up local development environment go to
 [Test Project for Docker Development Environment](dev-project/README.md).
