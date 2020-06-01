@@ -39,7 +39,7 @@ $ pipelinewise import --dir /opt/pipelinewise/dev-project/pipelinewise-config
 ```
 
 Check the status, you should see multiple pipelines. Each of them is replicating data from different taps to Postgres DWH.
-Every source database are filled with test data.
+Every source database is filled with some test data.
 
 ```sh
 $ pipelinewise status
