@@ -29,6 +29,8 @@ references:
           TAP_MONGODB_USER: mongoUser
           TAP_MONGODB_PASSWORD: Password1
           TAP_MONGODB_DB: test
+          TAP_MONGODB_ROOT_USER: mongoUser
+          TAP_MONGODB_ROOT_PASSWORD: Password1
 
       # PostgreSQL service container image used as test source database (for tap-postgres)
       - image: postgres:11.4
