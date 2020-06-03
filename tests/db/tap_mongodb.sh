@@ -1,10 +1,12 @@
 #!/bin/bash -e
 #
 # Building a test MongoDB database for integration testing of tap-mongodb
-# The sample data is Airbnb listing from http://insideairbnb.com/get-the-data.html
+# The listings data is Airbnb listing from http://insideairbnb.com/get-the-data.html
+# my_collection data is dummy data from https://www.mockaroo.com/
 PWD="$(dirname "$0")"
 
-TEST_DB_DATA=${PWD}/mongodb_data/listings.csv
+TEST_DB_DATA_1=${PWD}/mongodb_data/listings.csv
+TEST_DB_DATA_2=${PWD}/mongodb_data/my_collection.bson.gz
 echo "Building test Mongodb database..."
 
 # To run this script some environment variables must be set.
@@ -21,4 +23,15 @@ fi
 
 URL="mongodb://${TAP_MONGODB_USER}:${TAP_MONGODB_PASSWORD}@${TAP_MONGODB_HOST}:${TAP_MONGODB_PORT}/${TAP_MONGODB_DB}?authSource=admin"
 
-mongoimport --uri ${URL} --collection listings --type csv --headerline --drop ${TEST_DB_DATA}
+mongoimport --uri ${URL} \
+  --collection listings \
+  --type csv \
+  --headerline \
+  --drop ${TEST_DB_DATA_1}
+
+mongorestore --uri ${URL} \
+  --db ${TAP_MONGODB_DB} \
+  --collection my_collection \
+  --drop \
+  --gzip \
+  ${TEST_DB_DATA_2}

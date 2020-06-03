@@ -32,7 +32,10 @@ setup(name='pipelinewise',
           'python-dateutil<2.8.1',
           'messytables==0.15.*',
           'python-pidfile==3.0.0',
-          'pre-commit==1.21.0'
+          'pre-commit==1.21.0',
+          'pymongo==3.10.*',
+          'ujson==2.0.*',
+          'tzlocal==2.0.*',
       ],
       extras_require={
           'test': [
@@ -56,7 +59,9 @@ setup(name='pipelinewise',
               'postgres-to-postgres=pipelinewise.fastsync.postgres_to_postgres:main',
               's3-csv-to-snowflake=pipelinewise.fastsync.s3_csv_to_snowflake:main',
               's3-csv-to-postgres=pipelinewise.fastsync.s3_csv_to_postgres:main',
-              's3-csv-to-redshift=pipelinewise.fastsync.s3_csv_to_redshift:main'
+              's3-csv-to-redshift=pipelinewise.fastsync.s3_csv_to_redshift:main',
+              'mongodb-to-snowflake=pipelinewise.fastsync.mongodb_to_snowflake:main',
+              'mongodb-to-postgres=pipelinewise.fastsync.mongodb_to_postgres:main',
           ]
       },
       packages=find_packages(exclude=['tests*']),

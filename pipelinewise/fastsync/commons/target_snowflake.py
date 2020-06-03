@@ -20,12 +20,8 @@ logging.getLogger('snowflake.connector').setLevel(logging.WARNING)
 # pylint: disable=missing-function-docstring,no-self-use,too-many-arguments
 class FastSyncTargetSnowflake:
     """
-    Common functions for fastsync to Redshift
+    Common functions for fastsync to Snowflake
     """
-
-    EXTRACTED_AT_COLUMN = '_SDC_EXTRACTED_AT'
-    BATCHED_AT_COLUMN = '_SDC_BATCHED_AT'
-    DELETED_AT_COLUMN = '_SDC_DELETED_AT'
 
     # pylint: disable=invalid-name
     def __init__(self, connection_config, transformation_config=None):
@@ -46,7 +42,7 @@ class FastSyncTargetSnowflake:
                                            autocommit=True)
 
     def query(self, query, params=None):
-        LOGGER.debug('Running query: %s', query)
+        LOGGER.info('Running query: %s', query)
         with self.open_connection() as connection:
             with connection.cursor(snowflake.connector.DictCursor) as cur:
                 cur.execute(query, params)
@@ -114,13 +110,13 @@ class FastSyncTargetSnowflake:
         target_table = table_dict.get('table_name') if not is_temporary else table_dict.get('temp_table_name')
 
         # skip the EXTRACTED, BATCHED and DELETED columns in case they exist because they gonna be added later
-        columns = [c for c in columns if not (c.startswith(self.EXTRACTED_AT_COLUMN) or
-                                              c.startswith(self.BATCHED_AT_COLUMN) or
-                                              c.startswith(self.DELETED_AT_COLUMN))]
+        columns = [c for c in columns if not (c.startswith(utils.SDC_EXTRACTED_AT) or
+                                              c.startswith(utils.SDC_BATCHED_AT) or
+                                              c.startswith(utils.SDC_DELETED_AT))]
 
-        columns += [f'{self.EXTRACTED_AT_COLUMN} TIMESTAMP_NTZ',
-                    f'{self.BATCHED_AT_COLUMN} TIMESTAMP_NTZ',
-                    f'{self.DELETED_AT_COLUMN} VARCHAR']
+        columns += [f'{utils.SDC_EXTRACTED_AT} TIMESTAMP_NTZ',
+                    f'{utils.SDC_BATCHED_AT} TIMESTAMP_NTZ',
+                    f'{utils.SDC_DELETED_AT} VARCHAR']
 
         # We need the sort the columns for some taps( for now tap-s3-csv)
         # because later on when copying a csv file into Snowflake
@@ -148,7 +144,7 @@ class FastSyncTargetSnowflake:
         sql = f'COPY INTO {target_schema}."{target_table.upper()}" FROM \'@{stage}/{s3_key}\'' \
               f' FILE_FORMAT = (type=\'CSV\' escape=\'\\x1e\' escape_unenclosed_field=\'\\x1e\'' \
               f' field_optionally_enclosed_by=\'\"\' skip_header={int(skip_csv_header)}' \
-              f' compression=\'GZIP\' binary_format=\'HEX\')'
+              f' compression=\'GZIP\' binary_format=HEX)'
 
         # Get number of inserted records - COPY does insert only
         results = self.query(sql)

@@ -944,7 +944,7 @@ class PipelineWise:
             tap_state, {
                 'selected': True,
                 'target_type': ['target-snowflake', 'target-redshift', 'target-postgres'],
-                'tap_type': ['tap-mysql', 'tap-postgres', 'tap-s3-csv'],
+                'tap_type': ['tap-mysql', 'tap-postgres', 'tap-s3-csv', 'tap-mongodb'],
                 'initial_sync_required': True
             },
             create_fallback=True)
@@ -1246,20 +1246,22 @@ class PipelineWise:
               'replication_key_value' key created for INCREMENTAL tables
               'log_pos' key created by MySQL LOG_BASED tables
               'lsn' key created by PostgreSQL LOG_BASED tables
-              'modified_since' key created by CSV S3 tables
+              'modified_since' key created by CSV S3 INCREMENTAL tables
+              'token' key created by MongoDB LOG_BASED tables
 
             FULL_TABLE replication method is taken as initial sync required
         :param replication_method: stream replication method
         :param stream_bookmark: stream state bookmark
         :return: Boolean, True if needs initial sync, False otherwise
         """
-        return replication_method == self.FULL_TABLE or ((replication_method in [self.INCREMENTAL, self.LOG_BASED]) and
-                                                         (not ('replication_key_value' in stream_bookmark or
-                                                               'log_pos' in stream_bookmark or
-                                                               'lsn' in stream_bookmark or
-                                                               'modified_since' in stream_bookmark
-                                                               # this is replication key for tap-s3-csv used by Singer
-                                                               )))
+        return replication_method == self.FULL_TABLE \
+                or (replication_method == self.INCREMENTAL and
+                    'replication_key_value' not in stream_bookmark and
+                    'modified_since' not in stream_bookmark) \
+                or (replication_method == self.LOG_BASED and
+                    'lsn' not in stream_bookmark and
+                    'token' not in stream_bookmark)
+
 
     # pylint: disable=unused-argument
     def _exit_gracefully(self, sig, frame, exit_code=1):

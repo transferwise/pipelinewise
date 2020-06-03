@@ -153,7 +153,7 @@ class TestFastSyncTargetSnowflake:
             'COPY INTO test_schema."TEST_TABLE" FROM \'@dummy_stage/s3_key\''
             ' FILE_FORMAT = (type=\'CSV\' escape=\'\\x1e\' escape_unenclosed_field=\'\\x1e\''
             ' field_optionally_enclosed_by=\'\"\' skip_header=0'
-            ' compression=\'GZIP\' binary_format=\'HEX\')']
+            ' compression=\'GZIP\' binary_format=HEX)']
 
         # COPY table with reserved word in table and column names in temp table
         self.snowflake.executed_queries = []
@@ -167,7 +167,7 @@ class TestFastSyncTargetSnowflake:
             'COPY INTO test_schema."FULL_TEMP" FROM \'@dummy_stage/s3_key\''
             ' FILE_FORMAT = (type=\'CSV\' escape=\'\\x1e\' escape_unenclosed_field=\'\\x1e\''
             ' field_optionally_enclosed_by=\'\"\' skip_header=0'
-            ' compression=\'GZIP\' binary_format=\'HEX\')']
+            ' compression=\'GZIP\' binary_format=HEX)']
 
         # COPY table with space and uppercase in table name and s3 key
         self.snowflake.executed_queries = []
@@ -181,7 +181,7 @@ class TestFastSyncTargetSnowflake:
             'COPY INTO test_schema."TABLE WITH SPACE AND UPPERCASE_TEMP" FROM \'@dummy_stage/s3 key with space\''
             ' FILE_FORMAT = (type=\'CSV\' escape=\'\\x1e\' escape_unenclosed_field=\'\\x1e\''
             ' field_optionally_enclosed_by=\'\"\' skip_header=0'
-            ' compression=\'GZIP\' binary_format=\'HEX\')']
+            ' compression=\'GZIP\' binary_format=HEX)']
 
     def test_grant_select_on_table(self):
         """Validate if GRANT command generated correctly"""
