@@ -22,9 +22,6 @@ db_conn:
   user: "pipelinewise"                 # PostfreSQL user
   password: "secret"                   # Plain string or vault encrypted
   dbname: "postgres_source_db"         # PostgreSQL database name
-  logical_poll_total_seconds: 5        # Seconds to wait before assuming no more data
-                                       #    on older versions of PostgreSQL, this needs to be
-                                       #    increased if source server has very old wal files
   #filter_schemas: "schema1,schema2"   # Optional: Scan only the required schemas
                                        #    to improve the performance of
                                        #    data extraction

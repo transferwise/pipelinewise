@@ -3,7 +3,7 @@
 # ------------------------------------------------------------------------------
 # General Properties
 # ------------------------------------------------------------------------------
-id: "tap_mongo"
+id: "tap_mongo_to_pg"
 name: "MongoDB source test database"
 type: "tap-mongodb"
 owner: "test-runner"
@@ -38,3 +38,6 @@ schemas:
     tables:
       - table_name: "listings"
         replication_method: "FULL_TABLE"
+
+      - table_name: "my_collection"
+        replication_method: "LOG_BASED"

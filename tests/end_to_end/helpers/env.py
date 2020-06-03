@@ -74,6 +74,21 @@ class E2EEnv:
                 }
             },
             # ------------------------------------------------------------------
+            # Tap MongoDB is a REQUIRED test connector and test database with test data available
+            # in the docker environment
+            # ------------------------------------------------------------------
+            'TAP_MONGODB': {
+                'template_patterns': ['tap_postgres'],
+                'vars': {
+                    'HOST': {'value': os.environ.get('TAP_MONGODB_HOST'), 'required': True},
+                    'PORT': {'value': os.environ.get('TAP_MONGODB_PORT'), 'required': True},
+                    'USER': {'value': os.environ.get('TAP_MONGODB_USER'), 'required': True},
+                    'PASSWORD': {'value': os.environ.get('TAP_MONGODB_PASSWORD'), 'required': True},
+                    'DB': {'value': os.environ.get('TAP_MONGODB_DB'), 'required': True},
+                    'AUTH_DB': {'value': 'admin', 'required': True}
+                }
+            },
+            # ------------------------------------------------------------------
             # Tap S3 CSV is an OPTIONAL test connector and it requires credentials to a real S3 bucket.
             # To run the related tests add real S3 credentials to ../../../dev-project/.env
             # ------------------------------------------------------------------
@@ -267,7 +282,7 @@ class E2EEnv:
     # -------------------------------------------------------------------------
 
     def run_query_tap_postgres(self, query):
-        """Run and SQL query in target postgres database"""
+        """Run and SQL query in tap postgres database"""
         return db.run_query_postgres(query,
                                      host=self._get_conn_env_var('TAP_POSTGRES', 'HOST'),
                                      port=self._get_conn_env_var('TAP_POSTGRES', 'PORT'),
@@ -275,7 +290,17 @@ class E2EEnv:
                                      password=self._get_conn_env_var('TAP_POSTGRES', 'PASSWORD'),
                                      database=self._get_conn_env_var('TAP_POSTGRES', 'DB'))
 
-    def run_query_target_postgres(self, query):
+    def get_tap_mongodb_connection(self):
+        """Create and returns tap mongodb database instance to run queries on"""
+        return db.get_mongodb_connection(host=self._get_conn_env_var('TAP_MONGODB', 'HOST'),
+                                         port=self._get_conn_env_var('TAP_MONGODB', 'PORT'),
+                                         user=self._get_conn_env_var('TAP_MONGODB', 'USER'),
+                                         password=self._get_conn_env_var('TAP_MONGODB', 'PASSWORD'),
+                                         database=self._get_conn_env_var('TAP_MONGODB', 'DB'),
+                                         auth_database=self._get_conn_env_var('TAP_MONGODB', 'AUTH_DB'),
+                                         )
+
+    def run_query_target_postgres(self, query: object) -> object:
         """Run and SQL query in target postgres database"""
         return db.run_query_postgres(query,
                                      host=self._get_conn_env_var('TARGET_POSTGRES', 'HOST'),
@@ -364,6 +389,7 @@ class E2EEnv:
         self.run_query_target_postgres('DROP SCHEMA IF EXISTS ppw_e2e_tap_postgres_logical2 CASCADE')
         self.run_query_target_postgres('DROP SCHEMA IF EXISTS ppw_e2e_tap_mysql CASCADE')
         self.run_query_target_postgres('DROP SCHEMA IF EXISTS ppw_e2e_tap_s3_csv CASCADE')
+        self.run_query_target_postgres('DROP SCHEMA IF EXISTS ppw_e2e_tap_mongodb CASCADE')
 
         # Clean config directory
         shutil.rmtree(os.path.join(CONFIG_DIR, 'postgres_dwh'), ignore_errors=True)
@@ -392,6 +418,7 @@ class E2EEnv:
         self.run_query_target_snowflake('DROP SCHEMA IF EXISTS ppw_e2e_tap_postgres_logical2 CASCADE')
         self.run_query_target_snowflake('DROP SCHEMA IF EXISTS ppw_e2e_tap_mysql CASCADE')
         self.run_query_target_snowflake('DROP SCHEMA IF EXISTS ppw_e2e_tap_s3_csv CASCADE')
+        self.run_query_target_snowflake('DROP SCHEMA IF EXISTS ppw_e2e_tap_mongodb CASCADE')
 
         # Clean config directory
         shutil.rmtree(os.path.join(CONFIG_DIR, 'snowflake'), ignore_errors=True)

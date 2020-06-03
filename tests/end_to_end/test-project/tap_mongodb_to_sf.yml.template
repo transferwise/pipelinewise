@@ -3,7 +3,7 @@
 # ------------------------------------------------------------------------------
 # General Properties
 # ------------------------------------------------------------------------------
-id: "tap_mongo_to_pg"
+id: "tap_mongo_to_sf"
 name: "MongoDB source test database"
 type: "tap-mongodb"
 owner: "test-runner"
@@ -25,7 +25,7 @@ db_conn:
 # Destination (Target) - Target properties
 # Connection details should be in the relevant target YAML file
 # ------------------------------------------------------------------------------
-target: "postgres_dwh"                   # ID of the target connector where the data will be loaded
+target: "snowflake"                   # ID of the target connector where the data will be loaded
 batch_size_rows: 1000                  # Batch size for the stream to optimise load performance
 
 # ------------------------------------------------------------------------------
