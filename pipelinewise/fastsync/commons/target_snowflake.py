@@ -42,7 +42,7 @@ class FastSyncTargetSnowflake:
                                            autocommit=True)
 
     def query(self, query, params=None):
-        LOGGER.info('Running query: %s', query)
+        LOGGER.debug('Running query: %s', query)
         with self.open_connection() as connection:
             with connection.cursor(snowflake.connector.DictCursor) as cur:
                 cur.execute(query, params)
