@@ -64,7 +64,7 @@ references:
           MONGO_INITDB_DATABASE: test
         command:
           - bash
-          - c
+          - -c
           - "mongo -u $MONGO_INITDB_ROOT_USERNAME -p $MONGO_INITDB_ROOT_PASSWORD --authenticationDatabase admin admin <<EOF
               db.getName();
               db.createUser({
