@@ -117,6 +117,15 @@ PipelineWise can replicate data from the following data sources:
              :target: taps/zuora.html
 
         :ref:`tap-zuora`
+    
+    .. container:: tile
+
+        .. container:: img-hover-zoom
+
+          .. image:: ../img/google-analytics-logo.png
+             :target: taps/google_analytics.html
+
+        :ref:`tap-google-analytics`
 
 
 Configuring taps
@@ -134,4 +143,4 @@ Configuring taps
    taps/zendesk
    taps/jira
    taps/zuora
-
+   taps/google_analytics

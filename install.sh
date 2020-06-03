@@ -175,13 +175,14 @@ DEFAULT_CONNECTORS=(
     target-snowflake
     target-redshift
     target-postgres
-    transform-field,
-    tap-mongodb,
+    transform-field
+    tap-mongodb
 )
 EXTRA_CONNECTORS=(
     tap-adwords
     tap-oracle
     tap-zuora
+    tap-google-analytics
 )
 
 # Install only the default connectors if --connectors argument not passed
