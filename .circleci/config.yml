@@ -62,7 +62,18 @@ references:
           MONGO_INITDB_ROOT_USERNAME: mongoUser
           MONGO_INITDB_ROOT_PASSWORD: Password1
           MONGO_INITDB_DATABASE: test
-        command: [mongod]
+        command:
+          - bash
+          - c
+          - "mongo -u $MONGO_INITDB_ROOT_USERNAME -p $MONGO_INITDB_ROOT_PASSWORD --authenticationDatabase admin admin <<EOF
+              db.getName();
+              db.createUser({
+                  user: $(jq --arg 'user' $MONGO_USERNAME --null-input '$user'),
+                  pwd: $(jq --arg 'pwd' $MONGO_PASSWORD --null-input '$pwd'),
+                  roles: [{ role: 'readWrite', db: $MONGO_INITDB_DATABASE }]
+            });
+            EOF && mongod --replSet rs0
+          "
 jobs:
   test:
     <<: *container_config
@@ -74,6 +85,10 @@ jobs:
           command: |
             sudo apt-get update
             sudo apt install mariadb-client postgresql-client mongo-tools
+            wget https://repo.mongodb.org/apt/ubuntu/dists/bionic/mongodb-org/4.2/multiverse/binary-amd64/mongodb-org-shell_4.2.7_amd64.deb
+            dpkg -i ./mongodb-org-shell_4.2.7_amd64.deb && rm mongodb-org-shell_4.2.7_amd64.deb
+            ./mongo/init_rs.sh
+
             ./tests/db/tap_mysql_db.sh
             ./tests/db/tap_postgres_db.sh
             ./tests/db/tap_mongodb.sh
