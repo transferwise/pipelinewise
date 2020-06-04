@@ -1,4 +1,5 @@
 {
+  "$schema": "http://json-schema.org/draft-04/schema#",
   "definitions": {
     "schema": {
       "type": "object",
@@ -134,6 +135,45 @@
       "required": [
         "search_pattern"
       ]
+    },
+    "tap_mongo_implies_ft_and_lb": {
+      "anyOf": [
+        {
+          "not": {"$ref": "#/definitions/tap_mongo"}
+        },
+        {
+          "properties": {
+            "schemas": {
+            "type": "array",
+            "items": {
+              "properties": {
+                "tables": {
+                  "type": "array",
+                  "items": {
+                    "properties": {
+                      "replication_method": {
+                        "enum": ["LOG_BASED", "FULL_TABLE"]
+                      }
+                    },
+                    "required": ["replication_method"]
+                  }
+                }
+              },
+              "required": ["tables"]
+            }
+          }
+          },
+          "required": ["schemas"]
+        }
+      ]
+    },
+    "tap_mongo": {
+      "properties": {
+        "type": {
+          "enum": ["tap-mongodb"]
+        }
+      },
+      "required": ["type"]
     }
   },
   "type": "object",
@@ -180,6 +220,11 @@
       }
     }
   },
+  "allOf": [
+    {
+      "$ref": "#/definitions/tap_mongo_implies_ft_and_lb"
+    }
+  ],
   "required": [
     "id",
     "name",
