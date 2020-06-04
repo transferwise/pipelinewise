@@ -98,14 +98,26 @@ jobs:
             pylint pipelinewise tests
 
       - run:
-          name: 'Run tests'
+          name: 'Run unit tests'
           command: |
             . .virtualenvs/pipelinewise/bin/activate
             export PIPELINEWISE_HOME=$PWD
             mkdir test-reports
-            coverage run -m pytest -v --junitxml=test-reports/junit.xml
+            coverage run -m pytest tests/units -v --junitxml=test-reports/junit.xml
             coverage report
             coverage html -d coverage_html
+
+      - run:
+          name: 'Run E2E tests'
+          command: |
+            . .virtualenvs/pipelinewise/bin/activate
+            export PIPELINEWISE_HOME=$PWD
+            mkdir test-reports
+            coverage run -m pytest tests/end_to_end -v --junitxml=test-reports/junit.xml
+            coverage report
+            coverage html -d coverage_html
+          no_output_timeout: 15m
+
       - store_test_results:
           path: test-reports
       - store_artifacts:
