@@ -112,10 +112,7 @@ jobs:
           command: |
             . .virtualenvs/pipelinewise/bin/activate
             export PIPELINEWISE_HOME=$PWD
-            mkdir test-reports
-            coverage run -m pytest tests/end_to_end -v --junitxml=test-reports/junit.xml
-            coverage report
-            coverage html -d coverage_html
+            pytest tests/end_to_end -v
           no_output_timeout: 15m
 
       - store_test_results:
