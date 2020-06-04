@@ -4,13 +4,20 @@
 Tap Kafka
 ---------
 
+Messages from kafka topics are extracted into the following fields:
 
-Connecting to Kafka
-'''''''''''''''''''
+* ``MESSAGE_TIMESTAMP``: Timestamp extracted from the kafka metadata
+* ``MESSAGE_OFFSET``: Offset extracted from the kafka metadata
+* ``MESSAGE_PARTITION``: Partition extracted from the kafka metadata
+* ``MESSAGE``: The original and full kafka message
+* `Dynamic primary key columns`: (Optional) Fields extracted from the Kafka JSON messages by JSONPath selector(s).
 
-.. warning::
+Consuming Kafka messages
+''''''''''''''''''''''''
 
-  This section of the documentation is work in progress.
+Tap Kafka saves consumed messages into a local disk storage and sends commit messages to Kafka after every
+consumed message. A batching mechanism keeps maintaining of deleting and flushing messages from the local storage
+and sends singer compatible messages in small batches to standard output.
 
 
 Configuring what to replicate
@@ -53,11 +60,14 @@ Example YAML for ``tap-kafka``:
          transfer_id: "$.transferMetadata.transferId"
 
       # --------------------------------------------------------------------------
-      # Stop listening the topic if no message after certain milliseconds.
-      # Default is 10 seconds
+      # Kafka Consumer optional parameters
       # --------------------------------------------------------------------------
-      #consumer_timeout_ms: 10000
-
+      #max_runtime_ms: 300000                   # The maximum time for the tap to collect new messages from Kafka topic.
+      #consumer_timeout_ms: 10000               # Number of milliseconds to block during message iteration before raising StopIteration
+      #session_timeout_ms: 30000                # The timeout used to detect failures when using Kafka’s group management facilities.
+      #heartbeat_interval_ms: 10000             # The expected time in milliseconds between heartbeats to the consumer coordinator when using Kafka’s group management facilities.
+      #max_poll_interval_ms: 300000             # The maximum delay between invocations of poll() when using consumer group management.
+      #local_store_dir: ./tap-kafka-local-store # Path to the local store with consumed kafka messages
 
     # ------------------------------------------------------------------------------
     # Destination (Target) - Target properties
@@ -65,7 +75,7 @@ Example YAML for ``tap-kafka``:
     # ------------------------------------------------------------------------------
     target: "snowflake"                       # ID of the target connector where the data will be loaded
     batch_size_rows: 20000                    # Batch size for the stream to optimise load performance
-    default_target_schema: "kafka"            # Target schema where the data will be loaded 
+    default_target_schema: "kafka"            # Target schema where the data will be loaded
     default_target_schema_select_permission:  # Optional: Grant SELECT on schema and tables that created
       - grp_stats
 
@@ -79,11 +89,11 @@ Example YAML for ``tap-kafka``:
 
         # Kafka topic to replicate into destination Data Warehouse
         # You can load data only from one kafka topic in one YAML file.
-        # If you want load from multiple kafka topics, create another tap YAML similar to this file
+        # If you want load from multiple kafka topics, create another tap YAML similar to this file
         tables:
           - table_name: "my_kafka_topic"   # target table name needs to match to the topic name in snake case format
 
             # OPTIONAL: Load time transformations
-            #transformations:                    
+            #transformations:
             #  - column: "last_name"            # Column to transform
             #    type: "SET-NULL"               # Transformation type

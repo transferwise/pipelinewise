@@ -24,6 +24,24 @@ class FastSyncTapPostgres:
         self.primary_host_conn = None
         self.primary_host_curr = None
 
+    @staticmethod
+    def generate_replication_slot_name(dbname, tap_id=None, prefix='pipelinewise'):
+        """Generate replication slot name with
+
+        :param str dbname: Database name that will be part of the replication slot name
+        :param str tap_id: Optional. If provided then it will be appended to the end of the slot name
+        :param str prefix: Optional. Defaults to 'pipelinewise'
+        :return: well formatted lowercased replication slot name
+        :rtype: str
+        """
+        # Add tap_id to the end of the slot name if provided
+        if tap_id:
+            tap_id = f'_{tap_id}'
+        # Convert None to empty string
+        else:
+            tap_id = ''
+        return f'{prefix}_{dbname}{tap_id}'.lower()
+
     def open_connection(self):
         """
         Open connection
@@ -78,6 +96,46 @@ class FastSyncTapPostgres:
 
                 return []
 
+    # pylint: disable=no-member
+    def create_replication_slot(self):
+        """
+        Create replication slot on the primary host
+
+        IMPORTANT:
+        Replication slot name is different after PPW >=0.16.0 and it's using a
+        new pattern: pipelinewise_<dbname>_<tap_id>         PPW >= 0.16.0
+        old pattern: pipelinewise_<dbname>                  PPW <= 0.15.x
+
+        For backward compatibility and to keep the existing replication slots usable
+        we check if there's any existing replication slot with the old format.
+        If exists we keep using the old one but please note that using the old
+        format you won't be able to do LOG_BASED replication from the same postgres
+        database by multiple taps. If that the case then you need to drop the old
+        replication slot and full-resync the new taps.
+        """
+        try:
+            # Replication hosts pattern versions
+            slot_name_v15 = self.generate_replication_slot_name(dbname=self.connection_config['dbname'])
+            slot_name_v16 = self.generate_replication_slot_name(dbname=self.connection_config['dbname'],
+                                                                tap_id=self.connection_config['tap_id'])
+
+            # Backward compatibility: try to locate existing v15 slot first. PPW <= 0.15.0
+            v15_slots = self.primary_host_query(f'SELECT * FROM pg_replication_slots'
+                                                f" WHERE slot_name = '{slot_name_v15}'")
+            if len(v15_slots) > 0:
+                slot_name = slot_name_v15
+            else:
+                slot_name = slot_name_v16
+
+            # Create the replication host
+            self.primary_host_query(f"SELECT * FROM pg_create_logical_replication_slot('{slot_name}', 'wal2json')")
+        except Exception as exc:
+            # ERROR: replication slot already exists SQL state: 42710
+            if hasattr(exc, 'pgcode') and exc.pgcode == '42710':
+                pass
+            else:
+                raise exc
+
     # pylint: disable=too-many-branches,no-member,chained-comparison
     def fetch_current_log_pos(self):
         """
@@ -116,17 +174,8 @@ class FastSyncTapPostgres:
         if version < 90400:
             raise Exception('Logical replication not supported before PostgreSQL 9.4')
 
-        # Create replication slot, ignore error if already exists
-        try:
-            result = self.primary_host_query(
-                "SELECT * FROM pg_create_logical_replication_slot('pipelinewise_{}', 'wal2json')".format(
-                    self.connection_config['dbname'].lower()))
-        except Exception as exc:
-            # ERROR: replication slot "stitch_{}" already exists SQL state: 42710
-            if exc.pgcode == '42710':
-                pass
-            else:
-                raise exc
+        # Create replication slot
+        self.create_replication_slot()
 
         # Close replication slot dedicated connection
         self.primary_host_conn.close()
@@ -187,7 +236,7 @@ class FastSyncTapPostgres:
             'version': 1
         }
 
-    def get_primary_key(self, table):
+    def get_primary_keys(self, table):
         """
         Get the primary key of a table
         """
@@ -202,9 +251,9 @@ class FastSyncTapPostgres:
                         pg_attribute.attrelid = pg_class.oid AND
                         pg_attribute.attnum = any(pg_index.indkey)
                     AND indisprimary""".format(schema_name, table_name)
-        primary_key = self.query(sql)
-        if len(primary_key) > 0:
-            return primary_key[0][0]
+        pk_specs = self.query(sql)
+        if len(pk_specs) > 0:
+            return [safe_column_name(k[0]) for k in pk_specs]
 
         return None
 
@@ -245,7 +294,7 @@ class FastSyncTapPostgres:
 
         return {
             'columns': mapped_columns,
-            'primary_key': safe_column_name(self.get_primary_key(table_name))
+            'primary_key': self.get_primary_keys(table_name)
         }
 
     def copy_table(self, table_name, path):

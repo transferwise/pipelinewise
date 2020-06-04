@@ -1,5 +1,6 @@
 import logging
 import os
+import json
 import time
 from typing import List
 
@@ -31,8 +32,10 @@ class FastSyncTargetSnowflake:
         self.connection_config = connection_config
         self.transformation_config = transformation_config
         self.s3 = boto3.client('s3',
-                               aws_access_key_id=self.connection_config['aws_access_key_id'],
-                               aws_secret_access_key=self.connection_config['aws_secret_access_key'])
+                               aws_access_key_id=self.connection_config.get('aws_access_key_id'),
+                               aws_secret_access_key=self.connection_config.get('aws_secret_access_key'),
+                               aws_session_token=self.connection_config.get('aws_session_token')
+                               )
 
     def open_connection(self):
         return snowflake.connector.connect(user=self.connection_config['user'],
@@ -104,7 +107,7 @@ class FastSyncTargetSnowflake:
         sql = 'DROP TABLE IF EXISTS {}."{}"'.format(target_schema, target_table.upper())
         self.query(sql)
 
-    def create_table(self, target_schema: str, table_name: str, columns: List[str], primary_key: str,
+    def create_table(self, target_schema: str, table_name: str, columns: List[str], primary_key: List[str],
                      is_temporary: bool = False, sort_columns=False):
 
         table_dict = utils.tablename_to_dict(table_name)
@@ -125,50 +128,37 @@ class FastSyncTargetSnowflake:
         if sort_columns:
             columns.sort()
 
-        sql = f"""CREATE OR REPLACE TABLE {target_schema}."{target_table.upper()}" (
-        {','.join(columns)}
-        {f', PRIMARY KEY ({primary_key})' if primary_key else ''})
-        """
+        sql_columns = ','.join(columns)
+        sql_primary_keys = ','.join(primary_key) if primary_key else None
+        sql = f'CREATE OR REPLACE TABLE {target_schema}."{target_table.upper()}" (' \
+              f'{sql_columns}' \
+              f'{f", PRIMARY KEY ({sql_primary_keys}))" if primary_key else ")"}'
 
         self.query(sql)
 
-    def copy_to_table(self, s3_key, target_schema, table_name, is_temporary, skip_csv_header=False):
+    # pylint: disable=too-many-locals
+    def copy_to_table(self, s3_key, target_schema, table_name, size_bytes, is_temporary, skip_csv_header=False):
         LOGGER.info('Loading %s into Snowflake...', s3_key)
         table_dict = utils.tablename_to_dict(table_name)
         target_table = table_dict.get('table_name') if not is_temporary else table_dict.get('temp_table_name')
-
-        aws_access_key_id = self.connection_config['aws_access_key_id']
-        aws_secret_access_key = self.connection_config['aws_secret_access_key']
+        inserts = 0
         bucket = self.connection_config['s3_bucket']
 
-        master_key = self.connection_config.get('client_side_encryption_master_key', '')
-        if master_key != '':
-            sql = """COPY INTO {}."{}" FROM @{}/{}
-                FILE_FORMAT = (type='CSV' escape='\\x1e' escape_unenclosed_field='\\x1e' 
-                field_optionally_enclosed_by='\"' skip_header={} COMPRESSION='GZIP' BINARY_FORMAT='HEX') 
-            """.format(
-                target_schema,
-                target_table.upper(),
-                self.connection_config['stage'],
-                s3_key,
-                int(skip_csv_header),
-            )
-        else:
-            sql = """COPY INTO {}."{}" FROM 's3://{}/{}'
-                CREDENTIALS = (aws_key_id='{}' aws_secret_key='{}')
-                FILE_FORMAT = (type='CSV' escape='\\x1e' escape_unenclosed_field='\\x1e' 
-                field_optionally_enclosed_by='\"' skip_header={} COMPRESSION='GZIP' BINARY_FORMAT='HEX')
-            """.format(
-                target_schema,
-                target_table.upper(),
-                bucket,
-                s3_key,
-                aws_access_key_id,
-                aws_secret_access_key,
-                int(skip_csv_header),
-            )
+        stage = self.connection_config['stage']
+        sql = f'COPY INTO {target_schema}."{target_table.upper()}" FROM \'@{stage}/{s3_key}\'' \
+              f' FILE_FORMAT = (type=\'CSV\' escape=\'\\x1e\' escape_unenclosed_field=\'\\x1e\'' \
+              f' field_optionally_enclosed_by=\'\"\' skip_header={int(skip_csv_header)}' \
+              f' compression=\'GZIP\' binary_format=\'HEX\')'
 
-        self.query(sql)
+        # Get number of inserted records - COPY does insert only
+        results = self.query(sql)
+        if len(results) > 0:
+            inserts = results[0].get('rows_loaded', 0)
+
+        LOGGER.info('Loading into %s."%s": %s',
+                    target_schema,
+                    target_table.upper(),
+                    json.dumps({'inserts': inserts, 'updates': 0, 'size_bytes': size_bytes}))
 
         LOGGER.info('Deleting %s from S3...', s3_key)
         self.s3.delete_object(Bucket=bucket, Key=s3_key)
@@ -258,23 +248,3 @@ class FastSyncTargetSnowflake:
                                                                   target_table.upper()))
 
         self.query('DROP TABLE IF EXISTS {}."{}"'.format(schema, temp_table.upper()))
-
-    # pylint: disable=invalid-name
-    def clear_information_schema_columns_cache(self, tables):
-        pipelinewise_schema = utils.tablename_to_dict(self.connection_config['stage'])['schema_name']
-        schemas_to_clear_in_cache = utils.get_target_schemas(self.connection_config, tables)
-
-        # Create an empty cache table if not exists
-        self.query("""
-            CREATE TABLE IF NOT EXISTS {}.columns (table_schema VARCHAR, table_name VARCHAR, column_name VARCHAR, data_type VARCHAR)
-        """.format(pipelinewise_schema))
-
-        #  Clear table columns from information_schema cache
-        for schema_name in schemas_to_clear_in_cache:
-            LOGGER.info('Clearing information_schema cache for schema: %s', schema_name)
-
-            # Delete existing data about the current schema
-            self.query("""
-                DELETE FROM {}.columns
-                WHERE LOWER(table_schema) = '{}'
-            """.format(pipelinewise_schema, schema_name.lower()))

@@ -21,9 +21,9 @@ def setup(app):
 # -- Project information -----------------------------------------------------
 
 project = 'PipelineWise'
-copyright = '2019, TransferWise Ltd.'
-author = 'Peter Kosztolanyi'
-version = '0.12.0'
+copyright = '2020, TransferWise Ltd.'
+author = 'TransferWise'
+version = '0.16.0'
 
 
 # -- General configuration ---------------------------------------------------

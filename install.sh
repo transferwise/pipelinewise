@@ -59,7 +59,8 @@ make_virtualenv() {
     echo "Making Virtual Environment for [$1] in $VENV_DIR"
     python3 -m venv $VENV_DIR/$1
     source $VENV_DIR/$1/bin/activate
-    python3 -m pip install --upgrade pip
+    python3 -m pip install --upgrade pip setuptools
+
     if [ -f "requirements.txt" ]; then
         python3 -m pip install -r requirements.txt
     fi
@@ -71,6 +72,10 @@ make_virtualenv() {
 
         python3 -m pip install -e .$PIP_ARGS
     fi
+
+    echo ""
+    echo "===== Checking dependencies for conflict ..."
+    python3 -m pip check && echo "No conflicts" || exit 1
 
     check_license $1
     deactivate
@@ -169,12 +174,15 @@ DEFAULT_CONNECTORS=(
     target-s3-csv
     target-snowflake
     target-redshift
+    target-postgres
     transform-field
+    tap-mongodb
 )
 EXTRA_CONNECTORS=(
     tap-adwords
     tap-oracle
-    target-postgres
+    tap-zuora
+    tap-google-analytics
 )
 
 # Install only the default connectors if --connectors argument not passed

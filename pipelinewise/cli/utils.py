@@ -158,10 +158,11 @@ def get_tap_target_names(yaml_dir):
         yaml_dir (str): Path to the directory, which contains taps and targets files with .yml extension.
 
     Returns:
-        (tap_yamls, target_yamls): tap_yamls is a list of names inside yaml_dir with "tap_*.yml" pattern.
-                                   target_yamls is a list of names inside yaml_dir with "target_*.yml" pattern.
+        (tap_yamls, target_yamls): tap_yamls is a list of names inside yaml_dir with "tap_*.y(a)ml" pattern.
+                                   target_yamls is a list of names inside yaml_dir with "target_*.y(a)ml" pattern.
     """
-    yamls = [f for f in os.listdir(yaml_dir) if os.path.isfile(os.path.join(yaml_dir, f)) and f.endswith('.yml')]
+    yamls = [f for f in os.listdir(yaml_dir) if os.path.isfile(os.path.join(yaml_dir, f))
+             and (f.endswith('.yml') or f.endswith('.yaml'))]
     target_yamls = set(filter(lambda y: y.startswith('target_'), yamls))
     tap_yamls = set(filter(lambda y: y.startswith('tap_'), yamls))
 
@@ -368,11 +369,11 @@ def extract_log_attributes(log_file):
     }
 
 
-def get_tap_property(tap, property_key):
+def get_tap_property(tap, property_key, temp_dir=None):
     """
     Get a tap specific property value
     """
-    tap_props_inst = tap_properties.get_tap_properties(tap)
+    tap_props_inst = tap_properties.get_tap_properties(tap, temp_dir)
     tap_props = tap_props_inst.get(tap.get('type'), tap_props_inst.get('DEFAULT', {}))
 
     return tap_props.get(property_key)
@@ -391,11 +392,11 @@ def get_tap_property_by_tap_type(tap_type, property_key):
     return tap_props.get(property_key)
 
 
-def get_tap_extra_config_keys(tap):
+def get_tap_extra_config_keys(tap, temp_dir=None):
     """
     Get tap extra config property
     """
-    return get_tap_property(tap, 'tap_config_extras')
+    return get_tap_property(tap, 'tap_config_extras', temp_dir)
 
 
 def get_tap_stream_id(tap, database_name, schema_name, table_name):

@@ -13,7 +13,11 @@ owner: "somebody@foo.com"              # Data owner to contact
 # Source (Tap) - PostgreSQL connection details
 # ------------------------------------------------------------------------------
 db_conn:
-  host: "db_postgres_source"           # PostgreSQL host
+  host: "db_postgres_source"
+  logical_poll_total_seconds: 3        # seconds before exiting if no changes received from source
+                                       #    Warning: this can cause a tap to exit before receiving any
+                                       #    data, because PostgreSQL can take a long time to find the
+                                       #    position of the start lsn in the wal file.
   port: 5432                           # PostgreSQL port
   user: "pipelinewise"                 # PostfreSQL user
   password: "secret"                   # Plain string or vault encrypted
@@ -32,31 +36,34 @@ db_conn:
 # ------------------------------------------------------------------------------
 target: "postgres_dwh"                 # ID of the target connector where the data will be loaded
 batch_size_rows: 20000                 # Batch size for the stream to optimise load performance
-flush_all_streams: true              # target to flush all streams if any stream reaches batch_size_rows. Default false
+flush_all_streams: true                # Target to flush all streams if any stream reaches batch_size_rows. Default false
 
 
 # ------------------------------------------------------------------------------
-# LOG_BASED replication data
+# Source to target Schema mapping for LOG_BASED replication
 #   requires wal2json plugin and other source adjustments
 #   LOG_BASED is the default replication_method
-#
-# Source to target Schema mapping
 # ------------------------------------------------------------------------------
 schemas:
+
+  ### SOURCE SCHEMA 1: logical 1
   - source_schema: "logical1"
-    target_schema: "postgres_world_logical1"
+    target_schema: "ppw_dev_tap_postgres_logical1"
+
     tables:
       - table_name: "logical1_table1"
         replication_method: "LOG_BASED"
       - table_name: "logical1_table2"
       - table_name: "logical1_edgydata"
 
+  ### SOURCE SCHEMA 2: logical2
   - source_schema: "logical2"
-    target_schema: "postgres_world_logical2"
+    target_schema: "ppw_dev_tap_postgres_logical2"
     tables:
       - table_name: "logical2_table1"
 
+  ### SOURCE SCHEMA 3: logical3
   - source_schema: "logical3"
-    target_schema: "postgres_world_logical3"
+    target_schema: "ppw_dev_tap_postgres_logical3"
     tables:
       - table_name: "logical3_table1"

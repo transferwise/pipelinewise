@@ -13,18 +13,18 @@ owner: "test-runner"
 # Source (Tap) - MySQL connection details
 # ------------------------------------------------------------------------------
 db_conn:
-  host: "${DB_TAP_MYSQL_HOST}"                  # PostgreSQL host
-  port: ${DB_TAP_MYSQL_PORT}                    # PostgreSQL port
-  user: "${DB_TAP_MYSQL_USER}"                  # PostgreSQL user
-  password: "${DB_TAP_MYSQL_PASSWORD}"          # Plain string or vault encrypted
-  dbname: "${DB_TAP_MYSQL_DB}"                  # PostgreSQL database name
+  host: "${TAP_MYSQL_HOST}"             # MySQL host
+  port: ${TAP_MYSQL_PORT}               # MySQL port
+  user: "${TAP_MYSQL_USER}"             # MySQL user
+  password: "${TAP_MYSQL_PASSWORD}"     # Plain string or vault encrypted
+  dbname: "${TAP_MYSQL_DB}"             # MySQL database name
 
 
 # ------------------------------------------------------------------------------
 # Destination (Target) - Target properties
 # Connection details should be in the relevant target YAML file
 # ------------------------------------------------------------------------------
-target: "snowflake"                 # ID of the target connector where the data will be loaded
+target: "snowflake"                    # ID of the target connector where the data will be loaded
 batch_size_rows: 20000                 # Batch size for the stream to optimise load performance
 
 
@@ -33,17 +33,42 @@ batch_size_rows: 20000                 # Batch size for the stream to optimise l
 # ------------------------------------------------------------------------------
 schemas:
   - source_schema: "mysql_source_db"
-    target_schema: "mysql_grp24"
+    target_schema: "ppw_e2e_tap_mysql"
 
     tables:
-      - table_name: "table_with_binary" # This table has binary and varbinary columns
+      ### Table with LOG_BASED replication
+      - table_name: "weight_unit"
         replication_method: "LOG_BASED"
 
-      - table_name: "edgydata" # This table has SF reserved words as columns
+      ### Table with INCREMENTAL replication
+      - table_name: "address"
+        replication_method: "INCREMENTAL"
+        replication_key: "date_updated"
+
+      ### Table with FULL_TABLE replication
+      - table_name: "order"
+        replication_method: "FULL_TABLE"
+
+      ### Table with no primary key
+      - table_name: "no_pk_table"
+        replication_method: "FULL_TABLE"
+
+      ### Table with binary and varbinary columns
+      - table_name: "table_with_binary"
+        replication_method: "LOG_BASED"
+
+      ### Table with reserved words and columns and special characters
+      - table_name: "edgydata"
         replication_method: "LOG_BASED"
         transformations:
           - column: "case"
             type: "HASH"
 
-      - table_name: "no_pk_table"
-        replication_method: "FULL_TABLE"
+      ### Table with reserved word
+      - table_name: "full"
+        replication_method: "INCREMENTAL"
+        replication_key: "begin"
+
+      ### Table with space and mixed upper and lowercase characters
+      - table_name: "table_with_space and UPPERCase"
+        replication_method: "LOG_BASED"

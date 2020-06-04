@@ -9,6 +9,7 @@ The local development environment comes with the following containers and compon
 * Postgres test source database with test data (for tap-postgres)
 * Postgres test target data warehouse (for target-postgres)
 * Test Project that replicates data from MariaDB and Postgres databases into a Postgres Data Warehouse
+* Integration and End to End test cases
 
 ## How to use
 
@@ -37,8 +38,8 @@ Import the dev project:
 $ pipelinewise import --dir /opt/pipelinewise/dev-project/pipelinewise-config
 ```
 
-Check the status, you should see two pipelines. One is replicating data from MariaDB to Postgres DWH and
-another replicating from Postgres to the same Postgres DWH:
+Check the status, you should see multiple pipelines. Each of them is replicating data from different taps to Postgres DWH.
+Every source database is filled with some test data.
 
 ```sh
 $ pipelinewise status
@@ -77,12 +78,14 @@ Next time when running the same command, the incrementally and log based (CDC) r
 will capture the changes starting from the previously replicated position.
 
 If you want to connect to any of the test databases by a db client (CLI, MySQL Workbench, pgAdmin, intelliJ, DataGrip, etc.),
-check the `.env` file in the main folder of the repository for the credentials.
+check the [dev-project/.env](../dev-project/.env) file for the credentials.
 
+###  Running tests
 
 To run tests:
 
 ```sh
+$ cd /opt/pipelinewise
 $ pytest
 ```
 
@@ -101,9 +104,18 @@ $ coverage run -m pytest && coverage html -d coverage_html
 **Note**: The HTML report will be generated in `coverage_html/index.html`
 and can be opened **only** from the docker host and not inside from the container.
 
-To refresh the containers with new local code changes stop the running instances with ctrl+c
-and restart as usual:
+###  Configuring end to end tests
+
+You can customise which end to end tests you want to run by editing
+[dev-project/.env](../dev-project/.env) file. By default only the open source taps and targets are selected because only these databases can run in docker containers for free. However end to end test cases are available for commercial databases and data stores as well including S3, Snowflake, Redshift.
+
+To enable taps and targets to non open source data stores, add valid credentials to [dev-project/.env](../dev-project/.env) and the related tests cases will run automatically.
+
+### To refresh the containers
+
+To refresh the containers with new local code changes stop the running instances with `ctrl+c` and restart as usual:
 
 ```sh
 $ docker-compose up --build
 ```
+

@@ -1,0 +1,18 @@
+---
+# This is a minimalistic target configuration that used only for testing purposes
+id: "test_snowflake_target"
+name: "Test Target Connector #2"
+type: "target-snowflake"
+db_conn:
+  account: "account"
+  dbname: "foo_db"
+  user: "user"
+  password: "secret"
+  warehouse: "MY_WAREHOUSE"
+  s3_bucket: "s3_bucket"
+  s3_key_prefix: "s3_prefix/"
+  aws_access_key_id: "access_key_id"
+  stage: "foo_stage"
+  file_format: "foo_file_format"
+  aws_secret_access_key: "secret_access_key"
+  client_side_encryption_master_key: "master_key"

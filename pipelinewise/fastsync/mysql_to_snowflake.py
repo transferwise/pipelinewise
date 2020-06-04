@@ -3,7 +3,10 @@ import logging
 import os
 import sys
 import time
+from functools import partial
+from argparse import Namespace
 import multiprocessing
+from typing import Union
 
 from datetime import datetime
 from .commons import utils
@@ -25,8 +28,6 @@ REQUIRED_CONFIG_KEYS = {
         'user',
         'password',
         'warehouse',
-        'aws_access_key_id',
-        'aws_secret_access_key',
         's3_bucket',
         'stage',
         'file_format'
@@ -53,29 +54,29 @@ def tap_type_to_target_type(mysql_type, mysql_column_type):
         'mediumtext': 'VARCHAR',
         'longtext': 'VARCHAR',
         'enum': 'VARCHAR',
-        'integer':'NUMBER',
-        'tinyint':'BOOLEAN' if mysql_column_type == 'tinyint(1)' else 'NUMBER',
-        'smallint':'NUMBER',
-        'mediumint':'NUMBER',
-        'bigint':'NUMBER',
-        'bit':'BOOLEAN',
-        'dec':'FLOAT',
-        'decimal':'FLOAT',
-        'double':'FLOAT',
-        'float':'FLOAT',
-        'bool':'BOOLEAN',
-        'boolean':'BOOLEAN',
-        'date':'TIMESTAMP_NTZ',
-        'datetime':'TIMESTAMP_NTZ',
-        'timestamp':'TIMESTAMP_NTZ',
-        'year':'NUMBER',
+        'int': 'NUMBER',
+        'integer': 'NUMBER',
+        'tinyint': 'BOOLEAN' if mysql_column_type == 'tinyint(1)' else 'NUMBER',
+        'smallint': 'NUMBER',
+        'mediumint': 'NUMBER',
+        'bigint': 'NUMBER',
+        'bit': 'BOOLEAN',
+        'dec': 'FLOAT',
+        'decimal': 'FLOAT',
+        'double': 'FLOAT',
+        'float': 'FLOAT',
+        'bool': 'BOOLEAN',
+        'boolean': 'BOOLEAN',
+        'date': 'TIMESTAMP_NTZ',
+        'datetime': 'TIMESTAMP_NTZ',
+        'timestamp': 'TIMESTAMP_NTZ',
+        'year': 'NUMBER',
+        'json': 'VARIANT'
     }.get(mysql_type, 'VARCHAR')
 
 
-# pylint: disable=inconsistent-return-statements
-def sync_table(table):
+def sync_table(table: str, args: Namespace) -> Union[bool, str]:
     """Sync one table"""
-    args = utils.parse_args(REQUIRED_CONFIG_KEYS)
     mysql = FastSyncTapMySql(args.tap, tap_type_to_target_type)
     snowflake = FastSyncTargetSnowflake(args.target, args.transform)
 
@@ -92,6 +93,7 @@ def sync_table(table):
 
         # Exporting table data, get table definitions and close connection to avoid timeouts
         mysql.copy_table(table, filepath)
+        size_bytes = os.path.getsize(filepath)
         snowflake_types = mysql.map_column_types_to_target(table)
         snowflake_columns = snowflake_types.get('columns', [])
         primary_key = snowflake_types.get('primary_key')
@@ -106,7 +108,7 @@ def sync_table(table):
         snowflake.create_table(target_schema, table, snowflake_columns, primary_key, is_temporary=True)
 
         # Load into Snowflake table
-        snowflake.copy_to_table(s3_key, target_schema, table, is_temporary=True)
+        snowflake.copy_to_table(s3_key, target_schema, table, size_bytes, is_temporary=True)
 
         # Obfuscate columns
         snowflake.obfuscate_columns(target_schema, table)
@@ -128,8 +130,10 @@ def sync_table(table):
         utils.grant_privilege(target_schema, grantees, snowflake.grant_usage_on_schema)
         utils.grant_privilege(target_schema, grantees, snowflake.grant_select_on_schema)
 
+        return True
+
     except Exception as exc:
-        LOGGER.critical(exc)
+        LOGGER.exception(exc)
         return '{}: {}'.format(table, exc)
 
 
@@ -154,11 +158,8 @@ def main_impl():
     # Start loading tables in parallel in spawning processes by
     # utilising all available CPU cores
     with multiprocessing.Pool(cpu_cores) as proc:
-        table_sync_excs = list(filter(None, proc.map(sync_table, args.tables)))
-
-    # Clear information_schema columns cache
-    snowflake = FastSyncTargetSnowflake(args.target, args.transform)
-    snowflake.clear_information_schema_columns_cache(args.tables)
+        table_sync_excs = list(
+            filter(lambda x: not isinstance(x, bool), proc.map(partial(sync_table, args=args), args.tables)))
 
     # Log summary
     end_time = datetime.now()
@@ -169,7 +170,6 @@ def main_impl():
             Total tables selected to sync  : %s
             Tables loaded successfully     : %s
             Exceptions during table sync   : %s
-
             CPU cores                      : %s
             Runtime                        : %s
         -------------------------------------------------------

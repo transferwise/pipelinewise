@@ -1,9 +1,127 @@
+0.16.0 (2020-05-19)
+-------------------
+- Support reserved words as table and column names across every component, including fastsync and singer executables
+- Support loading tables with space in the name
+- Add tap-zuora
+- Switch to `psycopg-binary` 2.8.5 in every component, including fastsync and singer executables
+
+**FastSync**
+- Fixed an issue when composite primary keys not created correctly by fastsync
+- Create database specific unique replication slot names from tap-postgres
+- Fixed an issue when parallel running `CREATE SCHEMA IF NOT EXISTS` commands caused deadlock in PG
+- Support fastsync between tap-mysql, tap-postgres, tap-s3-csv to target-snowflake, target-postgres and target-redshift
+
+**Tap Postgres**
+- Bump `pipelinewise-tap-postgres` to 1.6.2
+    - Fixed issue when `JSON` type not converted to dictionary
+    - Fixed an issue when existing replication slot not found
+
+**Tap MySQL**
+- Bump `pipelinewise-tap-mysql` to 1.3.0
+    - Add optional `session_sqls` connection parameter
+    - Support MySQL `JSON` column type
+
+**Tap Oracle**
+- Bump `pipelinewise-tap-oracle` to 1.0.1
+    - Fixed an issue when output messages were not compatible with `pipelinewise-transform-field` component
+
+**Target Snowflake**
+- Bump `pipelinewise-target-snowflake` to 1.6.4
+    - Fix loading tables with space in the name
+
+**Target Postgres**
+- Bump `pipelinewise-target-postgres` to 2.0.0
+    - Implement missing and equivalent features of `pipelinewise-target-snowflake`
+    - Full changelog at https://github.com/transferwise/pipelinewise-target-postgres/blob/master/CHANGELOG.md#200-2020-05-02
+
+**Target Redshift**
+- Bump `pipelinewise-target-redshift` to 2.0.0
+    - Implement missing and equivalent features of `pipelinewise-target-snowflake`
+    - Full changelog at https://github.com/transferwise/pipelinewise-target-redshift/blob/master/CHANGELOG.md#140-2019-05-11
+
+0.15.0 (2020-04-09)
+-------------------
+**FastSync**
+- To Snowflake: Support for IAM roles, AWS Session Tokens and to pass credentials as environment variables
+
+**Tap Kafka**
+- Bump `pipelinewise-tap-kafka` to 3.0.0
+    - Add local storage of consumed messages and instant commit kafka offsets
+    - Add more configurable options: `consumer_timeout_ms`, `session_timeout_ms`, `heartbeat_interval_ms`, `max_poll_interval_ms`
+    - Add two new fixed output columns: `MESSAGE_PARTITION` and `MESSAGE_OFFSET`
+
+**Tap Snowflake**
+- Bump `pipelinewise-tap-snowflake` to 2.0.0
+    - Discover only the required tables to avoid issues when too many tables in the database causing `SHOW COLUMNS` column to return more than the maximum 10000 rows
+
+**Target Snowflake**
+- Bump `pipelinewise-target-snowflake` to 1.6.3
+    - Generate compressed CSV files by default. Optionally can be disabled by the `no_compression` config option
+
+
+0.14.3 (2020-03-25)
+-------------------
+- Support tap/target config files with `.yaml` extension when importing config
+- Fixed dependency conflict in install script
+- Fixed an issue when `add_metadata_columns` was not defined in `inheritable_config.json`
+
+**FastSync**
+- From MySQL: Increased default batch size to 50.000 rows when fastsync exporting data from MySQL tables
+- To Snowflake: Log inserts, updates and csv file sizes in the same format to target-snowflake connector
+
+**Tap Kafka**
+- Bump `pipelinewise-tap-kafka` to 2.1.1
+    - Commit offset from the state file and not from the consumed messages
+
+**Tap Snowflake**
+- Bump `pipelinewise-tap-snowflake` to 1.1.2
+    - Fixed some dependency conflicts
+
+**Target Snowflake**
+- Bump `pipelinewise-target-snowflake` to 1.6.2
+    - Log inserts, updates and csv file sizes in a more consumable format
+
+
+0.14.2 (2020-03-19)
+-------------------
+
+**Singer transformation**
+- Make tranformation consistent between FastSync and Singer by updating transform-field to transform without trimming.
+
+**tap-snowflake**
+- Remove PIPELINEWISE.COLUMNS cache table.
+
+
+0.14.1 (2020-03-13)
+-------------------
+
+**FastSync S3-csv to Snowflake**
+- Fix bug when `date_overrides` is present.
+
+**FastSync and singer target-snowflake**
+- Remove PIPELINEWISE.COLUMNS cache table.
+
+
+0.14.0 (2020-03-10)
+-------------------
+
+**FastSync Postgres**
+- Support reserved words as table names.
+
+**Install script**
+- update script to search full name plugins.
+
+**Tap Postgres**
+- Bump `pipelinewise-tap-postgres` to 1.5.1
+    - Support per session wal_sender_timeout
+
+
 0.13.3 (2020-03-09)
 -------------------
 
 **FastSync Postgres & Mysql**
-    - fix "'NoneType' object has no attribute 'upper'" that happens when table has no PK.
-    - fix "Information schema query returned too much data".
+- fix "'NoneType' object has no attribute 'upper'" that happens when table has no PK.
+- fix "Information schema query returned too much data".
 
 
 0.13.2 (2020-03-05)
@@ -28,9 +146,9 @@
 -------------------
 **Logging refactoring**:
 - Structured logs in Pipelinewise, FastSync and majority of plugins.
-- Include a logging config file in Pipelinewise repository and package [here](./pipelinewise/logging.conf). 
-- Ability to provide a custom logging config by setting the env variable `LOGGING_CONF_FILE` to be the 
-        path to the `.conf` file 
+- Include a logging config file in Pipelinewise repository and package [here](./pipelinewise/logging.conf).
+- Ability to provide a custom logging config by setting the env variable `LOGGING_CONF_FILE` to be the
+        path to the `.conf` file
 
 0.12.4 (2020-02-19)
 -------------------
@@ -44,7 +162,7 @@
 
 **FastSync MySQL**
     - Fix bug: map BINARY MySQL column to BINARY type IN SF
-    
+
 0.12.2 (2020-02-03)
 -------------------
 

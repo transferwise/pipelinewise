@@ -19,8 +19,9 @@ db_conn:
   warehouse: "<WAREHOUSE>"                      # Snowflake virtual warehouse
 
   # We use an intermediate external stage on S3 to load data into Snowflake
-  aws_access_key_id: "<ACCESS_KEY>"             # S3 - Plain string or vault encrypted
-  aws_secret_access_key: "<SECRET_ACCESS_KEY>"  # S3 - Plain string or vault encrypted
+  aws_access_key_id: "<ACCESS_KEY>"             # S3 - Plain string or vault encrypted - If not provided, AWS_ACCESS_KEY_ID environment variable or IAM role will be used
+  aws_secret_access_key: "<SECRET_ACCESS_KEY>"  # S3 - Plain string or vault encrypted - If not provided, AWS_SECRET_ACCESS_KEY environment variable or IAM role will be used
+  #aws_session_token: "<SESSION_TOKEN>"         # S3 - Plain string or vault encrypted - If not provided, AWS_SESSION_TOKEN environment variable or IAM role will be used
   s3_bucket: "<BUCKET_NAME>"                    # S3 external stbucket name
   s3_key_prefix: "snowflake-imports/"           # Optional: S3 key prefix
 

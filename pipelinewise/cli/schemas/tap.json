@@ -148,6 +148,7 @@
       "type": "string",
       "enum": [
         "tap-postgres",
+        "tap-mongodb",
         "tap-mysql",
         "tap-oracle",
         "tap-adwords",
@@ -156,7 +157,9 @@
         "tap-s3-csv",
         "tap-snowflake",
         "tap-salesforce",
-        "tap-jira"
+        "tap-jira",
+        "tap-zuora",
+        "tap-google-analytics"
       ]
     },
     "db_conn": {

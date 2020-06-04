@@ -2,7 +2,10 @@
 
 # Install OS dependencies
 apt-get update
-apt-get install -y mariadb-client postgresql-client alien libaio1
+apt-get install -y mariadb-client postgresql-client alien libaio1 mongo-tools
+
+wget https://repo.mongodb.org/apt/ubuntu/dists/bionic/mongodb-org/4.2/multiverse/binary-amd64/mongodb-org-shell_4.2.7_amd64.deb
+dpkg -i ./mongodb-org-shell_4.2.7_amd64.deb && rm mongodb-org-shell_4.2.7_amd64.deb
 
 # Change to dev-project folder
 cd dev-project
@@ -18,8 +21,11 @@ cd dev-project
 ../tests/db/tap_mysql_db.sh
 ../tests/db/tap_postgres_db.sh
 
+./mongo/init_rs.sh
+../tests/db/tap_mongodb.sh
+
 # Install PipelineWise in the container
-../install.sh --acceptlicenses --nousage --connectors=all
+../install.sh --acceptlicenses --nousage --connectors=target-snowflake,target-postgres,tap-mysql,tap-postgres,tap-mongodb,transform-field,tap-s3-csv
 if [[ $? != 0 ]]; then
     echo
     echo "ERROR: Docker container not started. Failed to install one or more PipelineWise components."
@@ -39,9 +45,10 @@ echo "PipelineWise Dev environment is ready in Docker container(s)."
 echo
 echo "Running containers:"
 echo "   - PipelineWise CLI and connectors"
-echo "   - PostgreSQL server with test database  (From host: localhost:${DB_TAP_POSTGRES_PORT_ON_HOST} - From CLI: ${DB_TAP_POSTGRES_HOST}:${DB_TAP_POSTGRES_PORT})"
-echo "   - MariaDB server with test database     (From host: localhost:${DB_TAP_MYSQL_PORT_ON_HOST} - From CLI: ${DB_TAP_MYSQL_HOST}:${DB_TAP_MYSQL_PORT})"
-echo "   - PostgreSQL server with empty database (From host: localhost:${DB_TARGET_POSTGRES_PORT_ON_HOST} - From CLI: ${DB_TARGET_POSTGRES_HOST}:${DB_TARGET_POSTGRES_PORT})"
+echo "   - PostgreSQL server with test database  (From host: localhost:${TAP_POSTGRES_PORT_ON_HOST} - From CLI: ${TAP_POSTGRES_HOST}:${TAP_POSTGRES_PORT})"
+echo "   - MariaDB server with test database     (From host: localhost:${TAP_MYSQL_PORT_ON_HOST} - From CLI: ${TAP_MYSQL_HOST}:${TAP_MYSQL_PORT})"
+echo "   - MongoDB replicaSet server with test database (From host: localhost:${TAP_MONGODB_PORT_ON_HOST} - From CLI: ${TAP_MONGODB_HOST}:${TAP_MONGODB_PORT})"
+echo "   - PostgreSQL server with empty database (From host: localhost:${TARGET_POSTGRES_PORT_ON_HOST} - From CLI: ${TARGET_POSTGRES_HOST}:${TARGET_POSTGRES_PORT})"
 echo "(For database credentials check .env file)"
 echo
 echo

@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 import logging
-import multiprocessing
 import os
 import sys
 import time
-from datetime import datetime
+from functools import partial
+from argparse import Namespace
+import multiprocessing
+from typing import Union
 
+from datetime import datetime
 from .commons import utils
 from .commons.tap_mysql import FastSyncTapMySql
 from .commons.target_redshift import FastSyncTargetRedshift
@@ -25,8 +28,6 @@ REQUIRED_CONFIG_KEYS = {
         'user',
         'password',
         'dbname',
-        'aws_access_key_id',
-        'aws_secret_access_key',
         's3_bucket'
     ]
 }
@@ -72,16 +73,15 @@ def tap_type_to_target_type(mysql_type, mysql_column_type):
         'datetime':'TIMESTAMP WITHOUT TIME ZONE',
         'timestamp':'TIMESTAMP WITHOUT TIME ZONE',
         'year':'NUMERIC NULL',
+        'json': 'CHARACTER VARYING({})'.format(LONG_VARCHAR_LENGTH)
     }.get(
         mysql_type,
         'CHARACTER VARYING({})'.format(DEFAULT_VARCHAR_LENGTH),
     )
 
 
-
-def sync_table(table):
+def sync_table(table: str, args: Namespace) -> Union[bool, str]:
     """Sync one table"""
-    args = utils.parse_args(REQUIRED_CONFIG_KEYS)
     mysql = FastSyncTapMySql(args.tap, tap_type_to_target_type)
     redshift = FastSyncTargetRedshift(args.target, args.transform)
 
@@ -98,6 +98,7 @@ def sync_table(table):
 
         # Exporting table data, get table definitions and close connection to avoid timeouts
         mysql.copy_table(table, filepath)
+        size_bytes = os.path.getsize(filepath)
         redshift_types = mysql.map_column_types_to_target(table)
         redshift_columns = redshift_types.get('columns', [])
         primary_key = redshift_types.get('primary_key')
@@ -112,7 +113,7 @@ def sync_table(table):
         redshift.create_table(target_schema, table, redshift_columns, primary_key, is_temporary=True)
 
         # Load into Redshift table
-        redshift.copy_to_table(s3_key, target_schema, table, is_temporary=True)
+        redshift.copy_to_table(s3_key, target_schema, table, size_bytes, is_temporary=True)
 
         # Obfuscate columns
         redshift.obfuscate_columns(target_schema, table)
@@ -133,8 +134,10 @@ def sync_table(table):
         utils.grant_privilege(target_schema, grantees, redshift.grant_usage_on_schema)
         utils.grant_privilege(target_schema, grantees, redshift.grant_select_on_schema)
 
+        return True
+
     except Exception as exc:
-        LOGGER.critical(exc)
+        LOGGER.exception(exc)
         return '{}: {}'.format(table, exc)
 
 
@@ -158,13 +161,13 @@ def main_impl():
 
     # Create target schemas sequentially, Redshift doesn't like it running in parallel
     redshift = FastSyncTargetRedshift(args.target, args.transform)
-    for target_schema in utils.get_target_schemas(args.target, args.tables):
-        redshift.create_schema(target_schema)
+    redshift.create_schemas(args.tables)
 
     # Start loading tables in parallel in spawning processes by
     # utilising all available CPU cores
     with multiprocessing.Pool(cpu_cores) as proc:
-        table_sync_excs = list(filter(None, proc.map(sync_table, args.tables)))
+        table_sync_excs = list(
+            filter(lambda x: not isinstance(x, bool), proc.map(partial(sync_table, args=args), args.tables)))
 
     # Log summary
     end_time = datetime.now()

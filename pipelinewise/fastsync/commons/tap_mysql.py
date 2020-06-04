@@ -12,6 +12,13 @@ from ...utils import safe_column_name
 
 LOGGER = logging.getLogger(__name__)
 
+DEFAULT_CHARSET = 'utf8'
+DEFAULT_EXPORT_BATCH_ROWS = 50000
+DEFAULT_SESSION_SQLS = ['SET @@session.time_zone="+0:00"',
+                        'SET @@session.wait_timeout=28800',
+                        'SET @@session.net_read_timeout=3600',
+                        'SET @@session.innodb_lock_wait_timeout=3600']
+
 
 class FastSyncTapMySql:
     """
@@ -20,8 +27,10 @@ class FastSyncTapMySql:
 
     def __init__(self, connection_config, tap_type_to_target_type):
         self.connection_config = connection_config
-        self.connection_config['charset'] = connection_config.get('charset', 'utf8')
-        self.connection_config['export_batch_rows'] = connection_config.get('export_batch_rows', 20000)
+        self.connection_config['charset'] = connection_config.get('charset', DEFAULT_CHARSET)
+        self.connection_config['export_batch_rows'] = connection_config.get('export_batch_rows',
+                                                                            DEFAULT_EXPORT_BATCH_ROWS)
+        self.connection_config['session_sqls'] = connection_config.get('session_sqls', DEFAULT_SESSION_SQLS)
         self.tap_type_to_target_type = tap_type_to_target_type
         self.conn = None
         self.conn_unbuffered = None
@@ -55,6 +64,30 @@ class FastSyncTapMySql:
             charset=self.connection_config['charset'],
             cursorclass=pymysql.cursors.SSCursor)
 
+        # Set session variables by running a list of SQLs which is defined
+        # in the optional session_sqls connection parameters
+        self.run_session_sqls()
+
+    def run_session_sqls(self):
+        """
+        Run list of SQLs from the "session_sqls" optional connection parameter
+        """
+        session_sqls = self.connection_config.get('session_sqls', DEFAULT_SESSION_SQLS)
+
+        warnings = []
+        if session_sqls and isinstance(session_sqls, list):
+            for sql in session_sqls:
+                try:
+                    self.query(sql)
+                    self.query(sql, self.conn_unbuffered)
+                except pymysql.err.InternalError:
+                    warnings.append(f'Could not set session variable: {sql}')
+
+        if warnings:
+            LOGGER.warning('Encountered non-fatal errors when configuring session that could impact performance:')
+        for warning in warnings:
+            LOGGER.warning(warning)
+
     def close_connections(self, silent=False):
         """
         Close connection
@@ -67,13 +100,17 @@ class FastSyncTapMySql:
                 LOGGER.exception(exc)
                 LOGGER.info('Connections seem to be already closed.')
 
-    def query(self, query, params=None, return_as_cursor=False, n_retry=1):
+    # pylint: disable=too-many-arguments
+    def query(self, query, conn=None, params=None, return_as_cursor=False, n_retry=1):
         """
         Run query
         """
         LOGGER.info('Running query: %s', query)
+        if conn is None:
+            conn = self.conn
+
         try:
-            with self.conn as cur:
+            with conn as cur:
                 cur.execute(query, params)
 
                 if return_as_cursor:
@@ -141,14 +178,16 @@ class FastSyncTapMySql:
             'version': 1
         }
 
-    def get_primary_key(self, table_name):
+    def get_primary_keys(self, table_name):
         """
         Get the primary key of a table
         """
-        sql = "SHOW KEYS FROM {} WHERE Key_name = 'PRIMARY'".format(table_name)
-        primary_key = self.query(sql)
-        if len(primary_key) > 0:
-            return primary_key[0].get('Column_name')
+        table_dict = utils.tablename_to_dict(table_name)
+        sql = "SHOW KEYS FROM `{}`.`{}` WHERE Key_name = 'PRIMARY'".format(table_dict['schema_name'],
+                                                                           table_dict['table_name'])
+        pk_specs = self.query(sql)
+        if len(pk_specs) > 0:
+            return [safe_column_name(k.get('Column_name')) for k in pk_specs]
 
         return None
 
@@ -201,7 +240,7 @@ class FastSyncTapMySql:
 
         return {
             'columns': mapped_columns,
-            'primary_key': safe_column_name(self.get_primary_key(table_name))
+            'primary_key': self.get_primary_keys(table_name)
         }
 
     # pylint: disable=too-many-locals
@@ -216,12 +255,15 @@ class FastSyncTapMySql:
         if len(column_safe_sql_values) == 0:
             raise Exception('{} table not found.'.format(table_name))
 
+        table_dict = utils.tablename_to_dict(table_name)
         sql = """SELECT {}
         ,CONVERT_TZ( NOW(),@@session.time_zone,'+00:00') AS _SDC_EXTRACTED_AT
         ,CONVERT_TZ( NOW(),@@session.time_zone,'+00:00') AS _SDC_BATCHED_AT
         ,null AS _SDC_DELETED_AT
-        FROM {}
-        """.format(','.join(column_safe_sql_values), table_name)
+        FROM `{}`.`{}`
+        """.format(','.join(column_safe_sql_values),
+                   table_dict['schema_name'],
+                   table_dict['table_name'])
         export_batch_rows = self.connection_config['export_batch_rows']
         exported_rows = 0
         with self.conn_unbuffered as cur:

@@ -53,6 +53,12 @@ class Config:
             # Add generated extra keys that not available in the YAML
             target_id = target_data['id']
 
+            # Check if a target with same ID already exists
+            # exit with error, otherwise, we would override the previous one and that would go unnoticed.
+            if target_id in targets:
+                config.logger.error('Duplicate target found "%s"', target_id)
+                sys.exit(1)
+
             target_data['files'] = config.get_connector_files(config.get_target_dir(target_id))
             target_data['taps'] = []
 
@@ -66,6 +72,13 @@ class Config:
             utils.validate(instance=tap_data, schema=tap_schema)
 
             tap_id = tap_data['id']
+
+            # Check if a tap with same ID already exists
+            # exit with error, otherwise, we would override the previous one and that would go unnoticed.
+            if tap_id in taps:
+                config.logger.error('Duplicate tap found "%s"', tap_id)
+                sys.exit(1)
+
             target_id = tap_data['target']
             if target_id not in targets:
                 config.logger.error("Can't find the target with the ID \"%s\" but it's referenced in %s", target_id,
@@ -136,7 +149,7 @@ class Config:
 
             # Save every tap JSON files
             for tap in target['taps']:
-                extra_config_keys = utils.get_tap_extra_config_keys(tap)
+                extra_config_keys = utils.get_tap_extra_config_keys(tap, self.get_temp_dir())
                 self.save_tap_jsons(target, tap, extra_config_keys)
 
     def save_main_config_json(self):
@@ -321,7 +334,8 @@ class Config:
             #   3: Otherwise we set flattening level to 0 (disabled)
             'data_flattening_max_level': tap.get('data_flattening_max_level',
                                                  utils.get_tap_property(tap, 'default_data_flattening_max_level') or 0),
-            'validate_records': tap.get('validate_records', False)
+            'validate_records': tap.get('validate_records', False),
+            'add_metadata_columns': tap.get('add_metadata_columns', False)
         })
 
         # Save the generated JSON files

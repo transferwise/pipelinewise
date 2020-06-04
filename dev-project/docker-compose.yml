@@ -8,28 +8,36 @@ services:
     entrypoint: /opt/pipelinewise/dev-project/entrypoint.sh
     environment:
       PIPELINEWISE_HOME: /opt/pipelinewise/dev-project
-      DB_TAP_MYSQL_HOST: db_mysql_source
-      DB_TAP_MYSQL_PORT: ${DB_TAP_MYSQL_PORT}
-      DB_TAP_MYSQL_PORT_ON_HOST: ${DB_TAP_MYSQL_PORT_ON_HOST}
-      DB_TAP_MYSQL_ROOT_PASSWORD: ${DB_TAP_MYSQL_ROOT_PASSWORD}
-      DB_TAP_MYSQL_USER: ${DB_TAP_MYSQL_USER}
-      DB_TAP_MYSQL_PASSWORD: ${DB_TAP_MYSQL_PASSWORD}
-      DB_TAP_MYSQL_DB: ${DB_TAP_MYSQL_DB}
+      TAP_MYSQL_HOST: db_mysql_source
+      TAP_MYSQL_PORT: ${TAP_MYSQL_PORT}
+      TAP_MYSQL_PORT_ON_HOST: ${TAP_MYSQL_PORT_ON_HOST}
+      TAP_MYSQL_ROOT_PASSWORD: ${TAP_MYSQL_ROOT_PASSWORD}
+      TAP_MYSQL_USER: ${TAP_MYSQL_USER}
+      TAP_MYSQL_PASSWORD: ${TAP_MYSQL_PASSWORD}
+      TAP_MYSQL_DB: ${TAP_MYSQL_DB}
 
-      DB_TAP_POSTGRES_HOST: db_postgres_source
-      DB_TAP_POSTGRES_PORT: ${DB_TAP_POSTGRES_PORT}
-      DB_TAP_POSTGRES_PORT_ON_HOST: ${DB_TAP_POSTGRES_PORT_ON_HOST}
-      DB_TAP_POSTGRES_USER: ${DB_TAP_POSTGRES_USER}
-      DB_TAP_POSTGRES_PASSWORD: ${DB_TAP_POSTGRES_PASSWORD}
-      DB_TAP_POSTGRES_DB: ${DB_TAP_POSTGRES_DB}
+      TAP_POSTGRES_HOST: db_postgres_source
+      TAP_POSTGRES_PORT: ${TAP_POSTGRES_PORT}
+      TAP_POSTGRES_PORT_ON_HOST: ${TAP_POSTGRES_PORT_ON_HOST}
+      TAP_POSTGRES_USER: ${TAP_POSTGRES_USER}
+      TAP_POSTGRES_PASSWORD: ${TAP_POSTGRES_PASSWORD}
+      TAP_POSTGRES_DB: ${TAP_POSTGRES_DB}
 
-      DB_TARGET_POSTGRES_HOST: db_postgres_dwh
-      DB_TARGET_POSTGRES_PORT: ${DB_TARGET_POSTGRES_PORT}
-      DB_TARGET_POSTGRES_PORT_ON_HOST: ${DB_TARGET_POSTGRES_PORT_ON_HOST}
-      DB_TARGET_POSTGRES_USER: ${DB_TARGET_POSTGRES_USER}
-      DB_TARGET_POSTGRES_PASSWORD: ${DB_TARGET_POSTGRES_PASSWORD}
-      DB_TARGET_POSTGRES_DB: ${DB_TARGET_POSTGRES_DB}
+      TARGET_POSTGRES_HOST: db_postgres_dwh
+      TARGET_POSTGRES_PORT: ${TARGET_POSTGRES_PORT}
+      TARGET_POSTGRES_PORT_ON_HOST: ${TARGET_POSTGRES_PORT_ON_HOST}
+      TARGET_POSTGRES_USER: ${TARGET_POSTGRES_USER}
+      TARGET_POSTGRES_PASSWORD: ${TARGET_POSTGRES_PASSWORD}
+      TARGET_POSTGRES_DB: ${TARGET_POSTGRES_DB}
 
+      TAP_MONGODB_HOST: db_mongo_source
+      TAP_MONGODB_PORT: ${TAP_MONGODB_PORT}
+      TAP_MONGODB_PORT_ON_HOST: ${TAP_MONGODB_PORT_ON_HOST}
+      TAP_MONGODB_USER: ${TAP_MONGODB_USER}
+      TAP_MONGODB_PASSWORD: ${TAP_MONGODB_PASSWORD}
+      TAP_MONGODB_DB: ${TAP_MONGODB_DB}
+      TAP_MONGODB_ROOT_USER: ${TAP_MONGODB_ROOT_USER}
+      TAP_MONGODB_ROOT_PASSWORD: ${TAP_MONGODB_ROOT_PASSWORD}
     volumes:
       - ../:/opt/pipelinewise
       # don't create container specific .virtualenvs files on host
@@ -42,35 +50,59 @@ services:
       - db_postgres_source
       - db_mysql_source
       - db_postgres_dwh
-
+      - db_mongo_source
+    networks:
+      - pipelinewise_network
 
   ### TAP (Data source) containers
   # PostgreSQL service container used as test source database
   # Using Debezium image with wal2json plugin for logical decoding
   db_postgres_source:
-    image: debezium/postgres:11-alpine
+    image: debezium/postgres:12-alpine
     container_name: pipelinewise_dev_postgres_source
     # Making some logical decoding adjustments
     command: -c "wal_level=logical" -c "max_replication_slots=5" -c "max_wal_senders=5"
     ports:
-      - ${DB_TAP_POSTGRES_PORT_ON_HOST}:${DB_TAP_POSTGRES_PORT}
+      - ${TAP_POSTGRES_PORT_ON_HOST}:${TAP_POSTGRES_PORT}
     environment:
-      POSTGRES_USER: ${DB_TAP_POSTGRES_USER}
-      POSTGRES_PASSWORD: ${DB_TAP_POSTGRES_PASSWORD}
-      POSTGRES_DB: ${DB_TAP_POSTGRES_DB}
+      POSTGRES_USER: ${TAP_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${TAP_POSTGRES_PASSWORD}
+      POSTGRES_DB: ${TAP_POSTGRES_DB}
+    networks:
+      - pipelinewise_network
 
   # MySQL service container used as test source database
   db_mysql_source:
     image: mariadb:10.2.26
     container_name: pipelinewise_dev_mysql_source
     ports:
-      - ${DB_TAP_MYSQL_PORT_ON_HOST}:${DB_TAP_MYSQL_PORT}
+      - ${TAP_MYSQL_PORT_ON_HOST}:${TAP_MYSQL_PORT}
     command: --default-authentication-plugin=mysql_native_password --log-bin=mysql-bin --binlog-format=ROW
     environment:
-      MYSQL_ROOT_PASSWORD: ${DB_TAP_MYSQL_ROOT_PASSWORD}
-      MYSQL_USER: ${DB_TAP_MYSQL_USER}
-      MYSQL_PASSWORD: ${DB_TAP_MYSQL_PASSWORD}
-      MYSQL_DATABASE: ${DB_TAP_MYSQL_DB}
+      MYSQL_ROOT_PASSWORD: ${TAP_MYSQL_ROOT_PASSWORD}
+      MYSQL_USER: ${TAP_MYSQL_USER}
+      MYSQL_PASSWORD: ${TAP_MYSQL_PASSWORD}
+      MYSQL_DATABASE: ${TAP_MYSQL_DB}
+    networks:
+      - pipelinewise_network
+
+  db_mongo_source:
+    container_name: "pipelinewise_dev_mongodb_source"
+    image: "mongo:4.2-bionic"
+    ports:
+      - ${TAP_MONGODB_PORT_ON_HOST}:${TAP_MONGODB_PORT}
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${TAP_MONGODB_ROOT_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${TAP_MONGODB_ROOT_PASSWORD}
+      MONGO_INITDB_DATABASE: ${TAP_MONGODB_DB}
+      MONGO_USERNAME: ${TAP_MONGODB_USER}
+      MONGO_PASSWORD: ${TAP_MONGODB_PASSWORD}
+      MONGO_REPLICA_HOST: db_mongo_source
+    volumes:
+      - ./mongo/create_user.sh:/docker-entrypoint-initdb.d/create_user.sh
+    command: [mongod, --replSet, rs0]
+    networks:
+      - pipelinewise_network
 
   ### Target containers
   # PostgreSQL service container used as test target database
@@ -78,15 +110,17 @@ services:
     image: postgres:11.4
     container_name: pipelinewise_dev_postgres_dwh
     ports:
-      - ${DB_TARGET_POSTGRES_PORT_ON_HOST}:${DB_TARGET_POSTGRES_PORT}
+      - ${TARGET_POSTGRES_PORT_ON_HOST}:${TARGET_POSTGRES_PORT}
     environment:
-      POSTGRES_USER: ${DB_TARGET_POSTGRES_USER}
-      POSTGRES_PASSWORD: ${DB_TARGET_POSTGRES_PASSWORD}
-      POSTGRES_DB: ${DB_TARGET_POSTGRES_DB}
+      POSTGRES_USER: ${TARGET_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${TARGET_POSTGRES_PASSWORD}
+      POSTGRES_DB: ${TARGET_POSTGRES_DB}
+    networks:
+      - pipelinewise_network
 
 networks:
-  default:
-    driver: bridge
+  pipelinewise_network:
     ipam:
+      driver: default
       config:
-      - subnet: 192.168.55.0/24
+        - subnet: 192.168.56.0/24

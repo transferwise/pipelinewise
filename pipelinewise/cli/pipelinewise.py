@@ -381,7 +381,6 @@ class PipelineWise:
             for new_stream_idx, new_stream in enumerate(new_streams):
                 new_tap_stream_id = new_stream['tap_stream_id']
 
-                old_stream = False
                 old_stream = next((item for item in old_streams if item['tap_stream_id'] == new_tap_stream_id), False)
 
                 # Is this a new stream?
@@ -416,16 +415,17 @@ class PipelineWise:
 
                     # Copy replication method from the old stream
                     try:
-                        new_schema['streams'][new_stream_idx]['metadata'][new_stream_table_mdata_idx]['metadata'][
-                            'replication-method'] = old_stream['metadata'][old_stream_table_mdata_idx]['metadata'][
-                                'replication-method']
+                        new_schema['streams'][new_stream_idx]['metadata'] \
+                            [new_stream_table_mdata_idx]['metadata']['replication-method'] = \
+                            old_stream['metadata'][old_stream_table_mdata_idx]['metadata']['replication-method']
                     except Exception:
                         pass
 
                     # Copy replication key from the old stream
                     try:
-                        new_schema['streams'][new_stream_idx]['metadata'][new_stream_table_mdata_idx]['metadata'][
-                            'replication-key'] = old_stream['metadata'][old_stream_table_mdata_idx]['metadata'][
+                        new_schema['streams'][new_stream_idx]['metadata'][new_stream_table_mdata_idx] \
+                            ['metadata']['replication-key'] = \
+                            old_stream['metadata'][old_stream_table_mdata_idx]['metadata'][
                                 'replication-key']
                     except Exception:
                         pass
@@ -512,7 +512,7 @@ class PipelineWise:
         Select the streams to sync in schema from a selection JSON file
         """
         if os.path.isfile(selection_file):
-            self.logger.info('Loading pre defined selection from %s', selection_file)
+            self.logger.debug('Loading pre defined selection from %s', selection_file)
             tap_selection = utils.load_json(selection_file)
             selection = tap_selection['selection']
 
@@ -531,8 +531,8 @@ class PipelineWise:
                     pass
 
                 if tap_stream_sel:
-                    self.logger.info('Mark %s tap_stream_id as selected with properties %s', tap_stream_id,
-                                     tap_stream_sel)
+                    self.logger.debug('Mark %s tap_stream_id as selected with properties %s', tap_stream_id,
+                                      tap_stream_sel)
                     schema['streams'][stream_idx]['metadata'][stream_table_mdata_idx]['metadata']['selected'] = True
                     if 'replication_method' in tap_stream_sel:
                         schema['streams'][stream_idx]['metadata'][stream_table_mdata_idx]['metadata'][
@@ -541,7 +541,7 @@ class PipelineWise:
                         schema['streams'][stream_idx]['metadata'][stream_table_mdata_idx]['metadata'][
                             'replication-key'] = tap_stream_sel['replication_key']
                 else:
-                    self.logger.info('Mark %s tap_stream_id as not selected', tap_stream_id)
+                    self.logger.debug('Mark %s tap_stream_id as not selected', tap_stream_id)
                     schema['streams'][stream_idx]['metadata'][stream_table_mdata_idx]['metadata']['selected'] = False
 
         return schema
@@ -624,7 +624,7 @@ class PipelineWise:
         target_id = target.get('id')
         target_type = target.get('type')
 
-        self.logger.info('Discovering %s (%s) tap in {%s (%s) target...', tap_id, tap_type, target_id, target_type)
+        self.logger.info('Discovering %s (%s) tap in %s (%s) target...', tap_id, tap_type, target_id, target_type)
 
         # Generate and run the command to run the tap directly
         command = f'{tap_bin} --config {tap_config_file} --discover'
@@ -943,7 +943,7 @@ class PipelineWise:
             tap_properties,
             tap_state, {
                 'selected': True,
-                'target_type': ['target-snowflake', 'target-redshift'],
+                'target_type': ['target-snowflake', 'target-redshift', 'target-postgres'],
                 'tap_type': ['tap-mysql', 'tap-postgres', 'tap-s3-csv'],
                 'initial_sync_required': True
             },
@@ -1128,25 +1128,36 @@ class PipelineWise:
         vault_secret = self.args.secret
 
         target_ids = set()
-        # Validate target json schemas
+        # Validate target json schemas and that no duplicate IDs exist
         for yaml_file in target_yamls:
             self.logger.info('Started validating %s', yaml_file)
             loaded_yaml = utils.load_yaml(os.path.join(yaml_dir, yaml_file), vault_secret)
             utils.validate(loaded_yaml, target_schema)
+
+            if loaded_yaml['id'] in target_ids:
+                self.logger.error('Duplicate target found "%s"', loaded_yaml['id'])
+                sys.exit(1)
+
             target_ids.add(loaded_yaml['id'])
             self.logger.info('Finished validating %s', yaml_file)
 
-        # Validate tap json schemas and check that every tap has valid 'target'
+        tap_ids = set()
+        # Validate tap json schemas, check that every tap has valid 'target' and that no duplicate IDs exist
         for yaml_file in tap_yamls:
             self.logger.info('Started validating %s', yaml_file)
             loaded_yaml = utils.load_yaml(os.path.join(yaml_dir, yaml_file), vault_secret)
             utils.validate(loaded_yaml, tap_schema)
+
+            if loaded_yaml['id'] in tap_ids:
+                self.logger.error('Duplicate tap found "%s"', loaded_yaml['id'])
+                sys.exit(1)
 
             if loaded_yaml['target'] not in target_ids:
                 self.logger.error("Can'f find the target with the ID '%s' referenced in '%s'. Available target IDs: %s",
                                   loaded_yaml['target'], yaml_file, target_ids)
                 sys.exit(1)
 
+            tap_ids.add(loaded_yaml['id'])
             self.logger.info('Finished validating %s', yaml_file)
 
         self.logger.info('Validation successful')
@@ -1242,13 +1253,13 @@ class PipelineWise:
         :param stream_bookmark: stream state bookmark
         :return: Boolean, True if needs initial sync, False otherwise
         """
-        return replication_method == self.FULL_TABLE or (
-            (replication_method in [self.INCREMENTAL, self.LOG_BASED]) and
-            (not ('replication_key_value' in stream_bookmark or
-                  'log_pos' in stream_bookmark or
-                  'lsn' in stream_bookmark or
-                  'modified_since' in stream_bookmark  # this is replication key for tap-s3-csv used by Singer
-                  )))
+        return replication_method == self.FULL_TABLE or ((replication_method in [self.INCREMENTAL, self.LOG_BASED]) and
+                                                         (not ('replication_key_value' in stream_bookmark or
+                                                               'log_pos' in stream_bookmark or
+                                                               'lsn' in stream_bookmark or
+                                                               'modified_since' in stream_bookmark
+                                                               # this is replication key for tap-s3-csv used by Singer
+                                                               )))
 
     # pylint: disable=unused-argument
     def _exit_gracefully(self, sig, frame, exit_code=1):

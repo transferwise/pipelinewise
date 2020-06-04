@@ -171,12 +171,12 @@ class FastSyncTapS3Csv:
         # use timestamp as a type instead if column is set in date_overrides configuration
         mapped_columns = []
         date_overrides = None if 'date_overrides' not in specs \
-            else {[safe_column_name(c) for c in specs['date_overrides']]}
+            else {safe_column_name(c) for c in specs['date_overrides']}
 
         for column_name, column_type in csv_columns:
 
             if date_overrides and column_name in date_overrides:
-                mapped_columns.append(f"{column_name} 'timestamp_ntz'")
+                mapped_columns.append(f'{column_name} {self.tap_type_to_target_type("date_override")}')
             else:
                 mapped_columns.append(f'{column_name} {self.tap_type_to_target_type(column_type)}')
 
@@ -220,7 +220,7 @@ class FastSyncTapS3Csv:
             replication_key: self.tables_last_modified[table].isoformat()
         } if table in self.tables_last_modified else {}
 
-    def _get_primary_keys(self, table_specs: Dict) -> Optional[str]:
+    def _get_primary_keys(self, table_specs: Dict) -> Optional[List]:
         """
         Returns the primary keys specified in the tap config by key_properties
         The keys are made safe by wrapping them in quotes in case one or more are reserved words.
@@ -228,7 +228,7 @@ class FastSyncTapS3Csv:
         :return: the keys concatenated and separated by comma if keys are given, otherwise None
         """
         if table_specs.get('key_properties', False):
-            return ','.join({safe_column_name(k) for k in table_specs['key_properties']})
+            return [safe_column_name(k) for k in table_specs['key_properties']]
 
         return None
 

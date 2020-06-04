@@ -29,8 +29,6 @@ REQUIRED_CONFIG_KEYS = {
         'user',
         'password',
         'warehouse',
-        'aws_access_key_id',
-        'aws_secret_access_key',
         's3_bucket',
         'stage',
         'file_format'
@@ -45,10 +43,12 @@ def tap_type_to_target_type(csv_type):
 
     return {
         'integer': 'INTEGER',
-        'number': 'NUMBER',
+        'number': 'FLOAT',
         'string': 'VARCHAR',
         'boolean': 'VARCHAR',  # The guess sometimes can be wrong, we'll use varchar for now.
-        'date': 'VARCHAR'  # The guess sometimes can be wrong, we'll use varchar for now.
+        'date': 'VARCHAR',  # The guess sometimes can be wrong, we'll use varchar for now.
+
+        'date_override': 'TIMESTAMP_NTZ'  # Column type to use when date_override defined in YAML
     }.get(csv_type, 'VARCHAR')
 
 
@@ -65,6 +65,7 @@ def sync_table(table_name: str, args: Namespace) -> Union[bool, str]:
         target_schema = utils.get_target_schema(args.target, table_name)
 
         s3_csv.copy_table(table_name, filepath)
+        size_bytes = os.path.getsize(filepath)
 
         snowflake_types = s3_csv.map_column_types_to_target(filepath, table_name)
         snowflake_columns = snowflake_types.get('columns', [])
@@ -84,7 +85,7 @@ def sync_table(table_name: str, args: Namespace) -> Union[bool, str]:
                                sort_columns=True)
 
         # Load into Snowflake table
-        snowflake.copy_to_table(s3_key, target_schema, table_name, is_temporary=True, skip_csv_header=True)
+        snowflake.copy_to_table(s3_key, target_schema, table_name, size_bytes, is_temporary=True, skip_csv_header=True)
 
         # Obfuscate columns
         snowflake.obfuscate_columns(target_schema, table_name)
@@ -112,7 +113,7 @@ def sync_table(table_name: str, args: Namespace) -> Union[bool, str]:
         return True
 
     except Exception as exc:
-        LOGGER.critical(exc)
+        LOGGER.exception(exc)
         return f'{table_name}: {exc}'
 
 
@@ -138,10 +139,6 @@ def main_impl():
     with multiprocessing.Pool(cpu_cores) as proc:
         table_sync_excs = list(
             filter(lambda x: not isinstance(x, bool), proc.map(partial(sync_table, args=args), args.tables)))
-
-    # Clear information_schema columns cache
-    snowflake = FastSyncTargetSnowflake(args.target, args.transform)
-    snowflake.clear_information_schema_columns_cache(args.tables)
 
     # Log summary
     end_time = datetime.now()

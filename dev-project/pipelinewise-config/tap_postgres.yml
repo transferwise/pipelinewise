@@ -13,7 +13,7 @@ owner: "somebody@foo.com"              # Data owner to contact
 # Source (Tap) - PostgreSQL connection details
 # ------------------------------------------------------------------------------
 db_conn:
-  host: "db_postgres_source"           # PostgreSQL host
+  host: "db_postgres_source"
   port: 5432                           # PostgreSQL port
   user: "pipelinewise"                 # PostfreSQL user
   password: "secret"                   # Plain string or vault encrypted
@@ -29,42 +29,67 @@ db_conn:
 # ------------------------------------------------------------------------------
 target: "postgres_dwh"                 # ID of the target connector where the data will be loaded
 batch_size_rows: 20000                 # Batch size for the stream to optimise load performance
-flush_all_streams: false             # target to flush all streams if any stream reaches batch_size_rows. Default false
+flush_all_streams: false               # Target to flush all streams if any stream reaches batch_size_rows. Default false
 
 
 # ------------------------------------------------------------------------------
-# Source to target Schema mapping
+# Source to target Schema mapping for FULL_TABLE and INCREMENTAL replication
 # ------------------------------------------------------------------------------
 schemas:
-  - source_schema: "public"           # Source schema in postgres with tables
-    target_schema: "postgres_world"   # Target schema in the destination Data Warehouse
-    # target_schema_select_permissions: # Optional: Grant SELECT on schema and tables that created
+
+  ### SOURCE SCHEMA 1: public
+  - source_schema: "public"               # Source schema in postgres with tables
+    target_schema: "ppw_dev_tap_postgres" # Target schema in the destination Data Warehouse
+    # target_schema_select_permissions:   # Optional: Grant SELECT on schema and tables that created
     #  - grp_read_only
-    tables:
+
     # List of tables to replicate from Postgres to destination Data Warehouse
+    #
     # Please check the Replication Strategies section in the documentation to understand the differences.
-      - table_name: "edgydata"
-        replication_method: "FULL_TABLE"  # INCREMENTAL, LOG_BASED or FULL_TABLE (Default LOG_BASED)
+    # LOG_BASED requires wal2json plugin and other postgres adjustments.
+    tables:
 
-      - table_name: "country"
-        replication_method: "FULL_TABLE"
-
+      ### Table with INCREMENTAL replication
       - table_name: "city"
         replication_method: "INCREMENTAL"
         replication_key: "id"
-        # transformations:                  # Optional: Load time transformations
-        #  - column: "population"           # Column to transform
-        #    type: "MASK-NUMBER"            # Transformation type
 
-      - table_name: "countrylanguage"
+      ### Table with FULL_TABLE replication
+      - table_name: "country"
         replication_method: "FULL_TABLE"
 
+      ### Table with no primary key
+      - table_name: "no_pk_table"
+        replication_method: "FULL_TABLE"
+
+      ### Table with reserved words and columns and special characters
+      - table_name: "edgydata"
+        replication_method: "INCREMENTAL"
+        replication_key: "cid"
+
+      ### Table with reserved word
+      - table_name: "order"
+        replication_method: "INCREMENTAL"
+        replication_key: "id"
+
+      ### Table with space and mixed upper and lowercase characters
+      - table_name: "table_with_space and UPPERCase"
+        replication_method: "FULL_TABLE"
+
+      ### Table with space and mixed upper and lowercase characters
+      - table_name: "table_with_reserved_words"
+        replication_method: "FULL_TABLE"
+
+  ### SOURCE SCHEMA 2: public2
   - source_schema: "public2"
-    target_schema: "postgres_world_2"
+    target_schema: "ppw_dev_tap_postgres_public2"
 
     tables:
+      ### Table with FULL_TABLE replication
       - table_name: "wearehere"
         replication_method: "FULL_TABLE"
+
+      ### Table with reserved words and columns and special characters
       - table_name: "public2_edgydata"
         replication_method: "INCREMENTAL"
         replication_key: "cid"

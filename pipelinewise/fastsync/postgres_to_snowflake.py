@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 import logging
-import multiprocessing
 import os
 import sys
 import time
-from datetime import datetime
+from functools import partial
+from argparse import Namespace
+import multiprocessing
+from typing import Union
 
+from datetime import datetime
 from .commons import utils
 from .commons.tap_postgres import FastSyncTapPostgres
 from .commons.target_snowflake import FastSyncTargetSnowflake
@@ -17,7 +20,9 @@ REQUIRED_CONFIG_KEYS = {
         'host',
         'port',
         'user',
-        'password'
+        'password',
+        'dbname',
+        'tap_id'    # tap_id is required to generate unique replication slot names
     ],
     'target': [
         'account',
@@ -25,8 +30,6 @@ REQUIRED_CONFIG_KEYS = {
         'user',
         'password',
         'warehouse',
-        'aws_access_key_id',
-        'aws_secret_access_key',
         's3_bucket',
         'stage',
         'file_format'
@@ -73,10 +76,9 @@ def tap_type_to_target_type(pg_type):
     }.get(pg_type, 'VARCHAR')
 
 
-# pylint: disable=inconsistent-return-statements
-def sync_table(table):
+# pylint: disable=too-many-locals
+def sync_table(table: str, args: Namespace) -> Union[bool, str]:
     """Sync one table"""
-    args = utils.parse_args(REQUIRED_CONFIG_KEYS)
     postgres = FastSyncTapPostgres(args.tap, tap_type_to_target_type)
     snowflake = FastSyncTargetSnowflake(args.target, args.transform)
 
@@ -94,6 +96,7 @@ def sync_table(table):
 
         # Exporting table data, get table definitions and close connection to avoid timeouts
         postgres.copy_table(table, filepath)
+        size_bytes = os.path.getsize(filepath)
         snowflake_types = postgres.map_column_types_to_target(table)
         snowflake_columns = snowflake_types.get('columns', [])
         primary_key = snowflake_types.get('primary_key')
@@ -108,7 +111,7 @@ def sync_table(table):
         snowflake.create_table(target_schema, table, snowflake_columns, primary_key, is_temporary=True)
 
         # Load into Snowflake table
-        snowflake.copy_to_table(s3_key, target_schema, table, is_temporary=True)
+        snowflake.copy_to_table(s3_key, target_schema, table, size_bytes, is_temporary=True)
 
         # Obfuscate columns
         snowflake.obfuscate_columns(target_schema, table)
@@ -130,8 +133,10 @@ def sync_table(table):
         utils.grant_privilege(target_schema, grantees, snowflake.grant_usage_on_schema)
         utils.grant_privilege(target_schema, grantees, snowflake.grant_select_on_schema)
 
+        return True
+
     except Exception as exc:
-        LOGGER.critical(exc)
+        LOGGER.exception(exc)
         return '{}: {}'.format(table, exc)
 
 
@@ -156,11 +161,8 @@ def main_impl():
     # Start loading tables in parallel in spawning processes by
     # utilising all available CPU cores
     with multiprocessing.Pool(cpu_cores) as proc:
-        table_sync_excs = list(filter(None, proc.map(sync_table, args.tables)))
-
-    # Clear information_schema columns cache
-    snowflake = FastSyncTargetSnowflake(args.target, args.transform)
-    snowflake.clear_information_schema_columns_cache(args.tables)
+        table_sync_excs = list(
+            filter(lambda x: not isinstance(x, bool), proc.map(partial(sync_table, args=args), args.tables)))
 
     # Log summary
     end_time = datetime.now()
