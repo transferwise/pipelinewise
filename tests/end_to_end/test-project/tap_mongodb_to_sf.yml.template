@@ -3,7 +3,7 @@
 # ------------------------------------------------------------------------------
 # General Properties
 # ------------------------------------------------------------------------------
-id: "tap_mongo_to_sf"
+id: "mongo_to_sf"
 name: "MongoDB source test database"
 type: "tap-mongodb"
 owner: "test-runner"
