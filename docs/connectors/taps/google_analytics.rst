@@ -2,7 +2,7 @@
 .. _tap-google-analytics:
 
 Tap Google Analytics
------------
+--------------------
 
 
 Configuring what to replicate

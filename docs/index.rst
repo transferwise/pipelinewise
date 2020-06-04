@@ -149,6 +149,26 @@ PipelineWise can replicate data from the following data sources:
 
         .. container:: img-hover-zoom
 
+          .. image:: img/zuora-logo.png
+             :target: connectors/taps/zuora.html
+
+        :ref:`tap-zuora`
+
+    .. container:: tile
+
+        .. container:: img-hover-zoom
+
+          .. image:: img/google-analytics-logo.png
+             :target: connectors/taps/google_analytics.html
+
+        :ref:`tap-google-analytics`
+
+.. container:: tile-wrapper
+
+    .. container:: tile
+
+        .. container:: img-hover-zoom
+
           .. image:: img/mongodb-logo.png
              :target: connectors/taps/mongodb.html
 
