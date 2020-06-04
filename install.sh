@@ -182,6 +182,7 @@ EXTRA_CONNECTORS=(
     tap-adwords
     tap-oracle
     tap-zuora
+    tap-google-analytics
 )
 
 # Install only the default connectors if --connectors argument not passed

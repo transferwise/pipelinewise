@@ -32,6 +32,7 @@ services:
 
       TAP_MONGODB_HOST: db_mongo_source
       TAP_MONGODB_PORT: ${TAP_MONGODB_PORT}
+      TAP_MONGODB_PORT_ON_HOST: ${TAP_MONGODB_PORT_ON_HOST}
       TAP_MONGODB_USER: ${TAP_MONGODB_USER}
       TAP_MONGODB_PASSWORD: ${TAP_MONGODB_PASSWORD}
       TAP_MONGODB_DB: ${TAP_MONGODB_DB}
@@ -98,7 +99,7 @@ services:
       MONGO_PASSWORD: ${TAP_MONGODB_PASSWORD}
       MONGO_REPLICA_HOST: db_mongo_source
     volumes:
-      - ./mongo/init.sh:/docker-entrypoint-initdb.d/init.sh
+      - ./mongo/create_user.sh:/docker-entrypoint-initdb.d/create_user.sh
     command: [mongod, --replSet, rs0]
     networks:
       - pipelinewise_network
