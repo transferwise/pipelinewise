@@ -153,15 +153,6 @@ PipelineWise can replicate data from the following data sources:
              :target: connectors/taps/mongodb.html
 
         :ref:`tap-mongodb`
-    
-    .. container:: tile
-
-        .. container:: img-hover-zoom
-
-          .. image:: img/zuora-logo.png
-             :target: connectors/taps/zuora.html
-
-        :ref:`tap-zuora`
 
 
 Target (Destination Connectors)
