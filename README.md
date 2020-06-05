@@ -170,7 +170,8 @@ For further instructions about setting up local development environment go to
 ## Contribution
 
 To add new taps and targets follow the instructions on
-[Contribution Page](https://transferwise.github.io/pipelinewise/project/contribution.html)
+* [Contribution Page](https://transferwise.github.io/pipelinewise/project/contribution.html)
+* [Code contribution guide](./CONTRIBUTING.md)
 
 
 ## Links
