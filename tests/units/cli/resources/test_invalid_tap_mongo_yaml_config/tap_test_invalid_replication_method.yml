@@ -1,0 +1,27 @@
+---
+
+id: "mysql_sample"
+name: "Sample MySQL Database"
+type: "tap-mongodb"
+owner: "somebody@foo.com"
+
+
+db_conn:
+  host: "<HOST>"
+  port: 3306
+  user: "<USER>"
+  password: "<PASSWORD>"
+  dbname: "<DB_NAME>"
+
+target: "test_snowflake_target"
+batch_size_rows: 20000
+
+schemas:
+  - source_schema: "my_db"
+    target_schema: "repl_my_db"
+    target_schema_select_permissions:
+      - grp_stats
+
+    tables:
+      - table_name: "table_one"
+        replication_method: "INCREMENTAL"
