@@ -32,8 +32,6 @@ Pull requests are the best way to propose changes to the codebase (we use [Githu
 5. Make sure your code lints.
 6. Issue that pull request!
 
-Pull requests trigger CI checks which run on a private CircleCI hosted on TransferWise's infrastructure.  
-
 
 ## Any contributions you make will be under the Apache License Version 2.0.
 In short, when you submit code changes, your submissions are understood to be under the same [Apache License Version 2.0](./LICENSE) that covers the project. Feel free to contact the maintainers if that's a concern.
