@@ -3,7 +3,7 @@
 # ------------------------------------------------------------------------------
 # General Properties
 # ------------------------------------------------------------------------------
-id: "tap_mongo_to_pg"
+id: "mongo_to_pg"
 name: "MongoDB source test database"
 type: "tap-mongodb"
 owner: "test-runner"
