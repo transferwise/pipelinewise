@@ -4,6 +4,7 @@ RUN apt-get -qq update && apt-get -qqy install \
         apt-utils \
         alien \
         libaio1 \
+        mongo-tools \
     && pip install --upgrade pip
 
 # Oracle Instant Clinet for tap-oracle
