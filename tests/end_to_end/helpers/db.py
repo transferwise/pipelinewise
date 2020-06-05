@@ -1,8 +1,12 @@
+from typing import Union
+
 import psycopg2
 import psycopg2.extras
+import pymongo
 import pymysql
 import snowflake.connector
 
+from pymongo.database import Database
 
 # pylint: disable=too-many-arguments
 def run_query_postgres(query, host, port, user, password, database):
@@ -214,3 +218,21 @@ def sql_dynamic_row_count_redshift(schemas: list) -> str:
            || 'ORDER BY tbl'
       FROM table_list
     """
+
+
+def get_mongodb_connection(host: str,
+                           port: Union[str, int],
+                           user: str,
+                           password: str,
+                           database: str,
+                           auth_database: str)->Database:
+    """
+    Creates a mongoDB connection to the db to sync from
+    Returns: Database instance with established connection
+
+    """
+    return pymongo.MongoClient(host=host,
+                               port=int(port),
+                               username=user,
+                               password=password,
+                               authSource=auth_database)[database]

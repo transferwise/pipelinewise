@@ -1,5 +1,11 @@
 import os
+import uuid
+from datetime import datetime
+from random import randint
+
+import bson
 import pytest
+from bson import Timestamp
 
 from .helpers import tasks
 from .helpers import assertions
@@ -7,7 +13,7 @@ from .helpers.env import E2EEnv
 
 DIR = os.path.dirname(__file__)
 TAP_MARIADB_ID = 'mariadb_to_pg'
-TAP_MONGODB_ID = 'tap_mongo'
+TAP_MONGODB_ID = 'mongo_to_pg'
 TAP_POSTGRES_ID = 'postgres_to_pg'
 TAP_S3_CSV_ID = 's3_csv_to_pg'
 TARGET_ID = 'postgres_dwh'
@@ -29,6 +35,7 @@ class TestTargetPostgres:
         self.run_query_tap_mysql = self.e2e.run_query_tap_mysql
         self.run_query_tap_postgres = self.e2e.run_query_tap_postgres
         self.run_query_target_postgres = self.e2e.run_query_target_postgres
+        self.mongodb_con = self.e2e.get_tap_mongodb_connection()
 
     def teardown_method(self):
         """Delete test directories and database objects"""
@@ -87,7 +94,7 @@ class TestTargetPostgres:
         assertions.assert_row_counts_equal(self.run_query_tap_postgres, self.run_query_target_postgres)
         assertions.assert_all_columns_exist(self.run_query_tap_postgres, self.e2e.run_query_target_postgres)
 
-        # 2. Make changes in MariaDB source database
+        # 2. Make changes in pg source database
         #  LOG_BASED - Missing due to some changes that's required in tap-postgres to test it automatically
         #  INCREMENTAL
         self.run_query_tap_postgres('INSERT INTO public.city (id, name, countrycode, district, population) '
@@ -131,11 +138,56 @@ class TestTargetPostgres:
     def test_replicate_mongodb_to_pg(self):
         """Replicate mongodb to Postgres"""
 
-        def assert_columns_exist():
-            """Helper inner function to test if every table and column exists in target snowflake"""
-            assertions.assert_cols_in_table(self.run_query_target_postgres, 'ppw_e2e_tap_mongodb', 'listings',
-                                            ['_id', 'document', '_sdc_deleted_at'])
+        def assert_columns_exist(table):
+            """Helper inner function to test if every table and column exists in the target"""
+            assertions.assert_cols_in_table(self.run_query_target_postgres, 'ppw_e2e_tap_mongodb', table,
+                                            ['_id', 'document', '_sdc_extracted_at',
+                                             '_sdc_batched_at', '_sdc_deleted_at'])
 
-        # Run tap first time - singer should be triggered
-        assertions.assert_run_tap_success(TAP_MONGODB_ID, TARGET_ID, ['singer'])
-        assert_columns_exist()
+        def assert_row_counts_equal(target_schema, table, count_in_source):
+            assert count_in_source == \
+                   self.run_query_target_postgres(f'select count(_id) from {target_schema}.{table}')[0][0]
+
+        # Run tap first time - fastsync and singer should be triggered
+        assertions.assert_run_tap_success(TAP_MONGODB_ID, TARGET_ID, ['fastsync', 'singer'])
+        assert_columns_exist('listings')
+        assert_columns_exist('my_collection')
+
+        listing_count = self.mongodb_con['listings'].count_documents({})
+        my_coll_count = self.mongodb_con['my_collection'].count_documents({})
+
+        assert_row_counts_equal('ppw_e2e_tap_mongodb', 'listings', listing_count)
+        assert_row_counts_equal('ppw_e2e_tap_mongodb', 'my_collection', my_coll_count)
+
+        result_insert = self.mongodb_con.my_collection.insert_many([
+            {
+                'age': randint(10, 30),
+                'id': 1001,
+                'uuid': uuid.uuid4(),
+                'ts': Timestamp(12030, 500)
+            },
+            {
+                'date': datetime.utcnow(),
+                'id': 1002,
+                'uuid': uuid.uuid4(),
+                'regex': bson.Regex(r'^[A-Z]\\w\\d{2,6}.*$')
+            },
+            {
+                'uuid': uuid.uuid4(),
+                'id': 1003,
+                'nested_json': {'a': 1, 'b': 3, 'c': {'key': bson.datetime.datetime(2020, 5, 3, 10, 0, 0)}}
+            }
+        ])
+        my_coll_count += len(result_insert.inserted_ids)
+
+        result_del = self.mongodb_con.my_collection.delete_one({'_id': result_insert.inserted_ids[0]})
+        my_coll_count -= result_del.deleted_count
+
+        result_update = self.mongodb_con.my_collection.update_many({}, {'$set': {'id': 0}})
+
+        assertions.assert_run_tap_success(TAP_MONGODB_ID, TARGET_ID, ['fastsync', 'singer'])
+
+        assert result_update.modified_count == self.run_query_target_postgres(
+            'select count(_id) from ppw_e2e_tap_mongodb.my_collection where cast(document->>\'id\' as int) = 0')[0][0]
+
+        assert_row_counts_equal('ppw_e2e_tap_mongodb', 'my_collection', my_coll_count)

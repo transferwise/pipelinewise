@@ -29,6 +29,8 @@ references:
           TAP_MONGODB_USER: mongoUser
           TAP_MONGODB_PASSWORD: Password1
           TAP_MONGODB_DB: test
+          TAP_MONGODB_ROOT_USER: mongoUser
+          TAP_MONGODB_ROOT_PASSWORD: Password1
 
       # PostgreSQL service container image used as test source database (for tap-postgres)
       - image: postgres:11.4
@@ -62,7 +64,8 @@ references:
           MONGO_INITDB_ROOT_USERNAME: mongoUser
           MONGO_INITDB_ROOT_PASSWORD: Password1
           MONGO_INITDB_DATABASE: test
-        command: [mongod]
+        command: [mongod, --replSet, rs0]
+
 jobs:
   test:
     <<: *container_config
@@ -74,6 +77,10 @@ jobs:
           command: |
             sudo apt-get update
             sudo apt install mariadb-client postgresql-client mongo-tools
+            wget https://repo.mongodb.org/apt/ubuntu/dists/bionic/mongodb-org/4.2/multiverse/binary-amd64/mongodb-org-shell_4.2.7_amd64.deb
+            sudo dpkg -i ./mongodb-org-shell_4.2.7_amd64.deb && rm mongodb-org-shell_4.2.7_amd64.deb
+            ./dev-project/mongo/init_rs.sh
+
             ./tests/db/tap_mysql_db.sh
             ./tests/db/tap_postgres_db.sh
             ./tests/db/tap_mongodb.sh
@@ -91,14 +98,23 @@ jobs:
             pylint pipelinewise tests
 
       - run:
-          name: 'Run tests'
+          name: 'Run unit tests'
           command: |
             . .virtualenvs/pipelinewise/bin/activate
             export PIPELINEWISE_HOME=$PWD
             mkdir test-reports
-            coverage run -m pytest -v --junitxml=test-reports/junit.xml
+            coverage run -m pytest tests/units -v --junitxml=test-reports/junit.xml
             coverage report
             coverage html -d coverage_html
+
+      - run:
+          name: 'Run E2E tests'
+          command: |
+            . .virtualenvs/pipelinewise/bin/activate
+            export PIPELINEWISE_HOME=$PWD
+            pytest tests/end_to_end -v
+          no_output_timeout: 15m
+
       - store_test_results:
           path: test-reports
       - store_artifacts:

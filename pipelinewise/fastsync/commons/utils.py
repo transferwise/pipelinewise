@@ -6,6 +6,10 @@ import logging
 
 LOGGER = logging.getLogger(__name__)
 
+SDC_EXTRACTED_AT = '_SDC_EXTRACTED_AT'
+SDC_BATCHED_AT = '_SDC_BATCHED_AT'
+SDC_DELETED_AT = '_SDC_DELETED_AT'
+
 
 # pylint: disable=missing-function-docstring
 def get_cpu_cores():
@@ -83,7 +87,11 @@ def get_tables_from_properties(properties):
     return tables
 
 
-def get_bookmark_for_table(table, properties, db_engine, dbname=None):
+def get_bookmark_for_table(
+        table,
+        properties,
+        db_engine,
+        dbname=None):
     """Get actual bookmark for a specific table used for LOG_BASED or INCREMENTAL
     replications
     """

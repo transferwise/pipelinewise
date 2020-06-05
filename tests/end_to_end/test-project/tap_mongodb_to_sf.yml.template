@@ -3,7 +3,7 @@
 # ------------------------------------------------------------------------------
 # General Properties
 # ------------------------------------------------------------------------------
-id: "tap_mongo"
+id: "mongo_to_sf"
 name: "MongoDB source test database"
 type: "tap-mongodb"
 owner: "test-runner"
@@ -13,28 +13,31 @@ owner: "test-runner"
 # Source (Tap) - Mongo connection details
 # ------------------------------------------------------------------------------
 db_conn:
-  host: "db_mongo_source"               # Mongodb host
-  port: 27017                           # Mongodb port
-  user: "pipelinewise"                  # Mongodb user
-  password: "secret"                    # Mongodb plain string or vault encrypted
-  auth_database: "admin"            # Mongodb database to authenticate on
-  dbname: "mongo_source_db"           # Mongodb database name to sync from
-  replica_set: "rs0"        # Mongodb replica set name, default null
+  host: "${TAP_MONGODB_HOST}"               	# Mongodb host
+  port: ${TAP_MONGODB_PORT}                     # Mongodb port
+  user: "${TAP_MONGODB_USER}"                  	# Mongodb user
+  password: "${TAP_MONGODB_PASSWORD}"           # Mongodb plain string or vault encrypted
+  auth_database: "admin"            			# Mongodb database to authenticate on
+  dbname: "${TAP_MONGODB_DB}"           		# Mongodb database name to sync from
+#  replica_set: rs0      						# Mongodb replica set name, default null
 
 # ------------------------------------------------------------------------------
 # Destination (Target) - Target properties
 # Connection details should be in the relevant target YAML file
 # ------------------------------------------------------------------------------
-target: "postgres_dwh"                   # ID of the target connector where the data will be loaded
+target: "snowflake"                   # ID of the target connector where the data will be loaded
 batch_size_rows: 1000                  # Batch size for the stream to optimise load performance
 
 # ------------------------------------------------------------------------------
 # Source to target Schema mapping
 # ------------------------------------------------------------------------------
 schemas:
-  - source_schema: "mongo_source_db"
-    target_schema: "mongodb_sync"
+  - source_schema: "${TAP_MONGODB_DB}"
+    target_schema: "ppw_e2e_tap_mongodb"
 
     tables:
       - table_name: "listings"
         replication_method: "FULL_TABLE"
+
+      - table_name: "my_collection"
+        replication_method: "LOG_BASED"
