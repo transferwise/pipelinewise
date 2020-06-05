@@ -1260,6 +1260,7 @@ class PipelineWise:
                     'modified_since' not in stream_bookmark) \
                 or (replication_method == self.LOG_BASED and
                     'lsn' not in stream_bookmark and
+                    'log_pos' not in stream_bookmark and
                     'token' not in stream_bookmark)
 
 
