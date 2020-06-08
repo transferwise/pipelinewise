@@ -24,6 +24,8 @@ cd dev-project
 ./mongo/init_rs.sh
 ../tests/db/tap_mongodb.sh
 
+../tests/db/target_postgres.sh
+
 # Install PipelineWise in the container
 ../install.sh --acceptlicenses --nousage --connectors=target-snowflake,target-postgres,tap-mysql,tap-postgres,tap-mongodb,transform-field,tap-s3-csv
 if [[ $? != 0 ]]; then
