@@ -33,7 +33,7 @@ batch_size_rows: 1000                  # Batch size for the stream to optimise l
 # ------------------------------------------------------------------------------
 schemas:
   - source_schema: "mongo_source_db"
-    target_schema: "mongodb_sync"
+    target_schema: "ppw_dev_tap_mongo"
 
     tables:
       - table_name: "listings"
