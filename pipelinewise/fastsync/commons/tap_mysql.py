@@ -200,15 +200,15 @@ class FastSyncTapMySql:
                 SELECT column_name,
                     data_type,
                     column_type,
-                    CONCAT("REPLACE(", safe_sql_value, ", '\n', ' ')") safe_sql_value
+                    safe_sql_value
                 FROM (SELECT column_name,
                             data_type,
                             column_type,
                             CASE
                             WHEN data_type IN ('blob', 'tinyblob', 'mediumblob', 'longblob', 'geometry')
-                                    THEN concat('hex(`', column_name, '`)')
+                                    THEN CONCAT('REPLACE(hex(`', column_name, '`)', ", '\n', ' ')")
                             WHEN data_type IN ('binary', 'varbinary')
-                                    THEN concat('hex(trim(trailing CHAR(0x00) from `',COLUMN_NAME,'`))')
+                                    THEN concat('REPLACE(hex(trim(trailing CHAR(0x00) from `',COLUMN_NAME,'`))', ", '\n', ' ')")
                             WHEN data_type IN ('bit')
                                     THEN concat('cast(`', column_name, '` AS unsigned)')
                             WHEN data_type IN ('datetime', 'timestamp', 'date')
@@ -216,8 +216,8 @@ class FastSyncTapMySql:
                             WHEN column_type IN ('tinyint(1)')
                                     THEN concat('CASE WHEN `' , column_name , '` is null THEN null WHEN `' , column_name , '` = 0 THEN 0 ELSE 1 END')
                             WHEN column_name = 'raw_data_hash'
-                                    THEN concat('hex(`', column_name, '`)')
-                            ELSE concat('cast(`', column_name, '` AS char CHARACTER SET utf8)')
+                                    THEN concat('REPLACE(hex(`', column_name, '`)', ", '\n', ' ')")
+                            ELSE concat('REPLACE(cast(`', column_name, '` AS char CHARACTER SET utf8)', ", '\n', ' ')")
                                 END AS safe_sql_value,
                             ordinal_position
                     FROM information_schema.columns
