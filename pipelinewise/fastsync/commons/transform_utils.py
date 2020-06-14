@@ -30,6 +30,7 @@ class SQLFlavor(Enum):
     """
     SNOWFLAKE = 'snowflake'
     POSTGRES = 'postgres'
+    BIGQUERY = 'bigquery'
 
 
 # pylint: disable=too-few-public-methods
@@ -162,17 +163,21 @@ class TransformationHelper:
 
             elif 'regex_match' in condition:
 
+                value = f"'{condition['regex_match']}'"
+
                 if sql_flavor == SQLFlavor.SNOWFLAKE:
                     operator = 'REGEXP'
 
                 elif sql_flavor == SQLFlavor.POSTGRES:
                     operator = '~'
 
+                elif sql_flavor == SQLFlavor.BIGQUERY:
+                    conditions.append(f"REGEXP_CONTAINS({cls.__safe_column(condition['column'], sql_flavor)}, {value})")
+                    continue
+
                 else:
                     raise NotImplementedError(f'regex_match conditional transformation in {sql_flavor.value} SQL '
                                               f'flavor not implemented!')
-
-                value = f"'{condition['regex_match']}'"
 
             else:
                 continue
@@ -189,6 +194,9 @@ class TransformationHelper:
 
         elif sql_flavor == SQLFlavor.POSTGRES:
             column = f'"{col.lower()}"'
+
+        elif sql_flavor == SQLFlavor.BIGQUERY:
+            column = f'`{col.lower()}`'
 
         else:
             column = col
@@ -212,6 +220,9 @@ class TransformationHelper:
 
         elif sql_flavor == SQLFlavor.POSTGRES:
             trans = f'{column} = ENCODE(DIGEST({column}, \'sha256\'), \'hex\')'
+
+        elif sql_flavor == SQLFlavor.BIGQUERY:
+            trans = f'{column} = TO_BASE64(SHA256({column}))'
 
         else:
             raise NotImplementedError(
@@ -240,6 +251,9 @@ class TransformationHelper:
         elif sql_flavor == SQLFlavor.POSTGRES:
             trans = '{0} = CONCAT(SUBSTRING({0}, 1, {1}), ENCODE(DIGEST(SUBSTRING({0}, {1} + 1), ' \
                     '\'sha256\'), \'hex\'))'.format(column, skip_first_n)
+        elif sql_flavor == SQLFlavor.BIGQUERY:
+            trans = '{0} = CONCAT(SUBSTRING({0}, 1, {1}), TO_BASE64(SHA256(SUBSTRING({0}, {1} + 1))))'.format(
+                column, skip_first_n)
         else:
             raise NotImplementedError(f'HASH-SKIP-FIRST-{skip_first_n} transformation in {sql_flavor.value} SQL flavor '
                                       f'not implemented!')
@@ -271,6 +285,10 @@ class TransformationHelper:
                     'DATE_PART(\'hour\', {0})::int, ' \
                     'DATE_PART(\'minute\', {0})::int, ' \
                     'DATE_PART(\'second\', {0})::double precision)'.format(column)
+        elif sql_flavor == SQLFlavor.BIGQUERY:
+            trans = f'{column} = TIMESTAMP(DATETIME(' \
+                    f'DATE(EXTRACT(YEAR FROM {column}), 1, 1),' \
+                    f'TIME({column})))'
         else:
             raise NotImplementedError(f'MASK-DATE transformation in {sql_flavor.value} SQL flavor '
                                       f'not implemented!')

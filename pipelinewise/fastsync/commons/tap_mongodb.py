@@ -147,7 +147,9 @@ class FastSyncTapMongoDB:
                    temp_dir: str,
                    split_large_files=False,
                    split_file_chunk_size_mb=1000,
-                   split_file_max_chunks=20):
+                   split_file_max_chunks=20,
+                   compress=True
+                   ):
         """
         Export data from table to a zipped csv
         Args:
@@ -174,7 +176,8 @@ class FastSyncTapMongoDB:
             gzip_splitter = split_gzip.open(filepath,
                                             mode='wt',
                                             chunk_size_mb=split_file_chunk_size_mb,
-                                            max_chunks=split_file_max_chunks if split_large_files else 0)
+                                            max_chunks=split_file_max_chunks if split_large_files else 0,
+                                            compress=compress)
             with gzip.open(export_file_path, 'rb') as export_file, gzip_splitter as gzfile:
                 writer = csv.DictWriter(gzfile,
                                         fieldnames=[elem[0] for elem in self._get_collection_columns()],

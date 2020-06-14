@@ -3,6 +3,7 @@ Pipelinewise common utils between cli and fastsync
 """
 from typing import Optional
 
+QUOTE_CHARACTER='"'
 
 def safe_column_name(name: Optional[str]) -> Optional[str]:
     """
@@ -14,6 +15,6 @@ def safe_column_name(name: Optional[str]) -> Optional[str]:
         str: safe column name
     """
     if name:
-        return f'"{name.upper()}"'
+        return f'{QUOTE_CHARACTER}{name.upper()}{QUOTE_CHARACTER}'
 
     return name

@@ -345,11 +345,26 @@ class FastSyncTapPostgres:
 
         return None
 
-    def get_table_columns(self, table_name):
+    def get_table_columns(self, table_name, max_num=None, date_type='date'):
         """
         Get PG table column details from information_schema
         """
         table_dict = utils.tablename_to_dict(table_name)
+
+        if max_num:
+            decimals = len(max_num.split('.')[1]) if '.' in max_num else 0
+            decimal_format = f"""
+              'CASE WHEN "' || column_name || '" IS NULL THEN NULL ELSE GREATEST(LEAST({max_num}, ROUND("' || column_name || '"::numeric , {decimals})), -{max_num}) END'
+            """
+            integer_format = """
+              '"' || column_name || '"'
+            """
+        else:
+            decimal_format = """
+              '"' || column_name || '"'
+            """
+            integer_format = decimal_format
+
         sql = """
                 SELECT
                     column_name
@@ -360,12 +375,15 @@ class FastSyncTapPostgres:
                 data_type,
                 CASE
                     WHEN data_type = 'ARRAY' THEN 'array_to_json("' || column_name || '") AS ' || column_name
+                    WHEN data_type = 'date' THEN column_name || '::{} AS ' || column_name
                     WHEN udt_name = 'time' THEN 'replace("' || column_name || E'"::varchar,\\\'24:00:00\\\',\\\'00:00:00\\\') AS ' || column_name
                     WHEN udt_name = 'timetz' THEN 'replace(("' || column_name || E'" at time zone \'\'UTC\'\')::time::varchar,\\\'24:00:00\\\',\\\'00:00:00\\\') AS ' || column_name
                     WHEN udt_name in ('timestamp', 'timestamptz') THEN
                        'CASE WHEN "' ||column_name|| E'" < \\'0001-01-01 00:00:00.000\\' '
                             'OR "' ||column_name|| E'" > \\'9999-12-31 23:59:59.999\\' THEN \\'9999-12-31 23:59:59.999\\' '
                             'ELSE "' ||column_name|| '" END AS "' ||column_name|| '"'
+                    WHEN data_type IN ('double precision', 'numeric', 'decimal', 'real') THEN {} || ' AS ' || column_name
+                    WHEN data_type IN ('smallint', 'integer', 'bigint', 'serial', 'bigserial') THEN {} || ' AS ' || column_name
                     ELSE '"'||column_name||'"'
                 END AS safe_sql_value
                 FROM information_schema.columns
@@ -373,7 +391,7 @@ class FastSyncTapPostgres:
                     AND table_name = '{}'
                 ORDER BY ordinal_position
                 ) AS x
-            """.format(table_dict.get('schema_name'), table_dict.get('table_name'))
+            """.format(date_type, decimal_format, integer_format, table_dict.get('schema_name'), table_dict.get('table_name'))
         return self.query(sql)
 
     def map_column_types_to_target(self, table_name):
@@ -392,9 +410,13 @@ class FastSyncTapPostgres:
     def copy_table(self,
                    table_name,
                    path,
+                   max_num=None,
+                   date_type='date',
                    split_large_files=False,
                    split_file_chunk_size_mb=1000,
-                   split_file_max_chunks=20):
+                   split_file_max_chunks=20,
+                   compress=True
+                   ):
         """
         Export data from table to a zipped csv
         Args:
@@ -405,7 +427,7 @@ class FastSyncTapPostgres:
             split_file_chunk_size_mb: File chunk sizes if `split_large_files` enabled. (Default: 1000)
             split_file_max_chunks: Max number of chunks if `split_large_files` enabled. (Default: 20)
         """
-        table_columns = self.get_table_columns(table_name)
+        table_columns = self.get_table_columns(table_name, max_num, date_type)
         column_safe_sql_values = [c.get('safe_sql_value') for c in table_columns]
 
         # If self.get_table_columns returns zero row then table not exist
@@ -425,7 +447,8 @@ class FastSyncTapPostgres:
         gzip_splitter = split_gzip.open(path,
                                         mode='wb',
                                         chunk_size_mb=split_file_chunk_size_mb,
-                                        max_chunks=split_file_max_chunks if split_large_files else 0)
+                                        max_chunks=split_file_max_chunks if split_large_files else 0,
+                                        compress=compress)
 
         with gzip_splitter as split_gzip_files:
             self.curr.copy_expert(sql, split_gzip_files, size=131072)

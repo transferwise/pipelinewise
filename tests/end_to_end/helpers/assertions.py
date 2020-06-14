@@ -101,7 +101,9 @@ def assert_cols_in_table(query_runner_fn: callable, table_schema: str, table_nam
     :param table_name: table with the columns
     :param columns: list of columns to check if there are in the table's columns
     """
-    sql = db.sql_get_columns_for_table(table_schema, table_name)
+    funcs = _map_tap_to_target_functions(None, query_runner_fn)
+    sql_get_columns_for_table_fn = funcs.get('target_sql_get_table_cols_fn', db.sql_get_columns_for_table)
+    sql = sql_get_columns_for_table_fn(table_schema, table_name)
     result = query_runner_fn(sql)
     cols = [res[0] for res in result]
     try:
@@ -149,6 +151,13 @@ def _map_tap_to_target_functions(tap_query_runner_fn: callable, target_query_run
             'target_sql_get_cols_fn': db.sql_get_columns_snowflake,
             'target_sql_dynamic_row_count_fn': db.sql_dynamic_row_count_snowflake,
         },
+        # target-bigquery specific attributes and functions
+        'run_query_target_bigquery': {
+            'target_sql_get_cols_fn': db.sql_get_columns_bigquery,
+            'target_sql_get_table_cols_fn': db.sql_get_columns_for_table_bigquery,
+            'target_sql_dynamic_row_count_fn': db.sql_dynamic_row_count_bigquery,
+            'target_sql_safe_name_fn': db.safe_name_bigquery,
+        },
         # target-redshift specific attributes and functions
         'run_query_target_redshift': {
             'target_sql_get_cols_fn': db.sql_get_columns_redshift,
@@ -157,7 +166,10 @@ def _map_tap_to_target_functions(tap_query_runner_fn: callable, target_query_run
     }
 
     # Merge the keys into one dict by tap and target query runner names
-    return {**f_map[tap_query_runner_fn.__name__], **f_map[target_query_runner_fn.__name__]}
+    if tap_query_runner_fn:
+        return {**f_map[tap_query_runner_fn.__name__], **f_map[target_query_runner_fn.__name__]}
+    else:
+        return {**f_map[target_query_runner_fn.__name__]}
 
 
 def assert_row_counts_equal(tap_query_runner_fn: callable, target_query_runner_fn: callable) -> None:
@@ -184,6 +196,11 @@ def assert_row_counts_equal(tap_query_runner_fn: callable, target_query_runner_f
     # Run the generated SQLs
     row_counts_in_source = _run_sql(tap_query_runner_fn, source_sql_row_count)
     row_counts_in_target = _run_sql(target_query_runner_fn, target_sql_row_count)
+
+    # Some sources and targets can't be compared directly (e.g. BigQuery doesn't accept spaces in table names)
+    # we fix that by renaming the source tables to names that the target would accept
+    if 'target_sql_safe_name_fn' in funcs:
+        row_counts_in_source = [(funcs['target_sql_safe_name_fn'](table), row_count) for (table,row_count) in row_counts_in_source]
 
     # Compare the two dataset
     assert row_counts_in_target == row_counts_in_source
@@ -239,6 +256,12 @@ def assert_all_columns_exist(tap_query_runner_fn: callable,
     # Compare the two dataset
     for table_cols in source_table_cols:
         table_to_check = table_cols[0].lower()
+
+        # Some sources and targets can't be compared directly (e.g. BigQuery doesn't accept spaces in table names)
+        # we fix that by renaming the source tables to names that the target would accept
+        if 'target_sql_safe_name_fn' in funcs:
+            table_to_check = funcs['target_sql_safe_name_fn'](table_to_check)
+
         source_cols = table_cols[1].lower().split(';')
 
         try:
