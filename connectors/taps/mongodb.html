@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Tap S3 CSV &mdash; PipelineWise  documentation</title>
+  <title>Tap MongoDB &mdash; PipelineWise  documentation</title>
   
 
   
@@ -17,7 +17,7 @@
   
   
   
-    <link rel="canonical" href="https://docs.ansible.com/ansible/latest/connectors/taps/s3_csv.html"/>
+    <link rel="canonical" href="https://docs.ansible.com/ansible/latest/connectors/taps/mongodb.html"/>
   
 
   
@@ -40,8 +40,8 @@
   <link rel="stylesheet" href="../../_static/css/custom.css" type="text/css" />
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
-    <link rel="next" title="Tap Kafka" href="kafka.html" />
-    <link rel="prev" title="Tap Oracle" href="oracle.html" /> 
+    <link rel="next" title="Tap Salesforce" href="salesforce.html" />
+    <link rel="prev" title="Tap Snowflake" href="snowflake.html" /> 
 </head>
 
 <body class="wy-body-for-nav">
@@ -122,13 +122,14 @@
 <li class="toctree-l2"><a class="reference internal" href="mysql.html">Tap MySQL</a></li>
 <li class="toctree-l2"><a class="reference internal" href="postgres.html">Tap PostgreSQL</a></li>
 <li class="toctree-l2"><a class="reference internal" href="oracle.html">Tap Oracle</a></li>
-<li class="toctree-l2 current"><a class="current reference internal" href="#">Tap S3 CSV</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="s3_csv.html">Tap S3 CSV</a></li>
+<li class="toctree-l2"><a class="reference internal" href="kafka.html">Tap Kafka</a></li>
+<li class="toctree-l2"><a class="reference internal" href="snowflake.html">Tap Snowflake</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Tap MongoDB</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#mongodb-setup-requirements">MongoDB setup requirements</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#configuring-what-to-replicate">Configuring what to replicate</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="kafka.html">Tap Kafka</a></li>
-<li class="toctree-l2"><a class="reference internal" href="snowflake.html">Tap Snowflake</a></li>
-<li class="toctree-l2"><a class="reference internal" href="mongodb.html">Tap MongoDB</a></li>
 <li class="toctree-l2"><a class="reference internal" href="salesforce.html">Tap Salesforce</a></li>
 <li class="toctree-l2"><a class="reference internal" href="zendesk.html">Tap Zendesk</a></li>
 <li class="toctree-l2"><a class="reference internal" href="jira.html">Tap Jira</a></li>
@@ -190,13 +191,13 @@
         
           <li><a href="../taps.html">Taps (Data Sources)</a> &raquo;</li>
         
-      <li>Tap S3 CSV</li>
+      <li>Tap MongoDB</li>
     
     
       <li class="wy-breadcrumbs-aside">
         
             
-            <a href="../../_sources/connectors/taps/s3_csv.rst.txt" rel="nofollow"> View page source</a>
+            <a href="../../_sources/connectors/taps/mongodb.rst.txt" rel="nofollow"> View page source</a>
           
         
       </li>
@@ -209,80 +210,110 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
             
-  <div class="section" id="tap-s3-csv">
-<span id="id1"></span><h1>Tap S3 CSV<a class="headerlink" href="#tap-s3-csv" title="Permalink to this headline">¶</a></h1>
+  <div class="section" id="tap-mongodb">
+<span id="id1"></span><h1>Tap MongoDB<a class="headerlink" href="#tap-mongodb" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="mongodb-setup-requirements">
+<h2>MongoDB setup requirements<a class="headerlink" href="#mongodb-setup-requirements" title="Permalink to this headline">¶</a></h2>
+<p><strong>Step 1: Check if you have all the required credentials for replicating data from MongoDB</strong></p>
+<ul class="simple">
+<li><p>The user must have one of the following roles: <code class="docutils literal notranslate"><span class="pre">read</span></code>, <code class="docutils literal notranslate"><span class="pre">readWrite</span></code>, <code class="docutils literal notranslate"><span class="pre">readAnyDatabase</span></code>, <code class="docutils literal notranslate"><span class="pre">readWriteAnyDatabase</span></code>, <code class="docutils literal notranslate"><span class="pre">dbOwner</span></code>, <code class="docutils literal notranslate"><span class="pre">backup</span></code>, <code class="docutils literal notranslate"><span class="pre">root</span></code>. These roles allow PipelineWise to see and read from the dbs to sync from.</p></li>
+<li><p>If privileges are set, the user must have at least these two actions: <code class="docutils literal notranslate"><span class="pre">find</span></code> and <code class="docutils literal notranslate"><span class="pre">changeStream</span></code>. These actions are necessary because they’re the actions that PipelineWise performs while syncing.</p></li>
+</ul>
+<p><strong>Step 2: Required database server settings</strong></p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This step is only required if you use <a class="reference internal" href="../../concept/replication_methods.html#log-based"><span class="std std-ref">Log Based</span></a> replication method.</p>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>To use log_based replication, your MongoDB server must be running MongoDB version 3.6 or greater, is either a replica set or sharded cluster and majority read concern is enabled.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">log_based</span></code> replication makes use of ChangeStreams that were introduced in version 3.6, for more info on ChangeStreams, head over to <a class="reference external" href="https://docs.mongodb.com/manual/changeStreams/">the official documentation</a>.</p>
+</div>
+<p><strong>Step 3. Create a PipelineWise database user</strong></p>
+<p>Next, you’ll create a dedicated user for PipelineWise. The user needs to have:</p>
+<ul class="simple">
+<li><p>One of the roles <code class="docutils literal notranslate"><span class="pre">read</span></code>, <code class="docutils literal notranslate"><span class="pre">readWrite</span></code>, <code class="docutils literal notranslate"><span class="pre">readAnyDatabase</span></code>, <code class="docutils literal notranslate"><span class="pre">readWriteAnyDatabase</span></code>, <code class="docutils literal notranslate"><span class="pre">dbOwner</span></code>, <code class="docutils literal notranslate"><span class="pre">backup</span></code>, <code class="docutils literal notranslate"><span class="pre">root</span></code> on the database that you want to replicate</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">find</span></code> &amp; <code class="docutils literal notranslate"><span class="pre">changeStream</span></code> privileges on the every collection that you want to replicate.</p></li>
+</ul>
+<p>Example:</p>
+<div class="highlight-js notranslate"><div class="highlight"><pre><span></span><span class="nx">db</span><span class="p">.</span><span class="nx">createRole</span><span class="p">({</span>
+
+        <span class="s2">&quot;role&quot;</span> <span class="o">:</span> <span class="s2">&quot;PipelineWiseRole&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;privileges&quot;</span> <span class="o">:</span> <span class="p">[{</span>
+
+                <span class="s2">&quot;resource&quot;</span> <span class="o">:</span><span class="p">{</span>
+
+                        <span class="s2">&quot;db&quot;</span> <span class="o">:</span> <span class="s2">&quot;my_db&quot;</span><span class="p">,</span>
+                        <span class="s2">&quot;collection&quot;</span> <span class="o">:</span> <span class="s2">&quot;my_collection&quot;</span>
+
+                <span class="p">},</span>
+                <span class="s2">&quot;actions&quot;</span> <span class="o">:</span> <span class="p">[</span><span class="s2">&quot;find&quot;</span><span class="p">,</span> <span class="s2">&quot;changeStream&quot;</span><span class="p">]</span>
+
+        <span class="p">}],</span>
+        <span class="s2">&quot;roles&quot;</span> <span class="o">:</span> <span class="p">[{</span><span class="s2">&quot;role&quot;</span><span class="o">:</span> <span class="s2">&quot;read&quot;</span><span class="p">,</span> <span class="s2">&quot;db&quot;</span><span class="o">:</span> <span class="s2">&quot;my_db&quot;</span><span class="p">}]</span>
+
+<span class="p">});</span>
+
+<span class="nx">db</span><span class="p">.</span><span class="nx">createUser</span><span class="p">({</span>
+
+        <span class="s2">&quot;user&quot;</span> <span class="o">:</span> <span class="s2">&quot;PipelineWiseUser&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;pwd&quot;</span><span class="o">:</span> <span class="s2">&quot;mY_VerY_StRonG_PaSSwoRd&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;roles&quot;</span> <span class="o">:</span> <span class="p">[</span><span class="s2">&quot;PipelineWiseRole&quot;</span><span class="p">]</span>
+
+<span class="p">});</span>
+</pre></div>
+</div>
+</div>
 <div class="section" id="configuring-what-to-replicate">
 <h2>Configuring what to replicate<a class="headerlink" href="#configuring-what-to-replicate" title="Permalink to this headline">¶</a></h2>
 <p>PipelineWise configures every tap with a common structured YAML file format.
-A sample YAML for S3 CSV replication can be generated into a project directory by
+A sample YAML for MongoDB replication can be generated into a project directory by
 following the steps in the <a class="reference internal" href="../../installation_guide/creating_pipelines.html#generating-pipelines"><span class="std std-ref">Generating Sample Pipelines</span></a> section.</p>
-<p>Example YAML for <code class="docutils literal notranslate"><span class="pre">tap-s3-csv</span></code>:</p>
+<p>Example YAML for <code class="docutils literal notranslate"><span class="pre">tap-mongodb</span></code>:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>---
 
 <span class="c1"># ------------------------------------------------------------------------------</span>
 <span class="c1"># General Properties</span>
 <span class="c1"># ------------------------------------------------------------------------------</span>
-id: <span class="s2">&quot;csv_on_s3&quot;</span>                        <span class="c1"># Unique identifier of the tap</span>
-name: <span class="s2">&quot;Sample CSV files on S3&quot;</span>          <span class="c1"># Name of the tap</span>
-type: <span class="s2">&quot;tap-s3-csv&quot;</span>                     <span class="c1"># !! THIS SHOULD NOT CHANGE !!</span>
-owner: <span class="s2">&quot;somebody@foo.com&quot;</span>              <span class="c1"># Data owner to contact</span>
+id: <span class="s2">&quot;tap_mongo&quot;</span>
+name: <span class="s2">&quot;MongoDB tap&quot;</span>
+type: <span class="s2">&quot;tap-mongodb&quot;</span>
+owner: <span class="s2">&quot;foo@bar.com&quot;</span>
 
 
 <span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="c1"># Source (Tap) - S3 connection details</span>
+<span class="c1"># Source (Tap) - Mongo connection details</span>
 <span class="c1"># ------------------------------------------------------------------------------</span>
 db_conn:
-  aws_access_key_id: <span class="s2">&quot;&lt;ACCESS_KEY_ID&gt;&quot;</span>          <span class="c1"># Plain string or vault encrypted</span>
-  aws_secret_access_key: <span class="s2">&quot;&lt;SECRET_ACCESS_KEY&gt;&quot;</span>  <span class="c1"># Plain string or vault encrypted</span>
-  <span class="c1">#aws_endpoint_url: &quot;&lt;FULL_ENDPOINT_URL&gt;&quot;      # Optional: for non AWS S3, for example https://nyc3.digitaloceanspaces.com</span>
-  bucket: <span class="s2">&quot;my-bucket&quot;</span>                           <span class="c1"># S3 Bucket name</span>
-  start_date: <span class="s2">&quot;2000-01-01&quot;</span>                      <span class="c1"># File before this data will be excluded</span>
-
+        host: <span class="s2">&quot;mongodb_host1,mongodb_host2,mongodb_host3&quot;</span>       <span class="c1"># Mongodb host(s)</span>
+        port: <span class="m">27017</span>                                             <span class="c1"># Mongodb port</span>
+        user: <span class="s2">&quot;PipelineWiseUser&quot;</span>                                <span class="c1"># Mongodb user</span>
+        password: <span class="s2">&quot;mY_VerY_StRonG_PaSSwoRd&quot;</span>                     <span class="c1"># Mongodb plain string or vault encrypted</span>
+        auth_database: <span class="s2">&quot;admin&quot;</span>                                  <span class="c1"># Mongodb database to authenticate on</span>
+        dbname: <span class="s2">&quot;my_db&quot;</span>                                         <span class="c1"># Mongodb database name to sync from</span>
+        replica_set: <span class="s2">&quot;my_replica_set&quot;</span>                           <span class="c1"># Optional, Mongodb replica set name, default null</span>
 
 <span class="c1"># ------------------------------------------------------------------------------</span>
 <span class="c1"># Destination (Target) - Target properties</span>
 <span class="c1"># Connection details should be in the relevant target YAML file</span>
 <span class="c1"># ------------------------------------------------------------------------------</span>
-target: <span class="s2">&quot;snowflake&quot;</span>                       <span class="c1"># ID of the target connector where the data will be loaded</span>
-batch_size_rows: <span class="m">20000</span>                    <span class="c1"># Batch size for the stream to optimise load performance</span>
-default_target_schema: <span class="s2">&quot;s3_feeds&quot;</span>         <span class="c1"># Target schema where the data will be loaded</span>
-default_target_schema_select_permission:  <span class="c1"># Optional: Grant SELECT on schema and tables that created</span>
-  - grp_power
-<span class="c1"># primary_key_required: False             # Optional: in case you want to load tables without key</span>
-                                          <span class="c1">#            properties, uncomment this. Please note</span>
-                                          <span class="c1">#            that files without primary keys will not</span>
-                                          <span class="c1">#            be de-duplicated and could cause</span>
-                                          <span class="c1">#            duplicates. Always try selecting</span>
-                                          <span class="c1">#            a reasonable key from the CSV file</span>
-
+target: <span class="s2">&quot;my_target&quot;</span>                                     <span class="c1"># ID of the target connector where the data will be loaded</span>
+batch_size_rows: <span class="m">1000</span>                                   <span class="c1"># Batch size for the stream to optimise load performance</span>
 
 <span class="c1"># ------------------------------------------------------------------------------</span>
 <span class="c1"># Source to target Schema mapping</span>
 <span class="c1"># ------------------------------------------------------------------------------</span>
 schemas:
-  - source_schema: <span class="s2">&quot;s3_feeds&quot;</span> <span class="c1"># This is mandatory, but can be anything in this tap type</span>
-    target_schema: <span class="s2">&quot;s3_feeds&quot;</span> <span class="c1"># Target schema in the destination Data Warehouse</span>
+        - source_schema: <span class="s2">&quot;my_db&quot;</span>                        <span class="c1"># Same name as dbname</span>
+          target_schema: <span class="s2">&quot;ppw_e2e_tap_mongodb&quot;</span>          <span class="c1"># Name of target schema to load to</span>
 
-    <span class="c1"># List of CSV files to destination tables</span>
-    tables:
+          <span class="c1"># List of collections to sync</span>
+          tables:
+                - table_name: <span class="s2">&quot;my_collection&quot;</span>
+                  replication_method: <span class="s2">&quot;FULL_TABLE&quot;</span>
 
-      <span class="c1"># Every file in S3 bucket that matches the search pattern will be loaded into this table</span>
-      - table_name: <span class="s2">&quot;feed_file_one&quot;</span>
-        s3_csv_mapping:
-          search_pattern: <span class="s2">&quot;^feed_file_one_.*.csv</span>$<span class="s2">&quot;</span> <span class="c1"># Required.</span>
-          search_prefix: <span class="s2">&quot;&quot;</span>                        <span class="c1"># Optional</span>
-          key_properties: <span class="o">[</span><span class="s2">&quot;id&quot;</span><span class="o">]</span>                   <span class="c1"># Optional</span>
-          delimiter: <span class="s2">&quot;,&quot;</span>                           <span class="c1"># Optional. Default: &#39;,&#39;</span>
-
-        <span class="c1"># OPTIONAL: Load time transformations</span>
-        <span class="c1">#transformations:</span>
-        <span class="c1">#  - column: &quot;last_name&quot;            # Column to transform</span>
-        <span class="c1">#    type: &quot;SET-NULL&quot;               # Transformation type</span>
-
-      <span class="c1"># You can add as many tables as you need...</span>
-      - table_name: <span class="s2">&quot;feed_file_two&quot;</span>
-        s3_csv_mapping:
-          search_pattern: <span class="s2">&quot;^feed_file_tow_.csv</span>$<span class="s2">&quot;</span>
+                <span class="c1"># default replication method is LOG_BASED</span>
+                - table_name: <span class="s2">&quot;my_other_collection&quot;</span>
 </pre></div>
 </div>
 </div>
@@ -296,10 +327,10 @@ schemas:
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
-        <a href="kafka.html" class="btn btn-neutral float-right" title="Tap Kafka" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+        <a href="salesforce.html" class="btn btn-neutral float-right" title="Tap Salesforce" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
       
       
-        <a href="oracle.html" class="btn btn-neutral float-left" title="Tap Oracle" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+        <a href="snowflake.html" class="btn btn-neutral float-left" title="Tap Snowflake" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
       
     </div>
   
