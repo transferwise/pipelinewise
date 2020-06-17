@@ -39,6 +39,7 @@ Documentation is available at https://transferwise.github.io/pipelinewise/
 Tap extracts data from any source and write it to a standard stream in a JSON-based format, and target
 consumes data from taps and do something with it, like load it into a file, API or database
 
+
 | Type      | Name       | Extra | Latest Version | Description                                          |
 |-----------|------------|-------|----------------|------------------------------------------------------|
 | Tap       | **[Postgres](https://github.com/transferwise/pipelinewise-tap-postgres)** | | [![PyPI version](https://badge.fury.io/py/pipelinewise-tap-postgres.svg)](https://badge.fury.io/py/pipelinewise-tap-postgres) | Extracts data from PostgreSQL databases. Supporting Log-Based, Key-Based Incremental and Full Table replications |
@@ -49,6 +50,7 @@ consumes data from taps and do something with it, like load it into a file, API 
 | Tap       | **[Snowflake](https://github.com/transferwise/pipelinewise-tap-snowflake)** | | [![PyPI version](https://badge.fury.io/py/pipelinewise-tap-snowflake.svg)](https://badge.fury.io/py/pipelinewise-tap-snowflake) | Extracts data from Snowflake databases. Supporting Key-Based Incremental and Full Table replications |
 | Tap       | **[Salesforce](https://github.com/singer-io/tap-salesforce)** | | [![PyPI version](https://badge.fury.io/py/tap-salesforce.svg)](https://badge.fury.io/py/tap-salesforce) | Extracts data from Salesforce database using BULK and REST extraction API with Key-Based incremental replications |
 | Tap       | **[Jira](https://github.com/singer-io/tap-jira)** | | [![PyPI version](https://badge.fury.io/py/tap-jira.svg)](https://badge.fury.io/py/tap-jira) | Extracts data from Atlassian Jira using Base auth or OAuth credentials |
+| Tap       | **[MongoDB](https://github.com/transferwise/pipelinewise-tap-mongodb)** | | [![PyPI version](https://badge.fury.io/py/pipelinewise-tap-mongodb.svg)](https://badge.fury.io/py/pipelinewise-tap-mongodb) | Extracts data from MongoDB databases. Supporting Log-Based and Full Table replications |
 | Tap       | **[AdWords](https://github.com/singer-io/tap-adwords)** | Extra | [![PyPI version](https://badge.fury.io/py/tap-adwords.svg)](https://badge.fury.io/py/tap-adwords) | Extracts data Google Ads API (former Google Adwords) using OAuth and support incremental loading based on input state |
 | Tap       | **[Google Analytics](https://github.com/transferwise/pipelinewise-tap-google-analytics)** | Extra | [![PyPI version](https://badge.fury.io/py/pipelinewise-tap-google-analytics.svg)](https://badge.fury.io/py/tap-adwords) | Extracts data from Google Analytics |
 | Tap       | **[Oracle](https://github.com/transferwise/pipelinewise-tap-oracle)** | Extra | [![PyPI version](https://badge.fury.io/py/pipelinewise-tap-oracle.svg)](https://badge.fury.io/py/pipelinewise-tap-oracle) | Extracts data from Oracle databases. Supporting Log-Based, Key-Based Incremental and Full Table replications |
@@ -60,6 +62,7 @@ consumes data from taps and do something with it, like load it into a file, API 
 | Transform | **[Field](https://github.com/transferwise/pipelinewise-transform-field)** | | [![PyPI version](https://badge.fury.io/py/pipelinewise-transform-field.svg)](https://badge.fury.io/py/pipelinewise-transform-field) | Transforms fields from any tap and sends the results to any target. Recommended for data masking/ obfuscation |
 
 **Note**: Extra connectors are experimental connectors and written by community contributors. These connectors are not maintained regularly and not installed by default. To install the extra packages use the `--connectors=all` option when installing PipelineWise.
+
 
 ### Running from docker
 
@@ -88,7 +91,7 @@ recommended method of start using PipelineWise.
     0 pipeline(s)
     ```
 
-You can run any pipelinewise command at this point. Tutorials to create and run pipelines is at https://transferwise.github.io/pipelinewise/installation_guide/creating_pipelines.html .
+You can run any pipelinewise command at this point. Tutorials to create and run pipelines is at [creating pipelines](https://transferwise.github.io/pipelinewise/installation_guide/creating_pipelines.html).
 
 **Running tests**:
 
@@ -130,7 +133,7 @@ You can run any pipelinewise command at this point. Tutorials to create and run 
     0 pipeline(s)
     ```
 
-You can run any pipelinewise command at this point. Tutorials to create and run pipelines is at https://transferwise.github.io/pipelinewise/installation_guide/creating_pipelines.html .
+You can run any pipelinewise command at this point. Tutorials to create and run pipelines is at [creating pipelines](https://transferwise.github.io/pipelinewise/installation_guide/creating_pipelines.html).
 
 **To run unit tests**:
 

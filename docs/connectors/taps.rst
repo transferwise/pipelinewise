@@ -127,6 +127,16 @@ PipelineWise can replicate data from the following data sources:
 
         :ref:`tap-google-analytics`
 
+.. container:: tile-wrapper
+
+    .. container:: tile
+
+        .. container:: img-hover-zoom
+
+          .. image:: ../img/mongodb-logo.png
+             :target: taps/mongodb.html
+
+        :ref:`tap-mongodb`
 
 Configuring taps
 ----------------
@@ -139,6 +149,7 @@ Configuring taps
    taps/s3_csv
    taps/kafka
    taps/snowflake
+   taps/mongodb
    taps/salesforce
    taps/zendesk
    taps/jira

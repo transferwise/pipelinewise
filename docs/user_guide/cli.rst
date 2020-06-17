@@ -122,7 +122,7 @@ the tap and target connectors into ``~/.pipelinewise``.
 
 :--dir: relative path to the project directory to import
 
-.. _cli_validate
+.. _cli_validate:
 
 validate
 """"""""
