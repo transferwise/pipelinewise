@@ -225,6 +225,7 @@ class TestConfig:
                             'type': 'tap-mysql',
                             'name': 'Sample MySQL Database',
                             'owner': 'somebody@foo.com',
+                            'stream_buffer_size': None,
                             'enabled': True,
                         }
                     ]

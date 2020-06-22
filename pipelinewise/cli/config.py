@@ -171,6 +171,7 @@ class Config:
                     'name': tap.get('name'),
                     'type': tap.get('type'),
                     'owner': tap.get('owner'),
+                    'stream_buffer_size': tap.get('stream_buffer_size'),
                     'enabled': True
                 })
 

@@ -17,6 +17,8 @@ from joblib import Parallel, delayed, parallel_backend
 from tabulate import tabulate
 
 from . import utils
+from . import commands
+from .commands import TapParams, TargetParams, TransformParams
 from .config import Config
 
 
@@ -48,7 +50,7 @@ class PipelineWise:
             self.target = self.get_target(args.target)
             self.target_bin = self.get_connector_bin(self.target['type'])
 
-        self.tranform_field_bin = self.get_connector_bin('transform-field')
+        self.transform_field_bin = self.get_connector_bin('transform-field')
         self.tap_run_log_file = None
 
         # Catch SIGINT and SIGTERM to exit gracefully
@@ -749,40 +751,16 @@ class PipelineWise:
         print(tabulate(tab_body, headers=tab_headers, tablefmt='simple'))
         print(f'{pipelines} pipeline(s)')
 
-    # pylint: disable=too-many-locals,too-many-arguments
-    def run_tap_singer(self, tap_type, tap_config, tap_properties, tap_state, tap_transformation, target_config):
+    def run_tap_singer(self, tap: TapParams, target: TargetParams, transform: TransformParams,
+                       stream_buffer_size: int = 0) -> str:
         """
-        Generating and running piped shell command to sync tables using singer taps and targets
+        Generate and run piped shell command to sync tables using singer taps and targets
         """
-        # Following the singer spec the catalog JSON file needs to be passed by the --catalog argument
-        # However some tap (i.e. tap-mysql and tap-postgres) requires it as --properties
-        # This is probably for historical reasons and need to clarify on Singer slack channels
-        tap_catalog_argument = utils.get_tap_property_by_tap_type(tap_type, 'tap_catalog_argument')
-
-        # Add state argument if exists to extract data incrementally
-        tap_state_arg = ''
-        if os.path.isfile(tap_state):
-            tap_state_arg = f'--state {tap_state}'
-
-        # Detect if transformation is needed
-        has_transformation = False
-        if os.path.isfile(tap_transformation):
-            trans = utils.load_json(tap_transformation)
-            if 'transformations' in trans and len(trans['transformations']) > 0:
-                has_transformation = True
-
-        # Run without transformation in the middle
-        if not has_transformation:
-            command = ' '.join(
-                (f'  {self.tap_bin} --config {tap_config} {tap_catalog_argument} {tap_properties} {tap_state_arg}',
-                 f'| {self.target_bin} --config {target_config}'))
-
-        # Run with transformation in the middle
-        else:
-            command = ' '.join(
-                (f'  {self.tap_bin} --config {tap_config} {tap_catalog_argument} {tap_properties} {tap_state_arg}',
-                 f'| {self.tranform_field_bin} --config {tap_transformation}',
-                 f'| {self.target_bin} --config {target_config}'))
+        # Build the piped executable command
+        command = commands.build_singer_command(tap=tap,
+                                                target=target,
+                                                transform=transform,
+                                                stream_buffer_size=stream_buffer_size)
 
         # Do not run if another instance is already running
         log_dir = os.path.dirname(self.tap_run_log_file)
@@ -803,7 +781,7 @@ class PipelineWise:
                 nonlocal start, state
 
                 if start is None or time() - start >= 2:
-                    with open(tap_state, 'w') as state_file:
+                    with open(tap.state, 'w') as state_file:
                         state_file.write(line)
 
                     # Update start time to be the current time.
@@ -828,33 +806,20 @@ class PipelineWise:
 
         # update the state file one last time to make sure it always has the last state message.
         if state is not None:
-            with open(tap_state, 'w') as statefile:
+            with open(tap.state, 'w') as statefile:
                 statefile.write(state)
 
-    # pylint: disable=too-many-arguments
-    def run_tap_fastsync(self, tap_type, target_type, tap_config, tap_properties, tap_state, tap_transformation,
-                         target_config):
+    def run_tap_fastsync(self, tap: TapParams, target: TargetParams, transform: TransformParams):
         """
         Generating and running shell command to sync tables using the native fastsync components
         """
-        fastsync_bin = utils.get_fastsync_bin(self.venv_dir, tap_type, target_type)
-
-        # Add state argument if exists to extract data incrementally
-        tap_transform_arg = ''
-        if os.path.isfile(tap_transformation):
-            tap_transform_arg = f'--transform {tap_transformation}'
-
-        tables_command = f'--tables {self.args.tables}' if self.args.tables else ''
-        command = ' '.join((
-            f'  {fastsync_bin} ',
-            f'--tap {tap_config}',
-            f'--properties {tap_properties}',
-            f'--state {tap_state}',
-            f'--target {target_config}',
-            f'--temp_dir {self.get_temp_dir()}',
-            f'{tap_transform_arg}',
-            f'{tables_command}'
-        ))
+        # Build the fastsync executable command
+        command = commands.build_fastsync_command(tap=tap,
+                                                  target=target,
+                                                  transform=transform,
+                                                  venv_dir=self.venv_dir,
+                                                  temp_dir=self.get_temp_dir(),
+                                                  tables=self.args.tables)
 
         # Do not run if another instance is already running
         log_dir = os.path.dirname(self.tap_run_log_file)
@@ -895,11 +860,11 @@ class PipelineWise:
                     replication are not using the singer components because
                     they are too slow to sync large tables.
         """
-
         tap_id = self.tap['id']
         tap_type = self.tap['type']
         target_id = self.target['id']
         target_type = self.target['type']
+        stream_buffer_size = self.tap.get('stream_buffer_size', commands.DEFAULT_STREAM_BUFFER_SIZE)
 
         self.logger.info('Running %s tap in %s target', tap_id, target_id)
 
@@ -952,19 +917,18 @@ class PipelineWise:
         start_time = datetime.now()
         try:
             with pidfile.PIDFile(self.tap['files']['pidfile']):
+                target_params = TargetParams(target_type, self.target_bin, cons_target_config)
+                transform_params = TransformParams(self.transform_field_bin, tap_transformation)
+
                 # Run fastsync for FULL_TABLE replication method
                 if len(fastsync_stream_ids) > 0:
                     self.logger.info('Table(s) selected to sync by fastsync: %s', fastsync_stream_ids)
                     self.tap_run_log_file = os.path.join(log_dir, f'{target_id}-{tap_id}-{current_time}.fastsync.log')
-                    self.run_tap_fastsync(
-                        tap_type,
-                        target_type,
-                        tap_config,
-                        tap_properties_fastsync,
-                        tap_state,
-                        tap_transformation,
-                        cons_target_config
-                    )
+                    tap_params = TapParams(tap_type, self.tap_bin, tap_config, tap_properties_fastsync, tap_state)
+
+                    self.run_tap_fastsync(tap=tap_params,
+                                          target=target_params,
+                                          transform=transform_params)
                 else:
                     self.logger.info('No table available that needs to be sync by fastsync')
 
@@ -972,14 +936,12 @@ class PipelineWise:
                 if len(singer_stream_ids) > 0:
                     self.logger.info('Table(s) selected to sync by singer: %s', singer_stream_ids)
                     self.tap_run_log_file = os.path.join(log_dir, f'{target_id}-{tap_id}-{current_time}.singer.log')
-                    self.run_tap_singer(
-                        tap_type,
-                        tap_config,
-                        tap_properties_singer,
-                        tap_state,
-                        tap_transformation,
-                        cons_target_config
-                    )
+                    tap_params = TapParams(tap_type, self.tap_bin, tap_config, tap_properties_singer, tap_state)
+
+                    self.run_tap_singer(tap=tap_params,
+                                        target=target_params,
+                                        transform=transform_params,
+                                        stream_buffer_size=stream_buffer_size)
                 else:
                     self.logger.info('No table available that needs to be sync by singer')
 
@@ -1087,15 +1049,14 @@ class PipelineWise:
         try:
             with pidfile.PIDFile(self.tap['files']['pidfile']):
                 self.tap_run_log_file = os.path.join(log_dir, f'{target_id}-{tap_id}-{current_time}.fastsync.log')
-                self.run_tap_fastsync(
-                    tap_type,
-                    target_type,
-                    tap_config,
-                    tap_properties,
-                    tap_state,
-                    tap_transformation,
-                    cons_target_config
-                )
+
+                # Create parameters as NamedTuples
+                tap_params = TapParams(tap_type, self.tap_bin, tap_config, tap_properties, tap_state)
+                target_params = TargetParams(self.target_bin, cons_target_config)
+                transform_params = TransformParams(self.transform_field_bin, tap_transformation)
+                self.run_tap_fastsync(tap=tap_params,
+                                      target=target_params,
+                                      transform=transform_params)
 
         except pidfile.AlreadyRunningError:
             self.logger.error('Another instance of the tap is already running.')
