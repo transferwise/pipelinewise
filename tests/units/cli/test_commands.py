@@ -6,6 +6,7 @@ import pipelinewise.cli.commands as commands
 from pipelinewise.cli.errors import StreamBufferTooLargeException
 
 
+# pylint: disable=no-self-use
 class TestCommands:
     """
     Unit tests for PipelineWise CLI commands functions
@@ -72,6 +73,7 @@ class TestCommands:
                                                         config=transform_config)
         assert command == f'/bin/transform_field.py --config {transform_config}'
 
+    # pylint: disable=invalid-name
     def test_build_stream_buffer_command(self):
         """Tests the function that generates stream buffer executable command"""
         # Should return empty string if buffer size is invalid or too small
