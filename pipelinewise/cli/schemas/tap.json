@@ -213,6 +213,11 @@
       "minimum": 1000,
       "maximum": 500000
     },
+    "stream_buffer_size": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000
+    },
     "schemas": {
       "type": "array",
       "items": {

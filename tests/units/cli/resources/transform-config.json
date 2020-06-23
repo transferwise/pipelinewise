@@ -1,0 +1,18 @@
+{
+    "transformations": [
+        {
+            "field_id": "device_name",
+            "safe_field_id": "\"DEVICE_NAME\"",
+            "tap_stream_name": "public-payment_token",
+            "type": "SET-NULL",
+            "when": null
+        },
+        {
+            "field_id": "token_pan",
+            "safe_field_id": "\"TOKEN_PAN\"",
+            "tap_stream_name": "public-payment_token",
+            "type": "SET-NULL",
+            "when": null
+        }
+    ]
+}

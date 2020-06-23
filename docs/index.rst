@@ -239,6 +239,7 @@ Content
    concept/singer
    concept/replication_methods
    concept/fastsync
+   concept/linux_pipes
 
 .. toctree::
    :maxdepth: 2

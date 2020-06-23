@@ -2,7 +2,7 @@
 
 # Install OS dependencies
 apt-get update
-apt-get install -y mariadb-client postgresql-client alien libaio1 mongo-tools
+apt-get install -y mariadb-client postgresql-client alien libaio1 mongo-tools mbuffer
 
 wget https://repo.mongodb.org/apt/ubuntu/dists/bionic/mongodb-org/4.2/multiverse/binary-amd64/mongodb-org-shell_4.2.7_amd64.deb
 dpkg -i ./mongodb-org-shell_4.2.7_amd64.deb && rm mongodb-org-shell_4.2.7_amd64.deb
