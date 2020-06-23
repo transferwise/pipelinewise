@@ -1,8 +1,7 @@
 
 
 <!DOCTYPE html>
-<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
-<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<html class="writer-html5" lang="en" >
 <head>
   <meta charset="utf-8">
   
@@ -10,6 +9,11 @@
   
   <title>Target Snowflake &mdash; PipelineWise  documentation</title>
   
+
+  
+  <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/css/custom.css" type="text/css" />
 
   
   
@@ -21,7 +25,9 @@
   
 
   
-  <script type="text/javascript" src="../../_static/js/modernizr.min.js"></script>
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
   
     
       <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
@@ -33,11 +39,6 @@
     <script type="text/javascript" src="../../_static/js/theme.js"></script>
 
     
-
-  
-  <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
-  <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
-  <link rel="stylesheet" href="../../_static/css/custom.css" type="text/css" />
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
     <link rel="next" title="Target Redshift" href="redshift.html" />
@@ -55,7 +56,7 @@
           
 
           
-            <a href="../../index.html" class="icon icon-home"> PipelineWise
+            <a href="../../index.html" class="icon icon-home" alt="Documentation Home"> PipelineWise
           
 
           
@@ -82,6 +83,7 @@
           
         </div>
 
+        
         <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
           
             
@@ -141,6 +143,7 @@
             
           
         </div>
+        
       </div>
     </nav>
 
@@ -179,7 +182,7 @@
 
   <ul class="wy-breadcrumbs">
     
-      <li><a href="../../index.html">Docs</a> &raquo;</li>
+      <li><a href="../../index.html" class="icon icon-home"></a> &raquo;</li>
         
           <li><a href="../targets.html">Targets (Destinations)</a> &raquo;</li>
         
@@ -209,9 +212,11 @@
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
 <dl class="simple">
-<dt>You need to create two objects in a Snowflake schema before start replicating data to Snowflake:</dt><dd><ul class="simple">
+<dt>You need to create a few objects in a Snowflake schema before start replicating data to Snowflake:</dt><dd><ul class="simple">
 <li><p><strong>Named External Stage</strong>: to upload the CSV files to S3 and to MERGE data into snowflake tables.</p></li>
 <li><p><strong>Named File Format</strong>: to run MERGE/COPY commands and to parse the CSV files correctly</p></li>
+<li><p><strong>A Role</strong>: to grant all the required permissions</p></li>
+<li><p><strong>A User</strong>: to run PipelineWise</p></li>
 </ul>
 </dd>
 </dl>
@@ -219,7 +224,7 @@
 <ol class="arabic simple">
 <li><p>Create a named external stage object on S3:</p></li>
 </ol>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>CREATE STAGE <span class="o">{</span>schema<span class="o">}</span>.<span class="o">{</span>stage_name<span class="o">}</span>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>CREATE STAGE <span class="o">{</span>database<span class="o">}</span>.<span class="o">{</span>schema<span class="o">}</span>.<span class="o">{</span>stage_name<span class="o">}</span>
 <span class="nv">url</span><span class="o">=</span><span class="s1">&#39;s3://{s3_bucket}&#39;</span>
 <span class="nv">credentials</span><span class="o">=(</span><span class="nv">AWS_KEY_ID</span><span class="o">=</span><span class="s1">&#39;{aws_key_id}&#39;</span> <span class="nv">AWS_SECRET_KEY</span><span class="o">=</span><span class="s1">&#39;{aws_secret_key}&#39;</span><span class="o">)</span>
 <span class="nv">encryption</span><span class="o">=(</span><span class="nv">MASTER_KEY</span><span class="o">=</span><span class="s1">&#39;{client_side_encryption_master_key}&#39;</span><span class="o">)</span><span class="p">;</span>
@@ -237,12 +242,38 @@ key in the <code class="docutils literal notranslate"><span class="pre">target-s
 <ol class="arabic simple" start="2">
 <li><p>Create a named file format:</p></li>
 </ol>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>CREATE file format IF NOT EXISTS <span class="o">{</span>schema<span class="o">}</span>.<span class="o">{</span>file_format_name<span class="o">}</span>
-<span class="nb">type</span> <span class="o">=</span> <span class="s1">&#39;CSV&#39;</span> <span class="nv">escape</span><span class="o">=</span><span class="s1">&#39;\\&#39;</span> <span class="nv">field_optionally_enclosed_by</span><span class="o">=</span><span class="s1">&#39;&quot;&#39;</span><span class="p">;</span>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>CREATE FILE FORMAT <span class="o">{</span>database<span class="o">}</span>.<span class="o">{</span>schema<span class="o">}</span>.<span class="o">{</span>file_format_name<span class="o">}</span>
+<span class="nv">TYPE</span> <span class="o">=</span> <span class="s1">&#39;CSV&#39;</span> <span class="nv">ESCAPE</span><span class="o">=</span><span class="s1">&#39;\\&#39;</span> <span class="nv">FIELD_OPTIONALLY_ENCLOSED_BY</span><span class="o">=</span><span class="s1">&#39;&quot;&#39;</span><span class="p">;</span>
 </pre></div>
 </div>
-<p>3. Create a Snowflake user with permissions to create new schemas and tables in a
-Snowflake database.</p>
+<ol class="arabic simple" start="3">
+<li><p>Create a Role with all the required permissions:</p></li>
+</ol>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>CREATE OR REPLACE ROLE ppw_target_snowflake<span class="p">;</span>
+GRANT USAGE ON DATABASE <span class="o">{</span>database<span class="o">}</span> TO ROLE ppw_target_snowflake<span class="p">;</span>
+GRANT CREATE SCHEMA ON DATABASE <span class="o">{</span>database<span class="o">}</span> TO ROLE ppw_target_snowflake<span class="p">;</span>
+
+GRANT USAGE ON SCHEMA <span class="o">{</span>database<span class="o">}</span>.<span class="o">{</span>schema<span class="o">}</span> TO role ppw_target_snowflake<span class="p">;</span>
+GRANT USAGE ON STAGE <span class="o">{</span>database<span class="o">}</span>.<span class="o">{</span>schema<span class="o">}</span>.<span class="o">{</span>stage_name<span class="o">}</span> TO ROLE ppw_target_snowflake<span class="p">;</span>
+GRANT USAGE ON FILE FORMAT <span class="o">{</span>database<span class="o">}</span>.<span class="o">{</span>schema<span class="o">}</span>.<span class="o">{</span>file_format_name<span class="o">}</span> TO ROLE ppw_target_snowflake<span class="p">;</span>
+GRANT USAGE ON WAREHOUSE <span class="o">{</span>warehouse<span class="o">}</span> TO ROLE ppw_target_snowflake<span class="p">;</span>
+</pre></div>
+</div>
+<p>Replace <code class="docutils literal notranslate"><span class="pre">database</span></code>, <code class="docutils literal notranslate"><span class="pre">schema</span></code>, <code class="docutils literal notranslate"><span class="pre">warehouse</span></code>, <code class="docutils literal notranslate"><span class="pre">stage_name</span></code> and <code class="docutils literal notranslate"><span class="pre">file_format_name</span></code>
+between <code class="docutils literal notranslate"><span class="pre">{</span></code> and <code class="docutils literal notranslate"><span class="pre">}</span></code> characters to the actual values from point 1 and 2.</p>
+<ol class="arabic simple" start="4">
+<li><p>Create a user and grant permission to the role:</p></li>
+</ol>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>CREATE OR REPLACE USER <span class="o">{</span>user<span class="o">}</span>
+<span class="nv">PASSWORD</span> <span class="o">=</span> <span class="s1">&#39;{password}&#39;</span>
+<span class="nv">DEFAULT_ROLE</span> <span class="o">=</span> ppw_target_snowflake
+<span class="nv">DEFAULT_WAREHOUSE</span> <span class="o">=</span> <span class="s1">&#39;{warehouse}&#39;</span>
+<span class="nv">MUST_CHANGE_PASSWORD</span> <span class="o">=</span> FALSE<span class="p">;</span>
+
+GRANT ROLE ppw_target_snowflake TO USER <span class="o">{</span>user<span class="o">}</span><span class="p">;</span>
+</pre></div>
+</div>
+<p>Replace <code class="docutils literal notranslate"><span class="pre">warehouse</span></code> between <code class="docutils literal notranslate"><span class="pre">{</span></code> and <code class="docutils literal notranslate"><span class="pre">}</span></code> characters to the actual values from point 3.</p>
 </div>
 <div class="section" id="configuring-where-to-replicate-data">
 <h2>Configuring where to replicate data<a class="headerlink" href="#configuring-where-to-replicate-data" title="Permalink to this headline">¶</a></h2>
@@ -313,11 +344,19 @@ db_conn:
 
   <div role="contentinfo">
     <p>
+        
         &copy; Copyright 2020, TransferWise Ltd.
 
     </p>
   </div>
-  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+    
+    
+    
+    Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
 
 </footer>
 
@@ -328,7 +367,6 @@ db_conn:
 
   </div>
   
-
 
   <script type="text/javascript">
       jQuery(function () {
