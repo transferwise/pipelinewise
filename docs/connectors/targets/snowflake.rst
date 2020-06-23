@@ -10,15 +10,17 @@ Snowflake setup requirements
 
 .. warning::
 
-  You need to create two objects in a Snowflake schema before start replicating data to Snowflake:
+  You need to create a few objects in a Snowflake schema before start replicating data to Snowflake:
    * **Named External Stage**: to upload the CSV files to S3 and to MERGE data into snowflake tables.
    * **Named File Format**: to run MERGE/COPY commands and to parse the CSV files correctly
+   * **A Role**: to grant all the required permissions
+   * **A User**: to run PipelineWise
 
 1. Create a named external stage object on S3:
 
 .. code-block:: bash
 
-    CREATE STAGE {schema}.{stage_name}
+    CREATE STAGE {database}.{schema}.{stage_name}
     url='s3://{s3_bucket}'
     credentials=(AWS_KEY_ID='{aws_key_id}' AWS_SECRET_KEY='{aws_secret_key}')
     encryption=(MASTER_KEY='{client_side_encryption_master_key}');
@@ -33,12 +35,39 @@ Snowflake setup requirements
 
 .. code-block:: bash
 
-    CREATE file format IF NOT EXISTS {schema}.{file_format_name}
-    type = 'CSV' escape='\\' field_optionally_enclosed_by='"';
+    CREATE FILE FORMAT {database}.{schema}.{file_format_name}
+    TYPE = 'CSV' ESCAPE='\\' FIELD_OPTIONALLY_ENCLOSED_BY='"';
 
-3. Create a Snowflake user with permissions to create new schemas and tables in a
-Snowflake database.
+3. Create a Role with all the required permissions:
 
+.. code-block:: bash
+
+    CREATE OR REPLACE ROLE ppw_target_snowflake;
+    GRANT USAGE ON DATABASE {database} TO ROLE ppw_target_snowflake;
+    GRANT CREATE SCHEMA ON DATABASE {database} TO ROLE ppw_target_snowflake;
+
+    GRANT USAGE ON SCHEMA {database}.{schema} TO role ppw_target_snowflake;
+    GRANT USAGE ON STAGE {database}.{schema}.{stage_name} TO ROLE ppw_target_snowflake;
+    GRANT USAGE ON FILE FORMAT {database}.{schema}.{file_format_name} TO ROLE ppw_target_snowflake;
+    GRANT USAGE ON WAREHOUSE {warehouse} TO ROLE ppw_target_snowflake;
+
+Replace ``database``, ``schema``, ``warehouse``, ``stage_name`` and ``file_format_name``
+between ``{`` and ``}`` characters to the actual values from point 1 and 2.
+
+
+4. Create a user and grant permission to the role:
+
+.. code-block:: bash
+
+    CREATE OR REPLACE USER {user}
+    PASSWORD = '{password}'
+    DEFAULT_ROLE = ppw_target_snowflake
+    DEFAULT_WAREHOUSE = '{warehouse}'
+    MUST_CHANGE_PASSWORD = FALSE;
+
+    GRANT ROLE ppw_target_snowflake TO USER {user};
+
+Replace ``warehouse`` between ``{`` and ``}`` characters to the actual values from point 3.
 
 Configuring where to replicate data
 '''''''''''''''''''''''''''''''''''
