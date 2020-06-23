@@ -173,7 +173,7 @@ def build_singer_command(tap: TapParams, target: TargetParams, transform: Transf
     stream_buffer_command = build_stream_buffer_command(stream_buffer_size)
 
     # Generate the final piped command with all the required components
-    sub_commands = [tap_command, stream_buffer_command, transformation_command, target_command]
+    sub_commands = [tap_command, transformation_command, stream_buffer_command, target_command]
     command = ' | '.join(list(filter(None, sub_commands)))
 
     return command

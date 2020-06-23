@@ -122,6 +122,26 @@ class TestCommands:
                           f' | /bin/transform_field.py --config {transform_config}' \
                           ' | /bin/target_postgres.py --config .ppw/config.json'
 
+        # Should generate a command with tap state and transformation and stream buffer
+        tap_params = commands.TapParams(type='tap-mysql',
+                                        bin='/bin/tap_mysql.py',
+                                        config='.ppw/config.json',
+                                        properties='.ppw/properties.json',
+                                        state=state_mock)
+        target_params = commands.TargetParams(type='target-postgres',
+                                              bin='/bin/target_postgres.py',
+                                              config='.ppw/config.json')
+        transform_params = commands.TransformParams(bin='/bin/transform_field.py',
+                                                    config=transform_config)
+
+        command = commands.build_singer_command(tap_params, target_params, transform_params, stream_buffer_size=10)
+
+        assert command == f'/bin/tap_mysql.py --config .ppw/config.json --properties .ppw/properties.json ' \
+                          f'--state {state_mock}' \
+                          f' | /bin/transform_field.py --config {transform_config}' \
+                          ' | mbuffer -m 10M' \
+                          ' | /bin/target_postgres.py --config .ppw/config.json'
+
         # Should generate a command without state and with transformation
         tap_params = commands.TapParams(type='tap-mysql',
                                         bin='/bin/tap_mysql.py',
