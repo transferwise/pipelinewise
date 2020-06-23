@@ -43,6 +43,6 @@ Fast Sync exists only between the following tap and target components:
 +----------------------------+----------------------------------+
 | :ref:`tap-s3-csv`          | **->** :ref:`target-postgres`    |
 +----------------------------+----------------------------------+
-| :ref:`tap-mongodb`         | **->** :ref:`target-postgres`   |
+| :ref:`tap-mongodb`         | **->** :ref:`target-postgres`    |
 +----------------------------+----------------------------------+
 

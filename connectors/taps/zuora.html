@@ -102,6 +102,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../concept/singer.html">Singer.io</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../concept/replication_methods.html">Replication Methods</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../concept/fastsync.html">Fast Sync</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../concept/linux_pipes.html">Linux Pipes in PipelineWise</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Using PipelineWise</span></p>
 <ul>
@@ -263,6 +264,7 @@ db_conn:
 <span class="c1"># ------------------------------------------------------------------------------</span>
 target: <span class="s2">&quot;snowflake&quot;</span>                       <span class="c1"># ID of the target connector where the data will be loaded</span>
 batch_size_rows: <span class="m">20000</span>                    <span class="c1"># Batch size for the stream to optimise load performance</span>
+stream_buffer_size: <span class="m">0</span>                     <span class="c1"># In-memory buffer size (MB) between taps and targets for asynchronous data pipes</span>
 default_target_schema: <span class="s2">&quot;zuora&quot;</span>       <span class="c1"># Target schema where the data will be loaded</span>
 default_target_schema_select_permission:  <span class="c1"># Optional: Grant SELECT on schema and tables that created</span>
   - grp_power

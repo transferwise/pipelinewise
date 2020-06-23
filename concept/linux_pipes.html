@@ -7,7 +7,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Fast Sync &mdash; PipelineWise  documentation</title>
+  <title>Linux Pipes in PipelineWise &mdash; PipelineWise  documentation</title>
   
 
   
@@ -21,7 +21,7 @@
   
   
   
-    <link rel="canonical" href="https://docs.ansible.com/ansible/latest/concept/fastsync.html"/>
+    <link rel="canonical" href="https://docs.ansible.com/ansible/latest/concept/linux_pipes.html"/>
   
 
   
@@ -41,8 +41,8 @@
     
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Linux Pipes in PipelineWise" href="linux_pipes.html" />
-    <link rel="prev" title="Replication Methods" href="replication_methods.html" /> 
+    <link rel="next" title="YAML configuration" href="../user_guide/yaml_config.html" />
+    <link rel="prev" title="Fast Sync" href="fastsync.html" /> 
 </head>
 
 <body class="wy-body-for-nav">
@@ -101,8 +101,12 @@
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="singer.html">Singer.io</a></li>
 <li class="toctree-l1"><a class="reference internal" href="replication_methods.html">Replication Methods</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Fast Sync</a></li>
-<li class="toctree-l1"><a class="reference internal" href="linux_pipes.html">Linux Pipes in PipelineWise</a></li>
+<li class="toctree-l1"><a class="reference internal" href="fastsync.html">Fast Sync</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Linux Pipes in PipelineWise</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#logic">Logic</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#increasing-buffer-size">Increasing buffer size</a></li>
+</ul>
+</li>
 </ul>
 <p class="caption"><span class="caption-text">Using PipelineWise</span></p>
 <ul>
@@ -175,13 +179,13 @@
     
       <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
         
-      <li>Fast Sync</li>
+      <li>Linux Pipes in PipelineWise</li>
     
     
       <li class="wy-breadcrumbs-aside">
         
             
-            <a href="../_sources/concept/fastsync.rst.txt" rel="nofollow"> View page source</a>
+            <a href="../_sources/concept/linux_pipes.rst.txt" rel="nofollow"> View page source</a>
           
         
       </li>
@@ -194,66 +198,58 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
             
-  <div class="section" id="fast-sync">
-<span id="fast-sync-main"></span><h1>Fast Sync<a class="headerlink" href="#fast-sync" title="Permalink to this headline">¶</a></h1>
-<p><strong>Fast Sync</strong> is one of the <a class="reference internal" href="replication_methods.html#replication-methods"><span class="std std-ref">Replication Methods</span></a> that is functionally identical to <a class="reference internal" href="replication_methods.html#full-table"><span class="std std-ref">Full Table</span></a>
-replication but Fast Sync is bypassing the <a class="reference external" href="https://github.com/singer-io/getting-started/blob/master/docs/SPEC.md">Singer Specification</a>
-for optimised performance. Primary use case of Fast Sync is initial sync or to resync large tables
-with hundreds of millions of rows where singer component would usually be running for long hours or
-sometimes for days.</p>
+  <div class="section" id="linux-pipes-in-pipelinewise">
+<span id="linux-pipes"></span><h1>Linux Pipes in PipelineWise<a class="headerlink" href="#linux-pipes-in-pipelinewise" title="Permalink to this headline">¶</a></h1>
+<p>A pipe is unidirectional interprocess communication channel. The term was coined by
+<a class="reference external" href="https://en.wikipedia.org/wiki/Douglas_McIlroy">Douglas McIlroy</a> for Unix shell and
+named by analogy with the pipeline.</p>
+<p>Pipes are most often used in shell-scripts to connect multiple commands by redirecting the output of
+one command (stdout) to the input (stdin) followed by using a pipe symbol ‘<cite>|</cite>’. <a class="reference internal" href="singer.html#singer"><span class="std std-ref">Singer.io</span></a> specification,
+hence PipelineWise is also using linux pipes to connect <a class="reference internal" href="../connectors/taps.html#taps-list"><span class="std std-ref">Taps (Data Sources)</span></a> and <a class="reference internal" href="../connectors/targets.html#targets-list"><span class="std std-ref">Targets (Destinations)</span></a> connectors.</p>
+<p>For example in the following command <code class="docutils literal notranslate"><span class="pre">tap-postgres</span></code> Extracts data from a postgres database and the
+extracted data sent to <code class="docutils literal notranslate"><span class="pre">target-snowflake</span></code> to Load it into a Snowflake database:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>tap-postgres <span class="p">|</span> target-snowflake
+</pre></div>
+</div>
+<div class="section" id="logic">
+<h2>Logic<a class="headerlink" href="#logic" title="Permalink to this headline">¶</a></h2>
+<p>Pipes provide asynchronous execution of commands using buffered I/O routines. Thus, all the commands
+in the pipeline operate in parallel, each in its own process.</p>
+<p>The size of the buffer since kernel version 2.6.11 is 65536 bytes (64K) and is equal to the page memory
+in older kernels. When attempting to read from an empty buffer, the read process is blocked until data
+appears. Similarly, if you attempt to write to a full buffer, the recording process will be blocked until
+the necessary amount of space is available.</p>
+<p>It is important to note, that despite the fact that pipes operates using file descriptor I/O streams,
+operations are performed in memory without loading to/from the disc.</p>
+<p>All the information given below is for bash shell 4.2 and kernel 3.10.10. Further details in the
+original <a class="reference external" href="https://blog.dataart.com/linux-pipes-tips-tricks">Linux Pipes Tips &amp; Tricks</a> post.</p>
+</div>
+<div class="section" id="increasing-buffer-size">
+<h2>Increasing buffer size<a class="headerlink" href="#increasing-buffer-size" title="Permalink to this headline">¶</a></h2>
+<p>Sometimes the default 64K buffer size that provided by the Linux kernel is too small. For example in the
+example above when you extracting data from a busy postgres database and loading into a busy Snowflake
+database sometimes you will find that that <code class="docutils literal notranslate"><span class="pre">tap-postgres</span></code> is blocked by <code class="docutils literal notranslate"><span class="pre">target-snowflake</span></code>.</p>
+<p>This happens when the target cannot load the data fast enough. For example if you have lot of concurrent
+queries in the target database the database can queue up new queries (at least in case of a Snowflake database)
+and this is blocking the tap to extract more data. This scenario can cause unexpected timeout in
+<code class="docutils literal notranslate"><span class="pre">tap-postgres</span></code> and other tap connectors. To avoid this scenario you can consider to increase the buffer size
+between the tap and target.</p>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
-<p><strong>Important</strong>: Fast Sync is not a selectable replication method in the <a class="reference internal" href="../user_guide/yaml_config.html#yaml-configuration"><span class="std std-ref">YAML configuration</span></a>.
-PipelineWise detects automatically when Fast Sync gives better performance than the singer
-components and uses it whenever it’s possible.</p>
+<p>PipelineWise doesn’t modify the kernel buffer size. When you need more buffer than
+the defualt 64K that’s provided by the kernel, PipelineWise will use its own
+buffering mechanism between taps and targets.</p>
+<p>PipelineWise is using <a class="reference external" href="https://www.maier-komor.de/mbuffer.html">mbuffer</a> to
+create custom sized buffer between taps and targets.</p>
 </div>
-<p>Fast Sync exists only between the following tap and target components:</p>
-<table class="docutils align-default">
-<colgroup>
-<col style="width: 45%" />
-<col style="width: 55%" />
-</colgroup>
-<tbody>
-<tr class="row-odd"><td colspan="2"><p><strong>Fast Sync supported Tap to Target combinations</strong></p></td>
-</tr>
-<tr class="row-even"><td><p><strong>Tap</strong></p></td>
-<td><p><strong>Target</strong></p></td>
-</tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="../connectors/taps/mysql.html#tap-mysql"><span class="std std-ref">Tap MySQL</span></a></p></td>
-<td><p><strong>-&gt;</strong> <a class="reference internal" href="../connectors/targets/snowflake.html#target-snowflake"><span class="std std-ref">Target Snowflake</span></a></p></td>
-</tr>
-<tr class="row-even"><td><p><a class="reference internal" href="../connectors/taps/postgres.html#tap-postgres"><span class="std std-ref">Tap PostgreSQL</span></a></p></td>
-<td><p><strong>-&gt;</strong> <a class="reference internal" href="../connectors/targets/snowflake.html#target-snowflake"><span class="std std-ref">Target Snowflake</span></a></p></td>
-</tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="../connectors/taps/s3_csv.html#tap-s3-csv"><span class="std std-ref">Tap S3 CSV</span></a></p></td>
-<td><p><strong>-&gt;</strong> <a class="reference internal" href="../connectors/targets/snowflake.html#target-snowflake"><span class="std std-ref">Target Snowflake</span></a></p></td>
-</tr>
-<tr class="row-even"><td><p><a class="reference internal" href="../connectors/taps/mongodb.html#tap-mongodb"><span class="std std-ref">Tap MongoDB</span></a></p></td>
-<td><p><strong>-&gt;</strong> <a class="reference internal" href="../connectors/targets/snowflake.html#target-snowflake"><span class="std std-ref">Target Snowflake</span></a></p></td>
-</tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="../connectors/taps/mysql.html#tap-mysql"><span class="std std-ref">Tap MySQL</span></a></p></td>
-<td><p><strong>-&gt;</strong> <a class="reference internal" href="../connectors/targets/redshift.html#target-redshift"><span class="std std-ref">Target Redshift</span></a></p></td>
-</tr>
-<tr class="row-even"><td><p><a class="reference internal" href="../connectors/taps/postgres.html#tap-postgres"><span class="std std-ref">Tap PostgreSQL</span></a></p></td>
-<td><p><strong>-&gt;</strong> <a class="reference internal" href="../connectors/targets/redshift.html#target-redshift"><span class="std std-ref">Target Redshift</span></a></p></td>
-</tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="../connectors/taps/s3_csv.html#tap-s3-csv"><span class="std std-ref">Tap S3 CSV</span></a></p></td>
-<td><p><strong>-&gt;</strong> <a class="reference internal" href="../connectors/targets/redshift.html#target-redshift"><span class="std std-ref">Target Redshift</span></a></p></td>
-</tr>
-<tr class="row-even"><td><p><a class="reference internal" href="../connectors/taps/mysql.html#tap-mysql"><span class="std std-ref">Tap MySQL</span></a></p></td>
-<td><p><strong>-&gt;</strong> <a class="reference internal" href="../connectors/targets/postgres.html#target-postgres"><span class="std std-ref">Target Postgres</span></a></p></td>
-</tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="../connectors/taps/postgres.html#tap-postgres"><span class="std std-ref">Tap PostgreSQL</span></a></p></td>
-<td><p><strong>-&gt;</strong> <a class="reference internal" href="../connectors/targets/postgres.html#target-postgres"><span class="std std-ref">Target Postgres</span></a></p></td>
-</tr>
-<tr class="row-even"><td><p><a class="reference internal" href="../connectors/taps/s3_csv.html#tap-s3-csv"><span class="std std-ref">Tap S3 CSV</span></a></p></td>
-<td><p><strong>-&gt;</strong> <a class="reference internal" href="../connectors/targets/postgres.html#target-postgres"><span class="std std-ref">Target Postgres</span></a></p></td>
-</tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="../connectors/taps/mongodb.html#tap-mongodb"><span class="std std-ref">Tap MongoDB</span></a></p></td>
-<td><p><strong>-&gt;</strong> <a class="reference internal" href="../connectors/targets/postgres.html#target-postgres"><span class="std std-ref">Target Postgres</span></a></p></td>
-</tr>
-</tbody>
-</table>
+<p>You can set custom buffer sizes in the tap YAML files by setting the <code class="docutils literal notranslate"><span class="pre">stream_buffer_size</span></code>
+value. If <code class="docutils literal notranslate"><span class="pre">stream_buffer_size</span></code> is greater than 0 then the following piped command will be
+generated to create larger buffer between taps and targets than the default
+buffer that’s provided by the Linux kernel:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>tap-postgres <span class="p">|</span> mbuffer -m 10M <span class="p">|</span> target-snowflake
+</pre></div>
+</div>
+</div>
 </div>
 
 
@@ -264,10 +260,10 @@ components and uses it whenever it’s possible.</p>
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
-        <a href="linux_pipes.html" class="btn btn-neutral float-right" title="Linux Pipes in PipelineWise" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+        <a href="../user_guide/yaml_config.html" class="btn btn-neutral float-right" title="YAML configuration" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
       
       
-        <a href="replication_methods.html" class="btn btn-neutral float-left" title="Replication Methods" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+        <a href="fastsync.html" class="btn btn-neutral float-left" title="Fast Sync" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
       
     </div>
   
