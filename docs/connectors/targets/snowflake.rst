@@ -61,11 +61,11 @@ between ``{`` and ``}`` characters to the actual values from point 1 and 2.
 
     CREATE OR REPLACE USER {user}
     PASSWORD = '{password}'
-    DEFAULT_ROLE = ppw_test_temp_role
+    DEFAULT_ROLE = ppw_target_snowflake
     DEFAULT_WAREHOUSE = '{warehouse}'
     MUST_CHANGE_PASSWORD = FALSE;
 
-    GRANT ROLE ppw_test_temp_role TO USER ppw_test_temp_login;
+    GRANT ROLE ppw_target_snowflake TO USER {user};
 
 Replace ``warehouse`` between ``{`` and ``}`` characters to the actual values from point 3.
 
