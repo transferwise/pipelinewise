@@ -89,7 +89,7 @@ class TestTargetSnowflake:
 
     @pytest.mark.dependency(depends=['import_config'])
     def test_replicate_mariadb_to_pg_with_custom_buffer_size(self):
-        """Replicate data from MariaDB to Postgres DWH with custom buffer size
+        """Replicate data from MariaDB to Snowflake with custom buffer size
         Same tests cases as test_replicate_mariadb_to_pg but using another tap with custom stream buffer size"""
         self.test_replicate_mariadb_to_pg(tap_mariadb_id=TAP_MARIADB_BUFFERED_STREAM_ID)
 
