@@ -87,6 +87,7 @@ class TestTargetPostgres:
         assertions.assert_row_counts_equal(self.run_query_tap_mysql, self.run_query_target_postgres)
         assertions.assert_all_columns_exist(self.run_query_tap_mysql, self.e2e.run_query_target_postgres)
 
+    # pylint: disable=invalid-name
     @pytest.mark.dependency(depends=['import_config'])
     def test_replicate_mariadb_to_pg_with_custom_buffer_size(self):
         """Replicate data from MariaDB to Postgres DWH with custom buffer size

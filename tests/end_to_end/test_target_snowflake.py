@@ -63,10 +63,10 @@ class TestTargetSnowflake:
         assertions.assert_command_success(return_code, stdout, stderr)
 
     @pytest.mark.dependency(depends=['import_config'])
-    def test_replicate_mariadb_to_sf(self):
+    def test_replicate_mariadb_to_sf(self, tap_mariadb_id=TAP_MARIADB_ID):
         """Replicate data from MariaDB to Snowflake"""
-        # Run tap first time - both fastsync and a singer should be triggered
-        assertions.assert_run_tap_success(TAP_MARIADB_ID, TARGET_ID, ['fastsync', 'singer'])
+        # 1. Run tap first time - both fastsync and a singer should be triggered
+        assertions.assert_run_tap_success(tap_mariadb_id, TARGET_ID, ['fastsync', 'singer'])
         assertions.assert_row_counts_equal(self.run_query_tap_mysql, self.run_query_target_snowflake)
         assertions.assert_all_columns_exist(self.run_query_tap_mysql, self.e2e.run_query_target_snowflake)
 
@@ -83,15 +83,16 @@ class TestTargetSnowflake:
         self.run_query_tap_mysql('DELETE FROM no_pk_table WHERE id > 10')
 
         # 3. Run tap second time - both fastsync and a singer should be triggered, there are some FULL_TABLE
-        assertions.assert_run_tap_success(TAP_POSTGRES_ID, TARGET_ID, ['fastsync', 'singer'])
-        assertions.assert_row_counts_equal(self.run_query_tap_postgres, self.run_query_target_snowflake)
+        assertions.assert_run_tap_success(tap_mariadb_id, TARGET_ID, ['fastsync', 'singer'])
+        assertions.assert_row_counts_equal(self.run_query_tap_mysql, self.run_query_target_snowflake)
         assertions.assert_all_columns_exist(self.run_query_tap_mysql, self.e2e.run_query_target_snowflake)
 
+    # pylint: disable=invalid-name
     @pytest.mark.dependency(depends=['import_config'])
     def test_replicate_mariadb_to_pg_with_custom_buffer_size(self):
         """Replicate data from MariaDB to Snowflake with custom buffer size
         Same tests cases as test_replicate_mariadb_to_pg but using another tap with custom stream buffer size"""
-        self.test_replicate_mariadb_to_pg(tap_mariadb_id=TAP_MARIADB_BUFFERED_STREAM_ID)
+        self.test_replicate_mariadb_to_sf(tap_mariadb_id=TAP_MARIADB_BUFFERED_STREAM_ID)
 
     @pytest.mark.dependency(depends=['import_config'])
     def test_replicate_pg_to_sf(self):
