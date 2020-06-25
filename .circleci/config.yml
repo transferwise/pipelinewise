@@ -76,7 +76,7 @@ jobs:
           name: 'Build source databases for integration tests'
           command: |
             sudo apt-get update
-            sudo apt install mariadb-client postgresql-client mongo-tools
+            sudo apt install mariadb-client postgresql-client mongo-tools mbuffer
             wget https://repo.mongodb.org/apt/ubuntu/dists/bionic/mongodb-org/4.2/multiverse/binary-amd64/mongodb-org-shell_4.2.7_amd64.deb
             sudo dpkg -i ./mongodb-org-shell_4.2.7_amd64.deb && rm mongodb-org-shell_4.2.7_amd64.deb
             ./dev-project/mongo/init_rs.sh

@@ -3,7 +3,7 @@
 # ------------------------------------------------------------------------------
 # General Properties
 # ------------------------------------------------------------------------------
-id: "mariadb_to_sf"
+id: "mariadb_to_sf_buffered_stream"
 name: "MariaDB source test database"
 type: "tap-mysql"
 owner: "test-runner"
@@ -26,7 +26,7 @@ db_conn:
 # ------------------------------------------------------------------------------
 target: "snowflake"                    # ID of the target connector where the data will be loaded
 batch_size_rows: 20000                 # Batch size for the stream to optimise load performance
-stream_buffer_size: 0                  # In-memory buffer size (MB) between taps and targets for asynchronous data pipes
+stream_buffer_size: 20                 # In-memory buffer size (MB) between taps and targets for asynchronous data pipes
 
 
 # ------------------------------------------------------------------------------
