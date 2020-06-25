@@ -25,7 +25,7 @@ db_conn:
 # ------------------------------------------------------------------------------
 target: "postgres_dwh"                    # ID of the target connector where the data will be loaded
 batch_size_rows: 20000                    # Batch size for the stream to optimise load performance
-stream_buffer_size: 0                     # In-memory buffer size between taps and targets for asynchronous data pipes
+stream_buffer_size: 0                     # In-memory buffer size (MB) between taps and targets for asynchronous data pipes
 primary_key_required: False               # Optional: in case you want to load tables without key
                                           #            properties, uncomment this. Please note
                                           #            that files without primary keys will not
