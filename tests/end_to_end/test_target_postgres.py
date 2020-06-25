@@ -13,6 +13,7 @@ from .helpers.env import E2EEnv
 
 DIR = os.path.dirname(__file__)
 TAP_MARIADB_ID = 'mariadb_to_pg'
+TAP_MARIADB_BUFFERED_STREAM_ID = 'mariadb_to_pg_buffered_stream'
 TAP_MONGODB_ID = 'mongo_to_pg'
 TAP_POSTGRES_ID = 'postgres_to_pg'
 TAP_S3_CSV_ID = 's3_csv_to_pg'
@@ -62,10 +63,10 @@ class TestTargetPostgres:
         assertions.assert_command_success(return_code, stdout, stderr)
 
     @pytest.mark.dependency(depends=['import_config'])
-    def test_replicate_mariadb_to_pg(self):
+    def test_replicate_mariadb_to_pg(self, tap_mariadb_id=TAP_MARIADB_ID):
         """Replicate data from MariaDB to Postgres DWH"""
         # 1. Run tap first time - both fastsync and a singer should be triggered
-        assertions.assert_run_tap_success(TAP_MARIADB_ID, TARGET_ID, ['fastsync', 'singer'])
+        assertions.assert_run_tap_success(tap_mariadb_id, TARGET_ID, ['fastsync', 'singer'])
         assertions.assert_row_counts_equal(self.run_query_tap_mysql, self.run_query_target_postgres)
         assertions.assert_all_columns_exist(self.run_query_tap_mysql, self.e2e.run_query_target_postgres)
 
@@ -82,9 +83,15 @@ class TestTargetPostgres:
         self.run_query_tap_mysql('DELETE FROM no_pk_table WHERE id > 10')
 
         # 3. Run tap second time - both fastsync and a singer should be triggered, there are some FULL_TABLE
-        assertions.assert_run_tap_success(TAP_MARIADB_ID, TARGET_ID, ['fastsync', 'singer'])
+        assertions.assert_run_tap_success(tap_mariadb_id, TARGET_ID, ['fastsync', 'singer'])
         assertions.assert_row_counts_equal(self.run_query_tap_mysql, self.run_query_target_postgres)
         assertions.assert_all_columns_exist(self.run_query_tap_mysql, self.e2e.run_query_target_postgres)
+
+    @pytest.mark.dependency(depends=['import_config'])
+    def test_replicate_mariadb_to_pg_with_custom_buffer_size(self):
+        """Replicate data from MariaDB to Postgres DWH with custom buffer size
+        Same tests cases as test_replicate_mariadb_to_pg but using another tap with custom stream buffer size"""
+        self.test_replicate_mariadb_to_pg(tap_mariadb_id=TAP_MARIADB_BUFFERED_STREAM_ID)
 
     @pytest.mark.dependency(depends=['import_config'])
     def test_replicate_pg_to_pg(self):
