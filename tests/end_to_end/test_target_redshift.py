@@ -7,7 +7,7 @@ from .helpers.env import E2EEnv
 
 DIR = os.path.dirname(__file__)
 TAP_MARIADB_ID = 'mariadb_to_rs'
-TAP_MARIADB_BUFFERED_STREAM_ID = 'mariadb_to_pg_buffered_stream'
+TAP_MARIADB_BUFFERED_STREAM_ID = 'mariadb_to_rs_buffered_stream'
 TAP_POSTGRES_ID = 'postgres_to_rs'
 TAP_S3_CSV_ID = 's3_csv_to_rs'
 TARGET_ID = 'redshift'

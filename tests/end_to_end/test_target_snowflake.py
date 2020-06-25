@@ -13,7 +13,7 @@ from .helpers.env import E2EEnv
 
 DIR = os.path.dirname(__file__)
 TAP_MARIADB_ID = 'mariadb_to_sf'
-TAP_MARIADB_BUFFERED_STREAM_ID = 'mariadb_to_pg_buffered_stream'
+TAP_MARIADB_BUFFERED_STREAM_ID = 'mariadb_to_sf_buffered_stream'
 TAP_POSTGRES_ID = 'postgres_to_sf'
 TAP_MONGODB_ID = 'mongo_to_sf'
 TAP_S3_CSV_ID = 's3_csv_to_sf'
