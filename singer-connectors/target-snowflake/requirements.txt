@@ -1,1 +1,1 @@
-pipelinewise-target-snowflake==1.6.5
+pipelinewise-target-snowflake==1.6.6
