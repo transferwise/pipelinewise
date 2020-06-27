@@ -110,7 +110,7 @@ Example YAML for ``tap-mysql``:
                                          #           to improve the performance of
                                          #           data extraction
     #export_batch_rows                   # Optional: Number of rows to export from MySQL
-                                         #           in one batch. Default is 20000.
+                                         #           in one batch. Default is 50000.
     #session_sqls:                       # Optional: Run SQLs to set session variables
     #  - SET @@session.time_zone="+0:00"             # when the connection made
     #  - SET @@session.wait_timeout=28800            # Defaults to the values listed here
