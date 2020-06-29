@@ -82,6 +82,16 @@ PipelineWise configures every tap with a common structured YAML file format.
 A sample YAML for MySQL replication can be generated into a project directory by
 following the steps in the :ref:`generating_pipelines` section.
 
+.. warning::
+
+  ``TINYINT`` by convention is used to store 0/1 for mysql booleans. In keeping with the
+  upstream singer mysql tap, pipelinewise uses this convention when creating target schemas.
+  If your tinyint columns contain values greater than 1, this will lead to errors when
+  loading data.
+
+  Read more info about this decision in `this github issue <https://github.com/singer-io/tap-mysql/issues/82>`_
+  or browse the codebase `here <https://github.com/transferwise/pipelinewise-tap-mysql/blob/34cbd9b085146c08003bfa460f1550ce78c65e4c/tap_mysql/__init__.py#L73>`_.
+
 Example YAML for ``tap-mysql``:
 
 .. code-block:: bash
