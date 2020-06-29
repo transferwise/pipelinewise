@@ -22,7 +22,7 @@ db_conn:
                                        #           to improve the performance of
                                        #           data extraction
   #export_batch_rows                   # Optional: Number of rows to export from MySQL
-                                       #           in one batch. Default is 20000.
+                                       #           in one batch. Default is 50000.
 
 
 # ------------------------------------------------------------------------------
