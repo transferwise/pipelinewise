@@ -159,6 +159,7 @@ def assert_row_counts_equal(tap_query_runner_fn: callable, target_query_runner_f
     assert row_counts_in_target == row_counts_in_source
 
 
+# pylint: disable=too-many-locals
 def assert_all_columns_exist(tap_query_runner_fn: callable,
                              target_query_runner_fn: callable,
                              colum_type_mapper_fn: callable = None) -> None:
