@@ -104,7 +104,8 @@ You can run any pipelinewise command at this point. Tutorials to create and run 
     * Python 3.x
     * python3-dev
     * python3-venv
-    * postgresql
+    * mongo-tools
+    * mbuffer
 
 2. Run the install script that installs the PipelineWise CLI and every supported singer connectors into separated virtual environments:
 
