@@ -159,12 +159,16 @@ def assert_row_counts_equal(tap_query_runner_fn: callable, target_query_runner_f
     assert row_counts_in_target == row_counts_in_source
 
 
-def assert_all_columns_exist(tap_query_runner_fn: callable, target_query_runner_fn: callable) -> None:
+# pylint: disable=too-many-locals
+def assert_all_columns_exist(tap_query_runner_fn: callable,
+                             target_query_runner_fn: callable,
+                             colum_type_mapper_fn: callable = None) -> None:
     """Takes two query runner methods, gets the columns list for every table in both the
     source and target database and tests if every column in source exists in the target database.
 
     :param tap_query_runner_fn: method to run queries in the first connection
-    :param target_query_runner_fn: method to run queries in the second connection"""
+    :param target_query_runner_fn: method to run queries in the second connection
+    :param colum_type_mapper_fn: method to convert source to target column types"""
     # Generate a map of source and target specific functions
     funcs = _map_tap_to_target_functions(tap_query_runner_fn, target_query_runner_fn)
 
@@ -180,20 +184,56 @@ def assert_all_columns_exist(tap_query_runner_fn: callable, target_query_runner_
     source_table_cols = _run_sql(tap_query_runner_fn, source_sql_get_cols)
     target_table_cols = _run_sql(target_query_runner_fn, target_sql_get_cols)
 
+    def _cols_list_to_dict(cols: List) -> dict:
+        """
+        Converts list of columns with char separators to dictionary
+
+        :param cols: list of ':' separated strings using the format of
+                     column_name:column_type:column_type_extra
+        :return: Dictionary of columns where key is the column_name
+        """
+        cols_dict = {}
+        for col in cols:
+            col_props = col.split(':')
+            cols_dict[col_props[0]] = {
+                'type': col_props[1],
+                'type_extra': col_props[2]
+            }
+
+        return cols_dict
+
     # Compare the two dataset
     for table_cols in source_table_cols:
         table_to_check = table_cols[0].lower()
-        source_cols = table_cols[1].lower().split(',')
+        source_cols = table_cols[1].lower().split(';')
 
         try:
-            target_cols = next(t[1] for t in target_table_cols if t[0].lower() == table_to_check).lower().split(',')
+            target_cols = next(t[1] for t in target_table_cols if t[0].lower() == table_to_check).lower().split(';')
         except StopIteration as ex:
             ex.args += ('Error', f'{table_to_check} table not found in target')
             raise
 
-        for col in source_cols:
+        source_cols_dict = _cols_list_to_dict(source_cols)
+        target_cols_dict = _cols_list_to_dict(target_cols)
+        print(target_cols_dict)
+        for col_name, col_props in source_cols_dict.items():
+            # Check if column exists in the target table
             try:
-                assert col in target_cols
+                assert col_name in target_cols_dict
             except AssertionError as ex:
-                ex.args += ('Error', f'{col} column not found in target table {table_to_check}')
+                ex.args += ('Error', f'{col_name} column not found in target table {table_to_check}')
                 raise
+
+            # Check if column type is expected in the target table, if mapper function provided
+            if colum_type_mapper_fn:
+                try:
+                    target_col = target_cols_dict[col_name]
+                    exp_col_type = colum_type_mapper_fn(col_props['type'], col_props['type_extra'])\
+                        .replace(' NULL', '').lower()
+                    act_col_type = target_col['type'].lower()
+                    assert act_col_type == exp_col_type
+                except AssertionError as ex:
+                    ex.args += ('Error', f'{col_name} column type is not as expected. '
+                                         f'Expected: {exp_col_type} '
+                                         f'Actual: {act_col_type}')
+                    raise
