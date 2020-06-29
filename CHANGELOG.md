@@ -1,3 +1,24 @@
+0.17.0 (2020-06-29)
+-------------------
+- Add tap-mongodb with FastSync components to Snowflake and Postgres
+- Add tap-google-analytics (as an optional extra connector, with no FastSync)
+- Add configurable `stream_buffer_size` option to use large buffers between taps and targets to avoid taps being blocked by long running targets.
+
+**FastSync**
+- Fixed an issue when some bad but valid MySQL dates are not loaded correctly into Snowflake
+
+**Tap MySQL**
+- Bump `pipelinewise-tap-mysql` to 1.3.2
+    - Fixed some dependency issues and bump `pymysql` to 0.9.3
+    - Full changelog at https://github.com/transferwise/pipelinewise-tap-mysql/blob/master/CHANGELOG.md#132-2020-06-15
+
+**Target Snowflake**
+- Bump `pipelinewise-target-snowflake` to 1.6.6
+    - Fixed an issue when new columns sometimes not added to target table
+    - Fixed an issue when the query runner returned incorrect value when multiple queries running in one transaction
+    - FUll changelog at https://github.com/transferwise/pipelinewise-target-snowflake/blob/master/CHANGELOG.md#166-2020-06-26
+
+
 0.16.0 (2020-05-19)
 -------------------
 - Support reserved words as table and column names across every component, including fastsync and singer executables
