@@ -73,3 +73,8 @@ schemas:
       ### Table with space and mixed upper and lowercase characters
       - table_name: "table_with_space and UPPERCase"
         replication_method: "LOG_BASED"
+
+      ### Table with all possible data types
+      - table_name: "all_datatypes"
+        replication_method: "LOG_BASED"
+

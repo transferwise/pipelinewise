@@ -6,6 +6,7 @@ from random import randint
 import bson
 import pytest
 from bson import Timestamp
+from pipelinewise.fastsync import mysql_to_snowflake
 
 from .helpers import tasks
 from .helpers import assertions
@@ -68,7 +69,8 @@ class TestTargetSnowflake:
         # 1. Run tap first time - both fastsync and a singer should be triggered
         assertions.assert_run_tap_success(tap_mariadb_id, TARGET_ID, ['fastsync', 'singer'])
         assertions.assert_row_counts_equal(self.run_query_tap_mysql, self.run_query_target_snowflake)
-        assertions.assert_all_columns_exist(self.run_query_tap_mysql, self.e2e.run_query_target_snowflake)
+        assertions.assert_all_columns_exist(self.run_query_tap_mysql, self.e2e.run_query_target_snowflake,
+                                            mysql_to_snowflake.tap_type_to_target_type)
 
         # 2. Make changes in MariaDB source database
         #  LOG_BASED
@@ -85,7 +87,8 @@ class TestTargetSnowflake:
         # 3. Run tap second time - both fastsync and a singer should be triggered, there are some FULL_TABLE
         assertions.assert_run_tap_success(tap_mariadb_id, TARGET_ID, ['fastsync', 'singer'])
         assertions.assert_row_counts_equal(self.run_query_tap_mysql, self.run_query_target_snowflake)
-        assertions.assert_all_columns_exist(self.run_query_tap_mysql, self.e2e.run_query_target_snowflake)
+        assertions.assert_all_columns_exist(self.run_query_tap_mysql, self.e2e.run_query_target_snowflake,
+                                            mysql_to_snowflake.tap_type_to_target_type)
 
     # pylint: disable=invalid-name
     @pytest.mark.dependency(depends=['import_config'])

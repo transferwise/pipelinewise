@@ -268,6 +268,109 @@ INSERT INTO `table_with_space and UPPERCase`(end) VALUES (10),(9),(8),(7),(6),(3
 /*!40000 ALTER TABLE `table_with_space and UPPERCase` ENABLE KEYS */;
 UNLOCK TABLES;
 
+--
+-- Table structure for table `ALL_DATATYPES`
+--
+
+DROP TABLE IF EXISTS `all_datatypes`;
+CREATE TABLE `all_datatypes` (
+    c_char          CHAR        PRIMARY KEY,
+    c_varchar       VARCHAR(100),
+    c_binary        BINARY,
+    c_varbinary     VARBINARY(100),
+    c_blob          BLOB,
+    c_tinyblob      TINYBLOB,
+    c_mediumblob    MEDIUMBLOB,
+    c_longblob      LONGBLOB,
+    c_geometry      GEOMETRY,
+    c_text          TEXT,
+    c_tinytext      TINYTEXT,
+    c_mediumtext    MEDIUMTEXT,
+    c_longtext      LONGTEXT,
+    c_enum          ENUM('one', 'two', 'three'),
+    c_tinyint_bool  TINYINT(1),
+    c_tinyint       TINYINT,
+    c_smallint      SMALLINT,
+    c_mediumint     MEDIUMINT,
+    c_bigint        BIGINT,
+    c_bit           BIT,
+    c_decimal       DECIMAL,
+    c_double        DOUBLE,
+    c_float         FLOAT,
+    c_bool          BOOLEAN,
+    c_date          DATE,
+    c_datetime      DATETIME,
+    c_timestamp     TIMESTAMP,
+    c_json          JSON
+)
+ENGINE=MyISAM AUTO_INCREMENT=0 DEFAULT CHARSET=utf8;
+
+--
+-- Dumping data for table `table_with_space and UPPERCase`
+--
+
+LOCK TABLES `all_datatypes` WRITE;
+/*!40000 ALTER TABLE `all_datatypes` DISABLE KEYS */;
+INSERT INTO all_datatypes (c_char,
+                           c_varchar,
+                           c_binary,
+                           c_varbinary,
+                           c_blob,
+                           c_tinyblob,
+                           c_mediumblob,
+                           c_longblob,
+                           c_geometry,
+                           c_text,
+                           c_tinytext,
+                           c_mediumtext,
+                           c_longtext,
+                           c_enum,
+                           c_tinyint_bool,
+                           c_tinyint,
+                           c_smallint,
+                           c_mediumint,
+                           c_bigint,
+                           c_bit,
+                           c_decimal,
+                           c_double,
+                           c_float,
+                           c_bool,
+                           c_date,
+                           c_datetime,
+                           c_timestamp,
+                           c_json)
+VALUES ('x',
+        'c_varchar',
+        X'01',
+        X'0123456789abcdef',
+        X'0123456789abcdef',
+        X'0123456789abcdef',
+        X'0123456789abcdef',
+        X'0123456789abcdef',
+        POINT(1, 1),
+        'c_text',
+        'c_tinytext',
+        'c_mediumtext',
+        'c_longtext',
+        'one',
+        1,
+        123,
+        123,
+        123,
+        123,
+        1,
+        10,
+        10.2,
+        10.2,
+        true,
+        '2020-06-01',
+        '2100-06-01 10:00:00',
+        '2020-06-01 10:00:00',
+        '{"k1": "value", "k2": 10}'
+);
+/*!40000 ALTER TABLE `all_datatypes` ENABLE KEYS */;
+UNLOCK TABLES;
+
 
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;

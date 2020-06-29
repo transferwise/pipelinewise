@@ -53,6 +53,7 @@ def tap_type_to_target_type(mysql_type, mysql_column_type):
         'int': 'INTEGER NULL',
         'tinyint': 'BOOLEAN' if mysql_column_type == 'tinyint(1)' else 'SMALLINT NULL',
         'smallint': 'SMALLINT NULL',
+        'mediumint': 'INTEGER NULL',
         'bigint': 'BIGINT NULL',
         'bit': 'BOOLEAN',
         'decimal': 'DOUBLE PRECISION',
