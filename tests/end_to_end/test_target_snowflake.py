@@ -90,6 +90,14 @@ class TestTargetSnowflake:
         assertions.assert_all_columns_exist(self.run_query_tap_mysql, self.e2e.run_query_target_snowflake,
                                             mysql_to_snowflake.tap_type_to_target_type)
 
+    @pytest.mark.dependency(depends=['import_config'])
+    def test_resync_mariadb_to_sf(self, tap_mariadb_id=TAP_MARIADB_ID):
+        """Resync tables from MariaDB to Snowflake"""
+        assertions.assert_resync_tables_success(tap_mariadb_id, TARGET_ID)
+        assertions.assert_row_counts_equal(self.run_query_tap_mysql, self.run_query_target_snowflake)
+        assertions.assert_all_columns_exist(self.run_query_tap_mysql, self.run_query_target_snowflake,
+                                            mysql_to_snowflake.tap_type_to_target_type)
+
     # pylint: disable=invalid-name
     @pytest.mark.dependency(depends=['import_config'])
     def test_replicate_mariadb_to_pg_with_custom_buffer_size(self):
