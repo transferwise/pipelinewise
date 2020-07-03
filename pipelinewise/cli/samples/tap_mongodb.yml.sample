@@ -19,7 +19,9 @@ db_conn:
   username: "<USERNAME>"							# User with read roles
   password: "<PASSWORD>"                            # Plain string or vault encrypted
   password: "secret"                    			# Mongodb plain string or vault encrypted
-  replica_set: "<replicaSet name>"        		# Mongodb replica set name, default null
+  replica_set: "<replicaSet name>"        			# Optional: Mongodb replica set name, default null
+  write_batch_rows: <int>							# Optional: Number of rows to write to csv file
+                                       				#           in one batch. Default is 50000.
 
 # ------------------------------------------------------------------------------
 # Destination (Target) - Target properties
