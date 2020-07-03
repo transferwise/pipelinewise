@@ -19,7 +19,8 @@ db_conn:
   password: "${TAP_MONGODB_PASSWORD}"           # Mongodb plain string or vault encrypted
   auth_database: "admin"            			# Mongodb database to authenticate on
   dbname: "${TAP_MONGODB_DB}"           		# Mongodb database name to sync from
-#  replica_set: rs0      						# Mongodb replica set name, default null
+  replica_set: rs0      						# Mongodb replica set name, default null
+  write_batch_rows: 500
 
 # ------------------------------------------------------------------------------
 # Destination (Target) - Target properties
