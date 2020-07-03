@@ -18,6 +18,16 @@ def assert_run_tap_success(tap, target, sync_engines):
         assert_state_file_valid(target, tap, log_file)
 
 
+def assert_resync_tables_success(tap, target):
+    """Resync a specific tap and make sure that it's using the correct sync engine,
+    finished successfully and state file created with the right content"""
+    [return_code, stdout, stderr] = tasks.run_command(f'pipelinewise sync_tables --tap {tap} --target {target}')
+
+    log_file = tasks.find_run_tap_log_file(stdout, 'fastsync')
+    assert_command_success(return_code, stdout, stderr, log_file)
+    assert_state_file_valid(target, tap, log_file)
+
+
 def assert_command_success(return_code, stdout, stderr, log_path=None):
     """Assert helper function to check if command finished successfully.
     In case of failure it logs stdout, stderr and content of the failed command log

@@ -90,6 +90,15 @@ class TestTargetPostgres:
         assertions.assert_all_columns_exist(self.run_query_tap_mysql, self.run_query_target_postgres,
                                             mysql_to_postgres.tap_type_to_target_type)
 
+    @pytest.mark.dependency(depends=['import_config'])
+    def test_resync_mariadb_to_pg(self, tap_mariadb_id=TAP_MARIADB_ID):
+        """Resync tables from MariaDB to Postgres DWH"""
+        # 1. Run tap first time - both fastsync and a singer should be triggered
+        assertions.assert_resync_tables_success(tap_mariadb_id, TARGET_ID)
+        assertions.assert_row_counts_equal(self.run_query_tap_mysql, self.run_query_target_postgres)
+        assertions.assert_all_columns_exist(self.run_query_tap_mysql, self.run_query_target_postgres,
+                                            mysql_to_postgres.tap_type_to_target_type)
+
     # pylint: disable=invalid-name
     @pytest.mark.dependency(depends=['import_config'])
     def test_replicate_mariadb_to_pg_with_custom_buffer_size(self):
@@ -146,7 +155,7 @@ class TestTargetPostgres:
         assert_columns_exist()
 
     @pytest.mark.dependency(depends=['import_config'])
-    def test_replicate_mongodb_to_pg(self):
+    def _test_replicate_mongodb_to_pg(self):
         """Replicate mongodb to Postgres"""
 
         def assert_columns_exist(table):

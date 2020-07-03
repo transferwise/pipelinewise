@@ -1052,7 +1052,7 @@ class PipelineWise:
 
                 # Create parameters as NamedTuples
                 tap_params = TapParams(tap_type, self.tap_bin, tap_config, tap_properties, tap_state)
-                target_params = TargetParams(self.target_bin, cons_target_config)
+                target_params = TargetParams(target_type, self.target_bin, cons_target_config)
                 transform_params = TransformParams(self.transform_field_bin, tap_transformation)
                 self.run_tap_fastsync(tap=tap_params,
                                       target=target_params,
