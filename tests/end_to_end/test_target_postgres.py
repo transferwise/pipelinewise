@@ -155,7 +155,7 @@ class TestTargetPostgres:
         assert_columns_exist()
 
     @pytest.mark.dependency(depends=['import_config'])
-    def _test_replicate_mongodb_to_pg(self):
+    def test_replicate_mongodb_to_pg(self):
         """Replicate mongodb to Postgres"""
 
         def assert_columns_exist(table):
