@@ -62,7 +62,7 @@ make_virtualenv() {
     python3 -m pip install --upgrade pip setuptools
 
     if [ -f "requirements.txt" ]; then
-        python3 -m pip install -r requirements.txt
+        python3 -m pip install --upgrade -r requirements.txt
     fi
     if [ -f "setup.py" ]; then
         PIP_ARGS=
@@ -70,7 +70,7 @@ make_virtualenv() {
             PIP_ARGS=$PIP_ARGS"[test]"
         fi
 
-        python3 -m pip install -e .$PIP_ARGS
+        python3 -m pip install --upgrade -e .$PIP_ARGS
     fi
 
     echo ""
