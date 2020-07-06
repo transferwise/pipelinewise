@@ -290,12 +290,14 @@ owner: <span class="s2">&quot;foo@bar.com&quot;</span>
 <span class="c1"># ------------------------------------------------------------------------------</span>
 db_conn:
         host: <span class="s2">&quot;mongodb_host1,mongodb_host2,mongodb_host3&quot;</span>       <span class="c1"># Mongodb host(s)</span>
-        port: <span class="m">27017</span>                                             <span class="c1"># Mongodb port</span>
-        user: <span class="s2">&quot;PipelineWiseUser&quot;</span>                                <span class="c1"># Mongodb user</span>
-        password: <span class="s2">&quot;mY_VerY_StRonG_PaSSwoRd&quot;</span>                     <span class="c1"># Mongodb plain string or vault encrypted</span>
-        auth_database: <span class="s2">&quot;admin&quot;</span>                                  <span class="c1"># Mongodb database to authenticate on</span>
-        dbname: <span class="s2">&quot;my_db&quot;</span>                                         <span class="c1"># Mongodb database name to sync from</span>
-        replica_set: <span class="s2">&quot;my_replica_set&quot;</span>                           <span class="c1"># Optional, Mongodb replica set name, default null</span>
+        port: <span class="m">27017</span>                                                     <span class="c1"># Mongodb port</span>
+        user: <span class="s2">&quot;PipelineWiseUser&quot;</span>                                        <span class="c1"># Mongodb user</span>
+        password: <span class="s2">&quot;mY_VerY_StRonG_PaSSwoRd&quot;</span>                 <span class="c1"># Mongodb plain string or vault encrypted</span>
+        auth_database: <span class="s2">&quot;admin&quot;</span>                                                  <span class="c1"># Mongodb database to authenticate on</span>
+        dbname: <span class="s2">&quot;my_db&quot;</span>                                                                 <span class="c1"># Mongodb database name to sync from</span>
+        replica_set: <span class="s2">&quot;my_replica_set&quot;</span>                                   <span class="c1"># Optional, Mongodb replica set name, default null</span>
+        write_batch_rows: &lt;int&gt;                                                         <span class="c1"># Optional: Number of rows to write to csv file</span>
+                                                                        <span class="c1">#           in one batch. Default is 50000.</span>
 
 <span class="c1"># ------------------------------------------------------------------------------</span>
 <span class="c1"># Destination (Target) - Target properties</span>
@@ -309,7 +311,7 @@ stream_buffer_size: <span class="m">0</span>                           <span cla
 <span class="c1"># Source to target Schema mapping</span>
 <span class="c1"># ------------------------------------------------------------------------------</span>
 schemas:
-        - source_schema: <span class="s2">&quot;my_db&quot;</span>                        <span class="c1"># Same name as dbname</span>
+        - source_schema: <span class="s2">&quot;my_db&quot;</span>                                        <span class="c1"># Same name as dbname</span>
           target_schema: <span class="s2">&quot;ppw_e2e_tap_mongodb&quot;</span>          <span class="c1"># Name of target schema to load to</span>
 
           <span class="c1"># List of collections to sync</span>
