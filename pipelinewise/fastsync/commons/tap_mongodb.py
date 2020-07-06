@@ -21,6 +21,8 @@ from . import utils
 from .errors import ExportError, TableNotFoundError, MongoDBInvalidDatetimeError
 
 LOGGER = logging.getLogger(__name__)
+DEFAULT_WRITE_BATCH_ROWS = 50000
+
 
 class MongoDBJsonEncoder(json.JSONEncoder):
     """
@@ -106,6 +108,9 @@ class FastSyncTapMongoDB:
             tap_type_to_target_type: Function that maps tap types to target ones
         """
         self.connection_config = connection_config
+        self.connection_config['write_batch_rows'] = connection_config.get('write_batch_rows',
+                                                                           DEFAULT_WRITE_BATCH_ROWS)
+
         self.tap_type_to_target_type = tap_type_to_target_type
         self.database: Optional[Database] = None
 
@@ -147,31 +152,56 @@ class FastSyncTapMongoDB:
         export_file_path = self._export_collection(temp_dir, table_dict['table_name'])
         extracted_at = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f')
 
+        write_batch_rows = self.connection_config['write_batch_rows']
         exported_rows = 0
 
-        with gzip.open(export_file_path, 'rb') as export_file, gzip.open(filepath, 'wt') as gzfile:
-            writer = csv.DictWriter(gzfile,
-                                    fieldnames=[elem[0] for elem in self._get_collection_columns()],
-                                    delimiter=',',
-                                    quotechar='"',
-                                    quoting=csv.QUOTE_MINIMAL)
+        try:
+            with gzip.open(export_file_path, 'rb') as export_file, gzip.open(filepath, 'wt') as gzfile:
+                writer = csv.DictWriter(gzfile,
+                                        fieldnames=[elem[0] for elem in self._get_collection_columns()],
+                                        delimiter=',',
+                                        quotechar='"',
+                                        quoting=csv.QUOTE_MINIMAL)
 
-            writer.writeheader()
+                writer.writeheader()
+                rows = []
 
-            for document in bson.decode_iter(export_file.read()):
-                row = {
-                    '_ID': str(document['_id']),
-                    'DOCUMENT': json.dumps(document, cls=MongoDBJsonEncoder, separators=(',', ':')),
-                    utils.SDC_EXTRACTED_AT: extracted_at,
-                    utils.SDC_BATCHED_AT: datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f'),
-                    utils.SDC_DELETED_AT: None
-                }
+                LOGGER.info('Starting data processing...')
 
-                writer.writerow(row)
+                # bson.decode_file_iter will generate one document at a time from the exported file
+                for document in bson.decode_file_iter(export_file):
+                    rows.append({
+                        '_ID': str(document['_id']),
+                        'DOCUMENT': json.dumps(document, cls=MongoDBJsonEncoder, separators=(',', ':')),
+                        utils.SDC_EXTRACTED_AT: extracted_at,
+                        utils.SDC_BATCHED_AT: datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f'),
+                        utils.SDC_DELETED_AT: None
+                    })
 
-                exported_rows += 1
+                    exported_rows += 1
 
-        os.remove(export_file_path)
+                    # writes batch to csv file and log some nice message on the progress.
+                    if exported_rows % write_batch_rows == 0:
+                        LOGGER.info(
+                            'Exporting batch from %s to %s rows from %s...',
+                            (exported_rows - write_batch_rows),
+                            exported_rows, table_name
+                        )
+
+                        writer.writerows(rows)
+                        rows.clear()
+
+                # write rows one last time
+                if rows:
+                    LOGGER.info('Exporting last batch ...')
+                    writer.writerows(rows)
+                    rows.clear()
+
+        finally:
+            # whether the code in try succeeds or fails
+            # make sure to delete the exported file
+            os.remove(export_file_path)
+
         LOGGER.info('Exported total of %s rows from %s...', exported_rows, table_name)
 
     @staticmethod
@@ -247,9 +277,15 @@ class FastSyncTapMongoDB:
         Returns: Path to the file
 
         """
+        LOGGER.info('Starting export of table "%s"', collection_name)
+
         url = f'mongodb://{self.connection_config["user"]}:{self.connection_config["password"]}' \
               f'@{self.connection_config["host"]}:{self.connection_config["port"]}/' \
-              f'{self.connection_config["database"]}?authSource={self.connection_config["auth_database"]}'
+              f'{self.connection_config["database"]}?authSource={self.connection_config["auth_database"]}' \
+              f'&readPreference=secondaryPreferred'
+
+        if self.connection_config.get('replica_set', None) is not None:
+            url += f'&replicaSet={self.connection_config["replica_set"]}'
 
         return_code = subprocess.call([
             'mongodump',

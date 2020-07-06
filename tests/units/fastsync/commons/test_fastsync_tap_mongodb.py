@@ -89,7 +89,8 @@ class TestFastSyncTapMongoDB(TestCase):
 
             call_mock.assert_called_once_with([
                 'mongodump',
-                '--uri', '"mongodb://my_user:secret@foo.com:3306/my_db?authSource=admin"',
+                '--uri', '"mongodb://my_user:secret@foo.com:3306/my_db'
+                         '?authSource=admin&readPreference=secondaryPreferred"',
                 '--forceTableScan',
                 '--gzip',
                 '-c', 'my_col',
@@ -114,7 +115,8 @@ class TestFastSyncTapMongoDB(TestCase):
                 with patch('pipelinewise.fastsync.commons.tap_mongodb.gzip') as gzip_mock:
                     mock_enter = Mock()
 
-                    with patch('pipelinewise.fastsync.commons.tap_mongodb.bson.decode_iter') as bson_decode_iter_mock:
+                    with patch('pipelinewise.fastsync.commons.tap_mongodb.bson.decode_file_iter') as \
+                            bson_decode_iter_mock:
 
                         bson_decode_iter_mock.return_value = [
                             {'_id': ObjectId('0123456789ab0123456789aa'), 'key1': 1, 'key2': time.time()},
@@ -131,7 +133,8 @@ class TestFastSyncTapMongoDB(TestCase):
 
                         call_mock.assert_called_once_with([
                             'mongodump',
-                            '--uri', '"mongodb://my_user:secret@foo.com:3306/my_db?authSource=admin"',
+                            '--uri', '"mongodb://my_user:secret@foo.com:3306/my_db'
+                                     '?authSource=admin&readPreference=secondaryPreferred"',
                             '--forceTableScan',
                             '--gzip',
                             '-c', 'my_col',

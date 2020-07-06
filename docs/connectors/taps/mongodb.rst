@@ -95,12 +95,14 @@ Example YAML for ``tap-mongodb``:
 	# ------------------------------------------------------------------------------
 	db_conn:
 		host: "mongodb_host1,mongodb_host2,mongodb_host3" 	# Mongodb host(s)
-		port: 27017                           			# Mongodb port
-		user: "PipelineWiseUser"                  		# Mongodb user
-		password: "mY_VerY_StRonG_PaSSwoRd"                 	# Mongodb plain string or vault encrypted
-		auth_database: "admin"            			# Mongodb database to authenticate on
-		dbname: "my_db"           				# Mongodb database name to sync from
-		replica_set: "my_replica_set"        			# Optional, Mongodb replica set name, default null
+		port: 27017                           				# Mongodb port
+		user: "PipelineWiseUser"                  			# Mongodb user
+		password: "mY_VerY_StRonG_PaSSwoRd"                 # Mongodb plain string or vault encrypted
+		auth_database: "admin"            					# Mongodb database to authenticate on
+		dbname: "my_db"           							# Mongodb database name to sync from
+		replica_set: "my_replica_set"        				# Optional, Mongodb replica set name, default null
+  		write_batch_rows: <int>								# Optional: Number of rows to write to csv file
+                                       						#           in one batch. Default is 50000.
 
 	# ------------------------------------------------------------------------------
 	# Destination (Target) - Target properties
@@ -114,7 +116,7 @@ Example YAML for ``tap-mongodb``:
 	# Source to target Schema mapping
 	# ------------------------------------------------------------------------------
 	schemas:
-	  	- source_schema: "my_db"			# Same name as dbname
+	  	- source_schema: "my_db"					# Same name as dbname
 		  target_schema: "ppw_e2e_tap_mongodb"		# Name of target schema to load to
 
 		  # List of collections to sync
