@@ -7,14 +7,12 @@ import json
 import logging
 import os
 import re
-import shlex
 import sys
 import tempfile
 import jsonschema
 import yaml
 
 from datetime import date, datetime
-from subprocess import PIPE, STDOUT, Popen
 from ansible.errors import AnsibleError
 from ansible.module_utils._text import to_text
 from ansible.module_utils.common._collections_compat import Mapping
@@ -51,15 +49,6 @@ class AnsibleJSONEncoder(json.JSONEncoder):
             # use default encoder
             value = super(AnsibleJSONEncoder, self).default(o)
         return value
-
-
-class RunCommandException(Exception):
-    """
-    Custom exception to raise when run command fails
-    """
-
-    def __init__(self, *args, **kwargs):
-        Exception.__init__(self, *args, **kwargs)
 
 
 def is_json(string):
@@ -447,71 +436,6 @@ def get_fastsync_bin(venv_dir, tap_type, target_type):
     fastsync_name = f'{source}-to-{target}'
 
     return os.path.join(venv_dir, 'pipelinewise', 'bin', fastsync_name)
-
-
-def run_command(command, log_file=None, line_callback=None):
-    """
-    Runs a shell command with or without log file with STDOUT and STDERR
-    """
-    piped_command = f"/bin/bash -o pipefail -c '{command}'"
-    LOGGER.debug('Running command %s', piped_command)
-
-    # Logfile is needed: Continuously polling STDOUT and STDERR and writing into a log file
-    # Once the command finished STDERR redirects to STDOUT and returns _only_ STDOUT
-    if log_file is not None:
-        LOGGER.info('Writing output into %s', log_file)
-
-        # Create log dir if not exists
-        os.makedirs(os.path.dirname(log_file), exist_ok=True)
-
-        # Status embedded in the log file name
-        log_file_running = f'{log_file}.running'
-        log_file_failed = f'{log_file}.failed'
-        log_file_success = f'{log_file}.success'
-
-        # Start command
-        proc = Popen(shlex.split(piped_command), stdout=PIPE, stderr=STDOUT)
-        with open(log_file_running, 'w+') as logfile:
-            stdout = ''
-            while True:
-                line = proc.stdout.readline()
-                if line:
-                    decoded_line = line.decode('utf-8')
-
-                    if line_callback is not None:
-                        decoded_line = line_callback(decoded_line)
-
-                    stdout += decoded_line
-
-                    logfile.write(decoded_line)
-                    logfile.flush()
-                if proc.poll() is not None:
-                    break
-
-        proc_rc = proc.poll()
-        if proc_rc != 0:
-            # Add failed status to the log file name
-            os.rename(log_file_running, log_file_failed)
-
-            # Raise run command exception
-            raise RunCommandException(f'Command failed. Return code: {proc_rc}')
-
-        # Add success status to the log file name
-        os.rename(log_file_running, log_file_success)
-
-        return [proc_rc, stdout, None]
-
-    # No logfile needed: STDOUT and STDERR returns in an array once the command finished
-    proc = Popen(shlex.split(piped_command), stdout=PIPE, stderr=PIPE)
-    proc_tuple = proc.communicate()
-    proc_rc = proc.returncode
-    stdout = proc_tuple[0].decode('utf-8')
-    stderr = proc_tuple[1].decode('utf-8')
-
-    if proc_rc != 0:
-        LOGGER.error(stderr)
-
-    return [proc_rc, stdout, stderr]
 
 
 # pylint: disable=redefined-builtin

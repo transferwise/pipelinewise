@@ -300,40 +300,6 @@ class TestUtils:
             'tables': 'SCHEMA_1.TABLE_ONE,SCHEMA_1.TABLE_TWO'
         }
 
-    def test_run_command(self):
-        """Test run command functions
-
-            Run command runs everything enclosed by /bin/bash -o pipefail -c '{}'
-            This means arguments should pass as plain string after the command
-
-            Return value is an array of: [return_code, stdout, stderr]
-        """
-
-        # Printing something to stdout should return 0
-        [returncode, stdout, stderr] = cli.utils.run_command('echo this is a test line')
-        assert [returncode, stdout, stderr] == [0, 'this is a test line\n', '']
-
-        # Running an invalid command should return 127 and some error message to stdout
-        [returncode, stdout, stderr] = cli.utils.run_command('invalid-command this is an invalid command')
-        assert [returncode, stdout] == [127, '']
-        assert stderr != ''
-
-        # If loggin enabled then a success command should create log file with success status
-        [returncode, stdout, stderr] = cli.utils.run_command('echo this is a test line', log_file='./test.log')
-        assert [returncode, stdout, stderr] == [0, 'this is a test line\n', None]
-        if os.path.isfile('test.log.success'):
-            os.remove('test.log.success')
-
-        # If logging enabled then a failed command should create log file with failed status
-        # NOTE: When logging is enabled and the command fails then it raises an exception
-        #       This behaviour is not in sync with no logging option
-        # TODO: Sync failed command execution behaviour with logging and no-logging option
-        #       Both should return [rc, stdout, stderr] list or both should raise exception
-        with pytest.raises(Exception):
-            cli.utils.run_command('invalid-command this is an invalid command', log_file='./test.log')
-        if os.path.isfile('test.log.failed'):
-            os.remove('test.log.failed')
-
     def test_get_tap_target_names(self):
         """Test get tap and target yamls"""
         expected_tap_names = {'tap_test.yml', 'tap_2test.yml', 'tap_valid.yaml'}
