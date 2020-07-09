@@ -953,7 +953,7 @@ class PipelineWise:
             utils.silentremove(tap_properties_singer)
             sys.exit(1)
         # Delete temp files if there is any
-        except utils.RunCommandException as exc:
+        except commands.RunCommandException as exc:
             self.logger.exception(exc)
             utils.silentremove(cons_target_config)
             utils.silentremove(tap_properties_fastsync)
@@ -1064,7 +1064,7 @@ class PipelineWise:
             utils.silentremove(cons_target_config)
             sys.exit(1)
         # Delete temp file if there is any
-        except utils.RunCommandException as exc:
+        except commands.RunCommandException as exc:
             self.logger.exception(exc)
             utils.silentremove(cons_target_config)
             sys.exit(1)
