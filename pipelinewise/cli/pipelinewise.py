@@ -586,7 +586,7 @@ class PipelineWise:
         # We will use the discover option to test connection
         tap_config = self.tap['files']['config']
         command = f'{self.tap_bin} --config {tap_config} --discover'
-        result = utils.run_command(command)
+        result = commands.run_command(command)
 
         # Get output and errors from tap
         # pylint: disable=unused-variable
@@ -630,7 +630,7 @@ class PipelineWise:
 
         # Generate and run the command to run the tap directly
         command = f'{tap_bin} --config {tap_config_file} --discover'
-        result = utils.run_command(command)
+        result = commands.run_command(command)
 
         # Get output and errors from tap
         # pylint: disable=unused-variable
@@ -760,7 +760,8 @@ class PipelineWise:
         command = commands.build_singer_command(tap=tap,
                                                 target=target,
                                                 transform=transform,
-                                                stream_buffer_size=stream_buffer_size)
+                                                stream_buffer_size=stream_buffer_size,
+                                                stream_buffer_log_file=self.tap_run_log_file)
 
         # Do not run if another instance is already running
         log_dir = os.path.dirname(self.tap_run_log_file)
@@ -800,9 +801,9 @@ class PipelineWise:
 
         # Run command with update_state_file as a callback to call for every stdout line
         if self.extra_log:
-            utils.run_command(command, self.tap_run_log_file, update_state_file_with_extra_log)
+            commands.run_command(command, self.tap_run_log_file, update_state_file_with_extra_log)
         else:
-            utils.run_command(command, self.tap_run_log_file, update_state_file)
+            commands.run_command(command, self.tap_run_log_file, update_state_file)
 
         # update the state file one last time to make sure it always has the last state message.
         if state is not None:
@@ -835,10 +836,10 @@ class PipelineWise:
 
         if self.extra_log:
             # Run command and copy fastsync output to main logger
-            utils.run_command(command, self.tap_run_log_file, add_fastsync_output_to_main_logger)
+            commands.run_command(command, self.tap_run_log_file, add_fastsync_output_to_main_logger)
         else:
             # Run command
-            utils.run_command(command, self.tap_run_log_file)
+            commands.run_command(command, self.tap_run_log_file)
 
     # pylint: disable=too-many-statements,too-many-locals
     def run_tap(self):
@@ -952,7 +953,7 @@ class PipelineWise:
             utils.silentremove(tap_properties_singer)
             sys.exit(1)
         # Delete temp files if there is any
-        except utils.RunCommandException as exc:
+        except commands.RunCommandException as exc:
             self.logger.exception(exc)
             utils.silentremove(cons_target_config)
             utils.silentremove(tap_properties_fastsync)
@@ -1063,7 +1064,7 @@ class PipelineWise:
             utils.silentremove(cons_target_config)
             sys.exit(1)
         # Delete temp file if there is any
-        except utils.RunCommandException as exc:
+        except commands.RunCommandException as exc:
             self.logger.exception(exc)
             utils.silentremove(cons_target_config)
             sys.exit(1)

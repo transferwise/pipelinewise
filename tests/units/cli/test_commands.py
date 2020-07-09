@@ -6,7 +6,7 @@ import pipelinewise.cli.commands as commands
 from pipelinewise.cli.errors import StreamBufferTooLargeException
 
 
-# pylint: disable=no-self-use
+# pylint: disable=no-self-use,fixme
 class TestCommands:
     """
     Unit tests for PipelineWise CLI commands functions
@@ -94,7 +94,11 @@ class TestCommands:
 
         # Should use custom buffer binary executable if bin parameter provided
         assert commands.build_stream_buffer_command(buffer_size=100, stream_buffer_bin='dummy_buffer') == \
-               f'dummy_buffer -m 100M'
+            f'dummy_buffer -m 100M'
+
+        # Should log mbuffer status to log file with .running extension
+        assert commands.build_stream_buffer_command(buffer_size=100, log_file='stream_buffer.log') == \
+            'mbuffer -m 100M -q -l stream_buffer.log.running'
 
     def test_build_singer_command(self):
         """Tests the function that generates the full singer singer command
@@ -244,3 +248,36 @@ class TestCommands:
                           ' --temp_dir dummy_temp_dir' \
                           f' --transform {transform_config}' \
                           ' --tables public.table_one,public.table_two'
+
+    def test_run_command(self):
+        """Test run command functions
+
+            Run command runs everything enclosed by /bin/bash -o pipefail -c '{}'
+            This means arguments should pass as plain string after the command
+
+            Return value is an array of: [return_code, stdout, stderr]
+        """
+        # Printing something to stdout should return 0
+        [returncode, stdout, stderr] = commands.run_command('echo this is a test line')
+        assert [returncode, stdout, stderr] == [0, 'this is a test line\n', '']
+
+        # Running an invalid command should return 127 and some error message to stdout
+        [returncode, stdout, stderr] = commands.run_command('invalid-command this is an invalid command')
+        assert [returncode, stdout] == [127, '']
+        assert stderr != ''
+
+        # If loggin enabled then a success command should create log file with success status
+        [returncode, stdout, stderr] = commands.run_command('echo this is a test line', log_file='./test.log')
+        assert [returncode, stdout, stderr] == [0, 'this is a test line\n', None]
+        assert os.path.isfile('test.log.success')
+        os.remove('test.log.success')
+
+        # If logging enabled then a failed command should create log file with failed status
+        # NOTE: When logging is enabled and the command fails then it raises an exception
+        #       This behaviour is not in sync with no logging option
+        # TODO: Sync failed command execution behaviour with logging and no-logging option
+        #       Both should return [rc, stdout, stderr] list or both should raise exception
+        with pytest.raises(Exception):
+            commands.run_command('invalid-command this is an invalid command', log_file='./test.log')
+        assert os.path.isfile('test.log.failed')
+        os.remove('test.log.failed')

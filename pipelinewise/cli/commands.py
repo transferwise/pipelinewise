@@ -2,7 +2,9 @@
 PipelineWise CLI - Commands
 """
 import os
+import shlex
 import logging
+from subprocess import PIPE, STDOUT, Popen
 from collections import namedtuple
 
 from . import utils
@@ -14,10 +16,21 @@ DEFAULT_STREAM_BUFFER_BIN = 'mbuffer'
 MIN_STREAM_BUFFER_SIZE = 10
 MAX_STREAM_BUFFER_SIZE = 1000
 
+STATUS_RUNNING = 'running'
+STATUS_FAILED = 'failed'
+STATUS_SUCCESS = 'success'
 
 TapParams = namedtuple('TapParams', ['type', 'bin', 'config', 'properties', 'state'])
 TargetParams = namedtuple('TargetParams', ['type', 'bin', 'config'])
 TransformParams = namedtuple('TransformParams', ['bin', 'config'])
+
+
+class RunCommandException(Exception):
+    """
+    Custom exception to raise when run command fails
+    """
+    def __init__(self, *args, **kwargs):
+        Exception.__init__(self, *args, **kwargs)
 
 
 def exists_and_executable(bin_path: str) -> bool:
@@ -111,7 +124,9 @@ def build_transformation_command(transform_bin: str, config: str) -> str:
     return trans_command
 
 
-def build_stream_buffer_command(buffer_size: int = 0, stream_buffer_bin: str = DEFAULT_STREAM_BUFFER_BIN) -> str:
+def build_stream_buffer_command(buffer_size: int = 0,
+                                log_file: str = None,
+                                stream_buffer_bin: str = DEFAULT_STREAM_BUFFER_BIN) -> str:
     """
     Builds a command that buffers data between tap and target
     connectors to stream data asynchronously. Buffering streams
@@ -120,6 +135,8 @@ def build_stream_buffer_command(buffer_size: int = 0, stream_buffer_bin: str = D
 
     Args:
         buffer_size: Size of buffer in megabytes
+        log_file: Log stream buffer status messages to this file
+                           (Default is None, logging to stderr)
         stream_buffer_bin: binary executable of buffer implementation
                            (Default is mbuffer)
 
@@ -142,11 +159,17 @@ def build_stream_buffer_command(buffer_size: int = 0, stream_buffer_bin: str = D
 
         buffer_command = f'{stream_buffer_bin} -m {buffer_size}M'
 
+        # Log status to external file instead of stderr if log_file defined
+        if log_file:
+            log_file_stats = log_file_with_status(log_file, STATUS_RUNNING)
+            buffer_command = f'{buffer_command} -q -l {log_file_stats}'
+
     return buffer_command
 
 
 def build_singer_command(tap: TapParams, target: TargetParams, transform: TransformParams,
-                         stream_buffer_size: int = 0) -> str:
+                         stream_buffer_size: int = 0,
+                         stream_buffer_log_file: str = None) -> str:
     """
     Builds a command that starts a full singer command with tap,
     target and optional transformation connectors. The connectors are
@@ -157,6 +180,8 @@ def build_singer_command(tap: TapParams, target: TargetParams, transform: Transf
         target: NamedTuple with target properties
         transform: NamedTuple with transform properties
         stream_buffer_size: in-memory buffer size between tap and target
+        stream_buffer_log_file: Log stream buffer status messages to this file
+                           (Default is None, logging to stderr)
 
     Returns:
         string of command line executable
@@ -170,7 +195,8 @@ def build_singer_command(tap: TapParams, target: TargetParams, transform: Transf
                                           target.config)
     transformation_command = build_transformation_command(transform.bin,
                                                           transform.config)
-    stream_buffer_command = build_stream_buffer_command(stream_buffer_size)
+    stream_buffer_command = build_stream_buffer_command(stream_buffer_size,
+                                                        stream_buffer_log_file)
 
     # Generate the final piped command with all the required components
     sub_commands = [tap_command, transformation_command, stream_buffer_command, target_command]
@@ -210,3 +236,88 @@ def build_fastsync_command(tap: TapParams, target: TargetParams, transform: Tran
         f'--tables {tables}' if tables else ''])))
 
     return command
+
+
+def log_file_with_status(log_file: str, status: str) -> str:
+    """
+    Adds an extension to a log file that represents the
+    actual status of the tap
+
+    Args:
+        log_file: log file path without status extension
+        status: a string that will be appended to the end of log file
+
+    Returns:
+        string of log file path with status extension
+    """
+    return f'{log_file}.{status}'
+
+
+def run_command(command: str, log_file: str = None, line_callback: callable = None):
+    """
+    Runs a shell command with or without log file with STDOUT and STDERR
+
+    Args:
+        command: A unix command to run
+        log_file: Write stdout and stderr to log file
+        line_callback: function to call on each line on stdout and stderr
+    """
+    piped_command = f"/bin/bash -o pipefail -c '{command}'"
+    LOGGER.debug('Running command %s', piped_command)
+
+    # Logfile is needed: Continuously polling STDOUT and STDERR and writing into a log file
+    # Once the command finished STDERR redirects to STDOUT and returns _only_ STDOUT
+    if log_file is not None:
+        LOGGER.info('Writing output into %s', log_file)
+
+        # Create log dir if not exists
+        os.makedirs(os.path.dirname(log_file), exist_ok=True)
+
+        # Status embedded in the log file name
+        log_file_running = log_file_with_status(log_file, STATUS_RUNNING)
+        log_file_failed = log_file_with_status(log_file, STATUS_FAILED)
+        log_file_success = log_file_with_status(log_file, STATUS_SUCCESS)
+
+        # Start command
+        proc = Popen(shlex.split(piped_command), stdout=PIPE, stderr=STDOUT)
+        with open(log_file_running, 'a+') as logfile:
+            stdout = ''
+            while True:
+                line = proc.stdout.readline()
+                if line:
+                    decoded_line = line.decode('utf-8')
+
+                    if line_callback is not None:
+                        decoded_line = line_callback(decoded_line)
+
+                    stdout += decoded_line
+
+                    logfile.write(decoded_line)
+                    logfile.flush()
+                if proc.poll() is not None:
+                    break
+
+        proc_rc = proc.poll()
+        if proc_rc != 0:
+            # Add failed status to the log file name
+            os.rename(log_file_running, log_file_failed)
+
+            # Raise run command exception
+            raise RunCommandException(f'Command failed. Return code: {proc_rc}')
+
+        # Add success status to the log file name
+        os.rename(log_file_running, log_file_success)
+
+        return [proc_rc, stdout, None]
+
+    # No logfile needed: STDOUT and STDERR returns in an array once the command finished
+    proc = Popen(shlex.split(piped_command), stdout=PIPE, stderr=PIPE)
+    proc_tuple = proc.communicate()
+    proc_rc = proc.returncode
+    stdout = proc_tuple[0].decode('utf-8')
+    stderr = proc_tuple[1].decode('utf-8')
+
+    if proc_rc != 0:
+        LOGGER.error(stderr)
+
+    return [proc_rc, stdout, stderr]
