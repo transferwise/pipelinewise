@@ -1,3 +1,9 @@
+0.17.1 (2020-07-09)
+-------------------
+- Fixed an issue when using FastSync on big MongoDB collections caused memory errors
+- Fixed an issue when `sync_tables` command was not working and failed with exception
+- Fixed an issue when custom `stream_buffer_size` option produced unreadable log files
+
 0.17.0 (2020-06-29)
 -------------------
 - Add tap-mongodb with FastSync components to Snowflake and Postgres
