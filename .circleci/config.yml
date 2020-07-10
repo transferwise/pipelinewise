@@ -33,8 +33,10 @@ references:
           TAP_MONGODB_ROOT_PASSWORD: Password1
 
       # PostgreSQL service container image used as test source database (for tap-postgres)
-      - image: postgres:11.4
+      - image: debezium/postgres:12-alpine
         name: db_postgres_source
+        # enable logical decoding
+        command: -c "wal_level=logical" -c "max_replication_slots=5" -c "max_wal_senders=5"
         environment:
           POSTGRES_USER: test
           POSTGRES_PASSWORD: test

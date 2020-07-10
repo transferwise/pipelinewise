@@ -14,7 +14,9 @@ owner: "test-runner"
 # ------------------------------------------------------------------------------
 db_conn:
   host: "${TAP_POSTGRES_HOST}"          # PostgreSQL host
-  logical_poll_total_seconds: 3         # Time out if no LOG_BASED changes received for 3 seconds
+  logical_poll_total_seconds: 5         # Time out if no LOG_BASED changes received for 5 seconds
+  break_at_end_lsn: false               # continue listening on changes
+  max_run_seconds: 7                    
   port: ${TAP_POSTGRES_PORT}            # PostgreSQL port
   user: "${TAP_POSTGRES_USER}"          # PostgreSQL user
   password: "${TAP_POSTGRES_PASSWORD}"  # Plain string or vault encrypted
@@ -87,14 +89,13 @@ schemas:
         replication_method: "INCREMENTAL"
         replication_key: "cid"
 
-  # Logical replication is currently disabled in end to end
   ### SOURCE SCHEMA 3: logical 1
-  #- source_schema: "logical1"
-  #  target_schema: "ppw_e2e_tap_postgres_logical1"
-  #
-  #  tables:
-  #    - table_name: "logical1_table1"
-  #      replication_method: "LOG_BASED"
+  - source_schema: "logical1"
+    target_schema: "ppw_e2e_tap_postgres_logical1"
+
+    tables:
+      - table_name: "logical1_table1"
+        replication_method: "LOG_BASED"
   #    - table_name: "logical1_table2"
   #    - table_name: "logical1_edgydata"
 

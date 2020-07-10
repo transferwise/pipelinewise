@@ -126,6 +126,12 @@ class TestTargetPostgres:
         #  FULL_TABLE
         self.run_query_tap_postgres("DELETE FROM public.country WHERE code = 'UMI'")
 
+        #  LOG_BASED
+        self.run_query_tap_postgres('ALTER TABLE logical1.logical1_table1 ADD COLUMN bool_col bool;')
+        self.run_query_tap_postgres('ALTER TABLE logical1.logical1_table1 RENAME COLUMN cvarchar2 to varchar_col;')
+        self.run_query_tap_postgres('INSERT INTO logical1.logical1_table1 (cvarchar, varchar_col, bool_col) values '
+                                    '(\'insert after alter table\', \'this is renamed column\', true);')
+
         # 3. Run tap second time - both fastsync and a singer should be triggered, there are some FULL_TABLE
         assertions.assert_run_tap_success(TAP_POSTGRES_ID, TARGET_ID, ['fastsync', 'singer'])
         assertions.assert_row_counts_equal(self.run_query_tap_postgres, self.run_query_target_postgres)
