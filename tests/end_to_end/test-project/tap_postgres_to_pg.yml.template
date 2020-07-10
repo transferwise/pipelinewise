@@ -14,9 +14,9 @@ owner: "test-runner"
 # ------------------------------------------------------------------------------
 db_conn:
   host: "${TAP_POSTGRES_HOST}"          # PostgreSQL host
-  logical_poll_total_seconds: 5         # Time out if no LOG_BASED changes received for 3 seconds
-  break_at_end_lsn: false
-  max_run_seconds: 7
+  logical_poll_total_seconds: 5         # Time out if no LOG_BASED changes received for 5 seconds
+  break_at_end_lsn: false               # continue listening on changes
+  max_run_seconds: 7                    
   port: ${TAP_POSTGRES_PORT}            # PostgreSQL port
   user: "${TAP_POSTGRES_USER}"          # PostgreSQL user
   password: "${TAP_POSTGRES_PASSWORD}"  # Plain string or vault encrypted
