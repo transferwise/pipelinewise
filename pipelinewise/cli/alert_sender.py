@@ -75,7 +75,7 @@ class AlertSender:
         Returns:
             AlertHandler tuple
         """
-        if alert_handler_type in self.alert_handlers.keys():
+        if alert_handler_type in self.alert_handlers:
             alert_handler_config = self.alert_handlers[alert_handler_type]
             alert_handler = AlertHandler(type=alert_handler_type, config=alert_handler_config)
             return alert_handler
