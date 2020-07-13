@@ -63,7 +63,7 @@ class Config:
             target_id = target_data['id']
 
             # Check if a target with same ID already exists
-            # exit with error, oterwise, we would override the previous one and that would go unnoticed.
+            # exit with error, otherwise, we would override the previous one and that would go unnoticed.
             if target_id in targets:
                 config.logger.error('Duplicate target found "%s"', target_id)
                 sys.exit(1)
