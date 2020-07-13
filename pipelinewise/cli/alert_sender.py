@@ -125,5 +125,5 @@ class AlertSender:
         Returns:
             Dictionary with number of successfully sent alerts
         """
-        sents = [self.send_to_handler(handler_type, message, level, exc) for handler_type in self.alert_handlers.keys()]
+        sents = [self.send_to_handler(handler_type, message, level, exc) for handler_type in self.alert_handlers]
         return {'sent': len(sents)}
