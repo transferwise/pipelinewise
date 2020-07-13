@@ -50,6 +50,6 @@ class SlackAlertHandler(BaseAlertHandler):
         self.client.chat_postMessage(channel=self.channel,
                                      text=f'```{exc}```' if exc else None,
                                      attachments=[{
-                                         "color": ALERT_LEVEL_SLACK_COLORS.get(level, BaseAlertHandler.ERROR),
-                                         "title": message
+                                         'color': ALERT_LEVEL_SLACK_COLORS.get(level, BaseAlertHandler.ERROR),
+                                         'title': message
                                      }])

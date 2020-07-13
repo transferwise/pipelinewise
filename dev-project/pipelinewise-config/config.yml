@@ -7,4 +7,3 @@ alert_handlers:
 #  slack:
 #    token: "slack-token"
 #    channel: "#slack-channel"
-
