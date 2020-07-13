@@ -330,3 +330,23 @@ class TestUtils:
                                                prefix='pipelinewise_test_temp_file_')[1]
         assert os.path.isfile(temp_file)
         os.remove(temp_file)
+
+    def test_tail_file(self):
+        """Test reading the last n lines of a file"""
+        sample_file = '{}/resources/sample-text.txt'.format(os.path.dirname(__file__))
+        # Should get the last 10 lines by default
+        assert cli.utils.tail_file(sample_file) == ['line 11\n',
+                                                    'line 12\n',
+                                                    'line 13\n',
+                                                    'line 14\n',
+                                                    'line 15\n',
+                                                    'line 16\n',
+                                                    'line 17\n',
+                                                    'line 18\n',
+                                                    'line 19\n',
+                                                    'line 20']
+
+        # Should get the last requested n lines
+        assert cli.utils.tail_file(sample_file, n_lines=3) == ['line 18\n',
+                                                               'line 19\n',
+                                                               'line 20']

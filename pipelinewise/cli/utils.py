@@ -446,3 +446,34 @@ def create_temp_file(suffix=None, prefix=None, dir=None, text=None):
     if dir:
         os.makedirs(dir, exist_ok=True)
     return tempfile.mkstemp(suffix, prefix, dir, text)
+
+
+def tail_file(file, n_lines=10, block_size=1024):
+    """
+    Returns the last n lines of a file
+
+    Args:
+        file: file to read
+        n_lines: number of last lines to extract
+        block_size: block size when reading file
+
+    Returns:
+        List of the last n lines of a file
+    """
+    lines = []
+    if file and os.path.isfile(file):
+        file_object = open(file)
+        file_object.seek(0, 2)
+        ext_lines = 1 - file_object.read(1).count('\n')
+        position = file_object.tell()
+        while n_lines >= ext_lines and position > 0:
+            block = min(block_size, position)
+            position -= block
+            file_object.seek(position, 0)
+            ext_lines += file_object.read(block).count('\n')
+        file_object.seek(position, 0)
+        ext_lines = min(ext_lines, n_lines)
+        lines = file_object.readlines()[-ext_lines:]
+        file_object.close()
+
+    return lines
