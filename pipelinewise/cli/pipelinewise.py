@@ -20,6 +20,8 @@ from . import utils
 from . import commands
 from .commands import TapParams, TargetParams, TransformParams
 from .config import Config
+from .alert_sender import AlertSender
+from .alert_handlers.base_alert_handler import BaseAlertHandler
 
 
 # pylint: disable=too-many-lines,too-many-instance-attributes,too-many-public-methods
@@ -41,6 +43,7 @@ class PipelineWise:
         self.pipelinewise_bin = os.path.join(self.venv_dir, 'cli', 'bin', 'pipelinewise')
         self.config_path = os.path.join(self.config_dir, 'config.json')
         self.load_config()
+        self.alert_sender = AlertSender(self.config.get('alert_handlers'))
 
         if args.tap != '*':
             self.tap = self.get_tap(args.target, args.tap)
@@ -56,6 +59,29 @@ class PipelineWise:
         # Catch SIGINT and SIGTERM to exit gracefully
         for sig in [signal.SIGINT, signal.SIGTERM]:
             signal.signal(sig, self._exit_gracefully)
+
+    def send_alert(self,
+                   message: str,
+                   level: str = BaseAlertHandler.ERROR,
+                   exc: Exception = None) -> dict:
+        """
+        Send alert messages to every alert handler if sender is not disabled for the tap
+
+        Args:
+            message: the alert message
+            level: alert level
+            exc: optional exception that triggered the alert
+
+        Returns:
+            Dictionary with number of successfully sent alerts
+        """
+        stats = {'sent': 0}
+
+        send_alert = self.tap.get('send_alert', True)
+        if send_alert:
+            stats = self.alert_sender.send_to_all_handlers(message=message, level=level, exc=exc)
+
+        return stats
 
     def create_consumable_target_config(self, target_config, tap_inheritable_config):
         """
@@ -959,12 +985,14 @@ class PipelineWise:
             utils.silentremove(tap_properties_fastsync)
             utils.silentremove(tap_properties_singer)
             self._print_tap_run_summary(self.STATUS_FAILED, start_time, datetime.now())
+            self.send_alert(message=f'{tap_id} tap failed', exc=exc)
             sys.exit(1)
         except Exception as exc:
             utils.silentremove(cons_target_config)
             utils.silentremove(tap_properties_fastsync)
             utils.silentremove(tap_properties_singer)
             self._print_tap_run_summary(self.STATUS_FAILED, start_time, datetime.now())
+            self.send_alert(message=f'{tap_id} tap failed', exc=exc)
             raise exc
 
         utils.silentremove(cons_target_config)
@@ -1067,9 +1095,11 @@ class PipelineWise:
         except commands.RunCommandException as exc:
             self.logger.exception(exc)
             utils.silentremove(cons_target_config)
+            self.send_alert(message=f'Failed to sync tables in {tap_id} tap', exc=exc)
             sys.exit(1)
         except Exception as exc:
             utils.silentremove(cons_target_config)
+            self.send_alert(message=f'Failed to sync tables in {tap_id} tap', exc=exc)
             raise exc
 
         utils.silentremove(cons_target_config)

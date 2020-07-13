@@ -254,7 +254,7 @@ def get_sample_file_paths():
     Get list of every available sample files (YAML, etc.) with absolute paths
     """
     samples_dir = os.path.join(os.path.dirname(__file__), 'samples')
-    return search_files(samples_dir, patterns=['*.yml.sample', 'README.md'], abs_path=True)
+    return search_files(samples_dir, patterns=['config.yml', '*.yml.sample', 'README.md'], abs_path=True)
 
 
 def validate(instance, schema):

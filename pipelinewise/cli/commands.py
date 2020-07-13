@@ -303,7 +303,7 @@ def run_command(command: str, log_file: str = None, line_callback: callable = No
             os.rename(log_file_running, log_file_failed)
 
             # Raise run command exception
-            raise RunCommandException(f'Command failed. Return code: {proc_rc}')
+            raise RunCommandException(f'Command failed. Return code: {proc_rc} Full log: {log_file_failed}')
 
         # Add success status to the log file name
         os.rename(log_file_running, log_file_success)

@@ -1,0 +1,32 @@
+{
+  "definitions": {
+    "alert_slack": {
+      "type": "object",
+      "properties": {
+        "token": {
+          "type": "string"
+        },
+        "channel": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "token",
+        "channel"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "type": ["object", "null"],
+  "properties": {
+    "alert_handlers": {
+      "type": ["object", "null"],
+      "properties": {
+        "slack": { "$ref": "#/definitions/alert_slack" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "required": [],
+  "additionalProperties": false
+}

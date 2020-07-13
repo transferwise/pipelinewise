@@ -143,7 +143,6 @@ class TestConfig:
         assert pytest_wrapped_e.type == SystemExit
         assert pytest_wrapped_e.value.code == 1
 
-
     def test_from_invalid_yamls_fails(self):
         """
         Test creating Config object using invalid YAML configuration
@@ -226,6 +225,7 @@ class TestConfig:
                             'name': 'Sample MySQL Database',
                             'owner': 'somebody@foo.com',
                             'stream_buffer_size': None,
+                            'send_alert': True,
                             'enabled': True,
                         }
                     ]

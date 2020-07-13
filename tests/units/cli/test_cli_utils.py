@@ -122,11 +122,13 @@ class TestUtils:
             ['Apple', 'Orange', 'Strawberry', 'Mango', 'Vault Encrypted Secret Fruit']
 
     def test_sample_file_path(self):
-        """Sample files must be a tap, target YAML or README file"""
+        """Sample files must be global config, tap, target YAML or README file"""
         for sample in cli.utils.get_sample_file_paths():
             assert os.path.isfile(sample) is True
             assert \
-                re.match('.*(tap|target)_.*.yml.sample$', sample) or re.match('.*README.md$', sample)
+                re.match('.*config.yml$', sample) or \
+                re.match('.*(tap|target)_.*.yml.sample$', sample) or \
+                re.match('.*README.md$', sample)
 
     def test_extract_log_attributes(self):
         """Log files must match to certain pattern with embedded attributes in the file name"""
