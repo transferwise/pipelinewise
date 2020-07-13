@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pipelinewise.cli as cli
 import pytest
+from unittest.mock import patch
 from tests.units.cli.cli_args import CliArgs
 from pipelinewise.cli.pipelinewise import PipelineWise
 
@@ -294,6 +295,18 @@ class TestCli:
         # Merging invalid or not existing JSONs should raise exception
         with pytest.raises(Exception):
             self.pipelinewise.create_consumable_target_config(target_config, tap_inheritable_config)
+
+    def test_send_alert(self):
+        """Test if alert"""
+        with patch('pipelinewise.cli.alert_sender.AlertSender.send_to_all_handlers') as aler_sender_mock:
+            aler_sender_mock.return_value = {'sent': 1}
+            # Should send alert and should return stats if alerting enabled on the tap
+            self.pipelinewise.tap = self.pipelinewise.get_tap('target_one', 'tap_one')
+            assert self.pipelinewise.send_alert('test-message') == {'sent': 1}
+
+        # Should not send alert and should return none if alerting disabled on the tap
+        self.pipelinewise.tap = self.pipelinewise.get_tap('target_one', 'tap_two')
+        assert self.pipelinewise.send_alert('test-message') == {'sent': 0}
 
     def test_command_encrypt_string(self, capsys):
         """Test vault encryption command output"""

@@ -1,0 +1,9 @@
+---
+
+# Alert handlers send alerts on run failures
+# Configure the certain alert handler if you want to send alerts
+# on failures otherwise comment it
+alert_handlers:
+#  slack:
+#    token: "slack-token"
+#    channel: "#slack-channel"

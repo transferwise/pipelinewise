@@ -21,6 +21,7 @@ class Config:
         self.logger = logging.getLogger(__name__)
         self.config_dir = config_dir
         self.config_path = os.path.join(self.config_dir, 'config.json')
+        self.global_config = dict()
         self.targets = dict()
 
     @classmethod
@@ -39,10 +40,18 @@ class Config:
         taps = {}
 
         config.logger.info('Searching YAML config files in %s', yaml_dir)
+        global_config_yaml = os.path.join(yaml_dir, 'config.yml')
         tap_yamls, target_yamls = utils.get_tap_target_names(yaml_dir)
 
+        global_config_schema = utils.load_schema('config')
         target_schema = utils.load_schema('target')
         tap_schema = utils.load_schema('tap')
+
+        # Load global config yaml
+        if os.path.exists(global_config_yaml):
+            global_config = utils.load_yaml(global_config_yaml)
+            utils.validate(instance=global_config, schema=global_config_schema)
+            config.global_config = global_config or {}
 
         # Load every target yaml into targets dictionary
         for yaml_file in target_yamls:
@@ -172,6 +181,7 @@ class Config:
                     'type': tap.get('type'),
                     'owner': tap.get('owner'),
                     'stream_buffer_size': tap.get('stream_buffer_size'),
+                    'send_alert': tap.get('send_alert', True),
                     'enabled': True
                 })
 
@@ -182,7 +192,7 @@ class Config:
                 'type': self.targets[key].get('type'),
                 'taps': taps
             })
-        main_config = {'targets': targets}
+        main_config = {**self.global_config, **{'targets': targets}}
 
         # Create config dir if not exists
         if not os.path.exists(self.config_dir):

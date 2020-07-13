@@ -11,6 +11,7 @@
                     "id": "tap_one",
                     "name": "Source One",
                     "owner": "somebody@transferwise.com",
+                    "send_alert": true,
                     "type": "tap-mysql"
                 },
                 {
@@ -18,6 +19,7 @@
                     "id": "tap_two",
                     "name": "Source Two",
                     "owner": "marten.hallik@transferwise.com",
+                    "send_alert": false,
                     "type": "tap-postgres"
                 }
             ]

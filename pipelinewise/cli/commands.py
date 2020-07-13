@@ -253,6 +253,7 @@ def log_file_with_status(log_file: str, status: str) -> str:
     return f'{log_file}.{status}'
 
 
+# pylint: disable=too-many-locals
 def run_command(command: str, log_file: str = None, line_callback: callable = None):
     """
     Runs a shell command with or without log file with STDOUT and STDERR
@@ -303,7 +304,11 @@ def run_command(command: str, log_file: str = None, line_callback: callable = No
             os.rename(log_file_running, log_file_failed)
 
             # Raise run command exception
-            raise RunCommandException(f'Command failed. Return code: {proc_rc}')
+            tail_log = ''.join(utils.tail_file(log_file_failed))
+            raise RunCommandException(f'Command failed. Return code: {proc_rc}\n'
+                                      f'Tail output: {tail_log}\n'
+                                      f'Full log: {log_file_failed}\n'
+                                      f'E')
 
         # Add success status to the log file name
         os.rename(log_file_running, log_file_success)
