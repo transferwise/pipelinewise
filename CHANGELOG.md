@@ -1,3 +1,11 @@
+0.18.0 (2020-07-14)
+-------------------
+- Add generic alert sender with Slack and VictorOps integration
+
+**Tap Postgres**
+- Bump `pipelinewise-tap-postgres` to 1.6.3
+    - Fixed a data loss issue when running `LOG_BASED` the tap not sending new `SCHEMA`
+
 0.17.1 (2020-07-09)
 -------------------
 - Fixed an issue when using FastSync on big MongoDB collections caused memory errors
