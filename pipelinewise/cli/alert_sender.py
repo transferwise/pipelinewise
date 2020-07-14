@@ -7,6 +7,7 @@ from collections import namedtuple
 
 from .alert_handlers.base_alert_handler import BaseAlertHandler
 from .alert_handlers.slack_alert_handler import SlackAlertHandler
+from .alert_handlers.victorops_alert_handler import VictoropsAlertHandler
 
 from .alert_handlers.errors import InvalidAlertHandlerException
 from .alert_handlers.errors import NotImplementedAlertHandlerException
@@ -21,7 +22,8 @@ AlertHandler = namedtuple('AlertHandler', ['type', 'config'])
 # The key is the alert handler name from the PPW config.yml
 # Every alert handler class needs to implement the BaseAlertHandler base class
 ALERT_HANDLER_TYPES_TO_CLASS = {
-    'slack': SlackAlertHandler
+    'slack': SlackAlertHandler,
+    'victorops': VictoropsAlertHandler
 }
 
 

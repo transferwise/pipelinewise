@@ -7,3 +7,7 @@ alert_handlers:
 #  slack:
 #    token: "slack-token"
 #    channel: "#slack-channel"
+
+#  victorops:
+#    base_url: "https://alert.victorops.com/integrations/generic/.../alert/.../..."
+#    routing_key: "victorops-routing-key"

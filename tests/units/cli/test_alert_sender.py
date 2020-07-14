@@ -1,4 +1,5 @@
 import pytest
+import collections
 from unittest.mock import patch
 from slack.errors import SlackApiError
 
@@ -6,6 +7,7 @@ import pipelinewise.cli.alert_handlers.errors as errors
 
 from pipelinewise.cli.alert_sender import AlertHandler, AlertSender
 from pipelinewise.cli.alert_handlers.slack_alert_handler import SlackAlertHandler
+from pipelinewise.cli.alert_handlers.victorops_alert_handler import VictoropsAlertHandler
 
 
 # pylint: disable=no-self-use,too-few-public-methods
@@ -102,3 +104,24 @@ class TestAlertSender:
             slack_post_message_mock.return_value = []
             slack = SlackAlertHandler({'token': 'valid-token', 'channel': '#my-channel'})
             slack.send('test message')
+
+    def test_victorops_handler(self):
+        """Functions to test victorops alert handler"""
+        # Should raise an exception if no base url and routing_key provided
+        with pytest.raises(errors.InvalidAlertHandlerException):
+            VictoropsAlertHandler({'no-victorops-url': 'no-url'})
+
+        # Should raise an exception if no base_url provided
+        with pytest.raises(errors.InvalidAlertHandlerException):
+            VictoropsAlertHandler({'routing_key': 'some-routing-key'})
+
+        # Should raise an exception if no routing_key provided
+        with pytest.raises(errors.InvalidAlertHandlerException):
+            VictoropsAlertHandler({'base_url': 'some-url'})
+
+        # Should send alert if valid victorops REST endpoint URL provided
+        with patch('requests.post') as victorops_post_message_mock:
+            VictorOpsResponseMock = collections.namedtuple('VictorOpsResponseMock', 'status_code')
+            victorops_post_message_mock.return_value = VictorOpsResponseMock(status_code=200)
+            victorops = VictoropsAlertHandler({'base_url': 'some-url', 'routing_key': 'some-routing-key'})
+            victorops.send('test message')
