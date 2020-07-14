@@ -88,6 +88,7 @@ Example YAML for ``tap-mongodb``:
 	name: "MongoDB tap"
 	type: "tap-mongodb"
 	owner: "foo@bar.com"
+	#send_alert: False                     # Optional: Disable all configured alerts on this tap
 
 
 	# ------------------------------------------------------------------------------

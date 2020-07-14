@@ -105,6 +105,7 @@ Example YAML for ``tap-mysql``:
   name: "Sample MySQL Database"          # Name of the tap
   type: "tap-mysql"                      # !! THIS SHOULD NOT CHANGE !!
   owner: "somebody@foo.com"              # Data owner to contact
+  #send_alert: False                     # Optional: Disable all configured alerts on this tap
 
 
   # ------------------------------------------------------------------------------

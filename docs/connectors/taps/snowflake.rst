@@ -32,6 +32,7 @@ Example YAML for tap-snowflake:
     name: "Sample Snowflake Database Tap"  # Name of the tap
     type: "tap-snowflake"                  # !! THIS SHOULD NOT CHANGE !!
     owner: "somebody@foo.com"              # Data owner to contact
+    #send_alert: False                     # Optional: Disable all configured alerts on this tap
 
 
     # ------------------------------------------------------------------------------

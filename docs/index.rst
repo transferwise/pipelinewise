@@ -253,6 +253,7 @@ Content
    user_guide/schema_changes
    user_guide/transformations
    user_guide/logging
+   user_guide/alerts
    user_guide/resync
    user_guide/integration
 

@@ -24,6 +24,7 @@ Example YAML for ``tap-jira``:
     name: "Jira"                           # Name of the tap
     type: "tap-jira"                       # !! THIS SHOULD NOT CHANGE !!
     owner: "somebody@foo.com"              # Data owner to contact
+    #send_alert: False                     # Optional: Disable all configured alerts on this tap
 
 
     # ------------------------------------------------------------------------------

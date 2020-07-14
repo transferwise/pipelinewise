@@ -32,6 +32,7 @@ Example YAML for tap-salesforce:
     name: "Sample data on Salesforce"      # Name of the tap
     type: "tap-salesforce"                 # !! THIS SHOULD NOT CHANGE !!
     owner: "somebody@foo.com"              # Data owner to contact
+    #send_alert: False                     # Optional: Disable all configured alerts on this tap
 
 
     # ------------------------------------------------------------------------------
