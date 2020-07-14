@@ -7,7 +7,7 @@ import requests
 from .errors import InvalidAlertHandlerException
 from .base_alert_handler import BaseAlertHandler
 
-# Map alert levels to slack compatible color names
+# Map alert levels to victorops compatible message types
 ALERT_LEVEL_MESSAGE_TYPES = {
     BaseAlertHandler.LOG: 'INFO',
     BaseAlertHandler.INFO: 'INFO',
