@@ -148,6 +148,7 @@ Example YAML for ``tap-oracle``:
     name: "Sample Oracle Database"         # Name of the tap
     type: "tap-oracle"                     # !! THIS SHOULD NOT CHANGE !!
     owner: "somebody@foo.com"              # Data owner to contact
+    #send_alert: False                     # Optional: Disable all configured alerts on this tap
 
 
     # ------------------------------------------------------------------------------

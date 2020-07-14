@@ -115,6 +115,8 @@
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/schema_changes.html">Schema Changes</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/transformations.html">Transformations</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/logging.html">Logging</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/alerts.html">Alerts</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/alerts.html#slack-alert-handler">Slack Alert Handler</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/resync.html">Resync Tables</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/integration.html">Integration</a></li>
 </ul>
@@ -248,6 +250,7 @@ id: <span class="s2">&quot;google_analytics_sample&quot;</span>          <span c
 name: <span class="s2">&quot;Google Analytics&quot;</span>               <span class="c1"># Name of the tap</span>
 type: <span class="s2">&quot;tap-google-analytics&quot;</span>           <span class="c1"># !! THIS SHOULD NOT CHANGE !!</span>
 owner: <span class="s2">&quot;somebody@foo.com&quot;</span>              <span class="c1"># Data owner to contact</span>
+<span class="c1">#send_alert: False                     # Optional: Disable all configured alerts on this tap</span>
 
 
 <span class="c1"># ------------------------------------------------------------------------------</span>

@@ -40,6 +40,7 @@ This will create a ``pipelinewise_samples`` directory with samples for each supp
 
     └── pipelinewise_samples
         ├── README.md
+        ├── config.yml
         ├── tap_jira.yml.sample
         ├── tap_kafka.yml.sample
         ├── tap_mysql_mariadb.yml.sample

@@ -7,7 +7,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Schema Changes &mdash; PipelineWise  documentation</title>
+  <title>Alerts &mdash; PipelineWise  documentation</title>
   
 
   
@@ -21,7 +21,7 @@
   
   
   
-    <link rel="canonical" href="https://docs.ansible.com/ansible/latest/user_guide/schema_changes.html"/>
+    <link rel="canonical" href="https://docs.ansible.com/ansible/latest/user_guide/alerts.html"/>
   
 
   
@@ -41,8 +41,8 @@
     
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Transformations" href="transformations.html" />
-    <link rel="prev" title="Metadata Columns" href="metadata_columns.html" /> 
+    <link rel="next" title="Resync Tables" href="resync.html" />
+    <link rel="prev" title="Logging" href="logging.html" /> 
 </head>
 
 <body class="wy-body-for-nav">
@@ -112,14 +112,11 @@
 <li class="toctree-l1"><a class="reference internal" href="scheduling.html">Scheduling</a></li>
 <li class="toctree-l1"><a class="reference internal" href="scheduling.html#multi-server-cluster">Multi-Server Cluster</a></li>
 <li class="toctree-l1"><a class="reference internal" href="metadata_columns.html">Metadata Columns</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Schema Changes</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#versioning-columns">Versioning columns</a></li>
-</ul>
-</li>
+<li class="toctree-l1"><a class="reference internal" href="schema_changes.html">Schema Changes</a></li>
 <li class="toctree-l1"><a class="reference internal" href="transformations.html">Transformations</a></li>
 <li class="toctree-l1"><a class="reference internal" href="logging.html">Logging</a></li>
-<li class="toctree-l1"><a class="reference internal" href="alerts.html">Alerts</a></li>
-<li class="toctree-l1"><a class="reference internal" href="alerts.html#slack-alert-handler">Slack Alert Handler</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Alerts</a></li>
+<li class="toctree-l1"><a class="reference internal" href="#slack-alert-handler">Slack Alert Handler</a></li>
 <li class="toctree-l1"><a class="reference internal" href="resync.html">Resync Tables</a></li>
 <li class="toctree-l1"><a class="reference internal" href="integration.html">Integration</a></li>
 </ul>
@@ -180,13 +177,13 @@
     
       <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
         
-      <li>Schema Changes</li>
+      <li>Alerts</li>
     
     
       <li class="wy-breadcrumbs-aside">
         
             
-            <a href="../_sources/user_guide/schema_changes.rst.txt" rel="nofollow"> View page source</a>
+            <a href="../_sources/user_guide/alerts.rst.txt" rel="nofollow"> View page source</a>
           
         
       </li>
@@ -199,119 +196,42 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
             
-  <div class="section" id="schema-changes">
-<span id="id1"></span><h1>Schema Changes<a class="headerlink" href="#schema-changes" title="Permalink to this headline">¶</a></h1>
-<p>Taps detect schema changes in source databases and target connectors alter the
-destination tables automatically. Based on the schema change type, PipelineWise
-performs different actions in the destination tables as per the below:</p>
-<ul class="simple">
-<li><p><strong>When new column added</strong>: target connectors <strong>add the new column</strong> to the destination
-table with the same name using a compatible data type.</p></li>
-<li><p><strong>When column dropped</strong>: target connectors <strong>DO NOT drop columns</strong>.
-Old column remains in the table in case you need to do historical analysis on
-the column. If the old column is not needed in the destination table then you can
-perform a manual <code class="docutils literal notranslate"><span class="pre">ALTER</span> <span class="pre">TABLE</span> <span class="pre">...</span> <span class="pre">DROP</span> <span class="pre">COLUMN</span> <span class="pre">...</span></code> statement in the target database
-or alternatively you can <a class="reference internal" href="resync.html#resync"><span class="std std-ref">Resync Tables</span></a>.</p></li>
-<li><p><strong>When column data type changed</strong>: target connectors are <strong>versioning the column</strong>.</p></li>
-</ul>
-<div class="section" id="versioning-columns">
-<span id="id2"></span><h2>Versioning columns<a class="headerlink" href="#versioning-columns" title="Permalink to this headline">¶</a></h2>
-<p>Target connectors are versioning columns <strong>when data type change is detected</strong> in the source
-table. Versioning columns means that the old column with the old datatype is
-renamed by adding a timestamp to column name and a new column with the new data
-type will be added to the table.</p>
-<p>For example if the data type of <code class="docutils literal notranslate"><span class="pre">COLUMN_THREE</span></code> changes from <code class="docutils literal notranslate"><span class="pre">INTEGER</span></code> to <code class="docutils literal notranslate"><span class="pre">VARCHAR</span></code>
-PipelineWise will replicate data in this order:</p>
-<ol class="arabic simple">
-<li><p>Before changing data type <code class="docutils literal notranslate"><span class="pre">COLUMN_THREE</span></code> is <code class="docutils literal notranslate"><span class="pre">INTEGER</span></code> just like in in source table:</p></li>
-</ol>
-<table class="docutils align-default">
-<colgroup>
-<col style="width: 32%" />
-<col style="width: 32%" />
-<col style="width: 36%" />
-</colgroup>
-<tbody>
-<tr class="row-odd"><td><p><strong>COLUMN_ONE</strong></p></td>
-<td><p><strong>COLUMN_TWO</strong></p></td>
-<td><dl class="simple">
-<dt><strong>COLUMN_THREE</strong></dt><dd><p>(INTEGER)</p>
-</dd>
-</dl>
-</td>
-</tr>
-<tr class="row-even"><td><p>text</p></td>
-<td><p>text</p></td>
-<td><p>1</p></td>
-</tr>
-<tr class="row-odd"><td><p>text</p></td>
-<td><p>text</p></td>
-<td><p>2</p></td>
-</tr>
-<tr class="row-even"><td><p>text</p></td>
-<td><p>text</p></td>
-<td><p>3</p></td>
-</tr>
-</tbody>
-</table>
-<p>2. After the data type change <code class="docutils literal notranslate"><span class="pre">COLUMN_THREE_20190812_1520</span></code> remains <code class="docutils literal notranslate"><span class="pre">INTEGER</span></code> with
-the old data and a new <code class="docutils literal notranslate"><span class="pre">COLUMN_TREE</span></code> column created with <code class="docutils literal notranslate"><span class="pre">VARCHAR</span></code> type that keeps
-data only after the change.</p>
-<table class="docutils align-default">
-<colgroup>
-<col style="width: 20%" />
-<col style="width: 20%" />
-<col style="width: 39%" />
-<col style="width: 22%" />
-</colgroup>
-<tbody>
-<tr class="row-odd"><td><p><strong>COLUMN_ONE</strong></p></td>
-<td><p><strong>COLUMN_TWO</strong></p></td>
-<td><dl class="simple">
-<dt><strong>COLUMN_THREE_20190812_1520</strong></dt><dd><p>(INTEGER)</p>
-</dd>
-</dl>
-</td>
-<td><dl class="simple">
-<dt><strong>COLUMN_THREE</strong></dt><dd><p>(VARCHAR)</p>
-</dd>
-</dl>
-</td>
-</tr>
-<tr class="row-even"><td><p>text</p></td>
-<td><p>text</p></td>
-<td><p>111</p></td>
-<td></td>
-</tr>
-<tr class="row-odd"><td><p>text</p></td>
-<td><p>text</p></td>
-<td><p>222</p></td>
-<td></td>
-</tr>
-<tr class="row-even"><td><p>text</p></td>
-<td><p>text</p></td>
-<td><p>333</p></td>
-<td></td>
-</tr>
-<tr class="row-odd"><td><p>text</p></td>
-<td><p>text</p></td>
-<td></td>
-<td><p>444-ABC</p></td>
-</tr>
-<tr class="row-even"><td><p>text</p></td>
-<td><p>text</p></td>
-<td></td>
-<td><p>555-DEF</p></td>
-</tr>
-</tbody>
-</table>
+  <div class="section" id="alerts">
+<span id="id1"></span><h1>Alerts<a class="headerlink" href="#alerts" title="Permalink to this headline">¶</a></h1>
+<p>PipelineWise can send alerts to external systems on run failures by configuring
+alert handlers in the main <code class="docutils literal notranslate"><span class="pre">config.yml</span></code>. This <code class="docutils literal notranslate"><span class="pre">config.yml</span></code> is created
+automatically when <a class="reference internal" href="../installation_guide/creating_pipelines.html#generating-pipelines"><span class="std std-ref">Generating Sample Pipelines</span></a>. Alerts triggered on
+<a class="reference internal" href="cli.html#cli-run-tap"><span class="std std-ref">run_tap</span></a> or <a class="reference internal" href="cli.html#cli-sync-tables"><span class="std std-ref">sync_tables</span></a> CLI command failures. The triggered
+alert provides the id of the failed tap and a description about the failure
+to the alert handler.</p>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
-<p>Please note the <code class="docutils literal notranslate"><span class="pre">NULL</span></code> values in <code class="docutils literal notranslate"><span class="pre">COLUMN_THREE_20190812</span></code> and <code class="docutils literal notranslate"><span class="pre">COLUMN_THREE</span></code> tables.
-<strong>Historical values are not converted to the new data types!</strong>
-If you need the actual representation of the table after data type changes then
-you need to <a class="reference internal" href="resync.html#resync"><span class="std std-ref">Resync Tables</span></a> the table.</p>
+<p>You can optionally disable alerts on certain taps by adding <code class="docutils literal notranslate"><span class="pre">send_alert:</span> <span class="pre">False</span></code>
+optional entry to any tap <a class="reference internal" href="yaml_config.html#yaml-configuration"><span class="std std-ref">YAML configuration</span></a> file.</p>
 </div>
+<dl class="simple">
+<dt>Currently available alert handlers:</dt><dd><ul class="simple">
+<li><p><a class="reference internal" href="#slack-alert-handler"><span class="std std-ref">Slack Alert Handler</span></a></p></li>
+</ul>
+</dd>
+</dl>
+</div>
+<div class="section" id="slack-alert-handler">
+<span id="id2"></span><h1>Slack Alert Handler<a class="headerlink" href="#slack-alert-handler" title="Permalink to this headline">¶</a></h1>
+<p>To send alerts to a Slack channel on failed tap runs:</p>
+<ol class="arabic simple">
+<li><p>Follow the instructions at <a class="reference external" href="https://api.slack.com/authentication/basics">Create a new Slack app</a> and get a <a class="reference external" href="https://api.slack.com/authentication/token-types#bot">Bot user token</a>.</p></li>
+<li><p>Add the <code class="docutils literal notranslate"><span class="pre">chat:write</span></code> OAuth Scope to the app.</p></li>
+<li><p>Invite the bot to the channel by the <code class="docutils literal notranslate"><span class="pre">/invite</span> <span class="pre">&lt;bot_name&gt;</span></code> slack command.</p></li>
+<li><p>Configure main <code class="docutils literal notranslate"><span class="pre">config.yml</span></code></p></li>
+</ol>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>---
+
+alert_handlers:
+  slack:
+    token: <span class="s2">&quot;slack-token&quot;</span>
+    channel: <span class="s2">&quot;#slack-channel&quot;</span>
+</pre></div>
 </div>
 </div>
 
@@ -323,10 +243,10 @@ you need to <a class="reference internal" href="resync.html#resync"><span class=
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
-        <a href="transformations.html" class="btn btn-neutral float-right" title="Transformations" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+        <a href="resync.html" class="btn btn-neutral float-right" title="Resync Tables" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
       
       
-        <a href="metadata_columns.html" class="btn btn-neutral float-left" title="Metadata Columns" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+        <a href="logging.html" class="btn btn-neutral float-left" title="Logging" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
       
     </div>
   

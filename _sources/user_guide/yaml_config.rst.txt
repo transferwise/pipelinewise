@@ -12,15 +12,19 @@ YAML configuration
   and usage of these YAML files in the following sections:
 
   * :ref:`creating_pipelines`
+  * :ref:`alerts`
+  * :ref:`tap-google-analytics`
   * :ref:`tap-jira`
   * :ref:`tap-kafka`
+  * :ref:`tap-mongodb`
   * :ref:`tap-mysql`
-  * :ref:`tap-postgres`
   * :ref:`tap-oracle`
+  * :ref:`tap-postgres`
   * :ref:`tap-s3-csv`
   * :ref:`tap-salesforce`
   * :ref:`tap-snowflake`
   * :ref:`tap-zendesk`
+  * :ref:`tap-zuora`
   * :ref:`target-postgres`
   * :ref:`target-redshift`
   * :ref:`target-snowflake`
