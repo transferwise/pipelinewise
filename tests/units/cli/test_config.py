@@ -36,6 +36,16 @@ class TestConfig:
         assert config.config_dir == PIPELINEWISE_TEST_HOME
         assert config.config_path == '{}/config.json'.format(PIPELINEWISE_TEST_HOME)
 
+        # Vault encrypted alert handlers should be loaded into global config
+        assert config.global_config == {
+            'alert_handlers': {
+                'slack': {
+                    'token': 'Vault Encrypted Secret Fruit',
+                    'channel': '#slack-channel'
+                }
+            }
+        }
+
         # The target dictionary should contain every target and tap parsed from YAML files
         assert config.targets == {
             'test_snowflake_target': {
@@ -212,6 +222,12 @@ class TestConfig:
 
         # Check content of the generated JSON files
         assert cli.utils.load_json(main_config_json) == {
+            'alert_handlers': {
+                'slack': {
+                    'token': 'Vault Encrypted Secret Fruit',
+                    'channel': '#slack-channel'
+                }
+            },
             'targets':
                 [{
                     'id': 'test_snowflake_target',
