@@ -50,9 +50,9 @@ class VictoropsAlertHandler(BaseAlertHandler):
         response = requests.post(
             f'{self.base_url}/{self.routing_key}',
             data=json.dumps({
-                "message_type": ALERT_LEVEL_MESSAGE_TYPES.get(level, BaseAlertHandler.ERROR),
-                "entity_display_name": message,
-                "state_message": exc}),
+                'message_type': ALERT_LEVEL_MESSAGE_TYPES.get(level, BaseAlertHandler.ERROR),
+                'entity_display_name': message,
+                'state_message': exc}),
             headers={'Content-Type': 'application/json'})
 
         # Success victorops message should return 200
