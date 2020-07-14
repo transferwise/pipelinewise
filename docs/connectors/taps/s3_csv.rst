@@ -25,6 +25,7 @@ Example YAML for ``tap-s3-csv``:
     name: "Sample CSV files on S3"          # Name of the tap
     type: "tap-s3-csv"                     # !! THIS SHOULD NOT CHANGE !!
     owner: "somebody@foo.com"              # Data owner to contact
+    #send_alert: False                     # Optional: Disable all configured alerts on this tap
 
 
     # ------------------------------------------------------------------------------

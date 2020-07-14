@@ -27,7 +27,8 @@ Example YAML for tap-zuora:
     id: "zuora"                       # Unique identifier of the tap
     name: "Sample data on Zuora"      # Name of the tap
     type: "tap-zuora"                 # !! THIS SHOULD NOT CHANGE !!
-    owner: "somebody@foo.com"              # Data owner to contact
+    owner: "somebody@foo.com"         # Data owner to contact
+    #send_alert: False                # Optional: Disable all configured alerts on this tap
 
 
     # ------------------------------------------------------------------------------
