@@ -49,7 +49,7 @@ class Config:
 
         # Load global config yaml
         if os.path.exists(global_config_yaml):
-            global_config = utils.load_yaml(global_config_yaml)
+            global_config = utils.load_yaml(global_config_yaml, vault_secret)
             utils.validate(instance=global_config, schema=global_config_schema)
             config.global_config = global_config or {}
 
