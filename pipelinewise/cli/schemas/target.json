@@ -24,6 +24,9 @@
         "s3_key_prefix": {
           "type": "string"
         },
+        "s3_acl": {
+          "type": "string"
+        },
         "stage": {
           "type": "string"
         },
@@ -81,6 +84,9 @@
         },
         "s3_key_prefix": {
           "type": "string"
+        },
+        "s3_acl": {
+          "type": "string"
         }
       },
       "required": [
@@ -134,6 +140,9 @@
           "type": "string"
         },
         "s3_key_prefix": {
+          "type": "string"
+        },
+        "s3_acl": {
           "type": "string"
         },
         "delimiter": {
