@@ -25,7 +25,7 @@ Currently available alert handlers:
 .. _slack_alert_handler:
 
 Slack Alert Handler
--------------------
+'''''''''''''''''''
 
 To send alerts to a Slack channel on failed tap runs:
 
@@ -57,7 +57,7 @@ To send alerts to a Slack channel on failed tap runs:
 .. _victorops_alert_handler:
 
 VictorOps Alert Handler
------------------------
+'''''''''''''''''''''''
 
 To send alerts and open an incident on VictorOps:
 

@@ -138,6 +138,15 @@ PipelineWise can replicate data from the following data sources:
 
         :ref:`tap-mongodb`
 
+    .. container:: tile
+
+        .. container:: img-hover-zoom
+
+          .. image:: ../img/github-logo.png
+             :target: taps/github.html
+
+        :ref:`tap-github`
+
 Configuring taps
 ----------------
 .. toctree::
@@ -155,3 +164,4 @@ Configuring taps
    taps/jira
    taps/zuora
    taps/google_analytics
+   taps/github
