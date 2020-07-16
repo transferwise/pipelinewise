@@ -83,15 +83,17 @@ Example YAML for ``tap-github``:
           - table_name: "issue_labels"
           - table_name: "issue_milestones"
           - table_name: "releases"
-          - table_name: "projects"
-          - table_name: "project_cards"
-          - table_name: "project_columns"
-          - table_name: "teams"
-          - table_name: "team_memberships"
-          - table_name: "team_members"
           - table_name: "assignees"
           - table_name: "collaborators"
           - table_name: "stargazers"
+
+          # Additional supported tables
+          #- table_name: "projects"
+          #- table_name: "project_cards"
+          #- table_name: "project_columns"
+          #- table_name: "teams"
+          #- table_name: "team_memberships"
+          #- table_name: "team_members"
 
             # OPTIONAL: Load time transformations - you can add it to any table
             #transformations:
