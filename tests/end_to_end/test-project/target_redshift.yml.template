@@ -27,6 +27,7 @@ db_conn:
                                                                      #           Used instead of the given AWS keys for the COPY operation if provided
   s3_bucket: "${TARGET_REDSHIFT_S3_BUCKET}"             # S3 external bucket name
   s3_key_prefix: "${TARGET_REDSHIFT_S3_KEY_PREFIX}"     # Optional: S3 key prefix
+  s3_acl: "${TARGET_REDSHIFT_S3_ACL}"                   # Optional: ACL for S3 objects
 
   # Optional: Overrides the default COPY options to load data into Redshift
   #           The values below are the defaults and fit for purpose for most cases.

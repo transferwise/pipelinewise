@@ -136,6 +136,7 @@ class E2EEnv:
                                                'optional': True},
                     'S3_BUCKET'             : {'value': os.environ.get('TARGET_SNOWFLAKE_S3_BUCKET')},
                     'S3_KEY_PREFIX'         : {'value': os.environ.get('TARGET_SNOWFLAKE_S3_KEY_PREFIX')},
+                    'S3_ACL'                : {'value': os.environ.get('TARGET_SNOWFLAKE_S3_ACL'), 'optional': True},
                     'STAGE'                 : {'value': os.environ.get('TARGET_SNOWFLAKE_STAGE')},
                     'FILE_FORMAT'           : {'value': os.environ.get('TARGET_SNOWFLAKE_FILE_FORMAT')},
                     'CLIENT_SIDE_ENCRYPTION_MASTER_KEY':
@@ -164,8 +165,9 @@ class E2EEnv:
                                                'optional': True},
                     'COPY_ROLE_ARN'         : {'value': os.environ.get('TARGET_REDSHIFT_COPY_ROLE_ARN'),
                                                'optional': True},
-                    'S3_BUCKET'              : {'value': os.environ.get('TARGET_REDSHIFT_S3_BUCKET')},
-                    'S3_KEY_PREFIX'         : {'value': os.environ.get('TARGET_REDSHIFT_S3_KEY_PREFIX')}
+                    'S3_BUCKET'             : {'value': os.environ.get('TARGET_REDSHIFT_S3_BUCKET')},
+                    'S3_KEY_PREFIX'         : {'value': os.environ.get('TARGET_REDSHIFT_S3_KEY_PREFIX')},
+                    'S3_ACL'                : {'value': os.environ.get('TARGET_REDSHIFT_S3_ACL'), 'optional': True}
                 }
             }
         }
