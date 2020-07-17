@@ -199,7 +199,8 @@
         "tap-salesforce",
         "tap-jira",
         "tap-zuora",
-        "tap-google-analytics"
+        "tap-google-analytics",
+        "tap-github"
       ]
     },
     "db_conn": {

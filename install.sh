@@ -171,12 +171,13 @@ DEFAULT_CONNECTORS=(
     tap-salesforce
     tap-snowflake
     tap-zendesk
+    tap-mongodb
+    tap-github
     target-s3-csv
     target-snowflake
     target-redshift
     target-postgres
     transform-field
-    tap-mongodb
 )
 EXTRA_CONNECTORS=(
     tap-adwords
