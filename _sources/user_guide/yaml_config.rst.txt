@@ -25,6 +25,7 @@ YAML configuration
   * :ref:`tap-snowflake`
   * :ref:`tap-zendesk`
   * :ref:`tap-zuora`
+  * :ref:`tap-github`
   * :ref:`target-postgres`
   * :ref:`target-redshift`
   * :ref:`target-snowflake`

@@ -115,9 +115,11 @@
 <li class="toctree-l1"><a class="reference internal" href="schema_changes.html">Schema Changes</a></li>
 <li class="toctree-l1"><a class="reference internal" href="transformations.html">Transformations</a></li>
 <li class="toctree-l1"><a class="reference internal" href="logging.html">Logging</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Alerts</a></li>
-<li class="toctree-l1"><a class="reference internal" href="#slack-alert-handler">Slack Alert Handler</a></li>
-<li class="toctree-l1"><a class="reference internal" href="#victorops-alert-handler">VictorOps Alert Handler</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Alerts</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#slack-alert-handler">Slack Alert Handler</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#victorops-alert-handler">VictorOps Alert Handler</a></li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="resync.html">Resync Tables</a></li>
 <li class="toctree-l1"><a class="reference internal" href="integration.html">Integration</a></li>
 </ul>
@@ -217,9 +219,8 @@ optional entry to any tap <a class="reference internal" href="yaml_config.html#y
 </ul>
 </dd>
 </dl>
-</div>
 <div class="section" id="slack-alert-handler">
-<span id="id2"></span><h1>Slack Alert Handler<a class="headerlink" href="#slack-alert-handler" title="Permalink to this headline">¶</a></h1>
+<span id="id2"></span><h2>Slack Alert Handler<a class="headerlink" href="#slack-alert-handler" title="Permalink to this headline">¶</a></h2>
 <p>To send alerts to a Slack channel on failed tap runs:</p>
 <ol class="arabic">
 <li><p>Follow the instructions at <a class="reference external" href="https://api.slack.com/authentication/basics">Create a new Slack app</a> and get a <a class="reference external" href="https://api.slack.com/authentication/token-types#bot">Bot user token</a>.</p></li>
@@ -241,7 +242,7 @@ alert_handlers:
 </div>
 </div>
 <div class="section" id="victorops-alert-handler">
-<span id="id3"></span><h1>VictorOps Alert Handler<a class="headerlink" href="#victorops-alert-handler" title="Permalink to this headline">¶</a></h1>
+<span id="id3"></span><h2>VictorOps Alert Handler<a class="headerlink" href="#victorops-alert-handler" title="Permalink to this headline">¶</a></h2>
 <p>To send alerts and open an incident on VictorOps:</p>
 <ol class="arabic">
 <li><p>Follow the instructions at <a class="reference external" href="https://help.victorops.com/knowledge-base/rest-endpoint-integration-guide/">Enable the VictorOps REST Endpoint</a> and get the long notify URL.</p></li>
@@ -263,6 +264,7 @@ alert_handlers:
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
 <p>Make sure the VictorOps <code class="docutils literal notranslate"><span class="pre">base_url</span></code> <strong>does not include</strong> the <code class="docutils literal notranslate"><span class="pre">routing_key</span></code>.</p>
+</div>
 </div>
 </div>
 

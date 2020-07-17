@@ -7,7 +7,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Tap Kafka &mdash; PipelineWise  documentation</title>
+  <title>Tap Github &mdash; PipelineWise  documentation</title>
   
 
   
@@ -21,7 +21,7 @@
   
   
   
-    <link rel="canonical" href="https://docs.ansible.com/ansible/latest/connectors/taps/kafka.html"/>
+    <link rel="canonical" href="https://docs.ansible.com/ansible/latest/connectors/taps/github.html"/>
   
 
   
@@ -41,8 +41,8 @@
     
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
-    <link rel="next" title="Tap Snowflake" href="snowflake.html" />
-    <link rel="prev" title="Tap S3 CSV" href="s3_csv.html" /> 
+    <link rel="next" title="Targets (Destinations)" href="../targets.html" />
+    <link rel="prev" title="Tap Google Analytics" href="google_analytics.html" /> 
 </head>
 
 <body class="wy-body-for-nav">
@@ -127,11 +127,7 @@
 <li class="toctree-l2"><a class="reference internal" href="postgres.html">Tap PostgreSQL</a></li>
 <li class="toctree-l2"><a class="reference internal" href="oracle.html">Tap Oracle</a></li>
 <li class="toctree-l2"><a class="reference internal" href="s3_csv.html">Tap S3 CSV</a></li>
-<li class="toctree-l2 current"><a class="current reference internal" href="#">Tap Kafka</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#consuming-kafka-messages">Consuming Kafka messages</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#configuring-what-to-replicate">Configuring what to replicate</a></li>
-</ul>
-</li>
+<li class="toctree-l2"><a class="reference internal" href="kafka.html">Tap Kafka</a></li>
 <li class="toctree-l2"><a class="reference internal" href="snowflake.html">Tap Snowflake</a></li>
 <li class="toctree-l2"><a class="reference internal" href="mongodb.html">Tap MongoDB</a></li>
 <li class="toctree-l2"><a class="reference internal" href="salesforce.html">Tap Salesforce</a></li>
@@ -139,7 +135,11 @@
 <li class="toctree-l2"><a class="reference internal" href="jira.html">Tap Jira</a></li>
 <li class="toctree-l2"><a class="reference internal" href="zuora.html">Tap Zuora</a></li>
 <li class="toctree-l2"><a class="reference internal" href="google_analytics.html">Tap Google Analytics</a></li>
-<li class="toctree-l2"><a class="reference internal" href="github.html">Tap Github</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Tap Github</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#configure-your-github-account">Configure your GitHub account</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#configuring-what-to-extract">Configuring what to extract</a></li>
+</ul>
+</li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../targets.html">Targets (Destinations)</a></li>
@@ -197,13 +197,13 @@
         
           <li><a href="../taps.html">Taps (Data Sources)</a> &raquo;</li>
         
-      <li>Tap Kafka</li>
+      <li>Tap Github</li>
     
     
       <li class="wy-breadcrumbs-aside">
         
             
-            <a href="../../_sources/connectors/taps/kafka.rst.txt" rel="nofollow"> View page source</a>
+            <a href="../../_sources/connectors/taps/github.rst.txt" rel="nofollow"> View page source</a>
           
         
       </li>
@@ -216,66 +216,40 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
             
-  <div class="section" id="tap-kafka">
-<span id="id1"></span><h1>Tap Kafka<a class="headerlink" href="#tap-kafka" title="Permalink to this headline">¶</a></h1>
-<p>Messages from kafka topics are extracted into the following fields:</p>
-<ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">MESSAGE_TIMESTAMP</span></code>: Timestamp extracted from the kafka metadata</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">MESSAGE_OFFSET</span></code>: Offset extracted from the kafka metadata</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">MESSAGE_PARTITION</span></code>: Partition extracted from the kafka metadata</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">MESSAGE</span></code>: The original and full kafka message</p></li>
-<li><p><cite>Dynamic primary key columns</cite>: (Optional) Fields extracted from the Kafka JSON messages by JSONPath selector(s).</p></li>
-</ul>
-<div class="section" id="consuming-kafka-messages">
-<h2>Consuming Kafka messages<a class="headerlink" href="#consuming-kafka-messages" title="Permalink to this headline">¶</a></h2>
-<p>Tap Kafka saves consumed messages into a local disk storage and sends commit messages to Kafka after every
-consumed message. A batching mechanism keeps maintaining of deleting and flushing messages from the local storage
-and sends singer compatible messages in small batches to standard output.</p>
+  <div class="section" id="tap-github">
+<span id="id1"></span><h1>Tap Github<a class="headerlink" href="#tap-github" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="configure-your-github-account">
+<h2>Configure your GitHub account<a class="headerlink" href="#configure-your-github-account" title="Permalink to this headline">¶</a></h2>
+<p>You need to create a GitHub access token to extract data from the Github API. Login to your
+GitHub account, go to the <a class="reference external" href="https://github.com/settings/tokens">Personal Access Tokens</a>
+settings page, and generate a new token with at least the <cite>repo</cite> scope. Save this
+access token, you’ll need it for the next step.</p>
 </div>
-<div class="section" id="configuring-what-to-replicate">
-<h2>Configuring what to replicate<a class="headerlink" href="#configuring-what-to-replicate" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="configuring-what-to-extract">
+<h2>Configuring what to extract<a class="headerlink" href="#configuring-what-to-extract" title="Permalink to this headline">¶</a></h2>
 <p>PipelineWise configures every tap with a common structured YAML file format.
-A sample YAML for Kafka replication can be generated into a project directory by
+A sample YAML for Jira replication can be generated into a project directory by
 following the steps in the <a class="reference internal" href="../../installation_guide/creating_pipelines.html#generating-pipelines"><span class="std std-ref">Generating Sample Pipelines</span></a> section.</p>
-<p>Example YAML for <code class="docutils literal notranslate"><span class="pre">tap-kafka</span></code>:</p>
+<p>Example YAML for <code class="docutils literal notranslate"><span class="pre">tap-github</span></code>:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>---
 
 <span class="c1"># ------------------------------------------------------------------------------</span>
 <span class="c1"># General Properties</span>
 <span class="c1"># ------------------------------------------------------------------------------</span>
-id: <span class="s2">&quot;kafka&quot;</span>                            <span class="c1"># Unique identifier of the tap</span>
-name: <span class="s2">&quot;Kafka Topic with sample data&quot;</span>   <span class="c1"># Name of the tap</span>
-type: <span class="s2">&quot;tap-kafka&quot;</span>                      <span class="c1"># !! THIS SHOULD NOT CHANGE !!</span>
+id: <span class="s2">&quot;github&quot;</span>                           <span class="c1"># Unique identifier of the tap</span>
+name: <span class="s2">&quot;Github&quot;</span>                         <span class="c1"># Name of the tap</span>
+type: <span class="s2">&quot;tap-github&quot;</span>                     <span class="c1"># !! THIS SHOULD NOT CHANGE !!</span>
 owner: <span class="s2">&quot;somebody@foo.com&quot;</span>              <span class="c1"># Data owner to contact</span>
 <span class="c1">#send_alert: False                     # Optional: Disable all configured alerts on this tap</span>
 
 
 <span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="c1"># Source (Tap) - Kafka connection details</span>
+<span class="c1"># Source (Tap) - Github connection details</span>
 <span class="c1"># ------------------------------------------------------------------------------</span>
 db_conn:
-  group_id: <span class="s2">&quot;myGroupId&quot;</span>
-  bootstrap_servers: <span class="s2">&quot;kafka1.foo.com:9092,kafka2.foo.com:9092,kafka3.foo.com:9092&quot;</span>
-  topic: <span class="s2">&quot;myKafkaTopic&quot;</span>
-
-
-  <span class="c1"># --------------------------------------------------------------------------</span>
-  <span class="c1"># Optionally you can define primary key(s) from the kafka JSON messages.</span>
-  <span class="c1"># If primary keys defined then extra column(s) will be added to the output</span>
-  <span class="c1"># singer stream with the extracted values by JSONPath selectors.</span>
-  <span class="c1"># --------------------------------------------------------------------------</span>
-  primary_keys:
-     transfer_id: <span class="s2">&quot;</span>$<span class="s2">.transferMetadata.transferId&quot;</span>
-
-  <span class="c1"># --------------------------------------------------------------------------</span>
-  <span class="c1"># Kafka Consumer optional parameters</span>
-  <span class="c1"># --------------------------------------------------------------------------</span>
-  <span class="c1">#max_runtime_ms: 300000                   # The maximum time for the tap to collect new messages from Kafka topic.</span>
-  <span class="c1">#consumer_timeout_ms: 10000               # Number of milliseconds to block during message iteration before raising StopIteration</span>
-  <span class="c1">#session_timeout_ms: 30000                # The timeout used to detect failures when using Kafka’s group management facilities.</span>
-  <span class="c1">#heartbeat_interval_ms: 10000             # The expected time in milliseconds between heartbeats to the consumer coordinator when using Kafka’s group management facilities.</span>
-  <span class="c1">#max_poll_interval_ms: 300000             # The maximum delay between invocations of poll() when using consumer group management.</span>
-  <span class="c1">#local_store_dir: ./tap-kafka-local-store # Path to the local store with consumed kafka messages</span>
+  access_token: <span class="s2">&quot;&lt;ACCESS_TOKEN&gt;&quot;</span>            <span class="c1"># Github access token with at least the repo scope</span>
+  repository: <span class="s2">&quot;transferwise/pipelinewise&quot;</span>   <span class="c1"># Path to one or multiple repositories that you want to extract data from</span>
+                                            <span class="c1"># Each repo path should be space delimited.</span>
 
 <span class="c1"># ------------------------------------------------------------------------------</span>
 <span class="c1"># Destination (Target) - Target properties</span>
@@ -284,28 +258,54 @@ db_conn:
 target: <span class="s2">&quot;snowflake&quot;</span>                       <span class="c1"># ID of the target connector where the data will be loaded</span>
 batch_size_rows: <span class="m">20000</span>                    <span class="c1"># Batch size for the stream to optimise load performance</span>
 stream_buffer_size: <span class="m">0</span>                     <span class="c1"># In-memory buffer size (MB) between taps and targets for asynchronous data pipes</span>
-default_target_schema: <span class="s2">&quot;kafka&quot;</span>            <span class="c1"># Target schema where the data will be loaded</span>
-default_target_schema_select_permission:  <span class="c1"># Optional: Grant SELECT on schema and tables that created</span>
-  - grp_stats
+default_target_schema: <span class="s2">&quot;github&quot;</span>            <span class="c1"># Target schema where the data will be loaded</span>
+<span class="c1">#default_target_schema_select_permission:  # Optional: Grant SELECT on schema and tables that created</span>
+<span class="c1">#  - grp_power</span>
 
 
 <span class="c1"># ------------------------------------------------------------------------------</span>
 <span class="c1"># Source to target Schema mapping</span>
 <span class="c1"># ------------------------------------------------------------------------------</span>
 schemas:
-  - source_schema: <span class="s2">&quot;kafka&quot;</span>             <span class="c1"># This is mandatory, but can be anything in this tap type</span>
-    target_schema: <span class="s2">&quot;kafka&quot;</span>             <span class="c1"># Target schema in the destination Data Warehouse</span>
 
-    <span class="c1"># Kafka topic to replicate into destination Data Warehouse</span>
-    <span class="c1"># You can load data only from one kafka topic in one YAML file.</span>
-    <span class="c1"># If you want load from multiple kafka topics, create another tap YAML similar to this file</span>
+  - source_schema: <span class="s2">&quot;github&quot;</span>             <span class="c1"># This is mandatory, but can be anything in this tap type</span>
+    target_schema: <span class="s2">&quot;github&quot;</span>             <span class="c1"># Target schema in the destination Data Warehouse</span>
+    target_schema_select_permissions:   <span class="c1"># Optional: Grant SELECT on schema and tables that created</span>
+      - grp_stats
+
+    <span class="c1"># List of Github tables to load into destination Data Warehouse</span>
+    <span class="c1"># Tap-Github will use the best incremental strategies automatically to replicate data</span>
     tables:
-      - table_name: <span class="s2">&quot;my_kafka_topic&quot;</span>   <span class="c1"># target table name needs to match to the topic name in snake case format</span>
+      <span class="c1"># Supported tables</span>
+      - table_name: <span class="s2">&quot;commits&quot;</span>
+      - table_name: <span class="s2">&quot;commit_comments&quot;</span>
+      - table_name: <span class="s2">&quot;pull_requests&quot;</span>
+      - table_name: <span class="s2">&quot;pull_request_reviews&quot;</span>
+      - table_name: <span class="s2">&quot;events&quot;</span>
+      - table_name: <span class="s2">&quot;pr_commits&quot;</span>
+      - table_name: <span class="s2">&quot;reviews&quot;</span>
+      - table_name: <span class="s2">&quot;review_comments&quot;</span>
+      - table_name: <span class="s2">&quot;comments&quot;</span>
+      - table_name: <span class="s2">&quot;issues&quot;</span>
+      - table_name: <span class="s2">&quot;issue_labels&quot;</span>
+      - table_name: <span class="s2">&quot;issue_milestones&quot;</span>
+      - table_name: <span class="s2">&quot;releases&quot;</span>
+      - table_name: <span class="s2">&quot;assignees&quot;</span>
+      - table_name: <span class="s2">&quot;collaborators&quot;</span>
+      - table_name: <span class="s2">&quot;stargazers&quot;</span>
 
-        <span class="c1"># OPTIONAL: Load time transformations</span>
+      <span class="c1"># Additional supported tables</span>
+      <span class="c1">#- table_name: &quot;projects&quot;</span>
+      <span class="c1">#- table_name: &quot;project_cards&quot;</span>
+      <span class="c1">#- table_name: &quot;project_columns&quot;</span>
+      <span class="c1">#- table_name: &quot;teams&quot;</span>
+      <span class="c1">#- table_name: &quot;team_memberships&quot;</span>
+      <span class="c1">#- table_name: &quot;team_members&quot;</span>
+
+        <span class="c1"># OPTIONAL: Load time transformations - you can add it to any table</span>
         <span class="c1">#transformations:</span>
-        <span class="c1">#  - column: &quot;last_name&quot;            # Column to transform</span>
-        <span class="c1">#    type: &quot;SET-NULL&quot;               # Transformation type</span>
+        <span class="c1">#  - column: &quot;some_column_to_transform&quot; # Column to transform</span>
+        <span class="c1">#    type: &quot;SET-NULL&quot;                   # Transformation type</span>
 </pre></div>
 </div>
 </div>
@@ -319,10 +319,10 @@ schemas:
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
-        <a href="snowflake.html" class="btn btn-neutral float-right" title="Tap Snowflake" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+        <a href="../targets.html" class="btn btn-neutral float-right" title="Targets (Destinations)" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
       
       
-        <a href="s3_csv.html" class="btn btn-neutral float-left" title="Tap S3 CSV" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+        <a href="google_analytics.html" class="btn btn-neutral float-left" title="Tap Google Analytics" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
       
     </div>
   
