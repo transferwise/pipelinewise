@@ -448,32 +448,42 @@ def create_temp_file(suffix=None, prefix=None, dir=None, text=None):
     return tempfile.mkstemp(suffix, prefix, dir, text)
 
 
-def tail_file(file, n_lines=10, block_size=1024):
+def find_errors_in_log_file(file, max_errors=10, error_pattern=None):
     """
-    Returns the last n lines of a file
+    Find error lines in a log file
 
     Args:
         file: file to read
-        n_lines: number of last lines to extract
-        block_size: block size when reading file
+        max_errors: max number of errors to find
+        error_pattern: Custom exception pattern
 
     Returns:
-        List of the last n lines of a file
+        List of error messages found in the file
     """
-    lines = []
-    if file and os.path.isfile(file):
-        file_object = open(file)
-        file_object.seek(0, 2)
-        ext_lines = 1 - file_object.read(1).count('\n')
-        position = file_object.tell()
-        while n_lines >= ext_lines and position > 0:
-            block = min(block_size, position)
-            position -= block
-            file_object.seek(position, 0)
-            ext_lines += file_object.read(block).count('\n')
-        file_object.seek(position, 0)
-        ext_lines = min(ext_lines, n_lines)
-        lines = file_object.readlines()[-ext_lines:]
-        file_object.close()
+    # List of known exception patterns in logs
+    known_error_patterns = re.compile(
+        # PPW error log patterns
+        r'CRITICAL|'
+        r'EXCEPTION|'
+        r'ERROR|'
+        # Basic tap and target connector exception patterns
+        r'pymysql\.err|'
+        r'psycopg2\.*Error|'
+        r'snowflake\.connector\.errors')
 
-    return lines
+    # Use known error patterns by default
+    if not error_pattern:
+        error_pattern = re.compile(known_error_patterns)
+
+    errors = []
+    if file and os.path.isfile(file):
+        with open(file) as file_object:
+            for line in file_object:
+                if len(re.findall(error_pattern, line)) > 0:
+                    errors.append(line)
+
+                    # Seek to the end of the file, if max_errors found
+                    if len(errors) >= max_errors:
+                        file_object.seek(0, 2)
+
+    return errors

@@ -331,22 +331,48 @@ class TestUtils:
         assert os.path.isfile(temp_file)
         os.remove(temp_file)
 
-    def test_tail_file(self):
+    def test_find_errors_in_log_file(self):
         """Test reading the last n lines of a file"""
-        sample_file = '{}/resources/sample-text.txt'.format(os.path.dirname(__file__))
-        # Should get the last 10 lines by default
-        assert cli.utils.tail_file(sample_file) == ['line 11\n',
-                                                    'line 12\n',
-                                                    'line 13\n',
-                                                    'line 14\n',
-                                                    'line 15\n',
-                                                    'line 16\n',
-                                                    'line 17\n',
-                                                    'line 18\n',
-                                                    'line 19\n',
-                                                    'line 20']
+        # Should return an empty list if no error in the file
+        log_file = '{}/resources/sample_log_files/tap-run-no-errors.log'.format(os.path.dirname(__file__))
+        assert cli.utils.find_errors_in_log_file(log_file) == []
 
-        # Should get the last requested n lines
-        assert cli.utils.tail_file(sample_file, n_lines=3) == ['line 18\n',
-                                                               'line 19\n',
-                                                               'line 20']
+        # Should return the line with errors
+        log_file = '{}/resources/sample_log_files/tap-run-errors.log'.format(os.path.dirname(__file__))
+        assert cli.utils.find_errors_in_log_file(log_file) == \
+               ['time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=CRITICAL This is a critical error\n',
+                'time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=EXCEPTION This is an exception\n',
+                'time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=ERROR This is an error\n',
+                'pymysql.err.OperationalError: (2013, '
+                "'Lost connection to MySQL server during query ([Errno 104] Connection reset by peer)')\n",
+                'time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=ERROR '
+                'message=error with status PGRES_COPY_BOTH and no message from the libpq\n',
+                'time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=CRITICAL '
+                'message=error with status PGRES_COPY_BOTH and no message from the libpq\n',
+                'snowflake.connector.errors.ProgrammingError: 091003 (22000): '
+                'Failure using stage area. Cause: [Access Denied (Status Code: 403; Error Code: AccessDenied)]\n']
+
+        # Should return the default max number of errors
+        log_file = '{}/resources/sample_log_files/tap-run-lot-of-errors.log'.format(os.path.dirname(__file__))
+        assert cli.utils.find_errors_in_log_file(log_file) == \
+            ['time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=CRITICAL This is a critical error 1\n',
+             'time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=CRITICAL This is a critical error 2\n',
+             'time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=CRITICAL This is a critical error 3\n',
+             'time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=CRITICAL This is a critical error 4\n',
+             'time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=CRITICAL This is a critical error 5\n',
+             'time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=CRITICAL This is a critical error 6\n',
+             'time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=CRITICAL This is a critical error 7\n',
+             'time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=CRITICAL This is a critical error 8\n',
+             'time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=CRITICAL This is a critical error 9\n',
+             'time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=CRITICAL This is a critical error 10\n']
+
+        # Should return the custom max number of errors
+        log_file = '{}/resources/sample_log_files/tap-run-lot-of-errors.log'.format(os.path.dirname(__file__))
+        assert cli.utils.find_errors_in_log_file(log_file, max_errors=2) == \
+            ['time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=CRITICAL This is a critical error 1\n',
+             'time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=CRITICAL This is a critical error 2\n']
+
+        # Should return the custom max number of errors
+        log_file = '{}/resources/sample_log_files/tap-run-errors.log'.format(os.path.dirname(__file__))
+        assert cli.utils.find_errors_in_log_file(log_file, error_pattern=re.compile('CUSTOM-ERR-PATTERN')) == \
+            ['CUSTOM-ERR-PATTERN: This is a custom pattern error message\n']

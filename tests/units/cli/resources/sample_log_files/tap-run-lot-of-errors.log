@@ -1,0 +1,28 @@
+time=2020-07-17 06:20:18 logger_name=tap_mysql log_level=INFO message=Server Parameters: version: x.x.x-MariaDB-log, wait_timeout: 28800, innodb_lock_wait_timeout: 3600, max_allowed_packet: 33554432, interactive_timeout: 28800
+time=2020-07-17 06:20:18 logger_name=tap_mysql log_level=INFO message=Server SSL Parameters(blank means SSL is not active): [ssl_version: ], [ssl_cipher: ]
+time=2020-07-17 06:20:19 logger_name=tap_mysql log_level=WARNING message=Columns {'column_one'} were selected but are not supported. Skipping them.
+time=2020-07-17 06:20:19 logger_name=tap_mysql log_level=WARNING message=Columns {'column_two'} were selected but are not supported. Skipping them.
+time=2020-07-17 06:20:19 logger_name=tap_mysql log_level=WARNING message=Columns {'column_three'} were selected but are not supported. Skipping them.
+time=2020-07-17 06:20:23 logger_name=target_snowflake log_level=INFO message=Table 'my_schema."TABLE_ONE"' exists
+time=2020-07-17 06:20:23 logger_name=target_snowflake log_level=INFO message=Table 'my_schema."TABLE_TWO"' exists
+time=2020-07-17 06:20:23 logger_name=target_snowflake log_level=INFO message=Table 'my_schema."TABLE_THREE"' exists
+time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=CRITICAL This is a critical error 1
+time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=CRITICAL This is a critical error 2
+time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=CRITICAL This is a critical error 3
+time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=CRITICAL This is a critical error 4
+time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=CRITICAL This is a critical error 5
+time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=CRITICAL This is a critical error 6
+time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=CRITICAL This is a critical error 7
+time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=CRITICAL This is a critical error 8
+time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=CRITICAL This is a critical error 9
+time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=CRITICAL This is a critical error 10
+time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=CRITICAL This is a critical error 11
+time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=CRITICAL This is a critical error 12
+time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=CRITICAL This is a critical error 13
+time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=CRITICAL This is a critical error 14
+time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=CRITICAL This is a critical error 15
+time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=CRITICAL This is a critical error 16
+time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=CRITICAL This is a critical error 17
+time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=CRITICAL This is a critical error 18
+time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=CRITICAL This is a critical error 19
+time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=CRITICAL This is a critical error 20

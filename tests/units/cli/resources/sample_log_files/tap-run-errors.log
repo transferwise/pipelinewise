@@ -1,0 +1,35 @@
+time=2020-07-17 06:20:18 logger_name=tap_mysql log_level=INFO message=Server Parameters: version: x.x.x-MariaDB-log, wait_timeout: 28800, innodb_lock_wait_timeout: 3600, max_allowed_packet: 33554432, interactive_timeout: 28800
+time=2020-07-17 06:20:18 logger_name=tap_mysql log_level=INFO message=Server SSL Parameters(blank means SSL is not active): [ssl_version: ], [ssl_cipher: ]
+time=2020-07-17 06:20:19 logger_name=tap_mysql log_level=WARNING message=Columns {'column_one'} were selected but are not supported. Skipping them.
+time=2020-07-17 06:20:19 logger_name=tap_mysql log_level=WARNING message=Columns {'column_two'} were selected but are not supported. Skipping them.
+time=2020-07-17 06:20:19 logger_name=tap_mysql log_level=WARNING message=Columns {'column_three'} were selected but are not supported. Skipping them.
+time=2020-07-17 06:20:23 logger_name=target_snowflake log_level=INFO message=Table 'my_schema."TABLE_ONE"' exists
+time=2020-07-17 06:20:23 logger_name=target_snowflake log_level=INFO message=Table 'my_schema."TABLE_TWO"' exists
+time=2020-07-17 06:20:23 logger_name=target_snowflake log_level=INFO message=Table 'my_schema."TABLE_THREE"' exists
+
+# Some generic captured by PPW logger
+time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=CRITICAL This is a critical error
+time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=EXCEPTION This is an exception
+time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=ERROR This is an error
+
+# Some tap-mysql error
+ConnectionResetError: [Errno 104] Connection reset by peer
+pymysql.err.OperationalError: (2013, 'Lost connection to MySQL server during query ([Errno 104] Connection reset by peer)')
+time=2020-07-16 18:51:47 logger_name=transform_field log_level=INFO message=Exiting normally
+time=2020-07-16 18:51:48 logger_name=target_snowflake log_level=INFO message=Uploading 8369 rows to external snowflake stage on S3
+time=2020-07-16 18:51:48 logger_name=target_snowflake log_level=INFO message=Target S3 bucket: xxxxxxxxx, local file: /home/pipelinewise/.pipelinewise/tmp/records_6fa4wr99.csv, S3 key: snowflake-imports/pipelinewise_my_schema-table_one.csv
+time=2020-07-16 18:51:48 logger_name=target_snowflake log_level=INFO message=Loading 8369 rows into 'my_schema."TABLE_ONE"'
+time=2020-07-16 18:53:37 logger_name=target_snowflake log_level=INFO message=Loading into my_Schema."TABLE_ONE": {"inserts": 7870, "updates": 499, "size_bytes": 184131}
+time=2020-07-16 18:53:38 logger_name=target_snowflake log_level=INFO message=Deleting snowflake-imports/pipelinewise_my_schema-table_one_20200716-185148-116760.csv from external snowflake stage on S3
+time=2020-07-16 18:53:38 logger_name=target_snowflake log_level=INFO message=Deleting rows from 'my_schema."TABLE_ONE"' table... DELETE FROM my_schema."TABLE_ONE" WHERE _sdc_deleted_at IS NOT NULL
+
+# Some tap-postgres error
+time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=ERROR message=error with status PGRES_COPY_BOTH and no message from the libpq
+time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=CRITICAL message=error with status PGRES_COPY_BOTH and no message from the libpq
+psycopg2.DatabaseError: error with status PGRES_COPY_BOTH and no message from the libpq
+
+# Some target-snowflake error
+snowflake.connector.errors.ProgrammingError: 091003 (22000): Failure using stage area. Cause: [Access Denied (Status Code: 403; Error Code: AccessDenied)]
+
+# Custom error pattern
+CUSTOM-ERR-PATTERN: This is a custom pattern error message

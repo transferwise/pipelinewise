@@ -1,0 +1,8 @@
+time=2020-07-17 06:20:18 logger_name=tap_mysql log_level=INFO message=Server Parameters: version: x.x.x-MariaDB-log, wait_timeout: 28800, innodb_lock_wait_timeout: 3600, max_allowed_packet: 33554432, interactive_timeout: 28800
+time=2020-07-17 06:20:18 logger_name=tap_mysql log_level=INFO message=Server SSL Parameters(blank means SSL is not active): [ssl_version: ], [ssl_cipher: ]
+time=2020-07-17 06:20:19 logger_name=tap_mysql log_level=WARNING message=Columns {'column_one'} were selected but are not supported. Skipping them.
+time=2020-07-17 06:20:19 logger_name=tap_mysql log_level=WARNING message=Columns {'column_two'} were selected but are not supported. Skipping them.
+time=2020-07-17 06:20:19 logger_name=tap_mysql log_level=WARNING message=Columns {'column_three'} were selected but are not supported. Skipping them.
+time=2020-07-17 06:20:23 logger_name=target_snowflake log_level=INFO message=Table 'my_schema."TABLE_ONE"' exists
+time=2020-07-17 06:20:23 logger_name=target_snowflake log_level=INFO message=Table 'my_schema."TABLE_TWO"' exists
+time=2020-07-17 06:20:23 logger_name=target_snowflake log_level=INFO message=Table 'my_schema."TABLE_THREE"' exists
