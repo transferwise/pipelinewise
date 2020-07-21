@@ -11,7 +11,9 @@
 - Bump `pipelinewise-tap-zendesk` to 1.2.0
     - Configurable `rate_limit`, `max_workers` and `batch_size` parameters
 
-
+0.18.1 (2020-07-15)
+-------------------
+- Fixed an issue when vault encrypted values were not in loaded from `config.yml`
 
 0.18.0 (2020-07-14)
 -------------------
