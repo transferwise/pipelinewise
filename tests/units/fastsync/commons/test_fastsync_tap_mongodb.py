@@ -152,8 +152,21 @@ class TestFastSyncTapMongoDB(TestCase):
         """
         cursor_mock = Mock(spec_set=DatabaseChangeStream).return_value
         type(cursor_mock).alive = PropertyMock(return_value=True)
-        type(cursor_mock).resume_token = PropertyMock(side_effect=['token1', 'token2',
-                                                                   'token3', 'token4'])
+        type(cursor_mock).resume_token = PropertyMock(side_effect=[
+            {
+                '_data': 'token1',
+                '_typeBits': b'\x81\x80'
+            },
+            {
+                '_data': 'token2',
+            },
+
+            {
+                '_data': 'token3'
+            },
+            {
+                '_data': 'token4'
+            }])
         cursor_mock.try_next.side_effect = [{}, {}, {}]
 
         mock_enter = Mock()
@@ -167,7 +180,9 @@ class TestFastSyncTapMongoDB(TestCase):
         self.mongo.database.watch.return_value = mock_watch
 
         self.assertDictEqual({
-            'token': 'token1'
+            'token': {
+                '_data': 'token1'
+            }
         }, self.mongo.fetch_current_log_pos())
 
     def test_fetch_current_incremental_key_pos(self):
