@@ -242,6 +242,9 @@ db_conn:
   access_token: <span class="s2">&quot;&lt;ACCESS_TOKEN&gt;&quot;</span>       <span class="c1"># Plain string or vault encrypted</span>
   subdomain: <span class="s2">&quot;zendesk_subdomain&quot;</span>       <span class="c1">#</span>
   start_date: <span class="s2">&quot;2000-01-01T00:00:00Z&quot;</span>   <span class="c1"># Data before this date will be ignored</span>
+  <span class="c1">#rate_limit: 1000                    # If you wish to avoid ever hitting the rate limit</span>
+  <span class="c1">#max_workers: 10                     # Max concurrent threads when communicating to zendesk API</span>
+  <span class="c1">#batch_size: 50                      # Number of tickets to query in one batch</span>
 
 
 <span class="c1"># ------------------------------------------------------------------------------</span>
