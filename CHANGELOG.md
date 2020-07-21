@@ -5,7 +5,7 @@
 
 **Tap MongoDB**
 - Bump `pipelinewise-tap-mongodb` to 1.0.1
-    - Fix case where resume tokens has extra properties that are not json serializable by saving `_data` only
+    - Fix case where resume tokens are not json serializable by extracting and saving `_data` only
 
 **Tap Zendesk**
 - Bump `pipelinewise-tap-zendesk` to 1.2.0
