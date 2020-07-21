@@ -35,6 +35,9 @@ Example YAML for tap-zendesk:
       access_token: "<ACCESS_TOKEN>"       # Plain string or vault encrypted
       subdomain: "zendesk_subdomain"       #
       start_date: "2000-01-01T00:00:00Z"   # Data before this date will be ignored
+      #rate_limit: 1000                    # If you wish to avoid ever hitting the rate limit
+      #max_workers: 10                     # Max concurrent threads when communicating to zendesk API
+      #batch_size: 50                      # Number of tickets to query in one batch
 
 
     # ------------------------------------------------------------------------------
