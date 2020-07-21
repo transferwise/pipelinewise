@@ -237,8 +237,19 @@ class FastSyncTapMongoDB:
                 if token is not None:
                     break
 
+        # Token can look like:
+        #       {'_data': 'A_LONG_HEX_DECIMAL_STRING'}
+        #    or {'_data': 'A_LONG_HEX_DECIMAL_STRING', '_typeBits': b'SOME_HEX'}
+        # https://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/resume_token.cpp#L82-L96
+
+        # Get the '_data' only from resume token
+        # token can contain a property '_typeBits' of type bytes which cannot be json
+        # serialized when saving the state in the function 'utils.save_state_file'.
+        # '_data' is enough to resume LOG_BASED Singer replication after FastSync
         return {
-            'token': token
+            'token': {
+                '_data': token['_data']
+            }
         }
 
     # pylint: disable=invalid-name
