@@ -4,7 +4,7 @@
 - Extract and send known error patterns from logs to alerts
 
 **Tap MongoDB**
-- Bump `pipelinewise-tap-zendesk` to 1.0.1
+- Bump `pipelinewise-tap-mongodb` to 1.0.1
     - Fix case where resume tokens has extra properties that are not json serializable by saving `_data` only
 
 **Tap Zendesk**
