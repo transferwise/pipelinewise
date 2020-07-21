@@ -1,3 +1,16 @@
+0.19.0 (2020-07-21)
+-------------------
+- Add tap-github
+- Extract and send known error patterns from logs to alerts
+
+**Tap MongoDB**
+- Bump `pipelinewise-tap-mongodb` to 1.0.1
+    - Fix case where resume tokens are not json serializable by extracting and saving `_data` only
+
+**Tap Zendesk**
+- Bump `pipelinewise-tap-zendesk` to 1.2.0
+    - Configurable `rate_limit`, `max_workers` and `batch_size` parameters
+
 0.18.1 (2020-07-15)
 -------------------
 - Fixed an issue when vault encrypted values were not in loaded from `config.yml`
