@@ -1013,7 +1013,7 @@ class PipelineWise:
             with open(pidfile_path) as pidf:
                 pid = pidf.read()
                 self.logger.info('Sending SIGINT to pid %s...', pid)
-                os.kill(int(pid), signal.SIGINT)
+                os.killpg(int(pid), signal.SIGINT)
         except ProcessLookupError:
             self.logger.error('Pid %s not found. Is the tap running on this machine? '
                               'Stopping taps remotely is not supported.', pid)
