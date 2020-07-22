@@ -402,7 +402,7 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
         # 1. Start the pipelinewise mock executable that's running
         #    linux piped dummy tap and target connectors
         with pidfile.PIDFile(pipelinewise.tap['files']['pidfile']):
-            os.spawnl(os.P_NOWAIT, f'{RESOURCES_DIR}/pipelinewise-mock.sh', 'pipelinewise-mock.ssh')
+            os.spawnl(os.P_NOWAIT, f'{RESOURCES_DIR}/pipelinewise-mock.sh', 'pipelinewise-mock.sh')
             # Wait 5 seconds making sure the dummy tap is running
             time.sleep(5)
 
