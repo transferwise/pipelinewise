@@ -24,6 +24,11 @@ db_conn:
   write_batch_rows: <int>							# Optional: Number of rows to write to csv file
                                        				#           in one batch. Default is 50000.
 
+  update_buffer_size: <int> 						# Optional: [LOG_BASED] The size of the buffer that holds detected update
+  													# operations in memory, the buffer is flushed once the size is reached. Default is 1.
+  await_time_ms: <int>								# Optional: [LOG_BASED] The maximum amount of time in milliseconds
+  													# the loge_base method waits for new data changes before exiting. Default is 1000 ms.
+
 # ------------------------------------------------------------------------------
 # Destination (Target) - Target properties
 # Connection details should be in the relevant target YAML file
@@ -45,7 +50,7 @@ schemas:
       - grp_stats
 
  	# Available replication methods: FULL_TABLE & LOG_BASED
-    # Default replicayion method is LOG_BASED
+    # Default replication method is LOG_BASED
     tables:
       - table_name: "table1"
         replication_method: "FULL_TABLE"

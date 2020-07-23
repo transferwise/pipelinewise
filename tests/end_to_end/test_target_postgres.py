@@ -75,6 +75,12 @@ class TestTargetPostgres:
         # 2. Make changes in MariaDB source database
         #  LOG_BASED
         self.run_query_tap_mysql('UPDATE weight_unit SET isactive = 0 WHERE weight_unit_id IN (2, 3, 4)')
+        self.run_query_tap_mysql('ALTER table weight_unit add column bool_col bool;')
+        self.run_query_tap_mysql('INSERT into weight_unit(weight_unit_name, isActive, original_date_created, bool_col) '
+                                 'values (\'Oz\', false, \'2020-07-23 10:00:00\', true);')
+        self.run_query_tap_mysql('ALTER table weight_unit change column bool_col is_imperial bool;')
+        self.run_query_tap_mysql('UPDATE weight_unit SET is_imperial = true WHERE weight_unit_name like \'%oz%\'')
+
         #  INCREMENTAL
         self.run_query_tap_mysql('INSERT INTO address(isactive, street_number, date_created, date_updated,'
                                  ' supplier_supplier_id, zip_code_zip_code_id)'
@@ -104,7 +110,7 @@ class TestTargetPostgres:
     def test_replicate_mariadb_to_pg_with_custom_buffer_size(self):
         """Replicate data from MariaDB to Postgres DWH with custom buffer size
         Same tests cases as test_replicate_mariadb_to_pg but using another tap with custom stream buffer size"""
-        self.test_replicate_mariadb_to_pg(tap_mariadb_id=TAP_MARIADB_BUFFERED_STREAM_ID)
+        self.test_resync_mariadb_to_pg(tap_mariadb_id=TAP_MARIADB_BUFFERED_STREAM_ID)
 
     @pytest.mark.dependency(depends=['import_config'])
     def test_replicate_pg_to_pg(self):
@@ -211,7 +217,7 @@ class TestTargetPostgres:
 
         result_update = self.mongodb_con.my_collection.update_many({}, {'$set': {'id': 0}})
 
-        assertions.assert_run_tap_success(TAP_MONGODB_ID, TARGET_ID, ['fastsync', 'singer'])
+        assertions.assert_run_tap_success(TAP_MONGODB_ID, TARGET_ID, ['singer'])
 
         assert result_update.modified_count == self.run_query_target_postgres(
             'select count(_id) from ppw_e2e_tap_mongodb.my_collection where cast(document->>\'id\' as int) = 0')[0][0]

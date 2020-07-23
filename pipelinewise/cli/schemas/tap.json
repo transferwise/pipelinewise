@@ -143,6 +143,20 @@
         },
         {
           "properties": {
+            "db_conn": {
+              "type": "object",
+              "properties": {
+                "update_buffer_size": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1000
+                },
+                "await_time_ms": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
             "schemas": {
             "type": "array",
             "items": {
@@ -154,8 +168,7 @@
                       "replication_method": {
                         "enum": ["LOG_BASED", "FULL_TABLE"]
                       }
-                    },
-                    "required": ["replication_method"]
+                    }
                   }
                 }
               },
