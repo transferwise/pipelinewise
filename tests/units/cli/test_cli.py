@@ -1,6 +1,10 @@
 import os
+import re
+import time
 import shutil
 import signal
+import psutil
+import pidfile
 from pathlib import Path
 
 import pipelinewise.cli as cli
@@ -9,7 +13,8 @@ from unittest.mock import patch
 from tests.units.cli.cli_args import CliArgs
 from pipelinewise.cli.pipelinewise import PipelineWise
 
-CONFIG_DIR = '{}/resources/sample_json_config'.format(os.path.dirname(__file__))
+RESOURCES_DIR = '{}/resources'.format(os.path.dirname(__file__))
+CONFIG_DIR = '{}/sample_json_config'.format(RESOURCES_DIR)
 VIRTUALENVS_DIR = './virtualenvs-dummy'
 TEST_PROJECT_NAME = 'test-project'
 TEST_PROJECT_DIR = '{}/{}'.format(os.getcwd(), TEST_PROJECT_NAME)
@@ -393,6 +398,22 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
         assert pytest_wrapped_e.type == SystemExit
         assert pytest_wrapped_e.value.code == 1
 
+        # Stop tap command should stop all the child processes
+        # 1. Start the pipelinewise mock executable that's running
+        #    linux piped dummy tap and target connectors
+        with pidfile.PIDFile(pipelinewise.tap['files']['pidfile']):
+            os.spawnl(os.P_NOWAIT, f'{RESOURCES_DIR}/pipelinewise-mock.sh', 'pipelinewise-mock.sh')
+            # Wait 5 seconds making sure the dummy tap is running
+            time.sleep(5)
+
+            # Send the stop_tap command
+            with pytest.raises(SystemExit):
+                pipelinewise.stop_tap()
+
+        # Should not have any remaining Pipelinewise related linux process
+        for proc in psutil.process_iter(['cmdline']):
+            full_command = ' '.join(proc.info['cmdline'])
+            assert re.match('pipelinewise|tap|target', full_command) is None
 
     def test_command_sync_tables(self):
         """Test run tap command"""
