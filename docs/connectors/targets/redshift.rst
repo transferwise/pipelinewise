@@ -52,6 +52,7 @@ Example YAML for target-redshift:
                                                     #           Used instead of the given AWS keys for the COPY operation if provided
       s3_bucket: "<BUCKET_NAME>"                    # S3 external bucket name
       s3_key_prefix: "redshift-imports/"            # Optional: S3 key prefix
+      s3_acl: "bucket-owner-full-control"           # Optional: ACL for S3 objects
 
       # Optional: Overrides the default COPY options to load data into Redshift
       #           The values below are the defaults and fit for purpose for most cases.

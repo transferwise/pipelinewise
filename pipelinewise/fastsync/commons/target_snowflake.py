@@ -54,6 +54,7 @@ class FastSyncTargetSnowflake:
 
     def upload_to_s3(self, file, table, tmp_dir=None):
         bucket = self.connection_config['s3_bucket']
+        s3_acl = self.connection_config.get('s3_acl')
         s3_key_prefix = self.connection_config.get('s3_key_prefix', '')
         s3_key = '{}pipelinewise_{}_{}.csv.gz'.format(s3_key_prefix, table, time.strftime('%Y%m%d-%H%M%S'))
 
@@ -76,19 +77,22 @@ class FastSyncTargetSnowflake:
             )
 
             # Upload to s3
+            extra_args = {'ACL': s3_acl} if s3_acl else dict()
+
             # Send key and iv in the metadata, that will be required to decrypt and upload the encrypted file
-            metadata = {
+            extra_args['Metadata'] = {
                 'x-amz-key': encryption_metadata.key,
                 'x-amz-iv': encryption_metadata.iv
             }
-            self.s3.upload_file(encrypted_file, bucket, s3_key, ExtraArgs={'Metadata': metadata})
+            self.s3.upload_file(encrypted_file, bucket, s3_key, ExtraArgs=extra_args)
 
             # Remove the uploaded encrypted file
             os.remove(encrypted_file)
 
         # Upload to S3 without encrypting
         else:
-            self.s3.upload_file(file, bucket, s3_key)
+            extra_args = {'ACL': s3_acl} if s3_acl else None
+            self.s3.upload_file(file, bucket, s3_key, ExtraArgs=extra_args)
 
         return s3_key
 

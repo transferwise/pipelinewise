@@ -106,6 +106,7 @@ Example YAML for target-snowflake:
       #aws_session_token: "<SESSION_TOKEN>"         # S3 - Plain string or vault encrypted - If not provided, AWS_SESSION_TOKEN environment variable or IAM role will be used
       s3_bucket: "<BUCKET_NAME>"                    # S3 external stbucket name
       s3_key_prefix: "snowflake-imports/"           # Optional: S3 key prefix
+      s3_acl: "bucket-owner-full-control"           # Optional: ACL for S3 objects
 
       # stage and file_format are pre-created objects in Snowflake that requires to load and
       # merge data correctly from S3 to tables in one step without using temp tables

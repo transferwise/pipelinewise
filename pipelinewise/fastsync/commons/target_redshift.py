@@ -77,12 +77,15 @@ class FastSyncTargetRedshift:
 
     def upload_to_s3(self, file, table):
         bucket = self.connection_config['s3_bucket']
+        s3_acl = self.connection_config.get('s3_acl')
         s3_key_prefix = self.connection_config.get('s3_key_prefix', '')
         s3_key = '{}pipelinewise_{}_{}.csv.gz'.format(s3_key_prefix, table, time.strftime('%Y%m%d-%H%M%S'))
 
+        extra_args = {'ACL': s3_acl} if s3_acl else None
+
         LOGGER.info('Uploading to S3 bucket: %s, local file: %s, S3 key: %s', bucket, file, s3_key)
 
-        self.s3.upload_file(file, bucket, s3_key)
+        self.s3.upload_file(file, bucket, s3_key, ExtraArgs=extra_args)
 
         return s3_key
 
