@@ -251,6 +251,7 @@ db_conn:
                                                 <span class="c1">#           Used instead of the given AWS keys for the COPY operation if provided</span>
   s3_bucket: <span class="s2">&quot;&lt;BUCKET_NAME&gt;&quot;</span>                    <span class="c1"># S3 external bucket name</span>
   s3_key_prefix: <span class="s2">&quot;redshift-imports/&quot;</span>            <span class="c1"># Optional: S3 key prefix</span>
+  s3_acl: <span class="s2">&quot;bucket-owner-full-control&quot;</span>           <span class="c1"># Optional: ACL for S3 objects</span>
 
   <span class="c1"># Optional: Overrides the default COPY options to load data into Redshift</span>
   <span class="c1">#           The values below are the defaults and fit for purpose for most cases.</span>
