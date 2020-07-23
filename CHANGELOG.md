@@ -1,3 +1,29 @@
+0.20.0 (2020-07-24)
+-------------------
+
+- Fixed an issue when `stop_tap` command doesn't kill child processes only the parent PPW executable
+
+**Tap MongoDB**
+- Bump `pipelinewise-tap-mongodb` to 1.1.0
+    - Add `await_time_ms` parameter to control how long the log_based method would wait for new change streams before stopping, default is 1000ms=1s which is the default anyway in the server.
+    - Add `update_buffer_size` parameter to control how many update operation we should keep in the memory before having to make a call to `find` operation to get the documents from the server. The default value is 1, i.e every detected update will be sent to stdout right away.
+
+**Tap MySQL**
+- Bump `pipelinewise-tap-mongodb` to 1.3.3
+    - During `LOG_BASED` runtime, detect new columns, incl renamed ones, by comparing the columns in the binlog event to the stream schema, and if there are any additional columns, run discovery and send a new `SCHEMA` message to target. This helps avoid data loss.
+
+**Tap Zendesk**
+- Bump `pipelinewise-tap-zendesk` to 1.2.1
+    - Use `start_time` query parameter to load satisfaction_ratings stream incrementally
+
+**Target Snowflake**
+- Bump `pipelinewise-target-snowflake` to 1.7.0
+    - Add `s3_acl` option to support ACL for S3 upload
+
+**Target Redshift**
+- Bump `pipelinewise-target-redshift` to 1.5.0
+    - Add `s3_acl` option to support ACL for S3 upload
+
 0.19.0 (2020-07-21)
 -------------------
 - Add tap-github
