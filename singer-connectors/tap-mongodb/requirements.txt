@@ -1,1 +1,1 @@
--e git+https://github.com/transferwise/pipelinewise-tap-mongodb.git@master#egg=pipelinewise-tap-mongodb
+pipelinewise-tap-mongodb==1.1.0
