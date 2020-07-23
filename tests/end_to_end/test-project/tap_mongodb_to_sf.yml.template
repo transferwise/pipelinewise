@@ -21,6 +21,8 @@ db_conn:
   dbname: "${TAP_MONGODB_DB}"           		# Mongodb database name to sync from
   replica_set: rs0      						# Mongodb replica set name, default null
   write_batch_rows: 500
+  update_buffer_size: 30
+#  await_time_ms: 5000 # 5 sec
 
 # ------------------------------------------------------------------------------
 # Destination (Target) - Target properties
@@ -39,7 +41,6 @@ schemas:
 
     tables:
       - table_name: "listings"
-        replication_method: "FULL_TABLE"
 
       - table_name: "my_collection"
         replication_method: "LOG_BASED"

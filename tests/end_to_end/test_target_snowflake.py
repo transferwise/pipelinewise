@@ -204,7 +204,7 @@ class TestTargetSnowflake:
 
         result_update = self.mongodb_con.my_collection.update_many({}, {'$set': {'id': 0}})
 
-        assertions.assert_run_tap_success(TAP_MONGODB_ID, TARGET_ID, ['fastsync', 'singer'])
+        assertions.assert_run_tap_success(TAP_MONGODB_ID, TARGET_ID, ['singer'])
 
         assert result_update.modified_count == self.run_query_target_snowflake(
             'select count(_id) from ppw_e2e_tap_mongodb.my_collection where document:id = 0')[0][0]
