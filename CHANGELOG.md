@@ -1,3 +1,11 @@
+0.20.1 (2020-07-24)
+-------------------
+
+**Tap MySQL**
+- revert back to `pipelinewise-tap-mysql` to 1.3.2
+    - 1.3.3 is breaking the replication
+
+
 0.20.0 (2020-07-24)
 -------------------
 
@@ -9,7 +17,7 @@
     - Add `update_buffer_size` parameter to control how many update operation we should keep in the memory before having to make a call to `find` operation to get the documents from the server. The default value is 1, i.e every detected update will be sent to stdout right away.
 
 **Tap MySQL**
-- Bump `pipelinewise-tap-mongodb` to 1.3.3
+- Bump `pipelinewise-tap-mysql` to 1.3.3
     - During `LOG_BASED` runtime, detect new columns, incl renamed ones, by comparing the columns in the binlog event to the stream schema, and if there are any additional columns, run discovery and send a new `SCHEMA` message to target. This helps avoid data loss.
 
 **Tap Zendesk**
