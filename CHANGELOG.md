@@ -3,7 +3,7 @@
 
 **Tap MySQL**
 - revert back to `pipelinewise-tap-mysql` to 1.3.2
-    - 1.3.3 is breaking replication
+    - 1.3.3 is breaking the replication
 
 
 0.20.0 (2020-07-24)
