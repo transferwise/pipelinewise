@@ -1,10 +1,14 @@
+0.20.2 (2020-07-27)
+-------------------
+
+- Fixed an issue when `stop_tap` command didn't kill running tap and child processes
+
 0.20.1 (2020-07-24)
 -------------------
 
 **Tap MySQL**
 - revert back to `pipelinewise-tap-mysql` to 1.3.2
     - 1.3.3 is breaking the replication
-
 
 0.20.0 (2020-07-24)
 -------------------
