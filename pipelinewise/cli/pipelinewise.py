@@ -8,6 +8,7 @@ import signal
 import sys
 import json
 import copy
+import psutil
 import pidfile
 
 from datetime import datetime
@@ -1011,9 +1012,17 @@ class PipelineWise:
         pidfile_path = self.tap['files']['pidfile']
         try:
             with open(pidfile_path) as pidf:
-                pid = pidf.read()
-                self.logger.info('Sending SIGINT to pid %s...', pid)
-                os.killpg(int(pid), signal.SIGINT)
+                pid = int(pidf.read())
+                parent = psutil.Process(pid)
+
+                # Terminate child processes
+                for child in parent.children(recursive=True):
+                    self.logger.info('Sending SIGINT to child pid %s...', child.pid)
+                    child.send_signal(signal.SIGINT)
+
+                # Terminate main process
+                self.logger.info('Sending SIGINT to main pid %s...', parent.pid)
+                parent.send_signal(signal.SIGINT)
         except ProcessLookupError:
             self.logger.error('Pid %s not found. Is the tap running on this machine? '
                               'Stopping taps remotely is not supported.', pid)
