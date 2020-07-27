@@ -402,7 +402,8 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
         # 1. Start the pipelinewise mock executable that's running
         #    linux piped dummy tap and target connectors
         with pidfile.PIDFile(pipelinewise.tap['files']['pidfile']):
-            os.spawnl(os.P_NOWAIT, f'{RESOURCES_DIR}/pipelinewise-mock.sh', 'pipelinewise-mock.sh')
+            os.spawnl(os.P_NOWAIT, f'{RESOURCES_DIR}/test_stop_tap/scheduler-mock.sh',
+                      'test_stop_tap/scheduler-mock.sh')
             # Wait 5 seconds making sure the dummy tap is running
             time.sleep(5)
 
@@ -413,7 +414,7 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
         # Should not have any remaining Pipelinewise related linux process
         for proc in psutil.process_iter(['cmdline']):
             full_command = ' '.join(proc.info['cmdline'])
-            assert re.match('pipelinewise|tap|target', full_command) is None
+            assert re.match('scheduler|pipelinewise|tap|target', full_command) is None
 
     def test_command_sync_tables(self):
         """Test run tap command"""
