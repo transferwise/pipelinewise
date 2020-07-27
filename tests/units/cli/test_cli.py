@@ -413,7 +413,7 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
         # Should not have any remaining Pipelinewise related linux process
         for proc in psutil.process_iter(['cmdline']):
             full_command = ' '.join(proc.info['cmdline'])
-            assert re.match('pipelinewise|tap|target', full_command) is None
+            assert re.match('scheduler|pipelinewise|tap|target', full_command) is None
 
     def test_command_sync_tables(self):
         """Test run tap command"""
