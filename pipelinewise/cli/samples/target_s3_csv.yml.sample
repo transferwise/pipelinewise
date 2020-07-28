@@ -12,9 +12,15 @@ type: "target-s3-csv"                  # !! THIS SHOULD NOT CHANGE !!
 # Target - S3 details
 # ------------------------------------------------------------------------------
 db_conn:
-  aws_access_key_id: "<ACCESS_KEY>"             # S3 access key id - Plain string or vault encrypted
-  aws_secret_access_key: "<SECRET_ACCESS_KEY"   # S3 secret access key - Plain string or vault encrypted
-  s3_bucket: "<BUCKET_NAME>"                    # S3 bucket name
+  # Profile based authentication
+  aws_profile: "<AWS_PROFILE>"                   # AWS profile name, if not provided, the 'default' profile will be used
+
+  # Non-profile based authentication
+  #aws_access_key_id: "<ACCESS_KEY>"             # AWS access key id - Plain string or vault encrypted
+  #aws_secret_access_key: "<SECRET_ACCESS_KEY"   # AWS secret access key - Plain string or vault encrypted
+  #aws_session_token: "<AWS_SESSION_TOKEN>"      # AWS session token - Plain string or vault encrypted
+
+  s3_bucket: "<BUCKET_NAME>"                     # S3 bucket name
 
   # Optional keys
   #s3_key_prefix: "pipelinewise-exports/"        # (Default: None) A static prefix before the generated S3 key names
