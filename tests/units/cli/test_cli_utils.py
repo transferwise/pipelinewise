@@ -351,7 +351,7 @@ class TestUtils:
                 'message=error with status PGRES_COPY_BOTH and no message from the libpq\n',
                 'snowflake.connector.errors.ProgrammingError: 091003 (22000): '
                 'Failure using stage area. Cause: [Access Denied (Status Code: 403; Error Code: AccessDenied)]\n',
-                "botocore.exceptions.HTTPClientError: An HTTP Client raised and unhandled exception: "
+                'botocore.exceptions.HTTPClientError: An HTTP Client raised and unhandled exception: '
                 "'No field numbered 1 is present in this asn1crypto.keys.PublicKeyInfo'\n"]
 
         # Should return the default max number of errors
