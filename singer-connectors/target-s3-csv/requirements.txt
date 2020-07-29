@@ -1,1 +1,1 @@
-pipelinewise-target-s3-csv==1.2.1
+pipelinewise-target-s3-csv==1.3.0
