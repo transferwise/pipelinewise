@@ -34,5 +34,9 @@ snowflake.connector.errors.ProgrammingError: 091003 (22000): Failure using stage
 # Some botocore error
 botocore.exceptions.HTTPClientError: An HTTP Client raised and unhandled exception: 'No field numbered 1 is present in this asn1crypto.keys.PublicKeyInfo'
 
+# Some generic python exception and error
+foo.exception.FakeException: This is a test exception
+foo.error.FakeError: This is a test exception
+
 # Custom error pattern
 CUSTOM-ERR-PATTERN: This is a custom pattern error message

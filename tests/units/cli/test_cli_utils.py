@@ -352,7 +352,9 @@ class TestUtils:
                 'snowflake.connector.errors.ProgrammingError: 091003 (22000): '
                 'Failure using stage area. Cause: [Access Denied (Status Code: 403; Error Code: AccessDenied)]\n',
                 'botocore.exceptions.HTTPClientError: An HTTP Client raised and unhandled exception: '
-                "'No field numbered 1 is present in this asn1crypto.keys.PublicKeyInfo'\n"]
+                "'No field numbered 1 is present in this asn1crypto.keys.PublicKeyInfo'\n",
+                'foo.exception.FakeException: This is a test exception\n',
+                'foo.error.FakeError: This is a test exception\n']
 
         # Should return the default max number of errors
         log_file = '{}/resources/sample_log_files/tap-run-lot-of-errors.log'.format(os.path.dirname(__file__))

@@ -470,7 +470,10 @@ def find_errors_in_log_file(file, max_errors=10, error_pattern=None):
         r'pymysql\.err|'
         r'psycopg2\.*Error|'
         r'snowflake\.connector\.errors|'
-        r'botocore\.exceptions\.')
+        r'botocore\.exceptions\.|'
+        # Generic python exceptions
+        r'\.[E|e]xception|'
+        r'\.[E|e]rror')
 
     # Use known error patterns by default
     if not error_pattern:
