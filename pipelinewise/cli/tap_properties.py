@@ -151,11 +151,7 @@ def get_tap_properties(tap=None, temp_dir=None):
             'default_data_flattening_max_level': 0
         },
         'tap-zendesk': {
-            'tap_config_extras': {
-                'rate_limit': 1000,
-                'max_workers': 10,
-                'batch_size': 50
-            },
+            'tap_config_extras': {},
             'tap_stream_id_pattern': '{{table_name}}',
             'tap_stream_name_pattern': '{{table_name}}',
             'tap_catalog_argument': '--catalog',
