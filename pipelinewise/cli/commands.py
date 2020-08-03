@@ -306,9 +306,8 @@ def run_command(command: str, log_file: str = None, line_callback: callable = No
             # Raise run command exception
             errors = ''.join(utils.find_errors_in_log_file(log_file_failed))
             raise RunCommandException(f'Command failed. Return code: {proc_rc}\n'
-                                      f'Errors found:\n{errors}\n'
-                                      f'Full log: {log_file_failed}\n'
-                                      f'E')
+                                      f'Error(s) found:\n{errors}\n'
+                                      f'Full log: {log_file_failed}')
 
         # Add success status to the log file name
         os.rename(log_file_running, log_file_success)

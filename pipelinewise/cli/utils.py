@@ -469,7 +469,11 @@ def find_errors_in_log_file(file, max_errors=10, error_pattern=None):
         # Basic tap and target connector exception patterns
         r'pymysql\.err|'
         r'psycopg2\.*Error|'
-        r'snowflake\.connector\.errors')
+        r'snowflake\.connector\.errors|'
+        r'botocore\.exceptions\.|'
+        # Generic python exceptions
+        r'\.[E|e]xception|'
+        r'\.[E|e]rror')
 
     # Use known error patterns by default
     if not error_pattern:
