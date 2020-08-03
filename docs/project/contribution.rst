@@ -10,8 +10,8 @@ simple but requires some preparation to make sure the new component is compatibl
 
 To add new item to the supported :ref:`taps` or :ref:`targets` please follow the steps below.
 
-Adding new tap
-''''''''''''''
+Adding new tap type
+'''''''''''''''''''
 
 1. Make sure your tap is following the Singer specification by following the following criterias:
 
@@ -67,8 +67,8 @@ Adding new tap
 6. Send a Pull Request to the `PipelineWise Github Repository <https://github.com/transferwise/pipelinewise>`_.
 
 
-Adding new target
-'''''''''''''''''
+Adding new target type
+''''''''''''''''''''''
 
 1. Make sure your target is following the Singer specification and meets the following criterias:
 
