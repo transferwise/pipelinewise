@@ -5,7 +5,7 @@ Contribution
 ------------
 
 PipelineWise is using the `Singer Specification <https://github.com/singer-io/getting-started/blob/master/docs/SPEC.md>`_
-for moving data from Taps to Targets. Adding new taps and targets that are following the singer specification is relatively
+for moving data from Taps to Targets. Adding new taps and targets types that are following the singer specification is relatively
 simple but requires some preparation to make sure the new component is compatible with the PipelineWise framework.
 
 To add new item to the supported :ref:`taps` or :ref:`targets` please follow the steps below.
