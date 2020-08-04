@@ -5,6 +5,24 @@ Tap S3 CSV
 -----------
 
 
+Extracting data from S3 in CSV file format is straightforward. You need to have
+access to an S3 bucket and the tap will download every file that matches the
+configured file pattern. It's tracking the ``Last-Modified`` timestamp on the
+S3 objects to incrementally download only the new or updated files.
+
+.. warning::
+
+  **Authentication Methods**
+
+   * **Profile based authentication**: This is the default authentication method. Credentials taken from
+     the ``default`` AWS profile, that's available on the host where PipelineWise is running.
+     To use anoter profile set the ``aws_profile`` parameter.
+   * **Non-profile based authentication**: To provide fixed credentials set ``aws_access_key_id``,
+     ``aws_secret_access_key`` and optionally the ``aws_session_token`` parameters.
+
+     Optionally the credentials can be vault-encrypted in the YAML. Please check :ref:`encrypting_passwords`
+     for further details.
+
 Configuring what to replicate
 '''''''''''''''''''''''''''''
 
@@ -32,9 +50,16 @@ Example YAML for ``tap-s3-csv``:
     # Source (Tap) - S3 connection details
     # ------------------------------------------------------------------------------
     db_conn:
-      aws_access_key_id: "<ACCESS_KEY_ID>"          # Plain string or vault encrypted
-      aws_secret_access_key: "<SECRET_ACCESS_KEY>"  # Plain string or vault encrypted
+      # Profile based authentication
+      aws_profile: "<AWS_PROFILE>"                  # AWS profile name, if not provided, the AWS_PROFILE environment variable or the 'default' profile will be used
+
+      # Non-profile based authentication
+      #aws_access_key_id: "<ACCESS_KEY>"            # Plain string or vault encrypted. Required for non-profile based auth. If not provided, AWS_ACCESS_KEY_ID environment variable will be used.
+      #aws_secret_access_key: "<SECRET_ACCESS_KEY"  # Plain string or vault encrypted. Required for non-profile based auth. If not provided, AWS_SECRET_ACCESS_KEY environment variable will be used.
+      #aws_session_token: "<AWS_SESSION_TOKEN>"     # Optional: Plain string or vault encrypted. If not provided, AWS_SESSION_TOKEN environment variable will be used.
+
       #aws_endpoint_url: "<FULL_ENDPOINT_URL>"      # Optional: for non AWS S3, for example https://nyc3.digitaloceanspaces.com
+
       bucket: "my-bucket"                           # S3 Bucket name
       start_date: "2000-01-01"                      # File before this data will be excluded
 
