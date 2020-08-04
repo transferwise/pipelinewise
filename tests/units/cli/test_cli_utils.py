@@ -13,6 +13,13 @@ class TestUtils:
     Unit Tests for PipelineWise CLI utility functions
     """
 
+    def assert_json_is_invalid(self, schema, invalid_target):
+        """Simple assertion to check if validate function exits with error"""
+        with pytest.raises(SystemExit) as pytest_wrapped_e:
+            cli.utils.validate(invalid_target, schema)
+        assert pytest_wrapped_e.type == SystemExit
+        assert pytest_wrapped_e.value.code == 1
+
     def test_json_detectors(self):
         """Testing JSON detector functions"""
         assert cli.utils.is_json('{Invalid JSON}') is False
@@ -207,8 +214,8 @@ class TestUtils:
             os.path.dirname(__file__)))
         assert cli.utils.load_schema('tap') == tap_schema
 
-    def test_json_validate(self):
-        """Test JSON schema validator functions"""
+    def test_json_validate_tap(self):
+        """Test JSON schema validator functions on taps"""
         schema = cli.utils.load_schema('tap')
 
         # Valid instance should return None
@@ -217,10 +224,19 @@ class TestUtils:
 
         # Invalid instance should exit
         invalid_tap = cli.utils.load_yaml('{}/resources/tap-invalid.yml'.format(os.path.dirname(__file__)))
-        with pytest.raises(SystemExit) as pytest_wrapped_e:
-            cli.utils.validate(invalid_tap, schema)
-        assert pytest_wrapped_e.type == SystemExit
-        assert pytest_wrapped_e.value.code == 1
+        self.assert_json_is_invalid(schema, invalid_tap)
+
+    def test_json_validate_target(self):
+        """Test JSON schema validator functions on targets"""
+        schema = cli.utils.load_schema('target')
+
+        # Valid instance should return None
+        valid_target = cli.utils.load_yaml('{}/resources/target-valid-s3-csv.yml'.format(os.path.dirname(__file__)))
+        assert cli.utils.validate(valid_target, schema) is None
+
+        # Invalid instance should exit
+        invalid_target = cli.utils.load_yaml('{}/resources/target-invalid-s3-csv.yml'.format(os.path.dirname(__file__)))
+        self.assert_json_is_invalid(schema, invalid_target)
 
     def test_delete_keys(self):
         """Test dictionary functions"""

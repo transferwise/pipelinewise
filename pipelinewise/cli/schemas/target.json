@@ -39,6 +39,12 @@
         "aws_secret_access_key": {
           "type": "string"
         },
+        "aws_session_token": {
+          "type": "string"
+        },
+        "aws_profile": {
+          "type": "string"
+        },
         "client_side_encryption_master_key": {
           "type": "string"
         }
@@ -79,6 +85,12 @@
         "aws_secret_access_key": {
           "type": "string"
         },
+        "aws_session_token": {
+          "type": "string"
+        },
+        "aws_profile": {
+          "type": "string"
+        },
         "s3_bucket": {
           "type": "string"
         },
@@ -95,8 +107,6 @@
         "user",
         "password",
         "dbname",
-        "aws_access_key_id",
-        "aws_secret_access_key",
         "s3_bucket"
       ]
     },
@@ -136,6 +146,12 @@
         "aws_secret_access_key": {
           "type": "string"
         },
+        "aws_session_token": {
+          "type": "string"
+        },
+        "aws_profile": {
+          "type": "string"
+        },
         "s3_bucket": {
           "type": "string"
         },
@@ -153,8 +169,6 @@
         }
       },
       "required": [
-        "aws_access_key_id",
-        "aws_secret_access_key",
         "s3_bucket"
       ]
     }
