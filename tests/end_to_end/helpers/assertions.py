@@ -172,7 +172,8 @@ def assert_row_counts_equal(tap_query_runner_fn: callable, target_query_runner_f
 # pylint: disable=too-many-locals
 def assert_all_columns_exist(tap_query_runner_fn: callable,
                              target_query_runner_fn: callable,
-                             colum_type_mapper_fn: callable = None) -> None:
+                             colum_type_mapper_fn: callable = None,
+                             ignore_cols = set()) -> None:
     """Takes two query runner methods, gets the columns list for every table in both the
     source and target database and tests if every column in source exists in the target database.
 
@@ -228,6 +229,10 @@ def assert_all_columns_exist(tap_query_runner_fn: callable,
         print(target_cols_dict)
         for col_name, col_props in source_cols_dict.items():
             # Check if column exists in the target table
+
+            if col_name in ignore_cols:
+                continue
+
             try:
                 assert col_name in target_cols_dict
             except AssertionError as ex:

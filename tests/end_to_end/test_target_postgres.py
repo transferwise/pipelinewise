@@ -97,7 +97,7 @@ class TestTargetPostgres:
         assertions.assert_run_tap_success(tap_mariadb_id, TARGET_ID, ['fastsync', 'singer'])
         assertions.assert_row_counts_equal(self.run_query_tap_mysql, self.run_query_target_postgres)
         assertions.assert_all_columns_exist(self.run_query_tap_mysql, self.run_query_target_postgres,
-                                            mysql_to_postgres.tap_type_to_target_type)
+                                            mysql_to_postgres.tap_type_to_target_type, {'blob_col'})
 
     @pytest.mark.dependency(depends=['import_config'])
     def test_resync_mariadb_to_pg(self, tap_mariadb_id=TAP_MARIADB_ID):
