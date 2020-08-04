@@ -1,0 +1,27 @@
+---
+
+# ------------------------------------------------------------------------------
+# General Properties
+# ------------------------------------------------------------------------------
+id: "s3"                               # Unique identifier of the target
+name: "S3 Target connector"            # Name of the target
+type: "target-s3-csv"                  # !! THIS SHOULD NOT CHANGE !!
+
+
+# ------------------------------------------------------------------------------
+# Target - S3 details
+# ------------------------------------------------------------------------------
+db_conn:
+  # Profile based authentication
+  aws_profile: "<AWS_PROFILE>"
+
+  # Non-profile based authentication
+  #aws_access_key_id: "<ACCESS_KEY>"
+  #aws_secret_access_key: "<SECRET_ACCESS_KEY"
+  #aws_session_token: "<AWS_SESSION_TOKEN>"
+
+  s3_bucket: "<BUCKET_NAME>"
+
+  s3_key_prefix: "pipelinewise-exports/"
+  delimiter: ","
+  quotechar: "\""
