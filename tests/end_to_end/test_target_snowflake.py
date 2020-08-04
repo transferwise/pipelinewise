@@ -75,15 +75,6 @@ class TestTargetSnowflake:
         # 2. Make changes in MariaDB source database
         #  LOG_BASED
         self.run_query_tap_mysql('UPDATE weight_unit SET isactive = 0 WHERE weight_unit_id IN (2, 3, 4)')
-        self.run_query_tap_mysql('ALTER table weight_unit add column bool_col bool;')
-        self.run_query_tap_mysql('INSERT into weight_unit(weight_unit_name, isActive, original_date_created, bool_col) '
-                                 'values (\'Oz\', false, \'2020-07-23 10:00:00\', true);')
-        self.run_query_tap_mysql('ALTER table weight_unit add column blob_col blob;')
-        self.run_query_tap_mysql('INSERT into weight_unit(weight_unit_name, isActive, original_date_created, blob_col) '
-                                 'values (\'Oz\', false, \'2020-07-23 10:00:00\', \'blob content\');')
-        self.run_query_tap_mysql('ALTER table weight_unit change column bool_col is_imperial bool;')
-        self.run_query_tap_mysql('UPDATE weight_unit SET is_imperial = false WHERE weight_unit_name like \'%oz%\'')
-
         #  INCREMENTAL
         self.run_query_tap_mysql('INSERT INTO address(isactive, street_number, date_created, date_updated,'
                                  ' supplier_supplier_id, zip_code_zip_code_id)'
