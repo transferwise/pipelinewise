@@ -14,6 +14,7 @@ class TestUtils:
     """
 
     def assert_json_is_invalid(self, schema, invalid_target):
+        """Simple assertion to check if validate function exits with error"""
         with pytest.raises(SystemExit) as pytest_wrapped_e:
             cli.utils.validate(invalid_target, schema)
         assert pytest_wrapped_e.type == SystemExit
