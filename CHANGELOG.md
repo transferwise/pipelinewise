@@ -1,3 +1,26 @@
+0.21.0 (2020-08-04)
+-------------------
+
+- Improve alert messages to include botocore and generic python exception and error patterns in the alerts
+
+**Tap S3 CSV**, **Target Snowflake**, **Target S3 CSV**, **Target Redshift**
+- Add `aws_profile` option to support Profile based authentication to S3
+- Add option to authenticate to S3 using `AWS_PROFILE`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` and `AWS_SESSION_TOKEN` environment variables
+
+**Target Snowflake**
+- Fixed an issue when target-snowflake was failing when `QUOTED_IDENTIFIERS_IGNORE_CASE` snowflake parameter set to True
+- Fixed an issue when new `SCHEMA` singer message triggered a flush event even if the newly received `SCHEMA` message is the same as the previous one
+- Add `s3_endpoint_url` option to support non-native S3 accounts
+
+**Target S3 CSV**
+- Add `naming_convention` option to create custom and dynamically named files on S3
+
+**Tap Snowflake**
+- Eliminate some warning messages of `optional pandas and/or pyarrow not installed`.
+
+**Tap Zendesk**
+- Fixed and issue when `rate_limit`, `max_workers` and `batch_size` were not configurable via the tap-zendesk YAML file
+
 0.20.2 (2020-07-27)
 -------------------
 
