@@ -5,9 +5,6 @@ Target S3 CSV
 ----------------
 
 
-AWS S3 setup requirements
-'''''''''''''''''''''''''
-
 Loading data to S3 in CSV file format is straightforward. You need to have
 access to an S3 bucket and you can generate data files on S3 from all the
 supported :ref:`taps_list`.
@@ -52,12 +49,12 @@ Example YAML for ``target-s3-csv``:
     # ------------------------------------------------------------------------------
     db_conn:
       # Profile based authentication
-      aws_profile: "<AWS_PROFILE>"                   # AWS profile name, if not provided, the 'default' profile will be used
+      aws_profile: "<AWS_PROFILE>"                  # AWS profile name, if not provided, the AWS_PROFILE environment variable or the 'default' profile will be used
 
       # Non-profile based authentication
-      #aws_access_key_id: "<ACCESS_KEY>"             # AWS access key id - Plain string or vault encrypted
-      #aws_secret_access_key: "<SECRET_ACCESS_KEY"   # AWS secret access key - Plain string or vault encrypted
-      #aws_session_token: "<AWS_SESSION_TOKEN>"      # AWS session token - Plain string or vault encrypted
+      #aws_access_key_id: "<ACCESS_KEY>"            # Plain string or vault encrypted. Required for non-profile based auth. If not provided, AWS_ACCESS_KEY_ID environment variable will be used.
+      #aws_secret_access_key: "<SECRET_ACCESS_KEY"  # Plain string or vault encrypted. Required for non-profile based auth. If not provided, AWS_SECRET_ACCESS_KEY environment variable will be used.
+      #aws_session_token: "<AWS_SESSION_TOKEN>"     # Optional: Plain string or vault encrypted. If not provided, AWS_SESSION_TOKEN environment variable will be used.
 
       s3_bucket: "<BUCKET_NAME>"                     # S3 bucket name
 

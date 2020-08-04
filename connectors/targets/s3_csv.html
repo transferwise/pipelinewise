@@ -129,7 +129,6 @@
 <li class="toctree-l2"><a class="reference internal" href="redshift.html">Target Redshift</a></li>
 <li class="toctree-l2"><a class="reference internal" href="postgres.html">Target Postgres</a></li>
 <li class="toctree-l2 current"><a class="current reference internal" href="#">Target S3 CSV</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#aws-s3-setup-requirements">AWS S3 setup requirements</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#configuring-where-to-replicate-data">Configuring where to replicate data</a></li>
 </ul>
 </li>
@@ -209,8 +208,6 @@
             
   <div class="section" id="target-s3-csv">
 <span id="id1"></span><h1>Target S3 CSV<a class="headerlink" href="#target-s3-csv" title="Permalink to this headline">¶</a></h1>
-<div class="section" id="aws-s3-setup-requirements">
-<h2>AWS S3 setup requirements<a class="headerlink" href="#aws-s3-setup-requirements" title="Permalink to this headline">¶</a></h2>
 <p>Loading data to S3 in CSV file format is straightforward. You need to have
 access to an S3 bucket and you can generate data files on S3 from all the
 supported <a class="reference internal" href="../taps.html#taps-list"><span class="std std-ref">Taps (Data Sources)</span></a>.</p>
@@ -229,7 +226,6 @@ for further details.</p>
 </li>
 </ul>
 </div></blockquote>
-</div>
 </div>
 <div class="section" id="configuring-where-to-replicate-data">
 <h2>Configuring where to replicate data<a class="headerlink" href="#configuring-where-to-replicate-data" title="Permalink to this headline">¶</a></h2>
@@ -252,12 +248,12 @@ type: <span class="s2">&quot;target-s3-csv&quot;</span>                  <span c
 <span class="c1"># ------------------------------------------------------------------------------</span>
 db_conn:
   <span class="c1"># Profile based authentication</span>
-  aws_profile: <span class="s2">&quot;&lt;AWS_PROFILE&gt;&quot;</span>                   <span class="c1"># AWS profile name, if not provided, the &#39;default&#39; profile will be used</span>
+  aws_profile: <span class="s2">&quot;&lt;AWS_PROFILE&gt;&quot;</span>                  <span class="c1"># AWS profile name, if not provided, the AWS_PROFILE environment variable or the &#39;default&#39; profile will be used</span>
 
   <span class="c1"># Non-profile based authentication</span>
-  <span class="c1">#aws_access_key_id: &quot;&lt;ACCESS_KEY&gt;&quot;             # AWS access key id - Plain string or vault encrypted</span>
-  <span class="c1">#aws_secret_access_key: &quot;&lt;SECRET_ACCESS_KEY&quot;   # AWS secret access key - Plain string or vault encrypted</span>
-  <span class="c1">#aws_session_token: &quot;&lt;AWS_SESSION_TOKEN&gt;&quot;      # AWS session token - Plain string or vault encrypted</span>
+  <span class="c1">#aws_access_key_id: &quot;&lt;ACCESS_KEY&gt;&quot;            # Plain string or vault encrypted. Required for non-profile based auth. If not provided, AWS_ACCESS_KEY_ID environment variable will be used.</span>
+  <span class="c1">#aws_secret_access_key: &quot;&lt;SECRET_ACCESS_KEY&quot;  # Plain string or vault encrypted. Required for non-profile based auth. If not provided, AWS_SECRET_ACCESS_KEY environment variable will be used.</span>
+  <span class="c1">#aws_session_token: &quot;&lt;AWS_SESSION_TOKEN&gt;&quot;     # Optional: Plain string or vault encrypted. If not provided, AWS_SESSION_TOKEN environment variable will be used.</span>
 
   s3_bucket: <span class="s2">&quot;&lt;BUCKET_NAME&gt;&quot;</span>                     <span class="c1"># S3 bucket name</span>
 
