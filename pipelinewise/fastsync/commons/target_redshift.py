@@ -28,6 +28,8 @@ class FastSyncTargetRedshift:
         self.connection_config = connection_config
         self.transformation_config = transformation_config
 
+        # Get the required parameters from config file and/or environment variables
+        aws_profile = self.connection_config.get('aws_profile') or os.environ.get('AWS_PROFILE')
         aws_access_key_id = self.connection_config.get('aws_access_key_id') or os.environ.get('AWS_ACCESS_KEY_ID')
         aws_secret_access_key = self.connection_config.get('aws_secret_access_key') or \
                                 os.environ.get('AWS_SECRET_ACCESS_KEY')
@@ -49,7 +51,7 @@ class FastSyncTargetRedshift:
             self.connection_config['aws_secret_access_key'] = credentials.secret_key
             self.connection_config['aws_session_token'] = credentials.token
         else:
-            aws_session = boto3.session.Session()
+            aws_session = boto3.session.Session(profile_name=aws_profile)
 
         self.s3 = aws_session.client('s3')
 
