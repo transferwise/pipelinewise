@@ -1,1 +1,1 @@
--e git+https://github.com/transferwise/pipelinewise-tap-mysql.git@AP-742#egg=pipelinewise-tap-mysql
+-e git+https://github.com/transferwise/pipelinewise-tap-mysql.git@master#egg=pipelinewise-tap-mysql
