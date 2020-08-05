@@ -1,3 +1,10 @@
+0.21.1 (2020-08-05)
+-------------------
+
+**Tap MySQL**
+- Fix two issues when a new discovery is done after detecting new changes in binlogs.
+
+
 0.21.0 (2020-08-04)
 -------------------
 
