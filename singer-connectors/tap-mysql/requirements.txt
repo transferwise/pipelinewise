@@ -1,1 +1,1 @@
--e git+https://github.com/transferwise/pipelinewise-tap-mysql.git@master#egg=pipelinewise-tap-mysql
+pipelinewise-tap-mysql==1.3.4
