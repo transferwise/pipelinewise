@@ -176,10 +176,13 @@ def assert_all_columns_exist(tap_query_runner_fn: callable,
                              ignore_cols: Union[Set, List] = None) -> None:
     """Takes two query runner methods, gets the columns list for every table in both the
     source and target database and tests if every column in source exists in the target database.
+    Some taps have unsupported column types and these are not part of the schemas published to the target thus
+    target table doesn't have such columns.
 
     :param tap_query_runner_fn: method to run queries in the first connection
     :param target_query_runner_fn: method to run queries in the second connection
-    :param column_type_mapper_fn: method to convert source to target column types"""
+    :param column_type_mapper_fn: method to convert source to target column types
+    :param ignore_cols: List or set of columns to ignore if we know target table won't have them"""
     # Generate a map of source and target specific functions
     funcs = _map_tap_to_target_functions(tap_query_runner_fn, target_query_runner_fn)
 
