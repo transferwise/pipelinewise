@@ -1,7 +1,7 @@
 import os
 import re
 
-from typing import List
+from typing import List, Set, Union
 from pathlib import Path
 
 from . import tasks
@@ -172,13 +172,17 @@ def assert_row_counts_equal(tap_query_runner_fn: callable, target_query_runner_f
 # pylint: disable=too-many-locals
 def assert_all_columns_exist(tap_query_runner_fn: callable,
                              target_query_runner_fn: callable,
-                             colum_type_mapper_fn: callable = None) -> None:
+                             column_type_mapper_fn: callable = None,
+                             ignore_cols: Union[Set, List] = None) -> None:
     """Takes two query runner methods, gets the columns list for every table in both the
     source and target database and tests if every column in source exists in the target database.
+    Some taps have unsupported column types and these are not part of the schemas published to the target thus
+    target table doesn't have such columns.
 
     :param tap_query_runner_fn: method to run queries in the first connection
     :param target_query_runner_fn: method to run queries in the second connection
-    :param colum_type_mapper_fn: method to convert source to target column types"""
+    :param column_type_mapper_fn: method to convert source to target column types
+    :param ignore_cols: List or set of columns to ignore if we know target table won't have them"""
     # Generate a map of source and target specific functions
     funcs = _map_tap_to_target_functions(tap_query_runner_fn, target_query_runner_fn)
 
@@ -228,6 +232,10 @@ def assert_all_columns_exist(tap_query_runner_fn: callable,
         print(target_cols_dict)
         for col_name, col_props in source_cols_dict.items():
             # Check if column exists in the target table
+
+            if ignore_cols and col_name in ignore_cols:
+                continue
+
             try:
                 assert col_name in target_cols_dict
             except AssertionError as ex:
@@ -235,10 +243,10 @@ def assert_all_columns_exist(tap_query_runner_fn: callable,
                 raise
 
             # Check if column type is expected in the target table, if mapper function provided
-            if colum_type_mapper_fn:
+            if column_type_mapper_fn:
                 try:
                     target_col = target_cols_dict[col_name]
-                    exp_col_type = colum_type_mapper_fn(col_props['type'], col_props['type_extra'])\
+                    exp_col_type = column_type_mapper_fn(col_props['type'], col_props['type_extra'])\
                         .replace(' NULL', '').lower()
                     act_col_type = target_col['type'].lower()
                     assert act_col_type == exp_col_type
