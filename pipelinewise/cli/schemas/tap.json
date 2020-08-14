@@ -225,12 +225,12 @@
     "batch_size_rows": {
       "type": "integer",
       "minimum": 1000,
-      "maximum": 500000
+      "maximum": 1000000
     },
     "stream_buffer_size": {
       "type": "integer",
       "minimum": 0,
-      "maximum": 1000
+      "maximum": 2500
     },
     "schemas": {
       "type": "array",
