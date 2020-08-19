@@ -1,8 +1,13 @@
+0.21.3 (2020-08-19)
+-------------------
+
+- Fixed an issue when tap was not started if stream buffer size is greater than 1G
+
 0.21.2 (2020-08-18)
 -------------------
 
 - Increase max batch_size_rows to 1000k from 500k
-- Incresea max stream_buffer_size to 2500
+- Increesa max stream_buffer_size to 2500
 
 0.21.1 (2020-08-05)
 -------------------
