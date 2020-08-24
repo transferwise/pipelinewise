@@ -15,6 +15,15 @@ components and uses it automatically whenever it’s possible.
 
 * MySQL to Snowflake.
 * MySQL to Redshift
+* MySQL to Postgres
+
 * Postgres to Snowflake
 * Postgres to Redshift
+* Postgres to Postgres
+
 * S3 CSV to Snowflake
+* S3 CSV to Redshift
+* S3 CSV to Postgres
+
+* MongoDB to Snowflake
+* MongoDB to Postgres
