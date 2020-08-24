@@ -66,7 +66,7 @@
             
             
               <div class="version">
-                0.21.0
+                0.21.3
               </div>
             
           
@@ -117,7 +117,6 @@
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/logging.html">Logging</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/alerts.html">Alerts</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/resync.html">Resync Tables</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/integration.html">Integration</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Connectors</span></p>
 <ul>
@@ -222,7 +221,7 @@ Once it’s successfully finished the data is available in the target database a
 the internal state file with the bookmark for the next run.</p>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
-<p>If you <span class="xref std std-ref">running_from_docker</span> then the full path to the log files in the output is
+<p>If you <a class="reference internal" href="installation.html#running-in-docker"><span class="std std-ref">running in docker</span></a> then the full path to the log files in the output is
 maybe not correct. Everything that referring to <code class="docutils literal notranslate"><span class="pre">/app/.pipelinewise/...</span></code> in the output
 is available on your Docker host at <code class="docutils literal notranslate"><span class="pre">${HOME}/.pipelinewise</span></code> directory.</p>
 <p>Read the <a class="reference internal" href="../user_guide/logging.html#logging"><span class="std std-ref">Logging</span></a> section for further details about logging.</p>
