@@ -21,7 +21,6 @@ Features
 - **Managed Schema Changes**: When source data changes, PipelineWise detects the change and alters the schema in your Analytics-Data-Store automatically
 - **Load time transformations**: Ideal place to obfuscate, mask or filter sensitive data that should never be replicated in the Data Warehouse
 - **YAML based configuration**: Data pipelines are defined as YAML files, ensuring that the entire configuration is kept under version control
-- **Integration with external tools**: With built-in event handlers you can trigger external scripts automatically when a certain event occures
 - **Extensible**: PipelineWise is using `Singer.io <https://www.singer.io/>`_  compatible taps and target connectors. New connectors can be added to PipelineWise with relatively small effort
 
 
@@ -255,7 +254,6 @@ Content
    user_guide/logging
    user_guide/alerts
    user_guide/resync
-   user_guide/integration
 
 .. toctree::
    :maxdepth: 2
