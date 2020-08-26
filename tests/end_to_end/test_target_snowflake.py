@@ -75,13 +75,14 @@ class TestTargetSnowflake:
         # 2. Make changes in MariaDB source database
         #  LOG_BASED
         self.run_query_tap_mysql('UPDATE weight_unit SET isactive = 0 WHERE weight_unit_id IN (2, 3, 4)')
-        self.run_query_tap_mysql("INSERT INTO edgydata VALUES"
-                                 "(10, 'Lorem ipsum dolor sit amet', 10, 'A', '[]', '00:00:00'),"
-                                 "(11, 'Thai: แผ่นดินฮั่นเสื่อมโทรมแสนสังเวช', 20, 'A', '{}', '12:00:59'),"
-                                 "(12, 'Chinese: 和毛泽东 <<重上井冈山>>. 严永欣, 一九八八年.', null, 'B', "
-                                 "'[{\"key\": \"ValueOne\", \"actions\": []}, {\"key\": \"ValueTwo\", \"actions\": []}]', '9:1:00'),"
-                                 "(13, 'Special Characters: [\"\\,''!@£$%^&*()]\\\\', null, 'B', null, '12:00:00'),"
-                                 "(14, '	', 20, 'B', null, '15:36:10')")
+        self.run_query_tap_mysql('INSERT INTO edgydata VALUES'
+                                 '(10, \'Lorem ipsum dolor sit amet\', 10, \'A\', \'[]\', \'00:00:00\'),'
+                                 '(11, \'Thai: แผ่นดินฮั่นเสื่อมโทรมแสนสังเวช\', 20, \'A\', \'{}\', \'12:00:59\'),'
+                                 '(12, \'Chinese: 和毛泽东 <<重上井冈山>>. 严永欣, 一九八八年.\', null,\'B\', '
+                                 '\'[{"key": "ValueOne", "actions": []}, {"key": "ValueTwo", "actions": []}]\','
+                                 ' \'9:1:00\'),'
+                                 '(13, \'Special Characters: [\"\\,''!@£$%^&*()]\\\\\', null, \'B\', null, \'12:00:00\'),'
+                                 '(14, \'	\', 20, \'B\', null, \'15:36:10\')')
 
         #  INCREMENTAL
         self.run_query_tap_mysql('INSERT INTO address(isactive, street_number, date_created, date_updated,'
