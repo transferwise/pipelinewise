@@ -78,7 +78,7 @@ jobs:
       - run:
           name: 'Check code formatting'
           command: |
-            python3 -m venv venv
+            python3 -m venv .venv
             . .venv/bin/activate
             pip install unify
             find pipelinewise tests -type f -name '*.py' | xargs unify --check-only
