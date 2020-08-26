@@ -78,14 +78,15 @@ jobs:
       - run:
           name: 'Check code formatting'
           command: |
-            . .virtualenvs/pipelinewise/bin/activate
+            python3 -m venv venv
+            . .venv/bin/activate
             pip install unify
             find pipelinewise tests -type f -name '*.py' | xargs unify --check-only
 
       - run:
           name: 'Pylinting'
           command: |
-            . .virtualenvs/pipelinewise/bin/activate
+            . .venv/bin/activate
             pip install pylint
             pylint pipelinewise tests
 
