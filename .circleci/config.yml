@@ -80,14 +80,13 @@ jobs:
           command: |
             python3 -m venv .venv
             . .venv/bin/activate
-            pip install unify
+            pip install -Ue .[test]
             find pipelinewise tests -type f -name '*.py' | xargs unify --check-only
 
       - run:
           name: 'Pylinting'
           command: |
             . .venv/bin/activate
-            pip install pylint
             pylint pipelinewise tests
 
       - run:
