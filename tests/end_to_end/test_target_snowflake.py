@@ -75,7 +75,7 @@ class TestTargetSnowflake:
         # 2. Make changes in MariaDB source database
         #  LOG_BASED
         self.run_query_tap_mysql('UPDATE weight_unit SET isactive = 0 WHERE weight_unit_id IN (2, 3, 4)')
-        self.run_query_tap_mysql('INSERT INTO edgydata edgydata (c_varchar, `group`, `case`, cjson, c_time) VALUES'
+        self.run_query_tap_mysql('INSERT INTO edgydata (c_varchar, `group`, `case`, cjson, c_time) VALUES'
                                  '(\'Lorem ipsum dolor sit amet\', 10, \'A\', \'[]\', \'00:00:00\'),'
                                  '(\'Thai: แผ่นดินฮั่นเสื่อมโทรมแสนสังเวช\', 20, \'A\', \'{}\', \'12:00:59\'),'
                                  '(\'Chinese: 和毛泽东 <<重上井冈山>>. 严永欣, 一九八八年.\', null,\'B\', '
