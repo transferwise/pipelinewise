@@ -90,7 +90,8 @@ class TestTargetPostgres:
                                  '(12, \'Chinese: 和毛泽东 <<重上井冈山>>. 严永欣, 一九八八年.\', null,\'B\', '
                                  '\'[{"key": "ValueOne", "actions": []}, {"key": "ValueTwo", "actions": []}]\','
                                  ' \'9:1:00\'),'
-                                 '(13, \'Special Characters: [\"\\,''!@£$%^&*()]\\\\\', null, \'B\', null, \'12:00:00\'),'
+                                 '(13, \'Special Characters: [\"\\,''!@£$%^&*()]\\\\\', null, \'B\', '
+                                 'null, \'12:00:00\'),'
                                  '(14, \'	\', 20, \'B\', null, \'15:36:10\')')
 
         #  INCREMENTAL
