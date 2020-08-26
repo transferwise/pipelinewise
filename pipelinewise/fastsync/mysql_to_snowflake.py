@@ -68,6 +68,7 @@ def tap_type_to_target_type(mysql_type, mysql_column_type):
         'date': 'TIMESTAMP_NTZ',
         'datetime': 'TIMESTAMP_NTZ',
         'timestamp': 'TIMESTAMP_NTZ',
+        'time': 'TIME',
         'json': 'VARIANT'
     }.get(mysql_type, 'VARCHAR')
 
