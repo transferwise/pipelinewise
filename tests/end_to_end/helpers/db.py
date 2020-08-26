@@ -33,6 +33,7 @@ def run_query_mysql(query, host, port, user, password, database):
                          user=user,
                          password=password,
                          database=database,
+                         charset="utf8mb4",
                          cursorclass=pymysql.cursors.Cursor) as cur:
         cur.execute(query)
         if cur.rowcount > 0:
