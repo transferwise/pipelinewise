@@ -74,6 +74,21 @@ jobs:
 
     steps:
       - checkout
+
+      - run:
+          name: 'Check code formatting'
+          command: |
+            . .virtualenvs/pipelinewise/bin/activate
+            pip install unify
+            find pipelinewise tests -type f -name '*.py' | xargs unify --check-only
+
+      - run:
+          name: 'Pylinting'
+          command: |
+            . .virtualenvs/pipelinewise/bin/activate
+            pip install pylint
+            pylint pipelinewise tests
+
       - run:
           name: 'Build source databases for integration tests'
           command: |
@@ -90,15 +105,6 @@ jobs:
       - run:
           name: 'Installing PipelineWise components and connectors'
           command: ./install.sh --acceptlicenses --connectors=all
-      - run:
-          name: 'Check code formatting and do pylinting'
-          command: |
-            . .virtualenvs/pipelinewise/bin/activate
-            pip install unify pylint
-            echo "Checking double quotes..."
-            find pipelinewise tests -type f -name '*.py' | xargs unify --check-only
-            echo "Running pylint..."
-            pylint pipelinewise tests
 
       - run:
           name: 'Run unit tests'
