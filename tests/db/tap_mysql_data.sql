@@ -28,7 +28,8 @@ CREATE TABLE `edgydata` (
   `c_varchar` varchar(128),
   `group` int,
   `case` varchar(1),
-  `cjson` json
+  `cjson` json,
+  `c_time` time default current_time
 ) ENGINE=MyISAM AUTO_INCREMENT=1001 DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -39,16 +40,16 @@ CREATE TABLE `edgydata` (
 LOCK TABLES `edgydata` WRITE;
 /*!40000 ALTER TABLE `edgydata` DISABLE KEYS */;
 INSERT INTO `edgydata` VALUES
-  (1, 'Lorem ipsum dolor sit amet', 10, 'A', '[]'),
-  (2, 'Thai: แผ่นดินฮั่นเสื่อมโทรมแสนสังเวช', 20, 'A', '{}'),
-  (3, 'Chinese: 和毛泽东 <<重上井冈山>>. 严永欣, 一九八八年.', null, 'B', '[{"key": "ValueOne", "actions": []}, {"key": "ValueTwo", "actions": []}]'),
-  (4, 'Special Characters: ["\\,''!@£$%^&*()]\\\\', null, 'B', null),
-  (5, '	', 20, 'B', null),
+  (1, 'Lorem ipsum dolor sit amet', 10, 'A', '[]', '23:55:01'),
+  (2, 'Thai: แผ่นดินฮั่นเสื่อมโทรมแสนสังเวช', 20, 'A', '{}', '10:00:59'),
+  (3, 'Chinese: 和毛泽东 <<重上井冈山>>. 严永欣, 一九八八年.', null, 'B', '[{"key": "ValueOne", "actions": []}, {"key": "ValueTwo", "actions": []}]', '15:36:10'),
+  (4, 'Special Characters: ["\\,''!@£$%^&*()]\\\\', null, 'B', null, '12:00:00'),
+  (5, '	', 20, 'B', null, '15:36:10'),
   (6,'Enter	The
-Ninja', 10, 'A', null),
+Ninja', 10, 'A', null, '15:36:10'),
   (7,'Liewe
-Maatjies', 20, 'A', null),
-  (8,'Liewe	Maatjies', 10, null, '[{"key": "Value''s One", "actions": []},{"key": "Value\U00000027s Two", "actions": []}]')
+Maatjies', 20, 'A', null, '09:16:10'),
+  (8,'Liewe	Maatjies', 10, null, '[{"key": "Value''s One", "actions": []},{"key": "Value\U00000027s Two", "actions": []}]', '00:30:00')
 ;
 
 /*!40000 ALTER TABLE `edgydata` ENABLE KEYS */;
@@ -301,7 +302,8 @@ CREATE TABLE `all_datatypes` (
     c_date          DATE,
     c_datetime      DATETIME,
     c_timestamp     TIMESTAMP,
-    c_json          JSON
+    c_json          JSON,
+    c_time          TIME
 )
 ENGINE=MyISAM AUTO_INCREMENT=0 DEFAULT CHARSET=utf8;
 
@@ -338,7 +340,8 @@ INSERT INTO all_datatypes (c_char,
                            c_date,
                            c_datetime,
                            c_timestamp,
-                           c_json)
+                           c_json,
+                           c_time)
 VALUES ('x',
         'c_varchar',
         X'01',
@@ -366,7 +369,8 @@ VALUES ('x',
         '2020-06-01',
         '2100-06-01 10:00:00',
         '2020-06-01 10:00:00',
-        '{"k1": "value", "k2": 10}'
+        '{"k1": "value", "k2": 10}',
+        '13:11:45'
 );
 /*!40000 ALTER TABLE `all_datatypes` ENABLE KEYS */;
 UNLOCK TABLES;
