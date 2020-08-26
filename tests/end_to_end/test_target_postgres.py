@@ -84,15 +84,15 @@ class TestTargetPostgres:
         self.run_query_tap_mysql('ALTER table weight_unit change column bool_col is_imperial bool;')
         self.run_query_tap_mysql('UPDATE weight_unit SET is_imperial = false WHERE weight_unit_name like \'%oz%\'')
 
-        self.run_query_tap_mysql('INSERT INTO edgydata VALUES'
-                                 '(10, \'Lorem ipsum dolor sit amet\', 10, \'A\', \'[]\', \'00:00:00\'),'
-                                 '(11, \'Thai: แผ่นดินฮั่นเสื่อมโทรมแสนสังเวช\', 20, \'A\', \'{}\', \'12:00:59\'),'
-                                 '(12, \'Chinese: 和毛泽东 <<重上井冈山>>. 严永欣, 一九八八年.\', null,\'B\', '
+        self.run_query_tap_mysql('INSERT INTO edgydata (c_varchar, `group`, `case`, cjson, c_time) VALUES'
+                                 '(\'Lorem ipsum dolor sit amet\', 10, \'A\', \'[]\', \'00:00:00\'),'
+                                 '(\'Thai: แผ่นดินฮั่นเสื่อมโทรมแสนสังเวช\', 20, \'A\', \'{}\', \'12:00:59\'),'
+                                 '(\'Chinese: 和毛泽东 <<重上井冈山>>. 严永欣, 一九八八年.\', null,\'B\', '
                                  '\'[{"key": "ValueOne", "actions": []}, {"key": "ValueTwo", "actions": []}]\','
                                  ' \'9:1:00\'),'
-                                 '(13, \'Special Characters: [\"\\,''!@£$%^&*()]\\\\\', null, \'B\', '
+                                 '(\'Special Characters: [\"\\,''!@£$%^&*()]\\\\\', null, \'B\', '
                                  'null, \'12:00:00\'),'
-                                 '(14, \'	\', 20, \'B\', null, \'15:36:10\')')
+                                 '(\'	\', 20, \'B\', null, \'15:36:10\')')
 
         #  INCREMENTAL
         self.run_query_tap_mysql('INSERT INTO address(isactive, street_number, date_created, date_updated,'
