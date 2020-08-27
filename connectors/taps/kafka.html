@@ -261,20 +261,25 @@ db_conn:
   <span class="c1"># --------------------------------------------------------------------------</span>
   <span class="c1"># Optionally you can define primary key(s) from the kafka JSON messages.</span>
   <span class="c1"># If primary keys defined then extra column(s) will be added to the output</span>
-  <span class="c1"># singer stream with the extracted values by JSONPath selectors.</span>
+  <span class="c1"># singer stream with the extracted values by /slashed/paths ala XPath selectors.</span>
   <span class="c1"># --------------------------------------------------------------------------</span>
   primary_keys:
-     transfer_id: <span class="s2">&quot;</span>$<span class="s2">.transferMetadata.transferId&quot;</span>
+     transfer_id: <span class="s2">&quot;/transferMetadata/transferId&quot;</span>
 
   <span class="c1"># --------------------------------------------------------------------------</span>
   <span class="c1"># Kafka Consumer optional parameters</span>
   <span class="c1"># --------------------------------------------------------------------------</span>
   <span class="c1">#max_runtime_ms: 300000                   # The maximum time for the tap to collect new messages from Kafka topic.</span>
-  <span class="c1">#consumer_timeout_ms: 10000               # Number of milliseconds to block during message iteration before raising StopIteration</span>
-  <span class="c1">#session_timeout_ms: 30000                # The timeout used to detect failures when using Kafka’s group management facilities.</span>
-  <span class="c1">#heartbeat_interval_ms: 10000             # The expected time in milliseconds between heartbeats to the consumer coordinator when using Kafka’s group management facilities.</span>
-  <span class="c1">#max_poll_interval_ms: 300000             # The maximum delay between invocations of poll() when using consumer group management.</span>
+  <span class="c1">#consumer_timeout_ms: 10000               # KafkaConsumer setting. Number of milliseconds to block during message iteration before raising StopIteration</span>
+  <span class="c1">#session_timeout_ms: 30000                # KafkaConsumer setting. The timeout used to detect failures when using Kafka’s group management facilities.</span>
+  <span class="c1">#heartbeat_interval_ms: 10000             # KafkaConsumer setting. The expected time in milliseconds between heartbeats to the consumer coordinator when using Kafka’s group management facilities.</span>
+  <span class="c1">#max_poll_interval_ms: 300000             # KafkaConsumer setting. The maximum delay between invocations of poll() when using consumer group management.</span>
+  <span class="c1">#max_poll_records: 500                    # KafkaConsumer setting. The maximum number of records returned in a single call to poll().</span>
+
+  <span class="c1">#commit_interval_ms: 5000                 # Number of milliseconds between two commits. This is different than the kafka auto commit feature. Tap-kafka sends commit messages automatically but only when the data consumed successfully and persisted to local store.</span>
   <span class="c1">#local_store_dir: ./tap-kafka-local-store # Path to the local store with consumed kafka messages</span>
+  <span class="c1">#local_store_batch_size_rows: 1000        # Number of messages to write to disk in one go. This can avoid high I/O issues when messages written to local store disk too frequently.</span>
+
 
 <span class="c1"># ------------------------------------------------------------------------------</span>
 <span class="c1"># Destination (Target) - Target properties</span>
