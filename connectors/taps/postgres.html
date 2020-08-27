@@ -330,6 +330,15 @@ db_conn:
   <span class="c1">#filter_schemas: &quot;schema1,schema2&quot;   # Optional: Scan only the required schemas</span>
                                        <span class="c1">#           to improve the performance of</span>
                                        <span class="c1">#           data extraction</span>
+  <span class="c1">#max_run_seconds                     # Optional: Stop running the tap after certain</span>
+                                       <span class="c1">#           number of seconds</span>
+                                       <span class="c1">#           Default: 43200</span>
+  <span class="c1">#logical_poll_total_seconds:         # Optional: Stop running the tap when no data</span>
+                                       <span class="c1">#           received from wal after certain number of seconds</span>
+                                       <span class="c1">#           Default: 10800</span>
+  <span class="c1">#break_at_end_lsn:                   # Optional: Stop running the tap if the newly received lsn</span>
+                                       <span class="c1">#           is after the max lsn that was detected when the tap started</span>
+                                       <span class="c1">#           Default: true</span>
 
 
 <span class="c1"># ------------------------------------------------------------------------------</span>
