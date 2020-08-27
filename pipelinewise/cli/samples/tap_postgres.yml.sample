@@ -22,6 +22,15 @@ db_conn:
   #filter_schemas: "schema1,schema2"   # Optional: Scan only the required schemas
                                        #           to improve the performance of
                                        #           data extraction
+  #max_run_seconds                     # Optional: Stop running the tap after certain
+                                       #           number of seconds
+                                       #           Default: 43200
+  #logical_poll_total_seconds:         # Optional: Stop running the tap when no data
+                                       #           received from wal after certain number of seconds
+                                       #           Default: 10800
+  #break_at_end_lsn:                   # Optional: Stop running the tap if the newly received lsn
+                                       #           is after the max lsn that was detected when the tap started
+                                       #           Default: true
 
 
 # ------------------------------------------------------------------------------

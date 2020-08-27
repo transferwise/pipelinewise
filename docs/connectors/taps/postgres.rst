@@ -152,7 +152,7 @@ Example YAML for ``tap-postgres``:
                                            #           received from wal after certain number of seconds
                                            #           Default: 10800
       #break_at_end_lsn:                   # Optional: Stop running the tap if the newly received lsn
-                                           #           is after the max lsn that was detected when the tap startup
+                                           #           is after the max lsn that was detected when the tap started
                                            #           Default: true
 
 
