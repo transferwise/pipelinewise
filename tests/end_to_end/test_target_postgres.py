@@ -169,6 +169,11 @@ class TestTargetPostgres:
                                                       'updated_at',
                                                       'ppw_e2e_tap_postgres."table_with_space and uppercase"')
 
+        result = self.run_query_target_postgres(
+            'SELECT updated_at FROM ppw_e2e_tap_postgres."table_with_space and uppercase" where cvarchar=\'M\';')[0][0]
+
+        assert result == datetime(2019, 12, 31, 22, 53, 56, 800000)
+
     @pytest.mark.dependency(depends=['import_config'])
     def test_replicate_s3_to_pg(self):
         """Replicate csv files from s3 to Postgres"""

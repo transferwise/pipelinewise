@@ -151,6 +151,12 @@ class TestTargetSnowflake:
                                                       'updated_at',
                                                       'ppw_e2e_tap_postgres."TABLE_WITH_SPACE AND UPPERCASE"')
 
+
+        result = self.run_query_target_snowflake(
+            'SELECT updated_at FROM ppw_e2e_tap_postgres."TABLE_WITH_SPACE AND UPPERCASE" where cvarchar=\'X\';')[0][0]
+
+        assert result == datetime(2019, 12, 31, 22, 53, 56, 800000)
+
     @pytest.mark.dependency(depends=['import_config'])
     def test_replicate_s3_to_sf(self):
         """Replicate csv files from s3 to Snowflake, check if return code is zero and success log file created"""
