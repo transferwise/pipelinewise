@@ -173,6 +173,15 @@ PipelineWise can replicate data from the following data sources:
 
         :ref:`tap-mongodb`
 
+    .. container:: tile
+
+        .. container:: img-hover-zoom
+
+          .. image:: img/github-logo.png
+             :target: connectors/taps/github.html
+
+        :ref:`tap-github`
+
 
 Target (Destination Connectors)
 -------------------------------
