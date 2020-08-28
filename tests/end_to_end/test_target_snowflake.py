@@ -121,10 +121,18 @@ class TestTargetSnowflake:
         # Run tap first time - both fastsync and a singer should be triggered
         assertions.assert_run_tap_success(TAP_POSTGRES_ID, TARGET_ID, ['fastsync', 'singer'])
         assertions.assert_row_counts_equal(self.run_query_tap_postgres, self.run_query_target_snowflake)
-        assertions.assert_all_columns_exist(self.run_query_tap_postgres, self.e2e.run_query_target_snowflake)
+        assertions.assert_all_columns_exist(self.run_query_tap_postgres, self.run_query_target_snowflake)
+        assertions.assert_date_column_naive_in_target(self.run_query_target_snowflake,
+                                                      'updated_at',
+                                                      'ppw_e2e_tap_postgres."TABLE_WITH_SPACE AND UPPERCASE"')
 
-        # 2. Make changes in MariaDB source database
-        #  LOG_BASED - Missing due to some changes that's required in tap-postgres to test it automatically
+        # 2. Make changes in PG source database
+        #  LOG_BASED
+        self.run_query_tap_postgres('insert into public."table_with_space and UPPERCase" (cvarchar, updated_at) values '
+                                    "('X', '2020-01-01 08:53:56.8+10'),"
+                                    "('Y', '2020-12-31 12:59:00.148+00'),"
+                                    "('Z', null),"
+                                    "('W', '2020-03-03 12:30:00');")
         #  INCREMENTAL
         self.run_query_tap_postgres('INSERT INTO public.city (id, name, countrycode, district, population) '
                                     "VALUES (4080, 'Bath', 'GBR', 'England', 88859)")
@@ -138,7 +146,16 @@ class TestTargetSnowflake:
         # 3. Run tap second time - both fastsync and a singer should be triggered, there are some FULL_TABLE
         assertions.assert_run_tap_success(TAP_POSTGRES_ID, TARGET_ID, ['fastsync', 'singer'])
         assertions.assert_row_counts_equal(self.run_query_tap_postgres, self.run_query_target_snowflake)
-        assertions.assert_all_columns_exist(self.run_query_tap_postgres, self.e2e.run_query_target_snowflake)
+        assertions.assert_all_columns_exist(self.run_query_tap_postgres, self.run_query_target_snowflake)
+        assertions.assert_date_column_naive_in_target(self.run_query_target_snowflake,
+                                                      'updated_at',
+                                                      'ppw_e2e_tap_postgres."TABLE_WITH_SPACE AND UPPERCASE"')
+
+
+        result = self.run_query_target_snowflake(
+            'SELECT updated_at FROM ppw_e2e_tap_postgres."TABLE_WITH_SPACE AND UPPERCASE" where cvarchar=\'X\';')[0][0]
+
+        assert result == datetime(2019, 12, 31, 22, 53, 56, 800000)
 
     @pytest.mark.dependency(depends=['import_config'])
     def test_replicate_s3_to_sf(self):
