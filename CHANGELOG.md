@@ -2,7 +2,7 @@
 -------------------
 
 **FastSync**
-- Fixed an issue when MySQL `TIME` column type mapping was not in sync with target-postgres and target-snowflake `time` type mapping
+- Fixed an issue when MySQL `TIME` column type mapping was not in sync with target-postgres and target-snowflake `TIME` type mappings
 - Fixed an issue when Postgres `TIMESTAMP WITH TIME ZONE` columns were not mapped correctly to the UTC equivalent data types in the target
 
 **Tap Kafka**
