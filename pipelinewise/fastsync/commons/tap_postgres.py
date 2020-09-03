@@ -259,7 +259,7 @@ class FastSyncTapPostgres:
 
     def get_table_columns(self, table_name):
         """
-        Get MySQL table column details from information_schema
+        Get PG table column details from information_schema
         """
         table_dict = utils.tablename_to_dict(table_name)
         sql = """
@@ -274,6 +274,10 @@ class FastSyncTapPostgres:
                     WHEN data_type = 'ARRAY' THEN 'array_to_json("' || column_name || '") AS ' || column_name
                     WHEN udt_name = 'time' THEN 'replace("' || column_name || E'"::varchar,\\\'24:00:00\\\',\\\'00:00:00\\\') AS ' || column_name
                     WHEN udt_name = 'timetz' THEN 'replace(("' || column_name || E'" at time zone \'\'UTC\'\')::time::varchar,\\\'24:00:00\\\',\\\'00:00:00\\\') AS ' || column_name
+                    WHEN udt_name in ('timestamp', 'timestamptz') THEN
+                       'CASE WHEN "' ||column_name|| E'" < \\'0001-01-01 00:00:00.000000\\' '
+                            'OR "' ||column_name|| E'" > \\'9999-12-31 23:59:59.999\\' THEN \\'9999-12-31 23:59:59.999\\' '
+                            'ELSE "' ||column_name|| '" END AS "' ||column_name|| '"'
                     ELSE '"'||column_name||'"'
                 END AS safe_sql_value
                 FROM information_schema.columns
@@ -286,7 +290,7 @@ class FastSyncTapPostgres:
 
     def map_column_types_to_target(self, table_name):
         """
-        Map MySQL column types to equivalent types in target
+        Map PG column types to equivalent types in target
         """
         postgres_columns = self.get_table_columns(table_name)
         mapped_columns = ['{} {}'.format(safe_column_name(pc[0]),
