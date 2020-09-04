@@ -275,7 +275,7 @@ class FastSyncTapPostgres:
                     WHEN udt_name = 'time' THEN 'replace("' || column_name || E'"::varchar,\\\'24:00:00\\\',\\\'00:00:00\\\') AS ' || column_name
                     WHEN udt_name = 'timetz' THEN 'replace(("' || column_name || E'" at time zone \'\'UTC\'\')::time::varchar,\\\'24:00:00\\\',\\\'00:00:00\\\') AS ' || column_name
                     WHEN udt_name in ('timestamp', 'timestamptz') THEN
-                       'CASE WHEN "' ||column_name|| E'" < \\'0001-01-01 00:00:00.000000\\' '
+                       'CASE WHEN "' ||column_name|| E'" < \\'0001-01-01 00:00:00.000\\' '
                             'OR "' ||column_name|| E'" > \\'9999-12-31 23:59:59.999\\' THEN \\'9999-12-31 23:59:59.999\\' '
                             'ELSE "' ||column_name|| '" END AS "' ||column_name|| '"'
                     ELSE '"'||column_name||'"'
