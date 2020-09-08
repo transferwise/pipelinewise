@@ -40,9 +40,11 @@ to records - including inserts, updates, and deletes - using a database’s bina
 
 .. warning::
 
-  **Log Based** replication method is available **only for MySQL and PostgreSQL-backed** databases
-  that support binary log replication and requires manual intervention when table structures change.
+  **Log Based** replication method is available **only for MySQL, PostgreSQL and MongoDB backend** databases
+  that support log replication.
 
+.. note::
+	When using **Log Based** replication method, table structures changes are detected automatically.
 
 .. _incremental:
 

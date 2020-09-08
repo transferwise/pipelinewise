@@ -36,7 +36,7 @@ the internal state file with the bookmark for the next run.
 
 .. warning::
 
-  If you :ref:`running_from_docker` then the full path to the log files in the output is
+  If you :ref:`running in docker <running_in_docker>` then the full path to the log files in the output is
   maybe not correct. Everything that referring to ``/app/.pipelinewise/...`` in the output
   is available on your Docker host at ``${HOME}/.pipelinewise`` directory.
 

@@ -84,6 +84,16 @@ class TestTargetPostgres:
         self.run_query_tap_mysql('ALTER table weight_unit change column bool_col is_imperial bool;')
         self.run_query_tap_mysql('UPDATE weight_unit SET is_imperial = false WHERE weight_unit_name like \'%oz%\'')
 
+        self.run_query_tap_mysql('INSERT INTO edgydata (c_varchar, `group`, `case`, cjson, c_time) VALUES'
+                                 '(\'Lorem ipsum dolor sit amet\', 10, \'A\', \'[]\', \'00:00:00\'),'
+                                 '(\'Thai: แผ่นดินฮั่นเสื่อมโทรมแสนสังเวช\', 20, \'A\', \'{}\', \'12:00:59\'),'
+                                 '(\'Chinese: 和毛泽东 <<重上井冈山>>. 严永欣, 一九八八年.\', null,\'B\', '
+                                 '\'[{"key": "ValueOne", "actions": []}, {"key": "ValueTwo", "actions": []}]\','
+                                 ' \'9:1:00\'),'
+                                 '(\'Special Characters: [\"\\,''!@£$%^&*()]\\\\\', null, \'B\', '
+                                 'null, \'12:00:00\'),'
+                                 '(\'	\', 20, \'B\', null, \'15:36:10\')')
+
         #  INCREMENTAL
         self.run_query_tap_mysql('INSERT INTO address(isactive, street_number, date_created, date_updated,'
                                  ' supplier_supplier_id, zip_code_zip_code_id)'
@@ -115,6 +125,7 @@ class TestTargetPostgres:
         Same tests cases as test_replicate_mariadb_to_pg but using another tap with custom stream buffer size"""
         self.test_resync_mariadb_to_pg(tap_mariadb_id=TAP_MARIADB_BUFFERED_STREAM_ID)
 
+
     @pytest.mark.dependency(depends=['import_config'])
     def test_replicate_pg_to_pg(self):
         """Replicate data from Postgres to Postgres DWH"""
@@ -122,9 +133,18 @@ class TestTargetPostgres:
         assertions.assert_run_tap_success(TAP_POSTGRES_ID, TARGET_ID, ['fastsync', 'singer'])
         assertions.assert_row_counts_equal(self.run_query_tap_postgres, self.run_query_target_postgres)
         assertions.assert_all_columns_exist(self.run_query_tap_postgres, self.run_query_target_postgres)
+        assertions.assert_date_column_naive_in_target(self.run_query_target_postgres,
+                                                      'updated_at',
+                                                      'ppw_e2e_tap_postgres."table_with_space and uppercase"')
 
         # 2. Make changes in pg source database
-        #  LOG_BASED - Missing due to some changes that's required in tap-postgres to test it automatically
+        #  LOG_BASED
+        self.run_query_tap_postgres('insert into public."table_with_space and UPPERCase" (cvarchar, updated_at) values '
+                                    "('M', '2020-01-01 08:53:56.8+10'),"
+                                    "('N', '2020-12-31 12:59:00.148+00'),"
+                                    "('O', null),"
+                                    "('P', '2020-03-03 12:30:00');")
+
         #  INCREMENTAL
         self.run_query_tap_postgres('INSERT INTO public.city (id, name, countrycode, district, population) '
                                     "VALUES (4080, 'Bath', 'GBR', 'England', 88859)")
@@ -145,6 +165,14 @@ class TestTargetPostgres:
         assertions.assert_run_tap_success(TAP_POSTGRES_ID, TARGET_ID, ['fastsync', 'singer'])
         assertions.assert_row_counts_equal(self.run_query_tap_postgres, self.run_query_target_postgres)
         assertions.assert_all_columns_exist(self.run_query_tap_postgres, self.run_query_target_postgres)
+        assertions.assert_date_column_naive_in_target(self.run_query_target_postgres,
+                                                      'updated_at',
+                                                      'ppw_e2e_tap_postgres."table_with_space and uppercase"')
+
+        result = self.run_query_target_postgres(
+            'SELECT updated_at FROM ppw_e2e_tap_postgres."table_with_space and uppercase" where cvarchar=\'M\';')[0][0]
+
+        assert result == datetime(2019, 12, 31, 22, 53, 56, 800000)
 
     @pytest.mark.dependency(depends=['import_config'])
     def test_replicate_s3_to_pg(self):

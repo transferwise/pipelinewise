@@ -4512,8 +4512,16 @@ CREATE TABLE "table_with_space and UPPERCase"
 (
     id serial primary key,
     cvarchar varchar,
-    created_at timestamp default current_timestamp
+    created_at timestamp default current_timestamp,
+    updated_at timestamp with time zone
 );
 
 
-insert into "table_with_space and UPPERCase" (cvarchar) values ('A'), ('B'), ('C'), ('D'), ('E'), ('F'), ('G');
+insert into "table_with_space and UPPERCase" (cvarchar, updated_at)
+values ('A', '2020-01-01 08:53:56.112248-07'),
+       ('B', '2020-08-31 08:53:56.2248+11:30'),
+       ('C', '2020-08-27 00:00:00.11+00:30'),
+       ('D', '2020-02-27 12:00:00.1148-12'),
+       ('E', '2020-12-31 12:59:00.148+00'),
+       ('F', null),
+       ('G', '2020-03-03 12:30:00');

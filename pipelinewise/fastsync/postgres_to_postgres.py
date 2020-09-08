@@ -61,7 +61,7 @@ def tap_type_to_target_type(pg_type):
         'date': 'TIMESTAMP WITHOUT TIME ZONE',
         'timestamp': 'TIMESTAMP WITHOUT TIME ZONE',
         'timestamp without time zone': 'TIMESTAMP WITHOUT TIME ZONE',
-        'timestamp with time zone': 'TIMESTAMP WITH TIME ZONE',
+        'timestamp with time zone': 'TIMESTAMP WITHOUT TIME ZONE',
         'time': 'TIME WITHOUT TIME ZONE',
         'time without time zone': 'TIME WITHOUT TIME ZONE',
         'time with time zone': 'TIME WITH TIME ZONE',

@@ -255,3 +255,18 @@ def assert_all_columns_exist(tap_query_runner_fn: callable,
                                          f'Expected: {exp_col_type} '
                                          f'Actual: {act_col_type}')
                     raise
+
+def assert_date_column_naive_in_target(target_query_runner_fn, column_name, full_table_name):
+    """
+    Checks if all dates in the given column are naive,i.e no timezone
+    Args:
+        target_query_runner_fn: target query runner callable
+        column_name: column of timestamp type
+        full_table_name: fully qualified table name
+    """
+    dates = target_query_runner_fn(
+        f'SELECT {column_name} FROM {full_table_name};')
+
+    for date in dates:
+        if date[0] is not None:
+            assert date[0].tzinfo is None
