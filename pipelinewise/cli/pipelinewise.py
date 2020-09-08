@@ -557,11 +557,7 @@ class PipelineWise:
                 try:
                     stream_table_mdata_idx = [i for i, md in enumerate(stream['metadata']) if md['breadcrumb'] == []][0]
                 except Exception:
-                    stream_table_mdata_idx = 0
-                    schema['streams'][stream_idx]['metadata'].insert(0, {
-                        'breadcrumb': [],
-                        'metadata': {}
-                    })
+                    raise Exception(f'Metadata of stream {tap_stream_id} doesn\'t have an empty breadcrumb')
 
                 if tap_stream_sel:
                     self.logger.debug('Mark %s tap_stream_id as selected with properties %s', tap_stream_id,
