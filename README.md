@@ -67,10 +67,9 @@ consumes data from taps and do something with it, like load it into a file, API 
 
 ### Running from docker
 
-If you have [Docker](https://www.docker.com/) installed then using docker is the easiest and
-recommended method of start using PipelineWise.
+If you have [Docker](https://www.docker.com/) installed then using docker is the recommended and easiest method to start using PipelineWise.
 
-1. Build an executable docker images that has every required dependency and it's isolated from your host system:
+1. Build an executable docker image that has every required dependency and is isolated from your host system:
 
     ```sh
     $ docker build -t pipelinewise:latest .
@@ -82,7 +81,7 @@ recommended method of start using PipelineWise.
     $ alias pipelinewise="$(PWD)/bin/pipelinewise-docker"
     ```
 
-3. Check if the installation was successfully by running the `pipelinewise status` command:
+3. Check if the installation was successful by running the `pipelinewise status` command:
 
     ```sh
     $ pipelinewise status
@@ -101,14 +100,14 @@ You can run any pipelinewise command at this point. Tutorials to create and run 
 
 ### Building from source
 
-1. Make sure that every dependencies installed on your system:
+1. Make sure that all dependencies are installed on your system:
     * Python 3.x
     * python3-dev
     * python3-venv
     * mongo-tools
     * mbuffer
 
-2. Run the install script that installs the PipelineWise CLI and every supported singer connectors into separated virtual environments:
+2. Run the install script that installs the PipelineWise CLI and all supported singer connectors into separate virtual environments:
 
     ```sh
     $ ./install.sh --connectors=all
@@ -116,16 +115,15 @@ You can run any pipelinewise command at this point. Tutorials to create and run 
     Press `Y` to accept the license agreement of the required singer components. To automate the installation and accept every license agreement run `./install --acceptlicenses`
     Use the optional `--connectors=...,...` argument to install only a specific list of singer connectors.
 
-3. To start CLI you need to activate the CLI virtual environment and has to set `PIPELINEWISE_HOME` environment variable:
+3. To start the CLI you need to activate the CLI virtual environment and set `PIPELINEWISE_HOME` environment variable:
 
     ```sh
     $ source {ACTUAL_ABSOLUTE_PATH}/.virtualenvs/pipelinewise/bin/activate
     $ export PIPELINEWISE_HOME={ACTUAL_ABSOLUTE_PATH}
     ```
-    (The `ACTUAL_ABSOLUTE_PATH` differs on every system, the install script prints you the correct command that fits
-    to your system once the installation completed)
+    (The `ACTUAL_ABSOLUTE_PATH` differs on every system, the install script prints the correct commands once the installation completes)
 
-4. Check if the installation was successfully by running the `pipelinewise status` command:
+4. Check if the installation was successful by running the `pipelinewise status` command:
 
     ```sh
     $ pipelinewise status
@@ -135,7 +133,7 @@ You can run any pipelinewise command at this point. Tutorials to create and run 
     0 pipeline(s)
     ```
 
-You can run any pipelinewise command at this point. Tutorials to create and run pipelines is at [creating pipelines](https://transferwise.github.io/pipelinewise/installation_guide/creating_pipelines.html).
+You can run any pipelinewise command at this point. Tutorials to create and run pipelines can be found here: [creating pipelines](https://transferwise.github.io/pipelinewise/installation_guide/creating_pipelines.html).
 
 **To run unit tests**:
 
@@ -149,7 +147,7 @@ To run unit tests and generate code coverage:
 $ coverage run -m pytest --ignore tests/end_to_end && coverage report
 ```
 
-To generate HTML coverage report.
+To generate code coverage HTML report.
 
 ```
 $ coverage run -m pytest --ignore tests/end_to_end && coverage html -d coverage_html
@@ -157,16 +155,16 @@ $ coverage run -m pytest --ignore tests/end_to_end && coverage html -d coverage_
 
 **Note**: The HTML report will be generated in `coverage_html/index.html`
 
-**To run integration and end to end tests**:
+**To run integration and end-to-end tests**:
 
 To run integration and end-to-end tests you need to use the [Docker Development Environment](dev-project/README.md). This will spin up a pre-configured PipelineWise project with pre-configured source and target databases in several docker containers which is required for the end-to-end test cases.
 
 ## Developing with Docker
 
 If you have [Docker](https://www.docker.com/) and [Docker Compose](https://docs.docker.com/compose/) installed,
-you can create a local development environment that includes not only the PipelineWise executables but a
-pre-configured development project as well with some databases as source and targets for a more convenient
-development experience and to run integration and end to end tests.
+you can create a local development environment that includes not only the PipelineWise executables but also a
+pre-configured development project with some databases as source and targets for a more convenient
+development experience and to run integration and end-to-end tests.
 
 For further instructions about setting up local development environment go to
 [Test Project for Docker Development Environment](dev-project/README.md).
