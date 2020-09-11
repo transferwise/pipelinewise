@@ -2,7 +2,7 @@
 -------------------
 
 **Tap MySQL**
-- Bump `pipelinewise-tap-mongodb` to 1.3.7
+- Bump `pipelinewise-tap-mysql` to 1.3.7
     - Fixed an issue when `tap-mysql` was logging every extracted record on INFO level
     - Fixed an issue when `TIME` column types replaced the whole record
 
