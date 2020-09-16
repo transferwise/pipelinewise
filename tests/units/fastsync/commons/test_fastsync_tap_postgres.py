@@ -60,7 +60,7 @@ class TestFastSyncTapPostgres(TestCase):
         assert self.postgres.generate_replication_slot_name('some.db',
                                                             'some.tap') == 'pipelinewise_some_db_some_tap'
 
-        # Replication slots name should be truncated to 64 characters
+        # Replication slot name should be truncated to 64 characters
         assert self.postgres.generate_replication_slot_name(
             'some_db_with_an_extremely_long_name',
             'some_tap_with_an_extremely_long_name'

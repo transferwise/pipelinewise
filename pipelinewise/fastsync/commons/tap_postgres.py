@@ -2,6 +2,7 @@ import datetime
 import decimal
 import gzip
 import logging
+import re
 import psycopg2
 import psycopg2.extras
 
@@ -40,7 +41,11 @@ class FastSyncTapPostgres:
         # Convert None to empty string
         else:
             tap_id = ''
-        return f'{prefix}_{dbname}{tap_id}'.lower()
+
+        slot_name = f'{prefix}_{dbname}{tap_id}'.lower()
+
+        # Replace invalid characters and truncate to a maximum of 64 characters; required by Postgres
+        return re.sub('[^a-z0-9_]', '_', slot_name)[:64]
 
     def open_connection(self):
         """
