@@ -6,6 +6,7 @@ class FastSyncTapPostgresMock(FastSyncTapPostgres):
     """
     Mocked FastSyncTapPostgres class
     """
+
     def __init__(self, connection_config, transformation_config=None):
         super().__init__(connection_config, transformation_config)
 
@@ -26,6 +27,7 @@ class TestFastSyncTapPostgres(TestCase):
     """
     Unit tests for fastsync tap postgres
     """
+
     def setUp(self) -> None:
         """Initialise test FastSyncTapPostgres object"""
         self.postgres = FastSyncTapPostgresMock(connection_config={'dbname': 'test_database',
@@ -35,7 +37,8 @@ class TestFastSyncTapPostgres(TestCase):
     def test_generate_replication_slot_name(self):
         """Validate if the replication slot name generated correctly"""
         # Provide only database name
-        assert self.postgres.generate_replication_slot_name('some_db') == 'pipelinewise_some_db'
+        assert self.postgres.generate_replication_slot_name(
+            'some_db') == 'pipelinewise_some_db'
 
         # Provide database name and tap_id
         assert self.postgres.generate_replication_slot_name('some_db',
@@ -49,6 +52,19 @@ class TestFastSyncTapPostgres(TestCase):
         # Replication slot name should be lowercase
         assert self.postgres.generate_replication_slot_name('SoMe_DB',
                                                             'SoMe_TaP') == 'pipelinewise_some_db_some_tap'
+
+        # Invalid characters should be replaced by underscores
+        assert self.postgres.generate_replication_slot_name('some-db',
+                                                            'some-tap') == 'pipelinewise_some_db_some_tap'
+
+        assert self.postgres.generate_replication_slot_name('some.db',
+                                                            'some.tap') == 'pipelinewise_some_db_some_tap'
+
+        # Replication slots name should be truncated to 64 characters
+        assert self.postgres.generate_replication_slot_name(
+            'some_db_with_an_extremely_long_name',
+            'some_tap_with_an_extremely_long_name'
+        ) == 'pipelinewise_some_db_with_an_extremely_long_name_some_tap_with_a'
 
     def test_create_replication_slot(self):
         """Validate if replication slot creation SQL commands generated correctly"""
