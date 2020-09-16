@@ -6,7 +6,6 @@ class FastSyncTapPostgresMock(FastSyncTapPostgres):
     """
     Mocked FastSyncTapPostgres class
     """
-
     def __init__(self, connection_config, transformation_config=None):
         super().__init__(connection_config, transformation_config)
 
@@ -27,7 +26,6 @@ class TestFastSyncTapPostgres(TestCase):
     """
     Unit tests for fastsync tap postgres
     """
-
     def setUp(self) -> None:
         """Initialise test FastSyncTapPostgres object"""
         self.postgres = FastSyncTapPostgresMock(connection_config={'dbname': 'test_database',
@@ -37,8 +35,7 @@ class TestFastSyncTapPostgres(TestCase):
     def test_generate_replication_slot_name(self):
         """Validate if the replication slot name generated correctly"""
         # Provide only database name
-        assert self.postgres.generate_replication_slot_name(
-            'some_db') == 'pipelinewise_some_db'
+        assert self.postgres.generate_replication_slot_name('some_db') == 'pipelinewise_some_db'
 
         # Provide database name and tap_id
         assert self.postgres.generate_replication_slot_name('some_db',
