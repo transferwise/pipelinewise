@@ -233,7 +233,7 @@
     "stream_buffer_size": {
       "type": "integer",
       "minimum": 0,
-      "maximum": 2500
+      "maximum": 30720
     },
     "schemas": {
       "type": "array",
