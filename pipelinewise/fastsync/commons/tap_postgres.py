@@ -57,6 +57,10 @@ class FastSyncTapPostgres:
             self.connection_config.get('replica_user', self.connection_config['user']),
             self.connection_config.get('replica_password', self.connection_config['password']),
             self.connection_config['dbname'])
+        
+        if 'ssl' in self.connection_config and self.connection_config['ssl'] == 'true':
+            conn_string += " sslmode='require'"
+        
         self.conn = psycopg2.connect(conn_string)
         # Set connection to autocommit
         self.conn.autocommit = True
