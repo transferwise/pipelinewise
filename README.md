@@ -69,10 +69,12 @@ consumes data from taps and do something with it, like load it into a file, API 
 
 If you have [Docker](https://www.docker.com/) installed then using docker is the recommended and easiest method to start using PipelineWise.
 
-1. Build an executable docker image that has every required dependency and is isolated from your host system:
+1. Build an executable docker image that has every required dependency and is isolated from your host system. 
+
+By default, the image will build with *all* connectors. In order to keep image size small, we strongly recommend you change it to just the connectors you need by supplying the `--build-arg` command:
 
     ```sh
-    $ docker build -t pipelinewise:latest .
+    $ docker build --build-arg connectors=tap-mysql,target-snowflake -t pipelinewise:latest .
     ```
 
 2. Once the image is ready, create an alias to the docker wrapper script:
