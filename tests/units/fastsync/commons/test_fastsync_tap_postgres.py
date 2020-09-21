@@ -57,12 +57,6 @@ class TestFastSyncTapPostgres(TestCase):
         assert self.postgres.generate_replication_slot_name('some.db',
                                                             'some.tap') == 'pipelinewise_some_db_some_tap'
 
-        # Replication slot name should be truncated to 64 characters
-        assert self.postgres.generate_replication_slot_name(
-            'some_db_with_an_extremely_long_name',
-            'some_tap_with_an_extremely_long_name'
-        ) == 'pipelinewise_some_db_with_an_extremely_long_name_some_tap_with_a'
-
     def test_create_replication_slot(self):
         """Validate if replication slot creation SQL commands generated correctly"""
         self.postgres.create_replication_slot()

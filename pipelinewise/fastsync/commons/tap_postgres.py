@@ -44,8 +44,8 @@ class FastSyncTapPostgres:
 
         slot_name = f'{prefix}_{dbname}{tap_id}'.lower()
 
-        # Replace invalid characters and truncate to a maximum of 64 characters; required by Postgres
-        return re.sub('[^a-z0-9_]', '_', slot_name)[:64]
+        # Replace invalid characters to ensure replication slot name is in accordance with Postgres spec
+        return re.sub('[^a-z0-9_]', '_', slot_name)
 
     def open_connection(self):
         """
