@@ -32,6 +32,9 @@ class FastSyncTargetPostgres:
             self.connection_config['password'],
             self.connection_config['port']
         )
+        
+        if 'ssl' in self.connection_config and self.connection_config['ssl'] == 'true':
+            conn_string += " sslmode='require'"
 
         return psycopg2.connect(conn_string)
 
