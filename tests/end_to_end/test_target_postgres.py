@@ -137,11 +137,27 @@ class TestTargetPostgres:
                                                       'updated_at',
                                                       'ppw_e2e_tap_postgres."table_with_space and uppercase"')
 
+        result = self.run_query_target_postgres(
+            'SELECT updated_at FROM '
+            'ppw_e2e_tap_postgres."table_with_space and uppercase" '
+            'where cvarchar=\'H\';')[0][0]
+
+        assert result == datetime(9999, 12, 31, 23, 59, 59, 999000)
+
+        result = self.run_query_target_postgres(
+            'SELECT updated_at FROM '
+            'ppw_e2e_tap_postgres."table_with_space and uppercase" '
+            'where cvarchar=\'I\';')[0][0]
+
+        assert result == datetime(9999, 12, 31, 23, 59, 59, 999000)
+
         # 2. Make changes in pg source database
         #  LOG_BASED
         self.run_query_tap_postgres('insert into public."table_with_space and UPPERCase" (cvarchar, updated_at) values '
                                     "('M', '2020-01-01 08:53:56.8+10'),"
                                     "('N', '2020-12-31 12:59:00.148+00'),"
+                                    "('Year in the faaaar future', '20000-05-23 12:40:00.148'),"
+                                    "('Year in the BC', '2020-01-23 01:40:00 BC'),"
                                     "('O', null),"
                                     "('P', '2020-03-03 12:30:00');")
 
@@ -173,6 +189,21 @@ class TestTargetPostgres:
             'SELECT updated_at FROM ppw_e2e_tap_postgres."table_with_space and uppercase" where cvarchar=\'M\';')[0][0]
 
         assert result == datetime(2019, 12, 31, 22, 53, 56, 800000)
+
+        result = self.run_query_target_postgres(
+            'SELECT updated_at FROM '
+            'ppw_e2e_tap_postgres."table_with_space and uppercase" '
+            'where cvarchar=\'Year in the faaaar future\';')[0][0]
+
+        assert result == datetime(9999, 12, 31, 23, 59, 59, 999000)
+
+
+        result = self.run_query_target_postgres(
+            'SELECT updated_at FROM '
+            'ppw_e2e_tap_postgres."table_with_space and uppercase" '
+            'where cvarchar=\'Year in the BC\';')[0][0]
+
+        assert result == datetime(9999, 12, 31, 23, 59, 59, 999000)
 
     @pytest.mark.dependency(depends=['import_config'])
     def test_replicate_s3_to_pg(self):
