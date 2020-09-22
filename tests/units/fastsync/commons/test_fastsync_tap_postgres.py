@@ -50,6 +50,13 @@ class TestFastSyncTapPostgres(TestCase):
         assert self.postgres.generate_replication_slot_name('SoMe_DB',
                                                             'SoMe_TaP') == 'pipelinewise_some_db_some_tap'
 
+        # Invalid characters should be replaced by underscores
+        assert self.postgres.generate_replication_slot_name('some-db',
+                                                            'some-tap') == 'pipelinewise_some_db_some_tap'
+
+        assert self.postgres.generate_replication_slot_name('some.db',
+                                                            'some.tap') == 'pipelinewise_some_db_some_tap'
+
     def test_create_replication_slot(self):
         """Validate if replication slot creation SQL commands generated correctly"""
         self.postgres.create_replication_slot()

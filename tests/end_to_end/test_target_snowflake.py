@@ -126,11 +126,27 @@ class TestTargetSnowflake:
                                                       'updated_at',
                                                       'ppw_e2e_tap_postgres."TABLE_WITH_SPACE AND UPPERCASE"')
 
+        result = self.run_query_target_snowflake(
+            'SELECT updated_at FROM '
+            'ppw_e2e_tap_postgres."TABLE_WITH_SPACE AND UPPERCASE" '
+            'where cvarchar=\'H\';')[0][0]
+
+        assert result == datetime(9999, 12, 31, 23, 59, 59, 998993)
+
+        result = self.run_query_target_snowflake(
+            'SELECT updated_at FROM '
+            'ppw_e2e_tap_postgres."TABLE_WITH_SPACE AND UPPERCASE" '
+            'where cvarchar=\'I\';')[0][0]
+
+        assert result == datetime(9999, 12, 31, 23, 59, 59, 998993)
+
         # 2. Make changes in PG source database
         #  LOG_BASED
         self.run_query_tap_postgres('insert into public."table_with_space and UPPERCase" (cvarchar, updated_at) values '
                                     "('X', '2020-01-01 08:53:56.8+10'),"
                                     "('Y', '2020-12-31 12:59:00.148+00'),"
+                                    "('faaaar future', '15000-05-23 12:40:00.148'),"
+                                    "('BC', '2020-01-23 01:40:00 BC'),"
                                     "('Z', null),"
                                     "('W', '2020-03-03 12:30:00');")
         #  INCREMENTAL
@@ -156,6 +172,20 @@ class TestTargetSnowflake:
             'SELECT updated_at FROM ppw_e2e_tap_postgres."TABLE_WITH_SPACE AND UPPERCASE" where cvarchar=\'X\';')[0][0]
 
         assert result == datetime(2019, 12, 31, 22, 53, 56, 800000)
+
+        result = self.run_query_target_snowflake(
+            'SELECT updated_at FROM '
+            'ppw_e2e_tap_postgres."TABLE_WITH_SPACE AND UPPERCASE" '
+            'where cvarchar=\'faaaar future\';')[0][0]
+
+        assert result == datetime(9999, 12, 31, 23, 59, 59, 998993)
+
+        result = self.run_query_target_snowflake(
+            'SELECT updated_at FROM '
+            'ppw_e2e_tap_postgres."TABLE_WITH_SPACE AND UPPERCASE" '
+            'where cvarchar=\'BC\';')[0][0]
+
+        assert result == datetime(9999, 12, 31, 23, 59, 59, 998993)
 
     @pytest.mark.dependency(depends=['import_config'])
     def test_replicate_s3_to_sf(self):
