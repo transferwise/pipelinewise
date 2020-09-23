@@ -154,6 +154,9 @@ Example YAML for ``tap-postgres``:
       #break_at_end_lsn:                   # Optional: Stop running the tap if the newly received lsn
                                            #           is after the max lsn that was detected when the tap started
                                            #           Default: true
+      #ssl: "true"                         # Optional: Using SSL via postgres sslmode 'require' option.
+                                           #           If the server does not accept SSL connections or the client
+                                           #           certificate is not recognized the connection will fail
 
 
     # ------------------------------------------------------------------------------

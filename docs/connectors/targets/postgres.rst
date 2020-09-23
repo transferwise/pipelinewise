@@ -42,4 +42,7 @@ Example YAML for ``target-postgres``:
       user: "<USER>"                       # PostgreSQL user
       password: "<PASSWORD>"               # Plain string or vault encrypted
       dbname: "<DB_NAME>"                  # PostgreSQL database name
+      #ssl: "true"                         # Optional: Using SSL via postgres sslmode 'require' option.
+                                           #           If the server does not accept SSL connections or the client
+                                           #           certificate is not recognized the connection will fail
 
