@@ -339,6 +339,9 @@ db_conn:
   <span class="c1">#break_at_end_lsn:                   # Optional: Stop running the tap if the newly received lsn</span>
                                        <span class="c1">#           is after the max lsn that was detected when the tap started</span>
                                        <span class="c1">#           Default: true</span>
+  <span class="c1">#ssl: &quot;true&quot;                         # Optional: Using SSL via postgres sslmode &#39;require&#39; option.</span>
+                                       <span class="c1">#           If the server does not accept SSL connections or the client</span>
+                                       <span class="c1">#           certificate is not recognized the connection will fail</span>
 
 
 <span class="c1"># ------------------------------------------------------------------------------</span>
