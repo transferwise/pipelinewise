@@ -70,7 +70,7 @@ make_virtualenv() {
             PIP_ARGS=$PIP_ARGS"[test]"
         fi
 
-        python3 -m pip install --upgrade -e .$PIP_ARGS
+        python3 -m pip install --upgrade -e .$PIP_ARGS --use-feature=2020-resolver
     fi
 
     echo ""
