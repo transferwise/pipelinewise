@@ -1,3 +1,19 @@
+0.23.0 (2020-09-25)
+-------------------
+
+- Fixed an issue when missing empty breadcrumb in tap properties file didn't raise an exception
+- Add option to build docker images only with selected tap and target connectors
+
+**Tap Postgres**
+- Bump `pipelinewise-tap-postgres` to 1.7.0
+    - Option to enable SSL mode
+    - Fixed an issue when timestamps out of the ISO-8601 range caused some failures
+    - Fixed an issue when when postgres replication slot name not generated correctly and contained invalid characters
+
+**Target Postgres**
+- Bump `pipelinewise-target-postgres` to 2.1.0
+    - Option to enable SSL mode
+
 0.22.1 (2020-09-10)
 -------------------
 
