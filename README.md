@@ -155,7 +155,7 @@ To generate code coverage HTML report.
 $ coverage run -m pytest --ignore tests/end_to_end && coverage html -d coverage_html
 ```
 
-**Note**: The HTML report will be generated in `coverage_html/index.html`
+**Note**: The HTML report will be generated in here `coverage_html/index.html`
 
 **To run integration and end-to-end tests**:
 
