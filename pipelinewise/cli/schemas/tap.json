@@ -213,7 +213,8 @@
         "tap-jira",
         "tap-zuora",
         "tap-google-analytics",
-        "tap-github"
+        "tap-github",
+        "tap-shopify"
       ]
     },
     "db_conn": {
