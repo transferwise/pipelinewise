@@ -184,6 +184,7 @@ EXTRA_CONNECTORS=(
     tap-oracle
     tap-zuora
     tap-google-analytics
+    tap-shopify
 )
 
 # Install only the default connectors if --connectors argument not passed
