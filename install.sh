@@ -173,6 +173,7 @@ DEFAULT_CONNECTORS=(
     tap-zendesk
     tap-mongodb
     tap-github
+    tap-slack
     target-s3-csv
     target-snowflake
     target-redshift
@@ -193,7 +194,7 @@ if [[ -z $CONNECTORS ]]; then
     done
 
 
-# Install every avaliable connectors if --connectors=all passed
+# Install every available connectors if --connectors=all passed
 elif [[ $CONNECTORS == "all" ]]; then
     for i in ${DEFAULT_CONNECTORS[@]}; do
         install_connector $i
