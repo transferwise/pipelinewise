@@ -182,6 +182,17 @@ PipelineWise can replicate data from the following data sources:
 
         :ref:`tap-github`
 
+.. container:: tile-wrapper
+
+    .. container:: tile
+
+        .. container:: img-hover-zoom
+
+          .. image:: img/slack-logo.png
+             :target: connectors/taps/slack.html
+
+        :ref:`tap-slack`
+
 
 Target (Destination Connectors)
 -------------------------------
