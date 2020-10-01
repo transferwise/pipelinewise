@@ -7,7 +7,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Tap Kafka &mdash; PipelineWise  documentation</title>
+  <title>Tap Shopify &mdash; PipelineWise  documentation</title>
   
 
   
@@ -21,7 +21,7 @@
   
   
   
-    <link rel="canonical" href="https://docs.ansible.com/ansible/latest/connectors/taps/kafka.html"/>
+    <link rel="canonical" href="https://docs.ansible.com/ansible/latest/connectors/taps/shopify.html"/>
   
 
   
@@ -41,8 +41,8 @@
     
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
-    <link rel="next" title="Tap Snowflake" href="snowflake.html" />
-    <link rel="prev" title="Tap S3 CSV" href="s3_csv.html" /> 
+    <link rel="next" title="Targets (Destinations)" href="../targets.html" />
+    <link rel="prev" title="Tap Github" href="github.html" /> 
 </head>
 
 <body class="wy-body-for-nav">
@@ -126,11 +126,7 @@
 <li class="toctree-l2"><a class="reference internal" href="postgres.html">Tap PostgreSQL</a></li>
 <li class="toctree-l2"><a class="reference internal" href="oracle.html">Tap Oracle</a></li>
 <li class="toctree-l2"><a class="reference internal" href="s3_csv.html">Tap S3 CSV</a></li>
-<li class="toctree-l2 current"><a class="current reference internal" href="#">Tap Kafka</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#consuming-kafka-messages">Consuming Kafka messages</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#configuring-what-to-replicate">Configuring what to replicate</a></li>
-</ul>
-</li>
+<li class="toctree-l2"><a class="reference internal" href="kafka.html">Tap Kafka</a></li>
 <li class="toctree-l2"><a class="reference internal" href="snowflake.html">Tap Snowflake</a></li>
 <li class="toctree-l2"><a class="reference internal" href="mongodb.html">Tap MongoDB</a></li>
 <li class="toctree-l2"><a class="reference internal" href="salesforce.html">Tap Salesforce</a></li>
@@ -139,7 +135,14 @@
 <li class="toctree-l2"><a class="reference internal" href="zuora.html">Tap Zuora</a></li>
 <li class="toctree-l2"><a class="reference internal" href="google_analytics.html">Tap Google Analytics</a></li>
 <li class="toctree-l2"><a class="reference internal" href="github.html">Tap Github</a></li>
-<li class="toctree-l2"><a class="reference internal" href="shopify.html">Tap Shopify</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Tap Shopify</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#configure-access-to-your-shopify-store">Configure access to your Shopify store</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#store-subdomain">Store Subdomain</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#private-app-api-password">Private App API Password</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#start-date">Start Date</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#configuring-what-to-extract">Configuring what to extract</a></li>
+</ul>
+</li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../targets.html">Targets (Destinations)</a></li>
@@ -197,13 +200,13 @@
         
           <li><a href="../taps.html">Taps (Data Sources)</a> &raquo;</li>
         
-      <li>Tap Kafka</li>
+      <li>Tap Shopify</li>
     
     
       <li class="wy-breadcrumbs-aside">
         
             
-            <a href="../../_sources/connectors/taps/kafka.rst.txt" rel="nofollow"> View page source</a>
+            <a href="../../_sources/connectors/taps/shopify.rst.txt" rel="nofollow"> View page source</a>
           
         
       </li>
@@ -216,70 +219,80 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
             
-  <div class="section" id="tap-kafka">
-<span id="id1"></span><h1>Tap Kafka<a class="headerlink" href="#tap-kafka" title="Permalink to this headline">¶</a></h1>
-<p>Messages from kafka topics are extracted into the following fields:</p>
+  <div class="section" id="tap-shopify">
+<span id="id1"></span><h1>Tap Shopify<a class="headerlink" href="#tap-shopify" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="configure-access-to-your-shopify-store">
+<h2>Configure access to your Shopify store<a class="headerlink" href="#configure-access-to-your-shopify-store" title="Permalink to this headline">¶</a></h2>
+<p>In order to extract your Shopify data, you will need:</p>
 <ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">MESSAGE_TIMESTAMP</span></code>: Timestamp extracted from the kafka metadata</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">MESSAGE_OFFSET</span></code>: Offset extracted from the kafka metadata</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">MESSAGE_PARTITION</span></code>: Partition extracted from the kafka metadata</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">MESSAGE</span></code>: The original and full kafka message</p></li>
-<li><p><cite>Dynamic primary key columns</cite>: (Optional) Fields extracted from the Kafka JSON messages by JSONPath selector(s).</p></li>
+<li><p>Store Subdomain</p></li>
+<li><p>Private App API Password</p></li>
+<li><p>Start Date</p></li>
 </ul>
-<div class="section" id="consuming-kafka-messages">
-<h2>Consuming Kafka messages<a class="headerlink" href="#consuming-kafka-messages" title="Permalink to this headline">¶</a></h2>
-<p>Tap Kafka saves consumed messages into a local disk storage and sends commit messages to Kafka after every
-consumed message. A batching mechanism keeps maintaining of deleting and flushing messages from the local storage
-and sends singer compatible messages in small batches to standard output.</p>
 </div>
-<div class="section" id="configuring-what-to-replicate">
-<h2>Configuring what to replicate<a class="headerlink" href="#configuring-what-to-replicate" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="store-subdomain">
+<h2>Store Subdomain<a class="headerlink" href="#store-subdomain" title="Permalink to this headline">¶</a></h2>
+<p>The store subdomain can be derived from your Shopify admin URL.</p>
+<p>If your admin URL starts with <code class="code docutils literal notranslate"><span class="pre">https://my-first-store.myshopify.com/</span></code>, your store subdomain is
+<code class="code docutils literal notranslate"><span class="pre">my-first-store</span></code>.</p>
+</div>
+<div class="section" id="private-app-api-password">
+<h2>Private App API Password<a class="headerlink" href="#private-app-api-password" title="Permalink to this headline">¶</a></h2>
+<p>You need to create a <a class="reference external" href="https://help.shopify.com/en/manual/apps/private-apps">Private App</a>
+API password to extract data from your Shopify Shop:</p>
+<ol class="arabic simple">
+<li><p>Log in to your Shopify store admin at <code class="code docutils literal notranslate"><span class="pre">https://&lt;store</span> <span class="pre">subdomain&gt;.myshopify.com/admin</span></code></p></li>
+<li><p>Click “Apps” in the sidebar on the left</p></li>
+<li><p>On the bottom of the page, click “Manage private apps” next to “Working with a developer on your shop?”</p></li>
+<li><p>Click the “Create a new private app” button</p></li>
+<li><p>Enter a “Private app name” of your choosing, e.g. “Singer”</p></li>
+<li><p>Enter your email address under “Emergency developer email”</p></li>
+<li><p>In the “Admin API” section, click “▼ Review disabled Admin API permissions”</p></li>
+<li><p>Choose “Read access” rather than “No access” in the access level dropdowns for the following permissions:</p>
+<ol class="arabic simple">
+<li><p>Products, variants and collections - <code class="code docutils literal notranslate"><span class="pre">read_products,</span> <span class="pre">write_products</span></code></p></li>
+<li><p>Orders, transactions and fulfillments - <code class="code docutils literal notranslate"><span class="pre">read_orders,</span> <span class="pre">write_orders</span></code></p></li>
+<li><p>Customer details and customer groups - <code class="code docutils literal notranslate"><span class="pre">read_customers,</span> <span class="pre">write_customers</span></code></p></li>
+</ol>
+</li>
+<li><p>Click “Save”</p></li>
+<li><p>In the modal that appears, click “I understand, create the app”</p></li>
+</ol>
+<p>Once the app has been created, you can locate the API password:</p>
+<ol class="arabic simple">
+<li><p>In the “Admin API” section on the private app details page, find the “Password” field and click “Show”</p></li>
+<li><p>The value that appears (starting with <code class="code docutils literal notranslate"><span class="pre">shppa_</span></code>) is your API password.</p></li>
+</ol>
+</div>
+<div class="section" id="start-date">
+<h2>Start Date<a class="headerlink" href="#start-date" title="Permalink to this headline">¶</a></h2>
+<p>This property determines how much historical data will be extracted.</p>
+</div>
+<div class="section" id="configuring-what-to-extract">
+<h2>Configuring what to extract<a class="headerlink" href="#configuring-what-to-extract" title="Permalink to this headline">¶</a></h2>
 <p>PipelineWise configures every tap with a common structured YAML file format.
-A sample YAML for Kafka replication can be generated into a project directory by
+A sample YAML for Jira replication can be generated into a project directory by
 following the steps in the <a class="reference internal" href="../../installation_guide/creating_pipelines.html#generating-pipelines"><span class="std std-ref">Generating Sample Pipelines</span></a> section.</p>
-<p>Example YAML for <code class="docutils literal notranslate"><span class="pre">tap-kafka</span></code>:</p>
+<p>Example YAML for <code class="docutils literal notranslate"><span class="pre">tap-shopify</span></code>:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>---
 
 <span class="c1"># ------------------------------------------------------------------------------</span>
 <span class="c1"># General Properties</span>
 <span class="c1"># ------------------------------------------------------------------------------</span>
-id: <span class="s2">&quot;kafka&quot;</span>                            <span class="c1"># Unique identifier of the tap</span>
-name: <span class="s2">&quot;Kafka Topic with sample data&quot;</span>   <span class="c1"># Name of the tap</span>
-type: <span class="s2">&quot;tap-kafka&quot;</span>                      <span class="c1"># !! THIS SHOULD NOT CHANGE !!</span>
-owner: <span class="s2">&quot;somebody@foo.com&quot;</span>              <span class="c1"># Data owner to contact</span>
-<span class="c1">#send_alert: False                     # Optional: Disable all configured alerts on this tap</span>
+id: <span class="s2">&quot;shopify&quot;</span>                           <span class="c1"># Unique identifier of the tap</span>
+name: <span class="s2">&quot;Shopify&quot;</span>                         <span class="c1"># Name of the tap</span>
+type: <span class="s2">&quot;tap-shopify&quot;</span>                     <span class="c1"># !! THIS SHOULD NOT CHANGE !!</span>
+owner: <span class="s2">&quot;somebody@foo.com&quot;</span>               <span class="c1"># Data owner to contact</span>
+<span class="c1">#send_alert: False                      # Optional: Disable all configured alerts on this tap</span>
 
 
 <span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="c1"># Source (Tap) - Kafka connection details</span>
+<span class="c1"># Source (Tap) - Shopify connection details</span>
 <span class="c1"># ------------------------------------------------------------------------------</span>
 db_conn:
-  group_id: <span class="s2">&quot;myGroupId&quot;</span>
-  bootstrap_servers: <span class="s2">&quot;kafka1.foo.com:9092,kafka2.foo.com:9092,kafka3.foo.com:9092&quot;</span>
-  topic: <span class="s2">&quot;myKafkaTopic&quot;</span>
-
-
-  <span class="c1"># --------------------------------------------------------------------------</span>
-  <span class="c1"># Optionally you can define primary key(s) from the kafka JSON messages.</span>
-  <span class="c1"># If primary keys defined then extra column(s) will be added to the output</span>
-  <span class="c1"># singer stream with the extracted values by /slashed/paths ala XPath selectors.</span>
-  <span class="c1"># --------------------------------------------------------------------------</span>
-  primary_keys:
-     transfer_id: <span class="s2">&quot;/transferMetadata/transferId&quot;</span>
-
-  <span class="c1"># --------------------------------------------------------------------------</span>
-  <span class="c1"># Kafka Consumer optional parameters</span>
-  <span class="c1"># --------------------------------------------------------------------------</span>
-  <span class="c1">#max_runtime_ms: 300000                   # The maximum time for the tap to collect new messages from Kafka topic.</span>
-  <span class="c1">#consumer_timeout_ms: 10000               # KafkaConsumer setting. Number of milliseconds to block during message iteration before raising StopIteration</span>
-  <span class="c1">#session_timeout_ms: 30000                # KafkaConsumer setting. The timeout used to detect failures when using Kafka’s group management facilities.</span>
-  <span class="c1">#heartbeat_interval_ms: 10000             # KafkaConsumer setting. The expected time in milliseconds between heartbeats to the consumer coordinator when using Kafka’s group management facilities.</span>
-  <span class="c1">#max_poll_interval_ms: 300000             # KafkaConsumer setting. The maximum delay between invocations of poll() when using consumer group management.</span>
-  <span class="c1">#max_poll_records: 500                    # KafkaConsumer setting. The maximum number of records returned in a single call to poll().</span>
-
-  <span class="c1">#commit_interval_ms: 5000                 # Number of milliseconds between two commits. This is different than the kafka auto commit feature. Tap-kafka sends commit messages automatically but only when the data consumed successfully and persisted to local store.</span>
-  <span class="c1">#local_store_dir: ./tap-kafka-local-store # Path to the local store with consumed kafka messages</span>
-  <span class="c1">#local_store_batch_size_rows: 1000        # Number of messages to write to disk in one go. This can avoid high I/O issues when messages written to local store disk too frequently.</span>
+  shop: <span class="s2">&quot;&lt;STORE SUBDOMAIN&gt;&quot;</span>               <span class="c1"># Shopify Store Subdomain</span>
+  api_key: <span class="s2">&quot;&lt;PRIVATE API KEY PASSWORD&gt;&quot;</span>   <span class="c1"># Shopify Private App API Password</span>
+  start_date: <span class="s2">&quot;2019-01-01&quot;</span>                <span class="c1"># Sync data from this date onwards</span>
 
 
 <span class="c1"># ------------------------------------------------------------------------------</span>
@@ -289,28 +302,41 @@ db_conn:
 target: <span class="s2">&quot;snowflake&quot;</span>                       <span class="c1"># ID of the target connector where the data will be loaded</span>
 batch_size_rows: <span class="m">20000</span>                    <span class="c1"># Batch size for the stream to optimise load performance</span>
 stream_buffer_size: <span class="m">0</span>                     <span class="c1"># In-memory buffer size (MB) between taps and targets for asynchronous data pipes</span>
-default_target_schema: <span class="s2">&quot;kafka&quot;</span>            <span class="c1"># Target schema where the data will be loaded</span>
-default_target_schema_select_permission:  <span class="c1"># Optional: Grant SELECT on schema and tables that created</span>
-  - grp_stats
+default_target_schema: <span class="s2">&quot;shopify&quot;</span>          <span class="c1"># Target schema where the data will be loaded</span>
 
 
 <span class="c1"># ------------------------------------------------------------------------------</span>
 <span class="c1"># Source to target Schema mapping</span>
 <span class="c1"># ------------------------------------------------------------------------------</span>
 schemas:
-  - source_schema: <span class="s2">&quot;kafka&quot;</span>             <span class="c1"># This is mandatory, but can be anything in this tap type</span>
-    target_schema: <span class="s2">&quot;kafka&quot;</span>             <span class="c1"># Target schema in the destination Data Warehouse</span>
 
-    <span class="c1"># Kafka topic to replicate into destination Data Warehouse</span>
-    <span class="c1"># You can load data only from one kafka topic in one YAML file.</span>
-    <span class="c1"># If you want load from multiple kafka topics, create another tap YAML similar to this file</span>
+  - source_schema: <span class="s2">&quot;shopify&quot;</span>             <span class="c1"># This is mandatory, but can be anything in this tap type</span>
+    target_schema: <span class="s2">&quot;shopify&quot;</span>             <span class="c1"># Target schema in the destination Data Warehouse</span>
+    <span class="c1">#target_schema_select_permissions:    # Optional: Grant SELECT on schema and tables that created</span>
+    <span class="c1">#  - grp_stats</span>
+
+    <span class="c1"># List of Github tables to load into destination Data Warehouse</span>
+    <span class="c1"># Tap-Github will use the best incremental strategies automatically to replicate data</span>
     tables:
-      - table_name: <span class="s2">&quot;my_kafka_topic&quot;</span>   <span class="c1"># target table name needs to match to the topic name in snake case format</span>
+      <span class="c1"># Supported tables</span>
+      - table_name: <span class="s2">&quot;orders&quot;</span>
+      - table_name: <span class="s2">&quot;customers&quot;</span>
+      - table_name: <span class="s2">&quot;products&quot;</span>
+      - table_name: <span class="s2">&quot;transactions&quot;</span>
 
-        <span class="c1"># OPTIONAL: Load time transformations</span>
+
+      <span class="c1"># Additional supported tables</span>
+      <span class="c1">#- table_name: &quot;custom_collections&quot;</span>
+      <span class="c1">#- table_name: &quot;abandoned_checkouts&quot;</span>
+      <span class="c1">#- table_name: &quot;metafields&quot;</span>
+      <span class="c1">#- table_name: &quot;order_refunds&quot;</span>
+      <span class="c1">#- table_name: &quot;collects&quot;</span>
+
+
+        <span class="c1"># OPTIONAL: Load time transformations - you can add it to any table</span>
         <span class="c1">#transformations:</span>
-        <span class="c1">#  - column: &quot;last_name&quot;            # Column to transform</span>
-        <span class="c1">#    type: &quot;SET-NULL&quot;               # Transformation type</span>
+        <span class="c1">#  - column: &quot;some_column_to_transform&quot; # Column to transform</span>
+        <span class="c1">#    type: &quot;SET-NULL&quot;                   # Transformation type</span>
 </pre></div>
 </div>
 </div>
@@ -324,10 +350,10 @@ schemas:
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
-        <a href="snowflake.html" class="btn btn-neutral float-right" title="Tap Snowflake" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+        <a href="../targets.html" class="btn btn-neutral float-right" title="Targets (Destinations)" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
       
       
-        <a href="s3_csv.html" class="btn btn-neutral float-left" title="Tap S3 CSV" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+        <a href="github.html" class="btn btn-neutral float-left" title="Tap Github" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
       
     </div>
   
