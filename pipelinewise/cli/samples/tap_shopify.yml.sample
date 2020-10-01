@@ -1,0 +1,63 @@
+---
+
+# ------------------------------------------------------------------------------
+# General Properties
+# ------------------------------------------------------------------------------
+id: "shopify"                           # Unique identifier of the tap
+name: "Shopify"                         # Name of the tap
+type: "tap-shopify"                     # !! THIS SHOULD NOT CHANGE !!
+owner: "somebody@foo.com"               # Data owner to contact
+#send_alert: False                      # Optional: Disable all configured alerts on this tap
+
+
+# ------------------------------------------------------------------------------
+# Source (Tap) - Shopify connection details
+# ------------------------------------------------------------------------------
+db_conn:
+  shop: "<STORE SUBDOMAIN>"               # Shopify Store Subdomain
+  api_key: "<PRIVATE API KEY PASSWORD>"   # Shopify Private App API Password
+  start_date: "2019-01-01"                # Sync data from this date onwards
+
+
+# ------------------------------------------------------------------------------
+# Destination (Target) - Target properties
+# Connection details should be in the relevant target YAML file
+# ------------------------------------------------------------------------------
+target: "snowflake"                       # ID of the target connector where the data will be loaded
+batch_size_rows: 20000                    # Batch size for the stream to optimise load performance
+stream_buffer_size: 0                     # In-memory buffer size (MB) between taps and targets for asynchronous data pipes
+default_target_schema: "shopify"          # Target schema where the data will be loaded
+
+
+# ------------------------------------------------------------------------------
+# Source to target Schema mapping
+# ------------------------------------------------------------------------------
+schemas:
+
+  - source_schema: "shopify"             # This is mandatory, but can be anything in this tap type
+    target_schema: "shopify"             # Target schema in the destination Data Warehouse
+    #target_schema_select_permissions:    # Optional: Grant SELECT on schema and tables that created
+    #  - grp_stats
+
+    # List of Github tables to load into destination Data Warehouse
+    # Tap-Github will use the best incremental strategies automatically to replicate data
+    tables:
+      # Supported tables
+      - table_name: "orders"
+      - table_name: "customers"
+      - table_name: "products"
+      - table_name: "transactions"
+
+
+      # Additional supported tables
+      #- table_name: "custom_collections"
+      #- table_name: "abandoned_checkouts"
+      #- table_name: "metafields"
+      #- table_name: "order_refunds"
+      #- table_name: "collects"
+
+
+        # OPTIONAL: Load time transformations - you can add it to any table
+        #transformations:
+        #  - column: "some_column_to_transform" # Column to transform
+        #    type: "SET-NULL"                   # Transformation type

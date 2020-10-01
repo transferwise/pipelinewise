@@ -147,6 +147,17 @@ PipelineWise can replicate data from the following data sources:
 
         :ref:`tap-github`
 
+.. container:: tile-wrapper
+
+    .. container:: tile
+
+        .. container:: img-hover-zoom
+
+          .. image:: ../img/shopify-logo.png
+             :target: taps/shopify.html
+
+        :ref:`tap-shopify`
+
 Configuring taps
 ----------------
 .. toctree::
@@ -165,3 +176,4 @@ Configuring taps
    taps/zuora
    taps/google_analytics
    taps/github
+   taps/shopify
