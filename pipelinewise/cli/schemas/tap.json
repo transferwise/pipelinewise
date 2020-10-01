@@ -214,6 +214,7 @@
         "tap-zuora",
         "tap-google-analytics",
         "tap-github",
+        "tap-shopify",
         "tap-slack"
       ]
     },
