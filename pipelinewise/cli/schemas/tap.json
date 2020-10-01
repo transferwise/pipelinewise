@@ -214,7 +214,8 @@
         "tap-zuora",
         "tap-google-analytics",
         "tap-github",
-        "tap-shopify"
+        "tap-shopify",
+        "tap-slack"
       ]
     },
     "db_conn": {

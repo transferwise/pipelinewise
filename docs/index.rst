@@ -190,8 +190,17 @@ PipelineWise can replicate data from the following data sources:
 
           .. image:: img/shopify-logo.png
              :target: connectors/taps/shopify.html
-             
+
         :ref:`tap-shopify`
+
+    .. container:: tile
+
+        .. container:: img-hover-zoom
+
+          .. image:: img/slack-logo.png
+             :target: connectors/taps/slack.html
+
+        :ref:`tap-slack`
 
 
 Target (Destination Connectors)
