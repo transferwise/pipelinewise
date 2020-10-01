@@ -7,7 +7,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Tap Github &mdash; PipelineWise  documentation</title>
+  <title>Tap Slack &mdash; PipelineWise  documentation</title>
   
 
   
@@ -21,7 +21,7 @@
   
   
   
-    <link rel="canonical" href="https://docs.ansible.com/ansible/latest/connectors/taps/github.html"/>
+    <link rel="canonical" href="https://docs.ansible.com/ansible/latest/connectors/taps/slack.html"/>
   
 
   
@@ -41,8 +41,8 @@
     
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
-    <link rel="next" title="Tap Shopify" href="shopify.html" />
-    <link rel="prev" title="Tap Google Analytics" href="google_analytics.html" /> 
+    <link rel="next" title="Targets (Destinations)" href="../targets.html" />
+    <link rel="prev" title="Tap Shopify" href="shopify.html" /> 
 </head>
 
 <body class="wy-body-for-nav">
@@ -134,13 +134,13 @@
 <li class="toctree-l2"><a class="reference internal" href="jira.html">Tap Jira</a></li>
 <li class="toctree-l2"><a class="reference internal" href="zuora.html">Tap Zuora</a></li>
 <li class="toctree-l2"><a class="reference internal" href="google_analytics.html">Tap Google Analytics</a></li>
-<li class="toctree-l2 current"><a class="current reference internal" href="#">Tap Github</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#configure-your-github-account">Configure your GitHub account</a></li>
+<li class="toctree-l2"><a class="reference internal" href="github.html">Tap Github</a></li>
+<li class="toctree-l2"><a class="reference internal" href="shopify.html">Tap Shopify</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Tap Slack</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#configure-your-slack-workspace">Configure your Slack workspace</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#configuring-what-to-extract">Configuring what to extract</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="shopify.html">Tap Shopify</a></li>
-<li class="toctree-l2"><a class="reference internal" href="slack.html">Tap Slack</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../targets.html">Targets (Destinations)</a></li>
@@ -198,13 +198,13 @@
         
           <li><a href="../taps.html">Taps (Data Sources)</a> &raquo;</li>
         
-      <li>Tap Github</li>
+      <li>Tap Slack</li>
     
     
       <li class="wy-breadcrumbs-aside">
         
             
-            <a href="../../_sources/connectors/taps/github.rst.txt" rel="nofollow"> View page source</a>
+            <a href="../../_sources/connectors/taps/slack.rst.txt" rel="nofollow"> View page source</a>
           
         
       </li>
@@ -217,29 +217,47 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
             
-  <div class="section" id="tap-github">
-<span id="id1"></span><h1>Tap Github<a class="headerlink" href="#tap-github" title="Permalink to this headline">¶</a></h1>
-<div class="section" id="configure-your-github-account">
-<h2>Configure your GitHub account<a class="headerlink" href="#configure-your-github-account" title="Permalink to this headline">¶</a></h2>
-<p>You need to create a GitHub access token to extract data from the Github API. Login to your
-GitHub account, go to the <a class="reference external" href="https://github.com/settings/tokens">Personal Access Tokens</a>
-settings page, and generate a new token with at least the <cite>repo</cite> scope. Save this
-access token, you’ll need it for the next step.</p>
+  <div class="section" id="tap-slack">
+<span id="id1"></span><h1>Tap Slack<a class="headerlink" href="#tap-slack" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="configure-your-slack-workspace">
+<h2>Configure your Slack workspace<a class="headerlink" href="#configure-your-slack-workspace" title="Permalink to this headline">¶</a></h2>
+<p>The tap requires a <a class="reference external" href="https://api.slack.com/authentication/token-types#granular_bot">Slack Bot user token</a>
+to interact with your Slack workspace. You can obtain a token for a single workspace by creating a new
+<a class="reference external" href="https://api.slack.com/apps?new_app=1">Slack App</a> in your workspace and assigning it the relevant
+<a class="reference external" href="https://api.slack.com/docs/oauth-scopes">scopes</a>.</p>
+<dl class="simple">
+<dt>As of right now, the minimum required scopes for this App are:</dt><dd><ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">channels:history</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">channels:join</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">channels:read</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">files:read</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">groups:read</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">links:read</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">reactions:read</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">remote_files:read</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">remote_files:write</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">team:read</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">usergroups:read</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">users.profile:read</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">users:read</span></code></p></li>
+</ul>
+</dd>
+</dl>
 </div>
 <div class="section" id="configuring-what-to-extract">
 <h2>Configuring what to extract<a class="headerlink" href="#configuring-what-to-extract" title="Permalink to this headline">¶</a></h2>
 <p>PipelineWise configures every tap with a common structured YAML file format.
 A sample YAML for Jira replication can be generated into a project directory by
 following the steps in the <a class="reference internal" href="../../installation_guide/creating_pipelines.html#generating-pipelines"><span class="std std-ref">Generating Sample Pipelines</span></a> section.</p>
-<p>Example YAML for <code class="docutils literal notranslate"><span class="pre">tap-github</span></code>:</p>
+<p>Example YAML for <code class="docutils literal notranslate"><span class="pre">tap-slack</span></code>:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>---
 
 <span class="c1"># ------------------------------------------------------------------------------</span>
 <span class="c1"># General Properties</span>
 <span class="c1"># ------------------------------------------------------------------------------</span>
-id: <span class="s2">&quot;github&quot;</span>                           <span class="c1"># Unique identifier of the tap</span>
-name: <span class="s2">&quot;Github&quot;</span>                         <span class="c1"># Name of the tap</span>
-type: <span class="s2">&quot;tap-github&quot;</span>                     <span class="c1"># !! THIS SHOULD NOT CHANGE !!</span>
+id: <span class="s2">&quot;slack&quot;</span>                            <span class="c1"># Unique identifier of the tap</span>
+name: <span class="s2">&quot;Slack&quot;</span>                          <span class="c1"># Name of the tap</span>
+type: <span class="s2">&quot;tap-slack&quot;</span>                      <span class="c1"># !! THIS SHOULD NOT CHANGE !!</span>
 owner: <span class="s2">&quot;somebody@foo.com&quot;</span>              <span class="c1"># Data owner to contact</span>
 <span class="c1">#send_alert: False                     # Optional: Disable all configured alerts on this tap</span>
 
@@ -248,9 +266,22 @@ owner: <span class="s2">&quot;somebody@foo.com&quot;</span>              <span c
 <span class="c1"># Source (Tap) - Github connection details</span>
 <span class="c1"># ------------------------------------------------------------------------------</span>
 db_conn:
-  access_token: <span class="s2">&quot;&lt;ACCESS_TOKEN&gt;&quot;</span>            <span class="c1"># Github access token with at least the repo scope</span>
-  repository: <span class="s2">&quot;transferwise/pipelinewise&quot;</span>   <span class="c1"># Path to one or multiple repositories that you want to extract data from</span>
-                                            <span class="c1"># Each repo path should be space delimited.</span>
+  token: <span class="s2">&quot;&lt;SLACK_TOKEN&gt;&quot;</span>                    <span class="c1"># Slack API token</span>
+  start_date: <span class="s2">&quot;2020-09-01&quot;</span>                  <span class="c1"># Start date. Data will be synced incrementally starting from this data</span>
+
+  <span class="c1">#channels: [&quot;ID1&quot;, &quot;ID2&quot;, &quot;ID3&quot;]          # Optional: By default, the tap will sync all channels it has been invited to.</span>
+                                            <span class="c1"># However, you can limit the tap to sync only the channels you specify by</span>
+                                            <span class="c1"># adding their IDs to the config</span>
+  <span class="c1">#exclude_archived: &quot;false&quot;                # Optional: You can control whether or not the tap will sync archived channels</span>
+                                            <span class="c1"># by including the following in the tap config</span>
+  <span class="c1">#private_channels: &quot;false&quot;                # Optional:, you can also specify whether you want to sync private</span>
+                                            <span class="c1"># channels. By default private channels not synced</span>
+  <span class="c1">#join_public_channels: &quot;false&quot;            # Optional: Auto-join every public channel.</span>
+                                            <span class="c1"># If you do not elect to have the tap join all public channels you must</span>
+                                            <span class="c1"># invite the bot to all channels you wish to sync.</span>
+  <span class="c1">#date_window_size: &quot;5&quot;                    # Optional: Due to the potentially high volume of data when syncing certain streams</span>
+                                            <span class="c1"># (messages, files, threads) this tap implements date windowing based on</span>
+                                            <span class="c1"># a configuration parameter.</span>
 
 <span class="c1"># ------------------------------------------------------------------------------</span>
 <span class="c1"># Destination (Target) - Target properties</span>
@@ -259,7 +290,7 @@ db_conn:
 target: <span class="s2">&quot;snowflake&quot;</span>                       <span class="c1"># ID of the target connector where the data will be loaded</span>
 batch_size_rows: <span class="m">20000</span>                    <span class="c1"># Batch size for the stream to optimise load performance</span>
 stream_buffer_size: <span class="m">0</span>                     <span class="c1"># In-memory buffer size (MB) between taps and targets for asynchronous data pipes</span>
-default_target_schema: <span class="s2">&quot;github&quot;</span>            <span class="c1"># Target schema where the data will be loaded</span>
+default_target_schema: <span class="s2">&quot;slack&quot;</span>            <span class="c1"># Target schema where the data will be loaded</span>
 <span class="c1">#default_target_schema_select_permission:  # Optional: Grant SELECT on schema and tables that created</span>
 <span class="c1">#  - grp_power</span>
 
@@ -269,39 +300,26 @@ default_target_schema: <span class="s2">&quot;github&quot;</span>            <sp
 <span class="c1"># ------------------------------------------------------------------------------</span>
 schemas:
 
-  - source_schema: <span class="s2">&quot;github&quot;</span>             <span class="c1"># This is mandatory, but can be anything in this tap type</span>
-    target_schema: <span class="s2">&quot;github&quot;</span>             <span class="c1"># Target schema in the destination Data Warehouse</span>
+  - source_schema: <span class="s2">&quot;slack&quot;</span>              <span class="c1"># This is mandatory, but can be anything in this tap type</span>
+    target_schema: <span class="s2">&quot;slack&quot;</span>              <span class="c1"># Target schema in the destination Data Warehouse</span>
     target_schema_select_permissions:   <span class="c1"># Optional: Grant SELECT on schema and tables that created</span>
       - grp_stats
 
-    <span class="c1"># List of Github tables to load into destination Data Warehouse</span>
-    <span class="c1"># Tap-Github will use the best incremental strategies automatically to replicate data</span>
+    <span class="c1"># List of Slack tables to load into destination Data Warehouse</span>
+    <span class="c1"># Tap-Slack will use the best incremental strategies automatically to replicate data</span>
     tables:
       <span class="c1"># Supported tables</span>
-      - table_name: <span class="s2">&quot;commits&quot;</span>
-      - table_name: <span class="s2">&quot;commit_comments&quot;</span>
-      - table_name: <span class="s2">&quot;pull_requests&quot;</span>
-      - table_name: <span class="s2">&quot;pull_request_reviews&quot;</span>
-      - table_name: <span class="s2">&quot;events&quot;</span>
-      - table_name: <span class="s2">&quot;pr_commits&quot;</span>
-      - table_name: <span class="s2">&quot;reviews&quot;</span>
-      - table_name: <span class="s2">&quot;review_comments&quot;</span>
-      - table_name: <span class="s2">&quot;comments&quot;</span>
-      - table_name: <span class="s2">&quot;issues&quot;</span>
-      - table_name: <span class="s2">&quot;issue_labels&quot;</span>
-      - table_name: <span class="s2">&quot;issue_milestones&quot;</span>
-      - table_name: <span class="s2">&quot;releases&quot;</span>
-      - table_name: <span class="s2">&quot;assignees&quot;</span>
-      - table_name: <span class="s2">&quot;collaborators&quot;</span>
-      - table_name: <span class="s2">&quot;stargazers&quot;</span>
+      - table_name: <span class="s2">&quot;channels&quot;</span>
+      - table_name: <span class="s2">&quot;users&quot;</span>
+      - table_name: <span class="s2">&quot;channel_members&quot;</span>
+      - table_name: <span class="s2">&quot;messages&quot;</span>
+      - table_name: <span class="s2">&quot;threads&quot;</span>
+      - table_name: <span class="s2">&quot;user_groups&quot;</span>
+      - table_name: <span class="s2">&quot;teams&quot;</span>
 
       <span class="c1"># Additional supported tables</span>
-      <span class="c1">#- table_name: &quot;projects&quot;</span>
-      <span class="c1">#- table_name: &quot;project_cards&quot;</span>
-      <span class="c1">#- table_name: &quot;project_columns&quot;</span>
-      <span class="c1">#- table_name: &quot;teams&quot;</span>
-      <span class="c1">#- table_name: &quot;team_memberships&quot;</span>
-      <span class="c1">#- table_name: &quot;team_members&quot;</span>
+      <span class="c1">#- table_name: &quot;files&quot;</span>
+      <span class="c1">#- table_name: &quot;remote_files&quot;</span>
 
         <span class="c1"># OPTIONAL: Load time transformations - you can add it to any table</span>
         <span class="c1">#transformations:</span>
@@ -320,10 +338,10 @@ schemas:
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
-        <a href="shopify.html" class="btn btn-neutral float-right" title="Tap Shopify" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+        <a href="../targets.html" class="btn btn-neutral float-right" title="Targets (Destinations)" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
       
       
-        <a href="google_analytics.html" class="btn btn-neutral float-left" title="Tap Google Analytics" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+        <a href="shopify.html" class="btn btn-neutral float-left" title="Tap Shopify" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
       
     </div>
   

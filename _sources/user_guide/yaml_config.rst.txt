@@ -26,6 +26,7 @@ YAML configuration
   * :ref:`tap-zendesk`
   * :ref:`tap-zuora`
   * :ref:`tap-github`
+  * :ref:`tap-slack`
   * :ref:`tap-shopify`
   * :ref:`target-postgres`
   * :ref:`target-redshift`
