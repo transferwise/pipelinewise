@@ -1,3 +1,13 @@
+0.24.0 (2020-10-01)
+-------------------
+
+- Add tap-slack
+- Add tap-shopify
+
+**Tap MongoDB**
+- Bump `pipelinewise-tap-mongodb` to 1.2.0
+    - Add support for SRV urls
+
 0.23.0 (2020-09-25)
 -------------------
 
