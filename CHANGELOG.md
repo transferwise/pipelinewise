@@ -1,3 +1,12 @@
+0.24.1 (2020-10-02)
+-------------------
+
+- Exit as failure when another instance of the tap is running or the tap is not enabled
+
+**Tap Slack**
+- Bump `pipelinewise-tap-slack` to 1.0.1
+    - Fixed an issue when `thread_ts` values were not populated correctly in `messages` and `threads` streams
+
 0.24.0 (2020-10-01)
 -------------------
 
