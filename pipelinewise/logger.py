@@ -9,7 +9,7 @@ class Logger:
     """PipelineWise logger class"""
 
     def __init__(self, debug: bool = False) -> None:
-        # Use custom logging configuration if LOGGING_CONF_FILE env var define
+        # Use custom logging configuration if LOGGING_CONF_FILE env var defined
         if 'LOGGING_CONF_FILE' in os.environ and os.environ['LOGGING_CONF_FILE']:
             path = os.environ['LOGGING_CONF_FILE']
         # Use the the embedded logging_debug.conf config if PipelineWise started in debug mode
