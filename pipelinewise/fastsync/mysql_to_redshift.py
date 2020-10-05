@@ -9,11 +9,12 @@ import multiprocessing
 from typing import Union
 
 from datetime import datetime
+from ..logger import Logger
 from .commons import utils
 from .commons.tap_mysql import FastSyncTapMySql
 from .commons.target_redshift import FastSyncTargetRedshift
 
-LOGGER = logging.getLogger(__name__)
+LOGGER = Logger().get_logger(__name__)
 
 REQUIRED_CONFIG_KEYS = {
     'tap': [
