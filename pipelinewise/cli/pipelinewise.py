@@ -41,7 +41,6 @@ class PipelineWise:
         self.config_dir = config_dir
         self.venv_dir = venv_dir
         self.extra_log = args.extra_log
-        self.debug = args.debug
         self.pipelinewise_bin = os.path.join(self.venv_dir, 'cli', 'bin', 'pipelinewise')
         self.config_path = os.path.join(self.config_dir, 'config.json')
         self.load_config()
@@ -831,7 +830,7 @@ class PipelineWise:
             return update_state_file(line)
 
         # Run command with update_state_file as a callback to call for every stdout line
-        if self.extra_log or self.debug:
+        if self.extra_log:
             commands.run_command(command, self.tap_run_log_file, update_state_file_with_extra_log)
         else:
             commands.run_command(command, self.tap_run_log_file, update_state_file)
@@ -868,7 +867,7 @@ class PipelineWise:
             sys.stdout.write(line)
             return line
 
-        if self.extra_log or self.debug:
+        if self.extra_log:
             # Run command and copy fastsync output to main logger
             commands.run_command(command, self.tap_run_log_file, add_fastsync_output_to_main_logger)
         else:
