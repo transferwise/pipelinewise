@@ -237,6 +237,8 @@ on the database, schema and tables that you want to replicate:</p>
 <li><p><code class="docutils literal notranslate"><span class="pre">GRANT</span> <span class="pre">SELECT</span> <span class="pre">ON</span> <span class="pre">ALL</span> <span class="pre">TABLES</span> <span class="pre">IN</span> <span class="pre">SCHEMA</span> <span class="pre">&lt;schema_name&gt;</span> <span class="pre">TO</span> <span class="pre">pipelinewise</span></code></p></li>
 </ul>
 </div></blockquote>
+<p>In order for pipelinewise user to automatically be able to access any tables created in the future, we recommend running the following query:</p>
+<p><code class="docutils literal notranslate"><span class="pre">ALTER</span> <span class="pre">DEFAULT</span> <span class="pre">PRIVILEGES</span> <span class="pre">IN</span> <span class="pre">SCHEMA</span> <span class="pre">&lt;schema_name&gt;</span> <span class="pre">GRANT</span> <span class="pre">SELECT</span> <span class="pre">ON</span> <span class="pre">TABLES</span> <span class="pre">TO</span> <span class="pre">pipelinewise;</span></code></p>
 <p><strong>Step 3: Configure Log-based Incremental Replication</strong></p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
