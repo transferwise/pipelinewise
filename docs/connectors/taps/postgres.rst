@@ -24,6 +24,9 @@ on the database, schema and tables that you want to replicate:
     * ``GRANT USAGE ON SCHEMA <schema_name> TO pipelinewise``
     * ``GRANT SELECT ON ALL TABLES IN SCHEMA <schema_name> TO pipelinewise``
 
+In order for pipelinewise user to automatically be able to access any tables created in the future, we recommend running the following query:
+    * ``ALTER DEFAULT PRIVILEGES IN SCHEMA <schema_name> GRANT SELECT ON TABLES TO pipelinewise;``
+
 **Step 3: Configure Log-based Incremental Replication**
 
 .. note::
