@@ -92,7 +92,8 @@ class TestTargetPostgres:
                                  ' \'9:1:00\'),'
                                  '(\'Special Characters: [\"\\,''!@£$%^&*()]\\\\\', null, \'B\', '
                                  'null, \'12:00:00\'),'
-                                 '(\'	\', 20, \'B\', null, \'15:36:10\')')
+                                 '(\'	\', 20, \'B\', null, \'15:36:10\'),'
+                                 '(CONCAT(CHAR(0x0000 using utf16), \'<- null char\'), 20, \'B\', null, \'15:36:10\')')
 
         #  INCREMENTAL
         self.run_query_tap_mysql('INSERT INTO address(isactive, street_number, date_created, date_updated,'

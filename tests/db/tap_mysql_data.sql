@@ -44,7 +44,7 @@ INSERT INTO `edgydata` VALUES
   (2, 'Thai: แผ่นดินฮั่นเสื่อมโทรมแสนสังเวช', 20, 'A', '{}', '10:00:59'),
   (3, 'Chinese: 和毛泽东 <<重上井冈山>>. 严永欣, 一九八八年.', null, 'B', '[{"key": "ValueOne", "actions": []}, {"key": "ValueTwo", "actions": []}]', '15:36:10'),
   (4, 'Special Characters: ["\\,''!@£$%^&*()]\\\\', null, 'B', null, '12:00:00'),
-  (5, '	', 20, 'B', null, '15:36:10'),
+  (5, CONCAT(' <- space ', CHAR(0x0000 using utf16), '<- null char'), 20, 'B', null, '15:36:10'),
   (6,'Enter	The
 Ninja', 10, 'A', null, '15:36:10'),
   (7,'Liewe
