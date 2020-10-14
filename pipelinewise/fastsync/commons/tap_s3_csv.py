@@ -138,33 +138,50 @@ class FastSyncTapS3Csv:
         s3_file_handle = S3Helper.get_file_handle(self.connection_config, s3_path)
 
         # pylint:disable=protected-access
-        headers.update(s3_file_handle._raw_stream.readline().strip().split(table_spec.get('delimiter', ',')))
-
-        # pylint:disable=protected-access
-        s3_file_handle._raw_stream.seek(0)
-
-        # pylint:disable=protected-access
         iterator = singer_encodings_csv.get_row_iterator(s3_file_handle._raw_stream, table_spec)
 
-        for row in iterator:
-            now_datetime = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f')
-            custom_columns = {
-                S3Helper.SDC_SOURCE_BUCKET_COLUMN: bucket,
-                S3Helper.SDC_SOURCE_FILE_COLUMN: s3_path,
-                S3Helper.SDC_SOURCE_LINENO_COLUMN: next(count),
-                '_SDC_EXTRACTED_AT': now_datetime,
-                '_SDC_BATCHED_AT': now_datetime,
-                '_SDC_DELETED_AT': None
-            }
+        headers.update(
+            map(safe_column_name, s3_file_handle._raw_stream.readline().strip().decode('utf8').split(table_spec.get('delimiter', ',')))
+        )
 
-            new_row = {}
+        headers.update({
+            S3Helper.SDC_SOURCE_BUCKET_COLUMN,
+            S3Helper.SDC_SOURCE_FILE_COLUMN,
+            S3Helper.SDC_SOURCE_LINENO_COLUMN,
+            '_SDC_EXTRACTED_AT',
+            '_SDC_BATCHED_AT',
+            '_SDC_DELETED_AT'
+        })
 
-            # make all columns safe
-            # pylint: disable=invalid-name
-            for k, v in row.items():
-                new_row[safe_column_name(k)] = v
+        s3_file_handle.close()
 
-            yield {**new_row, **custom_columns}
+        def get_rows():
+            s3_file_handle = S3Helper.get_file_handle(self.connection_config, s3_path)
+
+            # pylint:disable=protected-access
+            iterator = singer_encodings_csv.get_row_iterator(s3_file_handle._raw_stream, table_spec)
+
+            for row in iterator:
+                now_datetime = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f')
+                custom_columns = {
+                    S3Helper.SDC_SOURCE_BUCKET_COLUMN: bucket,
+                    S3Helper.SDC_SOURCE_FILE_COLUMN: s3_path,
+                    S3Helper.SDC_SOURCE_LINENO_COLUMN: next(count),
+                    '_SDC_EXTRACTED_AT': now_datetime,
+                    '_SDC_BATCHED_AT': now_datetime,
+                    '_SDC_DELETED_AT': None
+                }
+
+                new_row = {}
+
+                # make all columns safe
+                # pylint: disable=invalid-name
+                for k, v in row.items():
+                    new_row[safe_column_name(k)] = v
+
+                yield {**new_row, **custom_columns}
+
+        return get_rows()
 
 
     def map_column_types_to_target(self, filepath: str, table: str):
