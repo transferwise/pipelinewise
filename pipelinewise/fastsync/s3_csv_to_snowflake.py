@@ -54,67 +54,67 @@ def tap_type_to_target_type(csv_type):
 
 def sync_table(table_name: str, args: Namespace) -> Union[bool, str]:
     """Sync one table"""
-    s3_csv = FastSyncTapS3Csv(args.tap, tap_type_to_target_type)
-    snowflake = FastSyncTargetSnowflake(args.target, args.transform)
+    with FastSyncTapS3Csv(args.tap, tap_type_to_target_type) as s3_csv:
+        snowflake = FastSyncTargetSnowflake(args.target, args.transform)
 
-    try:
-        filename = 'pipelinewise_fastsync_{}_{}_{}.csv.gz'.format(args.tap['bucket'], table_name,
-                                                                  time.strftime('%Y%m%d-%H%M%S'))
-        filepath = os.path.join(args.temp_dir, filename)
-
-        target_schema = utils.get_target_schema(args.target, table_name)
-
-        s3_csv.copy_table(table_name, filepath)
-        size_bytes = os.path.getsize(filepath)
-
-        snowflake_types = s3_csv.map_column_types_to_target(filepath, table_name)
-        snowflake_columns = snowflake_types.get('columns', [])
-        primary_key = snowflake_types['primary_key']
-
-        # Uploading to S3
-        s3_key = snowflake.upload_to_s3(filepath, table_name, tmp_dir=args.temp_dir)
-        os.remove(filepath)
-
-        # Creating temp table in Snowflake
-        snowflake.create_schema(target_schema)
-        snowflake.create_table(target_schema,
-                               table_name,
-                               snowflake_columns,
-                               primary_key,
-                               is_temporary=True,
-                               sort_columns=True)
-
-        # Load into Snowflake table
-        snowflake.copy_to_table(s3_key, target_schema, table_name, size_bytes, is_temporary=True, skip_csv_header=True)
-
-        # Obfuscate columns
-        snowflake.obfuscate_columns(target_schema, table_name)
-
-        # Create target table and swap with the temp table in Snowflake
-        snowflake.create_table(target_schema, table_name, snowflake_columns, primary_key, sort_columns=True)
-        snowflake.swap_tables(target_schema, table_name)
-
-        # Get bookmark
-        bookmark = utils.get_bookmark_for_table(table_name, args.properties, s3_csv)
-
-        # Save bookmark to singer state file
-        # Lock to ensure that only one process writes the same state file at a time
-        LOCK.acquire()
         try:
-            utils.save_state_file(args.state, table_name, bookmark)
-        finally:
-            LOCK.release()
+            filename = 'pipelinewise_fastsync_{}_{}_{}.csv.gz'.format(args.tap['bucket'], table_name,
+                                                                      time.strftime('%Y%m%d-%H%M%S'))
+            filepath = os.path.join(args.temp_dir, filename)
 
-        # Table loaded, grant select on all tables in target schema
-        grantees = utils.get_grantees(args.target, table_name)
-        utils.grant_privilege(target_schema, grantees, snowflake.grant_usage_on_schema)
-        utils.grant_privilege(target_schema, grantees, snowflake.grant_select_on_schema)
+            target_schema = utils.get_target_schema(args.target, table_name)
 
-        return True
+            s3_csv.copy_table(table_name, filepath)
+            size_bytes = os.path.getsize(filepath)
 
-    except Exception as exc:
-        LOGGER.exception(exc)
-        return f'{table_name}: {exc}'
+            snowflake_types = s3_csv.map_column_types_to_target(filepath, table_name)
+            snowflake_columns = snowflake_types.get('columns', [])
+            primary_key = snowflake_types['primary_key']
+
+            # Uploading to S3
+            s3_key = snowflake.upload_to_s3(filepath, table_name, tmp_dir=args.temp_dir)
+            os.remove(filepath)
+
+            # Creating temp table in Snowflake
+            snowflake.create_schema(target_schema)
+            snowflake.create_table(target_schema,
+                                   table_name,
+                                   snowflake_columns,
+                                   primary_key,
+                                   is_temporary=True,
+                                   sort_columns=True)
+
+            # Load into Snowflake table
+            snowflake.copy_to_table(s3_key, target_schema, table_name, size_bytes, is_temporary=True, skip_csv_header=True)
+
+            # Obfuscate columns
+            snowflake.obfuscate_columns(target_schema, table_name)
+
+            # Create target table and swap with the temp table in Snowflake
+            snowflake.create_table(target_schema, table_name, snowflake_columns, primary_key, sort_columns=True)
+            snowflake.swap_tables(target_schema, table_name)
+
+            # Get bookmark
+            bookmark = utils.get_bookmark_for_table(table_name, args.properties, s3_csv)
+
+            # Save bookmark to singer state file
+            # Lock to ensure that only one process writes the same state file at a time
+            LOCK.acquire()
+            try:
+                utils.save_state_file(args.state, table_name, bookmark)
+            finally:
+                LOCK.release()
+
+            # Table loaded, grant select on all tables in target schema
+            grantees = utils.get_grantees(args.target, table_name)
+            utils.grant_privilege(target_schema, grantees, snowflake.grant_usage_on_schema)
+            utils.grant_privilege(target_schema, grantees, snowflake.grant_select_on_schema)
+
+            return True
+
+        except Exception as exc:
+            LOGGER.exception(exc)
+            return f'{table_name}: {exc}'
 
 
 def main_impl():

@@ -45,6 +45,22 @@ class FastSyncTapS3Csv:
         self.tap_type_to_target_type = tap_type_to_target_type
         self.tables_last_modified = {}
 
+    def __enter__(self):
+        # We observed data whose field size exceeded the default maximum of
+        # 131072. We believe the primary consequence of the following setting
+        # is that a malformed, wide CSV would potentially parse into a single
+        # large field rather than giving this error, but we also think the
+        # chances of that are very small and at any rate the source data would
+        # need to be fixed. The other consequence of this could be larger
+        # memory consumption but that's acceptable as well.
+        csv.field_size_limit(sys.maxsize)
+        self._field_size_limit = csv.field_size_limit
+        csv.field_size_limit = lambda size: None
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        csv.field_size_limit = self._field_size_limit
+
     def _find_table_spec_by_name(self, table_name: str) -> Dict:
         # look in tables array for the full specs dict of given table
         return next(filter(lambda x: x['table_name'] == table_name, self.connection_config['tables']))
@@ -117,15 +133,6 @@ class FastSyncTapS3Csv:
         bucket = self.connection_config['bucket']
 
         s3_file_handle = S3Helper.get_file_handle(self.connection_config, s3_path)
-
-        # We observed data whose field size exceeded the default maximum of
-        # 131072. We believe the primary consequence of the following setting
-        # is that a malformed, wide CSV would potentially parse into a single
-        # large field rather than giving this error, but we also think the
-        # chances of that are very small and at any rate the source data would
-        # need to be fixed. The other consequence of this could be larger
-        # memory consumption but that's acceptable as well.
-        csv.field_size_limit(sys.maxsize)
 
         # pylint:disable=protected-access
         iterator = singer_encodings_csv.get_row_iterator(s3_file_handle._raw_stream, table_spec)
