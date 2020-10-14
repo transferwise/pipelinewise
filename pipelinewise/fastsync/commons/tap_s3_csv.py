@@ -3,11 +3,12 @@ import gzip
 import logging
 import re
 import sys
+import itertools
 import boto3
 
 from datetime import datetime
 from time import struct_time
-from typing import Callable, Dict, List, Optional, Set
+from typing import Callable, Dict, List, Optional, Set, Iterator
 from botocore.credentials import DeferredRefreshableCredentials
 from messytables import (CSVTableSet, headers_guess, headers_processor, jts, offset_processor, type_guess)
 from singer.utils import strptime_with_tz
@@ -85,9 +86,11 @@ class FastSyncTapS3Csv:
         s3_files = S3Helper.get_input_files_for_table(self.connection_config, table_spec, modified_since)
 
         # variable to hold all the records from all matching files
-        records = []
+        records = itertools.chain()
         # variable to hold the set of column names from all matching files
         headers = set()
+        # generator for count to use within the record iterators
+        count = itertools.count(start=1)
 
         # given that there might be several files matching the search pattern
         # we want to keep the most recent date one of them was modified to use it as state bookmark
@@ -96,7 +99,7 @@ class FastSyncTapS3Csv:
         for s3_file in s3_files:
 
             # this function will add records to the `records` list passed to it and add to the `headers` set as well
-            self._get_file_records(s3_file['key'], table_spec, records, headers)
+            records = itertools.chain(records, self._get_file_records(s3_file['key'], table_spec, headers, count))
 
             # check if the current file has the most recent modification date
             if max_last_modified is None or max_last_modified < s3_file['last_modified']:
@@ -120,31 +123,33 @@ class FastSyncTapS3Csv:
             writer.writerows(records)
 
     # pylint: disable=too-many-locals
-    def _get_file_records(self, s3_path: str, table_spec: Dict, records: List[Dict], headers: Set) -> None:
+    def _get_file_records(self, s3_path: str, table_spec: Dict, headers: Set, count: Iterator[int]) -> Iterator[dict]:
         """
         Reads the file in s3_path and inserts the rows in records
         :param config: tap connection configuration
         :param s3_path: full path of file in S3 bucket
         :param table_spec: dict of table with its specs
-        :param records: list into which to insert the rows from file
         :param headers: set to update with any new column names
-        :return: None
+        :param count: record count
+        :return: Iterator[dict]
         """
         bucket = self.connection_config['bucket']
 
         s3_file_handle = S3Helper.get_file_handle(self.connection_config, s3_path)
 
+        headers.update(s3_file_handle.readline().strip().split(table_spec.get('delimiter', ',')))
+
+        s3_file_handle.seek(0)
+
         # pylint:disable=protected-access
         iterator = singer_encodings_csv.get_row_iterator(s3_file_handle._raw_stream, table_spec)
-
-        records_copied = len(records)
 
         for row in iterator:
             now_datetime = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f')
             custom_columns = {
                 S3Helper.SDC_SOURCE_BUCKET_COLUMN: bucket,
                 S3Helper.SDC_SOURCE_FILE_COLUMN: s3_path,
-                S3Helper.SDC_SOURCE_LINENO_COLUMN: records_copied + 1,
+                S3Helper.SDC_SOURCE_LINENO_COLUMN: next(count),
                 '_SDC_EXTRACTED_AT': now_datetime,
                 '_SDC_BATCHED_AT': now_datetime,
                 '_SDC_DELETED_AT': None
@@ -157,12 +162,8 @@ class FastSyncTapS3Csv:
             for k, v in row.items():
                 new_row[safe_column_name(k)] = v
 
-            record = {**new_row, **custom_columns}
+            yield {**new_row, **custom_columns}
 
-            records.append(record)
-            headers.update(record.keys())
-
-            records_copied += 1
 
     def map_column_types_to_target(self, filepath: str, table: str):
 
@@ -200,7 +201,7 @@ class FastSyncTapS3Csv:
         :return: a Zip object where each tuple has two elements: the first is the column name and the second is the type
         """
         with gzip.open(csv_file_path, 'rb') as csvfile:
-            table_set = CSVTableSet(csvfile)
+            table_set = CSVTableSet(csvfile, window=1)
 
             row_set = table_set.tables[0]
 
