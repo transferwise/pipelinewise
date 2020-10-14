@@ -217,7 +217,7 @@ class FastSyncTapMySql:
                                     THEN concat('CASE WHEN `' , column_name , '` is null THEN null WHEN `' , column_name , '` = 0 THEN 0 ELSE 1 END')
                             WHEN column_name = 'raw_data_hash'
                                     THEN concat('REPLACE(hex(`', column_name, '`)', ", '\n', ' ')")
-                            ELSE concat('REPLACE(cast(`', column_name, '` AS char CHARACTER SET utf8)', ", '\n', ' ')")
+                            ELSE concat('REPLACE(REPLACE(cast(`', column_name, '` AS char CHARACTER SET utf8)', ", '\n', ' '), '\0', '')")
                                 END AS safe_sql_value,
                             ordinal_position
                     FROM information_schema.columns
