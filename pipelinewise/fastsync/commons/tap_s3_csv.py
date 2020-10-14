@@ -202,7 +202,7 @@ class FastSyncTapS3Csv:
 
             row_set.register_processor(offset_processor(offset + 1))
 
-            types = list(map(jts.celltype_as_string, type_guess(row_set.sample, strict=True)))
+            types = ['string' for header in headers]
             return zip(headers, types)
 
     # pylint: disable=invalid-name
