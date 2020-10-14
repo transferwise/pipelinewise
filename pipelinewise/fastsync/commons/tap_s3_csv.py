@@ -137,9 +137,11 @@ class FastSyncTapS3Csv:
 
         s3_file_handle = S3Helper.get_file_handle(self.connection_config, s3_path)
 
-        headers.update(s3_file_handle.readline().strip().split(table_spec.get('delimiter', ',')))
+        # pylint:disable=protected-access
+        headers.update(s3_file_handle._raw_stream.readline().strip().split(table_spec.get('delimiter', ',')))
 
-        s3_file_handle.seek(0)
+        # pylint:disable=protected-access
+        s3_file_handle._raw_stream.seek(0)
 
         # pylint:disable=protected-access
         iterator = singer_encodings_csv.get_row_iterator(s3_file_handle._raw_stream, table_spec)
