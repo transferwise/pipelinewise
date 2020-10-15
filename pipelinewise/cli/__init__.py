@@ -4,6 +4,8 @@ PipelineWise CLI
 import argparse
 import os
 import sys
+import copy
+import logging
 
 from pkg_resources import get_distribution
 from ..logger import Logger
@@ -29,6 +31,26 @@ COMMANDS = [
     'validate',
     'encrypt_string',
 ]
+
+def __init_logger(log_file=None, debug=False):
+    """
+    Initialise logger and update its handlers and level accordingly
+    """
+    # get logger for pipelinewise
+    logger = Logger(debug).get_logger('pipelinewise')
+
+    # copy log configuration: level and formatter
+    level = logger.level
+    formatter = copy.deepcopy(logger.handlers[0].formatter)
+
+    # Create log file handler if required
+    if log_file and log_file != '*':
+        file_handler = logging.FileHandler(log_file)
+        file_handler.setLevel(level)
+        file_handler.setFormatter(formatter)
+
+        logger.addHandler(file_handler)
+
 
 # pylint: disable=too-many-branches,too-many-statements
 def main():
@@ -114,7 +136,7 @@ def main():
             sys.exit(1)
 
     # Init logger
-    Logger(debug=args.debug).get_logger('pipelinewise')
+    __init_logger(args.log, args.debug)
 
     ppw_instance = PipelineWise(args, CONFIG_DIR, VENV_DIR)
     getattr(ppw_instance, args.command)()
