@@ -822,8 +822,11 @@ class PipelineWise:
 
             return line
 
+        # Singer tap is running in subprocess.
+        # Collect the formatted logs and log it in the main PipelineWise process as well.
+        # Logs are already formatted at this stage so not using logging functions to avoid double formatting.
         def update_state_file_with_extra_log(line: str) -> str:
-            self.logger.info(line.rstrip('\n'))
+            sys.stdout.write(line)
             return update_state_file(line)
 
         # Run command with update_state_file as a callback to call for every stdout line
@@ -857,8 +860,11 @@ class PipelineWise:
                 'Log file detected in running status at %s', log_dir)
             sys.exit(1)
 
+        # Fastsync is running in subprocess.
+        # Collect the formatted logs and log it in the main PipelineWise process as well
+        # Logs are already formatted at this stage so not using logging functions to avoid double formatting.
         def add_fastsync_output_to_main_logger(line: str) -> str:
-            self.logger.info(line.rstrip('\n'))
+            sys.stdout.write(line)
             return line
 
         if self.extra_log:

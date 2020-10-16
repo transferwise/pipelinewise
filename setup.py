@@ -71,7 +71,8 @@ setup(name='pipelinewise',
               'pipelinewise/cli/schemas/*.json'
           ],
           'pipelinewise': [
-              'logging.conf'
+              'logging.conf',
+              'logging_debug.conf'
           ]
       },
       include_package_data=True)
