@@ -74,6 +74,7 @@ Example YAML for tap-zendesk:
           - table_name: "ticket_fields"
           - table_name: "ticket_metrics"
           - table_name: "users"
+          - table_name: "calls"
 
             # OPTIONAL: Load time transformations
             #transformations:                    
