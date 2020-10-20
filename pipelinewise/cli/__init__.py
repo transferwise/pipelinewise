@@ -65,11 +65,12 @@ def __init_profiler(profiler_arg: bool, logger: logging.Logger) -> Tuple[Optiona
     """
     Initialise profiling environment by creating a cprofile.Profiler instance, a folder where pstats can be dumped
     Args:
-        profiler_arg:
-        logger:
+        profiler_arg: the value of profiler argument passed when running the command
+        logger: a logger instance
 
     Returns:
-
+        If profiling enabled, a tuple of profiler instance and profiling directory where the stats files
+        would be dumped, otherwise, a tuple of nulls
     """
     if profiler_arg:
         logger.info('Profiling mode enabled')
