@@ -179,7 +179,8 @@
       "type": "string",
       "not": {
         "enum": [
-          "tmp"
+          "tmp",
+          "profiling"
         ]
       }
     },

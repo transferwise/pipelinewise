@@ -11,7 +11,7 @@ from . import utils
 from .errors import StreamBufferTooLargeException
 
 LOGGER = logging.getLogger(__name__)
-DEFAULT_STREAM_BUFFER_SIZE = 0          # Disabled by default
+DEFAULT_STREAM_BUFFER_SIZE = 0  # Disabled by default
 DEFAULT_STREAM_BUFFER_BIN = 'mbuffer'
 MIN_STREAM_BUFFER_SIZE = 10
 MAX_STREAM_BUFFER_SIZE = 2500
@@ -20,9 +20,9 @@ STATUS_RUNNING = 'running'
 STATUS_FAILED = 'failed'
 STATUS_SUCCESS = 'success'
 
-TapParams = namedtuple('TapParams', ['type', 'bin', 'config', 'properties', 'state'])
-TargetParams = namedtuple('TargetParams', ['type', 'bin', 'config'])
-TransformParams = namedtuple('TransformParams', ['bin', 'config'])
+TapParams = namedtuple('TapParams', ['id', 'type', 'bin', 'python_bin', 'config', 'properties', 'state'])
+TargetParams = namedtuple('TargetParams', ['id', 'type', 'bin', 'python_bin', 'config'])
+TransformParams = namedtuple('TransformParams', ['bin', 'python_bin', 'config', 'tap_id', 'target_id'])
 
 
 class RunCommandException(Exception):
@@ -56,59 +56,73 @@ def exists_and_executable(bin_path: str) -> bool:
     return True
 
 
-def build_tap_command(tap_type: str, tap_bin: str, config: str, properties: str, state: str = None) -> str:
+def build_tap_command(tap: TapParams,
+                      profiling_mode: bool = False,
+                      profiling_dir: str = None) -> str:
     """
     Builds a command that starts a singer tap connector with the
     required command line arguments
 
     Args:
-        tap_type: One of tap types defined in tap_properties.py
-        tap_bin: path the tap python executable
-        config: path to config json file
-        properties: path to the properties json file
-        state: path to the state json file
-
+        tap: TapParams instance with all the tap config details
+        profiling_mode: Flag to indicate whether build the command with profiling
+        profiling_dir: directory where profiling output should be dumped
     Returns:
         string of command line executable
     """
     # Following the singer spec the catalog JSON file needs to be passed by the --catalog argument
     # However some tap (i.e. tap-mysql and tap-postgres) requires it as --properties
     # This is probably for historical reasons and need to clarify on Singer slack channels
-    catalog_argument = utils.get_tap_property_by_tap_type(tap_type, 'tap_catalog_argument')
+    catalog_argument = utils.get_tap_property_by_tap_type(tap.type, 'tap_catalog_argument')
 
     state_arg = ''
-    if state and os.path.isfile(state):
-        state_arg = f'--state {state}'
+    if tap.state and os.path.isfile(tap.state):
+        state_arg = f'--state {tap.state}'
 
-    tap_command = f'{tap_bin} --config {config} {catalog_argument} {properties} {state_arg}'
+    tap_command = f'{tap.bin} --config {tap.config} {catalog_argument} {tap.properties} {state_arg}'
+
+    if profiling_mode:
+        dump_file = os.path.join(profiling_dir, f'tap_{tap.id}.pstat')
+        tap_command = f'{tap.python_bin} -m cProfile -o {dump_file} {tap_command}'
+
     return tap_command
 
 
-def build_target_command(target_bin: str, config: str) -> str:
+def build_target_command(target: TargetParams,
+                         profiling_mode: bool = False,
+                         profiling_dir: str = None) -> str:
     """
     Builds a command that starts a singer target connector with the
     required command line arguments
 
     Args:
-        target_bin: path the target python executable
-        config: path to config json file
-
+        target: TargetParams instance with all the target config details
+        profiling_mode: Flag to indicate whether build the command with profiling
+        profiling_dir: directory where profiling output should be dumped
     Returns:
         string of command line executable
     """
-    target_command = f'{target_bin} --config {config}'
+
+    target_command = f'{target.bin} --config {target.config}'
+
+    if profiling_mode:
+        dump_file = os.path.join(profiling_dir, f'target_{target.id}.pstat')
+        target_command = f'{target.python_bin} -m cProfile -o {dump_file} {target_command}'
+
     return target_command
 
 
-def build_transformation_command(transform_bin: str, config: str) -> str:
+def build_transformation_command(transform: TransformParams,
+                                 profiling_mode: bool = False,
+                                 profiling_dir: str = None) -> str:
     """
     Builds a command that starts a singer transformation connector
     with the required command line arguments
 
     Args:
-        transform_bin: path to the transform python executable
-        config: path to config json file
-
+        transform: TransformParams instance with all the transform config details
+        profiling_mode: Flag to indicate whether build the command with profiling
+        profiling_dir: directory where profiling output should be dumped
     Returns:
         string of command line executable if transformation found,
         None otherwise
@@ -116,10 +130,17 @@ def build_transformation_command(transform_bin: str, config: str) -> str:
     trans_command = None
 
     # Detect if transformation is needed
-    if os.path.isfile(config):
-        trans = utils.load_json(config)
+    if os.path.isfile(transform.config):
+        trans = utils.load_json(transform.config)
         if 'transformations' in trans and len(trans['transformations']) > 0:
-            trans_command = f'{transform_bin} --config {config}'
+            trans_command = f'{transform.bin} --config {transform.config}'
+
+            if profiling_mode:
+                dump_file = os.path.join(
+                    profiling_dir,
+                    f'transformation_{transform.tap_id}_{transform.target_id}.pstat')
+
+                trans_command = f'{transform.python_bin} -m cProfile -o {dump_file} {trans_command}'
 
     return trans_command
 
@@ -169,7 +190,9 @@ def build_stream_buffer_command(buffer_size: int = 0,
 
 def build_singer_command(tap: TapParams, target: TargetParams, transform: TransformParams,
                          stream_buffer_size: int = 0,
-                         stream_buffer_log_file: str = None) -> str:
+                         stream_buffer_log_file: str = None,
+                         profiling_mode: bool = False,
+                         profiling_dir: str = None) -> str:
     """
     Builds a command that starts a full singer command with tap,
     target and optional transformation connectors. The connectors are
@@ -182,21 +205,33 @@ def build_singer_command(tap: TapParams, target: TargetParams, transform: Transf
         stream_buffer_size: in-memory buffer size between tap and target
         stream_buffer_log_file: Log stream buffer status messages to this file
                            (Default is None, logging to stderr)
+        profiling_mode: Flag to indicate whether profiling is enabled or not
+        profiling_dir: directory where profiling output should be dumped
 
     Returns:
         string of command line executable
     """
-    tap_command = build_tap_command(tap.type,
-                                    tap.bin,
-                                    tap.config,
-                                    tap.properties,
-                                    tap.state)
-    target_command = build_target_command(target.bin,
-                                          target.config)
-    transformation_command = build_transformation_command(transform.bin,
-                                                          transform.config)
+    tap_command = build_tap_command(tap,
+                                    profiling_mode,
+                                    profiling_dir)
+
+    LOGGER.debug('Tap command: %s', tap_command)
+
+    target_command = build_target_command(target,
+                                          profiling_mode,
+                                          profiling_dir)
+
+    LOGGER.debug('Target command: %s', target_command)
+
+    transformation_command = build_transformation_command(transform,
+                                                          profiling_mode,
+                                                          profiling_dir)
+    LOGGER.debug('Transformation command: %s', transformation_command)
+
     stream_buffer_command = build_stream_buffer_command(stream_buffer_size,
                                                         stream_buffer_log_file)
+
+    LOGGER.debug('Buffer command: %s', stream_buffer_command)
 
     # Generate the final piped command with all the required components
     sub_commands = [tap_command, transformation_command, stream_buffer_command, target_command]
@@ -206,17 +241,26 @@ def build_singer_command(tap: TapParams, target: TargetParams, transform: Transf
 
 
 # pylint: disable=too-many-arguments
-def build_fastsync_command(tap: TapParams, target: TargetParams, transform: TransformParams,
-                           venv_dir: str, temp_dir: str, tables: str = None) -> str:
+def build_fastsync_command(tap: TapParams,
+                           target: TargetParams,
+                           transform: TransformParams,
+                           venv_dir: str,
+                           temp_dir: str,
+                           tables: str = None,
+                           profiling_mode: bool = False,
+                           profiling_dir: str = None
+                           ) -> str:
     """
     Builds a command that starts fastsync from a given tap to a
     given target with optional transformations.
 
     Args:
+        profiling_dir: directory where profiling output should be dumped
+        profiling_mode: Flag to indicate whether build the command with profiling
         tap: NamedTuple with tap properties
         target: NamedTuple with target properties
         transform: NamedTuple with transform properties
-        venv_dir:
+        venv_dir: path to virtual environment directory
         temp_dir: Temporary dir to generate export temp files
         tables: List of specific tables to fastsync
                 (Default is None, to sync every table)
@@ -225,8 +269,9 @@ def build_fastsync_command(tap: TapParams, target: TargetParams, transform: Tran
         string of command line executable
     """
     fastsync_bin = utils.get_fastsync_bin(venv_dir, tap.type, target.type)
-    command = ' '.join(list(filter(None, [
-        f'{fastsync_bin}',
+    ppw_python_bin = utils.get_pipelinewise_python_bin(venv_dir)
+
+    command_args = ' '.join(list(filter(None, [
         f'--tap {tap.config}',
         f'--properties {tap.properties}',
         f'--state {tap.state}',
@@ -234,6 +279,14 @@ def build_fastsync_command(tap: TapParams, target: TargetParams, transform: Tran
         f'--temp_dir {temp_dir}',
         f'--transform {transform.config}' if transform.config and os.path.isfile(transform.config) else '',
         f'--tables {tables}' if tables else ''])))
+
+    command = f'{fastsync_bin} {command_args}'
+
+    if profiling_mode:
+        dump_file = os.path.join(profiling_dir, f'fastsync_{tap.id}_{target.id}.pstat')
+        command = f'{ppw_python_bin} -m cProfile -o {dump_file} {command}'
+
+    LOGGER.debug('FastSync command: %s', command)
 
     return command
 

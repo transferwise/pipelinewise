@@ -28,3 +28,16 @@ def find_run_tap_log_file(stdout, sync_engine=None):
         pattern = re.compile(r'Writing output into (.+\.log)')
 
     return pattern.search(stdout).group(1)
+
+
+def find_profiling_folder(stdout):
+    """
+    Pipelinewise profiling mode creates a folder where all the stats files are dumped
+    This function tries to find that folder from the given stdout output
+    Args:
+        stdout: output of PPW
+    Returns: profiling folder as string
+    """
+    pattern = re.compile(r'Profiling stats files are in folder "(.+)"')
+
+    return pattern.search(stdout).group(1)
