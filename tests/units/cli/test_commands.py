@@ -28,50 +28,153 @@ class TestCommands:
     def test_build_tap_command(self):
         """Tests the function that generates tap executable command"""
         # State file should not be included if state file path not passed
-        command = commands.build_tap_command(tap_type='tap_mysql',
-                                             tap_bin='/bin/tap_mysql.py',
-                                             config='.ppw/config.json',
-                                             properties='.ppw/properties.json')
+        tap = commands.TapParams(id='my_tap_mysql',
+                                 type='tap_mysql',
+                                 bin='/bin/tap_mysql.py',
+                                 python_bin='/bin/python3',
+                                 config='.ppw/config.json',
+                                 properties='.ppw/properties.json',
+                                 state=None
+                                 )
+
+        # profiling is not enabled
+        command = commands.build_tap_command(tap=tap,
+                                             profiling_mode=False,
+                                             profiling_dir=None)
+
         assert command == '/bin/tap_mysql.py --config .ppw/config.json --catalog .ppw/properties.json '
 
+        # profiling is enabled
+        command = commands.build_tap_command(tap=tap,
+                                             profiling_mode=True,
+                                             profiling_dir='./profiling')
+
+        assert command == '/bin/python3 -m cProfile -o ./profiling/tap_my_tap_mysql.pstat /bin/tap_mysql.py ' \
+                          '--config .ppw/config.json --catalog .ppw/properties.json '
+
         # State file should not be included if state file passed but file not exists
-        command = commands.build_tap_command(tap_type='tap_mysql',
-                                             tap_bin='/bin/tap_mysql.py',
-                                             config='.ppw/config.json',
-                                             properties='.ppw/properties.json',
-                                             state='.pipelinewise/state.json')
+        tap = commands.TapParams(id='my_tap_mysql',
+                                 type='tap_mysql',
+                                 bin='/bin/tap_mysql.py',
+                                 python_bin='/bin/python3',
+                                 config='.ppw/config.json',
+                                 properties='.ppw/properties.json',
+                                 state='.pipelinewise/state.json'
+                                 )
+
+        # profiling is not enabled
+        command = commands.build_tap_command(tap=tap,
+                                             profiling_dir=None,
+                                             profiling_mode=False
+                                             )
+
         assert command == '/bin/tap_mysql.py --config .ppw/config.json --catalog .ppw/properties.json '
+
+        # profiling is enabled
+        command = commands.build_tap_command(tap=tap,
+                                             profiling_mode=True,
+                                             profiling_dir='./profiling'
+                                             )
+
+        assert command == '/bin/python3 -m cProfile -o ./profiling/tap_my_tap_mysql.pstat /bin/tap_mysql.py ' \
+                          '--config .ppw/config.json --catalog .ppw/properties.json '
 
         # State file should be included if state file passed and file exists
         state_mock = __file__
-        command = commands.build_tap_command(tap_type='tap_mysql',
-                                             tap_bin='/bin/tap_mysql.py',
-                                             config='.ppw/config.json',
-                                             properties='.ppw/properties.json',
-                                             state=state_mock)
+
+        tap = commands.TapParams(id='my_tap_mysql',
+                                 type='tap_mysql',
+                                 bin='/bin/tap_mysql.py',
+                                 python_bin='/bin/python3',
+                                 config='.ppw/config.json',
+                                 properties='.ppw/properties.json',
+                                 state=state_mock
+                                 )
+        # profiling is not enabled
+        command = commands.build_tap_command(tap=tap,
+                                             profiling_mode=False,
+                                             profiling_dir=None)
+
         assert command == f'/bin/tap_mysql.py --config .ppw/config.json --catalog .ppw/properties.json ' \
                           f'--state {state_mock}'
+
+        # profiling is enabled
+        command = commands.build_tap_command(tap=tap,
+                                             profiling_mode=True,
+                                             profiling_dir='./profiling')
+
+        assert command == f'/bin/python3 -m cProfile -o ./profiling/tap_my_tap_mysql.pstat /bin/tap_mysql.py ' \
+                          f'--config .ppw/config.json --catalog .ppw/properties.json --state {state_mock}'
 
     def test_build_target_command(self):
         """Tests the function that generates target executable command"""
         # Should return a input piped command with an executable target command
-        command = commands.build_target_command(target_bin='/bin/target_postgres.py',
-                                                config='.ppw/config.json')
+
+        target = commands.TargetParams(id='my_target',
+                                       type='target-snowflake',
+                                       bin='/bin/target_postgres.py',
+                                       python_bin='/bin/python',
+                                       config='.ppw/config.json')
+
+        # profiling is not enabled
+        command = commands.build_target_command(target=target,
+                                                profiling_mode=False,
+                                                profiling_dir=None)
+
         assert command == '/bin/target_postgres.py --config .ppw/config.json'
+
+        # profiling is enabled
+        command = commands.build_target_command(target=target,
+                                                profiling_mode=True,
+                                                profiling_dir='./profiling')
+        assert command == '/bin/python -m cProfile -o ./profiling/target_my_target.pstat /bin/target_postgres.py' \
+                          ' --config .ppw/config.json'
 
     def test_build_transform_command(self):
         """Tests the function that generates transform executable command"""
         # Should return empty string if config file exists but no transformation
         transform_config = '{}/resources/transform-config-empty.json'.format(os.path.dirname(__file__))
-        command = commands.build_transformation_command(transform_bin='/bin/transform_field.py',
-                                                        config=transform_config)
+        transform_bin = '/bin/transform_field.py'
+
+        transform = commands.TransformParams(config=transform_config,
+                                             bin=transform_bin,
+                                             python_bin='/bin/python',
+                                             tap_id='my_tap',
+                                             target_id='my_target')
+        # profiling disabled
+        command = commands.build_transformation_command(transform=transform,
+                                                        profiling_mode=False,
+                                                        profiling_dir=None)
+        assert command is None
+
+        # profiling enabled
+        command = commands.build_transformation_command(transform=transform,
+                                                        profiling_mode=True,
+                                                        profiling_dir='./profiling')
         assert command is None
 
         # Should return a input piped command with an executable transform command
         transform_config = '{}/resources/transform-config.json'.format(os.path.dirname(__file__))
-        command = commands.build_transformation_command(transform_bin='/bin/transform_field.py',
-                                                        config=transform_config)
+
+        transform = commands.TransformParams(config=transform_config,
+                                             bin=transform_bin,
+                                             python_bin='/bin/python',
+                                             tap_id='my_tap',
+                                             target_id='my_target')
+        # profiling disabled
+        command = commands.build_transformation_command(transform=transform,
+                                                        profiling_mode=False,
+                                                        profiling_dir=None)
+
         assert command == f'/bin/transform_field.py --config {transform_config}'
+
+        # profiling enabled
+        command = commands.build_transformation_command(transform=transform,
+                                                        profiling_mode=True,
+                                                        profiling_dir='./profiling')
+
+        assert command == f'/bin/python -m cProfile -o ./profiling/transformation_my_tap_my_target.pstat ' \
+                          f'/bin/transform_field.py --config {transform_config}'
 
     # pylint: disable=invalid-name
     def test_build_stream_buffer_command(self):
@@ -94,11 +197,11 @@ class TestCommands:
 
         # Should use custom buffer binary executable if bin parameter provided
         assert commands.build_stream_buffer_command(buffer_size=100, stream_buffer_bin='dummy_buffer') == \
-            f'dummy_buffer -m 100M'
+               f'dummy_buffer -m 100M'
 
         # Should log mbuffer status to log file with .running extension
         assert commands.build_stream_buffer_command(buffer_size=100, log_file='stream_buffer.log') == \
-            'mbuffer -m 100M -q -l stream_buffer.log.running'
+               'mbuffer -m 100M -q -l stream_buffer.log.running'
 
     def test_build_singer_command(self):
         """Tests the function that generates the full singer singer command
@@ -108,36 +211,53 @@ class TestCommands:
         state_mock = __file__
 
         # Should generate a command with tap state and transformation
-        tap_params = commands.TapParams(type='tap-mysql',
+        tap_params = commands.TapParams(id='my_tap',
+                                        type='tap-mysql',
                                         bin='/bin/tap_mysql.py',
+                                        python_bin='/bin/python',
                                         config='.ppw/config.json',
                                         properties='.ppw/properties.json',
                                         state=state_mock)
-        target_params = commands.TargetParams(type='target-postgres',
-                                              bin='/bin/target_postgres.py',
-                                              config='.ppw/config.json')
-        transform_params = commands.TransformParams(bin='/bin/transform_field.py',
-                                                    config=transform_config)
 
-        command = commands.build_singer_command(tap_params, target_params, transform_params)
+        target_params = commands.TargetParams(id='my_target',
+                                              type='target-postgres',
+                                              bin='/bin/target_postgres.py',
+                                              python_bin='/bin/python',
+                                              config='.ppw/config.json')
+
+        transform_params = commands.TransformParams(bin='/bin/transform_field.py',
+                                                    python_bin='/bin/python',
+                                                    config=transform_config,
+                                                    tap_id='my_tap',
+                                                    target_id='my_target')
+        # profiling disabled
+        command = commands.build_singer_command(tap_params,
+                                                target_params,
+                                                transform_params)
 
         assert command == f'/bin/tap_mysql.py --config .ppw/config.json --properties .ppw/properties.json ' \
                           f'--state {state_mock}' \
                           f' | /bin/transform_field.py --config {transform_config}' \
                           ' | /bin/target_postgres.py --config .ppw/config.json'
 
-        # Should generate a command with tap state and transformation and stream buffer
-        tap_params = commands.TapParams(type='tap-mysql',
-                                        bin='/bin/tap_mysql.py',
-                                        config='.ppw/config.json',
-                                        properties='.ppw/properties.json',
-                                        state=state_mock)
-        target_params = commands.TargetParams(type='target-postgres',
-                                              bin='/bin/target_postgres.py',
-                                              config='.ppw/config.json')
-        transform_params = commands.TransformParams(bin='/bin/transform_field.py',
-                                                    config=transform_config)
+        # profiling enabled
+        command = commands.build_singer_command(tap_params,
+                                                target_params,
+                                                transform_params,
+                                                profiling_mode=True,
+                                                profiling_dir='./profiling')
 
+        assert command == f'/bin/python -m cProfile -o ./profiling/tap_my_tap.pstat ' \
+                          f'/bin/tap_mysql.py --config .ppw/config.json --properties .ppw/properties.json ' \
+                          f'--state {state_mock}' \
+                          f' | /bin/python -m cProfile -o ./profiling/transformation_my_tap_my_target.pstat ' \
+                          f'/bin/transform_field.py --config {transform_config}' \
+                          ' | /bin/python -m cProfile -o ./profiling/target_my_target.pstat /bin/target_postgres.py ' \
+                          '--config .ppw/config.json'
+
+        # Should generate a command with tap state and transformation and stream buffer
+
+        # profiling disabled
         command = commands.build_singer_command(tap_params, target_params, transform_params, stream_buffer_size=10)
 
         assert command == f'/bin/tap_mysql.py --config .ppw/config.json --properties .ppw/properties.json ' \
@@ -146,58 +266,111 @@ class TestCommands:
                           ' | mbuffer -m 10M' \
                           ' | /bin/target_postgres.py --config .ppw/config.json'
 
+        # profiling enabled
+        command = commands.build_singer_command(tap_params,
+                                                target_params,
+                                                transform_params,
+                                                profiling_mode=True,
+                                                profiling_dir='./profiling',
+                                                stream_buffer_size=10)
+
+        assert command == f'/bin/python -m cProfile -o ./profiling/tap_my_tap.pstat /bin/tap_mysql.py ' \
+                          f'--config .ppw/config.json --properties .ppw/properties.json --state {state_mock}' \
+                          f' | /bin/python -m cProfile -o ./profiling/transformation_my_tap_my_target.pstat ' \
+                          f'/bin/transform_field.py --config {transform_config}' \
+                          ' | mbuffer -m 10M' \
+                          ' | /bin/python -m cProfile -o ./profiling/target_my_target.pstat /bin/target_postgres.py' \
+                          ' --config .ppw/config.json'
+
         # Should generate a command without state and with transformation
-        tap_params = commands.TapParams(type='tap-mysql',
+        tap_params = commands.TapParams(id='my_tap',
+                                        type='tap-mysql',
                                         bin='/bin/tap_mysql.py',
+                                        python_bin='/bin/python',
                                         config='.ppw/config.json',
                                         properties='.ppw/properties.json',
                                         state=None)
-        target_params = commands.TargetParams(type='target-postgres',
-                                              bin='/bin/target_postgres.py',
-                                              config='.ppw/config.json')
-        transform_params = commands.TransformParams(bin='/bin/transform_field.py',
-                                                    config=transform_config)
 
+        # profiling disabled
         command = commands.build_singer_command(tap_params, target_params, transform_params)
 
         assert command == f'/bin/tap_mysql.py --config .ppw/config.json --properties .ppw/properties.json ' \
                           f' | /bin/transform_field.py --config {transform_config}' \
                           ' | /bin/target_postgres.py --config .ppw/config.json'
 
+        # profiling enabled
+        command = commands.build_singer_command(tap_params,
+                                                target_params,
+                                                transform_params,
+                                                profiling_mode=True,
+                                                profiling_dir='./profiling')
+
+        assert command == f'/bin/python -m cProfile -o ./profiling/tap_my_tap.pstat ' \
+                          f'/bin/tap_mysql.py --config .ppw/config.json --properties .ppw/properties.json ' \
+                          f' | /bin/python -m cProfile -o ./profiling/transformation_my_tap_my_target.pstat ' \
+                          f'/bin/transform_field.py --config {transform_config}' \
+                          ' | /bin/python -m cProfile -o ./profiling/target_my_target.pstat ' \
+                          '/bin/target_postgres.py --config .ppw/config.json'
+
         # Should generate a command with state and without transformation
-        tap_params = commands.TapParams(type='tap-mysql',
+        tap_params = commands.TapParams(id='my_tap',
+                                        type='tap-mysql',
                                         bin='/bin/tap_mysql.py',
+                                        python_bin='/bin/python',
                                         config='.ppw/config.json',
                                         properties='.ppw/properties.json',
                                         state=state_mock)
-        target_params = commands.TargetParams(type='target-postgres',
-                                              bin='/bin/target_postgres.py',
-                                              config='.ppw/config.json')
-        transform_params = commands.TransformParams(bin='/bin/transform_field.py',
-                                                    config=transform_config_empty)
 
+        transform_params = commands.TransformParams(bin='/bin/transform_field.py',
+                                                    python_bin='/bin/python',
+                                                    config=transform_config_empty,
+                                                    tap_id='my_tap',
+                                                    target_id='my_target')
+        # profiling disabled
         command = commands.build_singer_command(tap_params, target_params, transform_params)
 
         assert command == f'/bin/tap_mysql.py --config .ppw/config.json --properties .ppw/properties.json ' \
                           f'--state {state_mock}' \
                           ' | /bin/target_postgres.py --config .ppw/config.json'
 
+        # profiling enabled
+        command = commands.build_singer_command(tap_params,
+                                                target_params,
+                                                transform_params,
+                                                profiling_mode=True,
+                                                profiling_dir='./profiling')
+
+        assert command == f'/bin/python -m cProfile -o ./profiling/tap_my_tap.pstat /bin/tap_mysql.py ' \
+                          f'--config .ppw/config.json --properties .ppw/properties.json ' \
+                          f'--state {state_mock}' \
+                          ' | /bin/python -m cProfile -o ./profiling/target_my_target.pstat /bin/target_postgres.py ' \
+                          '--config .ppw/config.json'
+
         # Should generate a command without state and transformation
-        tap_params = commands.TapParams(type='tap-mysql',
+        tap_params = commands.TapParams(id='my_tap',
+                                        type='tap-mysql',
                                         bin='/bin/tap_mysql.py',
+                                        python_bin='/bin/python',
                                         config='.ppw/config.json',
                                         properties='.ppw/properties.json',
                                         state='.ppw/state.json')
-        target_params = commands.TargetParams(type='target-postgres',
-                                              bin='/bin/target_postgres.py',
-                                              config='.ppw/config.json')
-        transform_params = commands.TransformParams(bin='/bin/transform_field.py',
-                                                    config=transform_config_empty)
-
+        # profiling disabled
         command = commands.build_singer_command(tap_params, target_params, transform_params)
 
         assert command == '/bin/tap_mysql.py --config .ppw/config.json --properties .ppw/properties.json ' \
                           ' | /bin/target_postgres.py --config .ppw/config.json'
+
+        # profiling enabled
+        command = commands.build_singer_command(tap_params,
+                                                target_params,
+                                                transform_params,
+                                                profiling_mode=True,
+                                                profiling_dir='./profiling')
+
+        assert command == '/bin/python -m cProfile -o ./profiling/tap_my_tap.pstat /bin/tap_mysql.py ' \
+                          '--config .ppw/config.json --properties .ppw/properties.json ' \
+                          ' | /bin/python -m cProfile -o ./profiling/target_my_target.pstat /bin/target_postgres.py ' \
+                          '--config .ppw/config.json'
 
     def test_build_fastsync_command(self):
         """Tests the function that generates the fastsync command"""
@@ -207,16 +380,28 @@ class TestCommands:
         temp_dir = 'dummy_temp_dir'
 
         # Should generate a fastsync command with transformation
-        tap_params = commands.TapParams(type='tap-mysql',
+
+        tap_params = commands.TapParams(id='my_tap',
+                                        type='tap-mysql',
                                         bin='/bin/tap_mysql.py',
+                                        python_bin='/tap-mysql/bin/python',
                                         config='.ppw/tap_config.json',
                                         properties='.ppw/properties.json',
                                         state=state_mock)
-        target_params = commands.TargetParams(type='target-postgres',
+
+        target_params = commands.TargetParams(id='my_target',
+                                              type='target-postgres',
                                               bin='/bin/target_postgres.py',
+                                              python_bin='/target-postgres/bin/python',
                                               config='.ppw/target_config.json')
+
         transform_params = commands.TransformParams(bin='/bin/transform_field.py',
-                                                    config=None)
+                                                    python_bin='transform/bin/python',
+                                                    config=None,
+                                                    tap_id='my_tap',
+                                                    target_id='my_target')
+
+        # profiling disabled
         command = commands.build_fastsync_command(tap_params, target_params, transform_params, venv_dir, temp_dir)
         assert command == '.dummy_venv_dir/pipelinewise/bin/mysql-to-postgres' \
                           ' --tap .ppw/tap_config.json' \
@@ -225,11 +410,53 @@ class TestCommands:
                           ' --target .ppw/target_config.json' \
                           ' --temp_dir dummy_temp_dir'
 
+        # profiling enabled
+        command = commands.build_fastsync_command(tap_params,
+                                                  target_params,
+                                                  transform_params,
+                                                  venv_dir,
+                                                  temp_dir,
+                                                  profiling_mode=True,
+                                                  profiling_dir='./profiling')
+
+        assert command == '.dummy_venv_dir/pipelinewise/bin/python -m cProfile ' \
+                          '-o ./profiling/fastsync_my_tap_my_target.pstat' \
+                          ' .dummy_venv_dir/pipelinewise/bin/mysql-to-postgres' \
+                          ' --tap .ppw/tap_config.json' \
+                          ' --properties .ppw/properties.json' \
+                          f' --state {state_mock}' \
+                          ' --target .ppw/target_config.json' \
+                          ' --temp_dir dummy_temp_dir'
+
         # Should generate a fastsync command with transformation
         transform_params = commands.TransformParams(bin='/bin/transform_field.py',
-                                                    config=transform_config)
+                                                    python_bin='transform/bin/python',
+                                                    config=transform_config,
+                                                    tap_id='my_tap',
+                                                    target_id='my_target')
+
+        # profiling disabled
         command = commands.build_fastsync_command(tap_params, target_params, transform_params, venv_dir, temp_dir)
         assert command == '.dummy_venv_dir/pipelinewise/bin/mysql-to-postgres' \
+                          ' --tap .ppw/tap_config.json' \
+                          ' --properties .ppw/properties.json' \
+                          f' --state {state_mock}' \
+                          ' --target .ppw/target_config.json' \
+                          ' --temp_dir dummy_temp_dir' \
+                          f' --transform {transform_config}'
+
+        # profiling enabled
+        command = commands.build_fastsync_command(tap_params,
+                                                  target_params,
+                                                  transform_params,
+                                                  venv_dir,
+                                                  temp_dir,
+                                                  profiling_mode=True,
+                                                  profiling_dir='./profiling')
+
+        assert command == '.dummy_venv_dir/pipelinewise/bin/python -m cProfile' \
+                          ' -o ./profiling/fastsync_my_tap_my_target.pstat' \
+                          ' .dummy_venv_dir/pipelinewise/bin/mysql-to-postgres' \
                           ' --tap .ppw/tap_config.json' \
                           ' --properties .ppw/properties.json' \
                           f' --state {state_mock}' \

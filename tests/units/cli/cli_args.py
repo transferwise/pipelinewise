@@ -17,7 +17,9 @@ class CliArgs:
                  string=None,
                  log='*',
                  extra_log=False,
-                 debug=False):
+                 debug=False,
+                 profiler=False
+                 ):
         self.target = target
         self.tap = tap
         self.tables = tables
@@ -28,6 +30,7 @@ class CliArgs:
         self.log = log
         self.extra_log = extra_log
         self.debug = debug
+        self.profiler = profiler
 
     # "log" Getters and setters
     @property

@@ -1,3 +1,4 @@
+import glob
 import os
 import re
 
@@ -8,24 +9,43 @@ from . import tasks
 from . import db
 
 
-def assert_run_tap_success(tap, target, sync_engines):
+def assert_run_tap_success(tap, target, sync_engines, profiling=False):
     """Run a specific tap and make sure that it's using the correct sync engine,
     finished successfully and state file created with the right content"""
-    [return_code, stdout, stderr] = tasks.run_command(f'pipelinewise run_tap --tap {tap} --target {target}')
+
+    command = f'pipelinewise run_tap --tap {tap} --target {target}'
+
+    if profiling:
+        command = f'{command} --profiler'
+
+    [return_code, stdout, stderr] = tasks.run_command(command)
+
     for sync_engine in sync_engines:
         log_file = tasks.find_run_tap_log_file(stdout, sync_engine)
         assert_command_success(return_code, stdout, stderr, log_file)
         assert_state_file_valid(target, tap, log_file)
 
+    if profiling:
+        assert_profiling_stats_files_created(stdout, 'run_tap', sync_engines, tap, target)
 
-def assert_resync_tables_success(tap, target):
+
+def assert_resync_tables_success(tap, target, profiling=False):
     """Resync a specific tap and make sure that it's using the correct sync engine,
     finished successfully and state file created with the right content"""
-    [return_code, stdout, stderr] = tasks.run_command(f'pipelinewise sync_tables --tap {tap} --target {target}')
+
+    command = f'pipelinewise sync_tables --tap {tap} --target {target}'
+
+    if profiling:
+        command = f'{command} --profiler'
+
+    [return_code, stdout, stderr] = tasks.run_command(command)
 
     log_file = tasks.find_run_tap_log_file(stdout, 'fastsync')
     assert_command_success(return_code, stdout, stderr, log_file)
     assert_state_file_valid(target, tap, log_file)
+
+    if profiling:
+        assert_profiling_stats_files_created(stdout, 'sync_tables', ['fastsync'], tap, target)
 
 
 def assert_command_success(return_code, stdout, stderr, log_path=None):
@@ -246,7 +266,7 @@ def assert_all_columns_exist(tap_query_runner_fn: callable,
             if column_type_mapper_fn:
                 try:
                     target_col = target_cols_dict[col_name]
-                    exp_col_type = column_type_mapper_fn(col_props['type'], col_props['type_extra'])\
+                    exp_col_type = column_type_mapper_fn(col_props['type'], col_props['type_extra']) \
                         .replace(' NULL', '').lower()
                     act_col_type = target_col['type'].lower()
                     assert act_col_type == exp_col_type
@@ -255,6 +275,7 @@ def assert_all_columns_exist(tap_query_runner_fn: callable,
                                          f'Expected: {exp_col_type} '
                                          f'Actual: {act_col_type}')
                     raise
+
 
 def assert_date_column_naive_in_target(target_query_runner_fn, column_name, full_table_name):
     """
@@ -270,3 +291,38 @@ def assert_date_column_naive_in_target(target_query_runner_fn, column_name, full
     for date in dates:
         if date[0] is not None:
             assert date[0].tzinfo is None
+
+
+def assert_profiling_stats_files_created(stdout: str,
+                                         command: str,
+                                         sync_engines: List = None,
+                                         tap: Union[str, List[str]] = None,
+                                         target: str = None):
+    """
+    Asserts that profiling pstat files were created by checking their existence
+    Args:
+        stdout: ppw command stdout
+        command: ppw command name
+        sync_engines: in case of run_tap or sync_tables, sync engines should be fastsync and/or singer
+        tap: in case of run_tap or sync_tables, tap is the tap ID
+        target: in case of run_tap or sync_tables, it is the target ID
+    """
+    # find profiling directory from output
+    profiler_dir = tasks.find_profiling_folder(stdout)
+
+    # crawl the folder looking for pstat files and strip the folder name from the file name
+    pstat_files = {file[len(f'{profiler_dir}/'):] for file in glob.iglob(f'{profiler_dir}/*.pstat')}
+
+    assert f'pipelinewise_{command}.pstat' in pstat_files
+
+    if sync_engines is not None:
+        if 'fastsync' in sync_engines:
+            assert f'fastsync_{tap}_{target}.pstat' in pstat_files
+
+        if 'singer' in sync_engines:
+            assert f'tap_{tap}.pstat' in pstat_files
+            assert f'target_{target}.pstat' in pstat_files
+
+    if isinstance(tap, list):
+        for tap_ in tap:
+            assert f'tap_{tap_}.pstat' in pstat_files

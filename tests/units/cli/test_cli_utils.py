@@ -7,12 +7,11 @@ import pytest
 VIRTUALENVS_DIR = './virtualenvs-dummy'
 
 
-# pylint: disable=no-self-use,fixme
+# pylint: disable=no-self-use,too-many-public-methods,fixme
 class TestUtils:
     """
     Unit Tests for PipelineWise CLI utility functions
     """
-
     def assert_json_is_invalid(self, schema, invalid_target):
         """Simple assertion to check if validate function exits with error"""
         with pytest.raises(SystemExit) as pytest_wrapped_e:
@@ -249,10 +248,7 @@ class TestUtils:
             'foo2': None,
             'foo3': None,
             'foo4': 'bar4'
-        }) == {
-            'foo': 'bar',
-            'foo4': 'bar4'
-        }
+        }) == {'foo': 'bar', 'foo4': 'bar4'}
 
         # Delete single key by name
         assert cli.utils.delete_keys_from_dict({'foo': 'bar', 'foo2': 'bar2'}, ['foo2']) == {'foo': 'bar'}
@@ -263,17 +259,14 @@ class TestUtils:
             'foo2': 'bar2',
             'foo3': None,
             'foo4': 'bar4'
-        }, ['foo2', 'foo4']) == {
-            'foo': 'bar',
-            'foo3': None
-        }
+        }, ['foo2', 'foo4']) == {'foo': 'bar', 'foo3': None}
 
         # Delete multiple keys from list of nested dictionaries
         assert cli.utils.delete_keys_from_dict(
             [{'foo': 'bar', 'foo2': 'bar2'},
              {'foo3': {'nested_foo': 'nested_bar', 'nested_foo2': 'nested_bar2'}}], ['foo2', 'nested_foo']) == \
-             [{'foo': 'bar'},
-              {'foo3': {'nested_foo2': 'nested_bar2'}}]
+               [{'foo': 'bar'},
+                {'foo3': {'nested_foo2': 'nested_bar2'}}]
 
     def test_silentremove(self):
         """Test removing functions"""
@@ -375,24 +368,40 @@ class TestUtils:
         # Should return the default max number of errors
         log_file = '{}/resources/sample_log_files/tap-run-lot-of-errors.log'.format(os.path.dirname(__file__))
         assert cli.utils.find_errors_in_log_file(log_file) == \
-            ['time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=CRITICAL This is a critical error 1\n',
-             'time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=CRITICAL This is a critical error 2\n',
-             'time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=CRITICAL This is a critical error 3\n',
-             'time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=CRITICAL This is a critical error 4\n',
-             'time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=CRITICAL This is a critical error 5\n',
-             'time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=CRITICAL This is a critical error 6\n',
-             'time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=CRITICAL This is a critical error 7\n',
-             'time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=CRITICAL This is a critical error 8\n',
-             'time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=CRITICAL This is a critical error 9\n',
-             'time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=CRITICAL This is a critical error 10\n']
+               ['time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=CRITICAL This is a critical error 1\n',
+                'time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=CRITICAL This is a critical error 2\n',
+                'time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=CRITICAL This is a critical error 3\n',
+                'time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=CRITICAL This is a critical error 4\n',
+                'time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=CRITICAL This is a critical error 5\n',
+                'time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=CRITICAL This is a critical error 6\n',
+                'time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=CRITICAL This is a critical error 7\n',
+                'time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=CRITICAL This is a critical error 8\n',
+                'time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=CRITICAL This is a critical error 9\n',
+                'time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=CRITICAL This is a critical error 10\n']
 
         # Should return the custom max number of errors
         log_file = '{}/resources/sample_log_files/tap-run-lot-of-errors.log'.format(os.path.dirname(__file__))
         assert cli.utils.find_errors_in_log_file(log_file, max_errors=2) == \
-            ['time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=CRITICAL This is a critical error 1\n',
-             'time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=CRITICAL This is a critical error 2\n']
+               ['time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=CRITICAL This is a critical error 1\n',
+                'time=2020-07-15 11:24:43 logger_name=tap_postgres log_level=CRITICAL This is a critical error 2\n']
 
         # Should return the custom max number of errors
         log_file = '{}/resources/sample_log_files/tap-run-errors.log'.format(os.path.dirname(__file__))
         assert cli.utils.find_errors_in_log_file(log_file, error_pattern=re.compile('CUSTOM-ERR-PATTERN')) == \
-            ['CUSTOM-ERR-PATTERN: This is a custom pattern error message\n']
+               ['CUSTOM-ERR-PATTERN: This is a custom pattern error message\n']
+
+    def test_generate_rand_str_exc(self):
+        """generate_random_string given a length lower than 1, expect an exception"""
+        with pytest.raises(Exception):
+            cli.utils.generate_random_string(-1)
+
+    def test_generate_rand_str_warning(self):
+        """generate_random_string given a length between 1 and 8 expect result and warning"""
+        with pytest.warns(Warning):
+            random_str = cli.utils.generate_random_string(5)
+            assert len(random_str) == 5
+
+    def test_generate_rand_str_success(self):
+        """generate_random_string given a length greater than or eq to 8 expect result"""
+        random_str = cli.utils.generate_random_string(10)
+        assert len(random_str) == 10
