@@ -26,6 +26,7 @@ As of right now, the minimum required scopes for this App are:
  - ``usergroups:read``
  - ``users.profile:read``
  - ``users:read``
+ - ``users:read.email`` - This scope is only required if you want to extract the user emails as well.
 
 Configuring what to extract
 '''''''''''''''''''''''''''
@@ -70,6 +71,10 @@ Example YAML for ``tap-slack``:
       #date_window_size: "5"                    # Optional: Due to the potentially high volume of data when syncing certain streams
                                                 # (messages, files, threads) this tap implements date windowing based on
                                                 # a configuration parameter.
+      #lookback_window: 14                      # Optional: Number of days to look back before the incremental start date.
+                                                # This is useful to get all data from child streams that can't be extracted
+                                                # incrementally, for example the message threads (conversation.replies method).
+                                                # Default is 14 days.
 
     # ------------------------------------------------------------------------------
     # Destination (Target) - Target properties
