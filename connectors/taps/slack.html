@@ -240,6 +240,7 @@ to interact with your Slack workspace. You can obtain a token for a single works
 <li><p><code class="docutils literal notranslate"><span class="pre">usergroups:read</span></code></p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">users.profile:read</span></code></p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">users:read</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">users:read.email</span></code> - This scope is only required if you want to extract the user emails as well.</p></li>
 </ul>
 </dd>
 </dl>
@@ -282,6 +283,10 @@ db_conn:
   <span class="c1">#date_window_size: &quot;5&quot;                    # Optional: Due to the potentially high volume of data when syncing certain streams</span>
                                             <span class="c1"># (messages, files, threads) this tap implements date windowing based on</span>
                                             <span class="c1"># a configuration parameter.</span>
+  <span class="c1">#lookback_window: 14                      # Optional: Number of days to look back before the incremental start date.</span>
+                                            <span class="c1"># This is useful to get all data from child streams that can&#39;t be extracted</span>
+                                            <span class="c1"># incrementally, for example the message threads (conversation.replies method).</span>
+                                            <span class="c1"># Default is 14 days.</span>
 
 <span class="c1"># ------------------------------------------------------------------------------</span>
 <span class="c1"># Destination (Target) - Target properties</span>
