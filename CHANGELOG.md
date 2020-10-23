@@ -1,3 +1,24 @@
+0.25.0 (2020-10-23)
+-------------------
+
+- Add `--profiler` optional parameter to pipelinewise commands
+- Use `--debug` logging in every subprocess
+- Fixed an issue when fastsync not extracting NULL characters correctly from MySQL
+
+**Tap Postgres**
+- Bump `pipelinewise-tap-postgres` to 1.7.1
+    - Parse data from json(b) when converting a row to a record message in log based replication method.
+
+**Tap MySQL**
+- Bump `pipelinewise-tap-mysql` to 1.3.8
+    - Fix mapping bit to boolean values
+
+**Tap Slack**
+- Bump `pipelinewise-tap-slack` to 1.1.0
+    - Extract user profiles from `users.list` API endpoint
+    - Extract message attachments from `conversations.history` API endpoint
+    - Fixed an issue when incremental bookmarks were not sent correctly in the `STATE` messages
+
 0.24.1 (2020-10-02)
 -------------------
 
