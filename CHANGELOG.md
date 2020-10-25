@@ -1,3 +1,59 @@
+0.25.0 (2020-10-23)
+-------------------
+
+- Add `--profiler` optional parameter to pipelinewise commands
+- Use `--debug` logging in every subprocess
+- Fixed an issue when fastsync not extracting NULL characters correctly from MySQL
+
+**Tap Postgres**
+- Bump `pipelinewise-tap-postgres` to 1.7.1
+    - Parse data from json(b) when converting a row to a record message in log based replication method.
+
+**Tap MySQL**
+- Bump `pipelinewise-tap-mysql` to 1.3.8
+    - Fix mapping bit to boolean values
+
+**Tap Slack**
+- Bump `pipelinewise-tap-slack` to 1.1.0
+    - Extract user profiles from `users.list` API endpoint
+    - Extract message attachments from `conversations.history` API endpoint
+    - Fixed an issue when incremental bookmarks were not sent correctly in the `STATE` messages
+
+0.24.1 (2020-10-02)
+-------------------
+
+- Exit as failure when another instance of the tap is running or the tap is not enabled
+
+**Tap Slack**
+- Bump `pipelinewise-tap-slack` to 1.0.1
+    - Fixed an issue when `thread_ts` values were not populated correctly in `messages` and `threads` streams
+
+0.24.0 (2020-10-01)
+-------------------
+
+- Add tap-slack
+- Add tap-shopify
+
+**Tap MongoDB**
+- Bump `pipelinewise-tap-mongodb` to 1.2.0
+    - Add support for SRV urls
+
+0.23.0 (2020-09-25)
+-------------------
+
+- Fixed an issue when missing empty breadcrumb in tap properties file didn't raise an exception
+- Add option to build docker images only with selected tap and target connectors
+
+**Tap Postgres**
+- Bump `pipelinewise-tap-postgres` to 1.7.0
+    - Option to enable SSL mode
+    - Fixed an issue when timestamps out of the ISO-8601 range caused some failures
+    - Fixed an issue when when postgres replication slot name not generated correctly and contained invalid characters
+
+**Target Postgres**
+- Bump `pipelinewise-target-postgres` to 2.1.0
+    - Option to enable SSL mode
+
 0.22.1 (2020-09-10)
 -------------------
 

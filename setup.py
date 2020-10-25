@@ -6,7 +6,7 @@ with open('README.md') as f:
     LONG_DESCRIPTION = f.read()
 
 setup(name='pipelinewise',
-      version='0.22.1',
+      version='0.25.0',
       description='PipelineWise',
       long_description=LONG_DESCRIPTION,
       long_description_content_type='text/markdown',
@@ -71,7 +71,8 @@ setup(name='pipelinewise',
               'pipelinewise/cli/schemas/*.json'
           ],
           'pipelinewise': [
-              'logging.conf'
+              'logging.conf',
+              'logging_debug.conf'
           ]
       },
       include_package_data=True)

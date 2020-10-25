@@ -60,14 +60,17 @@ class TestTargetPostgres:
         self.e2e.setup_target_postgres()
 
         # Import project
-        [return_code, stdout, stderr] = tasks.run_command(f'pipelinewise import_config --dir {self.project_dir}')
+        [return_code, stdout, stderr] = tasks.run_command(
+            f'pipelinewise import_config --dir {self.project_dir} --profiler')
+
         assertions.assert_command_success(return_code, stdout, stderr)
+        assertions.assert_profiling_stats_files_created(stdout, 'import_project')
 
     @pytest.mark.dependency(depends=['import_config'])
     def test_replicate_mariadb_to_pg(self, tap_mariadb_id=TAP_MARIADB_ID):
         """Replicate data from MariaDB to Postgres DWH"""
         # 1. Run tap first time - both fastsync and a singer should be triggered
-        assertions.assert_run_tap_success(tap_mariadb_id, TARGET_ID, ['fastsync', 'singer'])
+        assertions.assert_run_tap_success(tap_mariadb_id, TARGET_ID, ['fastsync', 'singer'], profiling=True)
         assertions.assert_row_counts_equal(self.run_query_tap_mysql, self.run_query_target_postgres)
         assertions.assert_all_columns_exist(self.run_query_tap_mysql, self.run_query_target_postgres,
                                             mysql_to_postgres.tap_type_to_target_type)
@@ -92,7 +95,8 @@ class TestTargetPostgres:
                                  ' \'9:1:00\'),'
                                  '(\'Special Characters: [\"\\,''!@£$%^&*()]\\\\\', null, \'B\', '
                                  'null, \'12:00:00\'),'
-                                 '(\'	\', 20, \'B\', null, \'15:36:10\')')
+                                 '(\'	\', 20, \'B\', null, \'15:36:10\'),'
+                                 '(CONCAT(CHAR(0x0000 using utf16), \'<- null char\'), 20, \'B\', null, \'15:36:10\')')
 
         #  INCREMENTAL
         self.run_query_tap_mysql('INSERT INTO address(isactive, street_number, date_created, date_updated,'
@@ -104,7 +108,7 @@ class TestTargetPostgres:
         self.run_query_tap_mysql('DELETE FROM no_pk_table WHERE id > 10')
 
         # 3. Run tap second time - both fastsync and a singer should be triggered, there are some FULL_TABLE
-        assertions.assert_run_tap_success(tap_mariadb_id, TARGET_ID, ['fastsync', 'singer'])
+        assertions.assert_run_tap_success(tap_mariadb_id, TARGET_ID, ['fastsync', 'singer'], profiling=True)
         assertions.assert_row_counts_equal(self.run_query_tap_mysql, self.run_query_target_postgres)
         assertions.assert_all_columns_exist(self.run_query_tap_mysql, self.run_query_target_postgres,
                                             mysql_to_postgres.tap_type_to_target_type, {'blob_col'})
@@ -125,7 +129,6 @@ class TestTargetPostgres:
         Same tests cases as test_replicate_mariadb_to_pg but using another tap with custom stream buffer size"""
         self.test_resync_mariadb_to_pg(tap_mariadb_id=TAP_MARIADB_BUFFERED_STREAM_ID)
 
-
     @pytest.mark.dependency(depends=['import_config'])
     def test_replicate_pg_to_pg(self):
         """Replicate data from Postgres to Postgres DWH"""
@@ -137,11 +140,27 @@ class TestTargetPostgres:
                                                       'updated_at',
                                                       'ppw_e2e_tap_postgres."table_with_space and uppercase"')
 
+        result = self.run_query_target_postgres(
+            'SELECT updated_at FROM '
+            'ppw_e2e_tap_postgres."table_with_space and uppercase" '
+            'where cvarchar=\'H\';')[0][0]
+
+        assert result == datetime(9999, 12, 31, 23, 59, 59, 999000)
+
+        result = self.run_query_target_postgres(
+            'SELECT updated_at FROM '
+            'ppw_e2e_tap_postgres."table_with_space and uppercase" '
+            'where cvarchar=\'I\';')[0][0]
+
+        assert result == datetime(9999, 12, 31, 23, 59, 59, 999000)
+
         # 2. Make changes in pg source database
         #  LOG_BASED
         self.run_query_tap_postgres('insert into public."table_with_space and UPPERCase" (cvarchar, updated_at) values '
                                     "('M', '2020-01-01 08:53:56.8+10'),"
                                     "('N', '2020-12-31 12:59:00.148+00'),"
+                                    "('Year in the faaaar future', '20000-05-23 12:40:00.148'),"
+                                    "('Year in the BC', '2020-01-23 01:40:00 BC'),"
                                     "('O', null),"
                                     "('P', '2020-03-03 12:30:00');")
 
@@ -173,6 +192,20 @@ class TestTargetPostgres:
             'SELECT updated_at FROM ppw_e2e_tap_postgres."table_with_space and uppercase" where cvarchar=\'M\';')[0][0]
 
         assert result == datetime(2019, 12, 31, 22, 53, 56, 800000)
+
+        result = self.run_query_target_postgres(
+            'SELECT updated_at FROM '
+            'ppw_e2e_tap_postgres."table_with_space and uppercase" '
+            'where cvarchar=\'Year in the faaaar future\';')[0][0]
+
+        assert result == datetime(9999, 12, 31, 23, 59, 59, 999000)
+
+        result = self.run_query_target_postgres(
+            'SELECT updated_at FROM '
+            'ppw_e2e_tap_postgres."table_with_space and uppercase" '
+            'where cvarchar=\'Year in the BC\';')[0][0]
+
+        assert result == datetime(9999, 12, 31, 23, 59, 59, 999000)
 
     @pytest.mark.dependency(depends=['import_config'])
     def test_replicate_s3_to_pg(self):

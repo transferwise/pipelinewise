@@ -70,7 +70,7 @@ make_virtualenv() {
             PIP_ARGS=$PIP_ARGS"[test]"
         fi
 
-        python3 -m pip install --upgrade -e .$PIP_ARGS
+        python3 -m pip install --upgrade -e .$PIP_ARGS --use-feature=2020-resolver
     fi
 
     echo ""
@@ -173,6 +173,7 @@ DEFAULT_CONNECTORS=(
     tap-zendesk
     tap-mongodb
     tap-github
+    tap-slack
     target-s3-csv
     target-snowflake
     target-redshift
@@ -184,6 +185,7 @@ EXTRA_CONNECTORS=(
     tap-oracle
     tap-zuora
     tap-google-analytics
+    tap-shopify
 )
 
 # Install only the default connectors if --connectors argument not passed
@@ -193,7 +195,7 @@ if [[ -z $CONNECTORS ]]; then
     done
 
 
-# Install every avaliable connectors if --connectors=all passed
+# Install every available connectors if --connectors=all passed
 elif [[ $CONNECTORS == "all" ]]; then
     for i in ${DEFAULT_CONNECTORS[@]}; do
         install_connector $i

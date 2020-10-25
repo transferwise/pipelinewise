@@ -7,8 +7,12 @@ import json
 import logging
 import os
 import re
+import secrets
+import string
 import sys
 import tempfile
+import warnings
+
 import jsonschema
 import yaml
 
@@ -51,12 +55,12 @@ class AnsibleJSONEncoder(json.JSONEncoder):
         return value
 
 
-def is_json(string):
+def is_json(stringss):
     """
     Detects if a string is a valid json or not
     """
     try:
-        json.loads(string)
+        json.loads(stringss)
     except Exception:
         return False
     return True
@@ -78,7 +82,7 @@ def is_json_file(path):
 
 def load_json(path):
     """
-    Deserialise JSON file to python object
+    Deserialize JSON file to python object
     """
     try:
         LOGGER.debug('Parsing file at %s', path)
@@ -94,7 +98,7 @@ def load_json(path):
 
 def is_state_message(line: str) -> bool:
     """
-    Detects if a string is a validstate message
+    Detects if a string is a valid state message
     """
     try:
         json_object = json.loads(line)
@@ -115,12 +119,12 @@ def save_json(data, path):
         raise Exception(f'Cannot save JSON {path} {exc}')
 
 
-def is_yaml(string):
+def is_yaml(strings):
     """
     Detects if a string is a valid yaml or not
     """
     try:
-        yaml.safe_load(string)
+        yaml.safe_load(strings)
     except Exception:
         return False
     return True
@@ -438,6 +442,17 @@ def get_fastsync_bin(venv_dir, tap_type, target_type):
     return os.path.join(venv_dir, 'pipelinewise', 'bin', fastsync_name)
 
 
+def get_pipelinewise_python_bin(venv_dir: str) -> str:
+    """
+    Get the absolute path of a PPW python executable
+    Args:
+        venv_dir: path to the ppw virtual env
+
+    Returns: path to python executable
+    """
+    return os.path.join(venv_dir, 'pipelinewise', 'bin', 'python')
+
+
 # pylint: disable=redefined-builtin
 def create_temp_file(suffix=None, prefix=None, dir=None, text=None):
     """
@@ -491,3 +506,22 @@ def find_errors_in_log_file(file, max_errors=10, error_pattern=None):
                         file_object.seek(0, 2)
 
     return errors
+
+
+def generate_random_string(length: int = 8) -> str:
+    """
+    Generate cryptographically secure random strings
+    Uses best practice from Python doc https://docs.python.org/3/library/secrets.html#recipes-and-best-practices
+    Args:
+        length: length of the string to generate
+    Returns: random string
+    """
+
+    if length < 1:
+        raise Exception('Length must be at least 1!')
+
+    if 0 < length < 8:
+        warnings.warn('Length is too small! consider 8 or more characters')
+
+    return ''.join(secrets.choice(string.ascii_uppercase + string.digits)
+                   for _ in range(length))
