@@ -174,6 +174,7 @@ DEFAULT_CONNECTORS=(
     tap-mongodb
     tap-github
     tap-slack
+    tap-mixpanel
     target-s3-csv
     target-snowflake
     target-redshift
