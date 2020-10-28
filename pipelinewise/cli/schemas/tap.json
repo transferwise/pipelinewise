@@ -215,7 +215,8 @@
         "tap-google-analytics",
         "tap-github",
         "tap-shopify",
-        "tap-slack"
+        "tap-slack",
+        "tap-mixpanel"
       ]
     },
     "db_conn": {

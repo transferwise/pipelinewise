@@ -167,6 +167,17 @@ PipelineWise can replicate data from the following data sources:
 
         :ref:`tap-slack`
 
+.. container:: tile-wrapper
+
+    .. container:: tile
+
+        .. container:: img-hover-zoom
+
+          .. image:: ../img/mixpanel-logo.png
+             :target: taps/mixpanel.html
+
+        :ref:`tap-mixpanel`
+
 Configuring taps
 ----------------
 .. toctree::
@@ -187,3 +198,4 @@ Configuring taps
    taps/github
    taps/shopify
    taps/slack
+   taps/mixpanel
