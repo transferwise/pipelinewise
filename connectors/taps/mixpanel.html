@@ -7,7 +7,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Tap Shopify &mdash; PipelineWise  documentation</title>
+  <title>Tap Mixpanel &mdash; PipelineWise  documentation</title>
   
 
   
@@ -21,7 +21,7 @@
   
   
   
-    <link rel="canonical" href="https://docs.ansible.com/ansible/latest/connectors/taps/shopify.html"/>
+    <link rel="canonical" href="https://docs.ansible.com/ansible/latest/connectors/taps/mixpanel.html"/>
   
 
   
@@ -41,8 +41,8 @@
     
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
-    <link rel="next" title="Tap Slack" href="slack.html" />
-    <link rel="prev" title="Tap Github" href="github.html" /> 
+    <link rel="next" title="Targets (Destinations)" href="../targets.html" />
+    <link rel="prev" title="Tap Slack" href="slack.html" /> 
 </head>
 
 <body class="wy-body-for-nav">
@@ -135,16 +135,13 @@
 <li class="toctree-l2"><a class="reference internal" href="zuora.html">Tap Zuora</a></li>
 <li class="toctree-l2"><a class="reference internal" href="google_analytics.html">Tap Google Analytics</a></li>
 <li class="toctree-l2"><a class="reference internal" href="github.html">Tap Github</a></li>
-<li class="toctree-l2 current"><a class="current reference internal" href="#">Tap Shopify</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#configure-access-to-your-shopify-store">Configure access to your Shopify store</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#store-subdomain">Store Subdomain</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#private-app-api-password">Private App API Password</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#start-date">Start Date</a></li>
+<li class="toctree-l2"><a class="reference internal" href="shopify.html">Tap Shopify</a></li>
+<li class="toctree-l2"><a class="reference internal" href="slack.html">Tap Slack</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Tap Mixpanel</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#authentication">Authentication</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#configuring-what-to-extract">Configuring what to extract</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="slack.html">Tap Slack</a></li>
-<li class="toctree-l2"><a class="reference internal" href="mixpanel.html">Tap Mixpanel</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../targets.html">Targets (Destinations)</a></li>
@@ -202,13 +199,13 @@
         
           <li><a href="../taps.html">Taps (Data Sources)</a> &raquo;</li>
         
-      <li>Tap Shopify</li>
+      <li>Tap Mixpanel</li>
     
     
       <li class="wy-breadcrumbs-aside">
         
             
-            <a href="../../_sources/connectors/taps/shopify.rst.txt" rel="nofollow"> View page source</a>
+            <a href="../../_sources/connectors/taps/mixpanel.rst.txt" rel="nofollow"> View page source</a>
           
         
       </li>
@@ -221,80 +218,63 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
             
-  <div class="section" id="tap-shopify">
-<span id="id1"></span><h1>Tap Shopify<a class="headerlink" href="#tap-shopify" title="Permalink to this headline">¶</a></h1>
-<div class="section" id="configure-access-to-your-shopify-store">
-<h2>Configure access to your Shopify store<a class="headerlink" href="#configure-access-to-your-shopify-store" title="Permalink to this headline">¶</a></h2>
-<p>In order to extract your Shopify data, you will need:</p>
+  <div class="section" id="tap-mixpanel">
+<span id="id1"></span><h1>Tap Mixpanel<a class="headerlink" href="#tap-mixpanel" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="authentication">
+<h2>Authentication<a class="headerlink" href="#authentication" title="Permalink to this headline">¶</a></h2>
+<p>The Mixpanel API uses Basic Authorization with the <code class="docutils literal notranslate"><span class="pre">api_secret</span></code> from the tap config in base-64 encoded format.
+It is slightly different than normal Basic Authorization with username/password. All requests include this
+header with the <code class="docutils literal notranslate"><span class="pre">api_secret</span></code> as the username, with no password.</p>
 <ul class="simple">
-<li><p>Store Subdomain</p></li>
-<li><p>Private App API Password</p></li>
-<li><p>Start Date</p></li>
+<li><p>Authorization: <code class="docutils literal notranslate"><span class="pre">Basic</span> <span class="pre">&lt;base-64</span> <span class="pre">encoded</span> <span class="pre">api_secret&gt;</span></code></p></li>
 </ul>
+<p>More details may be found in the Mixpanel <a class="reference external" href="https://developer.mixpanel.com/docs/data-export-api#section-authentication">API Authentication</a>
+instructions.</p>
+<p>The API secret can be found in the Mixpanel Console, upper-right Settings (gear icon),
+Organization Settings &gt; Projects and in the Access Keys section. For this tap,
+only the <code class="docutils literal notranslate"><span class="pre">api_secret</span></code> is needed (the <code class="docutils literal notranslate"><span class="pre">api_key</span></code> is legacy and the token is used only for uploading data).</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Each Mixpanel project has a different <code class="docutils literal notranslate"><span class="pre">api_secret</span></code>; therefore each Mixpanel pipeline instance is for a single project.</p>
 </div>
-<div class="section" id="store-subdomain">
-<h2>Store Subdomain<a class="headerlink" href="#store-subdomain" title="Permalink to this headline">¶</a></h2>
-<p>The store subdomain can be derived from your Shopify admin URL.</p>
-<p>If your admin URL starts with <code class="code docutils literal notranslate"><span class="pre">https://my-first-store.myshopify.com/</span></code>, your store subdomain is
-<code class="code docutils literal notranslate"><span class="pre">my-first-store</span></code>.</p>
-</div>
-<div class="section" id="private-app-api-password">
-<h2>Private App API Password<a class="headerlink" href="#private-app-api-password" title="Permalink to this headline">¶</a></h2>
-<p>You need to create a <a class="reference external" href="https://help.shopify.com/en/manual/apps/private-apps">Private App</a>
-API password to extract data from your Shopify Shop:</p>
-<ol class="arabic simple">
-<li><p>Log in to your Shopify store admin at <code class="code docutils literal notranslate"><span class="pre">https://&lt;store</span> <span class="pre">subdomain&gt;.myshopify.com/admin</span></code></p></li>
-<li><p>Click “Apps” in the sidebar on the left</p></li>
-<li><p>On the bottom of the page, click “Manage private apps” next to “Working with a developer on your shop?”</p></li>
-<li><p>Click the “Create a new private app” button</p></li>
-<li><p>Enter a “Private app name” of your choosing, e.g. “Singer”</p></li>
-<li><p>Enter your email address under “Emergency developer email”</p></li>
-<li><p>In the “Admin API” section, click “▼ Review disabled Admin API permissions”</p></li>
-<li><p>Choose “Read access” rather than “No access” in the access level dropdowns for the following permissions:</p>
-<ol class="arabic simple">
-<li><p>Products, variants and collections - <code class="code docutils literal notranslate"><span class="pre">read_products,</span> <span class="pre">write_products</span></code></p></li>
-<li><p>Orders, transactions and fulfillments - <code class="code docutils literal notranslate"><span class="pre">read_orders,</span> <span class="pre">write_orders</span></code></p></li>
-<li><p>Customer details and customer groups - <code class="code docutils literal notranslate"><span class="pre">read_customers,</span> <span class="pre">write_customers</span></code></p></li>
-</ol>
-</li>
-<li><p>Click “Save”</p></li>
-<li><p>In the modal that appears, click “I understand, create the app”</p></li>
-</ol>
-<p>Once the app has been created, you can locate the API password:</p>
-<ol class="arabic simple">
-<li><p>In the “Admin API” section on the private app details page, find the “Password” field and click “Show”</p></li>
-<li><p>The value that appears (starting with <code class="code docutils literal notranslate"><span class="pre">shppa_</span></code>) is your API password.</p></li>
-</ol>
-</div>
-<div class="section" id="start-date">
-<h2>Start Date<a class="headerlink" href="#start-date" title="Permalink to this headline">¶</a></h2>
-<p>This property determines how much historical data will be extracted.</p>
 </div>
 <div class="section" id="configuring-what-to-extract">
 <h2>Configuring what to extract<a class="headerlink" href="#configuring-what-to-extract" title="Permalink to this headline">¶</a></h2>
 <p>PipelineWise configures every tap with a common structured YAML file format.
-A sample YAML for Jira replication can be generated into a project directory by
+A sample YAML for the Mixpanel tap can be generated into a project directory by
 following the steps in the <a class="reference internal" href="../../installation_guide/creating_pipelines.html#generating-pipelines"><span class="std std-ref">Generating Sample Pipelines</span></a> section.</p>
-<p>Example YAML for <code class="docutils literal notranslate"><span class="pre">tap-shopify</span></code>:</p>
+<p>Example YAML for <code class="docutils literal notranslate"><span class="pre">tap-mixpanel</span></code>:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>---
 
 <span class="c1"># ------------------------------------------------------------------------------</span>
 <span class="c1"># General Properties</span>
 <span class="c1"># ------------------------------------------------------------------------------</span>
-id: <span class="s2">&quot;shopify&quot;</span>                           <span class="c1"># Unique identifier of the tap</span>
-name: <span class="s2">&quot;Shopify&quot;</span>                         <span class="c1"># Name of the tap</span>
-type: <span class="s2">&quot;tap-shopify&quot;</span>                     <span class="c1"># !! THIS SHOULD NOT CHANGE !!</span>
-owner: <span class="s2">&quot;somebody@foo.com&quot;</span>               <span class="c1"># Data owner to contact</span>
-<span class="c1">#send_alert: False                      # Optional: Disable all configured alerts on this tap</span>
+id: <span class="s2">&quot;mixpanel&quot;</span>                         <span class="c1"># Unique identifier of the tap</span>
+name: <span class="s2">&quot;Mixpanel&quot;</span>                       <span class="c1"># Name of the tap</span>
+type: <span class="s2">&quot;tap-mixpanel&quot;</span>                   <span class="c1"># !! THIS SHOULD NOT CHANGE !!</span>
+owner: <span class="s2">&quot;somebody@foo.com&quot;</span>              <span class="c1"># Data owner to contact</span>
+<span class="c1">#send_alert: False                     # Optional: Disable all configured alerts on this tap</span>
 
 
 <span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="c1"># Source (Tap) - Shopify connection details</span>
+<span class="c1"># Source (Tap) - Mixpanel connection details</span>
 <span class="c1"># ------------------------------------------------------------------------------</span>
 db_conn:
-  shop: <span class="s2">&quot;&lt;STORE SUBDOMAIN&gt;&quot;</span>               <span class="c1"># Shopify Store Subdomain</span>
-  api_key: <span class="s2">&quot;&lt;PRIVATE API KEY PASSWORD&gt;&quot;</span>   <span class="c1"># Shopify Private App API Password</span>
-  start_date: <span class="s2">&quot;2019-01-01&quot;</span>                <span class="c1"># Sync data from this date onwards</span>
+  api_secret: <span class="s2">&quot;&lt;MIXPANEL_API_SECRET&gt;&quot;</span>       <span class="c1"># Mixpanel API secret</span>
+  start_date: <span class="s2">&quot;2020-10-01&quot;</span>                  <span class="c1"># The default value to use if no bookmark exists for an endpoint</span>
+  date_window_size: <span class="m">30</span>                      <span class="c1"># Number of days for date window looping through transactional endpoints</span>
+                                            <span class="c1"># with from_date and to_date. Default date_window_size is 30 days.</span>
+                                            <span class="c1"># Clients with large volumes of events may want to decrease this to 14, 7,</span>
+                                            <span class="c1"># or even down to 1-2 days.</span>
+  attribution_window: <span class="m">1</span>                     <span class="c1"># Latency minimum number of days to look-back to account for delays in</span>
+                                            <span class="c1"># attributing accurate results. Default attribution window is 5 days.</span>
+  project_timezone: <span class="s2">&quot;Europe/London&quot;</span>         <span class="c1"># Time zone in which integer date times are stored. The project timezone</span>
+                                            <span class="c1"># may be found in the project settings in the Mixpanel console.</span>
+  user_agent: <span class="s2">&quot;tap-mixpanel &lt;api@foo.com&gt;&quot;</span>  <span class="c1"># Optional: Process and email for API logging purposes.</span>
+
+  <span class="c1">#export_events:                           # Optional: List of event names to export</span>
+  <span class="c1">#  - event_one</span>
+  <span class="c1">#  - event_two</span>
 
 
 <span class="c1"># ------------------------------------------------------------------------------</span>
@@ -304,7 +284,9 @@ db_conn:
 target: <span class="s2">&quot;snowflake&quot;</span>                       <span class="c1"># ID of the target connector where the data will be loaded</span>
 batch_size_rows: <span class="m">20000</span>                    <span class="c1"># Batch size for the stream to optimise load performance</span>
 stream_buffer_size: <span class="m">0</span>                     <span class="c1"># In-memory buffer size (MB) between taps and targets for asynchronous data pipes</span>
-default_target_schema: <span class="s2">&quot;shopify&quot;</span>          <span class="c1"># Target schema where the data will be loaded</span>
+default_target_schema: <span class="s2">&quot;mixpanel&quot;</span>         <span class="c1"># Target schema where the data will be loaded</span>
+<span class="c1">#default_target_schema_select_permission:  # Optional: Grant SELECT on schema and tables that created</span>
+<span class="c1">#  - grp_power</span>
 
 
 <span class="c1"># ------------------------------------------------------------------------------</span>
@@ -312,28 +294,24 @@ default_target_schema: <span class="s2">&quot;shopify&quot;</span>          <spa
 <span class="c1"># ------------------------------------------------------------------------------</span>
 schemas:
 
-  - source_schema: <span class="s2">&quot;shopify&quot;</span>             <span class="c1"># This is mandatory, but can be anything in this tap type</span>
-    target_schema: <span class="s2">&quot;shopify&quot;</span>             <span class="c1"># Target schema in the destination Data Warehouse</span>
-    <span class="c1">#target_schema_select_permissions:    # Optional: Grant SELECT on schema and tables that created</span>
-    <span class="c1">#  - grp_stats</span>
+  - source_schema: <span class="s2">&quot;mixpanel&quot;</span>           <span class="c1"># This is mandatory, but can be anything in this tap type</span>
+    target_schema: <span class="s2">&quot;mixpanel&quot;</span>           <span class="c1"># Target schema in the destination Data Warehouse</span>
+    target_schema_select_permissions:   <span class="c1"># Optional: Grant SELECT on schema and tables that created</span>
+      - grp_stats
 
-    <span class="c1"># List of Github tables to load into destination Data Warehouse</span>
-    <span class="c1"># Tap-Github will use the best incremental strategies automatically to replicate data</span>
+    <span class="c1"># List of Mixpanel tables to load into destination Data Warehouse</span>
+    <span class="c1"># Tap-Mixpanel will use the best incremental strategies automatically to replicate data</span>
     tables:
-      <span class="c1"># Supported tables</span>
-      - table_name: <span class="s2">&quot;orders&quot;</span>
-      - table_name: <span class="s2">&quot;customers&quot;</span>
-      - table_name: <span class="s2">&quot;products&quot;</span>
-      - table_name: <span class="s2">&quot;transactions&quot;</span>
+      <span class="c1"># Incrementally loaded tables</span>
+      - table_name: <span class="s2">&quot;export&quot;</span>
+      - table_name: <span class="s2">&quot;funnels&quot;</span>
+      - table_name: <span class="s2">&quot;revenue&quot;</span>
 
-
-      <span class="c1"># Additional supported tables</span>
-      <span class="c1">#- table_name: &quot;custom_collections&quot;</span>
-      <span class="c1">#- table_name: &quot;abandoned_checkouts&quot;</span>
-      <span class="c1">#- table_name: &quot;metafields&quot;</span>
-      <span class="c1">#- table_name: &quot;order_refunds&quot;</span>
-      <span class="c1">#- table_name: &quot;collects&quot;</span>
-
+      <span class="c1"># Tables that cannot load incrementally and will use FULL_TABLE method</span>
+      <span class="c1">#- table_name: &quot;engage&quot;</span>
+      <span class="c1">#- table_name: &quot;annotations&quot;</span>
+      <span class="c1">#- table_name: &quot;cohorts&quot;</span>
+      <span class="c1">#- table_name: &quot;cohort_members&quot;</span>
 
         <span class="c1"># OPTIONAL: Load time transformations - you can add it to any table</span>
         <span class="c1">#transformations:</span>
@@ -352,10 +330,10 @@ schemas:
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
-        <a href="slack.html" class="btn btn-neutral float-right" title="Tap Slack" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+        <a href="../targets.html" class="btn btn-neutral float-right" title="Targets (Destinations)" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
       
       
-        <a href="github.html" class="btn btn-neutral float-left" title="Tap Github" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+        <a href="slack.html" class="btn btn-neutral float-left" title="Tap Slack" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
       
     </div>
   
