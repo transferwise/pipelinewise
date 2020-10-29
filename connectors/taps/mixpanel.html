@@ -271,6 +271,10 @@ db_conn:
   project_timezone: <span class="s2">&quot;Europe/London&quot;</span>         <span class="c1"># Time zone in which integer date times are stored. The project timezone</span>
                                             <span class="c1"># may be found in the project settings in the Mixpanel console.</span>
   user_agent: <span class="s2">&quot;tap-mixpanel &lt;api@foo.com&gt;&quot;</span>  <span class="c1"># Optional: Process and email for API logging purposes.</span>
+  <span class="c1">#denest_properties: &quot;false&quot;               # Optional: Do not denest JSON responses in `export` and `engage` streams</span>
+                                            <span class="c1"># to avoid very wide tables. If denesting is disabled then responses are</span>
+                                            <span class="c1"># loaded into one JSON column in the target.</span>
+                                            <span class="c1"># Default denest_properties is false.</span>
 
   <span class="c1">#export_events:                           # Optional: List of event names to export</span>
   <span class="c1">#  - event_one</span>
