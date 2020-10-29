@@ -138,10 +138,10 @@ class FastSyncTapS3Csv:
         s3_file_handle = S3Helper.get_file_handle(self.connection_config, s3_path)
 
         # pylint:disable=protected-access
-        iterator = singer_encodings_csv.get_row_iterator(s3_file_handle._raw_stream, table_spec)
+        header_iterator = singer_encodings_csv.get_row_iterator(s3_file_handle._raw_stream, table_spec)
 
         headers.update(
-            map(safe_column_name, s3_file_handle._raw_stream.readline().strip().decode('utf8').split(table_spec.get('delimiter', ',')))
+            map(safe_column_name, next(header_iterator).keys())
         )
 
         headers.update({
@@ -159,7 +159,7 @@ class FastSyncTapS3Csv:
             s3_file_handle = S3Helper.get_file_handle(self.connection_config, s3_path)
 
             # pylint:disable=protected-access
-            iterator = singer_encodings_csv.get_row_iterator(s3_file_handle._raw_stream, table_spec)
+            row_iterator = singer_encodings_csv.get_row_iterator(s3_file_handle._raw_stream, table_spec)
 
             for row in iterator:
                 now_datetime = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f')
