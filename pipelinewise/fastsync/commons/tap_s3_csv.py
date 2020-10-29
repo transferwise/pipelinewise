@@ -161,7 +161,7 @@ class FastSyncTapS3Csv:
             # pylint:disable=protected-access
             row_iterator = singer_encodings_csv.get_row_iterator(s3_file_handle._raw_stream, table_spec)
 
-            for row in iterator:
+            for row in row_iterator:
                 now_datetime = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f')
                 custom_columns = {
                     S3Helper.SDC_SOURCE_BUCKET_COLUMN: bucket,
