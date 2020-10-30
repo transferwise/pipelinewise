@@ -1,3 +1,9 @@
+0.26.0 (2020-10-30)
+-------------------
+
+- Add tap-mixpanel
+- Bump `joblib` to 0.16.0 to fix some issues when running on python 3.8
+
 0.25.0 (2020-10-23)
 -------------------
 
