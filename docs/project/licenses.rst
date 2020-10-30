@@ -10,7 +10,7 @@ your build depends on the included connectors. Please note that if you use even 
 this will result in the entire build falling under AGPL license. Please always double check license compatibilities
 and terms for all components.
 
-To install :ref:`selecting_singer_connectors`
+More info in the :ref:`selecting_singer_connectors` section.
 
 Connectors and Licenses
 -----------------------
