@@ -105,6 +105,8 @@ class FastSyncTapS3Csv:
             if max_last_modified is None or max_last_modified < s3_file['last_modified']:
                 max_last_modified = s3_file['last_modified']
 
+        LOGGER.info("Final headers: %s", headers)
+
         # add the found last modified date to the dictionary
         self.tables_last_modified[table_name] = max_last_modified
 
@@ -157,6 +159,7 @@ class FastSyncTapS3Csv:
 
         def get_rows():
             s3_file_handle = S3Helper.get_file_handle(self.connection_config, s3_path)
+            LOGGER.info("Fetching rows from path: %s", s3_path)
 
             # pylint:disable=protected-access
             row_iterator = singer_encodings_csv.get_row_iterator(s3_file_handle._raw_stream, table_spec)
