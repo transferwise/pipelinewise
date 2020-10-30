@@ -1,39 +1,26 @@
-name: Publish docker images
+name: PR checker
 
 on:
-  push #:
-#    branches:
-#      - master
+  pull_request:
+    branches: [master]
+    types: [opened, edited, synchronize]
 
 jobs:
+  check-for-cc:
 
-  publish:
+    name: Check description
     runs-on: [self-hosted]
-
     steps:
-
-      - uses: actions/checkout@v2
+      - name: Run actions/checkout
+        uses: actions/checkout@v1
         with:
-          fetch-depth: 0
+          fetch-depth: 1
 
-      - name: Show me what you got
+      - name: Run check
         env:
-          CI_REF: '${{github.ref}}'
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PULL_REQUEST_CONTAINS_PATTERN: '.{20,}'
+          PULL_REQUEST_NOT_CONTAINS_PATTERN: 'add meaningful description before asking for approval'
+          PULL_REQUEST_COMMENT: 'Please check description. \nShould be meaningful and not empty.'
         run: |
-          echo "Changes found:"
-          .github/change-finder.sh
-          echo "Dockerfiles found:"
-          .github/change-finder.sh | .github/dockerfile-filter.sh
-      - name: Build and publish
-        env:
-          CI_REF:                '${{github.ref}}'
-          TAG_NAME:              'g${{github.run_number}}'
-          REGISTRY_URL:          'docker.tw.ee'
-          DEPLOY_USERNAME:       '${{ secrets.DEPLOY_USERNAME }}'
-          DEPLOY_PASSWORD:       '${{ secrets.DEPLOY_PASSWORD }}'
-        run: |
-            echo $CI_REF
-            for REPO in $(.github/change-finder.sh | .github/dockerfile-filter.sh); do
-                .github/docker-publish.sh $REPO $TAG_NAME
-                .circleci/github-publish.sh $REPO $TAG_NAME
-            done
+          .github/github-check.sh
