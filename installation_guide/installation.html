@@ -138,6 +138,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../project/contribution.html">Contribution</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../project/about.html">Project</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../project/licenses.html">Licenses</a></li>
 </ul>
 
             
@@ -296,12 +297,18 @@ To start CLI:
 </pre></div>
 </div>
 <div class="section" id="selecting-singer-connectors">
-<h3>Selecting singer connectors<a class="headerlink" href="#selecting-singer-connectors" title="Permalink to this headline">¶</a></h3>
-<p>You can install PipelineWise only with required connectors by using the <cite>–connectors=</cite> argument. For example if you
+<span id="id2"></span><h3>Selecting singer connectors<a class="headerlink" href="#selecting-singer-connectors" title="Permalink to this headline">¶</a></h3>
+<p>You can install PipelineWise only with required connectors by using the <code class="docutils literal notranslate"><span class="pre">--connectors=</span></code> argument. For example if you
 need to replicate data only from MySQL and PostgreSQL into a Snowflake database you can install PipelineWise by
 running:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ ./install.sh --connectors<span class="o">=</span>tap-mysql,tap-postgres,target-snowflake
 </pre></div>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Adding components may overwrite the default Apache2 License Version 2.0 terms and conditions.
+Please always double check license compatibilities and terms of the installed components.
+More info in the <a class="reference internal" href="../project/licenses.html#licenses"><span class="std std-ref">Licenses</span></a> section.</p>
 </div>
 <p>Here’s the list of the singer connectors and if they are installed by default or not:</p>
 <table class="docutils align-default">
