@@ -308,6 +308,7 @@ Content
 
    project/contribution
    project/about
+   project/licenses
 
 Indices and tables
 ==================

@@ -195,3 +195,11 @@ Apache License Version 2.0
 
 See [LICENSE](LICENSE) to see the full text.
 
+**Important Note:**
+
+PipelineWise as a standalone software is licensed under Apache License Version 2.0 but bundled components can
+use different licenses and may overwrite the terms and conditions detailed in Apache License Version 2.0.
+You can customise which connectors you want to include into the final PipelineWise build and the final license of
+your build depends on the included connectors. For further details please check the
+[Licenses](https://transferwise.github.io/pipelinewise/project/licenses.html) section in the documentation.
+
