@@ -1,9 +1,9 @@
 name: Publish docker images
 
 on:
-  push:
-    branches:
-      - master
+  push #:
+#    branches:
+#      - master
 
 jobs:
 
