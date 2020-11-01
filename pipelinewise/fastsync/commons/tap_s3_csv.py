@@ -1,7 +1,9 @@
 import csv
 import gzip
 import logging
+import tempfile
 import re
+import shutil
 import sys
 import itertools
 import boto3
@@ -97,7 +99,6 @@ class FastSyncTapS3Csv:
         max_last_modified = None
 
         for s3_file in s3_files:
-
             # this function will add records to the `records` list passed to it and add to the `headers` set as well
             records = itertools.chain(records, self._get_file_records(s3_file['key'], table_spec, headers, count))
 
@@ -112,7 +113,6 @@ class FastSyncTapS3Csv:
 
         # write to the given compressed csv file
         with gzip.open(file_path, 'wt') as gzfile:
-
             writer = csv.DictWriter(gzfile,
                                     fieldnames=sorted(list(headers)),
                                     extrasaction="ignore",
@@ -159,31 +159,41 @@ class FastSyncTapS3Csv:
         s3_file_handle.close()
 
         def get_rows():
-            s3_file_handle = S3Helper.get_file_handle(self.connection_config, s3_path)
             LOGGER.info("Fetching rows from path: %s", s3_path)
 
-            # pylint:disable=protected-access
-            row_iterator = singer_encodings_csv.get_row_iterator(s3_file_handle._raw_stream, table_spec)
+            with tempfile.NamedTemporaryFile(mode='w+b', suffix=".csv.gz") as tmpfile:
+                s3_file_handle = S3Helper.get_file_handle(self.connection_config, s3_path)
+                gzip_file = gzip.GzipFile(mode='wb', fileobj=tmpfile)
+                shutil.copyfileobj(s3_file_handle, gzip_file)
+                gzip_file.close()
+                s3_file_handle.close()
 
-            for row in row_iterator:
-                now_datetime = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f')
-                custom_columns = {
-                    S3Helper.SDC_SOURCE_BUCKET_COLUMN: bucket,
-                    S3Helper.SDC_SOURCE_FILE_COLUMN: s3_path,
-                    S3Helper.SDC_SOURCE_LINENO_COLUMN: next(count),
-                    '_SDC_EXTRACTED_AT': now_datetime,
-                    '_SDC_BATCHED_AT': now_datetime,
-                    '_SDC_DELETED_AT': None
-                }
+                LOGGER.info("Downloaded %s", s3_path)
 
-                new_row = {}
+                tmpfile.seek(0)
+                gzip_file = gzip.GzipFile(mode='rb', fileobj=tmpfile)
+                # pylint:disable=protected-access
+                row_iterator = singer_encodings_csv.get_row_iterator(gzip_file, table_spec)
 
-                # make all columns safe
-                # pylint: disable=invalid-name
-                for k, v in row.items():
-                    new_row[safe_column_name(k)] = v
+                for row in row_iterator:
+                    now_datetime = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f')
+                    custom_columns = {
+                        S3Helper.SDC_SOURCE_BUCKET_COLUMN: bucket,
+                        S3Helper.SDC_SOURCE_FILE_COLUMN: s3_path,
+                        S3Helper.SDC_SOURCE_LINENO_COLUMN: next(count),
+                        '_SDC_EXTRACTED_AT': now_datetime,
+                        '_SDC_BATCHED_AT': now_datetime,
+                        '_SDC_DELETED_AT': None
+                    }
 
-                yield {**new_row, **custom_columns}
+                    new_row = {}
+
+                    # make all columns safe
+                    # pylint: disable=invalid-name
+                    for k, v in row.items():
+                        new_row[safe_column_name(k)] = v
+
+                    yield {**new_row, **custom_columns}
 
         return get_rows()
 
