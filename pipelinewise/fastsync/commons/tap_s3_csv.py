@@ -105,7 +105,7 @@ class FastSyncTapS3Csv:
             if max_last_modified is None or max_last_modified < s3_file['last_modified']:
                 max_last_modified = s3_file['last_modified']
 
-        LOGGER.info("Final headers: %s", headers)
+        LOGGER.info("Collected headers: %s", headers)
 
         # add the found last modified date to the dictionary
         self.tables_last_modified[table_name] = max_last_modified
@@ -115,6 +115,7 @@ class FastSyncTapS3Csv:
 
             writer = csv.DictWriter(gzfile,
                                     fieldnames=sorted(list(headers)),
+                                    extrasaction="ignore",
                                     # we need to sort the headers so that copying into snowflake works
                                     delimiter=',',
                                     quotechar='"',
