@@ -244,7 +244,7 @@ class FastSyncTapS3Csv:
             row_set.register_processor(offset_processor(offset + 1))
 
             types = [
-                'integer' if header == safe_column_name(S3Helper.SDC_SOURCE_LINENO_COLUMN) else 'string'
+                'integer' if header == S3Helper.SDC_SOURCE_LINENO_COLUMN else 'string'
                 for header in headers
             ]
             return zip(headers, types)
