@@ -205,7 +205,7 @@ class FastSyncTapMySql:
                             data_type,
                             column_type,
                             CASE
-                            WHEN data_type IN ('blob', 'tinyblob', 'mediumblob', 'longblob', 'geometry')
+                            WHEN data_type IN ('blob', 'tinyblob', 'mediumblob', 'longblob')
                                     THEN CONCAT('REPLACE(hex(`', column_name, '`)', ", '\n', ' ')")
                             WHEN data_type IN ('binary', 'varbinary')
                                     THEN concat('REPLACE(hex(trim(trailing CHAR(0x00) from `',COLUMN_NAME,'`))', ", '\n', ' ')")
