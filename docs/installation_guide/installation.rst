@@ -120,16 +120,25 @@ the installation and accept every license agreement run ``./install --acceptlice
 
     --------------------------------------------------------------------------
 
+.. _selecting_singer_connectors:
+
 Selecting singer connectors
 '''''''''''''''''''''''''''
 
-You can install PipelineWise only with required connectors by using the `--connectors=` argument. For example if you
+You can install PipelineWise only with required connectors by using the ``--connectors=`` argument. For example if you
 need to replicate data only from MySQL and PostgreSQL into a Snowflake database you can install PipelineWise by
 running:
 
 .. code-block:: bash
 
     $ ./install.sh --connectors=tap-mysql,tap-postgres,target-snowflake
+
+.. warning::
+
+    Adding components may overwrite the default Apache2 License Version 2.0 terms and conditions.
+    Please always double check license compatibilities and terms of the installed components.
+    More info in the :ref:`licenses` section.
+
 
 Here’s the list of the singer connectors and if they are installed by default or not:
 
@@ -165,6 +174,14 @@ Here’s the list of the singer connectors and if they are installed by default 
 | tap-zuora                  | ./install --connectors=tap-zuora            | NO                               |                                       |
 +----------------------------+---------------------------------------------+----------------------------------+---------------------------------------+
 | tap-google-analytics       | ./install --connectors=tap-google-analytics | NO                               |                                       |
++----------------------------+---------------------------------------------+----------------------------------+---------------------------------------+
+| tap-github                 | ./install --connectors=tap-github           | YES                              |                                       |
++----------------------------+---------------------------------------------+----------------------------------+---------------------------------------+
+| tap-slack                  | ./install --connectors=tap-slack            | YES                              |                                       |
++----------------------------+---------------------------------------------+----------------------------------+---------------------------------------+
+| tap-shopify                | ./install --connectors=tap-shopify          | NO                               |                                       |
++----------------------------+---------------------------------------------+----------------------------------+---------------------------------------+
+| tap-mixpanel               | ./install --connectors=tap-mixpanel         | YES                              |                                       |
 +----------------------------+---------------------------------------------+----------------------------------+---------------------------------------+
 | target-postgres            | ./install --connectors=target-postgres      | YES                              |                                       |
 +----------------------------+---------------------------------------------+----------------------------------+---------------------------------------+

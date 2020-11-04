@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-import logging
 import os
 import sys
 import time
@@ -10,11 +9,12 @@ from argparse import Namespace
 from functools import partial
 from datetime import datetime
 
+from ..logger import Logger
 from .commons import utils
 from .commons.tap_mongodb import FastSyncTapMongoDB
 from .commons.target_snowflake import FastSyncTargetSnowflake
 
-LOGGER = logging.getLogger(__name__)
+LOGGER = Logger().get_logger(__name__)
 
 REQUIRED_CONFIG_KEYS = {
     'tap': [

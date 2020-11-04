@@ -18,6 +18,7 @@ CONFIG_DIR = '{}/sample_json_config'.format(RESOURCES_DIR)
 VIRTUALENVS_DIR = './virtualenvs-dummy'
 TEST_PROJECT_NAME = 'test-project'
 TEST_PROJECT_DIR = '{}/{}'.format(os.getcwd(), TEST_PROJECT_NAME)
+PROFILING_DIR = './profiling'
 
 
 # pylint: disable=no-self-use,too-many-public-methods,attribute-defined-outside-init,fixme
@@ -29,7 +30,7 @@ class TestCli:
     def setup_method(self):
         """Create CLI arguments"""
         self.args = CliArgs(log='coverage.log')
-        self.pipelinewise = PipelineWise(self.args, CONFIG_DIR, VIRTUALENVS_DIR)
+        self.pipelinewise = PipelineWise(self.args, CONFIG_DIR, VIRTUALENVS_DIR, PROFILING_DIR)
 
     def teardown_method(self):
         """Delete test directories"""

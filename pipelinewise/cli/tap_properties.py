@@ -238,6 +238,34 @@ def get_tap_properties(tap=None, temp_dir=None):
             'default_replication_method': 'LOG_BASED',
             'default_data_flattening_max_level': 0
         },
+        'tap-shopify': {
+            'tap_config_extras': {},
+            'tap_stream_id_pattern': '{{table_name}}',
+            'tap_stream_name_pattern': '{{table_name}}',
+            'tap_catalog_argument': '--catalog',
+            'default_replication_method': 'INCREMENTAL',
+            'default_data_flattening_max_level': 0
+        },
+        'tap-slack': {
+            'tap_config_extras': {},
+            'tap_stream_id_pattern': '{{table_name}}',
+            'tap_stream_name_pattern': '{{table_name}}',
+            'tap_catalog_argument': '--catalog',
+            'default_replication_method': 'LOG_BASED',
+            'default_data_flattening_max_level': 0
+        },
+        'tap-mixpanel': {
+            'tap_config_extras': {
+                'user_agent': 'PipelineWise - Tap Mixpanel',
+                # Do not denest properties by default
+                'denest_properties': tap.get('db_conn', {}).get('denest_properties', 'false') if tap else None
+            },
+            'tap_stream_id_pattern': '{{table_name}}',
+            'tap_stream_name_pattern': '{{table_name}}',
+            'tap_catalog_argument': '--catalog',
+            'default_replication_method': 'LOG_BASED',
+            'default_data_flattening_max_level': 0
+        },
         # Default values to use as a fallback method
         'DEFAULT': {
             'tap_config_extras': {},

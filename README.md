@@ -55,7 +55,10 @@ consumes data from taps and do something with it, like load it into a file, API 
 | Tap       | **[Google Analytics](https://github.com/transferwise/pipelinewise-tap-google-analytics)** | Extra | [![PyPI version](https://badge.fury.io/py/pipelinewise-tap-google-analytics.svg)](https://badge.fury.io/py/tap-adwords) | Extracts data from Google Analytics |
 | Tap       | **[Oracle](https://github.com/transferwise/pipelinewise-tap-oracle)** | Extra | [![PyPI version](https://badge.fury.io/py/pipelinewise-tap-oracle.svg)](https://badge.fury.io/py/pipelinewise-tap-oracle) | Extracts data from Oracle databases. Supporting Log-Based, Key-Based Incremental and Full Table replications |
 | Tap       | **[Zuora](https://github.com/transferwise/pipelinewise-tap-zuora)** | Extra | [![PyPI version](https://badge.fury.io/py/pipelinewise-tap-zuora.svg)](https://badge.fury.io/py/pipelinewise-tap-zuora) | Extracts data from Zuora database using AQAA and REST extraction API with Key-Based incremental replications |
-| Tap       | **[GitHub](https://github.com/singer-io/tap-github)** | Extra | [![PyPI version](https://badge.fury.io/py/tap-github.svg)](https://badge.fury.io/py/tap-github) | Extracts data from GitHub API using Personal Access Token and Key-Based incremental replications |
+| Tap       | **[GitHub](https://github.com/singer-io/tap-github)** |       | [![PyPI version](https://badge.fury.io/py/tap-github.svg)](https://badge.fury.io/py/tap-github) | Extracts data from GitHub API using Personal Access Token and Key-Based incremental replications |
+| Tap       | **[Shopify](https://github.com/singer-io/tap-shopify)** | Extra | [![PyPI version](https://badge.fury.io/py/tap-shopify.svg)](https://badge.fury.io/py/tap-shopify) | Extracts data from Shopify API using Personal App API Password and date based incremental replications |
+| Tap       | **[Slack](https://github.com/transferwise/pipelinewise-tap-slack)** |       | [![PyPI version](https://badge.fury.io/py/pipelinewise-tap-slack.svg)](https://badge.fury.io/py/pipelinewise-tap-slack) | Extracts data from a Slack API using Bot User Token and Key-Based incremental replications |
+| Tap       | **[Mixpanel](https://github.com/transferwise/pipelinewise-tap-mixpanel)** |       | [![PyPI version](https://badge.fury.io/py/pipelinewise-tap-mixpanel.svg)](https://badge.fury.io/py/pipelinewise-tap-mixpanel) | Extracts data from the Mixpanel API. |
 | Target    | **[Postgres](https://github.com/transferwise/pipelinewise-target-postgres)** | | [![PyPI version](https://badge.fury.io/py/pipelinewise-target-postgres.svg)](https://badge.fury.io/py/pipelinewise-target-postgres) | Loads data from any tap into PostgreSQL database |
 | Target    | **[Redshift](https://github.com/transferwise/pipelinewise-target-redshift)** | | [![PyPI version](https://badge.fury.io/py/pipelinewise-target-redshift.svg)](https://badge.fury.io/py/pipelinewise-target-redshift) | Loads data from any tap into Amazon Redshift Data Warehouse |
 | Target    | **[Snowflake](https://github.com/transferwise/pipelinewise-target-snowflake)** | | [![PyPI version](https://badge.fury.io/py/pipelinewise-target-snowflake.svg)](https://badge.fury.io/py/pipelinewise-target-snowflake) | Loads data from any tap into Snowflake Data Warehouse |
@@ -67,13 +70,14 @@ consumes data from taps and do something with it, like load it into a file, API 
 
 ### Running from docker
 
-If you have [Docker](https://www.docker.com/) installed then using docker is the easiest and
-recommended method of start using PipelineWise.
+If you have [Docker](https://www.docker.com/) installed then using docker is the recommended and easiest method to start using PipelineWise.
 
-1. Build an executable docker images that has every required dependency and it's isolated from your host system:
+1. Build an executable docker image that has every required dependency and is isolated from your host system. 
+
+By default, the image will build with *all* connectors. In order to keep image size small, we strongly recommend you change it to just the connectors you need by supplying the `--build-arg` command:
 
     ```sh
-    $ docker build -t pipelinewise:latest .
+    $ docker build --build-arg connectors=tap-mysql,target-snowflake -t pipelinewise:latest .
     ```
 
 2. Once the image is ready, create an alias to the docker wrapper script:
@@ -82,7 +86,7 @@ recommended method of start using PipelineWise.
     $ alias pipelinewise="$(PWD)/bin/pipelinewise-docker"
     ```
 
-3. Check if the installation was successfully by running the `pipelinewise status` command:
+3. Check if the installation was successful by running the `pipelinewise status` command:
 
     ```sh
     $ pipelinewise status
@@ -101,14 +105,14 @@ You can run any pipelinewise command at this point. Tutorials to create and run 
 
 ### Building from source
 
-1. Make sure that every dependencies installed on your system:
+1. Make sure that all dependencies are installed on your system:
     * Python 3.x
     * python3-dev
     * python3-venv
     * mongo-tools
     * mbuffer
 
-2. Run the install script that installs the PipelineWise CLI and every supported singer connectors into separated virtual environments:
+2. Run the install script that installs the PipelineWise CLI and all supported singer connectors into separate virtual environments:
 
     ```sh
     $ ./install.sh --connectors=all
@@ -116,16 +120,15 @@ You can run any pipelinewise command at this point. Tutorials to create and run 
     Press `Y` to accept the license agreement of the required singer components. To automate the installation and accept every license agreement run `./install --acceptlicenses`
     Use the optional `--connectors=...,...` argument to install only a specific list of singer connectors.
 
-3. To start CLI you need to activate the CLI virtual environment and has to set `PIPELINEWISE_HOME` environment variable:
+3. To start the CLI you need to activate the CLI virtual environment and set `PIPELINEWISE_HOME` environment variable:
 
     ```sh
     $ source {ACTUAL_ABSOLUTE_PATH}/.virtualenvs/pipelinewise/bin/activate
     $ export PIPELINEWISE_HOME={ACTUAL_ABSOLUTE_PATH}
     ```
-    (The `ACTUAL_ABSOLUTE_PATH` differs on every system, the install script prints you the correct command that fits
-    to your system once the installation completed)
+    (The `ACTUAL_ABSOLUTE_PATH` differs on every system, the install script prints the correct commands once the installation completes)
 
-4. Check if the installation was successfully by running the `pipelinewise status` command:
+4. Check if the installation was successful by running the `pipelinewise status` command:
 
     ```sh
     $ pipelinewise status
@@ -135,7 +138,7 @@ You can run any pipelinewise command at this point. Tutorials to create and run 
     0 pipeline(s)
     ```
 
-You can run any pipelinewise command at this point. Tutorials to create and run pipelines is at [creating pipelines](https://transferwise.github.io/pipelinewise/installation_guide/creating_pipelines.html).
+You can run any pipelinewise command at this point. Tutorials to create and run pipelines can be found here: [creating pipelines](https://transferwise.github.io/pipelinewise/installation_guide/creating_pipelines.html).
 
 **To run unit tests**:
 
@@ -149,7 +152,7 @@ To run unit tests and generate code coverage:
 $ coverage run -m pytest --ignore tests/end_to_end && coverage report
 ```
 
-To generate HTML coverage report.
+To generate code coverage HTML report.
 
 ```
 $ coverage run -m pytest --ignore tests/end_to_end && coverage html -d coverage_html
@@ -157,16 +160,16 @@ $ coverage run -m pytest --ignore tests/end_to_end && coverage html -d coverage_
 
 **Note**: The HTML report will be generated in `coverage_html/index.html`
 
-**To run integration and end to end tests**:
+**To run integration and end-to-end tests**:
 
 To run integration and end-to-end tests you need to use the [Docker Development Environment](dev-project/README.md). This will spin up a pre-configured PipelineWise project with pre-configured source and target databases in several docker containers which is required for the end-to-end test cases.
 
 ## Developing with Docker
 
 If you have [Docker](https://www.docker.com/) and [Docker Compose](https://docs.docker.com/compose/) installed,
-you can create a local development environment that includes not only the PipelineWise executables but a
-pre-configured development project as well with some databases as source and targets for a more convenient
-development experience and to run integration and end to end tests.
+you can create a local development environment that includes not only the PipelineWise executables but also a
+pre-configured development project with some databases as source and targets for a more convenient
+development experience and to run integration and end-to-end tests.
 
 For further instructions about setting up local development environment go to
 [Test Project for Docker Development Environment](dev-project/README.md).
@@ -191,4 +194,12 @@ To add new taps and targets follow the instructions on
 Apache License Version 2.0
 
 See [LICENSE](LICENSE) to see the full text.
+
+**Important Note:**
+
+PipelineWise as a standalone software is licensed under Apache License Version 2.0 but bundled components can
+use different licenses and may overwrite the terms and conditions detailed in Apache License Version 2.0.
+You can customise which connectors you want to include into the final PipelineWise build and the final license of
+your build depends on the included connectors. For further details please check the
+[Licenses](https://transferwise.github.io/pipelinewise/project/licenses.html) section in the documentation.
 

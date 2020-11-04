@@ -24,6 +24,12 @@ on the database, schema and tables that you want to replicate:
     * ``GRANT USAGE ON SCHEMA <schema_name> TO pipelinewise``
     * ``GRANT SELECT ON ALL TABLES IN SCHEMA <schema_name> TO pipelinewise``
 
+
+In order for pipelinewise user to automatically be able to access any tables created in the future, we recommend running the following query:
+
+``ALTER DEFAULT PRIVILEGES IN SCHEMA <schema_name> GRANT SELECT ON TABLES TO pipelinewise;``
+
+
 **Step 3: Configure Log-based Incremental Replication**
 
 .. note::
@@ -154,6 +160,9 @@ Example YAML for ``tap-postgres``:
       #break_at_end_lsn:                   # Optional: Stop running the tap if the newly received lsn
                                            #           is after the max lsn that was detected when the tap started
                                            #           Default: true
+      #ssl: "true"                         # Optional: Using SSL via postgres sslmode 'require' option.
+                                           #           If the server does not accept SSL connections or the client
+                                           #           certificate is not recognized the connection will fail
 
 
     # ------------------------------------------------------------------------------

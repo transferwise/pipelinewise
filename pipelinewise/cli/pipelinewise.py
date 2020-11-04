@@ -34,8 +34,12 @@ class PipelineWise:
     FULL_TABLE = 'FULL_TABLE'
     STATUS_SUCCESS = 'SUCCESS'
     STATUS_FAILED = 'FAILED'
+    TRANSFORM_FIELD_CONNECTOR_NAME = 'transform-field'
 
-    def __init__(self, args, config_dir, venv_dir):
+    def __init__(self, args, config_dir, venv_dir, profiling_dir=None):
+
+        self.profiling_mode = args.profiler
+        self.profiling_dir = profiling_dir
         self.args = args
         self.logger = logging.getLogger(__name__)
         self.config_dir = config_dir
@@ -49,12 +53,15 @@ class PipelineWise:
         if args.tap != '*':
             self.tap = self.get_tap(args.target, args.tap)
             self.tap_bin = self.get_connector_bin(self.tap['type'])
+            self.tap_python_bin = self.get_connector_python_bin(self.tap['type'])
 
         if args.target != '*':
             self.target = self.get_target(args.target)
             self.target_bin = self.get_connector_bin(self.target['type'])
+            self.target_python_bin = self.get_connector_python_bin(self.target['type'])
 
-        self.transform_field_bin = self.get_connector_bin('transform-field')
+        self.transform_field_bin = self.get_connector_bin(self.TRANSFORM_FIELD_CONNECTOR_NAME)
+        self.transform_field_python_bin = self.get_connector_python_bin(self.TRANSFORM_FIELD_CONNECTOR_NAME)
         self.tap_run_log_file = None
 
         # Catch SIGINT and SIGTERM to exit gracefully
@@ -304,6 +311,12 @@ class PipelineWise:
         """
         return os.path.join(self.venv_dir, connector_type, 'bin', connector_type)
 
+    def get_connector_python_bin(self, connector_type):
+        """
+        Get absolute path of a connector python command
+        """
+        return os.path.join(self.venv_dir, connector_type, 'bin', 'python')
+
     @classmethod
     def get_connector_files(cls, connector_dir):
         """
@@ -332,7 +345,7 @@ class PipelineWise:
 
         return targets
 
-    def get_target(self, target_id):
+    def get_target(self, target_id: str) -> Dict:
         """
         Get target by id
         """
@@ -557,7 +570,7 @@ class PipelineWise:
                 try:
                     stream_table_mdata_idx = [i for i, md in enumerate(stream['metadata']) if md['breadcrumb'] == []][0]
                 except Exception:
-                    pass
+                    raise Exception(f'Metadata of stream {tap_stream_id} doesn\'t have an empty breadcrumb')
 
                 if tap_stream_sel:
                     self.logger.debug('Mark %s tap_stream_id as selected with properties %s', tap_stream_id,
@@ -613,6 +626,11 @@ class PipelineWise:
         # We will use the discover option to test connection
         tap_config = self.tap['files']['config']
         command = f'{self.tap_bin} --config {tap_config} --discover'
+
+        if self.profiling_mode:
+            dump_file = os.path.join(self.profiling_dir, f'tap_{tap_id}.pstat')
+            command = f'{self.tap_python_bin} -m cProfile -o {dump_file} {command}'
+
         result = commands.run_command(command)
 
         # Get output and errors from tap
@@ -648,6 +666,7 @@ class PipelineWise:
         tap_properties_file = tap.get('files', {}).get('properties')
         tap_selection_file = tap.get('files', {}).get('selection')
         tap_bin = self.get_connector_bin(tap_type)
+        tap_python_bin = self.get_connector_python_bin(tap_type)
 
         # Define target props
         target_id = target.get('id')
@@ -657,6 +676,13 @@ class PipelineWise:
 
         # Generate and run the command to run the tap directly
         command = f'{tap_bin} --config {tap_config_file} --discover'
+
+        if self.profiling_mode:
+            dump_file = os.path.join(self.profiling_dir, f'tap_{tap_id}.pstat')
+            command = f'{tap_python_bin} -m cProfile -o {dump_file} {command}'
+
+        self.logger.debug('Discovery command: %s', command)
+
         result = commands.run_command(command)
 
         # Get output and errors from tap
@@ -670,6 +696,7 @@ class PipelineWise:
         try:
             new_schema = json.loads(new_schema)
         except Exception as exc:
+            self.logger.exception(exc)
             return f'Schema discovered by {tap_id} ({tap_type}) is not a valid JSON.'
 
         # Merge the old and new schemas and diff changes
@@ -778,7 +805,10 @@ class PipelineWise:
         print(tabulate(tab_body, headers=tab_headers, tablefmt='simple'))
         print(f'{pipelines} pipeline(s)')
 
-    def run_tap_singer(self, tap: TapParams, target: TargetParams, transform: TransformParams,
+    def run_tap_singer(self,
+                       tap: TapParams,
+                       target: TargetParams,
+                       transform: TransformParams,
                        stream_buffer_size: int = 0) -> str:
         """
         Generate and run piped shell command to sync tables using singer taps and targets
@@ -788,7 +818,9 @@ class PipelineWise:
                                                 target=target,
                                                 transform=transform,
                                                 stream_buffer_size=stream_buffer_size,
-                                                stream_buffer_log_file=self.tap_run_log_file)
+                                                stream_buffer_log_file=self.tap_run_log_file,
+                                                profiling_mode=self.profiling_mode,
+                                                profiling_dir=self.profiling_dir)
 
         # Do not run if another instance is already running
         log_dir = os.path.dirname(self.tap_run_log_file)
@@ -822,8 +854,11 @@ class PipelineWise:
 
             return line
 
+        # Singer tap is running in subprocess.
+        # Collect the formatted logs and log it in the main PipelineWise process as well.
+        # Logs are already formatted at this stage so not using logging functions to avoid double formatting.
         def update_state_file_with_extra_log(line: str) -> str:
-            self.logger.info(line.rstrip('\n'))
+            sys.stdout.write(line)
             return update_state_file(line)
 
         # Run command with update_state_file as a callback to call for every stdout line
@@ -847,7 +882,9 @@ class PipelineWise:
                                                   transform=transform,
                                                   venv_dir=self.venv_dir,
                                                   temp_dir=self.get_temp_dir(),
-                                                  tables=self.args.tables)
+                                                  tables=self.args.tables,
+                                                  profiling_mode=self.profiling_mode,
+                                                  profiling_dir=self.profiling_dir)
 
         # Do not run if another instance is already running
         log_dir = os.path.dirname(self.tap_run_log_file)
@@ -857,8 +894,11 @@ class PipelineWise:
                 'Log file detected in running status at %s', log_dir)
             sys.exit(1)
 
+        # Fastsync is running in subprocess.
+        # Collect the formatted logs and log it in the main PipelineWise process as well
+        # Logs are already formatted at this stage so not using logging functions to avoid double formatting.
         def add_fastsync_output_to_main_logger(line: str) -> str:
-            self.logger.info(line.rstrip('\n'))
+            sys.stdout.write(line)
             return line
 
         if self.extra_log:
@@ -898,14 +938,14 @@ class PipelineWise:
 
         # Run only if tap enabled
         if not self.tap.get('enabled', False):
-            self.logger.info('Tap %s is not enabled. Do nothing and exit normally.', self.tap['name'])
-            sys.exit(0)
+            self.logger.info('Tap %s is not enabled.', self.tap['name'])
+            sys.exit(1)
 
         # Run only if not running
         tap_status = self.detect_tap_status(target_id, tap_id)
         if tap_status['currentStatus'] == 'running':
-            self.logger.info('Tap %s is currently running. Do nothing and exit normally.', self.tap['name'])
-            sys.exit(0)
+            self.logger.info('Tap %s is currently running.', self.tap['name'])
+            sys.exit(1)
 
         # Generate and run the command to run the tap directly
         tap_config = self.tap['files']['config']
@@ -945,14 +985,29 @@ class PipelineWise:
         start_time = datetime.now()
         try:
             with pidfile.PIDFile(self.tap['files']['pidfile']):
-                target_params = TargetParams(target_type, self.target_bin, cons_target_config)
-                transform_params = TransformParams(self.transform_field_bin, tap_transformation)
+                target_params = TargetParams(id=target_id,
+                                             type=target_type,
+                                             bin=self.target_bin,
+                                             python_bin=self.target_python_bin,
+                                             config=cons_target_config)
+
+                transform_params = TransformParams(bin=self.transform_field_bin,
+                                                   python_bin=self.transform_field_python_bin,
+                                                   config=tap_transformation,
+                                                   tap_id=tap_id,
+                                                   target_id=target_id)
 
                 # Run fastsync for FULL_TABLE replication method
                 if len(fastsync_stream_ids) > 0:
                     self.logger.info('Table(s) selected to sync by fastsync: %s', fastsync_stream_ids)
                     self.tap_run_log_file = os.path.join(log_dir, f'{target_id}-{tap_id}-{current_time}.fastsync.log')
-                    tap_params = TapParams(tap_type, self.tap_bin, tap_config, tap_properties_fastsync, tap_state)
+                    tap_params = TapParams(id=tap_id,
+                                           type=tap_type,
+                                           bin=self.tap_bin,
+                                           python_bin=self.tap_python_bin,
+                                           config=tap_config,
+                                           properties=tap_properties_fastsync,
+                                           state=tap_state)
 
                     self.run_tap_fastsync(tap=tap_params,
                                           target=target_params,
@@ -964,7 +1019,13 @@ class PipelineWise:
                 if len(singer_stream_ids) > 0:
                     self.logger.info('Table(s) selected to sync by singer: %s', singer_stream_ids)
                     self.tap_run_log_file = os.path.join(log_dir, f'{target_id}-{tap_id}-{current_time}.singer.log')
-                    tap_params = TapParams(tap_type, self.tap_bin, tap_config, tap_properties_singer, tap_state)
+                    tap_params = TapParams(id=tap_id,
+                                           type=tap_type,
+                                           bin=self.tap_bin,
+                                           python_bin=self.tap_python_bin,
+                                           config=tap_config,
+                                           properties=tap_properties_singer,
+                                           state=tap_state)
 
                     self.run_tap_singer(tap=tap_params,
                                         target=target_params,
@@ -1051,8 +1112,8 @@ class PipelineWise:
 
         # Run only if tap enabled
         if not self.tap.get('enabled', False):
-            self.logger.info('Tap %s is not enabled. Do nothing and exit normally.', self.tap['name'])
-            sys.exit(0)
+            self.logger.info('Tap %s is not enabled.', self.tap['name'])
+            sys.exit(1)
 
         # Run only if tap not running
         tap_status = self.detect_tap_status(target_id, tap_id)
@@ -1089,9 +1150,31 @@ class PipelineWise:
                 self.tap_run_log_file = os.path.join(log_dir, f'{target_id}-{tap_id}-{current_time}.fastsync.log')
 
                 # Create parameters as NamedTuples
-                tap_params = TapParams(tap_type, self.tap_bin, tap_config, tap_properties, tap_state)
-                target_params = TargetParams(target_type, self.target_bin, cons_target_config)
-                transform_params = TransformParams(self.transform_field_bin, tap_transformation)
+                tap_params = TapParams(
+                    id=tap_id,
+                    type=tap_type,
+                    bin=self.tap_bin,
+                    python_bin=self.tap_python_bin,
+                    config=tap_config,
+                    properties=tap_properties,
+                    state=tap_state)
+
+                target_params = TargetParams(
+                    id=target_id,
+                    type=target_type,
+                    bin=self.target_bin,
+                    python_bin=self.target_python_bin,
+                    config=cons_target_config
+                )
+
+                transform_params = TransformParams(
+                    bin=self.transform_field_bin,
+                    config=tap_transformation,
+                    python_bin=self.transform_field_python_bin,
+                    tap_id=tap_id,
+                    target_id=target_id
+                )
+
                 self.run_tap_fastsync(tap=tap_params,
                                       target=target_params,
                                       transform=transform_params)
@@ -1263,7 +1346,6 @@ class PipelineWise:
                     'lsn' not in stream_bookmark and
                     'log_pos' not in stream_bookmark and
                     'token' not in stream_bookmark)
-
 
     # pylint: disable=unused-argument
     def _exit_gracefully(self, sig, frame, exit_code=1):

@@ -219,7 +219,7 @@ class FastSyncTapMySql:
                                     THEN concat('ST_AsGeoJSON(', column_name, ')')
                             WHEN column_name = 'raw_data_hash'
                                     THEN concat('REPLACE(hex(`', column_name, '`)', ", '\n', ' ')")
-                            ELSE concat('REPLACE(cast(`', column_name, '` AS char CHARACTER SET utf8)', ", '\n', ' ')")
+                            ELSE concat('REPLACE(REPLACE(cast(`', column_name, '` AS char CHARACTER SET utf8)', ", '\n', ' '), '\0', '')")
                                 END AS safe_sql_value,
                             ordinal_position
                     FROM information_schema.columns

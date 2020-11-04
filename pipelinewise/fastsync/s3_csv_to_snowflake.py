@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-import logging
 import multiprocessing
 import os
 import sys
@@ -9,11 +8,12 @@ from datetime import datetime
 from functools import partial
 from typing import Union
 
+from ..logger import Logger
 from .commons import utils
 from .commons.tap_s3_csv import FastSyncTapS3Csv
 from .commons.target_snowflake import FastSyncTargetSnowflake
 
-LOGGER = logging.getLogger(__name__)
+LOGGER = Logger().get_logger(__name__)
 
 
 REQUIRED_CONFIG_KEYS = {

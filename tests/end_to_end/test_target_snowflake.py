@@ -83,7 +83,8 @@ class TestTargetSnowflake:
                                  ' \'9:1:00\'),'
                                  '(\'Special Characters: [\"\\,''!@£$%^&*()]\\\\\', null, \'B\', '
                                  'null, \'12:00:00\'),'
-                                 '(\'	\', 20, \'B\', null, \'15:36:10\')')
+                                 '(\'	\', 20, \'B\', null, \'15:36:10\'),'
+                                 '(CONCAT(CHAR(0x0000 using utf16), \'<- null char\'), 20, \'B\', null, \'15:36:10\')')
 
         #  INCREMENTAL
         self.run_query_tap_mysql('INSERT INTO address(isactive, street_number, date_created, date_updated,'
@@ -103,7 +104,7 @@ class TestTargetSnowflake:
     @pytest.mark.dependency(depends=['import_config'])
     def test_resync_mariadb_to_sf(self, tap_mariadb_id=TAP_MARIADB_ID):
         """Resync tables from MariaDB to Snowflake"""
-        assertions.assert_resync_tables_success(tap_mariadb_id, TARGET_ID)
+        assertions.assert_resync_tables_success(tap_mariadb_id, TARGET_ID, profiling=True)
         assertions.assert_row_counts_equal(self.run_query_tap_mysql, self.run_query_target_snowflake)
         assertions.assert_all_columns_exist(self.run_query_tap_mysql, self.run_query_target_snowflake,
                                             mysql_to_snowflake.tap_type_to_target_type)
@@ -126,11 +127,27 @@ class TestTargetSnowflake:
                                                       'updated_at',
                                                       'ppw_e2e_tap_postgres."TABLE_WITH_SPACE AND UPPERCASE"')
 
+        result = self.run_query_target_snowflake(
+            'SELECT updated_at FROM '
+            'ppw_e2e_tap_postgres."TABLE_WITH_SPACE AND UPPERCASE" '
+            'where cvarchar=\'H\';')[0][0]
+
+        assert result == datetime(9999, 12, 31, 23, 59, 59, 998993)
+
+        result = self.run_query_target_snowflake(
+            'SELECT updated_at FROM '
+            'ppw_e2e_tap_postgres."TABLE_WITH_SPACE AND UPPERCASE" '
+            'where cvarchar=\'I\';')[0][0]
+
+        assert result == datetime(9999, 12, 31, 23, 59, 59, 998993)
+
         # 2. Make changes in PG source database
         #  LOG_BASED
         self.run_query_tap_postgres('insert into public."table_with_space and UPPERCase" (cvarchar, updated_at) values '
                                     "('X', '2020-01-01 08:53:56.8+10'),"
                                     "('Y', '2020-12-31 12:59:00.148+00'),"
+                                    "('faaaar future', '15000-05-23 12:40:00.148'),"
+                                    "('BC', '2020-01-23 01:40:00 BC'),"
                                     "('Z', null),"
                                     "('W', '2020-03-03 12:30:00');")
         #  INCREMENTAL
@@ -144,7 +161,7 @@ class TestTargetSnowflake:
         self.run_query_tap_postgres("DELETE FROM public.country WHERE code = 'UMI'")
 
         # 3. Run tap second time - both fastsync and a singer should be triggered, there are some FULL_TABLE
-        assertions.assert_run_tap_success(TAP_POSTGRES_ID, TARGET_ID, ['fastsync', 'singer'])
+        assertions.assert_run_tap_success(TAP_POSTGRES_ID, TARGET_ID, ['fastsync', 'singer'], profiling=True)
         assertions.assert_row_counts_equal(self.run_query_tap_postgres, self.run_query_target_snowflake)
         assertions.assert_all_columns_exist(self.run_query_tap_postgres, self.run_query_target_snowflake)
         assertions.assert_date_column_naive_in_target(self.run_query_target_snowflake,
@@ -156,6 +173,20 @@ class TestTargetSnowflake:
             'SELECT updated_at FROM ppw_e2e_tap_postgres."TABLE_WITH_SPACE AND UPPERCASE" where cvarchar=\'X\';')[0][0]
 
         assert result == datetime(2019, 12, 31, 22, 53, 56, 800000)
+
+        result = self.run_query_target_snowflake(
+            'SELECT updated_at FROM '
+            'ppw_e2e_tap_postgres."TABLE_WITH_SPACE AND UPPERCASE" '
+            'where cvarchar=\'faaaar future\';')[0][0]
+
+        assert result == datetime(9999, 12, 31, 23, 59, 59, 998993)
+
+        result = self.run_query_target_snowflake(
+            'SELECT updated_at FROM '
+            'ppw_e2e_tap_postgres."TABLE_WITH_SPACE AND UPPERCASE" '
+            'where cvarchar=\'BC\';')[0][0]
+
+        assert result == datetime(9999, 12, 31, 23, 59, 59, 998993)
 
     @pytest.mark.dependency(depends=['import_config'])
     def test_replicate_s3_to_sf(self):

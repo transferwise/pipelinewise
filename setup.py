@@ -6,7 +6,7 @@ with open('README.md') as f:
     LONG_DESCRIPTION = f.read()
 
 setup(name='pipelinewise',
-      version='0.22.0',
+      version='0.26.0',
       description='PipelineWise',
       long_description=LONG_DESCRIPTION,
       long_description_content_type='text/markdown',
@@ -21,7 +21,7 @@ setup(name='pipelinewise',
           'tabulate==0.8.2',
           'PyYAML==5.1.0',
           'ansible==2.7.16',
-          'joblib==0.13.2',
+          'joblib==0.16.0',
           'idna==2.7',
           'PyMySQL==0.7.11',
           'psycopg2-binary==2.8.5',
@@ -71,7 +71,8 @@ setup(name='pipelinewise',
               'pipelinewise/cli/schemas/*.json'
           ],
           'pipelinewise': [
-              'logging.conf'
+              'logging.conf',
+              'logging_debug.conf'
           ]
       },
       include_package_data=True)

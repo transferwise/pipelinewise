@@ -23,7 +23,7 @@ def setup(app):
 project = 'PipelineWise'
 copyright = '2020, TransferWise Ltd.'
 author = 'TransferWise'
-version = '0.22.0'
+version = '0.26.0'
 
 
 # -- General configuration ---------------------------------------------------
