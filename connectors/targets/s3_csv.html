@@ -262,6 +262,11 @@ db_conn:
   quotechar: <span class="s2">&quot;\&quot;&quot;</span>                                <span class="c1"># Default: &#39;\&quot;&#39;) A one-character string used to quote fields containing</span>
                                                    special characters, such as the delimiter or quotechar, or which contain
                                                    new-line characters.
+
+  <span class="c1">#encryption_type: &quot;KMS&quot;                        # (Default: None) The type of encryption to use. Current supported options are: &#39;none&#39; and &#39;KMS&#39;.</span>
+  <span class="c1">#encryption_key: &quot;&lt;ENCRYPTIION_KEY_ID&gt;&quot;        # A reference to the encryption key to use for data encryption.</span>
+                                                 <span class="c1"># For KMS encryption, this should be the name of the KMS encryption key ID (e.g. &#39;1234abcd-1234-1234-1234-1234abcd1234&#39;).</span>
+                                                 <span class="c1"># This field is ignored if &#39;encryption_type&#39; is none or blank.</span>
 </pre></div>
 </div>
 </div>
