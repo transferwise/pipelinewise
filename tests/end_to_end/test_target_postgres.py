@@ -98,6 +98,8 @@ class TestTargetPostgres:
                                  '(\'	\', 20, \'B\', null, \'15:36:10\'),'
                                  '(CONCAT(CHAR(0x0000 using utf16), \'<- null char\'), 20, \'B\', null, \'15:36:10\')')
 
+        self.run_query_tap_mysql('UPDATE all_datatypes SET c_point = NULL')
+
         #  INCREMENTAL
         self.run_query_tap_mysql('INSERT INTO address(isactive, street_number, date_created, date_updated,'
                                  ' supplier_supplier_id, zip_code_zip_code_id)'
