@@ -67,6 +67,8 @@ class TestTargetRedshift:
         # 2. Make changes in MariaDB source database
         #  LOG_BASED
         self.run_query_tap_mysql('UPDATE weight_unit SET isactive = 0 WHERE weight_unit_id IN (2, 3, 4)')
+        self.run_query_tap_mysql('UPDATE all_datatypes SET c_point = NULL')
+
         #  INCREMENTAL
         self.run_query_tap_mysql('INSERT INTO address(isactive, street_number, date_created, date_updated,'
                                  ' supplier_supplier_id, zip_code_zip_code_id)'
