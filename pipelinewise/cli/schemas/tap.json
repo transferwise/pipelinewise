@@ -213,6 +213,7 @@
         "tap-jira",
         "tap-zuora",
         "tap-google-analytics",
+        "tap-google-sheets",
         "tap-github",
         "tap-shopify",
         "tap-slack",
