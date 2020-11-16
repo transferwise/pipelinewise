@@ -270,6 +270,7 @@ def validate(instance, schema):
         schema_safe_inst = json.loads(json.dumps(instance, cls=AnsibleJSONEncoder))
         jsonschema.validate(instance=schema_safe_inst, schema=schema)
     except jsonschema.exceptions.ValidationError as exc:
+        raise exc
         LOGGER.critical('Invalid object %s', exc)
         sys.exit(1)
 
