@@ -63,3 +63,8 @@ Example YAML for ``target-s3-csv``:
       quotechar: "\""                                # Default: '\"') A one-character string used to quote fields containing
                                                        special characters, such as the delimiter or quotechar, or which contain
                                                        new-line characters.
+
+      #encryption_type: "KMS"                        # (Default: None) The type of encryption to use. Current supported options are: 'none' and 'KMS'.
+      #encryption_key: "<ENCRYPTIION_KEY_ID>"        # A reference to the encryption key to use for data encryption.
+                                                     # For KMS encryption, this should be the name of the KMS encryption key ID (e.g. '1234abcd-1234-1234-1234-1234abcd1234').
+                                                     # This field is ignored if 'encryption_type' is none or blank.
