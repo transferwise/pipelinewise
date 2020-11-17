@@ -75,6 +75,7 @@ make_virtualenv pipelinewise
 
 # Set default and extra singer connectors
 DEFAULT_CONNECTORS=(
+    tap-google-sheets
     tap-jira
     tap-kafka
     tap-mysql
@@ -102,6 +103,7 @@ EXTRA_CONNECTORS=(
 )
 
 CURRENT_CONNECTORS=(
+    tap-google-sheets
     tap-s3-csv
     tap-mysql
     tap-postgres
