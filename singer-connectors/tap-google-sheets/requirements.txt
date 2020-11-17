@@ -1,0 +1,2 @@
+#tap-google-sheets==1.0.4
+git+git://github.com/Health-Union/tap-google-sheets@master
