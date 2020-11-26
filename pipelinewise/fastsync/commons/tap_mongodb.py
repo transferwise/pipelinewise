@@ -298,6 +298,9 @@ class FastSyncTapMongoDB:
         if self.connection_config.get('replica_set', None) is not None:
             url += f'&replicaSet={self.connection_config["replica_set"]}'
 
+        if self.connection_config.get('ssl', None) is not None:
+            url += f'&ssl={self.connection_config["ssl"]}'
+
         return_code = subprocess.call([
             'mongodump',
             '--uri', f'"{url}"',

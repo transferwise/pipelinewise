@@ -24,7 +24,8 @@ class TestFastSyncTapMongoDB(TestCase):
                                   'user': 'my_user',
                                   'password': 'secret',
                                   'auth_database': 'admin',
-                                  'database': 'my_db'
+                                  'database': 'my_db',
+                                  'ssl': 'true'
                                   }
         self.mongo = FastSyncTapMongoDB(self.connection_config,
                                         lambda x: {
@@ -90,7 +91,7 @@ class TestFastSyncTapMongoDB(TestCase):
             call_mock.assert_called_once_with([
                 'mongodump',
                 '--uri', '"mongodb://my_user:secret@foo.com:3306/my_db'
-                         '?authSource=admin&readPreference=secondaryPreferred"',
+                         '?authSource=admin&readPreference=secondaryPreferred&ssl=true"',
                 '--forceTableScan',
                 '--gzip',
                 '-c', 'my_col',
@@ -134,7 +135,7 @@ class TestFastSyncTapMongoDB(TestCase):
                         call_mock.assert_called_once_with([
                             'mongodump',
                             '--uri', '"mongodb://my_user:secret@foo.com:3306/my_db'
-                                     '?authSource=admin&readPreference=secondaryPreferred"',
+                                     '?authSource=admin&readPreference=secondaryPreferred&ssl=true"',
                             '--forceTableScan',
                             '--gzip',
                             '-c', 'my_col',
