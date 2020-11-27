@@ -21,6 +21,8 @@ from . import utils
 from . import commands
 from .commands import TapParams, TargetParams, TransformParams
 from .config import Config
+from .alert_sender import AlertSender
+from .alert_handlers.base_alert_handler import BaseAlertHandler
 
 FASTSYNC_PAIRS = {
     'tap-mysql': {'target-snowflake', 'target-redshift', 'target-postgres'},
