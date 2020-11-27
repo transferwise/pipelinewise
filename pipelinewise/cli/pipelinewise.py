@@ -21,9 +21,13 @@ from . import utils
 from . import commands
 from .commands import TapParams, TargetParams, TransformParams
 from .config import Config
-from .alert_sender import AlertSender
-from .alert_handlers.base_alert_handler import BaseAlertHandler
 
+FASTSYNC_PAIRS = {
+    'tap-mysql': {'target-snowflake', 'target-redshift', 'target-postgres'},
+    'tap-postgres': {'target-snowflake', 'target-redshift', 'target-postgres'},
+    'tap-s3-csv': {'target-snowflake', 'target-redshift', 'target-postgres'},
+    'tap-mongodb': {'target-snowflake', 'target-postgres'}
+}
 
 # pylint: disable=too-many-lines,too-many-instance-attributes,too-many-public-methods
 class PipelineWise:
@@ -132,8 +136,7 @@ class PipelineWise:
         # Get filter conditions with default values from input dictionary
         # Nothing selected by default
         f_selected = filters.get('selected', None)
-        f_target_type = filters.get('target_type', None)
-        f_tap_type = filters.get('tap_type', None)
+        f_tap_target_pairs = filters.get('tap_target_pairs', None)
         f_replication_method = filters.get('replication_method', None)
         f_initial_sync_required = filters.get('initial_sync_required', None)
 
@@ -199,8 +202,7 @@ class PipelineWise:
                 # pylint: disable=too-many-boolean-expressions,bad-continuation
                 if (
                         (f_selected is None or selected == f_selected) and
-                        (f_target_type is None or target_type in f_target_type) and
-                        (f_tap_type is None or tap_type in f_tap_type) and
+                        (f_tap_target_pairs is None or target_type in f_tap_target_pairs.get(tap_type, {})) and
                         (f_replication_method is None or replication_method in f_replication_method) and
                         (f_initial_sync_required is None or initial_sync_required == f_initial_sync_required)
                 ):
@@ -976,8 +978,7 @@ class PipelineWise:
             tap_properties,
             tap_state, {
                 'selected': True,
-                'target_type': ['target-snowflake', 'target-redshift', 'target-postgres'],
-                'tap_type': ['tap-mysql', 'tap-postgres', 'tap-s3-csv', 'tap-mongodb'],
+                'tap_target_pairs': FASTSYNC_PAIRS,
                 'initial_sync_required': True
             },
             create_fallback=True)

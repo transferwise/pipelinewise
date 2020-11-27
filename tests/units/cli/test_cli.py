@@ -184,8 +184,7 @@ class TestCli:
                  os.path.dirname(__file__)),
              filters={
                  'selected': True,
-                 'target_type': ['target-snowflake'],
-                 'tap_type': ['tap-mysql', 'tap-postgres'],
+                 'tap_target_pairs': {'tap-mysql': {'target-snowflake'}, 'tap-postgres': {'target-snowflake'}},
                  'initial_sync_required': True
              },
              create_fallback=True)
@@ -200,6 +199,40 @@ class TestCli:
 
         # Fastsync and singer properties should be created
         assert fastsync_stream_ids == ['db_test_mysql-table_one', 'db_test_mysql-table_two']
+        assert singer_stream_ids == ['db_test_mysql-table_one', 'db_test_mysql-table_two']
+
+    # pylint: disable=bad-continuation
+    def test_create_filtered_tap_props_fallback(self):
+        """Test creating fastsync and singer specific properties file"""
+        (
+            tap_properties_fastsync,
+            fastsync_stream_ids,
+            tap_properties_singer,
+            singer_stream_ids
+        ) = self.pipelinewise.create_filtered_tap_properties(
+             target_type='target-snowflake',
+             tap_type='tap-mysql',
+             tap_properties='{}/resources/sample_json_config/target_one/tap_one/properties.json'.format(
+                 os.path.dirname(__file__)),
+             tap_state='{}/resources/sample_json_config/target_one/tap_one/state.json'.format(
+                 os.path.dirname(__file__)),
+             filters={
+                 'selected': True,
+                 'tap_target_pairs': {'tap-postgres': {'target-snowflake'}},
+                 'initial_sync_required': True
+             },
+             create_fallback=True)
+
+        # Fastsync and singer properties should be created
+        assert os.path.isfile(tap_properties_fastsync)
+        assert os.path.isfile(tap_properties_singer)
+
+        # Delete generated properties file
+        os.remove(tap_properties_fastsync)
+        os.remove(tap_properties_singer)
+
+        # Fastsync and singer properties should be created
+        assert fastsync_stream_ids == []
         assert singer_stream_ids == ['db_test_mysql-table_one', 'db_test_mysql-table_two']
 
     def test_merge_empty_catalog(self):
