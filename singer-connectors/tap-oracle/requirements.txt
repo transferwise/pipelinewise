@@ -1,1 +1,0 @@
-pipelinewise-tap-oracle==1.0.1
