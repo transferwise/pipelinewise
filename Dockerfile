@@ -9,7 +9,7 @@ RUN apt-get -qq update && apt-get -qqy install \
         wget \
     && pip install --upgrade pip
 
-ARG connectors=all
+ARG connectors=tap-mysql,target-snowflake
 COPY . /app
 
 # Install Oracle Instant Client for tap-oracle if its in the connectors list
