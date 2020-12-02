@@ -304,12 +304,13 @@ class TestFastSyncTargetSnowflake:
         # passing valid query_props
         self.snowflake.connection_config['tap_id'] = 'fake_tap'
         assert json.loads(self.snowflake.create_query_tag({'schema': 'fake_schema',
-                                                           'table': 'fake_table'})) == {
-            'ppw_component': 'fastsync',
-            'tap_id': 'fake_tap',
-            'schema': 'fake_schema',
-            'table': 'fake_table'
-        }
+                                                           'table': 'fake_table'})) == \
+               {
+                   'ppw_component': 'fastsync',
+                   'tap_id': 'fake_tap',
+                   'schema': 'fake_schema',
+                   'table': 'fake_table'
+               }
 
         # passing partial query_props
         self.snowflake.connection_config['tap_id'] = 'fake_tap'
