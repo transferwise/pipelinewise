@@ -1,3 +1,4 @@
+import json
 from pipelinewise.fastsync.commons.target_snowflake import FastSyncTargetSnowflake
 
 
@@ -254,3 +255,85 @@ class TestFastSyncTargetSnowflake:
             'ALTER TABLE test_schema."TABLE WITH SPACE AND UPPERCASE_TEMP" '
             'SWAP WITH test_schema."TABLE WITH SPACE AND UPPERCASE"',
             'DROP TABLE IF EXISTS test_schema."TABLE WITH SPACE AND UPPERCASE_TEMP"']
+
+    def test_create_query_tag(self):
+        """Validate if query tag genrated correctly"""
+        # not passing query_tag_props
+        assert json.loads(self.snowflake.create_query_tag()) == {
+            'ppw_component': 'fastsync',
+            'tap_id': None,
+            'schema': None,
+            'table': None
+        }
+
+        # passing invalid query_tag_props (string)
+        assert json.loads(self.snowflake.create_query_tag('invalid_query_props')) == {
+            'ppw_component': 'fastsync',
+            'tap_id': None,
+            'schema': None,
+            'table': None
+        }
+
+        # passing invalid query_tag_props (number)
+        self.snowflake.connection_config['tap_id'] = 'fake_tap'
+        assert json.loads(self.snowflake.create_query_tag(1234567890)) == {
+            'ppw_component': 'fastsync',
+            'tap_id': 'fake_tap',
+            'schema': None,
+            'table': None
+        }
+
+        # passing invalid query_tag_props (array)
+        self.snowflake.connection_config['tap_id'] = 'fake_tap'
+        assert json.loads(self.snowflake.create_query_tag([1, 2, 3])) == {
+            'ppw_component': 'fastsync',
+            'tap_id': 'fake_tap',
+            'schema': None,
+            'table': None
+        }
+
+        # passing invalid query_tag_props
+        self.snowflake.connection_config['tap_id'] = 'fake_tap'
+        assert json.loads(self.snowflake.create_query_tag()) == {
+            'ppw_component': 'fastsync',
+            'tap_id': 'fake_tap',
+            'schema': None,
+            'table': None
+        }
+
+        # passing valid query_props
+        self.snowflake.connection_config['tap_id'] = 'fake_tap'
+        assert json.loads(self.snowflake.create_query_tag({'schema': 'fake_schema',
+                                                           'table': 'fake_table'})) == {
+            'ppw_component': 'fastsync',
+            'tap_id': 'fake_tap',
+            'schema': 'fake_schema',
+            'table': 'fake_table'
+        }
+
+        # passing partial query_props
+        self.snowflake.connection_config['tap_id'] = 'fake_tap'
+        assert json.loads(self.snowflake.create_query_tag({'schema': 'fake_schema'})) == {
+            'ppw_component': 'fastsync',
+            'tap_id': 'fake_tap',
+            'schema': 'fake_schema',
+            'table': None
+        }
+
+        # passing partial query_props
+        self.snowflake.connection_config['tap_id'] = 'fake_tap'
+        assert json.loads(self.snowflake.create_query_tag({'table': 'fake_table'})) == {
+            'ppw_component': 'fastsync',
+            'tap_id': 'fake_tap',
+            'schema': None,
+            'table': 'fake_table'
+        }
+
+        # passing not supported query_props
+        self.snowflake.connection_config['tap_id'] = 'fake_tap'
+        assert json.loads(self.snowflake.create_query_tag({'fake_prop': 'fake_value'})) == {
+            'ppw_component': 'fastsync',
+            'tap_id': 'fake_tap',
+            'schema': None,
+            'table': None
+        }

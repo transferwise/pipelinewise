@@ -51,6 +51,19 @@ class FastSyncTargetSnowflake:
                                      region_name=self.connection_config.get('s3_region_name'),
                                      endpoint_url=self.connection_config.get('s3_endpoint_url'))
 
+    def create_query_tag(self, query_tag_props: dict = None) -> str:
+        schema = None
+        table = None
+
+        if isinstance(query_tag_props, dict):
+            schema = query_tag_props.get('schema')
+            table = query_tag_props.get('table')
+
+        return json.dumps({'ppw_component': 'fastsync',
+                           'tap_id': self.connection_config.get('tap_id'),
+                           'schema': schema,
+                           'table': table})
+
     def open_connection(self, query_tag_props=None):
         return snowflake.connector.connect(user=self.connection_config['user'],
                                            password=self.connection_config['password'],
@@ -61,12 +74,7 @@ class FastSyncTargetSnowflake:
                                            session_parameters={
                                                # Quoted identifiers should be case sensitive
                                                'QUOTED_IDENTIFIERS_IGNORE_CASE': 'FALSE',
-                                               'QUERY_TAG': json.dumps({
-                                                   'ppw_component': 'fastsync',
-                                                   'tap_id': self.connection_config.get('tap_id'),
-                                                   'table': query_tag_props.get('schema'),
-                                                   'schema': query_tag_props.get('table')
-                                               })
+                                               'QUERY_TAG': self.create_query_tag(query_tag_props)
                                            })
 
     def query(self, query, params=None, query_tag_props=None):
@@ -126,7 +134,7 @@ class FastSyncTargetSnowflake:
 
     def create_schema(self, schema):
         sql = 'CREATE SCHEMA IF NOT EXISTS {}'.format(schema)
-        self.query(sql, query_tag_props={'schema': schema, 'table': None})
+        self.query(sql, query_tag_props={'schema': schema})
 
     def drop_table(self, target_schema, table_name, is_temporary=False):
         table_dict = utils.tablename_to_dict(table_name)
@@ -208,14 +216,14 @@ class FastSyncTargetSnowflake:
         # Grant role is not mandatory parameter, do nothing if not specified
         if role:
             sql = 'GRANT USAGE ON SCHEMA {} TO ROLE {}'.format(target_schema, role)
-            self.query(sql, query_tag_props={'schema': target_schema, 'table': None})
+            self.query(sql, query_tag_props={'schema': target_schema})
 
     # pylint: disable=unused-argument
     def grant_select_on_schema(self, target_schema, role, to_group=False):
         # Grant role is not mandatory parameter, do nothing if not specified
         if role:
             sql = 'GRANT SELECT ON ALL TABLES IN SCHEMA {} TO ROLE {}'.format(target_schema, role)
-            self.query(sql, query_tag_props={'schema': target_schema, 'table': None})
+            self.query(sql, query_tag_props={'schema': target_schema})
 
     # pylint: disable=duplicate-string-formatting-argument
     def obfuscate_columns(self, target_schema, table_name):
