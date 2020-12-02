@@ -24,7 +24,7 @@ class FastSyncTargetSnowflakeMock(FastSyncTargetSnowflake):
         self.executed_queries = []
         self.s3 = S3Mock()
 
-    def query(self, query, params=None):
+    def query(self, query, params=None, query_tag_props=None):
         self.executed_queries.append(query)
         return []
 

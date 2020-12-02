@@ -4,6 +4,7 @@ PipelineWise CLI - Configuration class
 import logging
 import os
 import sys
+import json
 
 from pipelinewise.utils import safe_column_name
 from . import utils
@@ -318,6 +319,13 @@ class Config:
         # Generate tap inheritable_config dict
         tap_inheritable_config = utils.delete_empty_keys({
             'temp_dir': self.get_temp_dir(),
+            'tap_id': tap.get('id'),
+            'query_tag': json.dumps({
+                'ppw_component': tap.get('type'),
+                'tap_id': tap.get('id'),
+                'schema': '{schema}',
+                'table': '{table}'
+            }),
             'batch_size_rows': tap.get('batch_size_rows', 20000),
             'parallelism': tap.get('parallelism', 0),
             'parallelism_max': tap.get('parallelism_max', 4),
