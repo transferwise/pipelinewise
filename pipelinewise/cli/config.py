@@ -323,6 +323,7 @@ class Config:
             'query_tag': json.dumps({
                 'ppw_component': tap.get('type'),
                 'tap_id': tap.get('id'),
+                'database': '{database}',
                 'schema': '{schema}',
                 'table': '{table}'
             }),
