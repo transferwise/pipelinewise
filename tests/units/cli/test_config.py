@@ -302,7 +302,8 @@ class TestConfig:
             'temp_dir': './pipelinewise-test-config/tmp',
             'tap_id': 'mysql_sample',
             'query_tag':
-                '{"ppw_component": "tap-mysql", "tap_id": "mysql_sample", "schema": "{schema}", "table": "{table}"}',
+                '{"ppw_component": "tap-mysql", "tap_id": "mysql_sample", '
+                '"database": "{database}", "schema": "{schema}", "table": "{table}"}',
             'validate_records': False,
             'add_metadata_columns': False
         }
