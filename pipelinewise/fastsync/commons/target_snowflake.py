@@ -61,6 +61,7 @@ class FastSyncTargetSnowflake:
 
         return json.dumps({'ppw_component': 'fastsync',
                            'tap_id': self.connection_config.get('tap_id'),
+                           'database': self.connection_config['dbname'],
                            'schema': schema,
                            'table': table})
 

@@ -258,10 +258,14 @@ class TestFastSyncTargetSnowflake:
 
     def test_create_query_tag(self):
         """Validate if query tag genrated correctly"""
+        FAKE_DB = 'fake_db'
+        self.snowflake.connection_config['dbname'] = FAKE_DB
+
         # not passing query_tag_props
         assert json.loads(self.snowflake.create_query_tag()) == {
             'ppw_component': 'fastsync',
             'tap_id': None,
+            'database': FAKE_DB,
             'schema': None,
             'table': None
         }
@@ -270,6 +274,7 @@ class TestFastSyncTargetSnowflake:
         assert json.loads(self.snowflake.create_query_tag('invalid_query_props')) == {
             'ppw_component': 'fastsync',
             'tap_id': None,
+            'database': FAKE_DB,
             'schema': None,
             'table': None
         }
@@ -279,6 +284,7 @@ class TestFastSyncTargetSnowflake:
         assert json.loads(self.snowflake.create_query_tag(1234567890)) == {
             'ppw_component': 'fastsync',
             'tap_id': 'fake_tap',
+            'database': FAKE_DB,
             'schema': None,
             'table': None
         }
@@ -288,6 +294,7 @@ class TestFastSyncTargetSnowflake:
         assert json.loads(self.snowflake.create_query_tag([1, 2, 3])) == {
             'ppw_component': 'fastsync',
             'tap_id': 'fake_tap',
+            'database': FAKE_DB,
             'schema': None,
             'table': None
         }
@@ -297,6 +304,7 @@ class TestFastSyncTargetSnowflake:
         assert json.loads(self.snowflake.create_query_tag()) == {
             'ppw_component': 'fastsync',
             'tap_id': 'fake_tap',
+            'database': FAKE_DB,
             'schema': None,
             'table': None
         }
@@ -308,6 +316,7 @@ class TestFastSyncTargetSnowflake:
                {
                    'ppw_component': 'fastsync',
                    'tap_id': 'fake_tap',
+                   'database': FAKE_DB,
                    'schema': 'fake_schema',
                    'table': 'fake_table'
                }
@@ -317,6 +326,7 @@ class TestFastSyncTargetSnowflake:
         assert json.loads(self.snowflake.create_query_tag({'schema': 'fake_schema'})) == {
             'ppw_component': 'fastsync',
             'tap_id': 'fake_tap',
+            'database': FAKE_DB,
             'schema': 'fake_schema',
             'table': None
         }
@@ -326,6 +336,7 @@ class TestFastSyncTargetSnowflake:
         assert json.loads(self.snowflake.create_query_tag({'table': 'fake_table'})) == {
             'ppw_component': 'fastsync',
             'tap_id': 'fake_tap',
+            'database': FAKE_DB,
             'schema': None,
             'table': 'fake_table'
         }
@@ -335,6 +346,7 @@ class TestFastSyncTargetSnowflake:
         assert json.loads(self.snowflake.create_query_tag({'fake_prop': 'fake_value'})) == {
             'ppw_component': 'fastsync',
             'tap_id': 'fake_tap',
+            'database': FAKE_DB,
             'schema': None,
             'table': None
         }
