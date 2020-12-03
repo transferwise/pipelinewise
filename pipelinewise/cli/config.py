@@ -323,9 +323,9 @@ class Config:
             'query_tag': json.dumps({
                 'ppw_component': tap.get('type'),
                 'tap_id': tap.get('id'),
-                'database': '{database}',
-                'schema': '{schema}',
-                'table': '{table}'
+                'database': '{{database}}',
+                'schema': '{{schema}}',
+                'table': '{{table}}'
             }),
             'batch_size_rows': tap.get('batch_size_rows', 20000),
             'parallelism': tap.get('parallelism', 0),

@@ -303,7 +303,7 @@ class TestConfig:
             'tap_id': 'mysql_sample',
             'query_tag':
                 '{"ppw_component": "tap-mysql", "tap_id": "mysql_sample", '
-                '"database": "{database}", "schema": "{schema}", "table": "{table}"}',
+                '"database": "{{database}}", "schema": "{{schema}}", "table": "{{table}}"}',
             'validate_records': False,
             'add_metadata_columns': False
         }
