@@ -1,3 +1,13 @@
+0.27.0 (2020-12-04)
+-------------------
+
+- Bumping `snowflake-connector-python` across all componenets that uses to `2.3.6`
+- Tagging all queries issues to Snowflake by FastSync Snowflake and singer target-snowflake.
+- Add ssl support to mongodump in FastSync mongodb.
+- Fix issues build PPW docker images
+- Update doc.
+
+
 0.26.0 (2020-10-30)
 -------------------
 
