@@ -4,8 +4,10 @@
 - Bumping `snowflake-connector-python` across all componenets that uses to `2.3.6`
 - Tagging all queries issues to Snowflake by FastSync Snowflake and singer target-snowflake.
 - Add ssl support to mongodump in FastSync mongodb.
+- Add support for MySQL spatial types.
+
 - Fix issues build PPW docker images
-- Update doc.
+- Update documentation.
 
 
 0.26.0 (2020-10-30)
