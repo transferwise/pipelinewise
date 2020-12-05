@@ -185,8 +185,8 @@ def load_yaml(yaml_file, vault_secret=None):
             try:
                 if is_encrypted_file(stream):
                     file_data = stream.read()
-                    template = Template(json.dumps(yaml.load(vault.decrypt(file_data, None))))
-                    data = json.loads(template.render(env_var=os.environ))
+                    template = Template(vault.decrypt(file_data, None))
+                    data = yaml.load(template.render(env_var=os.environ))
                 else:
                     loader = AnsibleLoader(stream, None, vault.secrets)
                     try:
