@@ -17,6 +17,7 @@ import jsonschema
 import yaml
 
 from datetime import date, datetime
+from jinja2 import Template
 from ansible.errors import AnsibleError
 from ansible.module_utils._text import to_text
 from ansible.module_utils.common._collections_compat import Mapping
@@ -184,11 +185,13 @@ def load_yaml(yaml_file, vault_secret=None):
             try:
                 if is_encrypted_file(stream):
                     file_data = stream.read()
-                    data = yaml.load(vault.decrypt(file_data, None))
+                    template = Template(json.dumps(yaml.load(vault.decrypt(file_data, None))))
+                    data = json.loads(template.render(env_var=os.environ))
                 else:
                     loader = AnsibleLoader(stream, None, vault.secrets)
                     try:
-                        data = loader.get_single_data()
+                        template = Template(json.dumps(loader.get_single_data()))
+                        data = json.loads(template.render(env_var=os.environ))
                     except Exception as exc:
                         raise Exception(f'Error when loading YAML config at {yaml_file} {exc}')
                     finally:
