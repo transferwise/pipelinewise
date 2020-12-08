@@ -213,6 +213,17 @@ PipelineWise can replicate data from the following data sources:
 
         :ref:`tap-mixpanel`
 
+.. container:: tile-wrapper
+
+    .. container:: tile
+
+        .. container:: img-hover-zoom
+
+          .. image:: ../img/twilio-logo.png
+             :target: taps/twilio.html
+
+        :ref:`tap-twilio`
+
 
 Target (Destination Connectors)
 -------------------------------
