@@ -205,7 +205,7 @@ class FastSyncTapMySql:
                             data_type,
                             column_type,
                             CASE
-                            WHEN data_type IN ('blob', 'tinyblob', 'mediumblob', 'longblob', 'geometry')
+                            WHEN data_type IN ('blob', 'tinyblob', 'mediumblob', 'longblob')
                                     THEN CONCAT('REPLACE(hex(`', column_name, '`)', ", '\n', ' ')")
                             WHEN data_type IN ('binary', 'varbinary')
                                     THEN concat('REPLACE(hex(trim(trailing CHAR(0x00) from `',COLUMN_NAME,'`))', ", '\n', ' ')")
@@ -215,6 +215,8 @@ class FastSyncTapMySql:
                                     THEN concat('nullif(`', column_name, '`,STR_TO_DATE("0000-00-00 00:00:00", "%Y-%m-%d %T"))')
                             WHEN column_type IN ('tinyint(1)')
                                     THEN concat('CASE WHEN `' , column_name , '` is null THEN null WHEN `' , column_name , '` = 0 THEN 0 ELSE 1 END')
+                            WHEN column_type IN ('geometry', 'point', 'linestring', 'polygon', 'multipoint', 'multilinestring', 'multipolygon', 'geometrycollection')
+                                    THEN concat('ST_AsGeoJSON(', column_name, ')')
                             WHEN column_name = 'raw_data_hash'
                                     THEN concat('REPLACE(hex(`', column_name, '`)', ", '\n', ' ')")
                             ELSE concat('REPLACE(REPLACE(cast(`', column_name, '` AS char CHARACTER SET utf8)', ", '\n', ' '), '\0', '')")

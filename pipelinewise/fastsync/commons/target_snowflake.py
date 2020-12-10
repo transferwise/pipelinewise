@@ -52,7 +52,21 @@ class FastSyncTargetSnowflake:
                                      region_name=self.connection_config.get('s3_region_name'),
                                      endpoint_url=self.connection_config.get('s3_endpoint_url'))
 
-    def open_connection(self):
+    def create_query_tag(self, query_tag_props: dict = None) -> str:
+        schema = None
+        table = None
+
+        if isinstance(query_tag_props, dict):
+            schema = query_tag_props.get('schema')
+            table = query_tag_props.get('table')
+
+        return json.dumps({'ppw_component': 'fastsync',
+                           'tap_id': self.connection_config.get('tap_id'),
+                           'database': self.connection_config['dbname'],
+                           'schema': schema,
+                           'table': table})
+
+    def open_connection(self, query_tag_props=None):
         return snowflake.connector.connect(user=self.connection_config['user'],
                                            password=self.connection_config['password'],
                                            account=self.connection_config['account'],
@@ -61,12 +75,13 @@ class FastSyncTargetSnowflake:
                                            autocommit=True,
                                            session_parameters={
                                                # Quoted identifiers should be case sensitive
-                                               'QUOTED_IDENTIFIERS_IGNORE_CASE': 'FALSE'
+                                               'QUOTED_IDENTIFIERS_IGNORE_CASE': 'FALSE',
+                                               'QUERY_TAG': self.create_query_tag(query_tag_props)
                                            })
 
-    def query(self, query, params=None):
+    def query(self, query, params=None, query_tag_props=None):
         LOGGER.debug('Running query: %s', query)
-        with self.open_connection() as connection:
+        with self.open_connection(query_tag_props) as connection:
             with connection.cursor(snowflake.connector.DictCursor) as cur:
                 cur.execute(query, params)
 
@@ -121,14 +136,14 @@ class FastSyncTargetSnowflake:
 
     def create_schema(self, schema):
         sql = 'CREATE SCHEMA IF NOT EXISTS {}'.format(schema)
-        self.query(sql)
+        self.query(sql, query_tag_props={'schema': schema})
 
     def drop_table(self, target_schema, table_name, is_temporary=False):
         table_dict = utils.tablename_to_dict(table_name)
         target_table = table_dict.get('table_name') if not is_temporary else table_dict.get('temp_table_name')
 
         sql = 'DROP TABLE IF EXISTS {}."{}"'.format(target_schema, target_table.upper())
-        self.query(sql)
+        self.query(sql, query_tag_props={'schema': target_schema, 'table': table_name})
 
     def create_table(self, target_schema: str, table_name: str, columns: List[str], primary_key: List[str],
                      is_temporary: bool = False, sort_columns=False):
@@ -157,7 +172,7 @@ class FastSyncTargetSnowflake:
               f'{sql_columns}' \
               f'{f", PRIMARY KEY ({sql_primary_keys}))" if primary_key else ")"}'
 
-        self.query(sql)
+        self.query(sql, query_tag_props={'schema': target_schema, 'table': target_table})
 
     # pylint: disable=too-many-locals
     def copy_to_table(self, s3_key, target_schema, table_name, size_bytes, is_temporary, skip_csv_header=False):
@@ -174,7 +189,7 @@ class FastSyncTargetSnowflake:
               f' compression=GZIP binary_format=HEX)'
 
         # Get number of inserted records - COPY does insert only
-        results = self.query(sql)
+        results = self.query(sql, query_tag_props={'schema': target_schema, 'table': target_table})
         if len(results) > 0:
             inserts = results[0].get('rows_loaded', 0)
 
@@ -196,21 +211,21 @@ class FastSyncTargetSnowflake:
             table_dict = utils.tablename_to_dict(table_name)
             target_table = table_dict.get('table_name') if not is_temporary else table_dict.get('temp_table_name')
             sql = 'GRANT SELECT ON {}."{}" TO ROLE {}'.format(target_schema, target_table.upper(), role)
-            self.query(sql)
+            self.query(sql, query_tag_props={'schema': target_schema, 'table': table_name})
 
     # pylint: disable=unused-argument
     def grant_usage_on_schema(self, target_schema, role, to_group=False):
         # Grant role is not mandatory parameter, do nothing if not specified
         if role:
             sql = 'GRANT USAGE ON SCHEMA {} TO ROLE {}'.format(target_schema, role)
-            self.query(sql)
+            self.query(sql, query_tag_props={'schema': target_schema})
 
     # pylint: disable=unused-argument
     def grant_select_on_schema(self, target_schema, role, to_group=False):
         # Grant role is not mandatory parameter, do nothing if not specified
         if role:
             sql = 'GRANT SELECT ON ALL TABLES IN SCHEMA {} TO ROLE {}'.format(target_schema, role)
-            self.query(sql)
+            self.query(sql, query_tag_props={'schema': target_schema})
 
     # pylint: disable=duplicate-string-formatting-argument
     def obfuscate_columns(self, target_schema, table_name):
@@ -257,7 +272,7 @@ class FastSyncTargetSnowflake:
         # Generate and run UPDATE if at least one obfuscation rule found
         if len(trans_cols) > 0:
             sql = 'UPDATE {}.{} SET {}'.format(target_schema, temp_table, ','.join(trans_cols))
-            self.query(sql)
+            self.query(sql, query_tag_props={'schema': target_schema, 'table': temp_table})
 
     def swap_tables(self, schema, table_name):
         table_dict = utils.tablename_to_dict(table_name)
@@ -268,6 +283,8 @@ class FastSyncTargetSnowflake:
         self.query('ALTER TABLE {}."{}" SWAP WITH {}."{}"'.format(schema,
                                                                   temp_table.upper(),
                                                                   schema,
-                                                                  target_table.upper()))
+                                                                  target_table.upper()),
+                   query_tag_props={'schema': schema, 'table': target_table})
 
-        self.query('DROP TABLE IF EXISTS {}."{}"'.format(schema, temp_table.upper()))
+        self.query('DROP TABLE IF EXISTS {}."{}"'.format(schema, temp_table.upper()),
+                   query_tag_props={'schema': schema, 'table': temp_table})

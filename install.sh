@@ -70,7 +70,7 @@ make_virtualenv() {
             PIP_ARGS=$PIP_ARGS"[test]"
         fi
 
-        python3 -m pip install --upgrade -e .$PIP_ARGS --use-feature=2020-resolver
+        python3 -m pip install --upgrade -e .$PIP_ARGS
     fi
 
     echo ""
@@ -174,6 +174,7 @@ DEFAULT_CONNECTORS=(
     tap-mongodb
     tap-github
     tap-slack
+    tap-mixpanel
     target-s3-csv
     target-snowflake
     target-redshift

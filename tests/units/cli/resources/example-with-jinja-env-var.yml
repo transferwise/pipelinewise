@@ -1,0 +1,4 @@
+---
+app: "my-app"
+secret: "{{ env_var['APP_SECRET'] }}"
+environment: "{{ env_var['APP_ENVIRONMENT'] }}"

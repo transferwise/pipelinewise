@@ -127,6 +127,12 @@ class TestUtils:
                 '{}/resources/vault-secret.txt'.format(os.path.dirname(__file__))) == \
             ['Apple', 'Orange', 'Strawberry', 'Mango', 'Vault Encrypted Secret Fruit']
 
+        os.environ['APP_SECRET'] = app_secret = 'my-secret'
+        os.environ['APP_ENVIRONMENT'] = app_environment = 'test'
+        assert \
+            cli.utils.load_yaml('{}/resources/example-with-jinja-env-var.yml'.format(os.path.dirname(__file__))) == \
+            {'app': 'my-app', 'secret': app_secret, 'environment': app_environment}
+
     def test_sample_file_path(self):
         """Sample files must be global config, tap, target YAML or README file"""
         for sample in cli.utils.get_sample_file_paths():

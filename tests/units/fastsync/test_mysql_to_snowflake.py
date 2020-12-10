@@ -15,6 +15,14 @@ class S3CsvToPostgres(unittest.TestCase):
     """
     def test_tap_type_to_target_type_with_defined_tap_type_returns_equivalent_target_type(self):
         self.assertEqual('BINARY', tap_type_to_target_type('binary', None))
+        self.assertEqual('VARIANT', tap_type_to_target_type('geometry', None))
+        self.assertEqual('VARIANT', tap_type_to_target_type('point', None))
+        self.assertEqual('VARIANT', tap_type_to_target_type('linestring', None))
+        self.assertEqual('VARIANT', tap_type_to_target_type('polygon', None))
+        self.assertEqual('VARIANT', tap_type_to_target_type('multipoint', None))
+        self.assertEqual('VARIANT', tap_type_to_target_type('multilinestring', None))
+        self.assertEqual('VARIANT', tap_type_to_target_type('multipolygon', None))
+        self.assertEqual('VARIANT', tap_type_to_target_type('geometrycollection', None))
 
     def test_tap_type_to_target_type_with_undefined_tap_type_returns_CHARACTER_VARYING(self):
         self.assertEqual('VARCHAR', tap_type_to_target_type('random-type', 'random-type'))

@@ -1,3 +1,21 @@
+0.27.0 (2020-12-04)
+-------------------
+
+- Bumping `snowflake-connector-python` across all componenets that uses to `2.3.6`
+- Tagging all queries issues to Snowflake by FastSync Snowflake and singer target-snowflake.
+- Add ssl support to mongodump in FastSync mongodb.
+- Add support for MySQL spatial types.
+
+- Fix issues build PPW docker images
+- Update documentation.
+
+
+0.26.0 (2020-10-30)
+-------------------
+
+- Add tap-mixpanel
+- Bump `joblib` to 0.16.0 to fix some issues when running on python 3.8
+
 0.25.0 (2020-10-23)
 -------------------
 

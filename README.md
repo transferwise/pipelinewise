@@ -58,6 +58,7 @@ consumes data from taps and do something with it, like load it into a file, API 
 | Tap       | **[GitHub](https://github.com/singer-io/tap-github)** |       | [![PyPI version](https://badge.fury.io/py/tap-github.svg)](https://badge.fury.io/py/tap-github) | Extracts data from GitHub API using Personal Access Token and Key-Based incremental replications |
 | Tap       | **[Shopify](https://github.com/singer-io/tap-shopify)** | Extra | [![PyPI version](https://badge.fury.io/py/tap-shopify.svg)](https://badge.fury.io/py/tap-shopify) | Extracts data from Shopify API using Personal App API Password and date based incremental replications |
 | Tap       | **[Slack](https://github.com/transferwise/pipelinewise-tap-slack)** |       | [![PyPI version](https://badge.fury.io/py/pipelinewise-tap-slack.svg)](https://badge.fury.io/py/pipelinewise-tap-slack) | Extracts data from a Slack API using Bot User Token and Key-Based incremental replications |
+| Tap       | **[Mixpanel](https://github.com/transferwise/pipelinewise-tap-mixpanel)** |       | [![PyPI version](https://badge.fury.io/py/pipelinewise-tap-mixpanel.svg)](https://badge.fury.io/py/pipelinewise-tap-mixpanel) | Extracts data from the Mixpanel API. |
 | Target    | **[Postgres](https://github.com/transferwise/pipelinewise-target-postgres)** | | [![PyPI version](https://badge.fury.io/py/pipelinewise-target-postgres.svg)](https://badge.fury.io/py/pipelinewise-target-postgres) | Loads data from any tap into PostgreSQL database |
 | Target    | **[Redshift](https://github.com/transferwise/pipelinewise-target-redshift)** | | [![PyPI version](https://badge.fury.io/py/pipelinewise-target-redshift.svg)](https://badge.fury.io/py/pipelinewise-target-redshift) | Loads data from any tap into Amazon Redshift Data Warehouse |
 | Target    | **[Snowflake](https://github.com/transferwise/pipelinewise-target-snowflake)** | | [![PyPI version](https://badge.fury.io/py/pipelinewise-target-snowflake.svg)](https://badge.fury.io/py/pipelinewise-target-snowflake) | Loads data from any tap into Snowflake Data Warehouse |
@@ -193,4 +194,12 @@ To add new taps and targets follow the instructions on
 Apache License Version 2.0
 
 See [LICENSE](LICENSE) to see the full text.
+
+**Important Note:**
+
+PipelineWise as a standalone software is licensed under Apache License Version 2.0 but bundled components can
+use different licenses and may overwrite the terms and conditions detailed in Apache License Version 2.0.
+You can customise which connectors you want to include into the final PipelineWise build and the final license of
+your build depends on the included connectors. For further details please check the
+[Licenses](https://transferwise.github.io/pipelinewise/project/licenses.html) section in the documentation.
 
