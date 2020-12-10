@@ -16,7 +16,9 @@ import warnings
 import jsonschema
 import yaml
 
+from io import StringIO
 from datetime import date, datetime
+from jinja2 import Template
 from ansible.errors import AnsibleError
 from ansible.module_utils._text import to_text
 from ansible.module_utils.common._collections_compat import Mapping
@@ -181,6 +183,10 @@ def load_yaml(yaml_file, vault_secret=None):
     data = None
     if os.path.isfile(yaml_file):
         with open(yaml_file, 'r') as stream:
+            # Render environment variables using jinja templates
+            contents = stream.read()
+            template = Template(contents)
+            stream = StringIO(template.render(env_var=os.environ))
             try:
                 if is_encrypted_file(stream):
                     file_data = stream.read()
