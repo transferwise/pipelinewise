@@ -3,6 +3,7 @@ import gzip
 import logging
 import re
 import sys
+import os
 import boto3
 
 from datetime import datetime
@@ -259,12 +260,13 @@ class S3Helper:
     @classmethod
     @retry_pattern()
     def setup_aws_client(cls, config):
-        aws_access_key_id = config['aws_access_key_id']
-        aws_secret_access_key = config['aws_secret_access_key']
+        aws_session_params = dict()
+        for val in ("aws_profile", "aws_access_key_id", "aws_secret_access_key", "aws_session_token"):
+            if found_val := config.get(val) or os.environ.get(val.upper()):
+                aws_session_params[val] = found_val
 
         LOGGER.info('Attempting to create AWS session')
-        boto3.setup_default_session(aws_access_key_id=aws_access_key_id,
-                                    aws_secret_access_key=aws_secret_access_key)
+        boto3.setup_default_session(**aws_session_params)
 
     @classmethod
     def get_input_files_for_table(cls, config: Dict, table_spec: Dict, modified_since: struct_time = None):
