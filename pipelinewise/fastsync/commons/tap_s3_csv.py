@@ -260,16 +260,13 @@ class S3Helper:
     @classmethod
     @retry_pattern()
     def setup_aws_client(cls, config):
-        aws_session_parms = dict(
-            profile_name=config.get('aws_profile', None) or os.environ.get('AWS_PROFILE'),
-            aws_access_key_id=config.get('aws_access_key_id', None) or os.environ.get('AWS_ACCESS_KEY_ID'),
-            aws_secret_access_key=config.get('aws_secret_access_key', None) or \
-                                os.environ.get('AWS_SECRET_ACCESS_KEY'),
-            aws_session_token=config.get('aws_session_token', None) or os.environ.get('AWS_SESSION_TOKEN')
-        )
+        aws_session_params = dict()
+        for val in ("aws_profile", "aws_access_key_id", "aws_secret_access_key", "aws_session_token"):
+            if found_val := config.get(val) or os.environ.get(val.upper()):
+                aws_session_params[val] = found_val
 
         LOGGER.info('Attempting to create AWS session')
-        boto3.setup_default_session(**aws_session_parms)
+        boto3.setup_default_session(**aws_session_params)
 
     @classmethod
     def get_input_files_for_table(cls, config: Dict, table_spec: Dict, modified_since: struct_time = None):
