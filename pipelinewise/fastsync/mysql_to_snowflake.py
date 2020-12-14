@@ -62,7 +62,7 @@ def tap_type_to_target_type(mysql_type, mysql_column_type):
         'longtext': 'VARCHAR',
         'enum': 'VARCHAR',
         'int': 'NUMBER',
-        'tinyint': 'BOOLEAN' if mysql_column_type.startswith('tinyint(1)') else 'NUMBER',
+        'tinyint': 'BOOLEAN' if mysql_column_type and mysql_column_type.startswith('tinyint(1)') else 'NUMBER',
         'smallint': 'NUMBER',
         'mediumint': 'NUMBER',
         'bigint': 'NUMBER',
