@@ -114,7 +114,7 @@ class PipelineWise:
             raise Exception(f'Cannot merge JSON files {dict_a} {dict_b} - {exc}')
 
     # pylint: disable=too-many-statements,too-many-branches,too-many-nested-blocks,too-many-locals,too-many-arguments
-    def create_filtered_tap_properties(self, target_type, tap_type, tap_properties, tap_state, filters,
+    def create_filtered_tap_properties(self, target_type, target_config, tap_type, tap_properties, tap_state, filters,
                                        create_fallback=False):
         """
         Create a filtered version of tap properties file based on specific filter conditions.
@@ -136,10 +136,13 @@ class PipelineWise:
         f_tap_type = filters.get('tap_type', None)
         f_replication_method = filters.get('replication_method', None)
         f_initial_sync_required = filters.get('initial_sync_required', None)
+        f_load_via_snowpipe = filters.get('load_via_snowpipe', None)
 
         # Lists of tables that meet and don't meet the filter criteria
         filtered_tap_stream_ids = []
         fallback_filtered_stream_ids = []
+
+        load_via_snowpipe = utils.load_json(target_config).get('load_via_snowpipe', False)
 
         self.logger.debug('Filtering properties JSON by conditions: %s', filters)
         try:
@@ -202,7 +205,8 @@ class PipelineWise:
                         (f_target_type is None or target_type in f_target_type) and
                         (f_tap_type is None or tap_type in f_tap_type) and
                         (f_replication_method is None or replication_method in f_replication_method) and
-                        (f_initial_sync_required is None or initial_sync_required == f_initial_sync_required)
+                        (f_initial_sync_required is None or initial_sync_required == f_initial_sync_required) and
+                        (f_load_via_snowpipe is None or load_via_snowpipe == f_load_via_snowpipe)
                 ):
                     self.logger.debug("""Filter condition(s) matched:
                         Table              : %s
@@ -972,13 +976,15 @@ class PipelineWise:
             singer_stream_ids
         ) = self.create_filtered_tap_properties(
             target_type,
+            target_config,
             tap_type,
             tap_properties,
             tap_state, {
                 'selected': True,
                 'target_type': ['target-snowflake', 'target-redshift', 'target-postgres'],
                 'tap_type': ['tap-mysql', 'tap-postgres', 'tap-s3-csv', 'tap-mongodb'],
-                'initial_sync_required': True
+                'initial_sync_required': True,
+                'load_via_snowpipe': False
             },
             create_fallback=True)
 
