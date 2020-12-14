@@ -29,22 +29,18 @@ class FastSyncTargetSnowflake:
         self.transformation_config = transformation_config
 
         # Get the required parameters from config file and/or environment variables
-        aws_profile = self.connection_config.get('aws_profile') or os.environ.get('AWS_PROFILE')
-        aws_access_key_id = self.connection_config.get('aws_access_key_id') or os.environ.get('AWS_ACCESS_KEY_ID')
-        aws_secret_access_key = self.connection_config.get('aws_secret_access_key') or \
-                                os.environ.get('AWS_SECRET_ACCESS_KEY')
-        aws_session_token = self.connection_config.get('aws_session_token') or os.environ.get('AWS_SESSION_TOKEN')
+        aws_session_parms = dict(
+            profile_name=self.connection_config.get('aws_profile', None) or os.environ.get('AWS_PROFILE'),
+            aws_access_key_id=self.connection_config.get('aws_access_key_id', None) or \
+                              os.environ.get('AWS_ACCESS_KEY_ID'),
+            aws_secret_access_key=self.connection_config.get('aws_secret_access_key', None) or \
+                                  os.environ.get('AWS_SECRET_ACCESS_KEY'),
+            aws_session_token=self.connection_config.get('aws_session_token', None) or \
+                              os.environ.get('AWS_SESSION_TOKEN')
+        )
 
         # AWS credentials based authentication
-        if aws_access_key_id and aws_secret_access_key:
-            aws_session = boto3.session.Session(
-                aws_access_key_id=aws_access_key_id,
-                aws_secret_access_key=aws_secret_access_key,
-                aws_session_token=aws_session_token
-            )
-        # AWS Profile based authentication
-        else:
-            aws_session = boto3.session.Session(profile_name=aws_profile)
+        aws_session = boto3.session.Session(**aws_session_parms)
 
         # Create the s3 client
         self.s3 = aws_session.client('s3',
