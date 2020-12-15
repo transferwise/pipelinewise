@@ -1,1 +1,1 @@
-git+https://github.com/transferwise/pipelinewise-tap-twilio@master
+git+https://github.com/transferwise/pipelinewise-tap-twilio@add-chat

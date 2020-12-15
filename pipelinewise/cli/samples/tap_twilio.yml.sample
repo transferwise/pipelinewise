@@ -62,15 +62,27 @@ schemas:
     # Tap-Twilio will use the best incremental strategies automatically to replicate data
     tables:
       # Incrementally loaded tables
-      - table_name: "accounts"
-#      - table_name: "activities"
-#      - table_name: "events"
+      - table_name: "workspaces"
+      - table_name: "activities"
+      - table_name: "events"
+      - table_name: "tasks"
+#      - table_name: "task_channels"
+      - table_name: "task_queues"
+      - table_name: "workers"
+      - table_name: "workflows"
+      - table_name: "services"
+      - table_name: "roles"
+      - table_name: "users"
+#      - table_name: "channels"
+#      - table_name: "members"
+#      - table_name: "messages"
+
 
       # Tables that cannot load incrementally and will use FULL_TABLE method
-      #- table_name: "engage"
-      #- table_name: "annotations"
-      #- table_name: "cohorts"
-      #- table_name: "cohort_members"
+      - table_name: "channels"
+        replication_method: "FULL_TABLE"
+#      - table_name: "cumulative_statistics"
+#        replication_method: "FULL_TABLE"
 
         # OPTIONAL: Load time transformations - you can add it to any table
         #transformations:
