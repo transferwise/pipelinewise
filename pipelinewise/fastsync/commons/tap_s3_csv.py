@@ -262,7 +262,9 @@ class S3Helper:
     def setup_aws_client(cls, config):
         aws_session_params = dict()
         for val in ("aws_profile", "aws_access_key_id", "aws_secret_access_key", "aws_session_token"):
-            if found_val := config.get(val) or os.environ.get(val.upper()):
+            found_val = config.get(val) or os.environ.get(val.upper())
+            if found_val:
+                val = "profile_name" if val == "aws_profile" else val
                 aws_session_params[val] = found_val
 
         LOGGER.info('Attempting to create AWS session')
