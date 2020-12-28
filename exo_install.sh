@@ -24,7 +24,7 @@ make_virtualenv() {
     python3 -m pip install --upgrade pip setuptools 
     if [ -f "setup.py" ]; then
         echo "Installing pipelinewise package venv"
-        python3 -m pip install --upgrade -e . --use-feature=2020-resolver
+        python3 -m pip install --upgrade -e .
     else
         echo "Installing via requirements.txt"
         python3 -m pip install -r requirements.txt || $FAILED_INSTALLS += $1
