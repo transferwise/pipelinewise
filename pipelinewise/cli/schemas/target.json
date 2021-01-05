@@ -47,6 +47,15 @@
         },
         "client_side_encryption_master_key": {
           "type": "string"
+        },
+        "load_via_snowpipe": {
+          "type": "boolean"
+        },
+        "ignore_primary_key": {
+          "type": "boolean"
+        },
+        "max_retry": {
+          "type": "integer"
         }
       },
       "required": [
