@@ -98,6 +98,7 @@
 <li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Creating Pipelines</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#generating-sample-pipelines">Generating Sample Pipelines</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#environment-variables-in-yaml-config">Environment variables in YAML config</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#example-replication-from-mysql-to-snowflake">Example replication from MySQL to Snowflake</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#activating-the-pipelines-from-the-yaml-files">Activating the Pipelines from the YAML files</a></li>
 </ul>
@@ -253,6 +254,22 @@ details, select tables to replicate, define source to target schema mapping or a
 time transformations. Check the <a class="reference internal" href="#example-replication-mysql-to-snowflake"><span class="std std-ref">Example replication from MySQL to Snowflake</span></a> section
 for a real life example.</p>
 <p>Once you configured the YAML files you can go to <a class="reference internal" href="#import-project-from-yaml"><span class="std std-ref">Activating the Pipelines from the YAML files</span></a> section.</p>
+</div>
+<div class="section" id="environment-variables-in-yaml-config">
+<span id="passing-environment-variables-via-jinja"></span><h2>Environment variables in YAML config<a class="headerlink" href="#environment-variables-in-yaml-config" title="Permalink to this headline">¶</a></h2>
+<p>It is possible to use environment variables in the YAML config files.
+This feature is implemented using jinja templates and requires the following syntax to work:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>---
+id: <span class="s2">&quot;snowflake_test&quot;</span>
+name: <span class="s2">&quot;Snowflake Test&quot;</span>
+type: <span class="s2">&quot;target-snowflake&quot;</span>
+db_conn:
+  account: <span class="s2">&quot;rtxxxxxx.eu-central-1&quot;</span>
+  dbname: <span class="s2">&quot;analytics_db_test&quot;</span>
+  user: <span class="s2">&quot;snowflake_user&quot;</span>
+  password: <span class="s2">&quot;{{ env_var[&#39;MY_PASSWORD&#39;] }}&quot;</span>
+</pre></div>
+</div>
 </div>
 <div class="section" id="example-replication-from-mysql-to-snowflake">
 <span id="example-replication-mysql-to-snowflake"></span><h2>Example replication from MySQL to Snowflake<a class="headerlink" href="#example-replication-from-mysql-to-snowflake" title="Permalink to this headline">¶</a></h2>
