@@ -156,7 +156,7 @@ done
 
 # Welcome message
 if ! ENVSUBST_LOC="$(type -p "envsubst")" || [[ -z ENVSUBST_LOC ]]; then
-  echo "envsubst not found which is required to run this script. Try to install gettext or gettext-base package"
+  echo "envsubst not found but it's required to run this script. Try to install gettext or gettext-base package"
   exit 1
 fi
 
