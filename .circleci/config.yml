@@ -76,11 +76,17 @@ jobs:
       - checkout
 
       - run:
-          name: 'Check code formatting'
+          name: 'Install dependencies'
           command: |
             python3 -m venv .venv
             . .venv/bin/activate
+            pip install --upgrade pip setuptools wheel
             pip install -Ue .[test]
+
+      - run:
+          name: 'Check code formatting'
+          command: |
+            . .venv/bin/activate
             find pipelinewise tests -type f -name '*.py' | xargs unify --check-only
 
       - run:
