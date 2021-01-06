@@ -155,7 +155,7 @@ for arg in "$@"; do
 done
 
 # Welcome message
-cat $SRC_DIR/motd
+CURRENT_YEAR=$(date +"%Y") envsubst < $SRC_DIR/motd
 
 # Install PipelineWise core components
 cd $SRC_DIR
