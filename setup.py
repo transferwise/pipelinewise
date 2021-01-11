@@ -33,7 +33,7 @@ setup(name='pipelinewise',
           'python-pidfile==3.0.0',
           'pre-commit==1.21.0',
           'pymongo==3.10.*',
-          'ujson==2.0.*',
+          'ujson>=2.0,<4.1',
           'tzlocal==2.0.*',
           'slackclient==2.7.*',
           'psutil==5.7.2'
