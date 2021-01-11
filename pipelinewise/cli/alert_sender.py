@@ -62,8 +62,9 @@ class AlertSender:
             # Get and initialise the correct alert handler class
             alert_handler_class = ALERT_HANDLER_TYPES_TO_CLASS[alert_handler.type]
             handler = alert_handler_class(alert_handler.config)
-        except KeyError:
-            raise NotImplementedAlertHandlerException(f'Alert handler type not implemented: {alert_handler.type}')
+        except KeyError as key_error:
+            raise NotImplementedAlertHandlerException(f'Alert handler type not implemented: {alert_handler.type}') \
+                from key_error
 
         return handler
 

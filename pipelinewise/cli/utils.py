@@ -53,7 +53,7 @@ class AnsibleJSONEncoder(json.JSONEncoder):
             value = o.isoformat()
         else:
             # use default encoder
-            value = super(AnsibleJSONEncoder, self).default(o)
+            value = super().default(o)
         return value
 
 
@@ -95,7 +95,7 @@ def load_json(path):
             LOGGER.debug('No file at %s', path)
             return None
     except Exception as exc:
-        raise Exception(f'Error parsing {path} {exc}')
+        raise Exception(f'Error parsing {path} {exc}') from exc
 
 
 def is_state_message(line: str) -> bool:
@@ -118,7 +118,7 @@ def save_json(data, path):
         with open(path, 'w') as jsonfile:
             return json.dump(data, jsonfile, cls=AnsibleJSONEncoder, indent=4, sort_keys=True)
     except Exception as exc:
-        raise Exception(f'Cannot save JSON {path} {exc}')
+        raise Exception(f'Cannot save JSON {path} {exc}') from exc
 
 
 def is_yaml(strings):
@@ -196,11 +196,11 @@ def load_yaml(yaml_file, vault_secret=None):
                     try:
                         data = loader.get_single_data()
                     except Exception as exc:
-                        raise Exception(f'Error when loading YAML config at {yaml_file} {exc}')
+                        raise Exception(f'Error when loading YAML config at {yaml_file} {exc}') from exc
                     finally:
                         loader.dispose()
             except yaml.YAMLError as exc:
-                raise Exception(f'Error when loading YAML config at {yaml_file} {exc}')
+                raise Exception(f'Error when loading YAML config at {yaml_file} {exc}') from exc
     else:
         LOGGER.debug('No file at %s', yaml_file)
 

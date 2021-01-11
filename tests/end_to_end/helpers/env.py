@@ -194,7 +194,7 @@ class E2EEnv:
         elif isinstance(env_connector, list):
             env_conns = env_connector
         else:
-            raise Exception(f'env_connector must be string or list')
+            raise Exception('env_connector must be string or list')
 
         for env_conn in env_conns:
             for key, value in self.env[env_conn]['vars'].items():
