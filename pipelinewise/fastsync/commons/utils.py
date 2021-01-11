@@ -4,11 +4,22 @@ import multiprocessing
 import os
 import logging
 
+from typing import Dict
+
 LOGGER = logging.getLogger(__name__)
 
 SDC_EXTRACTED_AT = '_SDC_EXTRACTED_AT'
 SDC_BATCHED_AT = '_SDC_BATCHED_AT'
 SDC_DELETED_AT = '_SDC_DELETED_AT'
+
+
+class NotSelectedTableException(Exception):
+    """
+    Exception to raise when a table is not selected for resync
+    """
+    def __init__(self, table_name, selected_tables):
+        self.message = f'Cannot Resync unselected table "{table_name}"! Selected tables are: {selected_tables}'
+        super().__init__(self, self.message)
 
 
 # pylint: disable=missing-function-docstring
@@ -61,11 +72,11 @@ def tablename_to_dict(table, separator='.'):
     }
 
 
-def get_tables_from_properties(properties):
+def get_tables_from_properties(properties: Dict) -> set:
     """Get list of selected tables with schema names from properties json
     The output is used to generate list of tables to sync
     """
-    tables = []
+    tables = set()
 
     for stream in properties.get('streams', tables):
         metadata = stream.get('metadata', [])
@@ -79,10 +90,10 @@ def get_tables_from_properties(properties):
 
         if table_name and selected:
             if schema_name is not None or db_name is not None:
-                tables.append('{}.{}'.format(schema_name or db_name, table_name))
+                tables.add('{}.{}'.format(schema_name or db_name, table_name))
             else:
                 # Some tap types don't have db name nor schema name
-                tables.append(table_name)
+                tables.add(table_name)
 
     return tables
 
@@ -262,7 +273,8 @@ def save_state_file(path, table, bookmark, dbname=None):
     save_dict_to_json(path, state)
 
 
-def parse_args(required_config_keys):
+
+def parse_args(required_config_keys: Dict) -> argparse.Namespace:
     """Parse standard command-line args.
 
     --tap               Tap Config file
@@ -287,7 +299,8 @@ def parse_args(required_config_keys):
     parser.add_argument('--export-dir', help='Temporary directory required for CSV exports')
     parser.add_argument('--temp_dir', help='Temporary directory required for CSV exports')
 
-    args = parser.parse_args()
+    args: argparse.Namespace = parser.parse_args()
+
     if args.tap:
         args.tap = load_json(args.tap)
 
@@ -302,14 +315,32 @@ def parse_args(required_config_keys):
     else:
         args.transform = {}
 
-    if args.tables:
-        args.tables = args.tables.split(',')
-    else:
-        args.tables = get_tables_from_properties(args.properties)
+    # get all selected tables from json schema
+    all_selected_tables = get_tables_from_properties(args.properties)
 
-    if args.temp_dir:
-        args.temp_dir = args.temp_dir
+    # This is a flag for PG sources that indicate whether the logical slot should be dropped first before resyncing
+    # tables, we want to drop the slot only when all tables in a tap are to be resynced, not just few of them.
+    args.drop_pg_slot = False
+
+    if args.tables:
+        # prevent duplicates
+        unique_tables_list = set(args.tables.split(','))
+
+        # check if all the given tables are actually selected
+        for table in unique_tables_list:
+            if table not in all_selected_tables:
+                raise NotSelectedTableException(table, all_selected_tables)
+
+        # drop slot if all the given are the only selected one - same behavior as not specifying any table
+        if unique_tables_list == all_selected_tables:
+            args.drop_pg_slot = True
+
+        args.tables = unique_tables_list
     else:
+        args.tables = all_selected_tables
+        args.drop_pg_slot = True
+
+    if not args.temp_dir:
         args.temp_dir = os.path.realpath('.')
 
     check_config(args.tap, required_config_keys['tap'])
