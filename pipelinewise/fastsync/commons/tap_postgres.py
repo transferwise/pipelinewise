@@ -3,8 +3,12 @@ import decimal
 import gzip
 import logging
 import re
+import sys
 import psycopg2
 import psycopg2.extras
+
+from typing import Dict
+
 
 from . import utils
 from ...utils import safe_column_name
@@ -47,28 +51,122 @@ class FastSyncTapPostgres:
         # Replace invalid characters to ensure replication slot name is in accordance with Postgres spec
         return re.sub('[^a-z0-9_]', '_', slot_name)
 
+    @classmethod
+    def __get_slot_name(cls, connection, dbname: str, tap_id: str,) -> str:
+        """
+        Finds the right slot name to use and returns it
+
+        Args:
+            connection: pg connection instance
+            dbname: db name
+            tap_id: Id of tha tap
+
+        Returns:
+            String: slot name
+
+        """
+        # Replication hosts pattern versions
+        slot_name_v15 = cls.generate_replication_slot_name(dbname)
+        slot_name_v16 = cls.generate_replication_slot_name(dbname, tap_id)
+
+        v15_slots_count = 0
+
+        try:
+            # Backward compatibility: try to locate existing v15 slot first. PPW <= 0.15.0
+            with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
+                cur.execute(f"SELECT * FROM pg_replication_slots WHERE slot_name = '{slot_name_v15}';")
+                v15_slots_count = cur.rowcount
+
+        except psycopg2.Error:
+            LOGGER.exception('Error while looking for slots', exc_info=sys.exc_info())
+        finally:
+            if v15_slots_count > 0:
+                slot_name = slot_name_v15
+            else:
+                slot_name = slot_name_v16
+
+        return slot_name
+
+    @classmethod
+    def drop_slot(cls, connection_config: Dict) -> None:
+        """
+        Dropping the logical replication slot from primary server
+
+        Args:
+            connection_config: Dictionary with db credentials
+        """
+        LOGGER.info('Attempting to drop slot ...')
+
+        LOGGER.debug('Creating a connection to Primary server ..')
+        connection = cls.get_connection(connection_config, prioritize_primary=True)
+        LOGGER.debug('Connection to Primary server created.')
+
+        try:
+            slot_name = cls.__get_slot_name(connection, connection_config['dbname'], connection_config['tap_id'])
+
+            LOGGER.info('Dropping the slot "%s"', slot_name)
+            # drop the replication host
+            with connection.cursor() as cur:
+                cur.execute(f'SELECT pg_drop_replication_slot(slot_name) '
+                            f"FROM pg_replication_slots WHERE slot_name = '{slot_name}';")
+                LOGGER.info('Number of dropped slots: %s', cur.rowcount)
+
+        finally:
+            connection.close()
+
+    @classmethod
+    def get_connection(cls, connection_config: Dict, prioritize_primary: bool = False):
+        """
+        Class method to create a pg connection instance with autocommit enabled
+        Connection is either to the primary or a replica if its credentials are given
+
+        Args:
+            prioritize_primary: boolean to control whether to connect to primary or replica
+            connection_config: Dictionary containing the db connection details
+        Returns:
+            pg Connection instance
+        """
+        template = "host='{}' port='{}' user='{}' password='{}' dbname='{}'"
+
+        if prioritize_primary:
+            LOGGER.info('Connecting to primary server')
+            conn_string = template.format(
+                connection_config['host'],
+                connection_config['port'],
+                connection_config['user'],
+                connection_config['password'],
+                connection_config['dbname'])
+        else:
+            LOGGER.info('Connecting to replica')
+            conn_string = template.format(
+                # Fastsync is using replica_{host|port|user|password} values from the config by default
+                # to avoid making heavy load on the primary source database when syncing large tables
+                #
+                # If replica_{host|port|user|password} values are not defined in the config then it's
+                # using the normal credentials to connect
+                connection_config.get('replica_host', connection_config['host']),
+                connection_config.get('replica_port', connection_config['port']),
+                connection_config.get('replica_user', connection_config['user']),
+                connection_config.get('replica_password', connection_config['password']),
+                connection_config['dbname'])
+
+        if 'ssl' in connection_config and connection_config['ssl'] == 'true':
+            conn_string += " sslmode='require'"
+
+        conn = psycopg2.connect(conn_string)
+
+        # Set connection to autocommit
+        conn.autocommit = True
+
+        LOGGER.info('Connection to PGSQL server established')
+
+        return conn
+
     def open_connection(self):
         """
         Open connection
         """
-        conn_string = "host='{}' port='{}' user='{}' password='{}' dbname='{}'".format(
-            # Fastsync is using replica_{host|port|user|password} values from the config by default
-            # to avoid making heavy load on the primary source database when syncing large tables
-            #
-            # If replica_{host|port|user|password} values are not defined in the config then it's
-            # using the normal credentials to connect
-            self.connection_config.get('replica_host', self.connection_config['host']),
-            self.connection_config.get('replica_port', self.connection_config['port']),
-            self.connection_config.get('replica_user', self.connection_config['user']),
-            self.connection_config.get('replica_password', self.connection_config['password']),
-            self.connection_config['dbname'])
-
-        if 'ssl' in self.connection_config and self.connection_config['ssl'] == 'true':
-            conn_string += " sslmode='require'"
-
-        self.conn = psycopg2.connect(conn_string)
-        # Set connection to autocommit
-        self.conn.autocommit = True
+        self.conn = self.get_connection(self.connection_config, prioritize_primary=False)
         self.curr = self.conn.cursor()
 
     def close_connection(self):
@@ -123,18 +221,9 @@ class FastSyncTapPostgres:
         replication slot and full-resync the new taps.
         """
         try:
-            # Replication hosts pattern versions
-            slot_name_v15 = self.generate_replication_slot_name(dbname=self.connection_config['dbname'])
-            slot_name_v16 = self.generate_replication_slot_name(dbname=self.connection_config['dbname'],
-                                                                tap_id=self.connection_config['tap_id'])
-
-            # Backward compatibility: try to locate existing v15 slot first. PPW <= 0.15.0
-            v15_slots = self.primary_host_query(f'SELECT * FROM pg_replication_slots'
-                                                f" WHERE slot_name = '{slot_name_v15}'")
-            if len(v15_slots) > 0:
-                slot_name = slot_name_v15
-            else:
-                slot_name = slot_name_v16
+            slot_name = self.__get_slot_name(self.primary_host_conn,
+                                             self.connection_config['dbname'],
+                                             self.connection_config['tap_id'])
 
             # Create the replication host
             self.primary_host_query(f"SELECT * FROM pg_create_logical_replication_slot('{slot_name}', 'wal2json')")
@@ -152,16 +241,7 @@ class FastSyncTapPostgres:
         """
         # Create replication slot dedicated connection
         # Always use Primary server for creating replication_slot
-        primary_host_conn_string = "host='{}' port='{}' user='{}' password='{}' dbname='{}'".format(
-            self.connection_config['host'],
-            self.connection_config['port'],
-            self.connection_config['user'],
-            self.connection_config['password'],
-            self.connection_config['dbname']
-        )
-        self.primary_host_conn = psycopg2.connect(primary_host_conn_string)
-        # Set connection to autocommit
-        self.primary_host_conn.autocommit = True
+        self.primary_host_conn = self.get_connection(self.connection_config, prioritize_primary=True)
         self.primary_host_curr = self.primary_host_conn.cursor()
 
         # Make sure PostgreSQL version is 9.4 or higher
