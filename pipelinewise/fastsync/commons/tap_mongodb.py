@@ -43,8 +43,8 @@ class MongoDBJsonEncoder(json.JSONEncoder):
             try:
                 local_datetime = timezone.localize(val)
                 utc_datetime = local_datetime.astimezone(pytz.UTC)
-            except Exception as ex:
-                if str(ex) == 'year is out of range' and val.year == 0:
+            except Exception as exc:
+                if str(exc) == 'year is out of range' and val.year == 0:
                     # NB: Since datetimes are persisted as strings, it doesn't
                     # make sense to blow up on invalid Python datetimes (e.g.,
                     # year=0). In this case we're formatting it as a string and
@@ -56,7 +56,7 @@ class MongoDBJsonEncoder(json.JSONEncoder):
                                                                                       val.minute,
                                                                                       val.second,
                                                                                       val.microsecond)
-                raise MongoDBInvalidDatetimeError('Found invalid datetime {}'.format(val))
+                raise MongoDBInvalidDatetimeError('Found invalid datetime {}'.format(val)) from exc
 
             return singer_strftime(utc_datetime)
 
@@ -92,7 +92,7 @@ class MongoDBJsonEncoder(json.JSONEncoder):
         if o.__class__ in encoding_map:
             return encoding_map[o.__class__](o)
 
-        return super(MongoDBJsonEncoder, self).default(o)
+        return super().default(o)
 
 
 class FastSyncTapMongoDB:
