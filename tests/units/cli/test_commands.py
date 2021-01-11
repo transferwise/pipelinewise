@@ -197,7 +197,7 @@ class TestCommands:
 
         # Should use custom buffer binary executable if bin parameter provided
         assert commands.build_stream_buffer_command(buffer_size=100, stream_buffer_bin='dummy_buffer') == \
-               f'dummy_buffer -m 100M'
+               'dummy_buffer -m 100M'
 
         # Should log mbuffer status to log file with .running extension
         assert commands.build_stream_buffer_command(buffer_size=100, log_file='stream_buffer.log') == \
