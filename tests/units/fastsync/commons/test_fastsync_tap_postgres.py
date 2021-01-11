@@ -228,7 +228,7 @@ class TestFastSyncTapPostgres(TestCase):
 
         assert self.postgres.executed_queries_primary_host == [
             "SELECT * FROM pg_replication_slots WHERE slot_name = 'pipelinewise_my_db';",
-            "SELECT pg_drop_replication_slot(slot_name) FROM pg_replication_slots WHERE "
+            'SELECT pg_drop_replication_slot(slot_name) FROM pg_replication_slots WHERE '
             "slot_name = 'pipelinewise_my_db';",
         ]
 
@@ -266,6 +266,6 @@ class TestFastSyncTapPostgres(TestCase):
 
         assert self.postgres.executed_queries_primary_host == [
             "SELECT * FROM pg_replication_slots WHERE slot_name = 'pipelinewise_my_db';",
-            "SELECT pg_drop_replication_slot(slot_name) FROM pg_replication_slots WHERE "
+            'SELECT pg_drop_replication_slot(slot_name) FROM pg_replication_slots WHERE '
             "slot_name = 'pipelinewise_my_db_tap_test';",
         ]
