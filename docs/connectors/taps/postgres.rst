@@ -86,34 +86,18 @@ This should be sufficient unless you have a large number of read replicas connec
 
 Restart your PostgreSQL service to ensure the changes take effect.
 
-**Step 3.4: Create a replication slot**
+**Step 3.4: Replication slot**
 
-Next, you’ll create a dedicated logical replication slot for Stitch. In PostgreSQL, a logical replication
-slot represents a stream of database changes that can then be replayed to a client in the order they were
-made on the original server. Each slot streams a sequence of changes from a single database.
+In PostgreSQL, a logical replication slot represents a stream of database changes that can then be replayed to a
+client in the order they were made on the original server. Each slot streams a sequence of changes from a single
+database.
 
-**Note**: Replication slots are specific to a given database in a cluster. If you want to connect
-multiple databases - whether in one integration or several - you’ll need to create a replication slot
-for each database.
+Pipelinewise automatically creates a dedicated logical replication slot for each database and tap.
 
-1. Log into the master database as a superuser.
 
-2. Using the ``wal2json`` plugin, create a logical replication slot:
+.. note:: ``wal2json`` is required to use :ref:`log_based` in Pipelinewise for PostgreSQL-backed databases.
 
-.. code-block:: bash
-
-    SELECT *
-    FROM pg_create_logical_replication_slot('pipelinewise_<database_name>', 'wal2json');
-
-3. Log in as the PipelineWise user and verify you can read from the replication slot,
-replacing ``pipelinewise_<database_name>`` with the name of the replication slot:
-
-.. code-block:: bash
-
-    SELECT COUNT(*)
-    FROM pg_logical_slot_peek_changes('pipelinewise_<database_name>', null, null);
-
-**Note**: ``wal2json`` is required to use :ref:`log_based` in Stitch for PostgreSQL-backed databases.
+.. note:: In case of full resync of a whole tap, Pipelinewise will attempt to drop the slot.
 
 
 Configuring what to replicate
