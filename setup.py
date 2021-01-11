@@ -45,7 +45,7 @@ setup(name='pipelinewise',
               'coverage==4.5.3',
               'python-dotenv==0.10.3',
               'mock==4.0.3',
-              'pylint==2.4.4',
+              'pylint==2.6.0',
               'unify==0.5'
           ]
       },
