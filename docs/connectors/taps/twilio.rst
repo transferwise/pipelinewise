@@ -85,10 +85,9 @@ Example YAML for tap-twilio:
           - table_name: "cumulative_statistics"
           - table_name: "channels"
           # Programmable Chat resources
-          # these 2 resources would be huge amount of data (we had 35k chats per month in 2020 Dec, that multiplied by let's
-          # say an average of 50 messages would be 1.75million entries for only a month)
-          # - table_name: "members"
-          # - table_name: "chat_messages"
+          # These 2 resources are using FULL_TABLE method and can pull huge amount of data from the twilio api at every sync. Please use it with caution.
+          - table_name: "members"
+          - table_name: "chat_messages"
 
 
             # OPTIONAL: Load time transformations - you can add it to any table
