@@ -219,7 +219,7 @@ PipelineWise can replicate data from the following data sources:
 
         .. container:: img-hover-zoom
 
-          .. image:: ../img/twilio-logo.png
+          .. image:: img/twilio-logo.png
              :target: taps/twilio.html
 
         :ref:`tap-twilio`
