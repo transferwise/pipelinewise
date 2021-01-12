@@ -35,23 +35,7 @@ Example YAML for tap-twilio:
       account_sid: <TWILIO_ACCOUNT_SID>         # Twilio Account SID
       auth_token: <TWILIO_AUTH_TOKEN>           # Twilio Auth token
       start_date: "2020-10-01"                  # The default value to use if no bookmark exists for an endpoint
-      date_window_size: 30                      # Number of days for date window looping through transactional endpoints
-                                                # with from_date and to_date. Default date_window_size is 30 days.
-                                                # Clients with large volumes of events may want to decrease this to 14, 7,
-                                                # or even down to 1-2 days.
-      attribution_window: 1                     # Latency minimum number of days to look-back to account for delays in
-                                                # attributing accurate results. Default attribution window is 5 days.
-      project_timezone: "Europe/London"         # Time zone in which integer date times are stored. The project timezone
-                                                # may be found in the project settings in the Mixpanel console.
-      user_agent: "someone"                     # Optional: Process and email for API logging purposes.
-      #denest_properties: "false"               # Optional: Do not denest JSON responses in `export` and `engage` streams
-                                                # to avoid very wide tables. If denesting is disabled then responses are
-                                                # loaded into one JSON column in the target.
-                                                # Default denest_properties is false.
-
-      #export_events:                           # Optional: List of event names to export
-      #  - event_one
-      #  - event_two
+      user_agent: "someone@transferwise.com"    # Optional: Process and email for API logging purposes.
 
 
     # ------------------------------------------------------------------------------
@@ -101,12 +85,13 @@ Example YAML for tap-twilio:
           - table_name: "cumulative_statistics"
           - table_name: "channels"
           # Programmable Chat resources
-          - table_name: "members"
-          - table_name: "chat_messages"
+          # these 2 resources would be huge amount of data (we had 35k chats per month in 2020 Dec, that multiplied by let's
+          # say an average of 50 messages would be 1.75million entries for only a month)
+          # - table_name: "members"
+          # - table_name: "chat_messages"
 
 
             # OPTIONAL: Load time transformations - you can add it to any table
             #transformations:
             #  - column: "some_column_to_transform" # Column to transform
             #    type: "SET-NULL"                   # Transformation type
-
