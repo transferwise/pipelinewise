@@ -13,6 +13,8 @@
 # import os
 # import sys
 # sys.path.insert(0, os.path.abspath('.'))
+import datetime
+
 
 def setup(app):
     app.add_css_file('css/custom.css')
@@ -21,7 +23,7 @@ def setup(app):
 # -- Project information -----------------------------------------------------
 
 project = 'PipelineWise'
-copyright = '2020, TransferWise Ltd.'
+copyright = f'{datetime.datetime.now().year}, TransferWise Ltd.'
 author = 'TransferWise'
 version = '0.26.0'
 

@@ -59,7 +59,7 @@ make_virtualenv() {
     echo "Making Virtual Environment for [$1] in $VENV_DIR"
     python3 -m venv $VENV_DIR/$1
     source $VENV_DIR/$1/bin/activate
-    python3 -m pip install --upgrade pip setuptools
+    python3 -m pip install --upgrade pip setuptools wheel
 
     if [ -f "requirements.txt" ]; then
         python3 -m pip install --upgrade -r requirements.txt
@@ -155,7 +155,12 @@ for arg in "$@"; do
 done
 
 # Welcome message
-cat $SRC_DIR/motd
+if ! ENVSUBST_LOC="$(type -p "envsubst")" || [[ -z ENVSUBST_LOC ]]; then
+  echo "envsubst not found but it's required to run this script. Try to install gettext or gettext-base package"
+  exit 1
+fi
+
+CURRENT_YEAR=$(date +"%Y") envsubst < $SRC_DIR/motd
 
 # Install PipelineWise core components
 cd $SRC_DIR

@@ -111,7 +111,7 @@ class PipelineWise:
 
             return tempfile_path
         except Exception as exc:
-            raise Exception(f'Cannot merge JSON files {dict_a} {dict_b} - {exc}')
+            raise Exception(f'Cannot merge JSON files {dict_a} {dict_b} - {exc}') from exc
 
     # pylint: disable=too-many-statements,too-many-branches,too-many-nested-blocks,too-many-locals,too-many-arguments
     def create_filtered_tap_properties(self, target_type, tap_type, tap_properties, tap_state, filters,
@@ -196,7 +196,7 @@ class PipelineWise:
                 # Compare actual values to the filter conditions.
                 # Set the "selected" key to True if actual values meet the filter criteria
                 # Set the "selected" key to False if the actual values don't meet the filter criteria
-                # pylint: disable=too-many-boolean-expressions,bad-continuation
+                # pylint: disable=too-many-boolean-expressions
                 if (
                         (f_selected is None or selected == f_selected) and
                         (f_target_type is None or target_type in f_target_type) and
@@ -267,7 +267,7 @@ class PipelineWise:
             return temp_properties_path, filtered_tap_stream_ids
 
         except Exception as exc:
-            raise Exception(f'Cannot create JSON file - {exc}')
+            raise Exception(f'Cannot create JSON file - {exc}') from exc
 
     def load_config(self):
         """
@@ -340,8 +340,8 @@ class PipelineWise:
         self.load_config()
         try:
             targets = self.config.get('targets', [])
-        except Exception:
-            raise Exception('Targets not defined')
+        except Exception as exc:
+            raise Exception('Targets not defined') from exc
 
         return targets
 
@@ -379,8 +379,8 @@ class PipelineWise:
             for tap_idx, tap in enumerate(taps):
                 taps[tap_idx]['status'] = self.detect_tap_status(target_id, tap['id'])
 
-        except Exception:
-            raise Exception(f'No taps defined for {target_id} target')
+        except Exception as exc:
+            raise Exception(f'No taps defined for {target_id} target') from exc
 
         return taps
 
@@ -569,8 +569,8 @@ class PipelineWise:
                 # Find table specific metadata entries in the old and new streams
                 try:
                     stream_table_mdata_idx = [i for i, md in enumerate(stream['metadata']) if md['breadcrumb'] == []][0]
-                except Exception:
-                    raise Exception(f'Metadata of stream {tap_stream_id} doesn\'t have an empty breadcrumb')
+                except Exception as exc:
+                    raise Exception(f'Metadata of stream {tap_stream_id} doesn\'t have an empty breadcrumb') from exc
 
                 if tap_stream_sel:
                     self.logger.debug('Mark %s tap_stream_id as selected with properties %s', tap_stream_id,

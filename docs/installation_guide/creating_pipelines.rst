@@ -66,6 +66,28 @@ for a real life example.
 
 Once you configured the YAML files you can go to :ref:`import_project_from_yaml` section.
 
+.. _passing_environment_variables_via_jinja:
+
+Environment variables in YAML config
+------------------------------------
+
+It is possible to use environment variables in the YAML config files. 
+This feature is implemented using jinja templates and requires the following syntax to work:
+
+.. code-block:: bash
+
+    ---
+    id: "snowflake_test"
+    name: "Snowflake Test"
+    type: "target-snowflake"
+    db_conn:
+      account: "rtxxxxxx.eu-central-1"
+      dbname: "analytics_db_test"
+      user: "snowflake_user"
+      password: "{{ env_var['MY_PASSWORD'] }}"
+
+
+
 .. _example_replication_mysql_to_snowflake:
 
 Example replication from MySQL to Snowflake
