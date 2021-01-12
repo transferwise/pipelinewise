@@ -1,3 +1,9 @@
+0.28.1 (2021-01-12)
+-------------------
+
+- patch `pipelinewise-tap-snowflake`
+- Bumping dependencies of Pipelinewise
+
 0.28.0 (2021-01-08)
 -------------------
 
