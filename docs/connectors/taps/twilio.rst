@@ -42,7 +42,7 @@ Example YAML for tap-twilio:
     # Destination (Target) - Target properties
     # Connection details should be in the relevant target YAML file
     # ------------------------------------------------------------------------------
-    target: "postgres_dwh"                         # ID of the target connector where the data will be loaded
+    target: "snowflake"                        # ID of the target connector where the data will be loaded
     batch_size_rows: 20000                     # Batch size for the stream to optimise load performance
     stream_buffer_size: 0                      # In-memory buffer size (MB) between taps and targets for asynchronous data pipes
     default_target_schema: "twilio"            # Target schema where the data will be loaded
@@ -84,10 +84,12 @@ Example YAML for tap-twilio:
           # TaskRouter resources
           - table_name: "cumulative_statistics"
           - table_name: "channels"
+
           # Programmable Chat resources
-          # These 2 resources are using FULL_TABLE method and can pull huge amount of data from the twilio api at every sync. Please use it with caution.
-          - table_name: "members"
-          - table_name: "chat_messages"
+          # These 2 resources are using FULL_TABLE method and can pull huge amount of data from the twilio api at every sync.
+          # Please use it with caution.
+          #- table_name: "members"
+          #- table_name: "chat_messages"
 
 
             # OPTIONAL: Load time transformations - you can add it to any table
