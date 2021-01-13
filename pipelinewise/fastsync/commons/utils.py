@@ -284,6 +284,7 @@ def parse_args(required_config_keys: Dict) -> argparse.Namespace:
     --transform         Transformations Config file
     --tables            Tables to sync. (Separated by comma)
     --temp_dir          Directory to create temporary csv exports. Defaults to current work dir.
+    --drop_pg_slot      flag to drop or not the Postgres replication slot before starting the resync
 
     Returns the parsed args object from argparse. For each argument that
     point to JSON files (tap, state, properties, target, transform),
@@ -296,8 +297,8 @@ def parse_args(required_config_keys: Dict) -> argparse.Namespace:
     parser.add_argument('--target', help='Target Config file', required=True)
     parser.add_argument('--transform', help='Transformations Config file')
     parser.add_argument('--tables', help='Sync only specific tables')
-    parser.add_argument('--export-dir', help='Temporary directory required for CSV exports')
     parser.add_argument('--temp_dir', help='Temporary directory required for CSV exports')
+    parser.add_argument('--drop_pg_slot', help='Drop pg replication slot before starting resync', action='store_true')
 
     args: argparse.Namespace = parser.parse_args()
 
@@ -318,10 +319,6 @@ def parse_args(required_config_keys: Dict) -> argparse.Namespace:
     # get all selected tables from json schema
     all_selected_tables = get_tables_from_properties(args.properties)
 
-    # This is a flag for PG sources that indicate whether the logical slot should be dropped first before resyncing
-    # tables, we want to drop the slot only when all tables in a tap are to be resynced, not just few of them.
-    args.drop_pg_slot = False
-
     if args.tables:
         # prevent duplicates
         unique_tables_list = set(args.tables.split(','))
@@ -331,14 +328,9 @@ def parse_args(required_config_keys: Dict) -> argparse.Namespace:
             if table not in all_selected_tables:
                 raise NotSelectedTableException(table, all_selected_tables)
 
-        # drop slot if all the given are the only selected one - same behavior as not specifying any table
-        if unique_tables_list == all_selected_tables:
-            args.drop_pg_slot = True
-
         args.tables = unique_tables_list
     else:
         args.tables = all_selected_tables
-        args.drop_pg_slot = True
 
     if not args.temp_dir:
         args.temp_dir = os.path.realpath('.')
