@@ -395,8 +395,7 @@ class TestFastSyncUtils(TestCase):
     def test_parse_args_without_tables(self, mock_args, load_json_mock, check_config_mock, get_tables_prop_mock):
         """
         test args parsing:
-            not tables are specified, this should return a tables equal to the list of selected tables and a
-            drop_pg_slot = True
+            not tables are specified, this should return a tables equal to the list of selected tables
         """
         mock_args.return_value = argparse.Namespace(**{
             'tap': './tap.yml',
@@ -420,7 +419,6 @@ class TestFastSyncUtils(TestCase):
         self.assertDictEqual(
             vars(args), {
                 'tables': {'schema.table_1', 'schema.table_2'},
-                'drop_pg_slot': True,
                 'tap': {},
                 'target': {},
                 'transform': {},
@@ -436,12 +434,13 @@ class TestFastSyncUtils(TestCase):
     def test_parse_args_with_all_tables(self, mock_args, load_json_mock, check_config_mock, get_tables_prop_mock):
         """
         test args parsing:
-            all selected tables are specified, this should return a drop_pg_slot = True
+            all selected tables are specified
         """
         mock_args.return_value = argparse.Namespace(**{
             'tap': './tap.yml',
             'properties': './prop.json',
             'transform': None,
+            'drop_pg_slot': True,
             'target': './target.yml',
             'tables': 'schema.table_1,schema.table_2',
             'temp_dir': './'
@@ -500,7 +499,6 @@ class TestFastSyncUtils(TestCase):
         self.assertDictEqual(
             vars(args), {
                 'tables': {'schema.table_2'},
-                'drop_pg_slot': False,
                 'tap': {},
                 'target': {},
                 'transform': {},
