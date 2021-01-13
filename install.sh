@@ -180,6 +180,7 @@ DEFAULT_CONNECTORS=(
     tap-github
     tap-slack
     tap-mixpanel
+    tap-twilio
     target-s3-csv
     target-snowflake
     target-redshift
