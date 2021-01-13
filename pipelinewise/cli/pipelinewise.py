@@ -1140,7 +1140,7 @@ class PipelineWise:
 
         # Set drop_pg_slot to True if we want to sync the whole tap
         # This flag will be used by FastSync PG to (PG/SF/Redshift)
-        self.drop_pg_slot = True if not self.args.tables else False
+        self.drop_pg_slot = bool(not self.args.tables)
 
         # Some target attributes can be passed and override by tap (aka. inheritable config)
         # We merge the two configs and use that with the target
