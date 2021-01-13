@@ -40,6 +40,7 @@ class PipelineWise:
 
         self.profiling_mode = args.profiler
         self.profiling_dir = profiling_dir
+        self.drop_pg_slot = False
         self.args = args
         self.logger = logging.getLogger(__name__)
         self.config_dir = config_dir
@@ -884,7 +885,8 @@ class PipelineWise:
                                                   temp_dir=self.get_temp_dir(),
                                                   tables=self.args.tables,
                                                   profiling_mode=self.profiling_mode,
-                                                  profiling_dir=self.profiling_dir)
+                                                  profiling_dir=self.profiling_dir,
+                                                  drop_pg_slot=self.drop_pg_slot)
 
         # Do not run if another instance is already running
         log_dir = os.path.dirname(self.tap_run_log_file)
@@ -1136,6 +1138,10 @@ class PipelineWise:
         tap_transformation = self.tap['files']['transformation']
         target_config = self.target['files']['config']
 
+        # Set drop_pg_slot to True if we want to sync the whole tap
+        # This flag will be used by FastSync PG to (PG/SF/Redshift)
+        self.drop_pg_slot = True if not self.args.tables else False
+
         # Some target attributes can be passed and override by tap (aka. inheritable config)
         # We merge the two configs and use that with the target
         cons_target_config = self.create_consumable_target_config(target_config, tap_inheritable_config)
@@ -1278,8 +1284,7 @@ class PipelineWise:
             total_taps += len(target.get('taps'))
 
             with parallel_backend('threading', n_jobs=-1):
-                # Discover taps in parallel and return the list
-                #  of exception of the failed ones
+                # Discover taps in parallel and return the list of exception of the failed ones
                 discover_excs.extend(list(filter(None,
                                                  Parallel(verbose=100)(delayed(self.discover_tap)(
                                                      tap=tap,
