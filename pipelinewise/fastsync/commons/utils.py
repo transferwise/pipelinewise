@@ -3,6 +3,7 @@ import json
 import multiprocessing
 import os
 import logging
+from typing import Dict
 
 LOGGER = logging.getLogger(__name__)
 
@@ -332,3 +333,21 @@ def retry_pattern():
 
 def log_backoff_attempt(details):
     LOGGER.error('Error detected communicating with Amazon, triggering backoff: %s try', details.get('tries'))
+
+
+def get_pool_size(tap: Dict) -> int:
+    """
+    Get the pool size to use in FastSync
+    Args:
+        tap: tap config, a dictionary with optional key "fastsync_parallelism"
+
+    Returns: pool size as int
+
+    """
+    cpu_cores = get_cpu_cores()
+    fastsync_parallelism = tap.get('fastsync_parallelism', None)
+
+    if fastsync_parallelism is None:
+        return cpu_cores
+
+    return min(fastsync_parallelism, cpu_cores)
