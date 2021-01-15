@@ -25,7 +25,7 @@ def setup(app):
 project = 'PipelineWise'
 copyright = f'{datetime.datetime.now().year}, TransferWise Ltd.'
 author = 'TransferWise'
-version = '0.29.0'
+version = '0.26.0'
 
 
 # -- General configuration ---------------------------------------------------
