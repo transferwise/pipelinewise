@@ -28,6 +28,9 @@ db_conn:
   													# operations in memory, the buffer is flushed once the size is reached. Default is 1.
   await_time_ms: <int>								# Optional: [LOG_BASED] The maximum amount of time in milliseconds
   													# the loge_base method waits for new data changes before exiting. Default is 1000 ms.
+  fastsync_parallelism: <int>                       # Optional: size of multiprocessing pool used by FastSync
+                                                    #           Min: 1
+                                                    #           Default: number of CPU cores
 
 # ------------------------------------------------------------------------------
 # Destination (Target) - Target properties
