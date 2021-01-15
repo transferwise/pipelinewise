@@ -21,6 +21,7 @@ db_conn:
   user: "${TAP_POSTGRES_USER}"          # PostgreSQL user
   password: "${TAP_POSTGRES_PASSWORD}"  # Plain string or vault encrypted
   dbname: "${TAP_POSTGRES_DB}"          # PostgreSQL database name
+  fastsync_parallelism: 1
 
 
 # ------------------------------------------------------------------------------
