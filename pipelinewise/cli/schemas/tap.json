@@ -27,7 +27,8 @@
       "properties": {
         "fastsync_parallelism": {
           "type": "integer",
-          "minimum": 1
+          "minimum": 1,
+          "maximum": 1000
         }
       }
     },
