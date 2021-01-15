@@ -1,4 +1,7 @@
+import multiprocessing
 import os
+from unittest.mock import patch
+
 import pytest
 from unittest import TestCase
 from pipelinewise.fastsync.commons import utils
@@ -368,8 +371,9 @@ class TestFastSyncUtils(TestCase):
             'groups': ['grantee_group1', 'grantee_group2']
         }
 
-    def test_get_cpu_cores_should_succeed(self):
-        assert utils.get_cpu_cores() >= 1
+    @patch('pipelinewise.fastsync.commons.utils.multiprocessing.cpu_count', return_value=10)
+    def test_get_cpu_cores_should_succeed(self, cpu_count_mock):
+        assert utils.get_cpu_cores() == 10
 
     def test_check_config_with_all_required_keys_present_should_succeed(self):
         config = {'key1': 1, 'key2': 2, 'key3': 3}
@@ -383,3 +387,25 @@ class TestFastSyncUtils(TestCase):
 
         with pytest.raises(Exception):
             utils.check_config(config, required_keys)
+
+    @patch('pipelinewise.fastsync.commons.utils.multiprocessing.cpu_count', return_value=10)
+    def test_get_pool_size_without_custom_size(self, cpu_count_mock):
+        """
+        Calling get_pool_size without providing fastsync_parallelism return cpu core count
+        """
+        assert utils.get_pool_size({}) == 10
+
+    @patch('pipelinewise.fastsync.commons.utils.multiprocessing.cpu_count', return_value=10)
+    def test_get_pool_size_with_custom_size_small(self, cpu_count_mock):
+        """
+        Calling get_pool_size with fastsync_parallelism smaller than cpu core count return the fastsync_parallelism
+        """
+        assert utils.get_pool_size({'fastsync_parallelism': 2}) == 2
+
+
+    @patch('pipelinewise.fastsync.commons.utils.multiprocessing.cpu_count', return_value=10)
+    def test_get_pool_size_with_custom_size_big(self, cpu_count_mock):
+        """
+        Calling get_pool_size with fastsync_parallelism greater than cpu core count return the cpu core count
+        """
+        assert utils.get_pool_size({'fastsync_parallelism': 20}) == 10
