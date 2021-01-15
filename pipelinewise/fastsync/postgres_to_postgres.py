@@ -135,7 +135,7 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
 def main_impl():
     """Main sync logic"""
     args = utils.parse_args(REQUIRED_CONFIG_KEYS)
-    cpu_cores = utils.get_cpu_cores()
+    cpu_cores = args.tap.get('fastsync_parallelism', utils.get_cpu_cores())
     start_time = datetime.now()
     table_sync_excs = []
 
