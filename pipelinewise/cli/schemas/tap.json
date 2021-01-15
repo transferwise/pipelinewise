@@ -22,6 +22,15 @@
         "target_schema"
       ]
     },
+    "db_conn": {
+      "type": "object",
+      "properties": {
+        "fastsync_parallelism": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
     "table": {
       "type": "object",
       "anyOf": [
@@ -220,7 +229,7 @@
       ]
     },
     "db_conn": {
-      "type": "object"
+      "$ref": "#/definitions/db_conn"
     },
     "target": {
       "type": "string"
