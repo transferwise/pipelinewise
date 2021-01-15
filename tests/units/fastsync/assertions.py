@@ -122,7 +122,7 @@ def assert_main_impl_exit_normally_on_success(main_impl: callable,
                     })
 
                     utils_mock.parse_args.return_value = ns
-                    utils_mock.get_cpu_cores.return_value = 10
+                    utils_mock.get_pool_size.return_value = 10
 
                     mock_enter = Mock()
                     mock_enter.return_value.map.return_value = [True, True, True, True]
@@ -139,8 +139,9 @@ def assert_main_impl_exit_normally_on_success(main_impl: callable,
 
                     # assertions
                     utils_mock.parse_args.assert_called_once()
-                    utils_mock.get_cpu_cores.assert_called_once()
+                    utils_mock.get_pool_size.assert_called_once_with({})
                     mock_enter.return_value.map.assert_called_once()
+                    multiproc_mock.Pool.assert_called_once_with(10)
 
 
 # pylint: disable=missing-function-docstring,unused-variable,invalid-name
@@ -164,7 +165,7 @@ def assert_main_impl_should_exit_with_error_on_failure(main_impl: callable,
                     })
 
                     utils_mock.parse_args.return_value = ns
-                    utils_mock.get_cpu_cores.return_value = 10
+                    utils_mock.get_pool_size.return_value = 10
 
                     mock_enter = Mock()
                     mock_enter.return_value.map.return_value = [True, True, 'Critical: random error', True]
@@ -181,5 +182,8 @@ def assert_main_impl_should_exit_with_error_on_failure(main_impl: callable,
 
                         # assertions
                         utils_mock.parse_args.assert_called_once()
-                        utils_mock.get_cpu_cores.assert_called_once()
+                        utils_mock.get_pool_size.assert_called_once_with({
+                            'fastsync_parallelism': 4,
+                        })
                         mock_enter.return_value.map.assert_called_once()
+                        multiproc_mock.Pool.assert_called_once_with(10)
