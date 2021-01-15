@@ -117,7 +117,8 @@ def assert_main_impl_exit_normally_on_success(main_impl: callable,
                     ns = Namespace(**{
                         'tables': ['table_1', 'table_2', 'table_3', 'table_4'],
                         'target': 'sf',
-                        'transform': None
+                        'transform': None,
+                        'tap': {}
                     })
 
                     utils_mock.parse_args.return_value = ns
@@ -156,7 +157,10 @@ def assert_main_impl_should_exit_with_error_on_failure(main_impl: callable,
                     ns = Namespace(**{
                         'tables': ['table_1', 'table_2', 'table_3', 'table_4'],
                         'target': 'sf',
-                        'transform': None
+                        'transform': None,
+                        'tap': {
+                            'fastsync_parallelism': 4,
+                        }
                     })
 
                     utils_mock.parse_args.return_value = ns
