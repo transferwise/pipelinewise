@@ -288,28 +288,19 @@ on the database, schema and tables that you want to replicate:</p>
 This should be sufficient unless you have a large number of read replicas connected to the master instance.</p>
 <p><strong>Step 3.3: Restart the PostgreSQL service</strong></p>
 <p>Restart your PostgreSQL service to ensure the changes take effect.</p>
-<p><strong>Step 3.4: Create a replication slot</strong></p>
-<p>Next, you’ll create a dedicated logical replication slot for Stitch. In PostgreSQL, a logical replication
-slot represents a stream of database changes that can then be replayed to a client in the order they were
-made on the original server. Each slot streams a sequence of changes from a single database.</p>
-<p><strong>Note</strong>: Replication slots are specific to a given database in a cluster. If you want to connect
-multiple databases - whether in one integration or several - you’ll need to create a replication slot
-for each database.</p>
-<ol class="arabic simple">
-<li><p>Log into the master database as a superuser.</p></li>
-<li><p>Using the <code class="docutils literal notranslate"><span class="pre">wal2json</span></code> plugin, create a logical replication slot:</p></li>
-</ol>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>SELECT *
-FROM pg_create_logical_replication_slot<span class="o">(</span><span class="s1">&#39;pipelinewise_&lt;database_name&gt;&#39;</span>, <span class="s1">&#39;wal2json&#39;</span><span class="o">)</span><span class="p">;</span>
-</pre></div>
+<p><strong>Step 3.4: Replication slot</strong></p>
+<p>In PostgreSQL, a logical replication slot represents a stream of database changes that can then be replayed to a
+client in the order they were made on the original server. Each slot streams a sequence of changes from a single
+database.</p>
+<p>Pipelinewise automatically creates a dedicated logical replication slot for each database and tap.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><code class="docutils literal notranslate"><span class="pre">wal2json</span></code> is required to use <a class="reference internal" href="../../concept/replication_methods.html#log-based"><span class="std std-ref">Log Based</span></a> in Pipelinewise for PostgreSQL-backed databases.</p>
 </div>
-<p>3. Log in as the PipelineWise user and verify you can read from the replication slot,
-replacing <code class="docutils literal notranslate"><span class="pre">pipelinewise_&lt;database_name&gt;</span></code> with the name of the replication slot:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>SELECT COUNT<span class="o">(</span>*<span class="o">)</span>
-FROM pg_logical_slot_peek_changes<span class="o">(</span><span class="s1">&#39;pipelinewise_&lt;database_name&gt;&#39;</span>, null, null<span class="o">)</span><span class="p">;</span>
-</pre></div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>In case of full resync of a whole tap, Pipelinewise will attempt to drop the slot.</p>
 </div>
-<p><strong>Note</strong>: <code class="docutils literal notranslate"><span class="pre">wal2json</span></code> is required to use <a class="reference internal" href="../../concept/replication_methods.html#log-based"><span class="std std-ref">Log Based</span></a> in Stitch for PostgreSQL-backed databases.</p>
 </div>
 <div class="section" id="configuring-what-to-replicate">
 <h2>Configuring what to replicate<a class="headerlink" href="#configuring-what-to-replicate" title="Permalink to this headline">¶</a></h2>
