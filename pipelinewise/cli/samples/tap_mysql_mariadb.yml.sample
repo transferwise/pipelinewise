@@ -24,7 +24,9 @@ db_conn:
                                        #           data extraction
   #export_batch_rows                   # Optional: Number of rows to export from MySQL
                                        #           in one batch. Default is 50000.
-
+  fastsync_parallelism: <int>          # Optional: size of multiprocessing pool used by FastSync
+                                       #           Min: 1
+                                       #           Default: number of CPU cores
 
 # ------------------------------------------------------------------------------
 # Destination (Target) - Target properties

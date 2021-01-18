@@ -62,7 +62,9 @@ Example YAML for ``tap-s3-csv``:
 
       bucket: "my-bucket"                           # S3 Bucket name
       start_date: "2000-01-01"                      # File before this data will be excluded
-
+      fastsync_parallelism: <int>                   # Optional: size of multiprocessing pool used by FastSync
+                                                    #           Min: 1
+                                                    #           Default: number of CPU cores
     
     # ------------------------------------------------------------------------------
     # Destination (Target) - Target properties

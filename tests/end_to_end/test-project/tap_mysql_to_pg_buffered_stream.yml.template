@@ -18,6 +18,7 @@ db_conn:
   user: "${TAP_MYSQL_USER}"             # MySQL user
   password: "${TAP_MYSQL_PASSWORD}"     # Plain string or vault encrypted
   dbname: "${TAP_MYSQL_DB}"             # MySQL database name
+  fastsync_parallelism: 2
 
 
 # ------------------------------------------------------------------------------

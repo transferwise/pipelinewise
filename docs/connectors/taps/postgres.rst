@@ -147,7 +147,9 @@ Example YAML for ``tap-postgres``:
       #ssl: "true"                         # Optional: Using SSL via postgres sslmode 'require' option.
                                            #           If the server does not accept SSL connections or the client
                                            #           certificate is not recognized the connection will fail
-
+      fastsync_parallelism: <int>          # Optional: size of multiprocessing pool used by FastSync
+                                           #           Min: 1
+                                           #           Default: number of CPU cores
 
     # ------------------------------------------------------------------------------
     # Destination (Target) - Target properties

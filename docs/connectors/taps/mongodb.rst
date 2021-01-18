@@ -104,7 +104,13 @@ Example YAML for ``tap-mongodb``:
 		replica_set: "my_replica_set"        				# Optional, Mongodb replica set name, default null
   		write_batch_rows: <int>								# Optional: Number of rows to write to csv file
                                        						#           in one batch. Default is 50000.
-
+        update_buffer_size: <int> 						    # Optional: [LOG_BASED] The size of the buffer that holds detected update
+                                                            #           operations in memory, the buffer is flushed once the size is reached. Default is 1.
+        await_time_ms: <int>								# Optional: [LOG_BASED] The maximum amount of time in milliseconds
+                                                            #           the loge_base method waits for new data changes before exiting. Default is 1000 ms.
+        fastsync_parallelism: <int>                         # Optional: size of multiprocessing pool used by FastSync
+                                                            #           Min: 1
+                                                            #           Default: number of CPU cores
 	# ------------------------------------------------------------------------------
 	# Destination (Target) - Target properties
 	# Connection details should be in the relevant target YAML file

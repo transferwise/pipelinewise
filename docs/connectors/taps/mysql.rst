@@ -128,6 +128,9 @@ Example YAML for ``tap-mysql``:
     #  - SET @@session.net_read_timeout=3600
     #  - SET @@session.innodb_lock_wait_timeout=3600
 
+    fastsync_parallelism: <int>          # Optional: size of multiprocessing pool used by FastSync
+                                         #           Min: 1
+                                         #           Default: number of CPU cores
 
   # ------------------------------------------------------------------------------
   # Destination (Target) - Target properties

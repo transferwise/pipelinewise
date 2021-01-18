@@ -74,8 +74,6 @@ make_virtualenv() {
     fi
 
     echo ""
-    echo "===== Checking dependencies for conflict ..."
-    python3 -m pip check && echo "No conflicts" || exit 1
 
     check_license $1
     deactivate

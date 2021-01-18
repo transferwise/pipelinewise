@@ -17,6 +17,7 @@ db_conn:
   aws_secret_access_key: "${TAP_S3_CSV_AWS_SECRET_ACCESS_KEY}"  # Plain string or vault encrypted
   bucket: "${TAP_S3_CSV_BUCKET}"                                # S3 Bucket name
   start_date: "2000-01-01"                                      # File before this data will be excluded
+  fastsync_parallelism: 10
 
  
 # ------------------------------------------------------------------------------

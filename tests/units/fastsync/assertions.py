@@ -121,11 +121,12 @@ def assert_main_impl_exit_normally_on_success(main_impl: callable,
                             'tables': ['table_1', 'table_2', 'table_3', 'table_4'],
                             'target': 'sf',
                             'transform': None,
-                            'drop_pg_slot': False
+                            'drop_pg_slot': False,
+                            'tap': {}
                         })
 
                         utils_mock.parse_args.return_value = ns
-                        utils_mock.get_cpu_cores.return_value = 10
+                        utils_mock.get_pool_size.return_value = 10
 
                         mock_enter = Mock()
                         mock_enter.return_value.map.return_value = [True, True, True, True]
@@ -142,8 +143,9 @@ def assert_main_impl_exit_normally_on_success(main_impl: callable,
 
                         # assertions
                         utils_mock.parse_args.assert_called_once()
-                        utils_mock.get_cpu_cores.assert_called_once()
+                        utils_mock.get_pool_size.assert_called_once_with({})
                         mock_enter.return_value.map.assert_called_once()
+                        multiproc_mock.Pool.assert_called_once_with(10)
                         tap_mock.return_value.drop_slot.assert_not_called()
 
 
@@ -166,11 +168,11 @@ def assert_main_impl_should_exit_with_error_on_failure(main_impl: callable,
                             'target': 'sf',
                             'transform': None,
                             'drop_pg_slot': True,
-                            'tap': {},
+                            'tap': {'fastsync_parallelism': 4,},
                         })
 
                         utils_mock.parse_args.return_value = ns
-                        utils_mock.get_cpu_cores.return_value = 10
+                        utils_mock.get_pool_size.return_value = 10
 
                         mock_enter = Mock()
                         mock_enter.return_value.map.return_value = [True, True, 'Critical: random error', True]
@@ -187,6 +189,9 @@ def assert_main_impl_should_exit_with_error_on_failure(main_impl: callable,
 
                             # assertions
                             utils_mock.parse_args.assert_called_once()
-                            utils_mock.get_cpu_cores.assert_called_once()
+                            utils_mock.get_pool_size.assert_called_once_with({
+                                'fastsync_parallelism': 4,
+                            })
                             mock_enter.return_value.map.assert_called_once()
                             tap_mock.return_value.drop_slot.assert_called_once()
+                            multiproc_mock.Pool.assert_called_once_with(10)
