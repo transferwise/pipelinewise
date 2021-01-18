@@ -29,6 +29,7 @@ YAML configuration
   * :ref:`tap-slack`
   * :ref:`tap-shopify`
   * :ref:`tap-mixpanel`
+  * :ref:`tap-twilio`
   * :ref:`target-postgres`
   * :ref:`target-redshift`
   * :ref:`target-snowflake`

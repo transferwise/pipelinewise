@@ -40,6 +40,7 @@ class PipelineWise:
 
         self.profiling_mode = args.profiler
         self.profiling_dir = profiling_dir
+        self.drop_pg_slot = False
         self.args = args
         self.logger = logging.getLogger(__name__)
         self.config_dir = config_dir
@@ -111,7 +112,7 @@ class PipelineWise:
 
             return tempfile_path
         except Exception as exc:
-            raise Exception(f'Cannot merge JSON files {dict_a} {dict_b} - {exc}')
+            raise Exception(f'Cannot merge JSON files {dict_a} {dict_b} - {exc}') from exc
 
     # pylint: disable=too-many-statements,too-many-branches,too-many-nested-blocks,too-many-locals,too-many-arguments
     def create_filtered_tap_properties(self, target_type, tap_type, tap_properties, tap_state, filters,
@@ -196,7 +197,7 @@ class PipelineWise:
                 # Compare actual values to the filter conditions.
                 # Set the "selected" key to True if actual values meet the filter criteria
                 # Set the "selected" key to False if the actual values don't meet the filter criteria
-                # pylint: disable=too-many-boolean-expressions,bad-continuation
+                # pylint: disable=too-many-boolean-expressions
                 if (
                         (f_selected is None or selected == f_selected) and
                         (f_target_type is None or target_type in f_target_type) and
@@ -267,7 +268,7 @@ class PipelineWise:
             return temp_properties_path, filtered_tap_stream_ids
 
         except Exception as exc:
-            raise Exception(f'Cannot create JSON file - {exc}')
+            raise Exception(f'Cannot create JSON file - {exc}') from exc
 
     def load_config(self):
         """
@@ -340,8 +341,8 @@ class PipelineWise:
         self.load_config()
         try:
             targets = self.config.get('targets', [])
-        except Exception:
-            raise Exception('Targets not defined')
+        except Exception as exc:
+            raise Exception('Targets not defined') from exc
 
         return targets
 
@@ -379,8 +380,8 @@ class PipelineWise:
             for tap_idx, tap in enumerate(taps):
                 taps[tap_idx]['status'] = self.detect_tap_status(target_id, tap['id'])
 
-        except Exception:
-            raise Exception(f'No taps defined for {target_id} target')
+        except Exception as exc:
+            raise Exception(f'No taps defined for {target_id} target') from exc
 
         return taps
 
@@ -569,8 +570,8 @@ class PipelineWise:
                 # Find table specific metadata entries in the old and new streams
                 try:
                     stream_table_mdata_idx = [i for i, md in enumerate(stream['metadata']) if md['breadcrumb'] == []][0]
-                except Exception:
-                    raise Exception(f'Metadata of stream {tap_stream_id} doesn\'t have an empty breadcrumb')
+                except Exception as exc:
+                    raise Exception(f'Metadata of stream {tap_stream_id} doesn\'t have an empty breadcrumb') from exc
 
                 if tap_stream_sel:
                     self.logger.debug('Mark %s tap_stream_id as selected with properties %s', tap_stream_id,
@@ -884,7 +885,8 @@ class PipelineWise:
                                                   temp_dir=self.get_temp_dir(),
                                                   tables=self.args.tables,
                                                   profiling_mode=self.profiling_mode,
-                                                  profiling_dir=self.profiling_dir)
+                                                  profiling_dir=self.profiling_dir,
+                                                  drop_pg_slot=self.drop_pg_slot)
 
         # Do not run if another instance is already running
         log_dir = os.path.dirname(self.tap_run_log_file)
@@ -1136,6 +1138,10 @@ class PipelineWise:
         tap_transformation = self.tap['files']['transformation']
         target_config = self.target['files']['config']
 
+        # Set drop_pg_slot to True if we want to sync the whole tap
+        # This flag will be used by FastSync PG to (PG/SF/Redshift)
+        self.drop_pg_slot = bool(not self.args.tables)
+
         # Some target attributes can be passed and override by tap (aka. inheritable config)
         # We merge the two configs and use that with the target
         cons_target_config = self.create_consumable_target_config(target_config, tap_inheritable_config)
@@ -1278,8 +1284,7 @@ class PipelineWise:
             total_taps += len(target.get('taps'))
 
             with parallel_backend('threading', n_jobs=-1):
-                # Discover taps in parallel and return the list
-                #  of exception of the failed ones
+                # Discover taps in parallel and return the list of exception of the failed ones
                 discover_excs.extend(list(filter(None,
                                                  Parallel(verbose=100)(delayed(self.discover_tap)(
                                                      tap=tap,

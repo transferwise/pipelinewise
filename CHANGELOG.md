@@ -1,3 +1,26 @@
+0.29.0 (2021-01-13)
+-------------------
+
+- Add tap-twilio
+
+0.28.1 (2021-01-12)
+-------------------
+
+- patch `pipelinewise-tap-snowflake`
+- Bumping dependencies of Pipelinewise
+
+0.28.0 (2021-01-08)
+-------------------
+
+**New**
+- Support environement variables in tap yaml files and rendering them with jinja2 template.
+
+**Fixes**
+- bump pipelinewise-target-snowflake to 1.10.1
+- Map Mysql's `tinyint(1) unsigned` column type to targets' number column type
+- Bumping dependencies of Pipelinewise
+- Detect the copyright year dynamically
+
 0.27.0 (2020-12-04)
 -------------------
 

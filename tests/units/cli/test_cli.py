@@ -167,7 +167,6 @@ class TestCli:
         with pytest.raises(Exception):
             assert self.pipelinewise.get_tap('target_one', 'not-existing-tap') == {}
 
-    # pylint: disable=bad-continuation
     def test_create_filtered_tap_props(self):
         """Test creating fastsync and singer specific properties file"""
         (

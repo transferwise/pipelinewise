@@ -1,9 +1,13 @@
+import argparse
 import os
 from unittest.mock import patch
 
 import pytest
-from unittest import TestCase
+
+from unittest import TestCase, mock
+
 from pipelinewise.fastsync.commons import utils
+from pipelinewise.fastsync.commons.utils import NotSelectedTableException
 
 RESOURCES_DIR = '{}/resources'.format(os.path.dirname(__file__))
 
@@ -21,7 +25,7 @@ class MySqlMock:
             'version': 1
         }
 
-    #pylint: disable=unused-argument
+    # pylint: disable=unused-argument
     def fetch_current_incremental_key_pos(self, table, replication_key):
         return {
             'replication_key': replication_key,
@@ -41,7 +45,7 @@ class PostgresMock:
             'version': 1
         }
 
-    #pylint: disable=unused-argument
+    # pylint: disable=unused-argument
     def fetch_current_incremental_key_pos(self, table, replication_key):
         return {
             'replication_key': replication_key,
@@ -55,7 +59,7 @@ class S3CsvMock:
     S3 CSV mock
     """
 
-    #pylint: disable=unused-argument
+    # pylint: disable=unused-argument
     def fetch_current_incremental_key_pos(self, table, replication_key):
         return {
             'modified_since': '2019-11-15T07:39:44.171098'
@@ -130,17 +134,17 @@ class TestFastSyncUtils(TestCase):
 
         # MySQL schema
         assert mysql_tables == \
-               [
+               {
                    'mysql_source_db.address',
                    'mysql_source_db.order',
                    'mysql_source_db.weight_unit'
-               ]
+               }
 
         assert postgres_tables == \
-               [
+               {
                    'public.city',
                    'public.country'
-               ]
+               }
 
     def test_get_tables_from_properties_for_s3_csv(self):
         properties = utils.load_json('{}/properties_s3_csv.json'.format(RESOURCES_DIR))
@@ -149,11 +153,11 @@ class TestFastSyncUtils(TestCase):
 
         # MySQL schema
         assert s3_csv_tables == \
-               [
+               {
                    'applications',
                    'candidate_survey_questions',
                    'interviews',
-               ]
+               }
 
     def test_get_bookmark_for_table_mysql(self):
         """Test bookmark extractors for MySQL taps"""
@@ -408,3 +412,153 @@ class TestFastSyncUtils(TestCase):
         Calling get_pool_size with fastsync_parallelism greater than cpu core count return the cpu core count
         """
         assert utils.get_pool_size({'fastsync_parallelism': 20}) == 10
+
+    @mock.patch('pipelinewise.fastsync.commons.utils.get_tables_from_properties')
+    @mock.patch('pipelinewise.fastsync.commons.utils.check_config')
+    @mock.patch('pipelinewise.fastsync.commons.utils.load_json')
+    @mock.patch('argparse.ArgumentParser.parse_args')
+    def test_parse_args_without_tables(self, mock_args, load_json_mock, check_config_mock, get_tables_prop_mock):
+        """
+        test args parsing:
+            not tables are specified, this should return a tables equal to the list of selected tables
+        """
+        mock_args.return_value = argparse.Namespace(**{
+            'tap': './tap.yml',
+            'properties': './prop.json',
+            'transform': None,
+            'target': './target.yml',
+            'tables': None,
+            'temp_dir': './'
+        })
+
+        load_json_mock.return_value = {}
+        check_config_mock.return_value = None
+        get_tables_prop_mock.return_value = {'schema.table_1', 'schema.table_2'}
+
+        args = utils.parse_args({'tap': [], 'target': []})
+
+        get_tables_prop_mock.assert_called_once()
+        self.assertEqual(load_json_mock.call_count, 3)
+        self.assertEqual(check_config_mock.call_count, 2)
+
+        self.assertDictEqual(
+            vars(args), {
+                'tables': {'schema.table_1', 'schema.table_2'},
+                'tap': {},
+                'target': {},
+                'transform': {},
+                'properties': {},
+                'temp_dir': './'
+            }
+        )
+
+    @mock.patch('pipelinewise.fastsync.commons.utils.get_tables_from_properties')
+    @mock.patch('pipelinewise.fastsync.commons.utils.check_config')
+    @mock.patch('pipelinewise.fastsync.commons.utils.load_json')
+    @mock.patch('argparse.ArgumentParser.parse_args')
+    def test_parse_args_with_all_tables(self, mock_args, load_json_mock, check_config_mock, get_tables_prop_mock):
+        """
+        test args parsing:
+            all selected tables are specified
+        """
+        mock_args.return_value = argparse.Namespace(**{
+            'tap': './tap.yml',
+            'properties': './prop.json',
+            'transform': None,
+            'drop_pg_slot': True,
+            'target': './target.yml',
+            'tables': 'schema.table_1,schema.table_2',
+            'temp_dir': './'
+        })
+
+        load_json_mock.return_value = {}
+        check_config_mock.return_value = None
+        get_tables_prop_mock.return_value = {'schema.table_1', 'schema.table_2'}
+
+        args = utils.parse_args({'tap': [], 'target': []})
+
+        get_tables_prop_mock.assert_called_once()
+        self.assertEqual(load_json_mock.call_count, 3)
+        self.assertEqual(check_config_mock.call_count, 2)
+
+        self.assertDictEqual(
+            vars(args), {
+                'tables': {'schema.table_1', 'schema.table_2'},
+                'drop_pg_slot': True,
+                'tap': {},
+                'target': {},
+                'transform': {},
+                'properties': {},
+                'temp_dir': './'
+            }
+        )
+
+    @mock.patch('pipelinewise.fastsync.commons.utils.get_tables_from_properties')
+    @mock.patch('pipelinewise.fastsync.commons.utils.check_config')
+    @mock.patch('pipelinewise.fastsync.commons.utils.load_json')
+    @mock.patch('argparse.ArgumentParser.parse_args')
+    def test_parse_args_with_table_found(self, mock_args, load_json_mock, check_config_mock, get_tables_prop_mock):
+        """
+        test args parsing:
+            one table is specified out of 2, this should return a drop_pg_slot = False
+        """
+        mock_args.return_value = argparse.Namespace(**{
+            'tap': './tap.yml',
+            'properties': './prop.json',
+            'transform': None,
+            'target': './target.yml',
+            'tables': 'schema.table_2',
+            'temp_dir': './'
+        })
+
+        load_json_mock.return_value = {}
+        check_config_mock.return_value = None
+        get_tables_prop_mock.return_value = {'schema.table_1', 'schema.table_2'}
+
+        args = utils.parse_args({'tap': [], 'target': []})
+
+        get_tables_prop_mock.assert_called_once()
+        self.assertEqual(load_json_mock.call_count, 3)
+        self.assertEqual(check_config_mock.call_count, 2)
+
+        self.assertDictEqual(
+            vars(args), {
+                'tables': {'schema.table_2'},
+                'tap': {},
+                'target': {},
+                'transform': {},
+                'properties': {},
+                'temp_dir': './'
+            }
+        )
+
+    @mock.patch('pipelinewise.fastsync.commons.utils.get_tables_from_properties')
+    @mock.patch('pipelinewise.fastsync.commons.utils.check_config')
+    @mock.patch('pipelinewise.fastsync.commons.utils.load_json')
+    @mock.patch('argparse.ArgumentParser.parse_args')
+    def test_parse_args_with_table_not_selected(self, mock_args, load_json_mock, check_config_mock,
+                                                get_tables_prop_mock):
+        """
+        test args parsing:
+            one table not found in selected tables, this should throw a  NotSelectedTableException exception
+        """
+        mock_args.return_value = argparse.Namespace(**{
+            'tap': './tap.yml',
+            'properties': './prop.json',
+            'transform': None,
+            'target': './target.yml',
+            'tables': 'schema.table_not_selected',
+            'temp_dir': './'
+        })
+
+        load_json_mock.return_value = {}
+        check_config_mock.return_value = None
+        get_tables_prop_mock.return_value = {'schema.table_1', 'schema.table_2'}
+
+        with pytest.raises(NotSelectedTableException):
+            utils.parse_args({'tap': [], 'target': []})
+
+        get_tables_prop_mock.assert_called_once()
+        check_config_mock.assert_not_called()
+        self.assertEqual(load_json_mock.call_count, 3)
+

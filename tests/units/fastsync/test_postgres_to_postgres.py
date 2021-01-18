@@ -9,7 +9,7 @@ TARGET = 'FastSyncTargetPostgres'
 
 
 # pylint: disable=missing-function-docstring,invalid-name,no-self-use
-class S3CsvToPostgres(unittest.TestCase):
+class PostgresToPostgres(unittest.TestCase):
     """
     Unit tests for postgres postgres to postgres
     """

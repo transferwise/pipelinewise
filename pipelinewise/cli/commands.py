@@ -248,13 +248,15 @@ def build_fastsync_command(tap: TapParams,
                            temp_dir: str,
                            tables: str = None,
                            profiling_mode: bool = False,
-                           profiling_dir: str = None
+                           profiling_dir: str = None,
+                           drop_pg_slot: bool = False
                            ) -> str:
     """
     Builds a command that starts fastsync from a given tap to a
     given target with optional transformations.
 
     Args:
+        drop_pg_slot: flag for fastsync to indicate whether to drop or not PG replication slot
         profiling_dir: directory where profiling output should be dumped
         profiling_mode: Flag to indicate whether build the command with profiling
         tap: NamedTuple with tap properties
@@ -278,7 +280,9 @@ def build_fastsync_command(tap: TapParams,
         f'--target {target.config}',
         f'--temp_dir {temp_dir}',
         f'--transform {transform.config}' if transform.config and os.path.isfile(transform.config) else '',
-        f'--tables {tables}' if tables else ''])))
+        f'--tables {tables}' if tables else '',
+        '--drop_pg_slot' if drop_pg_slot else '',
+    ])))
 
     command = f'{fastsync_bin} {command_args}'
 

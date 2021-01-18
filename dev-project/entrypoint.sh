@@ -2,7 +2,7 @@
 
 # Install OS dependencies
 apt-get update
-apt-get install -y mariadb-client postgresql-client alien libaio1 mongo-tools mbuffer
+apt-get install -y mariadb-client postgresql-client alien libaio1 mongo-tools mbuffer gettext-base
 
 wget https://repo.mongodb.org/apt/ubuntu/dists/bionic/mongodb-org/4.2/multiverse/binary-amd64/mongodb-org-shell_4.2.7_amd64.deb
 dpkg -i ./mongodb-org-shell_4.2.7_amd64.deb && rm mongodb-org-shell_4.2.7_amd64.deb
@@ -36,10 +36,9 @@ if [[ $? != 0 ]]; then
 fi
 
 # Activate CLI virtual environment at every login
-DO_AT_LOGIN="cd $PIPELINEWISE_HOME && source $PIPELINEWISE_HOME/.virtualenvs/pipelinewise/bin/activate && cat $PIPELINEWISE_HOME/../motd"
-if [[ `tail -n1 ~/.bashrc` != "$DO_AT_LOGIN" ]]; then
-    echo $DO_AT_LOGIN >> ~/.bashrc
-fi
+sed -i '/motd/d' ~/.bashrc  # Delete any existing old DO_AT_LOGIN line from bashrc
+DO_AT_LOGIN="cd $PIPELINEWISE_HOME && source $PIPELINEWISE_HOME/.virtualenvs/pipelinewise/bin/activate && CURRENT_YEAR=\$(date +'%Y') envsubst < $PIPELINEWISE_HOME/../motd"
+echo $DO_AT_LOGIN >> ~/.bashrc
 
 echo
 echo "=========================================================================="

@@ -2,12 +2,13 @@
 import os
 import sys
 import time
-from functools import partial
-from argparse import Namespace
 import multiprocessing
-from typing import Union
 
+from argparse import Namespace
+from typing import Union
+from functools import partial
 from datetime import datetime
+
 from ..logger import Logger
 from .commons import utils
 from .commons.tap_postgres import FastSyncTapPostgres
@@ -156,6 +157,10 @@ def main_impl():
             Pool size                      : %s
         -------------------------------------------------------
         """, args.tables, len(args.tables), pool_size)
+
+    # if internal arg drop_pg_slot is set to True, then we drop the slot before starting resync
+    if args.drop_pg_slot:
+        FastSyncTapPostgres.drop_slot(args.tap)
 
     # Create target schemas sequentially, Redshift doesn't like it running in parallel
     redshift = FastSyncTargetRedshift(args.target, args.transform)

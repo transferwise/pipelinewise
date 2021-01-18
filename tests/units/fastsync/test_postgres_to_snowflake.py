@@ -9,7 +9,7 @@ TARGET = 'FastSyncTargetSnowflake'
 
 
 # pylint: disable=missing-function-docstring,invalid-name,no-self-use
-class S3CsvToPostgres(unittest.TestCase):
+class PostgresToSnowflake(unittest.TestCase):
     """
     Unit tests for fastsync postgres to snowflake
     """

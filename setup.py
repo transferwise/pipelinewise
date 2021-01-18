@@ -6,7 +6,7 @@ with open('README.md') as f:
     LONG_DESCRIPTION = f.read()
 
 setup(name='pipelinewise',
-      version='0.27.0',
+      version='0.29.0',
       description='PipelineWise',
       long_description=LONG_DESCRIPTION,
       long_description_content_type='text/markdown',
@@ -19,14 +19,13 @@ setup(name='pipelinewise',
       install_requires=[
           'argparse==1.4.0',
           'tabulate==0.8.2',
-          'PyYAML==5.1.0',
+          'PyYAML==5.3.1',
           'ansible==2.7.16',
-          'Jinja2==2.10.1',
-          'joblib==0.16.0',
-          'idna==2.7',
+          'Jinja2==2.11.2',
+          'joblib==1.0.0',
           'PyMySQL==0.7.11',
           'psycopg2-binary==2.8.5',
-          'snowflake-connector-python==2.3.6',
+          'snowflake-connector-python[pandas]==2.3.7',
           'pipelinewise-singer-python==1.*',
           'singer-encodings==0.0.*',
           'python-dateutil<2.8.1',
@@ -34,19 +33,18 @@ setup(name='pipelinewise',
           'python-pidfile==3.0.0',
           'pre-commit==1.21.0',
           'pymongo==3.10.*',
-          'ujson==2.0.*',
           'tzlocal==2.0.*',
           'slackclient==2.7.*',
-          'psutil==5.7.2'
+          'psutil==5.8.0'
       ],
       extras_require={
           'test': [
-              'pytest==5.0.1',
+              'pytest==6.2.1',
               'pytest-dependency==0.4.0',
               'coverage==4.5.3',
-              'python-dotenv==0.10.3',
-              'mock==3.0.5',
-              'pylint==2.4.4',
+              'python-dotenv==0.15.0',
+              'mock==4.0.3',
+              'pylint==2.6.0',
               'unify==0.5'
           ]
       },

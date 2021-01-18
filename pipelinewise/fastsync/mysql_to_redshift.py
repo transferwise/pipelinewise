@@ -64,7 +64,7 @@ def tap_type_to_target_type(mysql_type, mysql_column_type):
         'longtext': 'CHARACTER VARYING({})'.format(LONG_VARCHAR_LENGTH),
         'enum': 'CHARACTER VARYING({})'.format(DEFAULT_VARCHAR_LENGTH),
         'int': 'NUMERIC NULL',
-        'tinyint': 'BOOLEAN' if mysql_column_type == 'tinyint(1)' else 'NUMERIC NULL',
+        'tinyint': 'BOOLEAN' if mysql_column_type and mysql_column_type.startswith('tinyint(1)') else 'NUMERIC NULL',
         'smallint': 'NUMERIC NULL',
         'mediumint': 'NUMERIC NULL',
         'bigint': 'NUMERIC NULL',
