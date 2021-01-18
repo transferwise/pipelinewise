@@ -279,7 +279,9 @@ db_conn:
 
   bucket: <span class="s2">&quot;my-bucket&quot;</span>                           <span class="c1"># S3 Bucket name</span>
   start_date: <span class="s2">&quot;2000-01-01&quot;</span>                      <span class="c1"># File before this data will be excluded</span>
-
+  fastsync_parallelism: &lt;int&gt;                   <span class="c1"># Optional: size of multiprocessing pool used by FastSync</span>
+                                                <span class="c1">#           Min: 1</span>
+                                                <span class="c1">#           Default: number of CPU cores</span>
 
 <span class="c1"># ------------------------------------------------------------------------------</span>
 <span class="c1"># Destination (Target) - Target properties</span>

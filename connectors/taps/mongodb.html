@@ -309,7 +309,13 @@ db_conn:
         replica_set: <span class="s2">&quot;my_replica_set&quot;</span>                                   <span class="c1"># Optional, Mongodb replica set name, default null</span>
         write_batch_rows: &lt;int&gt;                                                         <span class="c1"># Optional: Number of rows to write to csv file</span>
                                                                         <span class="c1">#           in one batch. Default is 50000.</span>
-
+update_buffer_size: &lt;int&gt;                                                   <span class="c1"># Optional: [LOG_BASED] The size of the buffer that holds detected update</span>
+                                                    <span class="c1">#           operations in memory, the buffer is flushed once the size is reached. Default is 1.</span>
+await_time_ms: &lt;int&gt;                                                            <span class="c1"># Optional: [LOG_BASED] The maximum amount of time in milliseconds</span>
+                                                    <span class="c1">#           the loge_base method waits for new data changes before exiting. Default is 1000 ms.</span>
+fastsync_parallelism: &lt;int&gt;                         <span class="c1"># Optional: size of multiprocessing pool used by FastSync</span>
+                                                    <span class="c1">#           Min: 1</span>
+                                                    <span class="c1">#           Default: number of CPU cores</span>
 <span class="c1"># ------------------------------------------------------------------------------</span>
 <span class="c1"># Destination (Target) - Target properties</span>
 <span class="c1"># Connection details should be in the relevant target YAML file</span>

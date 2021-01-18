@@ -333,6 +333,9 @@ db_conn:
   <span class="c1">#  - SET @@session.net_read_timeout=3600</span>
   <span class="c1">#  - SET @@session.innodb_lock_wait_timeout=3600</span>
 
+  fastsync_parallelism: &lt;int&gt;          <span class="c1"># Optional: size of multiprocessing pool used by FastSync</span>
+                                       <span class="c1">#           Min: 1</span>
+                                       <span class="c1">#           Default: number of CPU cores</span>
 
 <span class="c1"># ------------------------------------------------------------------------------</span>
 <span class="c1"># Destination (Target) - Target properties</span>

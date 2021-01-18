@@ -344,7 +344,9 @@ db_conn:
   <span class="c1">#ssl: &quot;true&quot;                         # Optional: Using SSL via postgres sslmode &#39;require&#39; option.</span>
                                        <span class="c1">#           If the server does not accept SSL connections or the client</span>
                                        <span class="c1">#           certificate is not recognized the connection will fail</span>
-
+  fastsync_parallelism: &lt;int&gt;          <span class="c1"># Optional: size of multiprocessing pool used by FastSync</span>
+                                       <span class="c1">#           Min: 1</span>
+                                       <span class="c1">#           Default: number of CPU cores</span>
 
 <span class="c1"># ------------------------------------------------------------------------------</span>
 <span class="c1"># Destination (Target) - Target properties</span>
