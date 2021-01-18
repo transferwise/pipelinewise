@@ -148,7 +148,7 @@ def assert_main_impl_exit_normally_on_success(main_impl: callable,
                         multiproc_mock.Pool.assert_called_once_with(10)
                         tap_mock.return_value.drop_slot.assert_not_called()
 
-                       
+
 # pylint: disable=missing-function-docstring,unused-variable,invalid-name
 def assert_main_impl_should_exit_with_error_on_failure(main_impl: callable,
                                                        package_nm: str,

@@ -561,4 +561,3 @@ class TestFastSyncUtils(TestCase):
         get_tables_prop_mock.assert_called_once()
         check_config_mock.assert_not_called()
         self.assertEqual(load_json_mock.call_count, 3)
-
