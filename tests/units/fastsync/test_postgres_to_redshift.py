@@ -9,7 +9,7 @@ TARGET = 'FastSyncTargetRedshift'
 
 
 # pylint: disable=missing-function-docstring,invalid-name,no-self-use
-class S3CsvToPostgres(unittest.TestCase):
+class PostgresToRedshift(unittest.TestCase):
     """
     Unit tests for postgres postgres to redshift
     """

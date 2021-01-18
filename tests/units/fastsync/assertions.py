@@ -114,32 +114,37 @@ def assert_main_impl_exit_normally_on_success(main_impl: callable,
         with patch(objects_to_mock.full_target_class_nm) as target_mock:
             with patch(objects_to_mock.sync_table_fn_nm) as sync_table_mock:
                 with patch(objects_to_mock.multiproc_module_nm) as multiproc_mock:
-                    ns = Namespace(**{
-                        'tables': ['table_1', 'table_2', 'table_3', 'table_4'],
-                        'target': 'sf',
-                        'transform': None
-                    })
+                    with patch(objects_to_mock.full_tap_class_nm) as tap_mock:
+                        tap_mock.return_value.drop_slot.side_effect = None
 
-                    utils_mock.parse_args.return_value = ns
-                    utils_mock.get_cpu_cores.return_value = 10
+                        ns = Namespace(**{
+                            'tables': ['table_1', 'table_2', 'table_3', 'table_4'],
+                            'target': 'sf',
+                            'transform': None,
+                            'drop_pg_slot': False
+                        })
 
-                    mock_enter = Mock()
-                    mock_enter.return_value.map.return_value = [True, True, True, True]
+                        utils_mock.parse_args.return_value = ns
+                        utils_mock.get_cpu_cores.return_value = 10
 
-                    pool_mock = Mock(spec_set=multiprocessing.Pool).return_value
+                        mock_enter = Mock()
+                        mock_enter.return_value.map.return_value = [True, True, True, True]
 
-                    # to mock variable p in with statement, we need __enter__ and __exist__
-                    pool_mock.__enter__ = mock_enter
-                    pool_mock.__exit__ = Mock()
-                    multiproc_mock.Pool.return_value = pool_mock
+                        pool_mock = Mock(spec_set=multiprocessing.Pool).return_value
 
-                    # call function
-                    main_impl()
+                        # to mock variable p in with statement, we need __enter__ and __exist__
+                        pool_mock.__enter__ = mock_enter
+                        pool_mock.__exit__ = Mock()
+                        multiproc_mock.Pool.return_value = pool_mock
 
-                    # assertions
-                    utils_mock.parse_args.assert_called_once()
-                    utils_mock.get_cpu_cores.assert_called_once()
-                    mock_enter.return_value.map.assert_called_once()
+                        # call function
+                        main_impl()
+
+                        # assertions
+                        utils_mock.parse_args.assert_called_once()
+                        utils_mock.get_cpu_cores.assert_called_once()
+                        mock_enter.return_value.map.assert_called_once()
+                        tap_mock.return_value.drop_slot.assert_not_called()
 
 
 # pylint: disable=missing-function-docstring,unused-variable,invalid-name
@@ -153,29 +158,35 @@ def assert_main_impl_should_exit_with_error_on_failure(main_impl: callable,
         with patch(objects_to_mock.full_target_class_nm) as target_mock:
             with patch(objects_to_mock.sync_table_fn_nm) as sync_table_mock:
                 with patch(objects_to_mock.multiproc_module_nm) as multiproc_mock:
-                    ns = Namespace(**{
-                        'tables': ['table_1', 'table_2', 'table_3', 'table_4'],
-                        'target': 'sf',
-                        'transform': None
-                    })
+                    with patch(objects_to_mock.full_tap_class_nm) as tap_mock:
+                        tap_mock.return_value.drop_slot.side_effect = None
 
-                    utils_mock.parse_args.return_value = ns
-                    utils_mock.get_cpu_cores.return_value = 10
+                        ns = Namespace(**{
+                            'tables': ['table_1', 'table_2', 'table_3', 'table_4'],
+                            'target': 'sf',
+                            'transform': None,
+                            'drop_pg_slot': True,
+                            'tap': {},
+                        })
 
-                    mock_enter = Mock()
-                    mock_enter.return_value.map.return_value = [True, True, 'Critical: random error', True]
+                        utils_mock.parse_args.return_value = ns
+                        utils_mock.get_cpu_cores.return_value = 10
 
-                    pool_mock = Mock(spec_set=multiprocessing.Pool).return_value
+                        mock_enter = Mock()
+                        mock_enter.return_value.map.return_value = [True, True, 'Critical: random error', True]
 
-                    # to mock variable p in with statement, we need __enter__ and __exist__
-                    pool_mock.__enter__ = mock_enter
-                    pool_mock.__exit__ = Mock()
-                    multiproc_mock.Pool.return_value = pool_mock
+                        pool_mock = Mock(spec_set=multiprocessing.Pool).return_value
 
-                    with pytest.raises(SystemExit):
-                        main_impl()
+                        # to mock variable p in with statement, we need __enter__ and __exist__
+                        pool_mock.__enter__ = mock_enter
+                        pool_mock.__exit__ = Mock()
+                        multiproc_mock.Pool.return_value = pool_mock
 
-                        # assertions
-                        utils_mock.parse_args.assert_called_once()
-                        utils_mock.get_cpu_cores.assert_called_once()
-                        mock_enter.return_value.map.assert_called_once()
+                        with pytest.raises(SystemExit):
+                            main_impl()
+
+                            # assertions
+                            utils_mock.parse_args.assert_called_once()
+                            utils_mock.get_cpu_cores.assert_called_once()
+                            mock_enter.return_value.map.assert_called_once()
+                            tap_mock.return_value.drop_slot.assert_called_once()

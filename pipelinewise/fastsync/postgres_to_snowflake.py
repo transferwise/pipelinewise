@@ -2,12 +2,13 @@
 import os
 import sys
 import time
-from functools import partial
-from argparse import Namespace
 import multiprocessing
-from typing import Union
 
+from argparse import Namespace
+from typing import Union
+from functools import partial
 from datetime import datetime
+
 from ..logger import Logger
 from .commons import utils
 from .commons.tap_postgres import FastSyncTapPostgres
@@ -157,6 +158,10 @@ def main_impl():
             CPU cores                      : %s
         -------------------------------------------------------
         """, args.tables, len(args.tables), cpu_cores)
+
+    # if internal arg drop_pg_slot is set to True, then we drop the slot before starting resync
+    if args.drop_pg_slot:
+        FastSyncTapPostgres.drop_slot(args.tap)
 
     # Start loading tables in parallel in spawning processes by
     # utilising all available CPU cores
