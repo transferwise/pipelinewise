@@ -34,7 +34,7 @@ setup(name='pipelinewise',
           'pre-commit==1.21.0',
           'pymongo==3.10.*',
           'tzlocal==2.0.*',
-          'slackclient==2.7.*',
+          'slackclient>=2.7,<2.10',
           'psutil==5.8.0'
       ],
       extras_require={
