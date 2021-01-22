@@ -1,3 +1,10 @@
+0.30.0 (2021-01-22)
+-------------------
+
+- Drop postgres replication slot in case of full re-sync of a tap
+- Add `fastsync_parallelism` optional parameter to customize the number of cores to use for parallelisation in FastSync
+- Bump `pipelinewise-tap-twilio` to `1.0.2`
+
 0.29.0 (2021-01-13)
 -------------------
 
