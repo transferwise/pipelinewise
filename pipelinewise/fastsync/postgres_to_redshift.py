@@ -124,7 +124,7 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
         # Lock to ensure that only one process writes the same state file at a time
         LOCK.acquire()
         try:
-            utils.save_state_file(args.state, table, bookmark, dbname=dbname)
+            utils.save_state_file(args.state, table, bookmark)
         finally:
             LOCK.release()
 
