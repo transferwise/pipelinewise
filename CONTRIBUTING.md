@@ -12,10 +12,11 @@ We love your input! We want to make contributing to this project as easy and tra
 
 Please keep all your communication respectful. 
 
-## On PipelineWise at TransferWise
-PipelineWise is the ELT engine used at TransferWise to move data from +150 sources to different targets, 
+## On PipelineWise at Wise (fka TransferWise)
+PipelineWise is the ELT engine used at Wise to move data from +150 sources to different targets, 
 the main sources include Mysql/MariaDB, Postgres, S3 buckets and targets include Snowflake and S3 buckets, 
-this means we are extra careful when making changes to/dealing with PRs touching any of the connectors that are used at TransferWise.
+this means we are extra careful when making changes to/dealing with PRs touching any of the connectors that are used 
+at Wise.
 
 
 ## We Develop with Github

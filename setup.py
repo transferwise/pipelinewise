@@ -10,7 +10,7 @@ setup(name='pipelinewise',
       description='PipelineWise',
       long_description=LONG_DESCRIPTION,
       long_description_content_type='text/markdown',
-      author='TransferWise',
+      author='Wise',
       url='https://github.com/transferwise/pipelinewise',
       classifiers=[
           'License :: OSI Approved :: Apache Software License',
