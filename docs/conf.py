@@ -23,8 +23,8 @@ def setup(app):
 # -- Project information -----------------------------------------------------
 
 project = 'PipelineWise'
-copyright = f'{datetime.datetime.now().year}, TransferWise Ltd.'
-author = 'TransferWise'
+copyright = f'{datetime.datetime.now().year}, Wise Ltd.'
+author = 'Wise'
 version = '0.30.0'
 
 
