@@ -2,7 +2,7 @@
 -------------------
 
 - Update TransferWise references to Wise
-- Bump `pipelinewise-tap-twilio` to `1.1.0`
+- Bump `pipelinewise-tap-twilio` to `1.1.1`
 - Bump `psycopg-binary` from `2.8.5` to `2.8.6`
 
 0.30.0 (2021-01-22)
