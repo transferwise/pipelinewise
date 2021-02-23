@@ -6,7 +6,7 @@ Project
 History
 -------
 
-PipelineWise was started in August 2018 by Peter Kosztolanyi at TransferWise
+PipelineWise was started in August 2018 by Peter Kosztolanyi at Wise
 and the project was open sourced at the end of August 2019.
 
 Committers
