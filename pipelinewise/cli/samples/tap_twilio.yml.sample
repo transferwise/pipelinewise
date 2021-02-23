@@ -16,7 +16,7 @@ owner: "somebody@foo.com"              # Data owner to contact
 db_conn:
   account_sid: <TWILIO_ACCOUNT_SID>         # Twilio Account SID
   auth_token: <TWILIO_AUTH_TOKEN>           # Twilio Auth token
-  start_date: "2020-10-01"                  # The default value to use if no bookmark exists for an endpoint
+  start_date: "2021-02-01T00:00:00Z"        # The default value to use if no bookmark exists for an endpoint. ISO-8601 datetime formatted string
   user_agent: "someone@transferwise.com"    # Optional: Process and email for API logging purposes.
 
 
