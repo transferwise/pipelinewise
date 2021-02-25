@@ -18,8 +18,6 @@ LOGGER = Logger().get_logger(__name__)
 
 REQUIRED_CONFIG_KEYS = {
     'tap': [
-        'aws_access_key_id',
-        'aws_secret_access_key',
         'bucket',
         'start_date'
     ],
