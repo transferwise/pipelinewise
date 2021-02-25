@@ -222,3 +222,107 @@ class TestFastSyncTapS3Csv(TestCase):
             ],
             'primary_key': None
         }, output)
+
+
+class TestS3Helper(TestCase):
+    """
+    Unit tests for S3Helper in tap s3 csv
+    """
+
+    def test_setup_aws_client_with_creds(self):
+        """
+        Test that the aws client is setup when credentials are given
+        """
+        config = {
+            'aws_access_key_id': 'some key id',
+            'aws_secret_access_key': 'some secret key',
+            'aws_session_token': 'token'
+        }
+
+        with patch('pipelinewise.fastsync.commons.tap_s3_csv.boto3') as boto3_mock:
+            S3Helper.setup_aws_client(config)
+
+            boto3_mock.setup_default_session.assert_called_once_with(
+                aws_access_key_id=config['aws_access_key_id'],
+                aws_secret_access_key=config['aws_secret_access_key'],
+                aws_session_token=config['aws_session_token']
+            )
+
+    def test_setup_aws_client_with_env_creds(self):
+        """
+        Test that the aws client is setup when credentials are in the environment
+        """
+
+        config = {
+            'aws_access_key_id': 'some key id',
+            'aws_secret_access_key': 'some secret key',
+            'aws_session_token': 'token'
+        }
+
+        os.environ['AWS_ACCESS_KEY_ID'] = config['aws_access_key_id']
+        os.environ['AWS_SECRET_ACCESS_KEY'] = config['aws_secret_access_key']
+        os.environ['AWS_SESSION_TOKEN'] = config['aws_session_token']
+
+        with patch('pipelinewise.fastsync.commons.tap_s3_csv.boto3') as boto3_mock:
+            S3Helper.setup_aws_client({})
+
+            boto3_mock.setup_default_session.assert_called_once_with(
+                aws_access_key_id=config['aws_access_key_id'],
+                aws_secret_access_key=config['aws_secret_access_key'],
+                aws_session_token=config['aws_session_token']
+            )
+
+        os.environ.pop('AWS_ACCESS_KEY_ID')
+        os.environ.pop('AWS_SECRET_ACCESS_KEY')
+        os.environ.pop('AWS_SESSION_TOKEN')
+
+    def test_setup_aws_client_with_profile(self):
+        """
+        Test that the aws client is setup when profile is given
+        """
+
+        config = {
+            'aws_profile': 'my_profile',
+        }
+
+        with patch('pipelinewise.fastsync.commons.tap_s3_csv.boto3') as boto3_mock:
+            S3Helper.setup_aws_client(config)
+
+            boto3_mock.setup_default_session.assert_called_once_with(
+                profile_name=config['aws_profile'],
+            )
+
+    def test_setup_aws_client_with_env_profile(self):
+        """
+        Test that the aws client is setup when profile is in the environment
+        """
+
+        config = {
+            'aws_profile': 'my_profile',
+        }
+
+        os.environ['AWS_PROFILE'] = config['aws_profile']
+
+        with patch('pipelinewise.fastsync.commons.tap_s3_csv.boto3') as boto3_mock:
+            S3Helper.setup_aws_client({})
+
+            boto3_mock.setup_default_session.assert_called_once_with(
+                profile_name=config['aws_profile'],
+            )
+
+        os.environ.pop('AWS_PROFILE')
+
+    def test_setup_aws_client_with_no_profile_nor_creds(self):
+        """
+        Test that the aws client is setup when no profile and no creds are given
+        and are not in the environment
+        """
+
+        with patch('pipelinewise.fastsync.commons.tap_s3_csv.boto3') as boto3_mock:
+            S3Helper.setup_aws_client({})
+
+            boto3_mock.setup_default_session.assert_called_once_with(
+                profile_name=None
+            )
+
+    # TODO: add unit tests for the rest of class methods.
