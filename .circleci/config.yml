@@ -128,6 +128,7 @@ jobs:
             . .virtualenvs/pipelinewise/bin/activate
             export PIPELINEWISE_HOME=$PWD
             pytest tests/end_to_end -v
+          no_output_timeout: 30m
 
       - store_test_results:
           path: test-reports
