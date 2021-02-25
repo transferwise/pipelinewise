@@ -228,7 +228,7 @@ class TestS3Helper(TestCase):
     """
     Unit tests for S3Helper in tap s3 csv
     """
-
+    # pylint: disable=R0201
     def test_setup_aws_client_with_creds(self):
         """
         Test that the aws client is setup when credentials are given
@@ -248,6 +248,7 @@ class TestS3Helper(TestCase):
                 aws_session_token=config['aws_session_token']
             )
 
+    # pylint: disable=R0201
     def test_setup_aws_client_with_env_creds(self):
         """
         Test that the aws client is setup when credentials are in the environment
@@ -276,6 +277,7 @@ class TestS3Helper(TestCase):
         os.environ.pop('AWS_SECRET_ACCESS_KEY')
         os.environ.pop('AWS_SESSION_TOKEN')
 
+    # pylint: disable=R0201
     def test_setup_aws_client_with_profile(self):
         """
         Test that the aws client is setup when profile is given
@@ -292,6 +294,7 @@ class TestS3Helper(TestCase):
                 profile_name=config['aws_profile'],
             )
 
+    # pylint: disable=R0201
     def test_setup_aws_client_with_env_profile(self):
         """
         Test that the aws client is setup when profile is in the environment
@@ -312,6 +315,7 @@ class TestS3Helper(TestCase):
 
         os.environ.pop('AWS_PROFILE')
 
+    # pylint: disable=R0201
     def test_setup_aws_client_with_no_profile_nor_creds(self):
         """
         Test that the aws client is setup when no profile and no creds are given
