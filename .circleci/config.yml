@@ -119,7 +119,7 @@ jobs:
             export PIPELINEWISE_HOME=$PWD
             mkdir test-reports
             coverage run -m pytest tests/units -v --junitxml=test-reports/junit.xml
-            coverage report
+            coverage report --fail-under=69 || { echo 'Coverage threshold of 69% not met!' ; exit 1; }
             coverage html -d coverage_html
 
       - run:
