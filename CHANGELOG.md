@@ -1,3 +1,8 @@
+0.31.1 (2021-02-26)
+-------------------
+
+- Add support for AWS profile based authentication to FastSync tap-s3-csv.
+
 0.31.0 (2021-02-23)
 -------------------
 
