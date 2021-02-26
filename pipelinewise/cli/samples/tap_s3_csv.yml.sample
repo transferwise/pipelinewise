@@ -4,7 +4,7 @@
 # General Properties
 # ------------------------------------------------------------------------------
 id: "csv_on_s3"                        # Unique identifier of the tap
-name: "Sampe CSV files on S3"          # Name of the tap
+name: "Sample CSV files on S3"          # Name of the tap
 type: "tap-s3-csv"                     # !! THIS SHOULD NOT CHANGE !!
 owner: "somebody@foo.com"              # Data owner to contact
 #send_alert: False                     # Optional: Disable all configured alerts on this tap
@@ -15,9 +15,11 @@ owner: "somebody@foo.com"              # Data owner to contact
 # ------------------------------------------------------------------------------
 db_conn:
   # Profile based authentication
-  aws_profile: "<AWS_PROFILE>"                  # AWS profile name, if not provided, the AWS_PROFILE environment variable or the 'default' profile will be used
+  aws_profile: "<AWS_PROFILE>"                  # AWS profile name, if not provided, the AWS_PROFILE environment
+                                                # variable or the 'default' profile will be used, if not
+                                                # available, then IAM role attached to the host will be used.
 
-  # Non-profile based authentication
+  # Credentials based authentication
   #aws_access_key_id: "<ACCESS_KEY>"            # Plain string or vault encrypted. Required for non-profile based auth. If not provided, AWS_ACCESS_KEY_ID environment variable will be used.
   #aws_secret_access_key: "<SECRET_ACCESS_KEY"  # Plain string or vault encrypted. Required for non-profile based auth. If not provided, AWS_SECRET_ACCESS_KEY environment variable will be used.
   #aws_session_token: "<AWS_SESSION_TOKEN>"     # Optional: Plain string or vault encrypted. If not provided, AWS_SESSION_TOKEN environment variable will be used.

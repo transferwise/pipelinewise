@@ -43,9 +43,11 @@ Example YAML for target-redshift:
 
       # We use an intermediate S3 to load data into Redshift
       # S3 Profile based authentication
-      aws_profile: "<AWS_PROFILE>"                  # AWS profile name, if not provided, the AWS_PROFILE environment variable or the 'default' profile will be used
+      aws_profile: "<AWS_PROFILE>"                  # AWS profile name, if not provided, the AWS_PROFILE environment
+                                                    # variable or the 'default' profile will be used, if not
+                                                    # available, then IAM role attached to the host will be used.
 
-      # S3 Non-profile based authentication
+      # S3 Credentials based authentication
       #aws_access_key_id: "<ACCESS_KEY>"            # Plain string or vault encrypted. Required for non-profile based auth. If not provided, AWS_ACCESS_KEY_ID environment variable will be used.
       #aws_secret_access_key: "<SECRET_ACCESS_KEY"  # Plain string or vault encrypted. Required for non-profile based auth. If not provided, AWS_SECRET_ACCESS_KEY environment variable will be used.
       #aws_session_token: "<AWS_SESSION_TOKEN>"     # Optional: Plain string or vault encrypted. If not provided, AWS_SESSION_TOKEN environment variable will be used.
