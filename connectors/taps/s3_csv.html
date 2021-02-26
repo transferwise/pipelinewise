@@ -235,13 +235,17 @@ S3 objects to incrementally download only the new or updated files.</p>
 <blockquote>
 <div><ul>
 <li><p><strong>Profile based authentication</strong>: This is the default authentication method. Credentials taken from
-the <code class="docutils literal notranslate"><span class="pre">default</span></code> AWS profile, that’s available on the host where PipelineWise is running.
-To use anoter profile set the <code class="docutils literal notranslate"><span class="pre">aws_profile</span></code> parameter.</p></li>
-<li><p><strong>Non-profile based authentication</strong>: To provide fixed credentials set <code class="docutils literal notranslate"><span class="pre">aws_access_key_id</span></code>,
+the <code class="docutils literal notranslate"><span class="pre">AWS_PROFILE</span></code> environment variable or the <code class="docutils literal notranslate"><span class="pre">default</span></code> AWS profile, that’s available on the host where
+PipelineWise is running.
+To use another profile set the <code class="docutils literal notranslate"><span class="pre">aws_profile</span></code> parameter.
+This method requires the presence of <code class="docutils literal notranslate"><span class="pre">~/.aws/credentials</span></code> file on the host.</p></li>
+<li><p><strong>Credentials based authentication</strong>: To provide fixed credentials set <code class="docutils literal notranslate"><span class="pre">aws_access_key_id</span></code>,
 <code class="docutils literal notranslate"><span class="pre">aws_secret_access_key</span></code> and optionally the <code class="docutils literal notranslate"><span class="pre">aws_session_token</span></code> parameters.</p>
 <p>Optionally the credentials can be vault-encrypted in the YAML. Please check <a class="reference internal" href="../../user_guide/encrypting_passwords.html#encrypting-passwords"><span class="std std-ref">Encrypting Passwords</span></a>
 for further details.</p>
 </li>
+<li><p><strong>IAM role based authentication</strong>: When no credentials and no AWS profile is given nor found on the host,
+PipelineWise will resort to use the IAM role attached to the host.</p></li>
 </ul>
 </div></blockquote>
 </div>
@@ -267,10 +271,13 @@ owner: <span class="s2">&quot;somebody@foo.com&quot;</span>              <span c
 <span class="c1"># Source (Tap) - S3 connection details</span>
 <span class="c1"># ------------------------------------------------------------------------------</span>
 db_conn:
-  <span class="c1"># Profile based authentication</span>
-  aws_profile: <span class="s2">&quot;&lt;AWS_PROFILE&gt;&quot;</span>                  <span class="c1"># AWS profile name, if not provided, the AWS_PROFILE environment variable or the &#39;default&#39; profile will be used</span>
 
-  <span class="c1"># Non-profile based authentication</span>
+  <span class="c1"># Profile based authentication</span>
+  aws_profile: <span class="s2">&quot;&lt;AWS_PROFILE&gt;&quot;</span>                  <span class="c1"># AWS profile name, if not provided, the AWS_PROFILE environment</span>
+                                                <span class="c1"># variable or the &#39;default&#39; profile will be used, if not</span>
+                                                <span class="c1"># available, then IAM role attached to the host will be used.</span>
+
+  <span class="c1"># Credentials based authentication</span>
   <span class="c1">#aws_access_key_id: &quot;&lt;ACCESS_KEY&gt;&quot;            # Plain string or vault encrypted. Required for non-profile based auth. If not provided, AWS_ACCESS_KEY_ID environment variable will be used.</span>
   <span class="c1">#aws_secret_access_key: &quot;&lt;SECRET_ACCESS_KEY&quot;  # Plain string or vault encrypted. Required for non-profile based auth. If not provided, AWS_SECRET_ACCESS_KEY environment variable will be used.</span>
   <span class="c1">#aws_session_token: &quot;&lt;AWS_SESSION_TOKEN&gt;&quot;     # Optional: Plain string or vault encrypted. If not provided, AWS_SESSION_TOKEN environment variable will be used.</span>

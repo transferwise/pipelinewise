@@ -309,9 +309,11 @@ db_conn:
 
   <span class="c1"># We use an external stage on S3 to load data into Snowflake</span>
   <span class="c1"># S3 Profile based authentication</span>
-  aws_profile: <span class="s2">&quot;&lt;AWS_PROFILE&gt;&quot;</span>                  <span class="c1"># AWS profile name, if not provided, the AWS_PROFILE environment variable or the &#39;default&#39; profile will be used</span>
+  aws_profile: <span class="s2">&quot;&lt;AWS_PROFILE&gt;&quot;</span>                  <span class="c1"># AWS profile name, if not provided, the AWS_PROFILE environment</span>
+                                                <span class="c1"># variable or the &#39;default&#39; profile will be used, if not</span>
+                                                <span class="c1"># available, then IAM role attached to the host will be used.</span>
 
-  <span class="c1"># S3 Non-profile based authentication</span>
+  <span class="c1"># S3 Credentials based authentication</span>
   <span class="c1">#aws_access_key_id: &quot;&lt;ACCESS_KEY&gt;&quot;            # Plain string or vault encrypted. Required for non-profile based auth. If not provided, AWS_ACCESS_KEY_ID environment variable will be used.</span>
   <span class="c1">#aws_secret_access_key: &quot;&lt;SECRET_ACCESS_KEY&quot;  # Plain string or vault encrypted. Required for non-profile based auth. If not provided, AWS_SECRET_ACCESS_KEY environment variable will be used.</span>
   <span class="c1">#aws_session_token: &quot;&lt;AWS_SESSION_TOKEN&gt;&quot;     # Optional: Plain string or vault encrypted. If not provided, AWS_SESSION_TOKEN environment variable will be used.</span>
