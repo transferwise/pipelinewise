@@ -46,6 +46,9 @@ schemas:
       - table_name: "address"
         replication_method: "INCREMENTAL"
         replication_key: "date_updated"
+        transformations:
+          - column: "date_created"
+            type: "MASK-DATE"
 
       ### Table with FULL_TABLE replication
       - table_name: "order"
@@ -65,6 +68,8 @@ schemas:
         transformations:
           - column: "case"
             type: "HASH"
+          - column: "group"
+            type: "MASK-NUMBER"
 
       ### Table with reserved word
       - table_name: "full"

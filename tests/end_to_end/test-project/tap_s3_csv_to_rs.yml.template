@@ -56,7 +56,9 @@ schemas:
           - column: "email"
             type: "HASH"
           - column: "group"
-            type: "HASH"
+            type: "MASK-HIDDEN"
+          - column: "ip_address"
+            type: "SET-NULL"
 
       - table_name: "countries"
         s3_csv_mapping:
