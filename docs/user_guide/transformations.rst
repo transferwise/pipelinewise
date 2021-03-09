@@ -44,7 +44,7 @@ The following transformations can be added optionally into the :ref:`yaml_config
 .. _transformation_validation:
 
 Transformation validation
-''''''''''''''''''''''
+'''''''''''''''''''''''''
 
 PipelineWise will run a transformation validation as part of the `import` logic, the validation consists of making sure
 that the transformation type is compatible with the column/field it's being applied to, e.g `HASH` can only be
