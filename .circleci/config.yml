@@ -1,5 +1,16 @@
 version: 2
+
 references:
+
+  docker_k8s_deployer: &docker_k8s_deployer
+    docker:
+      - image: docker.tw.ee/k8s-deployer:2
+    working_directory: ~/pipelinewise
+
+  attach_workspace: &attach_workspace
+    attach_workspace:
+      at: ~/pipelinewise
+
   container_config: &container_config
     docker:
       # Main python container
@@ -164,19 +175,38 @@ jobs:
       - checkout
       - run: .circleci/publish_docs.sh
 
+  publish_service:
+    <<: *docker_k8s_deployer
+    steps:
+      - checkout
+      - setup_remote_docker
+      - *attach_workspace
+      - run:
+          name: Push and release the new docker image to artifactory
+          command: k8s-deployment docker-build jfrog-cli-docker-push
+          environment:
+            DEPLOY_SLACK_CHANNEL: "#analytics-platform-alerts"
+            DEPLOY_IMAGE_NAME: "pipelinewise"
+            DEPLOY_DOCKERFILE: "./Dockerfile"
+
+  promote_docker_image:
+    <<: *docker_k8s_deployer
+    steps:
+      - setup_remote_docker
+      - *attach_workspace
+      - run:
+          name: Promote built artifact for PipelineWise
+          command: k8s-deployment trigger-image-promotion
+          environment:
+            DEPLOY_IMAGE_NAME: "pipelinewise"
+            DEPLOY_SLACK_CHANNEL: "#analytics-platform-alerts"
+
+
 workflows:
   version: 2
   build_and_test:
     jobs:
       - test
-      - build-and-push-docker:
-          context: artifactory-deploy-docker
-          requires:
-            - test
-          filters:
-            branches:
-              only:
-                - master
 
   deploy_doc:
     jobs:
