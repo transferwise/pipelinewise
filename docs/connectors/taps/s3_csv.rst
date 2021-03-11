@@ -38,7 +38,7 @@ following the steps in the :ref:`generating_pipelines` section.
 
 Example YAML for ``tap-s3-csv``:
 
-.. code-block:: bash
+.. code-block:: yaml
 
     ---
 

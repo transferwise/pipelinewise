@@ -32,7 +32,7 @@ If you're building something where a wide variety of users need to be able to gi
 
 Example YAML for ``tap-google-analytics``:
 
-.. code-block:: bash
+.. code-block:: yaml
 
     ---
 

@@ -21,7 +21,7 @@ following the steps in the :ref:`generating_pipelines` section.
 
 Example YAML for tap-snowflake:
 
-.. code-block:: bash
+.. code-block:: yaml
 
     ---
 
