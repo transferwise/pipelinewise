@@ -160,7 +160,7 @@ jobs:
       - checkout
       - run: .circleci/publish_docs.sh
 
-  publish_service:
+  upload_docker_image:
     <<: *docker_k8s_deployer
     steps:
       - checkout
@@ -189,9 +189,28 @@ jobs:
 
 workflows:
   version: 2
-  build_and_test:
+
+  build:
     jobs:
       - test
+
+      - upload_docker_image:
+          context: upload-build
+          requires:
+            - test
+          filters:
+            branches:
+              only:
+                - master
+
+      - promote_docker_image:
+          context: promote-build
+          requires:
+            - upload_docker_image
+          filters:
+            branches:
+              only:
+                - master
 
   deploy_doc:
     jobs:
