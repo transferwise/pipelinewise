@@ -1,1 +1,1 @@
--e git+https://github.com/transferwise/pipelinewise-transform-field.git@AP-928#egg=pipelinewise-transform-field
+pipelinewise-transform-field==2.1.0
