@@ -146,21 +146,6 @@ jobs:
       - store_artifacts:
           path: coverage_html
 
-  build-and-push-docker:
-    docker:
-      - image: docker.tw.ee/k8s-deployer:1
-
-    steps:
-      - checkout
-      - setup_remote_docker
-      - run:
-          name: Push and release the new version
-          command: k8s-deployment docker-build docker-push
-          environment:
-            DEPLOY_DOCKERFILE: ./Dockerfile
-            DEPLOY_IMAGE_NAME: pipelinewise
-            DEPLOY_SLACK_CHANNEL: '#analytics-db-updates'
-
   # For documentation deployment. You'll need the following environment vars
   # in your Circle CI settings, otherwise this will not work.
   #
