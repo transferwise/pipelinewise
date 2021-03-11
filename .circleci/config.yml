@@ -3,15 +3,16 @@ version: 2
 references:
 
   docker_k8s_deployer: &docker_k8s_deployer
+    working_directory: ~/pipelinewise
     docker:
       - image: docker.tw.ee/k8s-deployer:2
-    working_directory: ~/pipelinewise
 
   attach_workspace: &attach_workspace
     attach_workspace:
       at: ~/pipelinewise
 
   container_config: &container_config
+    working_directory: ~/pipelinewise
     docker:
       # Main python container
       - image: circleci/python:3.7.7
@@ -163,7 +164,6 @@ jobs:
   upload_docker_image:
     <<: *docker_k8s_deployer
     steps:
-      - checkout
       - setup_remote_docker
       - *attach_workspace
       - run:
