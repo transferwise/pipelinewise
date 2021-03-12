@@ -513,17 +513,50 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
         tap_with_no_pk_not_selected = cli.utils.load_json(
             '{}//tap_properties_with_no_pk_not_selected.json'.format(test_files_dir))
 
-        # Test scenarios when post import checks should pass
-        assert pipelinewise._run_post_import_tap_checks(tap_pk_required, tap_with_pk) == []
-        assert pipelinewise._run_post_import_tap_checks(tap_pk_not_required, tap_with_pk) == []
-        assert pipelinewise._run_post_import_tap_checks(tap_pk_required, tap_with_no_pk_full_table) == []
-        assert pipelinewise._run_post_import_tap_checks(tap_pk_not_required, tap_with_no_pk_incremental) == []
-        assert pipelinewise._run_post_import_tap_checks(tap_pk_not_required, tap_with_no_pk_log_based) == []
-        assert pipelinewise._run_post_import_tap_checks(tap_pk_required, tap_with_no_pk_not_selected) == []
-        assert pipelinewise._run_post_import_tap_checks(tap_pk_not_defined, tap_with_no_pk_full_table) == []
+        with patch('pipelinewise.cli.pipelinewise.commands.run_command') as run_command_mock:
+            # Test scenarios when post import checks should pass
+            assert pipelinewise._run_post_import_tap_checks(tap_pk_required, tap_with_pk, 'snowflake') == []
+            assert pipelinewise._run_post_import_tap_checks(tap_pk_not_required, tap_with_pk, 'snowflake') == []
+            assert pipelinewise._run_post_import_tap_checks(tap_pk_required, tap_with_no_pk_full_table, 'snowflake') \
+                   == []
+            assert pipelinewise._run_post_import_tap_checks(tap_pk_not_required, tap_with_no_pk_incremental,
+                                                            'snowflake') == []
+            assert pipelinewise._run_post_import_tap_checks(tap_pk_not_required, tap_with_no_pk_log_based,
+                                                            'snowflake') == []
+            assert pipelinewise._run_post_import_tap_checks(tap_pk_required, tap_with_no_pk_not_selected,
+                                                            'snowflake') == []
+            assert pipelinewise._run_post_import_tap_checks(tap_pk_not_defined, tap_with_no_pk_full_table,
+                                                            'snowflake') == []
 
-        # Test scenarios when post import checks should fail due to primary keys not exists
-        assert len(pipelinewise._run_post_import_tap_checks(tap_pk_required, tap_with_no_pk_incremental)) == 1
-        assert len(pipelinewise._run_post_import_tap_checks(tap_pk_required, tap_with_no_pk_log_based)) == 1
-        assert len(pipelinewise._run_post_import_tap_checks(tap_pk_not_defined, tap_with_no_pk_incremental)) == 1
-        assert len(pipelinewise._run_post_import_tap_checks(tap_pk_not_defined, tap_with_no_pk_log_based)) == 1
+            # Test scenarios when post import checks should fail due to primary keys not exists
+            assert len(pipelinewise._run_post_import_tap_checks(tap_pk_required, tap_with_no_pk_incremental,
+                                                                'snowflake')) == 1
+            assert len(pipelinewise._run_post_import_tap_checks(tap_pk_required, tap_with_no_pk_log_based,
+                                                                'snowflake')) == 1
+            assert len(pipelinewise._run_post_import_tap_checks(tap_pk_not_defined, tap_with_no_pk_incremental,
+                                                                'snowflake')) == 1
+            assert len(pipelinewise._run_post_import_tap_checks(tap_pk_not_defined, tap_with_no_pk_log_based,
+                                                                'snowflake')) == 1
+
+            # Test scenarios when post import checks should fail due to transformations validation command fails
+            tap_with_trans = cli.utils.\
+                load_json('{}/tap_config_with_transformations.json'.format(test_files_dir))
+
+            run_command_mock.return_value = (1, None, 'transformation `HASH` cannot be applied')
+
+            assert len(pipelinewise._run_post_import_tap_checks(tap_with_trans, tap_with_no_pk_not_selected,
+                                                                'snowflake')) == 1
+
+            assert len(pipelinewise._run_post_import_tap_checks(tap_with_trans, tap_with_no_pk_incremental,
+                                                                'snowflake')) == 2
+
+            # mock successfull transformation validation command
+            run_command_mock.return_value = (0, None, None)
+
+            assert len(pipelinewise._run_post_import_tap_checks(tap_with_trans, tap_with_no_pk_not_selected,
+                                                                'snowflake')) == 0
+
+            assert len(pipelinewise._run_post_import_tap_checks(tap_with_trans, tap_with_no_pk_incremental,
+                                                                'snowflake')) == 1
+
+            assert run_command_mock.call_count == 4

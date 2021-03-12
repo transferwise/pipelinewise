@@ -1,0 +1,7 @@
+{
+    "id": "my_tap",
+    "primary_key_required": true,
+    "files": {
+        "transformation": "./transformations.json"
+    }
+}

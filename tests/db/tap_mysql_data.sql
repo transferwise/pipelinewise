@@ -17,7 +17,7 @@
 
 
 --
--- Table structure for table `address`
+-- Table structure for table `edgydata`
 --
 
 DROP TABLE IF EXISTS `edgydata`;

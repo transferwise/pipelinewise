@@ -1,0 +1,8 @@
+{
+  "transformations" : [
+    {
+      "type": "HASH",
+      "field_id": "col_1"
+    }
+  ]
+}
