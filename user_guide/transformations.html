@@ -117,6 +117,7 @@
 <li class="toctree-l1"><a class="reference internal" href="schema_changes.html">Schema Changes</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Transformations</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#transformation-methods">Transformation Methods</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#transformation-validation">Transformation validation</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#conditional-transformations">Conditional Transformations</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#example">Example</a></li>
 </ul>
@@ -206,8 +207,8 @@
             
   <div class="section" id="transformations">
 <span id="id1"></span><h1>Transformations<a class="headerlink" href="#transformations" title="Permalink to this headline">¶</a></h1>
-<p>PipelineWise can perform row level load time transformations between tap and target components
-and makes and ideal place to obfuscate, mask or filter sensitive data that should never be replicated in the Data Warehouse.</p>
+<p>PipelineWise can perform row level load time transformations between tap and target components and makes and ideal
+place to obfuscate, mask or filter sensitive data that should never be replicated into the data warehouse.</p>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
 <p><strong>Important</strong>: Load Time Transformations are not designed for complex transformations, mapping,
@@ -223,16 +224,24 @@ doing traditional ETL. ELT ingests data first into DWH in the original format an
 <span id="id2"></span><h2>Transformation Methods<a class="headerlink" href="#transformation-methods" title="Permalink to this headline">¶</a></h2>
 <p>The following transformations can be added optionally into the <a class="reference internal" href="yaml_config.html#yaml-configuration"><span class="std std-ref">YAML configuration</span></a>:</p>
 <ul class="simple">
-<li><p><strong>SET-NULL</strong>: Transforms any column to NULL</p></li>
-<li><p><strong>HASH</strong>: Transforms string columns to hash</p></li>
-<li><p><strong>HASH-SKIP-FIRST-n</strong>: Transforms string columns to hash skipping first n characters, e.g. HASH-SKIP-FIRST-2</p></li>
-<li><p><strong>MASK-DATE</strong>: Replaces the months and day parts of date columns to be always 1st of Jan</p></li>
-<li><p><strong>MASK-NUMBER</strong>: Transforms any numeric column to zero</p></li>
-<li><p><strong>MASK-HIDDEN</strong>: Transforms any string column value to ‘hidden’</p></li>
+<li><p><strong>SET-NULL</strong>: Transforms any column to NULL.</p></li>
+<li><p><strong>HASH</strong>: Transforms string columns to hash.</p></li>
+<li><p><strong>HASH-SKIP-FIRST-n</strong>: Transforms string columns to hash skipping first n characters, e.g. HASH-SKIP-FIRST-2.</p></li>
+<li><p><strong>MASK-DATE</strong>: Replaces the months and day parts of date columns to be always 1st of Jan.</p></li>
+<li><p><strong>MASK-NUMBER</strong>: Transforms any numeric column to zero.</p></li>
+<li><p><strong>MASK-HIDDEN</strong>: Transforms any string column value to ‘hidden’.</p></li>
 </ul>
 </div>
+<div class="section" id="transformation-validation">
+<span id="id3"></span><h2>Transformation validation<a class="headerlink" href="#transformation-validation" title="Permalink to this headline">¶</a></h2>
+<p>PipelineWise will run a transformation validation as part of the <cite>import</cite> logic, the validation consists of making sure
+that the transformation type is compatible with the column/field it’s being applied to, e.g <cite>HASH</cite> can only be
+applied to string type fields.</p>
+<p>The validation will also take place at runtime, ie <cite>run_tap</cite>, to make sure any changes to a stream schema are still
+compatible with the configured transformation.</p>
+</div>
 <div class="section" id="conditional-transformations">
-<span id="id3"></span><h2>Conditional Transformations<a class="headerlink" href="#conditional-transformations" title="Permalink to this headline">¶</a></h2>
+<span id="id4"></span><h2>Conditional Transformations<a class="headerlink" href="#conditional-transformations" title="Permalink to this headline">¶</a></h2>
 <p>Using the optional <code class="docutils literal notranslate"><span class="pre">when</span></code> keyword, you can specify conditions how
 the transformation should be applied. If the condition matches
 PipelineWise performs the transformation, otherwise it keeps
