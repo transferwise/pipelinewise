@@ -2,7 +2,6 @@
 import multiprocessing
 import os
 import sys
-import time
 from argparse import Namespace
 from datetime import datetime
 from functools import partial
@@ -51,8 +50,7 @@ def sync_table(table_name: str, args: Namespace) -> Union[bool, str]:
     postgres = FastSyncTargetPostgres(args.target, args.transform)
 
     try:
-        filename = 'pipelinewise_fastsync_{}_{}_{}.csv.gz'.format(args.tap['bucket'], table_name,
-                                                                  time.strftime('%Y%m%d-%H%M%S'))
+        filename = utils.gen_export_filename(tap_id=args.target.get('tap_id'), table=table_name)
         filepath = os.path.join(args.temp_dir, filename)
 
         target_schema = utils.get_target_schema(args.target, table_name)

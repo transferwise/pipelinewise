@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import os
 import sys
-import time
 import multiprocessing
 
 from typing import Union
@@ -60,7 +59,7 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
 
     try:
         dbname = args.tap.get('dbname')
-        filename = 'pipelinewise_fastsync_{}_{}_{}.csv.gz'.format(dbname, table, time.strftime('%Y%m%d-%H%M%S'))
+        filename = utils.gen_export_filename(tap_id=args.target.get('tap_id'), table=table)
         filepath = os.path.join(args.temp_dir, filename)
         target_schema = utils.get_target_schema(args.target, table)
 
@@ -79,7 +78,7 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
         mongodb.close_connection()
 
         # Uploading to S3
-        s3_key = snowflake.upload_to_s3(filepath, table, tmp_dir=args.temp_dir)
+        s3_key = snowflake.upload_to_s3(filepath, tmp_dir=args.temp_dir)
         # os.remove(filepath)
 
         # Creating temp table in Snowflake
