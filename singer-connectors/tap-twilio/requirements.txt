@@ -1,1 +1,1 @@
-pipelinewise-tap-twilio==1.1.1
+pipelinewise-tap-twilio==1.1.2
