@@ -1,3 +1,5 @@
+from unittest import TestCase
+
 from pipelinewise.fastsync.commons.target_postgres import FastSyncTargetPostgres
 
 
@@ -5,6 +7,7 @@ class FastSyncTargetPostgresMock(FastSyncTargetPostgres):
     """
     Mocked FastSyncTargetPostgres class
     """
+
     def __init__(self, connection_config, transformation_config=None):
         super().__init__(connection_config, transformation_config)
 
@@ -14,12 +17,12 @@ class FastSyncTargetPostgresMock(FastSyncTargetPostgres):
         self.executed_queries.append(query)
 
 
-# pylint: disable=attribute-defined-outside-init
-class TestFastSyncTargetPostgres:
+class TestFastSyncTargetPostgres(TestCase):
     """
     Unit tests for fastsync target postgres
     """
-    def setup_method(self):
+
+    def setUp(self) -> None:
         """Initialise test FastSyncTargetPostgres object"""
         self.postgres = FastSyncTargetPostgresMock(connection_config={}, transformation_config={})
 
@@ -193,3 +196,188 @@ class TestFastSyncTargetPostgres:
             'DROP TABLE IF EXISTS test_schema."table with space and uppercase"',
             'ALTER TABLE test_schema."table with space and uppercase_temp" '
             'RENAME TO "table with space and uppercase"']
+
+    def test_obfuscate_columns_case1(self):
+        """
+        Test obfuscation where given transformations are emtpy
+        Test should pass with no executed queries
+        """
+        target_schema = 'my_schema'
+        table_name = 'public.my_table'
+
+        self.postgres.transformation_config = {}
+
+        self.postgres.obfuscate_columns(target_schema, table_name)
+        self.assertFalse(self.postgres.executed_queries)
+
+    def test_obfuscate_columns_case2(self):
+        """
+        Test obfuscation where given transformations has an unsupported transformation type
+        Test should fail
+        """
+        target_schema = 'my_schema'
+        table_name = 'public.my_table'
+
+        self.postgres.transformation_config = {
+            'transformations': [
+                {
+                    'field_id': 'col_7',
+                    'tap_stream_name': 'public-my_table',
+                    'type': 'RANDOM'
+                }
+            ]
+        }
+
+        with self.assertRaises(ValueError):
+            self.postgres.obfuscate_columns(target_schema, table_name)
+
+        self.assertFalse(self.postgres.executed_queries)
+
+    def test_obfuscate_columns_case3(self):
+        """
+        Test obfuscation where given transformations have no conditions
+        Test should pass
+        """
+        target_schema = 'my_schema'
+        table_name = 'public.my_table'
+
+        self.postgres.transformation_config = {
+            'transformations': [
+                {
+                    'field_id': 'col_1',
+                    'tap_stream_name': 'public-my_table',
+                    'type': 'SET-NULL'
+                },
+                {
+                    'field_id': 'col_2',
+                    'tap_stream_name': 'public-my_table',
+                    'type': 'MASK-HIDDEN'
+                },
+                {
+                    'field_id': 'col_3',
+                    'tap_stream_name': 'public-my_table',
+                    'type': 'MASK-DATE'
+                },
+                {
+                    'field_id': 'col_4',
+                    'tap_stream_name': 'public-my_table',
+                    'safe_field_id': '"col_4"',
+                    'type': 'MASK-NUMBER'
+                },
+                {
+                    'field_id': 'col_5',
+                    'tap_stream_name': 'public-my_table',
+                    'type': 'HASH'
+                },
+                {
+                    'field_id': 'col_6',
+                    'tap_stream_name': 'public-my_table',
+                    'type': 'HASH-SKIP-FIRST-5'
+                }
+            ]
+        }
+
+        self.postgres.obfuscate_columns(target_schema, table_name)
+
+        self.assertListEqual(
+            self.postgres.executed_queries,
+            [
+                'UPDATE "my_schema"."my_table" SET '
+                '"col_1" = NULL, '
+                '"col_2" = \'hidden\', '
+                '"col_3" = MAKE_TIMESTAMP(DATE_PART(\'year\', "col_3")::int, 1, 1, DATE_PART(\'hour\', "col_3")::int, '
+                'DATE_PART(\'minute\', "col_3")::int, DATE_PART(\'second\', "col_3")::double precision), '
+                '"col_4" = 0, '
+                '"col_5" = ENCODE(DIGEST("col_5", \'sha256\'), \'hex\'), '
+                '"col_6" = CONCAT(SUBSTRING("col_6", 1, 5), '
+                'ENCODE(DIGEST(SUBSTRING("col_6", 5 + 1), \'sha256\'), \'hex\'));'
+            ])
+
+    def test_obfuscate_columns_case4(self):
+        """
+        Test obfuscation where given transformations have conditions
+        Test should pass
+        """
+        target_schema = 'my_schema'
+        table_name = 'public.my_table'
+
+        self.postgres.transformation_config = {
+            'transformations': [
+                {
+                    'field_id': 'col_1',
+                    'tap_stream_name': 'public-my_table',
+                    'type': 'SET-NULL'
+                },
+                {
+                    'field_id': 'col_2',
+                    'tap_stream_name': 'public-my_table',
+                    'type': 'MASK-HIDDEN',
+                    'when': [
+                        {
+                            'column': 'col_4',
+                            'safe_column': '"col_4"',
+                            'equals': None
+                        },
+                        {
+                            'column': 'col_1',
+                        }
+                    ]
+                },
+                {
+                    'field_id': 'col_3',
+                    'tap_stream_name': 'public-my_table',
+                    'type': 'MASK-DATE',
+                    'when': [
+                        {
+                            'column': 'col_5',
+                            'equals': 'some_value'
+                        }
+                    ]
+                },
+                {
+                    'field_id': 'col_4',
+                    'tap_stream_name': 'public-my_table',
+                    'type': 'MASK-NUMBER'
+                },
+                {
+                    'field_id': 'col_5',
+                    'tap_stream_name': 'public-my_table',
+                    'type': 'HASH'
+                },
+                {
+                    'field_id': 'col_6',
+                    'tap_stream_name': 'public-my_table',
+                    'type': 'HASH-SKIP-FIRST-5',
+                    'when': [
+                        {
+                            'column': 'col_1',
+                            'equals': 30
+                        },
+                        {
+                            'column': 'col_2',
+                            'regex_match': r'[0-9]{3}\.[0-9]{3}'
+                        }
+                    ]
+                }
+            ]
+        }
+
+        self.postgres.obfuscate_columns(target_schema, table_name, is_temporary=True)
+
+        self.assertListEqual(
+            self.postgres.executed_queries,
+            [
+                'UPDATE "my_schema"."my_table_temp" SET "col_2" = \'hidden\' WHERE ("col_4" IS NULL);',
+                'UPDATE "my_schema"."my_table_temp" SET '
+                '"col_3" = MAKE_TIMESTAMP(DATE_PART(\'year\', "col_3")::int, 1, 1, DATE_PART(\'hour\', "col_3")::int, '
+                'DATE_PART(\'minute\', "col_3")::int, DATE_PART(\'second\', "col_3")::double precision) '
+                'WHERE ("col_5" = \'some_value\');',
+                'UPDATE "my_schema"."my_table_temp" SET '
+                '"col_6" = CONCAT(SUBSTRING("col_6", 1, 5), '
+                'ENCODE(DIGEST(SUBSTRING("col_6", 5 + 1), \'sha256\'), \'hex\')) WHERE ("col_1" = 30) AND '
+                '("col_2" ~ \'[0-9]{3}\.[0-9]{3}\');', # pylint: disable=anomalous-backslash-in-string
+
+                'UPDATE "my_schema"."my_table_temp" SET "col_1" = NULL, '
+                '"col_4" = 0, "col_5" = ENCODE(DIGEST("col_5", \'sha256\'), \'hex\');'
+            ]
+        )

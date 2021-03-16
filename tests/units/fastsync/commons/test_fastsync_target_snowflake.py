@@ -1,4 +1,6 @@
 import json
+from unittest import TestCase
+
 from pipelinewise.fastsync.commons.target_snowflake import FastSyncTargetSnowflake
 
 
@@ -7,6 +9,7 @@ class S3Mock:
     """
     Mocked boto3
     """
+
     def __init__(self):
         pass
 
@@ -19,6 +22,7 @@ class FastSyncTargetSnowflakeMock(FastSyncTargetSnowflake):
     """
     Mocked FastSyncTargetPostgres class
     """
+
     def __init__(self, connection_config, transformation_config=None):
         super().__init__(connection_config, transformation_config)
 
@@ -30,12 +34,12 @@ class FastSyncTargetSnowflakeMock(FastSyncTargetSnowflake):
         return []
 
 
-# pylint: disable=attribute-defined-outside-init
-class TestFastSyncTargetSnowflake:
+class TestFastSyncTargetSnowflake(TestCase):
     """
     Unit tests for fastsync target snowflake
     """
-    def setup_method(self):
+
+    def setUp(self) -> None:
         """Initialise test FastSyncTargetPostgres object"""
         self.snowflake = FastSyncTargetSnowflakeMock(connection_config={'s3_bucket': 'dummy_bucket',
                                                                         'stage': 'dummy_stage'},
@@ -44,7 +48,7 @@ class TestFastSyncTargetSnowflake:
     def test_create_schema(self):
         """Validate if create schema queries generated correctly"""
         self.snowflake.create_schema('new_schema')
-        assert self.snowflake.executed_queries == ['CREATE SCHEMA IF NOT EXISTS new_schema']
+        self.assertListEqual(self.snowflake.executed_queries, ['CREATE SCHEMA IF NOT EXISTS new_schema'])
 
     def test_drop_table(self):
         """Validate if drop table queries generated correctly"""
@@ -349,3 +353,182 @@ class TestFastSyncTargetSnowflake:
             'schema': None,
             'table': None
         }
+
+    def test_obfuscate_columns_case1(self):
+        """
+        Test obfuscation where given transformations are emtpy
+        Test should pass with no executed queries
+        """
+        target_schema = 'my_schema'
+        table_name = 'public.my_table'
+
+        self.snowflake.transformation_config = {}
+
+        self.snowflake.obfuscate_columns(target_schema, table_name)
+        self.assertFalse(self.snowflake.executed_queries)
+
+    def test_obfuscate_columns_case2(self):
+        """
+        Test obfuscation where given transformations has an unsupported transformation type
+        Test should fail
+        """
+        target_schema = 'my_schema'
+        table_name = 'public.my_table'
+
+        self.snowflake.transformation_config = {
+            'transformations': [
+                {
+                    'field_id': 'col_7',
+                    'tap_stream_name': 'public-my_table',
+                    'type': 'RANDOM'
+                }
+            ]
+        }
+
+        with self.assertRaises(ValueError):
+            self.snowflake.obfuscate_columns(target_schema, table_name)
+
+        self.assertFalse(self.snowflake.executed_queries)
+
+    def test_obfuscate_columns_case3(self):
+        """
+        Test obfuscation where given transformations have no conditions
+        Test should pass
+        """
+        target_schema = 'my_schema'
+        table_name = 'public.my_table'
+
+        self.snowflake.transformation_config = {
+            'transformations': [
+                {
+                    'field_id': 'col_1',
+                    'tap_stream_name': 'public-my_table',
+                    'type': 'SET-NULL'
+                },
+                {
+                    'field_id': 'col_2',
+                    'tap_stream_name': 'public-my_table',
+                    'type': 'MASK-HIDDEN'
+                },
+                {
+                    'field_id': 'col_3',
+                    'tap_stream_name': 'public-my_table',
+                    'type': 'MASK-DATE'
+                },
+                {
+                    'field_id': 'col_4',
+                    'tap_stream_name': 'public-my_table',
+                    'safe_field_id': '"COL_4"',
+                    'type': 'MASK-NUMBER'
+                },
+                {
+                    'field_id': 'col_5',
+                    'tap_stream_name': 'public-my_table',
+                    'type': 'HASH'
+                },
+                {
+                    'field_id': 'col_6',
+                    'tap_stream_name': 'public-my_table',
+                    'type': 'HASH-SKIP-FIRST-5'
+                }
+            ]
+        }
+
+        self.snowflake.obfuscate_columns(target_schema, table_name)
+
+        self.assertListEqual(
+            self.snowflake.executed_queries,
+            [
+                'UPDATE "MY_SCHEMA"."MY_TABLE_TEMP" SET '
+                '"COL_1" = NULL, '
+                '"COL_2" = \'hidden\', '
+                '"COL_3" = TIMESTAMP_NTZ_FROM_PARTS(DATE_FROM_PARTS(YEAR("COL_3"), 1, 1),TO_TIME("COL_3")), '
+                '"COL_4" = 0, '
+                '"COL_5" = SHA2("COL_5", 256), '
+                '"COL_6" = CONCAT(SUBSTRING("COL_6", 1, 5), SHA2(SUBSTRING("COL_6", 5 + 1), 256));'
+            ])
+
+    def test_obfuscate_columns_case4(self):
+        """
+        Test obfuscation where given transformations have conditions
+        Test should pass
+        """
+        target_schema = 'my_schema'
+        table_name = 'public.my_table'
+
+        self.snowflake.transformation_config = {
+            'transformations': [
+                {
+                    'field_id': 'col_1',
+                    'tap_stream_name': 'public-my_table',
+                    'type': 'SET-NULL'
+                },
+                {
+                    'field_id': 'col_2',
+                    'tap_stream_name': 'public-my_table',
+                    'type': 'MASK-HIDDEN',
+                    'when': [
+                        {
+                            'column': 'col_4',
+                            'safe_column': '"COL_4"',
+                            'equals': None
+                        },
+                        {
+                            'column': 'col_1',
+                        }
+                    ]
+                },
+                {
+                    'field_id': 'col_3',
+                    'tap_stream_name': 'public-my_table',
+                    'type': 'MASK-DATE',
+                    'when': [
+                        {
+                            'column': 'col_5',
+                            'equals': 'some_value'
+                        }
+                    ]
+                },
+                {
+                    'field_id': 'col_4',
+                    'tap_stream_name': 'public-my_table',
+                    'type': 'MASK-NUMBER'
+                },
+                {
+                    'field_id': 'col_5',
+                    'tap_stream_name': 'public-my_table',
+                    'type': 'HASH'
+                },
+                {
+                    'field_id': 'col_6',
+                    'tap_stream_name': 'public-my_table',
+                    'type': 'HASH-SKIP-FIRST-5',
+                    'when': [
+                        {
+                            'column': 'col_1',
+                            'equals': 30
+                        },
+                        {
+                            'column': 'col_2',
+                            'regex_match': r'[0-9]{3}\.[0-9]{3}'
+                        }
+                    ]
+                }
+            ]
+        }
+
+        self.snowflake.obfuscate_columns(target_schema, table_name)
+
+        self.assertListEqual(
+            self.snowflake.executed_queries,
+            [
+                'UPDATE "MY_SCHEMA"."MY_TABLE_TEMP" SET "COL_2" = \'hidden\' WHERE ("COL_4" IS NULL);',
+                'UPDATE "MY_SCHEMA"."MY_TABLE_TEMP" SET "COL_3" = TIMESTAMP_NTZ_FROM_PARTS('
+                'DATE_FROM_PARTS(YEAR("COL_3"), 1, 1),TO_TIME("COL_3")) WHERE ("COL_5" = \'some_value\');',
+                'UPDATE "MY_SCHEMA"."MY_TABLE_TEMP" SET '
+                '"COL_6" = CONCAT(SUBSTRING("COL_6", 1, 5), SHA2(SUBSTRING("COL_6", 5 + 1), 256)) '
+                'WHERE ("COL_1" = 30) AND ("COL_2" '
+                'REGEXP \'[0-9]{3}\.[0-9]{3}\');',  # pylint: disable=anomalous-backslash-in-string
+                'UPDATE "MY_SCHEMA"."MY_TABLE_TEMP" SET "COL_1" = NULL, "COL_4" = 0, "COL_5" = SHA2("COL_5", 256);'
+            ]
+        )
