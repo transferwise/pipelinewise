@@ -108,7 +108,7 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
         mysql.close_connections()
 
         # Uploading to S3
-        s3_key = redshift.upload_to_s3(filepath, table)
+        s3_key = redshift.upload_to_s3(filepath)
         os.remove(filepath)
 
         # Creating temp table in Redshift

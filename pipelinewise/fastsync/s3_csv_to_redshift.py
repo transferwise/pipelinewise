@@ -65,7 +65,7 @@ def sync_table(table_name: str, args: Namespace) -> Union[bool, str]:
         primary_key = redshift_types['primary_key']
 
         # Uploading to S3
-        s3_key = redshift.upload_to_s3(filepath, table_name)
+        s3_key = redshift.upload_to_s3(filepath)
         os.remove(filepath)
 
         # Creating temp table in Redshift

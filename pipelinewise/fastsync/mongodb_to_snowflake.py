@@ -78,7 +78,7 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
         mongodb.close_connection()
 
         # Uploading to S3
-        s3_key = snowflake.upload_to_s3(filepath, table, tmp_dir=args.temp_dir)
+        s3_key = snowflake.upload_to_s3(filepath, tmp_dir=args.temp_dir)
         # os.remove(filepath)
 
         # Creating temp table in Snowflake
