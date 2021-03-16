@@ -1,7 +1,6 @@
 import logging
 import os
 import json
-import time
 from typing import List
 
 import boto3
