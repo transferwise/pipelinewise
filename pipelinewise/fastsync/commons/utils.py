@@ -4,10 +4,9 @@ import multiprocessing
 import os
 import logging
 import datetime
-import random
-import string
 
 from typing import Dict
+from pipelinewise.cli.utils import generate_random_string
 
 LOGGER = logging.getLogger(__name__)
 
@@ -403,7 +402,7 @@ def gen_export_filename(tap_id: str,
         suffix = datetime.datetime.now().strftime('%Y%m%d-%H%M%S-%f')
 
     if not postfix:
-        postfix = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+        postfix = generate_random_string()
 
     if not ext:
         ext = 'csv.gz'
