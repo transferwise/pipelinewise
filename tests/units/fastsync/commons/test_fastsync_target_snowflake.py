@@ -528,7 +528,7 @@ class TestFastSyncTargetSnowflake(TestCase):
                 'UPDATE "MY_SCHEMA"."MY_TABLE_TEMP" SET '
                 '"COL_6" = CONCAT(SUBSTRING("COL_6", 1, 5), SHA2(SUBSTRING("COL_6", 5 + 1), 256)) '
                 'WHERE ("COL_1" = 30) AND ("COL_2" '
-                'REGEXP \'[0-9]{3}\.[0-9]{3}\');',  # pylint: disable=anomalous-backslash-in-string
+                'REGEXP \'[0-9]{3}\.[0-9]{3}\');',  # pylint: disable=W1401
                 'UPDATE "MY_SCHEMA"."MY_TABLE_TEMP" SET "COL_1" = NULL, "COL_4" = 0, "COL_5" = SHA2("COL_5", 256);'
             ]
         )

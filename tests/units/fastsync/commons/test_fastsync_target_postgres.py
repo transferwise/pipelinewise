@@ -375,7 +375,7 @@ class TestFastSyncTargetPostgres(TestCase):
                 'UPDATE "my_schema"."my_table_temp" SET '
                 '"col_6" = CONCAT(SUBSTRING("col_6", 1, 5), '
                 'ENCODE(DIGEST(SUBSTRING("col_6", 5 + 1), \'sha256\'), \'hex\')) WHERE ("col_1" = 30) AND '
-                '("col_2" ~ \'[0-9]{3}\.[0-9]{3}\');', # pylint: disable=anomalous-backslash-in-string
+                '("col_2" ~ \'[0-9]{3}\.[0-9]{3}\');', # pylint: disable=W1401
 
                 'UPDATE "my_schema"."my_table_temp" SET "col_1" = NULL, '
                 '"col_4" = 0, "col_5" = ENCODE(DIGEST("col_5", \'sha256\'), \'hex\');'

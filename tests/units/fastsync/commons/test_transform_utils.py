@@ -333,7 +333,7 @@ class TestTransformHelper(unittest.TestCase):
                 {
                     'trans': '"COL_6" = CONCAT(SUBSTRING("COL_6", 1, 5), SHA2(SUBSTRING("COL_6", 5 + 1), 256))',
                     'conditions': '("COL_1" = 30) AND ("COL_2" '
-                                  'REGEXP \'[0-9]{3}\.[0-9]{3}\')',  # pylint: disable=anomalous-backslash-in-string
+                                  'REGEXP \'[0-9]{3}\.[0-9]{3}\')',  # pylint: disable=W1401
                 },
             ]
         )
@@ -447,8 +447,7 @@ class TestTransformHelper(unittest.TestCase):
                 {
                     'trans': '"col_6" = CONCAT(SUBSTRING("col_6", 1, 5), ENCODE(DIGEST(SUBSTRING("col_6", 5 + 1), '
                              '\'sha256\'), \'hex\'))',
-                    'conditions': '("col_1" = 30) AND ("col_2" ~ '
-                                  '\'[0-9]{3}\.[0-9]{3}\')',  # pylint: disable=anomalous-backslash-in-string
+                    'conditions': '("col_1" = 30) AND ("col_2" ~ \'[0-9]{3}\.[0-9]{3}\')',  # pylint: disable=W1401
                 },
             ]
         )
