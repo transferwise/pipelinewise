@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import os
 import sys
-import time
 from functools import partial
 from argparse import Namespace
 import multiprocessing
@@ -90,7 +89,7 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
     redshift = FastSyncTargetRedshift(args.target, args.transform)
 
     try:
-        filename = 'pipelinewise_fastsync_{}_{}.csv.gz'.format(table, time.strftime('%Y%m%d-%H%M%S'))
+        filename = utils.gen_export_filename(tap_id=args.target.get('tap_id'), table=table)
         filepath = os.path.join(args.temp_dir, filename)
         target_schema = utils.get_target_schema(args.target, table)
 
