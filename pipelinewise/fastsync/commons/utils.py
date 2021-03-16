@@ -400,7 +400,7 @@ def gen_export_filename(tap_id: str,
         Unique filename as a string
     """
     if not suffix:
-        suffix = datetime.datetime.now().strftime("%Y%m%d-%H%M%S-%f")
+        suffix = datetime.datetime.now().strftime('%Y%m%d-%H%M%S-%f')
 
     if not postfix:
         postfix = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
