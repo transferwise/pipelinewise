@@ -95,6 +95,7 @@ def assert_sync_table_exception_on_failed_copy(sync_table: callable,
             with patch(objects_to_mock.utils_module_nm) as utils_mock:
                 with patch(objects_to_mock.multiproc_module_nm) as multiproc_mock:
                     utils_mock.get_target_schema.return_value = 'my-target-schema'
+                    utils_mock.gen_export_filename.return_value = 'my-export-file'
                     tap_mock.return_value.copy_table.side_effect = Exception('Boooom')
 
                     assert sync_table('table_1', FASTSYNC_NS) == 'table_1: Boooom'
