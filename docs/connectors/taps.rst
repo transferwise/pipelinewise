@@ -27,6 +27,8 @@ PipelineWise can replicate data from the following data sources:
 
         :ref:`tap-mysql`
 
+.. container:: tile-wrapper
+
     .. container:: tile
 
         .. container:: img-hover-zoom
@@ -65,6 +67,8 @@ PipelineWise can replicate data from the following data sources:
              :target: taps/oracle.html
 
         :ref:`tap-oracle`
+
+.. container:: tile-wrapper
 
     .. container:: tile
 
@@ -105,6 +109,8 @@ PipelineWise can replicate data from the following data sources:
 
         :ref:`tap-zendesk`
 
+.. container:: tile-wrapper
+
     .. container:: tile
 
         .. container:: img-hover-zoom
@@ -142,6 +148,8 @@ PipelineWise can replicate data from the following data sources:
              :target: taps/google_analytics.html
 
         :ref:`tap-google-analytics`
+
+.. container:: tile-wrapper
 
     .. container:: tile
 
@@ -182,16 +190,16 @@ PipelineWise can replicate data from the following data sources:
 
         :ref:`tap-mixpanel`
 
-    .. container:: tile-wrapper
+.. container:: tile-wrapper
 
-        .. container:: tile
+    .. container:: tile
 
-            .. container:: img-hover-zoom
+        .. container:: img-hover-zoom
 
-              .. image:: ../img/twilio-logo.png
-                 :target: taps/twilio.html
+          .. image:: ../img/twilio-logo.png
+             :target: taps/twilio.html
 
-            :ref:`tap-twilio`
+        :ref:`tap-twilio`
 
 Configuring taps
 ----------------
