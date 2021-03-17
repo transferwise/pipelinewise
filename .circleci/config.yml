@@ -170,7 +170,7 @@ jobs:
           name: Push and release the new docker image to artifactory
           command: k8s-deployment docker-build jfrog-cli-docker-push
           environment:
-            DEPLOY_SLACK_CHANNEL: "#analytics-platform-alerts"
+            DEPLOY_SLACK_CHANNEL: "#analytics-platform-builds"
             DEPLOY_IMAGE_NAME: "pipelinewise"
             DEPLOY_DOCKERFILE: "./Dockerfile"
 
@@ -184,7 +184,7 @@ jobs:
           command: k8s-deployment trigger-image-promotion
           environment:
             DEPLOY_IMAGE_NAME: "pipelinewise"
-            DEPLOY_SLACK_CHANNEL: "#analytics-platform-alerts"
+            DEPLOY_SLACK_CHANNEL: "#analytics-platform-builds"
 
 
 workflows:
