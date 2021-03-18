@@ -195,7 +195,7 @@ workflows:
       - test
 
       - upload_docker_image:
-          context: artifactory-deploy-docker
+          context: kubernetes-staging
           requires:
             - test
           filters:
