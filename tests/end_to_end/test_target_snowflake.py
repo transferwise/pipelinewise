@@ -103,6 +103,27 @@ class TestTargetSnowflake:
         assertions.assert_all_columns_exist(self.run_query_tap_mysql, self.e2e.run_query_target_snowflake,
                                             mysql_to_snowflake.tap_type_to_target_type, {'blob_col'})
 
+        # Checking if mask-date transformation is working
+        result = self.run_query_target_snowflake(
+            'SELECT count(1) FROM ppw_e2e_tap_mysql.address '
+            'where MONTH(date_created) != 1 or DAY(date_created)::int != 1;')[0][0]
+
+        assert result == 0
+
+        # Checking if conditional MASK-NUMBER transformation is working
+        result = self.run_query_target_snowflake(
+            'SELECT count(1) FROM ppw_e2e_tap_mysql.address '
+            'where zip_code_zip_code_id != 0 and street_number REGEXP \'[801]\';')[0][0]
+
+        assert result == 0
+
+        # Checking if conditional SET-NULL transformation is working
+        result = self.run_query_target_snowflake(
+            'SELECT count(1) FROM ppw_e2e_tap_mysql.edgydata '
+            'where "GROUP" is not null and "CASE" = \'B\';')[0][0]
+
+        assert result == 0
+
     @pytest.mark.dependency(depends=['import_config'])
     def test_resync_mariadb_to_sf(self, tap_mariadb_id=TAP_MARIADB_ID):
         """Resync tables from MariaDB to Snowflake"""

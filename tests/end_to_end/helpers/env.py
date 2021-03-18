@@ -140,7 +140,8 @@ class E2EEnv:
                     'STAGE'                 : {'value': os.environ.get('TARGET_SNOWFLAKE_STAGE')},
                     'FILE_FORMAT'           : {'value': os.environ.get('TARGET_SNOWFLAKE_FILE_FORMAT')},
                     'CLIENT_SIDE_ENCRYPTION_MASTER_KEY':
-                        {'value': os.environ.get('TARGET_SNOWFLAKE_FILE_FORMAT'), 'optional': True},
+                        {'value': os.environ.get('TARGET_SNOWFLAKE_CLIENT_SIDE_ENCRYPTION_MASTER_KEY'),
+                         'optional': True},
                 }
             },
             # ------------------------------------------------------------------
@@ -198,15 +199,13 @@ class E2EEnv:
 
         for env_conn in env_conns:
             for key, value in self.env[env_conn]['vars'].items():
-                # If value not defined
-                if not value['value']:
-                    # Value is not optional
-                    if not value.get('optional'):
-                        # Value not defined but the entirely component is optional
-                        if self.env[env_conn].get('optional'):
-                            return False
-                        # Value not defined but it's a required property
-                        raise Exception(f'{env_conn}_{key} env var is required but not defined.')
+                # If value not defined and is not optional
+                if not value['value'] and not value.get('optional'):
+                    # Value not defined but the entirely component is optional
+                    if self.env[env_conn].get('optional'):
+                        return False
+                    # Value not defined but it's a required property
+                    raise Exception(f'{env_conn}_{key} env var is required but not defined.')
         return True
 
     def _find_env_conn_by_template_name(self, template_name):
@@ -221,7 +220,7 @@ class E2EEnv:
 
     # pylint: disable=invalid-name
     def _all_env_vars_to_dict(self):
-        """Tranform self.env dict to a simple key-value dictionary
+        """Transform self.env dict to a simple key-value dictionary
         From:
             {
                 'TAP_X': {'vars': {'HOST': {'value': 'my_host_x'}}},

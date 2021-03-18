@@ -1,5 +1,5 @@
 {
-  "$schema": "http://json-schema.org/draft-04/schema#",
+  "$schema": "http://json-schema.org/draft-07/schema#",
   "definitions": {
     "schema": {
       "type": "object",
@@ -31,6 +31,34 @@
           "maximum": 1000
         }
       }
+    },
+    "condition": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "column": {
+              "type": "string"
+            },
+            "equals": {
+              "type": ["null", "integer", "string", "boolean", "number"]
+            }
+          },
+          "required": ["column", "equals"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "column": {
+              "type": "string"
+            },
+            "regex_match": {
+              "type": "string"
+            }
+          },
+          "required": ["column", "regex_match"]
+        }
+      ]
     },
     "table": {
       "type": "object",
@@ -116,6 +144,13 @@
             "MASK-NUMBER",
             "MASK-HIDDEN"
           ]
+        },
+        "when": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/condition"
+          },
+          "minItems": 1
         }
       },
       "required": [
