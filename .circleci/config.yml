@@ -195,7 +195,7 @@ workflows:
       - test
 
       - upload_docker_image:
-          context: upload-build
+          context: artifactory-deploy-docker
           requires:
             - test
           filters:
