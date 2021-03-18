@@ -137,7 +137,7 @@ following the steps in the :ref:`generating_pipelines` section.
 
 Example YAML for ``tap-oracle``:
 
-.. code-block:: bash
+.. code-block:: yaml
 
     ---
 

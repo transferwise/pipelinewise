@@ -109,7 +109,7 @@ following the steps in the :ref:`generating_pipelines` section.
 
 Example YAML for ``tap-postgres``:
 
-.. code-block:: bash
+.. code-block:: yaml
 
     ---
 

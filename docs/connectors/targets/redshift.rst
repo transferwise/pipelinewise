@@ -19,7 +19,7 @@ following the steps in the :ref:`generating_pipelines` section.
 
 Example YAML for target-redshift:
 
-.. code-block:: bash
+.. code-block:: yaml
 
     ---
 
