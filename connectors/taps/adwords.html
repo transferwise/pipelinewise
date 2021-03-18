@@ -7,7 +7,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   
-  <title>Tap Mixpanel &mdash; PipelineWise  documentation</title>
+  <title>Tap AdWords &mdash; PipelineWise  documentation</title>
   
 
   
@@ -22,7 +22,7 @@
 
   
   
-    <link rel="canonical" href="https://docs.ansible.com/ansible/latest/connectors/taps/mixpanel.html"/>
+    <link rel="canonical" href="https://docs.ansible.com/ansible/latest/connectors/taps/adwords.html"/>
   
 
   
@@ -43,8 +43,8 @@
     
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
-    <link rel="next" title="Tap Twilio" href="twilio.html" />
-    <link rel="prev" title="Tap Slack" href="slack.html" /> 
+    <link rel="next" title="Targets (Destinations)" href="../targets.html" />
+    <link rel="prev" title="Tap Twilio" href="twilio.html" /> 
 </head>
 
 <body class="wy-body-for-nav">
@@ -139,13 +139,13 @@
 <li class="toctree-l2"><a class="reference internal" href="github.html">Tap Github</a></li>
 <li class="toctree-l2"><a class="reference internal" href="shopify.html">Tap Shopify</a></li>
 <li class="toctree-l2"><a class="reference internal" href="slack.html">Tap Slack</a></li>
-<li class="toctree-l2 current"><a class="current reference internal" href="#">Tap Mixpanel</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#authentication">Authentication</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mixpanel.html">Tap Mixpanel</a></li>
+<li class="toctree-l2"><a class="reference internal" href="twilio.html">Tap Twilio</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Tap AdWords</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#documentation">Documentation</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#configuring-what-to-extract">Configuring what to extract</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="twilio.html">Tap Twilio</a></li>
-<li class="toctree-l2"><a class="reference internal" href="adwords.html">Tap AdWords</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../targets.html">Targets (Destinations)</a></li>
@@ -206,13 +206,13 @@
         
           <li><a href="../taps.html">Taps (Data Sources)</a> &raquo;</li>
         
-      <li>Tap Mixpanel</li>
+      <li>Tap AdWords</li>
     
     
       <li class="wy-breadcrumbs-aside">
         
           
-            <a href="../../_sources/connectors/taps/mixpanel.rst.txt" rel="nofollow"> View page source</a>
+            <a href="../../_sources/connectors/taps/adwords.rst.txt" rel="nofollow"> View page source</a>
           
         
       </li>
@@ -225,105 +225,72 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
             
-  <div class="section" id="tap-mixpanel">
-<span id="id1"></span><h1>Tap Mixpanel<a class="headerlink" href="#tap-mixpanel" title="Permalink to this headline">¶</a></h1>
-<div class="section" id="authentication">
-<h2>Authentication<a class="headerlink" href="#authentication" title="Permalink to this headline">¶</a></h2>
-<p>The Mixpanel API uses Basic Authorization with the <code class="docutils literal notranslate"><span class="pre">api_secret</span></code> from the tap config in base-64 encoded format.
-It is slightly different than normal Basic Authorization with username/password. All requests include this
-header with the <code class="docutils literal notranslate"><span class="pre">api_secret</span></code> as the username, with no password.</p>
-<ul class="simple">
-<li><p>Authorization: <code class="docutils literal notranslate"><span class="pre">Basic</span> <span class="pre">&lt;base-64</span> <span class="pre">encoded</span> <span class="pre">api_secret&gt;</span></code></p></li>
-</ul>
-<p>More details may be found in the Mixpanel <a class="reference external" href="https://developer.mixpanel.com/docs/data-export-api#section-authentication">API Authentication</a>
-instructions.</p>
-<p>The API secret can be found in the Mixpanel Console, upper-right Settings (gear icon),
-Organization Settings &gt; Projects and in the Access Keys section. For this tap,
-only the <code class="docutils literal notranslate"><span class="pre">api_secret</span></code> is needed (the <code class="docutils literal notranslate"><span class="pre">api_key</span></code> is legacy and the token is used only for uploading data).</p>
-<div class="admonition warning">
-<p class="admonition-title">Warning</p>
-<p>Each Mixpanel project has a different <code class="docutils literal notranslate"><span class="pre">api_secret</span></code>; therefore each Mixpanel pipeline instance is for a single project.</p>
-</div>
+  <div class="section" id="tap-adwords">
+<span id="id1"></span><h1>Tap AdWords<a class="headerlink" href="#tap-adwords" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="documentation">
+<h2>Documentation<a class="headerlink" href="#documentation" title="Permalink to this headline">¶</a></h2>
+<p>[Singer-io tap-adwords](<a class="reference external" href="https://github.com/singer-io/tap-adwords/blob/master/README.md">https://github.com/singer-io/tap-adwords/blob/master/README.md</a>)</p>
 </div>
 <div class="section" id="configuring-what-to-extract">
 <h2>Configuring what to extract<a class="headerlink" href="#configuring-what-to-extract" title="Permalink to this headline">¶</a></h2>
 <p>PipelineWise configures every tap with a common structured YAML file format.
-A sample YAML for the Mixpanel tap can be generated into a project directory by
+A sample YAML for AdWords replication can be generated into a project directory by
 following the steps in the <a class="reference internal" href="../../installation_guide/creating_pipelines.html#generating-pipelines"><span class="std std-ref">Generating Sample Pipelines</span></a> section.</p>
-<p>Example YAML for <code class="docutils literal notranslate"><span class="pre">tap-mixpanel</span></code>:</p>
+<p>Example YAML for <code class="docutils literal notranslate"><span class="pre">tap-adwords</span></code>:</p>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nn">---</span>
-
 <span class="c1"># ------------------------------------------------------------------------------</span>
 <span class="c1"># General Properties</span>
 <span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="nt">id</span><span class="p">:</span> <span class="s">&quot;mixpanel&quot;</span>                         <span class="c1"># Unique identifier of the tap</span>
-<span class="nt">name</span><span class="p">:</span> <span class="s">&quot;Mixpanel&quot;</span>                       <span class="c1"># Name of the tap</span>
-<span class="nt">type</span><span class="p">:</span> <span class="s">&quot;tap-mixpanel&quot;</span>                   <span class="c1"># !! THIS SHOULD NOT CHANGE !!</span>
-<span class="nt">owner</span><span class="p">:</span> <span class="s">&quot;somebody@foo.com&quot;</span>              <span class="c1"># Data owner to contact</span>
-<span class="c1">#send_alert: False                     # Optional: Disable all configured alerts on this tap</span>
+<span class="nt">id</span><span class="p">:</span> <span class="s">&quot;adwords&quot;</span>                           <span class="c1"># Unique identifier of the tap</span>
+<span class="nt">name</span><span class="p">:</span> <span class="s">&quot;Google</span><span class="nv"> </span><span class="s">Adwords&quot;</span>                  <span class="c1"># Name of the tap</span>
+<span class="nt">type</span><span class="p">:</span> <span class="s">&quot;tap-adwords&quot;</span>                     <span class="c1"># !! THIS SHOULD NOT CHANGE !!</span>
+<span class="nt">owner</span><span class="p">:</span> <span class="s">&quot;Foo&quot;</span>                            <span class="c1"># Data owner to contact</span>
+<span class="c1">#send_alert: False                      # Optional: Disable all configured alerts on this tap</span>
 
-
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="c1"># Source (Tap) - Mixpanel connection details</span>
-<span class="c1"># ------------------------------------------------------------------------------</span>
+<span class="nt">primary_key_required</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">False</span>
 <span class="nt">db_conn</span><span class="p">:</span>
-  <span class="nt">api_secret</span><span class="p">:</span> <span class="s">&quot;&lt;MIXPANEL_API_SECRET&gt;&quot;</span>       <span class="c1"># Mixpanel API secret</span>
-  <span class="nt">start_date</span><span class="p">:</span> <span class="s">&quot;2020-10-01&quot;</span>                  <span class="c1"># The default value to use if no bookmark exists for an endpoint</span>
-  <span class="nt">date_window_size</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">30</span>                      <span class="c1"># Number of days for date window looping through transactional endpoints</span>
-                                            <span class="c1"># with from_date and to_date. Default date_window_size is 30 days.</span>
-                                            <span class="c1"># Clients with large volumes of events may want to decrease this to 14, 7,</span>
-                                            <span class="c1"># or even down to 1-2 days.</span>
-  <span class="nt">attribution_window</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">1</span>                     <span class="c1"># Latency minimum number of days to look-back to account for delays in</span>
-                                            <span class="c1"># attributing accurate results. Default attribution window is 5 days.</span>
-  <span class="nt">project_timezone</span><span class="p">:</span> <span class="s">&quot;Europe/London&quot;</span>         <span class="c1"># Time zone in which integer date times are stored. The project timezone</span>
-                                            <span class="c1"># may be found in the project settings in the Mixpanel console.</span>
-  <span class="nt">user_agent</span><span class="p">:</span> <span class="s">&quot;tap-mixpanel</span><span class="nv"> </span><span class="s">&lt;api@foo.com&gt;&quot;</span>  <span class="c1"># Optional: Process and email for API logging purposes.</span>
-  <span class="c1">#denest_properties: &quot;false&quot;               # Optional: Do not denest JSON responses in `export` and `engage` streams</span>
-                                            <span class="c1"># to avoid very wide tables. If denesting is disabled then responses are</span>
-                                            <span class="c1"># loaded into one JSON column in the target.</span>
-                                            <span class="c1"># Default denest_properties is false.</span>
-
-  <span class="c1">#export_events:                           # Optional: List of event names to export</span>
-  <span class="c1">#  - event_one</span>
-  <span class="c1">#  - event_two</span>
-
+  <span class="nt">developer_token</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">&lt;&gt;</span>
+  <span class="nt">oauth_client_secret</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">&lt;&gt;</span>
+  <span class="nt">refresh_token</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">&lt;&gt;</span>
+  <span class="nt">oauth_client_id</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">&lt;&gt;</span>
+  <span class="nt">start_date</span><span class="p">:</span> <span class="s">&quot;2021-01-01&quot;</span>
+  <span class="nt">user_agent</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">&lt;&gt;</span>
+  <span class="nt">customer_ids</span><span class="p">:</span> <span class="s">&quot;ID1,ID2,ID3&quot;</span>
 
 <span class="c1"># ------------------------------------------------------------------------------</span>
 <span class="c1"># Destination (Target) - Target properties</span>
 <span class="c1"># Connection details should be in the relevant target YAML file</span>
 <span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="nt">target</span><span class="p">:</span> <span class="s">&quot;snowflake&quot;</span>                       <span class="c1"># ID of the target connector where the data will be loaded</span>
-<span class="nt">batch_size_rows</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">20000</span>                    <span class="c1"># Batch size for the stream to optimise load performance</span>
+<span class="nt">target</span><span class="p">:</span> <span class="s">&quot;snowflake&quot;</span>
+<span class="nt">batch_size_rows</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">20000</span>
 <span class="nt">stream_buffer_size</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">0</span>                     <span class="c1"># In-memory buffer size (MB) between taps and targets for asynchronous data pipes</span>
-<span class="nt">default_target_schema</span><span class="p">:</span> <span class="s">&quot;mixpanel&quot;</span>         <span class="c1"># Target schema where the data will be loaded</span>
-<span class="c1">#default_target_schema_select_permission:  # Optional: Grant SELECT on schema and tables that created</span>
-<span class="c1">#  - grp_power</span>
 
-
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="c1"># Source to target Schema mapping</span>
-<span class="c1"># ------------------------------------------------------------------------------</span>
+<span class="c1"># Replication methods are not required to be defined for this tap</span>
 <span class="nt">schemas</span><span class="p">:</span>
-
-  <span class="p p-Indicator">-</span> <span class="nt">source_schema</span><span class="p">:</span> <span class="s">&quot;mixpanel&quot;</span>           <span class="c1"># This is mandatory, but can be anything in this tap type</span>
-    <span class="nt">target_schema</span><span class="p">:</span> <span class="s">&quot;mixpanel&quot;</span>           <span class="c1"># Target schema in the destination Data Warehouse</span>
-    <span class="nt">target_schema_select_permissions</span><span class="p">:</span>   <span class="c1"># Optional: Grant SELECT on schema and tables that created</span>
-      <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">grp_stats</span>
-
-    <span class="c1"># List of Mixpanel tables to load into destination Data Warehouse</span>
-    <span class="c1"># Tap-Mixpanel will use the best incremental strategies automatically to replicate data</span>
+  <span class="p p-Indicator">-</span> <span class="nt">source_schema</span><span class="p">:</span> <span class="s">&quot;google_adwords&quot;</span>
+    <span class="nt">target_schema</span><span class="p">:</span> <span class="s">&quot;google_adwords&quot;</span>
+    <span class="nt">target_schema_select_permissions</span><span class="p">:</span>
+      <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">role_x</span>
     <span class="nt">tables</span><span class="p">:</span>
-      <span class="c1"># Incrementally loaded tables</span>
-      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;export&quot;</span>
-      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;funnels&quot;</span>
-      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;revenue&quot;</span>
-
-      <span class="c1"># Tables that cannot load incrementally and will use FULL_TABLE method</span>
-      <span class="c1">#- table_name: &quot;engage&quot;</span>
-      <span class="c1">#- table_name: &quot;annotations&quot;</span>
-      <span class="c1">#- table_name: &quot;cohorts&quot;</span>
-      <span class="c1">#- table_name: &quot;cohort_members&quot;</span>
-
+      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;campaigns&quot;</span>
+      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;ad_groups&quot;</span>
+      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;ads&quot;</span>
+      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;accounts&quot;</span>
+      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;keywords_performance_report&quot;</span>
+      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;ad_performance_report&quot;</span>
+      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;adgroup_performance_report&quot;</span>
+      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;campaign_performance_report&quot;</span>
+      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;account_performance_report&quot;</span>
+      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;geo_performance_report&quot;</span>
+      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;search_query_performance_report&quot;</span>
+      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;criteria_performance_report&quot;</span>
+      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;click_performance_report&quot;</span>
+      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;display_keyword_performance_report&quot;</span>
+      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;placement_performance_report&quot;</span>
+      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;audience_performance_report&quot;</span>
+      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;display_topics_performance_report&quot;</span>
+      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;final_url_report&quot;</span>
+      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;video_performance_report&quot;</span>
         <span class="c1"># OPTIONAL: Load time transformations - you can add it to any table</span>
         <span class="c1">#transformations:</span>
         <span class="c1">#  - column: &quot;some_column_to_transform&quot; # Column to transform</span>
@@ -339,8 +306,8 @@ following the steps in the <a class="reference internal" href="../../installatio
           </div>
           <footer>
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
-        <a href="twilio.html" class="btn btn-neutral float-right" title="Tap Twilio" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
-        <a href="slack.html" class="btn btn-neutral float-left" title="Tap Slack" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../targets.html" class="btn btn-neutral float-right" title="Targets (Destinations)" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="twilio.html" class="btn btn-neutral float-left" title="Tap Twilio" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
     </div>
 
   <hr/>

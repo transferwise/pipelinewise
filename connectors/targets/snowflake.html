@@ -287,29 +287,29 @@ GRANT ROLE ppw_target_snowflake TO USER <span class="o">{</span>user<span class=
 A sample YAML for Snowflake target can be generated into a project directory by
 following the steps in the <a class="reference internal" href="../../installation_guide/creating_pipelines.html#generating-pipelines"><span class="std std-ref">Generating Sample Pipelines</span></a> section.</p>
 <p>Example YAML for target-snowflake:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>---
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nn">---</span>
 
 <span class="c1"># ------------------------------------------------------------------------------</span>
 <span class="c1"># General Properties</span>
 <span class="c1"># ------------------------------------------------------------------------------</span>
-id: <span class="s2">&quot;snowflake&quot;</span>                        <span class="c1"># Unique identifier of the target</span>
-name: <span class="s2">&quot;Snowflake&quot;</span>                      <span class="c1"># Name of the target</span>
-type: <span class="s2">&quot;target-snowflake&quot;</span>               <span class="c1"># !! THIS SHOULD NOT CHANGE !!</span>
+<span class="nt">id</span><span class="p">:</span> <span class="s">&quot;snowflake&quot;</span>                        <span class="c1"># Unique identifier of the target</span>
+<span class="nt">name</span><span class="p">:</span> <span class="s">&quot;Snowflake&quot;</span>                      <span class="c1"># Name of the target</span>
+<span class="nt">type</span><span class="p">:</span> <span class="s">&quot;target-snowflake&quot;</span>               <span class="c1"># !! THIS SHOULD NOT CHANGE !!</span>
 
 
 <span class="c1"># ------------------------------------------------------------------------------</span>
 <span class="c1"># Target - Data Warehouse connection details</span>
 <span class="c1"># ------------------------------------------------------------------------------</span>
-db_conn:
-  account: <span class="s2">&quot;rtxxxxx.eu-central-1&quot;</span>               <span class="c1"># Snowflake account</span>
-  dbname: <span class="s2">&quot;&lt;DB_NAME&gt;&quot;</span>                           <span class="c1"># Snowflake database name</span>
-  user: <span class="s2">&quot;&lt;USER&gt;&quot;</span>                                <span class="c1"># Snowflake user</span>
-  password: <span class="s2">&quot;&lt;PASSWORD&gt;&quot;</span>                        <span class="c1"># Plain string or vault encrypted</span>
-  warehouse: <span class="s2">&quot;&lt;WAREHOUSE&gt;&quot;</span>                      <span class="c1"># Snowflake virtual warehouse</span>
+<span class="nt">db_conn</span><span class="p">:</span>
+  <span class="nt">account</span><span class="p">:</span> <span class="s">&quot;rtxxxxx.eu-central-1&quot;</span>               <span class="c1"># Snowflake account</span>
+  <span class="nt">dbname</span><span class="p">:</span> <span class="s">&quot;&lt;DB_NAME&gt;&quot;</span>                           <span class="c1"># Snowflake database name</span>
+  <span class="nt">user</span><span class="p">:</span> <span class="s">&quot;&lt;USER&gt;&quot;</span>                                <span class="c1"># Snowflake user</span>
+  <span class="nt">password</span><span class="p">:</span> <span class="s">&quot;&lt;PASSWORD&gt;&quot;</span>                        <span class="c1"># Plain string or vault encrypted</span>
+  <span class="nt">warehouse</span><span class="p">:</span> <span class="s">&quot;&lt;WAREHOUSE&gt;&quot;</span>                      <span class="c1"># Snowflake virtual warehouse</span>
 
   <span class="c1"># We use an external stage on S3 to load data into Snowflake</span>
   <span class="c1"># S3 Profile based authentication</span>
-  aws_profile: <span class="s2">&quot;&lt;AWS_PROFILE&gt;&quot;</span>                  <span class="c1"># AWS profile name, if not provided, the AWS_PROFILE environment</span>
+  <span class="nt">aws_profile</span><span class="p">:</span> <span class="s">&quot;&lt;AWS_PROFILE&gt;&quot;</span>                  <span class="c1"># AWS profile name, if not provided, the AWS_PROFILE environment</span>
                                                 <span class="c1"># variable or the &#39;default&#39; profile will be used, if not</span>
                                                 <span class="c1"># available, then IAM role attached to the host will be used.</span>
 
@@ -320,8 +320,8 @@ db_conn:
 
   <span class="c1">#aws_endpoint_url: &quot;&lt;FULL_ENDPOINT_URL&gt;&quot;      # Optional: for non AWS S3, for example https://nyc3.digitaloceanspaces.com</span>
 
-  s3_bucket: <span class="s2">&quot;&lt;BUCKET_NAME&gt;&quot;</span>                    <span class="c1"># S3 external stbucket name</span>
-  s3_key_prefix: <span class="s2">&quot;snowflake-imports/&quot;</span>           <span class="c1"># Optional: S3 key prefix</span>
+  <span class="nt">s3_bucket</span><span class="p">:</span> <span class="s">&quot;&lt;BUCKET_NAME&gt;&quot;</span>                    <span class="c1"># S3 external stbucket name</span>
+  <span class="nt">s3_key_prefix</span><span class="p">:</span> <span class="s">&quot;snowflake-imports/&quot;</span>           <span class="c1"># Optional: S3 key prefix</span>
   <span class="c1">#s3_acl: &quot;&lt;S3_OBJECT_ACL&gt;&quot;                    # Optional: Assign the canned ACL to the uploaded file on S3</span>
 
   <span class="c1"># stage and file_format are pre-created objects in Snowflake that requires to load and</span>
@@ -329,8 +329,8 @@ db_conn:
   <span class="c1">#  stage      : External stage object pointing to an S3 bucket</span>
   <span class="c1">#  file_format: Named file format object used for bulk loading data from S3 into</span>
   <span class="c1">#               snowflake tables.</span>
-  stage: <span class="s2">&quot;&lt;SCHEMA&gt;.&lt;STAGE_OBJECT_NAME&gt;&quot;</span>
-  file_format: <span class="s2">&quot;&lt;SCHEMA&gt;.&lt;FILE_FORMAT_OBJECT_NAME&gt;&quot;</span>
+  <span class="nt">stage</span><span class="p">:</span> <span class="s">&quot;&lt;SCHEMA&gt;.&lt;STAGE_OBJECT_NAME&gt;&quot;</span>
+  <span class="nt">file_format</span><span class="p">:</span> <span class="s">&quot;&lt;SCHEMA&gt;.&lt;FILE_FORMAT_OBJECT_NAME&gt;&quot;</span>
 
   <span class="c1"># Optional: Client Side Encryption</span>
   <span class="c1"># The same master key has to be added to the external stage object created in snowflake</span>

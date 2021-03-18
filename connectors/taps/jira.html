@@ -144,6 +144,7 @@
 <li class="toctree-l2"><a class="reference internal" href="slack.html">Tap Slack</a></li>
 <li class="toctree-l2"><a class="reference internal" href="mixpanel.html">Tap Mixpanel</a></li>
 <li class="toctree-l2"><a class="reference internal" href="twilio.html">Tap Twilio</a></li>
+<li class="toctree-l2"><a class="reference internal" href="adwords.html">Tap AdWords</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../targets.html">Targets (Destinations)</a></li>
@@ -231,26 +232,26 @@
 A sample YAML for Jira replication can be generated into a project directory by
 following the steps in the <a class="reference internal" href="../../installation_guide/creating_pipelines.html#generating-pipelines"><span class="std std-ref">Generating Sample Pipelines</span></a> section.</p>
 <p>Example YAML for <code class="docutils literal notranslate"><span class="pre">tap-jira</span></code>:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>---
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nn">---</span>
 
 <span class="c1"># ------------------------------------------------------------------------------</span>
 <span class="c1"># General Properties</span>
 <span class="c1"># ------------------------------------------------------------------------------</span>
-id: <span class="s2">&quot;jira&quot;</span>                             <span class="c1"># Unique identifier of the tap</span>
-name: <span class="s2">&quot;Jira&quot;</span>                           <span class="c1"># Name of the tap</span>
-type: <span class="s2">&quot;tap-jira&quot;</span>                       <span class="c1"># !! THIS SHOULD NOT CHANGE !!</span>
-owner: <span class="s2">&quot;somebody@foo.com&quot;</span>              <span class="c1"># Data owner to contact</span>
+<span class="nt">id</span><span class="p">:</span> <span class="s">&quot;jira&quot;</span>                             <span class="c1"># Unique identifier of the tap</span>
+<span class="nt">name</span><span class="p">:</span> <span class="s">&quot;Jira&quot;</span>                           <span class="c1"># Name of the tap</span>
+<span class="nt">type</span><span class="p">:</span> <span class="s">&quot;tap-jira&quot;</span>                       <span class="c1"># !! THIS SHOULD NOT CHANGE !!</span>
+<span class="nt">owner</span><span class="p">:</span> <span class="s">&quot;somebody@foo.com&quot;</span>              <span class="c1"># Data owner to contact</span>
 <span class="c1">#send_alert: False                     # Optional: Disable all configured alerts on this tap</span>
 
 
 <span class="c1"># ------------------------------------------------------------------------------</span>
 <span class="c1"># Source (Tap) - Jira connection details</span>
 <span class="c1"># ------------------------------------------------------------------------------</span>
-db_conn:
+<span class="nt">db_conn</span><span class="p">:</span>
   <span class="c1"># Method 1: Base authentication</span>
-  base_url: <span class="s2">&quot;https://&lt;your_domain&gt;.atlassian.net&quot;</span>  <span class="c1"># the URL where your Jira installation can be found</span>
-  username: <span class="s2">&quot;&lt;USERNAME&gt;&quot;</span>
-  password: <span class="s2">&quot;&lt;PASSWORD&gt;&quot;</span>                            <span class="c1"># Plain string or vault encrypted</span>
+  <span class="nt">base_url</span><span class="p">:</span> <span class="s">&quot;https://&lt;your_domain&gt;.atlassian.net&quot;</span>  <span class="c1"># the URL where your Jira installation can be found</span>
+  <span class="nt">username</span><span class="p">:</span> <span class="s">&quot;&lt;USERNAME&gt;&quot;</span>
+  <span class="nt">password</span><span class="p">:</span> <span class="s">&quot;&lt;PASSWORD&gt;&quot;</span>                            <span class="c1"># Plain string or vault encrypted</span>
 
   <span class="c1"># Method 2: OAuth authentication</span>
   <span class="c1">#oauth_client_secret: &quot;&lt;oauth-client-secret&gt;&quot;     # Plain string or vault encrypted</span>
@@ -259,40 +260,40 @@ db_conn:
   <span class="c1">#cloud_id: &quot;&lt;cloud-id&gt;&quot;</span>
   <span class="c1">#refresh_token: &quot;&lt;refresh-token&gt;&quot;                 # Plain string or vault encrypted</span>
 
-  start_date: <span class="s2">&quot;2010-01-01&quot;</span>  <span class="c1"># specifies the date at which the tap will begin pulling data</span>
+  <span class="nt">start_date</span><span class="p">:</span> <span class="s">&quot;2010-01-01&quot;</span>  <span class="c1"># specifies the date at which the tap will begin pulling data</span>
 
 
 <span class="c1"># ------------------------------------------------------------------------------</span>
 <span class="c1"># Destination (Target) - Target properties</span>
 <span class="c1"># Connection details should be in the relevant target YAML file</span>
 <span class="c1"># ------------------------------------------------------------------------------</span>
-target: <span class="s2">&quot;snowflake&quot;</span>                       <span class="c1"># ID of the target connector where the data will be loaded</span>
-batch_size_rows: <span class="m">20000</span>                    <span class="c1"># Batch size for the stream to optimise load performance</span>
-stream_buffer_size: <span class="m">0</span>                     <span class="c1"># In-memory buffer size (MB) between taps and targets for asynchronous data pipes</span>
-default_target_schema: <span class="s2">&quot;jira&quot;</span>             <span class="c1"># Target schema where the data will be loaded</span>
-default_target_schema_select_permission:  <span class="c1"># Optional: Grant SELECT on schema and tables that created</span>
-  - grp_power
+<span class="nt">target</span><span class="p">:</span> <span class="s">&quot;snowflake&quot;</span>                       <span class="c1"># ID of the target connector where the data will be loaded</span>
+<span class="nt">batch_size_rows</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">20000</span>                    <span class="c1"># Batch size for the stream to optimise load performance</span>
+<span class="nt">stream_buffer_size</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">0</span>                     <span class="c1"># In-memory buffer size (MB) between taps and targets for asynchronous data pipes</span>
+<span class="nt">default_target_schema</span><span class="p">:</span> <span class="s">&quot;jira&quot;</span>             <span class="c1"># Target schema where the data will be loaded</span>
+<span class="nt">default_target_schema_select_permission</span><span class="p">:</span>  <span class="c1"># Optional: Grant SELECT on schema and tables that created</span>
+  <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">grp_power</span>
 
 
 <span class="c1"># ------------------------------------------------------------------------------</span>
 <span class="c1"># Source to target Schema mapping</span>
 <span class="c1"># ------------------------------------------------------------------------------</span>
-schemas:
-  - source_schema: <span class="s2">&quot;jira&quot;</span>               <span class="c1"># This is mandatory, but can be anything in this tap type</span>
-    target_schema: <span class="s2">&quot;jira&quot;</span>               <span class="c1"># Target schema in the destination Data Warehouse</span>
-    target_schema_select_permissions:   <span class="c1"># Optional: Grant SELECT on schema and tables that created</span>
-      - grp_stats
+<span class="nt">schemas</span><span class="p">:</span>
+  <span class="p p-Indicator">-</span> <span class="nt">source_schema</span><span class="p">:</span> <span class="s">&quot;jira&quot;</span>               <span class="c1"># This is mandatory, but can be anything in this tap type</span>
+    <span class="nt">target_schema</span><span class="p">:</span> <span class="s">&quot;jira&quot;</span>               <span class="c1"># Target schema in the destination Data Warehouse</span>
+    <span class="nt">target_schema_select_permissions</span><span class="p">:</span>   <span class="c1"># Optional: Grant SELECT on schema and tables that created</span>
+      <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">grp_stats</span>
 
     <span class="c1"># List of Jira tables to replicate into destination Data Warehouse</span>
     <span class="c1"># Tap-Jira will use the best incremental strategies automatically to replicate data</span>
-    tables:
+    <span class="nt">tables</span><span class="p">:</span>
 
       <span class="c1"># Tables replicated incrementally</span>
-      - table_name: <span class="s2">&quot;changelogs&quot;</span>
-      - table_name: <span class="s2">&quot;issues&quot;</span>
-      - table_name: <span class="s2">&quot;issue_comments&quot;</span>
-      - table_name: <span class="s2">&quot;issue_transitions&quot;</span>
-      - table_name: <span class="s2">&quot;worklogs&quot;</span>
+      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;changelogs&quot;</span>
+      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;issues&quot;</span>
+      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;issue_comments&quot;</span>
+      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;issue_transitions&quot;</span>
+      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;worklogs&quot;</span>
 
         <span class="c1"># OPTIONAL: Load time transformations - you can add it to any table</span>
         <span class="c1">#transformations:</span>
@@ -302,13 +303,13 @@ schemas:
       <span class="c1"># FULL_TABLE replicated tables</span>
       <span class="c1"># JIRA Cloud REST API doesn&#39;t provide reasonable replication keys for these tables.</span>
       <span class="c1"># Replicating these tables can run longer. Please consider this when scheduling the tap.</span>
-      - table_name: <span class="s2">&quot;projects&quot;</span>
-      - table_name: <span class="s2">&quot;project_categories&quot;</span>
-      - table_name: <span class="s2">&quot;project_types&quot;</span>
-      - table_name: <span class="s2">&quot;resolutions&quot;</span>
-      - table_name: <span class="s2">&quot;roles&quot;</span>
-      - table_name: <span class="s2">&quot;users&quot;</span>
-      - table_name: <span class="s2">&quot;versions&quot;</span>
+      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;projects&quot;</span>
+      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;project_categories&quot;</span>
+      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;project_types&quot;</span>
+      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;resolutions&quot;</span>
+      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;roles&quot;</span>
+      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;users&quot;</span>
+      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;versions&quot;</span>
 </pre></div>
 </div>
 </div>

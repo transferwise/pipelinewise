@@ -64,7 +64,7 @@ following the steps in the :ref:`generating_pipelines` section.
 
 Example YAML for ``tap-shopify``:
 
-.. code-block:: bash
+.. code-block:: yaml
 
     ---
 

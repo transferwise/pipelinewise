@@ -241,22 +241,22 @@ PipelineWise will resort to use the IAM role attached to the host.</p></li>
 A sample YAML for S3 CSV target can be generated into a project directory by
 following the steps in the <a class="reference internal" href="../../installation_guide/creating_pipelines.html#generating-pipelines"><span class="std std-ref">Generating Sample Pipelines</span></a> section.</p>
 <p>Example YAML for <code class="docutils literal notranslate"><span class="pre">target-s3-csv</span></code>:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>---
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nn">---</span>
 
 <span class="c1"># ------------------------------------------------------------------------------</span>
 <span class="c1"># General Properties</span>
 <span class="c1"># ------------------------------------------------------------------------------</span>
-id: <span class="s2">&quot;s3&quot;</span>                               <span class="c1"># Unique identifier of the target</span>
-name: <span class="s2">&quot;S3 Target connector&quot;</span>            <span class="c1"># Name of the target</span>
-type: <span class="s2">&quot;target-s3-csv&quot;</span>                  <span class="c1"># !! THIS SHOULD NOT CHANGE !!</span>
+<span class="nt">id</span><span class="p">:</span> <span class="s">&quot;s3&quot;</span>                               <span class="c1"># Unique identifier of the target</span>
+<span class="nt">name</span><span class="p">:</span> <span class="s">&quot;S3</span><span class="nv"> </span><span class="s">Target</span><span class="nv"> </span><span class="s">connector&quot;</span>            <span class="c1"># Name of the target</span>
+<span class="nt">type</span><span class="p">:</span> <span class="s">&quot;target-s3-csv&quot;</span>                  <span class="c1"># !! THIS SHOULD NOT CHANGE !!</span>
 
 
 <span class="c1"># ------------------------------------------------------------------------------</span>
 <span class="c1"># Target - S3 details</span>
 <span class="c1"># ------------------------------------------------------------------------------</span>
-db_conn:
+<span class="nt">db_conn</span><span class="p">:</span>
   <span class="c1"># Profile based authentication</span>
-  aws_profile: <span class="s2">&quot;&lt;AWS_PROFILE&gt;&quot;</span>                  <span class="c1"># AWS profile name, if not provided, the AWS_PROFILE environment</span>
+  <span class="nt">aws_profile</span><span class="p">:</span> <span class="s">&quot;&lt;AWS_PROFILE&gt;&quot;</span>                  <span class="c1"># AWS profile name, if not provided, the AWS_PROFILE environment</span>
                                                 <span class="c1"># variable or the &#39;default&#39; profile will be used, if not</span>
                                                 <span class="c1"># available, then IAM role attached to the host will be used.</span>
 
@@ -265,13 +265,13 @@ db_conn:
   <span class="c1">#aws_secret_access_key: &quot;&lt;SECRET_ACCESS_KEY&quot;  # Plain string or vault encrypted. Required for non-profile based auth. If not provided, AWS_SECRET_ACCESS_KEY environment variable will be used.</span>
   <span class="c1">#aws_session_token: &quot;&lt;AWS_SESSION_TOKEN&gt;&quot;     # Optional: Plain string or vault encrypted. If not provided, AWS_SESSION_TOKEN environment variable will be used.</span>
 
-  s3_bucket: <span class="s2">&quot;&lt;BUCKET_NAME&gt;&quot;</span>                     <span class="c1"># S3 bucket name</span>
+  <span class="nt">s3_bucket</span><span class="p">:</span> <span class="s">&quot;&lt;BUCKET_NAME&gt;&quot;</span>                     <span class="c1"># S3 bucket name</span>
 
-  s3_key_prefix: <span class="s2">&quot;pipelinewise-exports/&quot;</span>         <span class="c1"># (Default: None) A static prefix before the generated S3 key names</span>
-  delimiter: <span class="s2">&quot;,&quot;</span>                                 <span class="c1"># (Default: &#39;,&#39;) A one-character string used to separate fields.</span>
-  quotechar: <span class="s2">&quot;\&quot;&quot;</span>                                <span class="c1"># Default: &#39;\&quot;&#39;) A one-character string used to quote fields containing</span>
-                                                   special characters, such as the delimiter or quotechar, or which contain
-                                                   new-line characters.
+  <span class="nt">s3_key_prefix</span><span class="p">:</span> <span class="s">&quot;pipelinewise-exports/&quot;</span>         <span class="c1"># (Default: None) A static prefix before the generated S3 key names</span>
+  <span class="nt">delimiter</span><span class="p">:</span> <span class="s">&quot;,&quot;</span>                                 <span class="c1"># (Default: &#39;,&#39;) A one-character string used to separate fields.</span>
+  <span class="nt">quotechar</span><span class="p">:</span> <span class="s">&quot;\&quot;&quot;</span>                                <span class="c1"># Default: &#39;\&quot;&#39;) A one-character string used to quote fields containing</span>
+                                                   <span class="l l-Scalar l-Scalar-Plain">special characters, such as the delimiter or quotechar, or which contain</span>
+                                                   <span class="l l-Scalar l-Scalar-Plain">new-line characters.</span>
 
   <span class="c1">#encryption_type: &quot;KMS&quot;                        # (Default: None) The type of encryption to use. Current supported options are: &#39;none&#39; and &#39;KMS&#39;.</span>
   <span class="c1">#encryption_key: &quot;&lt;ENCRYPTION_KEY_ID&gt;&quot;        # A reference to the encryption key to use for data encryption.</span>
