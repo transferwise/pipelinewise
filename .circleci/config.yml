@@ -195,7 +195,6 @@ workflows:
       - test
 
       - upload_docker_image:
-          context: kubernetes-staging
           requires:
             - test
           filters:
