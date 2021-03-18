@@ -164,6 +164,7 @@ jobs:
   upload_docker_image:
     <<: *docker_k8s_deployer
     steps:
+      - checkout
       - setup_remote_docker
       - *attach_workspace
       - run:
@@ -177,6 +178,7 @@ jobs:
   promote_docker_image:
     <<: *docker_k8s_deployer
     steps:
+      - checkout
       - setup_remote_docker
       - *attach_workspace
       - run:
