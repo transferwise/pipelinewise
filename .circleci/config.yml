@@ -1,6 +1,18 @@
 version: 2
+
 references:
+
+  docker_k8s_deployer: &docker_k8s_deployer
+    working_directory: ~/pipelinewise
+    docker:
+      - image: docker.tw.ee/k8s-deployer:2
+
+  attach_workspace: &attach_workspace
+    attach_workspace:
+      at: ~/pipelinewise
+
   container_config: &container_config
+    working_directory: ~/pipelinewise
     docker:
       # Main python container
       - image: circleci/python:3.7.7
@@ -135,21 +147,6 @@ jobs:
       - store_artifacts:
           path: coverage_html
 
-  build-and-push-docker:
-    docker:
-      - image: docker.tw.ee/k8s-deployer:1
-
-    steps:
-      - checkout
-      - setup_remote_docker
-      - run:
-          name: Push and release the new version
-          command: k8s-deployment docker-build docker-push
-          environment:
-            DEPLOY_DOCKERFILE: ./Dockerfile
-            DEPLOY_IMAGE_NAME: pipelinewise
-            DEPLOY_SLACK_CHANNEL: '#analytics-db-updates'
-
   # For documentation deployment. You'll need the following environment vars
   # in your Circle CI settings, otherwise this will not work.
   #
@@ -164,15 +161,51 @@ jobs:
       - checkout
       - run: .circleci/publish_docs.sh
 
+  upload_docker_image:
+    <<: *docker_k8s_deployer
+    steps:
+      - setup_remote_docker
+      - *attach_workspace
+      - run:
+          name: Push and release the new docker image to artifactory
+          command: k8s-deployment docker-build jfrog-cli-docker-push
+          environment:
+            DEPLOY_SLACK_CHANNEL: "#analytics-platform-builds"
+            DEPLOY_IMAGE_NAME: "pipelinewise"
+            DEPLOY_DOCKERFILE: "./Dockerfile"
+
+  promote_docker_image:
+    <<: *docker_k8s_deployer
+    steps:
+      - setup_remote_docker
+      - *attach_workspace
+      - run:
+          name: Promote built artifact for PipelineWise
+          command: k8s-deployment trigger-image-promotion
+          environment:
+            DEPLOY_IMAGE_NAME: "pipelinewise"
+            DEPLOY_SLACK_CHANNEL: "#analytics-platform-builds"
+
+
 workflows:
   version: 2
-  build_and_test:
+
+  build:
     jobs:
       - test
-      - build-and-push-docker:
-          context: artifactory-deploy-docker
+
+      - upload_docker_image:
           requires:
             - test
+          filters:
+            branches:
+              only:
+                - master
+
+      - promote_docker_image:
+          context: promote-build
+          requires:
+            - upload_docker_image
           filters:
             branches:
               only:

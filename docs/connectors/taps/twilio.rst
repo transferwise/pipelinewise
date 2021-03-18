@@ -14,7 +14,7 @@ following the steps in the :ref:`generating_pipelines` section.
 
 Example YAML for tap-twilio:
 
-.. code-block:: bash
+.. code-block:: yaml
 
     ---
 

@@ -13,7 +13,7 @@ following the steps in the :ref:`generating_pipelines` section.
 
 Example YAML for ``tap-jira``:
 
-.. code-block:: bash
+.. code-block:: yaml
 
     ---
 

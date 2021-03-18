@@ -41,12 +41,21 @@ schemas:
       ### Table with LOG_BASED replication
       - table_name: "weight_unit"
         replication_method: "LOG_BASED"
+        transformations:
+          - column: "weight_unit_name"
+            type: "HASH-SKIP-FIRST-2"
 
       ### Table with INCREMENTAL replication
       - table_name: "address"
         replication_method: "INCREMENTAL"
         replication_key: "date_updated"
         transformations:
+          - column: "zip_code_zip_code_id"
+            type: "MASK-NUMBER"
+            when:
+              - column: 'street_number'
+                regex_match: '[801]'
+
           - column: "date_created"
             type: "MASK-DATE"
 
@@ -68,9 +77,17 @@ schemas:
         transformations:
           - column: "case"
             type: "HASH"
+
           - column: "group"
             type: "MASK-NUMBER"
-
+            when:
+              - column: 'case'
+                equals: 'A'
+          - column: "group"
+            type: "SET-NULL"
+            when:
+              - column: 'case'
+                equals: 'B'
       ### Table with reserved word
       - table_name: "full"
         replication_method: "INCREMENTAL"

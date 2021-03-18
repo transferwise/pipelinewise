@@ -45,7 +45,7 @@ schemas:
     # List of tables to replicate from MySQL/MariaDB to destination Data Warehouse
     #
     # Please check the Replication Strategies section in the documentation to understand the differences.
-    # For LOG_BASED replication method you might need to adjust the source mysql/ mariadb configuration.
+    # For LOG_BASED replication method you might need to adjust the source mysql/ mariadb configuration.
     tables:
       ### Table with LOG_BASED replication
       - table_name: "weight_unit"
@@ -58,6 +58,18 @@ schemas:
       - table_name: "address"
         replication_method: "INCREMENTAL"
         replication_key: "date_updated"
+        transformations:
+          - column: "street_number"
+            type: "HASH"
+
+          - column: "zip_code_zip_code_id"
+            type: "MASK-NUMBER"
+            when:
+              - column: 'street_number'
+                regex_match: '[801]'
+
+          - column: "date_created"
+            type: "MASK-DATE"
 
       ### Table with FULL_TABLE replication
       - table_name: "order"
@@ -74,9 +86,21 @@ schemas:
       ### Table with reserved words and columns and special characters
       - table_name: "edgydata"
         replication_method: "LOG_BASED"
-        transformations:                # OPTIONAL: Load time transformations
-          - column: "case"              # Column to transform
-            type: "HASH"                # Transformation type
+        transformations:
+          - column: "case"
+            type: "HASH"
+
+          - column: "group"
+            type: "MASK-NUMBER"
+            when:
+              - column: 'case'
+                equals: 'A'
+
+          - column: "group"
+            type: "SET-NULL"
+            when:
+              - column: 'case'
+                equals: 'B'
 
       ### Table with reserved word
       - table_name: "full"
