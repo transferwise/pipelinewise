@@ -170,7 +170,7 @@ jobs:
   # GH_TOKEN (the personal Git token with pushes enabled)
   deploy-doc:
     docker:
-      - image: ccimg/python:3.8
+      - image: cimg/python:3.8
     working_directory: ~/gh_doc_automation
     steps:
       - checkout
