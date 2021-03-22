@@ -1,3 +1,14 @@
+0.32.0 (2021-03-22)
+-------------------
+
+- Add transformation validation post import check to detect and deny load time transformations that's changing data types
+- Fixed an issue when fastsync to Postgres and Snowflake were failing if multiple load time transformations defined on the same column
+- Fixed an issue when fastsync not using unique file names and causing table name collision in the target database
+- Bump `pipelinewise-tap-mysql` from `1.4.0` to `1.4.2`
+    - Fixed an issue when data sometimes lost during `LOG_BASED` replication
+- Bump `pipelinewise-tap-twilio` from `1.1.1` to `1.1.2`
+    - Fix missing elements for streams without ordered response
+
 0.31.1 (2021-02-26)
 -------------------
 
