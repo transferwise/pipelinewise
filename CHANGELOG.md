@@ -8,6 +8,7 @@
     - Fixed an issue when data sometimes lost during `LOG_BASED` replication
 - Bump `pipelinewise-tap-twilio` from `1.1.1` to `1.1.2`
     - Fix missing elements for streams without ordered response
+- Bump `pipelinewsie-target-snowflake` from `1.10.1` to `1.11.0`
 
 0.31.1 (2021-02-26)
 -------------------
