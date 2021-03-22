@@ -174,7 +174,6 @@ jobs:
             DEPLOY_SLACK_CHANNEL: "#analytics-platform-builds"
             DEPLOY_IMAGE_NAME: "pipelinewise"
             DEPLOY_DOCKERFILE: "./Dockerfile"
-            DEPLOY_REGISTRY_URL: $DEPLOY_REGISTRY_URL
 
   promote_docker_image:
     <<: *docker_k8s_deployer
@@ -188,7 +187,6 @@ jobs:
           environment:
             DEPLOY_IMAGE_NAME: "pipelinewise"
             DEPLOY_SLACK_CHANNEL: "#analytics-platform-builds"
-            DEPLOY_REGISTRY_URL: $DEPLOY_REGISTRY_URL
 
 
 workflows:
