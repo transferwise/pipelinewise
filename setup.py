@@ -19,7 +19,7 @@ setup(name='pipelinewise',
       install_requires=[
           'argparse==1.4.0',
           'tabulate==0.8.2',
-          'PyYAML==5.3.1',
+          'PyYAML==5.4.1',
           'ansible==2.7.16',
           'Jinja2==2.11.3',
           'joblib==1.0.0',
