@@ -105,7 +105,7 @@ def assert_cols_in_table(query_runner_fn: callable, table_schema: str, table_nam
     result = query_runner_fn(sql)
     cols = [res[0] for res in result]
     try:
-        assert all([col in cols for col in columns])
+        assert all(col in cols for col in columns)
     except AssertionError as ex:
         ex.args += ('Error', columns, f'One ore more columns not found in target table {table_name}')
         raise
