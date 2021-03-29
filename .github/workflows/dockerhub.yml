@@ -1,0 +1,41 @@
+name: Docker Image to DockerHub
+
+on:
+  release:
+    types:
+      - [published]
+
+jobs:
+
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Generate tag
+      uses: frabert/replace-string-action@master
+      id: genTag
+      with:
+        pattern: '.*(\d+\.\d+\.\d+).*'
+        string: "${{ github.event.release.tag_name }}"
+        replace-with: '$1'
+
+    - name: Login to DockerHub
+      uses: docker/login-action@v1
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+    - name: Build and push
+      id: docker_build
+      uses: docker/build-push-action@v2
+      with:
+        file: ./Dockerfile
+        push: true
+        tags: transferwiseworkspace/pipelinewise:${{ steps.genTag.outputs.replaced }}
+
+    - name: Image digest
+      run: echo ${{ steps.docker_build.outputs.digest }}
+
