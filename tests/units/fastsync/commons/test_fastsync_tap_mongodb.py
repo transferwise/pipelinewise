@@ -59,7 +59,7 @@ class TestFastSyncTapMongoDB(TestCase):
 
         self.mongo.close_connection()
 
-        client.close.assert_called_once()
+        self.assertEqual(client.close.call_count, 1)
 
     def test_copy_table_with_collection_not_found_expect_exception(self):
         """
@@ -72,7 +72,7 @@ class TestFastSyncTapMongoDB(TestCase):
         with self.assertRaises(TableNotFoundError):
             self.mongo.copy_table('my_col', 'file.csv.gzip', 'tmp')
 
-        self.mongo.database.list_collection_names.assert_called_once()
+        self.assertEqual(self.mongo.database.list_collection_names.call_count, 1)
 
     def test_copy_table_with_collection_found_but_export_failed_expect_exception(self):
         """
@@ -98,7 +98,7 @@ class TestFastSyncTapMongoDB(TestCase):
                 '-o', 'tmp'
             ])
 
-        self.mongo.database.list_collection_names.assert_called_once()
+        self.assertEqual(self.mongo.database.list_collection_names.call_count, 1)
 
     def test_copy_table_with_collection_found_success(self):
         """
@@ -144,8 +144,8 @@ class TestFastSyncTapMongoDB(TestCase):
 
                         os_remove_mock.assert_has_calls(
                             [call('tmp/my_db/my_col.metadata.json.gz'), call('tmp/my_db/my_col.bson.gz')])
-                        self.assertEqual(2, os_remove_mock.call_count)
-                        bson_decode_iter_mock.assert_called_once()
+                        self.assertEqual(os_remove_mock.call_count, 2)
+                        self.assertEqual(bson_decode_iter_mock.call_count, 1)
 
     def test_fetch_current_log_pos_return_first_token(self):
         """
