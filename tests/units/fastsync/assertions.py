@@ -2,7 +2,7 @@ import pytest
 import collections
 import multiprocessing
 
-from unittest.mock import patch, Mock, MagicMock
+from unittest.mock import patch, Mock
 from argparse import Namespace
 
 
