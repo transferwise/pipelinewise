@@ -39,7 +39,7 @@ setup(name='pipelinewise',
       ],
       extras_require={
           'test': [
-              'pytest==6.2.2',
+              'pytest==6.2.3',
               'pytest-dependency==0.4.0',
               'coverage==5.5',
               'python-dotenv==0.15.0',
