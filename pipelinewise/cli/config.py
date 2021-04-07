@@ -328,6 +328,7 @@ class Config:
                 'table': '{{table}}'
             }),
             'batch_size_rows': tap.get('batch_size_rows', 20000),
+            'batch_wait_limit_seconds': tap.get('batch_wait_limit_seconds', None),
             'parallelism': tap.get('parallelism', 0),
             'parallelism_max': tap.get('parallelism_max', 4),
             'hard_delete': tap.get('hard_delete', True),

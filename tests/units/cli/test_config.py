@@ -287,6 +287,7 @@ class TestConfig:
         }
         assert cli.utils.load_json(tap_inheritable_config_json) == {
             'batch_size_rows': 20000,
+            'batch_wait_limit_seconds': None,
             'data_flattening_max_level': 0,
             'flush_all_streams': False,
             'hard_delete': True,
