@@ -1,1 +1,1 @@
-pipelinewise-target-snowflake==1.12.0
+git+git://github.com/transferwise/pipelinewise-target-snowflake@flush_interval_v2#egg=pipelinewise-target-snowflake

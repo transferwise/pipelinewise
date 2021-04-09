@@ -82,6 +82,7 @@ class TestConfig:
                     'owner': 'somebody@foo.com',
                     'target': 'test_snowflake_target',
                     'batch_size_rows': 20000,
+                    'batch_wait_limit_seconds': 3600,
                     'db_conn': {
                         'dbname': '<DB_NAME>',
                         'host': '<HOST>',
@@ -287,7 +288,7 @@ class TestConfig:
         }
         assert cli.utils.load_json(tap_inheritable_config_json) == {
             'batch_size_rows': 20000,
-            'batch_wait_limit_seconds': None,
+            'batch_wait_limit_seconds': 3600,
             'data_flattening_max_level': 0,
             'flush_all_streams': False,
             'hard_delete': True,
