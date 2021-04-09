@@ -158,7 +158,7 @@ Example YAML for ``tap-postgres``:
     target: "snowflake"                    # ID of the target connector where the data will be loaded
     batch_size_rows: 20000                 # Batch size for the stream to optimise load performance
     stream_buffer_size: 0                  # In-memory buffer size (MB) between taps and targets for asynchronous data pipes
-    #batch_wait_limit_seconds: 600         # Optional: Maximum time to wait for `batch_size_rows`
+    #batch_wait_limit_seconds: 3600        # Optional: Maximum time to wait for `batch_size_rows`. Available only for snowflake target.
 
 
     # ------------------------------------------------------------------------------
