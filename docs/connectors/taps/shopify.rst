@@ -95,6 +95,7 @@ Example YAML for ``tap-shopify``:
     batch_size_rows: 20000                    # Batch size for the stream to optimise load performance
     stream_buffer_size: 0                     # In-memory buffer size (MB) between taps and targets for asynchronous data pipes
     default_target_schema: "shopify"          # Target schema where the data will be loaded
+    #batch_wait_limit_seconds: 3600           # Optional: Maximum time to wait for `batch_size_rows`. Available only for snowflake target.
 
 
     # ------------------------------------------------------------------------------

@@ -48,6 +48,7 @@ default_target_schema_select_permission:  # Optional: Grant SELECT on schema and
                                           #            be de-duplicated and could cause
                                           #            duplicates. Aloways try selecting
                                           #            a reasonable key from the CSV file
+#batch_wait_limit_seconds: 3600           # Optional: Maximum time to wait for `batch_size_rows`. Available only for snowflake target.
 
 
 # ------------------------------------------------------------------------------

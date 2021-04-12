@@ -91,6 +91,7 @@ Example YAML for ``tap-s3-csv``:
                                               #            be de-duplicated and could cause
                                               #            duplicates. Always try selecting
                                               #            a reasonable key from the CSV file
+    #batch_wait_limit_seconds: 3600           # Optional: Maximum time to wait for `batch_size_rows`. Available only for snowflake target.
 
 
     # ------------------------------------------------------------------------------
