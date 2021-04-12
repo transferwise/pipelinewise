@@ -280,6 +280,7 @@ following the steps in the <a class="reference internal" href="../../installatio
 <span class="nt">default_target_schema</span><span class="p">:</span> <span class="s">&quot;zuora&quot;</span>       <span class="c1"># Target schema where the data will be loaded</span>
 <span class="nt">default_target_schema_select_permission</span><span class="p">:</span>  <span class="c1"># Optional: Grant SELECT on schema and tables that created</span>
   <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">grp_power</span>
+<span class="c1">#batch_wait_limit_seconds: 3600           # Optional: Maximum time to wait for `batch_size_rows`. Available only for snowflake target.</span>
 
 
 <span class="c1"># ------------------------------------------------------------------------------</span>

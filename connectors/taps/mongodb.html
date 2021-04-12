@@ -324,6 +324,7 @@ fastsync_parallelism: &lt;int&gt;                         <span class="c1"># Opt
 target: <span class="s2">&quot;my_target&quot;</span>                                     <span class="c1"># ID of the target connector where the data will be loaded</span>
 batch_size_rows: <span class="m">1000</span>                                   <span class="c1"># Batch size for the stream to optimise load performance</span>
 stream_buffer_size: <span class="m">0</span>                           <span class="c1"># In-memory buffer size (MB) between taps and targets for asynchronous data pipes</span>
+<span class="c1">#batch_wait_limit_seconds: 3600                 # Optional: Maximum time to wait for `batch_size_rows`. Available only for snowflake target.</span>
 
 <span class="c1"># ------------------------------------------------------------------------------</span>
 <span class="c1"># Source to target Schema mapping</span>

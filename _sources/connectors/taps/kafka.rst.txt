@@ -85,6 +85,7 @@ Example YAML for ``tap-kafka``:
     default_target_schema: "kafka"            # Target schema where the data will be loaded
     default_target_schema_select_permission:  # Optional: Grant SELECT on schema and tables that created
       - grp_stats
+    #batch_wait_limit_seconds: 3600           # Optional: Maximum time to wait for `batch_size_rows`. Available only for snowflake target.
 
 
     # ------------------------------------------------------------------------------

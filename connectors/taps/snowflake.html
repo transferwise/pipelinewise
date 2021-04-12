@@ -270,6 +270,7 @@ following the steps in the <a class="reference internal" href="../../installatio
 <span class="nt">target</span><span class="p">:</span> <span class="s">&quot;snowflake&quot;</span>                    <span class="c1"># ID of the target connector where the data will be loaded</span>
 <span class="nt">batch_size_rows</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">20000</span>                 <span class="c1"># Batch size for the stream to optimise load performance</span>
 <span class="nt">stream_buffer_size</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">0</span>                  <span class="c1"># In-memory buffer size (MB) between taps and targets for asynchronous data pipes</span>
+<span class="c1">#batch_wait_limit_seconds: 3600        # Optional: Maximum time to wait for `batch_size_rows`. Available only for snowflake target.</span>
 
 
 <span class="c1"># ------------------------------------------------------------------------------</span>
