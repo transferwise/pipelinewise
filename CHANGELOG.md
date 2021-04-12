@@ -1,7 +1,12 @@
+0.33.0 (2021-04-12)
+-------------------
+
+- Bump `pipelinewise-target-snowflake` from `1.11.1` to `1.12.0`
+
 0.32.1 (2021-03-26)
 -------------------
 
-- Bump `pipelinewsie-target-snowflake` from `1.11.0` to `1.11.1`
+- Bump `pipelinewise-target-snowflake` from `1.11.0` to `1.11.1`
 
 0.32.0 (2021-03-22)
 -------------------
