@@ -3,7 +3,7 @@
 
 - Add `batch_wait_limit_seconds` option to every tap/target combination
 - Bump `pipelinewise-target-snowflake` from `1.11.1` to `1.12.0`
-    - Add `batch_wait_limit_seconds` option to every tap/target combination
+    - Add `batch_wait_limit_seconds` option
 - Bump `pipelinewise-tap-mysql` from `1.4.2` to `1.4.3`
 - Bump a few vulnerable and security outdated packages
 
