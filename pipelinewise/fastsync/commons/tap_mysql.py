@@ -1,13 +1,12 @@
 import csv
 import datetime
 import decimal
-import gzip
 import logging
 import pymysql
 
 from pymysql import InterfaceError, OperationalError
 
-from . import utils
+from . import utils, split_gzip
 from ...utils import safe_column_name
 
 LOGGER = logging.getLogger(__name__)
@@ -246,9 +245,21 @@ class FastSyncTapMySql:
         }
 
     # pylint: disable=too-many-locals
-    def copy_table(self, table_name, path):
+    def copy_table(self,
+                   table_name,
+                   path,
+                   split_large_files=False,
+                   split_file_chunk_size_mb=1000,
+                   split_file_max_chunks=20):
         """
         Export data from table to a zipped csv
+        Args:
+            table_name: Fully qualified table name to export
+            path: Path where to create the zip file(s) with the exported data
+            split_large_files: Split large files to multiple pieces and create multiple zip files
+                               with -partXYZ postfix in the filename. (Default: False)
+            split_file_chunk_size_mb: File chunk sizes if `split_large_files` enabled. (Default: 1000)
+            split_file_max_chunks: Max number of chunks if `split_large_files` enabled. (Default: 20)
         """
         table_columns = self.get_table_columns(table_name)
         column_safe_sql_values = [c.get('safe_sql_value') for c in table_columns]
@@ -270,8 +281,13 @@ class FastSyncTapMySql:
         exported_rows = 0
         with self.conn_unbuffered as cur:
             cur.execute(sql)
-            with gzip.open(path, 'wt') as gzfile:
-                writer = csv.writer(gzfile,
+            gzip_splitter = split_gzip.open(path,
+                                            mode='wt',
+                                            chunk_size_mb=split_file_chunk_size_mb,
+                                            max_chunks=split_file_max_chunks if split_large_files else 0)
+
+            with gzip_splitter as split_gzip_files:
+                writer = csv.writer(split_gzip_files,
                                     delimiter=',',
                                     quotechar='"',
                                     quoting=csv.QUOTE_MINIMAL)

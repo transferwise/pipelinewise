@@ -281,6 +281,19 @@
       "minimum": 0,
       "maximum": 2500
     },
+    "split_large_files": {
+      "type": "boolean"
+    },
+    "split_file_chunk_size_mb": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 2500
+    },
+    "split_file_max_chunks": {
+      "type": "integer",
+      "min": "1",
+      "max": "100"
+    },
     "schemas": {
       "type": "array",
       "items": {

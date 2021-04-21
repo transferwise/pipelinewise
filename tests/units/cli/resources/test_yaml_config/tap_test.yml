@@ -30,7 +30,9 @@ db_conn:
 target: "test_snowflake_target"        # ID of the target connector where the data will be loaded
 batch_size_rows: 20000                 # Batch size for the stream to optimise load performance
 batch_wait_limit_seconds: 3600         # Optional: Maximum time to wait for `batch_size_rows`
-
+split_large_files: true                # Optional: Split large batch files to smaller pieces
+split_file_chunk_size_mb: 500          # Optional: File chunk sizes if `split_large_files` enabled
+split_file_max_chunks: 25              # Optional: Max number of chunks if `split_large_files` enabled
 
 # ------------------------------------------------------------------------------
 # Source to target Schema mapping

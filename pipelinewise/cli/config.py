@@ -356,7 +356,10 @@ class Config:
             'data_flattening_max_level': tap.get('data_flattening_max_level',
                                                  utils.get_tap_property(tap, 'default_data_flattening_max_level') or 0),
             'validate_records': tap.get('validate_records', False),
-            'add_metadata_columns': tap.get('add_metadata_columns', False)
+            'add_metadata_columns': tap.get('add_metadata_columns', False),
+            'split_large_files': tap.get('split_large_files', False),
+            'split_file_chunk_size_mb': tap.get('split_file_chunk_size_mb', 1000),
+            'split_file_max_chunks': tap.get('split_file_max_chunks', 20)
         })
 
         # Save the generated JSON files
