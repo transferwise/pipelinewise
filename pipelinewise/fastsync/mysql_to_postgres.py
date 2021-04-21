@@ -31,7 +31,6 @@ REQUIRED_CONFIG_KEYS = {
 
 LOCK = multiprocessing.Lock()
 
-# tap_type_to_target_type('int', 'int(10) unsigned')
 
 def tap_type_to_target_type(mysql_type, mysql_column_type):
     """Data type mapping from MySQL to Postgres"""
