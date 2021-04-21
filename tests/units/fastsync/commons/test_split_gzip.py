@@ -101,8 +101,8 @@ class SplitGzipFile(TestCase):
         Write all data into one chunk
         """
         # test data fits into one chunk
-        with split_gzip.SplitGzipFile(self.filename, 'wb', chunk_size_mb=1000, max_chunks=20) as f:
-            f.write(DATA_WITH_100_BYTES * 50)
+        with split_gzip.SplitGzipFile(self.filename, 'wb', chunk_size_mb=1000, max_chunks=20) as f_write:
+            f_write.write(DATA_WITH_100_BYTES * 50)
 
         with gzip.open(f'{self.filename}.part00001', 'rb') as f_read:
             file_content = f_read.read()
