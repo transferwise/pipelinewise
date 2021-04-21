@@ -32,7 +32,7 @@ class SplitGzipFile(TestCase):
     """
     Unit tests for SplitGzipFileWriter
     """
-    filename = "{}_{}_tmp".format('@test', os.getpid())
+    filename = '{}_{}_tmp'.format('@test', os.getpid())
 
     def setUp(self):
         unlink(self.filename)

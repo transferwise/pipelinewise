@@ -15,7 +15,7 @@ EST_COMPR_RATE = 0.12
 
 
 # pylint: disable=W0622
-def open(base_filename, mode="wb", chunk_size_mb=None, max_chunks=None, est_compr_rate=None):
+def open(base_filename, mode='wb', chunk_size_mb=None, max_chunks=None, est_compr_rate=None):
     """Open a gzip-compressed file in binary or text mode.
 
     Args:
@@ -33,7 +33,7 @@ def open(base_filename, mode="wb", chunk_size_mb=None, max_chunks=None, est_comp
     Return:
         File like object
     """
-    if mode not in ["wb", "wt"]:
+    if mode not in ['wb', 'wt']:
         raise ValueError('Invalid mode: %r' % (mode,))
     return SplitGzipFile(base_filename, mode, chunk_size_mb, max_chunks, est_compr_rate)
 
