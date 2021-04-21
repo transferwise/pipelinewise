@@ -31,6 +31,7 @@ REQUIRED_CONFIG_KEYS = {
 
 LOCK = multiprocessing.Lock()
 
+# tap_type_to_target_type('int', 'int(10) unsigned')
 
 def tap_type_to_target_type(mysql_type, mysql_column_type):
     """Data type mapping from MySQL to Postgres"""
@@ -56,9 +57,9 @@ def tap_type_to_target_type(mysql_type, mysql_column_type):
         'mediumtext': 'CHARACTER VARYING',
         'longtext': 'CHARACTER VARYING',
         'enum': 'CHARACTER VARYING',
-        'int': 'INTEGER NULL',
+        'int': 'BIGINT NULL' if (mysql_column_type and mysql_column_type == 'int(10) unsigned') else 'INTEGER NULL',
         'tinyint': 'BOOLEAN' if mysql_column_type and mysql_column_type.startswith('tinyint(1)') else 'SMALLINT NULL',
-        'smallint': 'SMALLINT NULL',
+        'smallint': 'INTEGER NULL' if (mysql_column_type and mysql_column_type == 'smallint(5) unsigned') else 'SMALLINT NULL',
         'mediumint': 'INTEGER NULL',
         'bigint': 'BIGINT NULL',
         'bit': 'BOOLEAN',
