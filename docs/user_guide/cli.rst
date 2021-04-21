@@ -50,6 +50,8 @@ Run a specific pipeline
 
 :--extra_log: Optional: Copy logging into PipelineWise logger to see tap run logs at runtime in STDOUT
 
+:--enable_fastsync: Optional: Use FastSync when possible. Enabled by default.
+
 
 .. _cli_stop_tap:
 
@@ -110,6 +112,8 @@ sync and resets the table bookmarks to their new location.
 :--tap: Tap connector id
 
 :--tables: Optional: Comma separated list of tables to sync from the data source.
+
+:--enable_fastsync: Optional: Use FastSync when possible. Enabled by default.
 
 
 .. _cli_import:

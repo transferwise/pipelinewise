@@ -18,7 +18,8 @@ class CliArgs:
                  log='*',
                  extra_log=False,
                  debug=False,
-                 profiler=False
+                 profiler=False,
+                 enable_fastsync=True,
                  ):
         self.target = target
         self.tap = tap
@@ -29,6 +30,7 @@ class CliArgs:
         self.string = string
         self.log = log
         self.extra_log = extra_log
+        self.enable_fastsync = enable_fastsync
         self.debug = debug
         self.profiler = profiler
 
