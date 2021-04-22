@@ -141,7 +141,7 @@ Example YAML for ``tap-mysql``:
   stream_buffer_size: 0                  # In-memory buffer size (MB) between taps and targets for asynchronous data pipes
   #batch_wait_limit_seconds: 3600        # Optional: Maximum time to wait for `batch_size_rows`. Available only for snowflake target.
 
-  # Options only for Fastsycn for Snowflake
+  # Options only for Fastsync for Snowflake
   #split_large_files: False              # Optional: split large files to multiple pieces and create multipart zip files. (Default: False)
   #split_file_chunk_size_mb: 1000        # Optional: File chunk sizes if `split_large_files` enabled. (Default: 1000)
   #split_file_max_chunks: 20             # Optional: Max number of chunks if `split_large_files` enabled. (Default: 20)
