@@ -63,7 +63,7 @@ class SplitGzipFile(TestCase):
         Test if passing invalid parameters raising exceptions
         """
         with self.assertRaises(ValueError):
-            split_gzip.open('basefile', mode="invalidmode")
+            split_gzip.open('basefile', mode='invalidmode')
         with self.assertRaises(ValueError):
             split_gzip.open('basefile', mode='wt', chunk_size_mb=0)
         with self.assertRaises(ValueError):
