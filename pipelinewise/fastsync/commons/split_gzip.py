@@ -35,6 +35,10 @@ def open(base_filename, mode='wb', chunk_size_mb=None, max_chunks=None, est_comp
     """
     if mode not in ['wb', 'wt']:
         raise ValueError('Invalid mode: %r' % (mode,))
+    if chunk_size_mb is not None and chunk_size_mb < 1:
+        raise ValueError('Invalid chunk_size_mb: %d' % (chunk_size_mb,))
+    if max_chunks is not None and max_chunks < 0:
+        raise ValueError('Invalid max_chunks: %d' % (max_chunks,))
     return SplitGzipFile(base_filename, mode, chunk_size_mb, max_chunks, est_compr_rate)
 
 

@@ -58,6 +58,17 @@ class SplitGzipFile(TestCase):
         self.assertEqual(round(gzip_splitter._bytes_to_megabytes(1000 ** 2 * 10), 5), 9.53674)
         self.assertEqual(round(gzip_splitter._bytes_to_megabytes(1000 ** 3), 5), 953.67432)
 
+    def test_parameter_validation(self):
+        """
+        Test if passing invalid parameters raising exceptions
+        """
+        with self.assertRaises(ValueError):
+            split_gzip.open('basefile', mode="invalidmode")
+        with self.assertRaises(ValueError):
+            split_gzip.open('basefile', mode='wt', chunk_size_mb=0)
+        with self.assertRaises(ValueError):
+            split_gzip.open('basefile', max_chunks=-1)
+
     # pylint: disable=W0212
     def test_gen_export_chunk_filename(self):
         """
