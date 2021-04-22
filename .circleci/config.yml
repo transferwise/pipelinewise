@@ -15,7 +15,8 @@ references:
     working_directory: ~/pipelinewise
     docker:
       # Main python container
-      - image: circleci/python:3.7.7
+      # Use circleci next-gen image
+      - image: cimg/python:3.7
         environment:
           TAP_MYSQL_HOST: db_mysql_source
           TAP_MYSQL_PORT: 3306
@@ -81,31 +82,11 @@ references:
         command: [mongod, --replSet, rs0]
 
 jobs:
-  test:
+  e2e_tests:
     <<: *container_config
 
     steps:
       - checkout
-
-      - run:
-          name: 'Install dependencies'
-          command: |
-            python3 -m venv .venv
-            . .venv/bin/activate
-            pip install --upgrade pip setuptools wheel
-            pip install -Ue .[test]
-
-      - run:
-          name: 'Check code formatting'
-          command: |
-            . .venv/bin/activate
-            find pipelinewise tests -type f -name '*.py' | xargs unify --check-only
-
-      - run:
-          name: 'Pylinting'
-          command: |
-            . .venv/bin/activate
-            pylint pipelinewise tests
 
       - run:
           name: 'Build source databases for integration tests'
@@ -125,27 +106,12 @@ jobs:
           command: ./install.sh --acceptlicenses --connectors=all
 
       - run:
-          name: 'Run unit tests'
-          command: |
-            . .virtualenvs/pipelinewise/bin/activate
-            export PIPELINEWISE_HOME=$PWD
-            mkdir test-reports
-            coverage run -m pytest tests/units -v --junitxml=test-reports/junit.xml
-            coverage report --fail-under=69 || { echo 'Coverage threshold of 69% not met!' ; exit 1; }
-            coverage html -d coverage_html
-
-      - run:
           name: 'Run E2E tests'
           command: |
             . .virtualenvs/pipelinewise/bin/activate
             export PIPELINEWISE_HOME=$PWD
             pytest tests/end_to_end -v
           no_output_timeout: 30m
-
-      - store_test_results:
-          path: test-reports
-      - store_artifacts:
-          path: coverage_html
 
   # For documentation deployment. You'll need the following environment vars
   # in your Circle CI settings, otherwise this will not work.
@@ -155,7 +121,7 @@ jobs:
   # GH_TOKEN (the personal Git token with pushes enabled)
   deploy-doc:
     docker:
-      - image: circleci/python:3.7.7
+      - image: cimg/python:3.7
     working_directory: ~/gh_doc_automation
     steps:
       - checkout
@@ -194,12 +160,12 @@ workflows:
 
   build:
     jobs:
-      - test
+      - e2e_tests
 
       - upload_docker_image:
           context: kubernetes-staging
           requires:
-            - test
+            - e2e_tests
           filters:
             branches:
               only:
