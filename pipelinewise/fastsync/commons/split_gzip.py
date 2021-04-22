@@ -42,6 +42,7 @@ def open(base_filename, mode='wb', chunk_size_mb=None, max_chunks=None, est_comp
     return SplitGzipFile(base_filename, mode, chunk_size_mb, max_chunks, est_compr_rate)
 
 
+# pylint: disable=R0902
 class SplitGzipFile(io.BufferedIOBase):
     """The SplitGzipFile file like object class that implements only the write method.
 
@@ -113,16 +114,31 @@ class SplitGzipFile(io.BufferedIOBase):
         """
         return size / float(1 << 20)
 
-    def write(self, b):
+    def write(self, _bytes):
+        """
+        Writes bytes into the active chunk file and updates the estimated new size of the file after compression.
+
+        Compressed file size cannot be calculated at write time because compression is a separated
+        process that performs only when we finished writing the file. We need to estimate the compressed size.
+
+        Args:
+            _bytes: Bytes to write
+        """
         self._activate_chunk_file()
 
-        self.chunk_file.write(b)
+        self.chunk_file.write(_bytes)
         self.current_chunk_size_mb = SplitGzipFile._bytes_to_megabytes(self.chunk_file.tell() * self.est_compr_rate)
 
     def close(self):
+        """
+        Close the active chunk file
+        """
         if self.chunk_file is None:
             return
         self.chunk_file.close()
 
     def flush(self):
+        """
+        Flush the active chunk write buffers
+        """
         self.chunk_file.flush()
