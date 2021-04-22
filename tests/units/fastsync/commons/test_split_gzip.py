@@ -28,9 +28,9 @@ def unlink(filename):
         pass
 
 
-class SplitGzipFile(TestCase):
+class TestSplitGzipFile(TestCase):
     """
-    Unit tests for SplitGzipFileWriter
+    Unit tests for SplitGzipFile
     """
     filename = '{}_{}_tmp'.format('@test', os.getpid())
 
