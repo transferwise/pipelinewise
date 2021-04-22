@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 import os
 import sys
+import glob
+import re
 from functools import partial
 from argparse import Namespace
 import multiprocessing
@@ -96,23 +98,37 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
         bookmark = utils.get_bookmark_for_table(table, args.properties, mysql)
 
         # Exporting table data, get table definitions and close connection to avoid timeouts
-        mysql.copy_table(table, filepath)
-        size_bytes = os.path.getsize(filepath)
+        mysql.copy_table(table,
+                         filepath,
+                         split_large_files=args.target.get('split_large_files'),
+                         split_file_chunk_size_mb=args.target.get('split_file_chunk_size_mb'),
+                         split_file_max_chunks=args.target.get('split_file_max_chunks'))
+        file_parts = glob.glob(f'{filepath}*')
+        size_bytes = sum([os.path.getsize(file_part) for file_part in file_parts])
         snowflake_types = mysql.map_column_types_to_target(table)
         snowflake_columns = snowflake_types.get('columns', [])
         primary_key = snowflake_types.get('primary_key')
         mysql.close_connections()
 
         # Uploading to S3
-        s3_key = snowflake.upload_to_s3(filepath, tmp_dir=args.temp_dir)
-        os.remove(filepath)
+        s3_keys = []
+        for file_part in file_parts:
+            s3_keys.append(snowflake.upload_to_s3(file_part, tmp_dir=args.temp_dir))
+            os.remove(file_part)
+
+        # Create a pattern that match all file parts by removing multipart suffix
+        s3_key_pattern = re.sub(r'\.part\d*$', '', s3_keys[0])
 
         # Creating temp table in Snowflake
         snowflake.create_schema(target_schema)
         snowflake.create_table(target_schema, table, snowflake_columns, primary_key, is_temporary=True)
 
         # Load into Snowflake table
-        snowflake.copy_to_table(s3_key, target_schema, table, size_bytes, is_temporary=True)
+        snowflake.copy_to_table(s3_key_pattern, target_schema, table, size_bytes, is_temporary=True)
+
+        # Delete all file parts from s3
+        for s3_key in s3_keys:
+            snowflake.s3.delete_object(Bucket=args.target.get('s3_bucket'), Key=s3_key)
 
         # Obfuscate columns
         snowflake.obfuscate_columns(target_schema, table)
