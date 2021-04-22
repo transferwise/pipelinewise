@@ -93,6 +93,10 @@ class TestSplitGzipFile(TestCase):
         # chunk seq should not increase further if chunk_seq equals to split_file_max_chunks
         gzip_splitter.chunk_seq = 20
         self.assertEqual(gzip_splitter._gen_chunk_filename(), 'basefile.part00020')
+        # chunk seq should not increase further if chunk_seq reached max_chunks, even if the chunk size is greater
+        # than chunk_size_mb
+        gzip_splitter.current_chunk_size_mb = 1050
+        self.assertEqual(gzip_splitter._gen_chunk_filename(), 'basefile.part00020')
 
     def test_write_with_no_split(self):
         """
