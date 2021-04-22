@@ -42,7 +42,6 @@ def open(base_filename, mode='wb', chunk_size_mb=None, max_chunks=None, est_comp
     return SplitGzipFile(base_filename, mode, chunk_size_mb, max_chunks, est_compr_rate)
 
 
-# pylint: disable=R0902
 class SplitGzipFile(io.BufferedIOBase):
     """The SplitGzipFile file like object class that implements only the write method.
 
@@ -61,8 +60,6 @@ class SplitGzipFile(io.BufferedIOBase):
         self.chunk_size_mb = chunk_size_mb or DEFAULT_CHUNK_SIZE_MB
         self.max_chunks = max_chunks if max_chunks is not None else DEFAULT_MAX_CHUNKS
         self.est_compr_rate = est_compr_rate if est_compr_rate is not None else EST_COMPR_RATE
-
-        self.split_large_files = True
         self.chunk_seq = 1
         self.current_chunk_size_mb = 0
         self.chunk_filename = None
