@@ -117,7 +117,7 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
             os.remove(file_part)
 
         # Create a pattern that match all file parts by removing multipart suffix
-        s3_key_pattern = re.sub(r'\.part\d*$', '', s3_keys[0])
+        s3_key_pattern = re.sub(r'\.part\d*$', '', s3_keys[0]) if len(s3_keys) > 0 else 'NO_FILES_TO_LOAD'
 
         # Creating temp table in Snowflake
         snowflake.create_schema(target_schema)
