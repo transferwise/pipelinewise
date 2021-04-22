@@ -58,7 +58,7 @@ class SplitGzipFile(io.BufferedIOBase):
 
         self.base_filename = base_filename
         self.mode = mode
-        self.chunk_size_mb = chunk_size_mb if chunk_size_mb is not None else DEFAULT_CHUNK_SIZE_MB
+        self.chunk_size_mb = chunk_size_mb or DEFAULT_CHUNK_SIZE_MB
         self.max_chunks = max_chunks if max_chunks is not None else DEFAULT_MAX_CHUNKS
         self.est_compr_rate = est_compr_rate if est_compr_rate is not None else EST_COMPR_RATE
 
