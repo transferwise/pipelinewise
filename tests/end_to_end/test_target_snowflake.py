@@ -134,6 +134,7 @@ class TestTargetSnowflake:
         assertions.assert_all_columns_exist(self.run_query_tap_mysql, self.run_query_target_snowflake,
                                             mysql_to_snowflake.tap_type_to_target_type)
 
+    # pylint: disable=invalid-name
     @pytest.mark.dependency(depends=['import_config'])
     def test_resync_mariadb_to_sf_with_split_large_files(self, tap_mariadb_id=TAP_MARIADB_SPLIT_LARGE_FILES_ID):
         """Resync tables from MariaDB to Snowflake using splitting large files option"""
@@ -142,6 +143,7 @@ class TestTargetSnowflake:
         assertions.assert_all_columns_exist(self.run_query_tap_mysql, self.run_query_target_snowflake,
                                             mysql_to_snowflake.tap_type_to_target_type)
 
+    # pylint: disable=invalid-name
     def test_resync_pg_to_sf_with_split_large_files(self, tap_postgres_id=TAP_MARIADB_SPLIT_LARGE_FILES_ID):
         """Resync tables from Postgres to Snowflake using splitting large files option"""
         assertions.assert_resync_tables_success(tap_postgres_id, TARGET_ID, profiling=True)

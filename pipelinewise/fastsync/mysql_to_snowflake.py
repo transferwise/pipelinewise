@@ -81,6 +81,7 @@ def tap_type_to_target_type(mysql_type, mysql_column_type):
     }.get(mysql_type, 'VARCHAR')
 
 
+# pylint: disable=too-many-locals
 def sync_table(table: str, args: Namespace) -> Union[bool, str]:
     """Sync one table"""
     mysql = FastSyncTapMySql(args.tap, tap_type_to_target_type)
