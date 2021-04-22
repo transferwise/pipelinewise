@@ -84,7 +84,9 @@ references:
 jobs:
   e2e_tests:
     <<: *container_config
-
+    environment:
+      PR_NUMBER: $CIRCLE_PR_NUMBER
+      GITHUB_REPO: $CIRCLE_PROJECT_REPONAME
     steps:
       - checkout
 
