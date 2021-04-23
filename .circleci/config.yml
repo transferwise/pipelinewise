@@ -89,11 +89,13 @@ jobs:
       - setup_remote_docker:
           docker_layer_caching: true
       - run:
+          when:
+
           name: 'Run E2E tests'
           command: |
-            ./scripts/ci_check_no_file_changes.sh python
+            ./scripts/ci_check_no_file_changes.sh python && rc=$? || rc=$?
 
-            if [[ $? -eq 1 ]]
+            if [[ $rc -eq 1 ]]
             then
               sudo apt-get update
               sudo apt install mariadb-client postgresql-client mongo-tools mbuffer gettext-base
@@ -126,13 +128,15 @@ jobs:
     working_directory: ~/gh_doc_automation
     steps:
       - checkout
-      - run: |
-          ./scripts/ci_check_no_file_changes.sh doc
+      - run:
+          name: "Publish doc if it has changed"
+          command: |
+            ./scripts/ci_check_no_file_changes.sh doc && rc=$? || rc=$?
 
-          if [[ $? -eq 1 ]]
-          then
-            .circleci/publish_docs.sh
-          fi
+            if [[ $rc -eq 1 ]]
+            then
+              .circleci/publish_docs.sh
+            fi
 
   upload_docker_image:
     <<: *docker_k8s_deployer
