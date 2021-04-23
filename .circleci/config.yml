@@ -86,7 +86,8 @@ jobs:
     <<: *container_config
     steps:
       - checkout
-
+      - setup_remote_docker:
+          docker_layer_caching: true
       - run:
           name: 'Run E2E tests'
           command: |
