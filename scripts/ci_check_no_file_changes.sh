@@ -45,7 +45,7 @@ do
     REGEX="(^tests\/|^pipelinewise\/|^singer-connectors\/|^setup\.py)"
     echo "Searching for changes in python files"
   elif [[ ${CHECK} == "doc" ]]; then
-    REGEX="(^docs\/)"
+    REGEX="(^docs\/|.circleci/publish_docs.sh)"
     echo "Searching for changes in documentation files"
   else
     echo "Invalid check: \"${CHECK}\". Falling back to exiting with FAILURE code"
