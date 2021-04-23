@@ -84,15 +84,15 @@ references:
 jobs:
   e2e_tests:
     <<: *container_config
-    environment:
-      PR_NUMBER: $CIRCLE_PR_NUMBER
-      GITHUB_REPO: $CIRCLE_PROJECT_REPONAME
     steps:
       - checkout
 
       - run:
           name: 'Run E2E tests'
           command: |
+            export PR_NUMBER=$CIRCLE_PR_NUMBER
+            export GITHUB_REPO=$CIRCLE_PROJECT_REPONAME
+
             if [[ "$(./scripts/ci_check_no_file_changes.sh python)" -eq 1 ]]
             then
               sudo apt-get update
