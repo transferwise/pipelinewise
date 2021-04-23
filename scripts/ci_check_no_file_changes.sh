@@ -27,7 +27,7 @@ if [[ (-z ${PR_NUMBER}) && (-z ${CIRCLE_PULL_REQUEST}) ]]; then
   exit 1
 fi
 
-if [[ -z ${CIRCLE_PULL_REQUEST}]]; then
+if [[ -z ${CIRCLE_PULL_REQUEST} ]]; then
   URL="https://api.github.com/repos/${GITHUB_REPO}/pulls/${PR_NUMBER}/files"
 else
   URL="${CIRCLE_PULL_REQUEST}/files"
