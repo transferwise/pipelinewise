@@ -91,7 +91,8 @@ jobs:
       - run:
           name: 'Run E2E tests'
           command: |
-            if [[ "$(./scripts/ci_check_no_file_changes.sh python)" -eq 1 ]]
+
+            if [[ ! "$(./scripts/ci_check_no_file_changes.sh python)" ]]
             then
               sudo apt-get update
               sudo apt install mariadb-client postgresql-client mongo-tools mbuffer gettext-base
