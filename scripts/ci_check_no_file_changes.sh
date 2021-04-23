@@ -22,12 +22,15 @@
 # to check for python changes, run with CHECKS=python
 # To check for doc changes, run with CHECKS=doc
 # To check for python and doc changes, run with CHECKS="python doc"
-if [[ -z ${PR_NUMBER} ]]; then
+if [[ -z ${PR_NUMBER} && -z ${CIRCLE_PULL_REQUEST}]]; then
   echo "Not a PR; Exiting with FAILURE code"
   exit 1
 fi
 
-URL="https://api.github.com/repos/${GITHUB_REPO}/pulls/${PR_NUMBER}/files"
+if [[ -z ${CIRCLE_PULL_REQUEST}]]; then
+  URL="https://api.github.com/repos/${GITHUB_REPO}/pulls/${PR_NUMBER}/files"
+else
+  URL="${CIRCLE_PULL_REQUEST}/files"
 
 echo $URL
 

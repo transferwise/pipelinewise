@@ -90,20 +90,6 @@ jobs:
       - run:
           name: 'Run E2E tests'
           command: |
-
-            echo $CIRCLE_PR_NUMBER
-            echo ${CIRCLE_PR_NUMBER}
-            echo $CIRCLE_PROJECT_REPONAME
-            echo ${CIRCLE_PROJECT_REPONAME}
-
-            export PR_NUMBER=${CIRCLE_PR_NUMBER}
-            export GITHUB_REPO=${CIRCLE_PROJECT_REPONAME}
-
-            echo $PR_NUMBER
-            echo ${PR_NUMBER}
-            echo $GITHUB_REPO
-            echo ${GITHUB_REPO}
-
             if [[ "$(./scripts/ci_check_no_file_changes.sh python)" -eq 1 ]]
             then
               sudo apt-get update
