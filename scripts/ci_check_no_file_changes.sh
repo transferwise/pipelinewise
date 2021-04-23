@@ -27,13 +27,14 @@ if [[ (-z ${PR_NUMBER}) && (-z ${CIRCLE_PULL_REQUEST}) ]]; then
   exit 1
 fi
 
-if [[ -z ${CIRCLE_PULL_REQUEST} ]]; then
-  URL="https://api.github.com/repos/${GITHUB_REPO}/pulls/${PR_NUMBER}/files"
-else
-  URL="${CIRCLE_PULL_REQUEST}/files"
+if [[ ! -z ${CIRCLE_PULL_REQUEST} ]]; then
+  PR_NUMBER=$(grep -Po '.*\/pull\/\K(\d+)' <<< $CIRCLE_PULL_REQUEST) # extract PR number from circleci full PR path
+  GITHUB_REPO="${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}"
 fi
 
-echo $URL
+URL="https://api.github.com/repos/${GITHUB_REPO}/pulls/${PR_NUMBER}/files"
+
+echo "PR URL:${URL}"
 
 FILES=$(curl -s -X GET -G "${URL}" | jq -r '.[] | .filename')
 
