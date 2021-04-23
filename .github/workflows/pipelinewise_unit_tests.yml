@@ -40,7 +40,7 @@ jobs:
           pip install -U pip setuptools wheel
           pip install -Ue .[test]
 
-      - name: Check code formatting
+      - name: Run Unit tests
         if: steps.check.outcome == 'failure'
         run: |
           export PIPELINEWISE_HOME=$PWD
