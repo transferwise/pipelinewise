@@ -31,6 +31,7 @@ if [[ -z ${CIRCLE_PULL_REQUEST}]]; then
   URL="https://api.github.com/repos/${GITHUB_REPO}/pulls/${PR_NUMBER}/files"
 else
   URL="${CIRCLE_PULL_REQUEST}/files"
+fi
 
 echo $URL
 
