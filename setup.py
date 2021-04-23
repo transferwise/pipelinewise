@@ -40,7 +40,7 @@ setup(name='pipelinewise',
           'test': [
               'pytest==6.2.3',
               'pytest-dependency==0.4.0',
-              'coverage==5.5',
+              'pytest-cov==2.11',
               'python-dotenv==0.17.0',
               'mock==4.0.3',
               'pylint==2.7.4',
