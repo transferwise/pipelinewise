@@ -91,8 +91,9 @@ jobs:
       - run:
           name: 'Run E2E tests'
           command: |
+            ./scripts/ci_check_no_file_changes.sh python
 
-            if [[ ! "$(./scripts/ci_check_no_file_changes.sh python)" ]]
+            if [[ $? -eq 1 ]]
             then
               sudo apt-get update
               sudo apt install mariadb-client postgresql-client mongo-tools mbuffer gettext-base
@@ -125,7 +126,13 @@ jobs:
     working_directory: ~/gh_doc_automation
     steps:
       - checkout
-      - run: .circleci/publish_docs.sh
+      - run: |
+          ./scripts/ci_check_no_file_changes.sh doc
+
+          if [[ $? -eq 1 ]]
+          then
+            .circleci/publish_docs.sh
+          fi
 
   upload_docker_image:
     <<: *docker_k8s_deployer
