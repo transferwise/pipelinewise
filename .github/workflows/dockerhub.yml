@@ -3,7 +3,7 @@ name: Docker Image to DockerHub
 on:
   release:
     types:
-      - [published]
+      - published
 
 jobs:
 
