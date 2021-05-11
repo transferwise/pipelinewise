@@ -13,6 +13,8 @@
   
   <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
   <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
   <link rel="stylesheet" href="../../_static/css/custom.css" type="text/css" />
 
   
@@ -34,6 +36,7 @@
   
     
       <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+        <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
         <script src="../../_static/jquery.js"></script>
         <script src="../../_static/underscore.js"></script>
         <script src="../../_static/doctools.js"></script>
@@ -357,6 +360,11 @@ following the steps in the <a class="reference internal" href="../../installatio
 <span class="nt">batch_size_rows</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">20000</span>                 <span class="c1"># Batch size for the stream to optimise load performance</span>
 <span class="nt">stream_buffer_size</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">0</span>                  <span class="c1"># In-memory buffer size (MB) between taps and targets for asynchronous data pipes</span>
 <span class="c1">#batch_wait_limit_seconds: 3600        # Optional: Maximum time to wait for `batch_size_rows`. Available only for snowflake target.</span>
+
+<span class="c1"># Options only for Fastsync for Snowflake</span>
+<span class="c1">#split_large_files: False              # Optional: split large files to multiple pieces and create multipart zip files. (Default: False)</span>
+<span class="c1">#split_file_chunk_size_mb: 1000        # Optional: File chunk sizes if `split_large_files` enabled. (Default: 1000)</span>
+<span class="c1">#split_file_max_chunks: 20             # Optional: Max number of chunks if `split_large_files` enabled. (Default: 20)</span>
 
 
 <span class="c1"># ------------------------------------------------------------------------------</span>
