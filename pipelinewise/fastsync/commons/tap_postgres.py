@@ -1,6 +1,5 @@
 import datetime
 import decimal
-import gzip
 import logging
 import re
 import sys
@@ -10,7 +9,7 @@ import psycopg2.extras
 from typing import Dict
 
 
-from . import utils
+from . import utils, split_gzip
 from ...utils import safe_column_name
 
 LOGGER = logging.getLogger(__name__)
@@ -390,9 +389,21 @@ class FastSyncTapPostgres:
             'primary_key': self.get_primary_keys(table_name)
         }
 
-    def copy_table(self, table_name, path):
+    def copy_table(self,
+                   table_name,
+                   path,
+                   split_large_files=False,
+                   split_file_chunk_size_mb=1000,
+                   split_file_max_chunks=20):
         """
         Export data from table to a zipped csv
+        Args:
+            table_name: Fully qualified table name to export
+            path: Path where to create the zip file(s) with the exported data
+            split_large_files: Split large files to multiple pieces and create multiple zip files
+                               with -partXYZ postfix in the filename. (Default: False)
+            split_file_chunk_size_mb: File chunk sizes if `split_large_files` enabled. (Default: 1000)
+            split_file_max_chunks: Max number of chunks if `split_large_files` enabled. (Default: 20)
         """
         table_columns = self.get_table_columns(table_name)
         column_safe_sql_values = [c.get('safe_sql_value') for c in table_columns]
@@ -403,7 +414,6 @@ class FastSyncTapPostgres:
 
         schema_name, table_name = table_name.split('.')
 
-
         sql = """COPY (SELECT {}
         ,now() AT TIME ZONE 'UTC'
         ,now() AT TIME ZONE 'UTC'
@@ -411,5 +421,11 @@ class FastSyncTapPostgres:
         FROM {}."{}") TO STDOUT with CSV DELIMITER ','
         """.format(','.join(column_safe_sql_values), schema_name, table_name)
         LOGGER.info('Exporting data: %s', sql)
-        with gzip.open(path, 'wt') as gzfile:
-            self.curr.copy_expert(sql, gzfile, size=131072)
+
+        gzip_splitter = split_gzip.open(path,
+                                        mode='wb',
+                                        chunk_size_mb=split_file_chunk_size_mb,
+                                        max_chunks=split_file_max_chunks if split_large_files else 0)
+
+        with gzip_splitter as split_gzip_files:
+            self.curr.copy_expert(sql, split_gzip_files, size=131072)

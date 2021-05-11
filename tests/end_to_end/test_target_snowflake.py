@@ -14,8 +14,10 @@ from .helpers.env import E2EEnv
 
 DIR = os.path.dirname(__file__)
 TAP_MARIADB_ID = 'mariadb_to_sf'
+TAP_MARIADB_SPLIT_LARGE_FILES_ID = 'mariadb_to_sf_split_large_files'
 TAP_MARIADB_BUFFERED_STREAM_ID = 'mariadb_to_sf_buffered_stream'
 TAP_POSTGRES_ID = 'postgres_to_sf'
+TAP_POSTGRES_SPLIT_LARGE_FILES_ID = 'postgres_to_sf_split_large_files'
 TAP_MONGODB_ID = 'mongo_to_sf'
 TAP_S3_CSV_ID = 's3_csv_to_sf'
 TARGET_ID = 'snowflake'
@@ -128,6 +130,23 @@ class TestTargetSnowflake:
     def test_resync_mariadb_to_sf(self, tap_mariadb_id=TAP_MARIADB_ID):
         """Resync tables from MariaDB to Snowflake"""
         assertions.assert_resync_tables_success(tap_mariadb_id, TARGET_ID, profiling=True)
+        assertions.assert_row_counts_equal(self.run_query_tap_mysql, self.run_query_target_snowflake)
+        assertions.assert_all_columns_exist(self.run_query_tap_mysql, self.run_query_target_snowflake,
+                                            mysql_to_snowflake.tap_type_to_target_type)
+
+    # pylint: disable=invalid-name
+    @pytest.mark.dependency(depends=['import_config'])
+    def test_resync_mariadb_to_sf_with_split_large_files(self, tap_mariadb_id=TAP_MARIADB_SPLIT_LARGE_FILES_ID):
+        """Resync tables from MariaDB to Snowflake using splitting large files option"""
+        assertions.assert_resync_tables_success(tap_mariadb_id, TARGET_ID, profiling=True)
+        assertions.assert_row_counts_equal(self.run_query_tap_mysql, self.run_query_target_snowflake)
+        assertions.assert_all_columns_exist(self.run_query_tap_mysql, self.run_query_target_snowflake,
+                                            mysql_to_snowflake.tap_type_to_target_type)
+
+    # pylint: disable=invalid-name
+    def test_resync_pg_to_sf_with_split_large_files(self, tap_postgres_id=TAP_POSTGRES_SPLIT_LARGE_FILES_ID):
+        """Resync tables from Postgres to Snowflake using splitting large files option"""
+        assertions.assert_resync_tables_success(tap_postgres_id, TARGET_ID, profiling=True)
         assertions.assert_row_counts_equal(self.run_query_tap_mysql, self.run_query_target_snowflake)
         assertions.assert_all_columns_exist(self.run_query_tap_mysql, self.run_query_target_snowflake,
                                             mysql_to_snowflake.tap_type_to_target_type)

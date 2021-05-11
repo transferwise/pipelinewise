@@ -83,6 +83,9 @@ class TestConfig:
                     'target': 'test_snowflake_target',
                     'batch_size_rows': 20000,
                     'batch_wait_limit_seconds': 3600,
+                    'split_large_files': True,
+                    'split_file_chunk_size_mb': 500,
+                    'split_file_max_chunks': 25,
                     'db_conn': {
                         'dbname': '<DB_NAME>',
                         'host': '<HOST>',
@@ -307,7 +310,10 @@ class TestConfig:
                 '{"ppw_component": "tap-mysql", "tap_id": "mysql_sample", '
                 '"database": "{{database}}", "schema": "{{schema}}", "table": "{{table}}"}',
             'validate_records': False,
-            'add_metadata_columns': False
+            'add_metadata_columns': False,
+            'split_large_files': True,
+            'split_file_chunk_size_mb': 500,
+            'split_file_max_chunks': 25
         }
 
         # Delete the generated JSON config directory

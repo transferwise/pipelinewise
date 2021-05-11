@@ -180,7 +180,6 @@ class FastSyncTargetSnowflake:
         table_dict = utils.tablename_to_dict(table_name)
         target_table = table_dict.get('table_name') if not is_temporary else table_dict.get('temp_table_name')
         inserts = 0
-        bucket = self.connection_config['s3_bucket']
 
         stage = self.connection_config['stage']
         sql = f'COPY INTO {target_schema}."{target_table.upper()}" FROM \'@{stage}/{s3_key}\'' \
@@ -191,15 +190,15 @@ class FastSyncTargetSnowflake:
         # Get number of inserted records - COPY does insert only
         results = self.query(sql, query_tag_props={'schema': target_schema, 'table': target_table})
         if len(results) > 0:
-            inserts = results[0].get('rows_loaded', 0)
+            inserts = sum([file_part.get('rows_loaded', 0) for file_part in results])
 
         LOGGER.info('Loading into %s."%s": %s',
                     target_schema,
                     target_table.upper(),
-                    json.dumps({'inserts': inserts, 'updates': 0, 'size_bytes': size_bytes}))
-
-        LOGGER.info('Deleting %s from S3...', s3_key)
-        self.s3.delete_object(Bucket=bucket, Key=s3_key)
+                    json.dumps({'inserts': inserts,
+                                'updates': 0,
+                                'file_parts': len(results),
+                                'size_bytes': size_bytes}))
 
     # grant_... functions are common functions called by utils.py: grant_privilege function
     # "to_group" is not used here but exists for compatibility reasons with other database types
