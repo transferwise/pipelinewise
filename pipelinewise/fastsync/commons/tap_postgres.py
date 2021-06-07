@@ -370,6 +370,7 @@ class FastSyncTapPostgres:
                     column_name
                     ,data_type
                     ,safe_sql_value
+                    ,character_maximum_length
                 FROM (SELECT
                 column_name,
                 data_type,
@@ -385,7 +386,8 @@ class FastSyncTapPostgres:
                     WHEN data_type IN ('double precision', 'numeric', 'decimal', 'real') THEN {} || ' AS ' || column_name
                     WHEN data_type IN ('smallint', 'integer', 'bigint', 'serial', 'bigserial') THEN {} || ' AS ' || column_name
                     ELSE '"'||column_name||'"'
-                END AS safe_sql_value
+                END AS safe_sql_value,
+                character_maximum_length
                 FROM information_schema.columns
                 WHERE table_schema = '{}'
                     AND table_name = '{}'
@@ -399,8 +401,15 @@ class FastSyncTapPostgres:
         Map PG column types to equivalent types in target
         """
         postgres_columns = self.get_table_columns(table_name)
-        mapped_columns = ['{} {}'.format(safe_column_name(pc[0]),
-                                         self.tap_type_to_target_type(pc[1])) for pc in postgres_columns]
+        mapped_columns = []
+        for pc in postgres_columns:
+            column_type = self.tap_type_to_target_type(pc[1])
+            # postgres bit type can have length greater than 1
+            # most targets would want to map length 1 to boolean and the rest to number
+            if isinstance(column_type, list):
+                column_type = column_type[1 if pc[3] > 1 else 0]
+            mapping = '{} {}'.format(safe_column_name(pc[0]), column_type)
+            mapped_columns.append(mapping)
 
         return {
             'columns': mapped_columns,
