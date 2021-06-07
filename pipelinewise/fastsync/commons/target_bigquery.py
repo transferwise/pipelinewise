@@ -23,8 +23,7 @@ def safe_name(name, quotes=True):
     removed_bad_chars = re.sub(pattern, '_', name).lower()
     if quotes:
         return '`{}`'.format(removed_bad_chars)
-    else:
-        return removed_bad_chars
+    return removed_bad_chars
 
 class FastSyncTargetBigquery:
     def __init__(self, connection_config, transformation_config=None):
