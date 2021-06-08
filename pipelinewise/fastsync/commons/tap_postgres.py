@@ -416,6 +416,7 @@ class FastSyncTapPostgres:
             'primary_key': self.get_primary_keys(table_name)
         }
 
+    # pylint: disable=too-many-arguments
     def copy_table(self,
                    table_name,
                    path,

@@ -115,6 +115,7 @@ class FastSyncTargetBigquery:
 
         self.query(sql)
 
+    # pylint: disable=R0913,R0914
     def copy_to_table(self, filepath, target_schema, table_name, size_bytes, is_temporary, skip_csv_header=False, allow_quoted_newlines=True, write_truncate=True):
         LOGGER.info("BIGQUERY - Loading {} into Bigquery...".format(filepath))
         table_dict = utils.tablename_to_dict(table_name)

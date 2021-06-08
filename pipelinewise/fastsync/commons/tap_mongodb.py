@@ -140,7 +140,7 @@ class FastSyncTapMongoDB:
         """
         self.database.client.close()
 
-    # pylint: disable=R0914
+    # pylint: disable=R0914,R0913
     def copy_table(self,
                    table_name: str,
                    filepath: str,
