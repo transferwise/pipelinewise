@@ -1,4 +1,6 @@
+import gzip
 import os
+import tempfile
 import uuid
 from datetime import datetime
 from random import randint
@@ -18,6 +20,7 @@ TAP_MARIADB_SPLIT_LARGE_FILES_ID = 'mariadb_to_sf_split_large_files'
 TAP_MARIADB_BUFFERED_STREAM_ID = 'mariadb_to_sf_buffered_stream'
 TAP_POSTGRES_ID = 'postgres_to_sf'
 TAP_POSTGRES_SPLIT_LARGE_FILES_ID = 'postgres_to_sf_split_large_files'
+TAP_POSTGRES_ARCHIVE_LOAD_FILES_ID = 'postgres_to_sf_archive_load_files'
 TAP_MONGODB_ID = 'mongo_to_sf'
 TAP_S3_CSV_ID = 's3_csv_to_sf'
 TARGET_ID = 'snowflake'
@@ -229,6 +232,64 @@ class TestTargetSnowflake:
             'where cvarchar=\'BC\';')[0][0]
 
         assert result == datetime(9999, 12, 31, 23, 59, 59, 998993)
+
+    # pylint: disable=invalid-name
+    @pytest.mark.dependency(depends=['import_config'])
+    def test_replicate_pg_to_sf_with_archive_load_files(self):
+        """Fastsync tables from Postgres to Snowflake with archive load files enabled"""
+        if not self.e2e.env['TARGET_SNOWFLAKE']['is_configured']:
+            pytest.skip('Target Snowflake environment variables are not provided')
+
+        s3_bucket = os.environ.get('TARGET_SNOWFLAKE_S3_BUCKET')
+        s3_client = self.e2e.get_aws_session().client('s3')
+
+        # Delete any dangling files from archive
+        files_in_s3_archive = s3_client.list_objects(
+            Bucket=s3_bucket, Prefix='archive/postgres_to_sf_archive_load_files/').get('Contents', [])
+        for file_in_archive in files_in_s3_archive:
+            s3_client.delete_object(Bucket=s3_bucket, Key=(file_in_archive['Key']))
+
+        # Run tap
+        assertions.assert_run_tap_success(TAP_POSTGRES_ARCHIVE_LOAD_FILES_ID, TARGET_ID, ['fastsync', 'singer'])
+
+        # Assert expected files in archive folder
+        for schema_table in ['public.city', 'public.country', 'public2.wearehere']:
+            schema, table = schema_table.split('.')
+            files_in_s3_archive = s3_client.list_objects(
+                Bucket=s3_bucket,
+                Prefix=('archive/postgres_to_sf_archive_load_files/{}'.format(table))).get('Contents')
+
+            if files_in_s3_archive is None or len(files_in_s3_archive) != 1:
+                raise Exception('files_in_archive for {} is {}'.format(table, files_in_s3_archive))
+
+            # Assert expected metadata
+            archive_metadata = s3_client.head_object(Bucket=s3_bucket, Key=(files_in_s3_archive[0]['Key']))['Metadata']
+
+            expected_metadata = {
+                'tap': 'postgres_to_sf_archive_load_files',
+                'schema': schema,
+                'table': table,
+                'archived-by': 'pipelinewise_fastsync_postgres_to_snowflake'
+            }
+
+            if archive_metadata != expected_metadata:
+                raise Exception('archive_metadata for {} is {}'.format(table, archive_metadata))
+
+            # Assert expected file contents
+            with tempfile.NamedTemporaryFile() as tmpfile:
+
+                with open(tmpfile.name, 'wb') as f:
+                    s3_client.download_fileobj(s3_bucket, files_in_s3_archive[0]['Key'], f)
+
+                with gzip.open(tmpfile, 'rt') as gzipfile:
+                    rows_in_csv = len(gzipfile.readlines())
+
+            rows_in_table = self.run_query_tap_postgres('SELECT COUNT(1) FROM {}'.format(schema_table))[0][0]
+
+            if rows_in_csv != rows_in_table:
+                raise Exception('Rows in csv and db differ: {} vs {}'.format(rows_in_csv, rows_in_table))
+
+
 
     @pytest.mark.dependency(depends=['import_config'])
     def test_replicate_s3_to_sf(self):

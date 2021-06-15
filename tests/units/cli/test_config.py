@@ -313,7 +313,8 @@ class TestConfig:
             'add_metadata_columns': False,
             'split_large_files': True,
             'split_file_chunk_size_mb': 500,
-            'split_file_max_chunks': 25
+            'split_file_max_chunks': 25,
+            'archive_load_files': False
         }
 
         # Delete the generated JSON config directory

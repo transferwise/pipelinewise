@@ -134,6 +134,29 @@ class FastSyncTargetSnowflake:
 
         return s3_key
 
+    def copy_to_archive(self, source_s3_key, tap_id, table):
+        """Copy load file to archive folder with metadata added"""
+        table_dict = utils.tablename_to_dict(table)
+        archive_table = table_dict.get('table_name')
+        archive_schema = table_dict.get('schema_name', '')
+
+        archive_metadata = {
+            'tap': tap_id,
+            'schema': archive_schema,
+            'table': archive_table,
+            'archived-by': 'pipelinewise_fastsync_postgres_to_snowflake'
+        }
+
+        archive_file = source_s3_key.split('/')[-1]
+        archive_folder = 'archive/{}/{}'.format(tap_id, archive_table)
+        archive_key = '{}/{}'.format(archive_folder, archive_file)
+
+        LOGGER.info('Archiving %s to %s', source_s3_key, archive_key)
+        bucket = self.connection_config['s3_bucket']
+        copy_source = '{}/{}'.format(bucket, source_s3_key)
+        self.s3.copy_object(CopySource=copy_source, Bucket=bucket, Key=archive_key, Metadata=archive_metadata,
+                            MetadataDirective='REPLACE')
+
     def create_schema(self, schema):
         sql = 'CREATE SCHEMA IF NOT EXISTS {}'.format(schema)
         self.query(sql, query_tag_props={'schema': schema})

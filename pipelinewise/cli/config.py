@@ -359,7 +359,8 @@ class Config:
             'add_metadata_columns': tap.get('add_metadata_columns', False),
             'split_large_files': tap.get('split_large_files', False),
             'split_file_chunk_size_mb': tap.get('split_file_chunk_size_mb', 1000),
-            'split_file_max_chunks': tap.get('split_file_max_chunks', 20)
+            'split_file_max_chunks': tap.get('split_file_max_chunks', 20),
+            'archive_load_files': tap.get('archive_load_files', False)
         })
 
         # Save the generated JSON files
