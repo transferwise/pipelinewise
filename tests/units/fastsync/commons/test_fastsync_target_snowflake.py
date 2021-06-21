@@ -537,7 +537,8 @@ class TestFastSyncTargetSnowflake(TestCase):
             ]
         )
 
-    def test_copy_to_archive_default_bucket_and_folder(self):
+    # pylint: disable=invalid-name
+    def test_default_archive_destination(self):
         """
         Validate parameters passed to s3 copy_object method when custom s3 bucket and folder are not defined
         """
@@ -559,7 +560,8 @@ class TestFastSyncTargetSnowflake(TestCase):
             },
             MetadataDirective='REPLACE')
 
-    def test_copy_to_archive_custom_bucket_and_folder(self):
+    # pylint: disable=invalid-name
+    def test_custom_archive_destination(self):
         """
         Validate parameters passed to s3 copy_object method when using custom s3 bucket and folder
         """

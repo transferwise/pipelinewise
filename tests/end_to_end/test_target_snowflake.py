@@ -233,7 +233,7 @@ class TestTargetSnowflake:
 
         assert result == datetime(9999, 12, 31, 23, 59, 59, 998993)
 
-    # pylint: disable=invalid-name
+    # pylint: disable=invalid-name,too-many-locals
     @pytest.mark.dependency(depends=['import_config'])
     def test_replicate_pg_to_sf_with_archive_load_files(self):
         """Fastsync tables from Postgres to Snowflake with archive load files enabled"""
