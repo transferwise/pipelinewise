@@ -240,12 +240,15 @@ class TestTargetSnowflake:
         if not self.e2e.env['TARGET_SNOWFLAKE']['is_configured']:
             pytest.skip('Target Snowflake environment variables are not provided')
 
+        archive_s3_prefix = 'archive'  # Custom s3 prefix defined in TAP_POSTGRES_ARCHIVE_LOAD_FILES_ID
+
         s3_bucket = os.environ.get('TARGET_SNOWFLAKE_S3_BUCKET')
         s3_client = self.e2e.get_aws_session().client('s3')
 
         # Delete any dangling files from archive
         files_in_s3_archive = s3_client.list_objects(
-            Bucket=s3_bucket, Prefix='archive/postgres_to_sf_archive_load_files/').get('Contents', [])
+            Bucket=s3_bucket,
+            Prefix='{}/postgres_to_sf_archive_load_files/'.format(archive_s3_prefix)).get('Contents', [])
         for file_in_archive in files_in_s3_archive:
             s3_client.delete_object(Bucket=s3_bucket, Key=(file_in_archive['Key']))
 
@@ -257,7 +260,7 @@ class TestTargetSnowflake:
             schema, table = schema_table.split('.')
             files_in_s3_archive = s3_client.list_objects(
                 Bucket=s3_bucket,
-                Prefix=('archive/postgres_to_sf_archive_load_files/{}'.format(table))).get('Contents')
+                Prefix=('{}/postgres_to_sf_archive_load_files/{}'.format(archive_s3_prefix, table))).get('Contents')
 
             if files_in_s3_archive is None or len(files_in_s3_archive) != 1:
                 raise Exception('files_in_archive for {} is {}'.format(table, files_in_s3_archive))

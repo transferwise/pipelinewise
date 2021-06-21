@@ -537,9 +537,9 @@ class TestFastSyncTargetSnowflake(TestCase):
             ]
         )
 
-    def test_copy_to_archive(self):
+    def test_copy_to_archive_default_bucket_and_folder(self):
         """
-        Validate parameters passed to s3 copy_object method
+        Validate parameters passed to s3 copy_object method when custom s3 bucket and folder are not defined
         """
         mock_copy_object = MagicMock()
         self.snowflake.s3.copy_object = mock_copy_object
@@ -551,6 +551,30 @@ class TestFastSyncTargetSnowflake(TestCase):
             Bucket='some_bucket',
             CopySource='some_bucket/snowflake-import/ppw_20210615115603_fastsync.csv.gz',
             Key='archive/some-tap/some_table/ppw_20210615115603_fastsync.csv.gz',
+            Metadata={
+                'tap': 'some-tap',
+                'schema': 'some_schema',
+                'table': 'some_table',
+                'archived-by': 'pipelinewise_fastsync_postgres_to_snowflake'
+            },
+            MetadataDirective='REPLACE')
+
+    def test_copy_to_archive_custom_bucket_and_folder(self):
+        """
+        Validate parameters passed to s3 copy_object method when using custom s3 bucket and folder
+        """
+        mock_copy_object = MagicMock()
+        self.snowflake.s3.copy_object = mock_copy_object
+        self.snowflake.connection_config['s3_bucket'] = 'some_bucket'
+        self.snowflake.connection_config['archive_load_files_s3_bucket'] = 'archive_bucket'
+        self.snowflake.connection_config['archive_load_files_s3_prefix'] = 'archive_folder'
+        self.snowflake.copy_to_archive(
+            'snowflake-import/ppw_20210615115603_fastsync.csv.gz', 'some-tap', 'some_schema.some_table')
+
+        mock_copy_object.assert_called_with(
+            Bucket='archive_bucket',
+            CopySource='some_bucket/snowflake-import/ppw_20210615115603_fastsync.csv.gz',
+            Key='archive_folder/some-tap/some_table/ppw_20210615115603_fastsync.csv.gz',
             Metadata={
                 'tap': 'some-tap',
                 'schema': 'some_schema',

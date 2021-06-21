@@ -147,15 +147,23 @@ class FastSyncTargetSnowflake:
             'archived-by': 'pipelinewise_fastsync_postgres_to_snowflake'
         }
 
-        archive_file = source_s3_key.split('/')[-1]
-        archive_folder = 'archive/{}/{}'.format(tap_id, archive_table)
-        archive_key = '{}/{}'.format(archive_folder, archive_file)
+        # Retain same filename
+        archive_file_basename = os.path.basename(source_s3_key)
 
-        LOGGER.info('Archiving %s to %s', source_s3_key, archive_key)
-        bucket = self.connection_config['s3_bucket']
-        copy_source = '{}/{}'.format(bucket, source_s3_key)
-        self.s3.copy_object(CopySource=copy_source, Bucket=bucket, Key=archive_key, Metadata=archive_metadata,
-                            MetadataDirective='REPLACE')
+        # Get archive s3 prefix from config, defaulting to 'archive' if not specified
+        archive_s3_prefix = self.connection_config.get('archive_load_files_s3_prefix', 'archive')
+
+        source_s3_bucket = self.connection_config.get('s3_bucket')
+
+        # Get archive s3 bucket from config, defaulting to same bucket used for Snowflake imports if not specified
+        archive_s3_bucket = self.connection_config.get('archive_load_files_s3_bucket', source_s3_bucket)
+
+        archive_key = '{}/{}/{}/{}'.format(archive_s3_prefix, tap_id, archive_table, archive_file_basename)
+        copy_source = '{}/{}'.format(source_s3_bucket, source_s3_key)
+        LOGGER.info('Archiving %s to %s', copy_source, archive_key)
+
+        self.s3.copy_object(CopySource=copy_source, Bucket=archive_s3_bucket, Key=archive_key,
+                            Metadata=archive_metadata, MetadataDirective='REPLACE')
 
     def create_schema(self, schema):
         sql = 'CREATE SCHEMA IF NOT EXISTS {}'.format(schema)
