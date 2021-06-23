@@ -1,3 +1,9 @@
+0.34.0 (2021-06-23)
+-------------------
+
+- Bump `pipelinewise-tap-postgres` from `1.7.1` to `1.8.0`
+    - Add discovering of partitioned tables
+
 0.33.0 (2021-04-12)
 -------------------
 
