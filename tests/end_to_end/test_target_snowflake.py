@@ -240,7 +240,7 @@ class TestTargetSnowflake:
         if not self.e2e.env['TARGET_SNOWFLAKE']['is_configured']:
             pytest.skip('Target Snowflake environment variables are not provided')
 
-        archive_s3_prefix = 'archive'  # Custom s3 prefix defined in TAP_POSTGRES_ARCHIVE_LOAD_FILES_ID
+        archive_s3_prefix = 'archive_folder'  # Custom s3 prefix defined in TAP_POSTGRES_ARCHIVE_LOAD_FILES_ID
 
         s3_bucket = os.environ.get('TARGET_SNOWFLAKE_S3_BUCKET')
         s3_client = self.e2e.get_aws_session().client('s3')
