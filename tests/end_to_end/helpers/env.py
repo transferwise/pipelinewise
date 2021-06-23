@@ -187,6 +187,23 @@ class E2EEnv:
         """Get the value of a specific variable in the self.env dict"""
         return self.env[connector]['vars'][key]['value']
 
+    def get_aws_session(self):
+        """Get AWS session with using access from TARGET_SNOWFLAKE_ env vars"""
+        if not self.env['TARGET_SNOWFLAKE']['is_configured']:
+            raise Exception('TARGET_SNOWFLAKE is not configured')
+
+        aws_access_key_id = os.environ.get('TARGET_SNOWFLAKE_AWS_ACCESS_KEY')
+        aws_secret_access_key = os.environ.get('TARGET_SNOWFLAKE_AWS_SECRET_ACCESS_KEY')
+        if aws_access_key_id is None or aws_secret_access_key is None:
+            raise Exception(
+                'Env vars TARGET_SNOWFLAKE_AWS_ACCESS_KEY and TARGET_SNOWFLAKE_AWS_SECRET_ACCESS_KEY are required')
+
+        return boto3.session.Session(
+            aws_access_key_id=aws_access_key_id,
+            aws_secret_access_key=aws_secret_access_key
+        )
+
+
     def _is_env_connector_configured(self, env_connector):
         """Detect if certain component(s) of env vars group is configured properly"""
         env_conns = []

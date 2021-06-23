@@ -83,10 +83,12 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
     """Sync one table"""
     postgres = FastSyncTapPostgres(args.tap, tap_type_to_target_type)
     snowflake = FastSyncTargetSnowflake(args.target, args.transform)
+    tap_id = args.target.get('tap_id')
+    archive_load_files = args.target.get('archive_load_files', False)
 
     try:
         dbname = args.tap.get('dbname')
-        filename = utils.gen_export_filename(tap_id=args.target.get('tap_id'), table=table)
+        filename = utils.gen_export_filename(tap_id=tap_id, table=table)
         filepath = os.path.join(args.temp_dir, filename)
         target_schema = utils.get_target_schema(args.target, table)
 
@@ -97,7 +99,6 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
         bookmark = utils.get_bookmark_for_table(table, args.properties, postgres, dbname=dbname)
 
         # Exporting table data, get table definitions and close connection to avoid timeouts
-        postgres.copy_table(table, filepath)
         postgres.copy_table(table,
                             filepath,
                             split_large_files=args.target.get('split_large_files'),
@@ -126,8 +127,12 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
         # Load into Snowflake table
         snowflake.copy_to_table(s3_key_pattern, target_schema, table, size_bytes, is_temporary=True)
 
-        # Delete all file parts from s3
         for s3_key in s3_keys:
+            if archive_load_files:
+                # Copy load file to archive
+                snowflake.copy_to_archive(s3_key, tap_id, table)
+
+            # Delete all file parts from s3
             snowflake.s3.delete_object(Bucket=args.target.get('s3_bucket'), Key=s3_key)
 
         # Obfuscate columns
