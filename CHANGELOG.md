@@ -1,3 +1,12 @@
+0.34.0 (2021-06-24)
+-------------------
+- Add `split_large_files` option to FastSync target-snowflake to load large files in parallel into Snowflake
+- Add `archive_load_files` option to FastSync target-snwoflake to archive load files on S3
+- Bump `pipelinewise-tap-postgres` from `1.7.1` to `1.8.0`
+    - Add discovering of partitioned table
+- Bump `pipelinewise-target-snowflake` from `1.12.0` to `1.13.0`
+    - Add `archive_load_files` parameter to optionally archive load files on S3
+
 0.33.0 (2021-04-12)
 -------------------
 
