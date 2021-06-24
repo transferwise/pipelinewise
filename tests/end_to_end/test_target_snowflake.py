@@ -256,14 +256,23 @@ class TestTargetSnowflake:
         assertions.assert_run_tap_success(TAP_POSTGRES_ARCHIVE_LOAD_FILES_ID, TARGET_ID, ['fastsync', 'singer'])
 
         # Assert expected files in archive folder
-        for schema_table in ['public.city', 'public.country', 'public2.wearehere']:
+        expected_archive_files_count = {
+            'public.city': 2,       # INCREMENTAL: fastsync and singer
+            'public.country': 1,    # FULL_TABLE : fastsync only
+            'public2.wearehere': 1  # FULL_TABLE : fastsync only
+        }
+        for schema_table in expected_archive_files_count:
             schema, table = schema_table.split('.')
             files_in_s3_archive = s3_client.list_objects(
                 Bucket=s3_bucket,
                 Prefix=('{}/postgres_to_sf_archive_load_files/{}'.format(archive_s3_prefix, table))).get('Contents')
 
-            if files_in_s3_archive is None or len(files_in_s3_archive) != 1:
-                raise Exception('files_in_archive for {} is {}'.format(table, files_in_s3_archive))
+            expected_archive_files = expected_archive_files_count[schema_table]
+            if files_in_s3_archive is None or len(files_in_s3_archive) != expected_archive_files:
+                raise Exception('files_in_archive for {} is {}. Expected archive files count: {}'.format(
+                    table,
+                    files_in_s3_archive,
+                    expected_archive_files))
 
             # Assert expected metadata
             archive_metadata = s3_client.head_object(Bucket=s3_bucket, Key=(files_in_s3_archive[0]['Key']))['Metadata']
