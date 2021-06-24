@@ -71,7 +71,7 @@
             
             
               <div class="version">
-                0.33.0
+                0.34.0
               </div>
             
           
@@ -350,10 +350,13 @@ or browse the codebase <a class="reference external" href="https://github.com/tr
 <span class="nt">stream_buffer_size</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">0</span>                  <span class="c1"># In-memory buffer size (MB) between taps and targets for asynchronous data pipes</span>
 <span class="c1">#batch_wait_limit_seconds: 3600        # Optional: Maximum time to wait for `batch_size_rows`. Available only for snowflake target.</span>
 
-<span class="c1"># Options only for Fastsync for Snowflake</span>
-<span class="c1">#split_large_files: False              # Optional: split large files to multiple pieces and create multipart zip files. (Default: False)</span>
-<span class="c1">#split_file_chunk_size_mb: 1000        # Optional: File chunk sizes if `split_large_files` enabled. (Default: 1000)</span>
-<span class="c1">#split_file_max_chunks: 20             # Optional: Max number of chunks if `split_large_files` enabled. (Default: 20)</span>
+<span class="c1"># Options only for Snowflake target</span>
+<span class="c1">#split_large_files: False                       # Optional: split large files to multiple pieces and create multipart zip files. (Default: False)</span>
+<span class="c1">#split_file_chunk_size_mb: 1000                 # Optional: File chunk sizes if `split_large_files` enabled. (Default: 1000)</span>
+<span class="c1">#split_file_max_chunks: 20                      # Optional: Max number of chunks if `split_large_files` enabled. (Default: 20)</span>
+<span class="c1">#archive_load_files: False                      # Optional: when enabled, the files loaded to Snowflake will also be stored in `archive_load_files_s3_bucket`</span>
+<span class="c1">#archive_load_files_s3_prefix: &quot;archive&quot;        # Optional: When `archive_load_files` is enabled, the archived files will be placed in the archive S3 bucket under this prefix.</span>
+<span class="c1">#archive_load_files_s3_bucket: &quot;&lt;BUCKET_NAME&gt;&quot;  # Optional: When `archive_load_files` is enabled, the archived files will be placed in this bucket. (Default: the value of `s3_bucket` in target snowflake YAML)</span>
 
 
 <span class="c1"># ------------------------------------------------------------------------------</span>
