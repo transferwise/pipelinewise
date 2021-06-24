@@ -9,7 +9,6 @@ from google.api_core import exceptions
 
 from .transform_utils import TransformationHelper, SQLFlavor
 from . import utils
-utils.QUOTE_CHARACTER = '`'
 
 LOGGER = logging.getLogger(__name__)
 
@@ -37,16 +36,16 @@ class FastSyncTargetBigquery:
     def query(self, query, params=[]):
         def to_query_parameter(value):
             if isinstance(value, int):
-                value_type = "INT64"
+                value_type = 'INT64'
             elif isinstance(value, float):
-                value_type = "NUMERIC"
+                value_type = 'NUMERIC'
             #TODO: repeated float here and in target
             elif isinstance(value, float):
-                value_type = "FLOAT64"
+                value_type = 'FLOAT64'
             elif isinstance(value, bool):
-                value_type = "BOOL"
+                value_type = 'BOOL'
             else:
-                value_type = "STRING"
+                value_type = 'STRING'
             return bigquery.ScalarQueryParameter(None, value_type, value)
 
         job_config = bigquery.QueryJobConfig()
@@ -60,7 +59,7 @@ class FastSyncTargetBigquery:
             queries = [query]
 
         client = self.open_connection()
-        LOGGER.info("TARGET_BIGQUERY - Running query: {}".format(query))
+        LOGGER.info('TARGET_BIGQUERY - Running query: {}'.format(query))
         query_job = client.query(';\n'.join(queries), job_config=job_config)
         query_job.result()
 
@@ -82,7 +81,7 @@ class FastSyncTargetBigquery:
         table_dict = utils.tablename_to_dict(table_name)
         target_table = safe_name(table_dict.get('table_name') if not is_temporary else table_dict.get('temp_table_name'))
 
-        sql = "DROP TABLE IF EXISTS {}.{}".format(target_schema, target_table.lower())
+        sql = 'DROP TABLE IF EXISTS {}.{}'.format(target_schema, target_table.lower())
         self.query(sql)
 
     def create_table(self, target_schema: str, table_name: str, columns: List[str],
@@ -117,7 +116,7 @@ class FastSyncTargetBigquery:
 
     # pylint: disable=R0913,R0914
     def copy_to_table(self, filepath, target_schema, table_name, size_bytes, is_temporary, skip_csv_header=False, allow_quoted_newlines=True, write_truncate=True):
-        LOGGER.info("BIGQUERY - Loading {} into Bigquery...".format(filepath))
+        LOGGER.info('BIGQUERY - Loading {} into Bigquery...'.format(filepath))
         table_dict = utils.tablename_to_dict(table_name)
         target_table = safe_name(table_dict.get('table_name' if not is_temporary else 'temp_table_name').lower(),
                                  quotes=False)
@@ -159,19 +158,19 @@ class FastSyncTargetBigquery:
         if role:
             table_dict = utils.tablename_to_dict(table_name)
             target_table = safe_name(table_dict.get('table_name') if not is_temporary else table_dict.get('temp_table_name'))
-            sql = "GRANT SELECT ON {}.{} TO ROLE {}".format(target_schema, target_table, role)
+            sql = 'GRANT SELECT ON {}.{} TO ROLE {}'.format(target_schema, target_table, role)
             self.query(sql)
 
     def grant_usage_on_schema(self, target_schema, role, to_group=False):
         # Grant role is not mandatory parameter, do nothing if not specified
         if role:
-            sql = "GRANT USAGE ON SCHEMA {} TO ROLE {}".format(target_schema, role)
+            sql = 'GRANT USAGE ON SCHEMA {} TO ROLE {}'.format(target_schema, role)
             self.query(sql)
 
     def grant_select_on_schema(self, target_schema, role, to_group=False):
         # Grant role is not mandatory parameter, do nothing if not specified
         if role:
-            sql = "GRANT SELECT ON ALL TABLES IN SCHEMA {} TO ROLE {}".format(target_schema, role)
+            sql = 'GRANT SELECT ON ALL TABLES IN SCHEMA {} TO ROLE {}'.format(target_schema, role)
             self.query(sql)
 
     def obfuscate_columns(self, target_schema: str, table_name: str):

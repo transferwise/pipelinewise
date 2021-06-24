@@ -15,9 +15,8 @@ from .commons.tap_postgres import FastSyncTapPostgres
 from .commons.target_bigquery import FastSyncTargetBigquery
 
 from .. import utils as pipelinewise_utils
-pipelinewise_utils.QUOTE_CHARACTER = '`'
 
-MAX_NUM="99999999999999999999999999999.999999999"
+MAX_NUM='99999999999999999999999999999.999999999'
 
 LOGGER = logging.getLogger(__name__)
 
@@ -74,7 +73,7 @@ def tap_type_to_target_type(pg_type):
 # pylint: disable=too-many-locals
 def sync_table(table: str, args: Namespace) -> Union[bool, str]:
     """Sync one table"""
-    postgres = FastSyncTapPostgres(args.tap, tap_type_to_target_type)
+    postgres = FastSyncTapPostgres(args.tap, tap_type_to_target_type, target_quote='`')
     bigquery = FastSyncTargetBigquery(args.target, args.transform)
 
     try:

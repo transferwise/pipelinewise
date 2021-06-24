@@ -15,7 +15,7 @@ DEFAULT_MAX_CHUNKS = 20
 EST_COMPR_RATE = 0.12
 
 
-# pylint: disable=W0622
+# pylint: disable=W0622,R1732
 def open(base_filename, mode='wb', chunk_size_mb=None, max_chunks=None, est_compr_rate=None, compress=True):
     """Open a gzip-compressed file in binary or text mode.
 

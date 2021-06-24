@@ -24,13 +24,14 @@ class FastSyncTapMySql:
     Common functions for fastsync from a MySQL database
     """
 
-    def __init__(self, connection_config, tap_type_to_target_type):
+    def __init__(self, connection_config, tap_type_to_target_type, target_quote=None):
         self.connection_config = connection_config
         self.connection_config['charset'] = connection_config.get('charset', DEFAULT_CHARSET)
         self.connection_config['export_batch_rows'] = connection_config.get('export_batch_rows',
                                                                             DEFAULT_EXPORT_BATCH_ROWS)
         self.connection_config['session_sqls'] = connection_config.get('session_sqls', DEFAULT_SESSION_SQLS)
         self.tap_type_to_target_type = tap_type_to_target_type
+        self.target_quote = target_quote
         self.conn = None
         self.conn_unbuffered = None
 
@@ -186,7 +187,7 @@ class FastSyncTapMySql:
                                                                            table_dict['table_name'])
         pk_specs = self.query(sql)
         if len(pk_specs) > 0:
-            return [safe_column_name(k.get('Column_name')) for k in pk_specs]
+            return [safe_column_name(k.get('Column_name'), self.target_quote) for k in pk_specs]
 
         return None
 
@@ -256,7 +257,7 @@ class FastSyncTapMySql:
         """
         mysql_columns = self.get_table_columns(table_name)
         mapped_columns = [
-            '{} {}'.format(safe_column_name(pc.get('column_name')),
+            '{} {}'.format(safe_column_name(pc.get('column_name'), self.target_quote),
                            self.tap_type_to_target_type(pc.get('data_type'), pc.get('column_type')))
             for pc in mysql_columns]
 

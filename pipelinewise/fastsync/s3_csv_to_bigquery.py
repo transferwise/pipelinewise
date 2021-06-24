@@ -13,7 +13,6 @@ from .commons.tap_s3_csv import FastSyncTapS3Csv
 from .commons.target_bigquery import FastSyncTargetBigquery
 
 from .. import utils as pipelinewise_utils
-pipelinewise_utils.QUOTE_CHARACTER = '`'
 
 LOGGER = Logger().get_logger(__name__)
 
@@ -48,7 +47,7 @@ def tap_type_to_target_type(csv_type):
 
 def sync_table(table_name: str, args: Namespace) -> Union[bool, str]:
     """Sync one table"""
-    s3_csv = FastSyncTapS3Csv(args.tap, tap_type_to_target_type)
+    s3_csv = FastSyncTapS3Csv(args.tap, tap_type_to_target_type, target_quote='`')
     bigquery = FastSyncTargetBigquery(args.target, args.transform)
 
     try:

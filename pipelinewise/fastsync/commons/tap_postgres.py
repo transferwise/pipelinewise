@@ -20,9 +20,10 @@ class FastSyncTapPostgres:
     Common functions for fastsync from a Postgres database
     """
 
-    def __init__(self, connection_config, tap_type_to_target_type):
+    def __init__(self, connection_config, tap_type_to_target_type, target_quote=None):
         self.connection_config = connection_config
         self.tap_type_to_target_type = tap_type_to_target_type
+        self.target_quote = target_quote
         self.conn = None
         self.curr = None
         self.primary_host_conn = None
@@ -341,7 +342,7 @@ class FastSyncTapPostgres:
                     AND indisprimary""".format(schema_name, table_name)
         pk_specs = self.query(sql)
         if len(pk_specs) > 0:
-            return [safe_column_name(k[0]) for k in pk_specs]
+            return [safe_column_name(k[0], self.target_quote) for k in pk_specs]
 
         return None
 
@@ -408,7 +409,7 @@ class FastSyncTapPostgres:
             # most targets would want to map length 1 to boolean and the rest to number
             if isinstance(column_type, list):
                 column_type = column_type[1 if pc[3] > 1 else 0]
-            mapping = '{} {}'.format(safe_column_name(pc[0]), column_type)
+            mapping = '{} {}'.format(safe_column_name(pc[0], self.target_quote), column_type)
             mapped_columns.append(mapping)
 
         return {

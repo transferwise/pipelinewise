@@ -43,6 +43,7 @@ class FastSyncTapS3Csv:
 
         self.connection_config = connection_config
         self.tap_type_to_target_type = tap_type_to_target_type
+        self.target_quote = target_quote
         self.tables_last_modified = {}
 
     def _find_table_spec_by_name(self, table_name: str) -> Dict:
@@ -148,7 +149,7 @@ class FastSyncTapS3Csv:
             # make all columns safe
             # pylint: disable=invalid-name
             for k, v in row.items():
-                new_row[safe_column_name(k)] = v
+                new_row[safe_column_name(k, self.target_quote)] = v
 
             record = {**new_row, **custom_columns}
 
@@ -171,7 +172,7 @@ class FastSyncTapS3Csv:
         # use timestamp as a type instead if column is set in date_overrides configuration
         mapped_columns = []
         date_overrides = None if 'date_overrides' not in specs \
-            else {safe_column_name(c) for c in specs['date_overrides']}
+            else {safe_column_name(c, self.target_quote) for c in specs['date_overrides']}
 
         for column_name, column_type in csv_columns:
 
@@ -228,7 +229,7 @@ class FastSyncTapS3Csv:
         :return: the keys concatenated and separated by comma if keys are given, otherwise None
         """
         if table_specs.get('key_properties', False):
-            return [safe_column_name(k) for k in table_specs['key_properties']]
+            return [safe_column_name(k, self.target_quote) for k in table_specs['key_properties']]
 
         return None
 

@@ -49,14 +49,14 @@ class TestFastSyncTargetBigquery:
         self.bigquery = FastSyncTargetBigqueryMock(connection_config={'project_id': 'dummy-project'},
                                                    transformation_config={})
 
-    @patch("pipelinewise.fastsync.commons.target_bigquery.bigquery.Client")
+    @patch('pipelinewise.fastsync.commons.target_bigquery.bigquery.Client')
     def test_create_schema(self, Client, bigquery_job):
         """Validate if create schema queries generated correctly"""
         Client().query.return_value = bigquery_job
         self.bigquery.create_schema('new_schema')
         Client().create_dataset.assert_called_with('new_schema', exists_ok=True)
 
-    @patch("pipelinewise.fastsync.commons.target_bigquery.bigquery.Client")
+    @patch('pipelinewise.fastsync.commons.target_bigquery.bigquery.Client')
     def test_drop_table(self, Client, bigquery_job):
         """Validate if drop table queries generated correctly"""
         Client().query.return_value = bigquery_job
@@ -85,7 +85,7 @@ class TestFastSyncTargetBigquery:
         Client().query.assert_called_with(
             'DROP TABLE IF EXISTS test_schema.`test_table_with_space_temp`', job_config=ANY)
 
-    @patch("pipelinewise.fastsync.commons.target_bigquery.bigquery.Client")
+    @patch('pipelinewise.fastsync.commons.target_bigquery.bigquery.Client')
     def test_create_table(self, Client, bigquery_job):
         """Validate if create table queries generated correctly"""
         Client().query.return_value = bigquery_job
@@ -143,8 +143,8 @@ class TestFastSyncTargetBigquery:
             '_sdc_deleted_at timestamp)',
             job_config=ANY)
 
-    @patch("pipelinewise.fastsync.commons.target_bigquery.bigquery.LoadJobConfig")
-    @patch("pipelinewise.fastsync.commons.target_bigquery.bigquery.Client")
+    @patch('pipelinewise.fastsync.commons.target_bigquery.bigquery.LoadJobConfig')
+    @patch('pipelinewise.fastsync.commons.target_bigquery.bigquery.Client')
     def test_copy_to_table(self, Client, LoadJobConfig, bigquery_job_config, bigquery_job):
         """Validate if COPY command generated correctly"""
         # COPY table with standard table and column names
@@ -201,7 +201,7 @@ class TestFastSyncTargetBigquery:
         Client().dataset().table.assert_called_with('table_with_space_and_uppercase_temp')
         assert Client().load_table_from_file.call_count == 3
 
-    @patch("pipelinewise.fastsync.commons.target_bigquery.bigquery.Client")
+    @patch('pipelinewise.fastsync.commons.target_bigquery.bigquery.Client')
     def test_grant_select_on_table(self, Client, bigquery_job):
         """Validate if GRANT command generated correctly"""
         # GRANT table with standard table and column names
@@ -229,7 +229,7 @@ class TestFastSyncTargetBigquery:
         Client().query.assert_called_with(
             'GRANT SELECT ON test_schema.`table_with_space_and_uppercase` TO ROLE test_role', job_config=ANY)
 
-    @patch("pipelinewise.fastsync.commons.target_bigquery.bigquery.Client")
+    @patch('pipelinewise.fastsync.commons.target_bigquery.bigquery.Client')
     def test_grant_usage_on_schema(self, Client, bigquery_job):
         """Validate if GRANT command generated correctly"""
         self.bigquery.grant_usage_on_schema(target_schema='test_schema',
@@ -237,7 +237,7 @@ class TestFastSyncTargetBigquery:
         Client().query.assert_called_with(
             'GRANT USAGE ON SCHEMA test_schema TO ROLE test_role', job_config=ANY)
 
-    @patch("pipelinewise.fastsync.commons.target_bigquery.bigquery.Client")
+    @patch('pipelinewise.fastsync.commons.target_bigquery.bigquery.Client')
     def test_grant_select_on_schema(self, Client, bigquery_job):
         """Validate if GRANT command generated correctly"""
         self.bigquery.grant_select_on_schema(target_schema='test_schema',
@@ -245,8 +245,8 @@ class TestFastSyncTargetBigquery:
         Client().query.assert_called_with(
             'GRANT SELECT ON ALL TABLES IN SCHEMA test_schema TO ROLE test_role', job_config=ANY)
 
-    @patch("pipelinewise.fastsync.commons.target_bigquery.bigquery.CopyJobConfig")
-    @patch("pipelinewise.fastsync.commons.target_bigquery.bigquery.Client")
+    @patch('pipelinewise.fastsync.commons.target_bigquery.bigquery.CopyJobConfig')
+    @patch('pipelinewise.fastsync.commons.target_bigquery.bigquery.Client')
     def test_swap_tables(self, Client, CopyJobConfig, bigquery_job_config, bigquery_job):
         """Validate if swap table commands generated correctly"""
         # Swap tables with standard table and column names
