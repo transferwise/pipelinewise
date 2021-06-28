@@ -3,7 +3,7 @@ from unittest.mock import Mock, patch, ANY, mock_open
 from google.cloud import bigquery
 from pipelinewise.fastsync.commons.target_bigquery import FastSyncTargetBigquery
 
-@pytest.fixture(name="query_result")
+@pytest.fixture(name='query_result')
 def fixture_query_result():
     """
     Mocked Bigquery Run Query Results
@@ -13,7 +13,7 @@ def fixture_query_result():
     return mocked_qr
 
 # pylint: disable=W0613
-@pytest.fixture(name="bigquery_job")
+@pytest.fixture(name='bigquery_job')
 def fixture_bigquery_job(query_result):
     """
     Mocked Bigquery Job Query
@@ -24,7 +24,7 @@ def fixture_bigquery_job(query_result):
     mocked_qj.result().total_rows = 0
     return mocked_qj
 
-@pytest.fixture(name="bigquery_job_config")
+@pytest.fixture(name='bigquery_job_config')
 def fixture_bigquery_job_config():
     """
     Mocked Bigquery Job Config
