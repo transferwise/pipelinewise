@@ -26,7 +26,7 @@ class FastSyncTapS3Csv:
     """
 
     # pylint: disable=bare-except
-    def __init__(self, connection_config: Dict, tap_type_to_target_type: Callable):
+    def __init__(self, connection_config: Dict, tap_type_to_target_type: Callable, target_quote=None):
         """
         Constructor
         :param connection_config: tap connection config

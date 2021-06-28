@@ -14,8 +14,6 @@ from .commons import utils
 from .commons.tap_mysql import FastSyncTapMySql
 from .commons.target_bigquery import FastSyncTargetBigquery
 
-from .. import utils as pipelinewise_utils
-
 MAX_NUM='99999999999999999999999999999.999999999'
 
 LOGGER = logging.getLogger(__name__)
@@ -106,7 +104,13 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
         # Load into Bigquery table
         for num, file_part in enumerate(file_parts):
             write_truncate = num == 0
-            bigquery.copy_to_table(filepath, target_schema, table, size_bytes, is_temporary=True, write_truncate=write_truncate)
+            bigquery.copy_to_table(
+                filepath,
+                target_schema,
+                table,
+                size_bytes,
+                is_temporary=True,
+                write_truncate=write_truncate)
             os.remove(file_part)
 
         # Obfuscate columns

@@ -61,6 +61,7 @@ def run_query_snowflake(query, account, database, warehouse, user, password):
 
 
 def safe_name_bigquery(name):
+    """Return the safe_name of a column in BigQuery"""
     return safe_name(name, quotes=False)
 
 
@@ -253,8 +254,6 @@ def sql_dynamic_row_count_snowflake(schemas: list) -> str:
 def sql_dynamic_row_count_bigquery(schemas: list) -> str:
     """Generates an SQL statement that counts the number of rows in
     every table in a specific schema(s) in a Snowflake database"""
-    sql_schemas = ', '.join(f"'{schema.lower()}'" for schema in schemas)
-
     table_queries = ' UNION DISTINCT '.join(f"""
             SELECT table_schema, table_name
             FROM `{schema}`.INFORMATION_SCHEMA.TABLES

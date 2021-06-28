@@ -202,7 +202,7 @@ class FastSyncTapMySql:
             decimal_format = f"""
               CONCAT('GREATEST(LEAST({max_num}, ROUND(`', column_name, '`, {decimals})), -{max_num})')
             """
-            integer_format = f"""
+            integer_format = """
               CONCAT('`', column_name, '`')
             """
         else:
@@ -211,7 +211,10 @@ class FastSyncTapMySql:
             """
             integer_format = decimal_format
 
-        sql = """
+        schema_name = table_dict.get('schema_name')
+        table_name = table_dict.get('table_name')
+
+        sql = f"""
                 SELECT column_name,
                     data_type,
                     column_type,
@@ -227,7 +230,7 @@ class FastSyncTapMySql:
                             WHEN data_type IN ('bit')
                                     THEN concat('cast(`', column_name, '` AS unsigned)')
                             WHEN data_type IN ('date')
-                                    THEN concat('nullif(CAST(`', column_name, '` AS {}),STR_TO_DATE("0000-00-00 00:00:00", "%Y-%m-%d %T"))')
+                                    THEN concat('nullif(CAST(`', column_name, '` AS {date_type}),STR_TO_DATE("0000-00-00 00:00:00", "%Y-%m-%d %T"))')
                             WHEN data_type IN ('datetime', 'timestamp')
                                     THEN concat('nullif(`', column_name, '`,STR_TO_DATE("0000-00-00 00:00:00", "%Y-%m-%d %T"))')
                             WHEN column_type IN ('tinyint(1)')
@@ -237,18 +240,18 @@ class FastSyncTapMySql:
                             WHEN column_name = 'raw_data_hash'
                                     THEN concat('REPLACE(REPLACE(hex(`', column_name, '`)', ", '\n', ' '), '\r', '')")
                             WHEN data_type IN ('double', 'numeric', 'float', 'decimal', 'real')
-                                    THEN {}
+                                    THEN {decimal_format}
                             WHEN data_type IN ('smallint', 'integer', 'bigint', 'mediumint', 'int')
-                                    THEN {}
+                                    THEN {integer_format}
                             ELSE concat('REPLACE(REPLACE(REPLACE(cast(`', column_name, '` AS char CHARACTER SET utf8)', ", '\n', ' '), '\r', ''), '\0', '')")
                                 END AS safe_sql_value,
                             ordinal_position
                     FROM information_schema.columns
-                    WHERE table_schema = '{}'
-                        AND table_name = '{}') x
+                    WHERE table_schema = '{schema_name}'
+                        AND table_name = '{table_name}') x
                 ORDER BY
                         ordinal_position
-            """.format(date_type, decimal_format, integer_format, table_dict.get('schema_name'), table_dict.get('table_name'))
+            """
         return self.query(sql)
 
     def map_column_types_to_target(self, table_name):

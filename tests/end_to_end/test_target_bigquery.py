@@ -300,6 +300,9 @@ class TestTargetBigquery:
         assertions.assert_run_tap_success(TAP_MONGODB_ID, TARGET_ID, ['singer'])
 
         assert result_update.modified_count == self.run_query_target_bigquery(
-            "select count(_id) from ppw_e2e_tap_mongodb.my_collection where SAFE_CAST(JSON_EXTRACT_SCALAR(document, '$.id') AS INT64) = 0")[0][0]
+            """select count(_id)
+               from ppw_e2e_tap_mongodb.my_collection
+               where SAFE_CAST(JSON_EXTRACT_SCALAR(document, '$.id') AS INT64) = 0
+               """)[0][0]
 
         assert_row_counts_equal('ppw_e2e_tap_mongodb', 'my_collection', my_coll_count)

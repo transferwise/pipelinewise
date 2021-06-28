@@ -4,7 +4,6 @@ import re
 from typing import List, Dict
 
 from google.cloud import bigquery
-from google.cloud.bigquery.job import SourceFormat
 from google.api_core import exceptions
 
 from .transform_utils import TransformationHelper, SQLFlavor
@@ -17,6 +16,10 @@ logging.getLogger('bigquery.connector').setLevel(logging.WARNING)
 
 
 def safe_name(name, quotes=True):
+    """
+    Get a table name that BigQuery would accept by removing all bad chars
+    and making it lowercase
+    """
     name = name.replace('`', '')
     pattern = '[^a-zA-Z0-9]'
     removed_bad_chars = re.sub(pattern, '_', name).lower()
@@ -24,7 +27,12 @@ def safe_name(name, quotes=True):
         return '`{}`'.format(removed_bad_chars)
     return removed_bad_chars
 
+
+# pylint: disable=missing-function-docstring,no-self-use,too-many-arguments
 class FastSyncTargetBigquery:
+    """
+    Common functions for fastsync to BigQuery
+    """
     def __init__(self, connection_config, transformation_config=None):
         self.connection_config = connection_config
         self.transformation_config = transformation_config
@@ -33,7 +41,7 @@ class FastSyncTargetBigquery:
         project_id = self.connection_config['project_id']
         return bigquery.Client(project=project_id)
 
-    def query(self, query, params=[]):
+    def query(self, query, params=None):
         def to_query_parameter(value):
             if isinstance(value, int):
                 value_type = 'INT64'
@@ -48,18 +56,21 @@ class FastSyncTargetBigquery:
                 value_type = 'STRING'
             return bigquery.ScalarQueryParameter(None, value_type, value)
 
+        if params is None:
+            params = []
+
         job_config = bigquery.QueryJobConfig()
         query_params = [to_query_parameter(p) for p in params]
         job_config.query_parameters = query_params
 
         queries = []
-        if type(query) is list:
+        if isinstance(query, list):
             queries.extend(query)
         else:
             queries = [query]
 
         client = self.open_connection()
-        LOGGER.info('TARGET_BIGQUERY - Running query: {}'.format(query))
+        LOGGER.info('TARGET_BIGQUERY - Running query: %s', query)
         query_job = client.query(';\n'.join(queries), job_config=job_config)
         query_job.result()
 
@@ -72,14 +83,14 @@ class FastSyncTargetBigquery:
         for schema in set([schema_name, temp_schema]):
             datasets = client.list_datasets()
             dataset_ids = [d.dataset_id.lower() for d in datasets]
-            
+
             if schema.lower() not in dataset_ids:
-                LOGGER.info("Schema '{}' does not exist. Creating...".format(schema))
-                dataset = client.create_dataset(schema, exists_ok=True)
+                LOGGER.info("Schema '%s' does not exist. Creating...", schema)
+                client.create_dataset(schema, exists_ok=True)
 
     def drop_table(self, target_schema, table_name, is_temporary=False):
         table_dict = utils.tablename_to_dict(table_name)
-        target_table = safe_name(table_dict.get('table_name') if not is_temporary else table_dict.get('temp_table_name'))
+        target_table = safe_name(table_dict.get('table_name' if not is_temporary else 'temp_table_name'))
 
         sql = 'DROP TABLE IF EXISTS {}.{}'.format(target_schema, target_table.lower())
         self.query(sql)
@@ -115,8 +126,9 @@ class FastSyncTargetBigquery:
         self.query(sql)
 
     # pylint: disable=R0913,R0914
-    def copy_to_table(self, filepath, target_schema, table_name, size_bytes, is_temporary, skip_csv_header=False, allow_quoted_newlines=True, write_truncate=True):
-        LOGGER.info('BIGQUERY - Loading {} into Bigquery...'.format(filepath))
+    def copy_to_table(self, filepath, target_schema, table_name, size_bytes, is_temporary,
+                      skip_csv_header=False, allow_quoted_newlines=True, write_truncate=True):
+        LOGGER.info('BIGQUERY - Loading %s into Bigquery...', filepath)
         table_dict = utils.tablename_to_dict(table_name)
         target_table = safe_name(table_dict.get('table_name' if not is_temporary else 'temp_table_name').lower(),
                                  quotes=False)
@@ -135,13 +147,13 @@ class FastSyncTargetBigquery:
             job = client.load_table_from_file(exported_data, table_ref, job_config=job_config)
         try:
             job.result()
-        except exceptions.BadRequest as e:
+        except exceptions.BadRequest as exc:
             for error_row in job.errors:
-                LOGGER.critical('ERROR: {}'.format(error_row['message']))
-            raise e
+                LOGGER.critical('ERROR: %s', error_row['message'])
+            raise exc
 
-        LOGGER.info('Job {}'.format(job))
-        LOGGER.info('Job.output_rows {}'.format(job.output_rows))
+        LOGGER.info('Job %s', job)
+        LOGGER.info('Job.output_rows %s', job.output_rows)
         inserts = job.output_rows
         LOGGER.info('Loading into %s."%s": %s',
                     target_schema,
@@ -153,20 +165,23 @@ class FastSyncTargetBigquery:
     # grant_... functions are common functions called by utils.py: grant_privilege function
     # "to_group" is not used here but exists for compatibility reasons with other database types
     # "to_group" is for databases that can grant to users and groups separately like Amazon Redshift
+    # pylint: disable=unused-argument
     def grant_select_on_table(self, target_schema, table_name, role, is_temporary, to_group=False):
         # Grant role is not mandatory parameter, do nothing if not specified
         if role:
             table_dict = utils.tablename_to_dict(table_name)
-            target_table = safe_name(table_dict.get('table_name') if not is_temporary else table_dict.get('temp_table_name'))
+            target_table = safe_name(table_dict.get('table_name' if not is_temporary else 'temp_table_name'))
             sql = 'GRANT SELECT ON {}.{} TO ROLE {}'.format(target_schema, target_table, role)
             self.query(sql)
 
+    # pylint: disable=unused-argument
     def grant_usage_on_schema(self, target_schema, role, to_group=False):
         # Grant role is not mandatory parameter, do nothing if not specified
         if role:
             sql = 'GRANT USAGE ON SCHEMA {} TO ROLE {}'.format(target_schema, role)
             self.query(sql)
 
+    # pylint: disable=unused-argument
     def grant_select_on_schema(self, target_schema, role, to_group=False):
         # Grant role is not mandatory parameter, do nothing if not specified
         if role:

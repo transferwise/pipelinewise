@@ -168,8 +168,7 @@ def _map_tap_to_target_functions(tap_query_runner_fn: callable, target_query_run
     # Merge the keys into one dict by tap and target query runner names
     if tap_query_runner_fn:
         return {**f_map[tap_query_runner_fn.__name__], **f_map[target_query_runner_fn.__name__]}
-    else:
-        return {**f_map[target_query_runner_fn.__name__]}
+    return {**f_map[target_query_runner_fn.__name__]}
 
 
 def assert_row_counts_equal(tap_query_runner_fn: callable, target_query_runner_fn: callable) -> None:
@@ -200,7 +199,13 @@ def assert_row_counts_equal(tap_query_runner_fn: callable, target_query_runner_f
     # Some sources and targets can't be compared directly (e.g. BigQuery doesn't accept spaces in table names)
     # we fix that by renaming the source tables to names that the target would accept
     if 'target_sql_safe_name_fn' in funcs:
-        row_counts_in_source = [(funcs['target_sql_safe_name_fn'](table), row_count) for (table,row_count) in row_counts_in_source]
+        row_counts_in_source = [
+          (
+            funcs['target_sql_safe_name_fn'](table),
+            row_count
+          )
+          for (table,row_count) in row_counts_in_source
+        ]
 
     # Compare the two dataset
     assert row_counts_in_target == row_counts_in_source

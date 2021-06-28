@@ -366,7 +366,10 @@ class FastSyncTapPostgres:
             """
             integer_format = decimal_format
 
-        sql = """
+        schema_name = table_dict.get('schema_name')
+        table_name = table_dict.get('table_name')
+
+        sql = f"""
                 SELECT
                     column_name
                     ,data_type
@@ -377,24 +380,24 @@ class FastSyncTapPostgres:
                 data_type,
                 CASE
                     WHEN data_type = 'ARRAY' THEN 'array_to_json("' || column_name || '") AS ' || column_name
-                    WHEN data_type = 'date' THEN column_name || '::{} AS ' || column_name
+                    WHEN data_type = 'date' THEN column_name || '::{date_type} AS ' || column_name
                     WHEN udt_name = 'time' THEN 'replace("' || column_name || E'"::varchar,\\\'24:00:00\\\',\\\'00:00:00\\\') AS ' || column_name
                     WHEN udt_name = 'timetz' THEN 'replace(("' || column_name || E'" at time zone \'\'UTC\'\')::time::varchar,\\\'24:00:00\\\',\\\'00:00:00\\\') AS ' || column_name
                     WHEN udt_name in ('timestamp', 'timestamptz') THEN
                        'CASE WHEN "' ||column_name|| E'" < \\'0001-01-01 00:00:00.000\\' '
                             'OR "' ||column_name|| E'" > \\'9999-12-31 23:59:59.999\\' THEN \\'9999-12-31 23:59:59.999\\' '
                             'ELSE "' ||column_name|| '" END AS "' ||column_name|| '"'
-                    WHEN data_type IN ('double precision', 'numeric', 'decimal', 'real') THEN {} || ' AS ' || column_name
-                    WHEN data_type IN ('smallint', 'integer', 'bigint', 'serial', 'bigserial') THEN {} || ' AS ' || column_name
+                    WHEN data_type IN ('double precision', 'numeric', 'decimal', 'real') THEN {decimal_format} || ' AS ' || column_name
+                    WHEN data_type IN ('smallint', 'integer', 'bigint', 'serial', 'bigserial') THEN {integer_format} || ' AS ' || column_name
                     ELSE '"'||column_name||'"'
                 END AS safe_sql_value,
                 character_maximum_length
                 FROM information_schema.columns
-                WHERE table_schema = '{}'
-                    AND table_name = '{}'
+                WHERE table_schema = '{schema_name}'
+                    AND table_name = '{table_name}'
                 ORDER BY ordinal_position
                 ) AS x
-            """.format(date_type, decimal_format, integer_format, table_dict.get('schema_name'), table_dict.get('table_name'))
+            """
         return self.query(sql)
 
     def map_column_types_to_target(self, table_name):

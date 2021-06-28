@@ -12,8 +12,6 @@ from .commons import utils
 from .commons.tap_s3_csv import FastSyncTapS3Csv
 from .commons.target_bigquery import FastSyncTargetBigquery
 
-from .. import utils as pipelinewise_utils
-
 LOGGER = Logger().get_logger(__name__)
 
 
