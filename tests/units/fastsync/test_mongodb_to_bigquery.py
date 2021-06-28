@@ -1,31 +1,23 @@
 import unittest
 from . import assertions
 
-from pipelinewise.fastsync.mysql_to_bigquery import tap_type_to_target_type, sync_table, main_impl
+from pipelinewise.fastsync.mongodb_to_bigquery import tap_type_to_target_type, sync_table, main_impl
 
-PACKAGE_IN_SCOPE = 'pipelinewise.fastsync.mysql_to_bigquery'
-TAP = 'FastSyncTapMySql'
+PACKAGE_IN_SCOPE = 'pipelinewise.fastsync.mongodb_to_bigquery'
+TAP = 'FastSyncTapMongoDB'
 TARGET = 'FastSyncTargetBigquery'
 
 
 # pylint: disable=missing-function-docstring,invalid-name,no-self-use
-class MySQLToBigQuery(unittest.TestCase):
+class MongoDBToBigquery(unittest.TestCase):
     """
-    Unit tests for fastsync mysql to bigquery
+    Unit tests for fastsync MongoDB to postgres
     """
     def test_tap_type_to_target_type_with_defined_tap_type_returns_equivalent_target_type(self):
-        self.assertEqual('STRING', tap_type_to_target_type('binary', None))
-        self.assertEqual('STRING', tap_type_to_target_type('geometry', None))
-        self.assertEqual('STRING', tap_type_to_target_type('point', None))
-        self.assertEqual('STRING', tap_type_to_target_type('linestring', None))
-        self.assertEqual('STRING', tap_type_to_target_type('polygon', None))
-        self.assertEqual('STRING', tap_type_to_target_type('multipoint', None))
-        self.assertEqual('STRING', tap_type_to_target_type('multilinestring', None))
-        self.assertEqual('STRING', tap_type_to_target_type('multipolygon', None))
-        self.assertEqual('STRING', tap_type_to_target_type('geometrycollection', None))
+        self.assertEqual('STRING', tap_type_to_target_type('object'))
 
     def test_tap_type_to_target_type_with_undefined_tap_type_returns_STRING(self):
-        self.assertEqual('STRING', tap_type_to_target_type('random-type', 'random-type'))
+        self.assertEqual('STRING', tap_type_to_target_type('random-type'))
 
     @staticmethod
     def test_sync_table_runs_successfully_returns_true():

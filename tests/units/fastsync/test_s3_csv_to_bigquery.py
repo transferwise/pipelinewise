@@ -1,31 +1,23 @@
 import unittest
 from . import assertions
 
-from pipelinewise.fastsync.mysql_to_bigquery import tap_type_to_target_type, sync_table, main_impl
+from pipelinewise.fastsync.s3_csv_to_bigquery import tap_type_to_target_type, sync_table, main_impl
 
-PACKAGE_IN_SCOPE = 'pipelinewise.fastsync.mysql_to_bigquery'
-TAP = 'FastSyncTapMySql'
+PACKAGE_IN_SCOPE = 'pipelinewise.fastsync.s3_csv_to_bigquery'
+TAP = 'FastSyncTapS3Csv'
 TARGET = 'FastSyncTargetBigquery'
 
 
 # pylint: disable=missing-function-docstring,invalid-name,no-self-use
-class MySQLToBigQuery(unittest.TestCase):
+class S3CsvToPostgres(unittest.TestCase):
     """
-    Unit tests for fastsync mysql to bigquery
+    Unit tests for fastsync s3 csv to bigquery
     """
     def test_tap_type_to_target_type_with_defined_tap_type_returns_equivalent_target_type(self):
-        self.assertEqual('STRING', tap_type_to_target_type('binary', None))
-        self.assertEqual('STRING', tap_type_to_target_type('geometry', None))
-        self.assertEqual('STRING', tap_type_to_target_type('point', None))
-        self.assertEqual('STRING', tap_type_to_target_type('linestring', None))
-        self.assertEqual('STRING', tap_type_to_target_type('polygon', None))
-        self.assertEqual('STRING', tap_type_to_target_type('multipoint', None))
-        self.assertEqual('STRING', tap_type_to_target_type('multilinestring', None))
-        self.assertEqual('STRING', tap_type_to_target_type('multipolygon', None))
-        self.assertEqual('STRING', tap_type_to_target_type('geometrycollection', None))
+        self.assertEqual('INT64', tap_type_to_target_type('integer'))
 
     def test_tap_type_to_target_type_with_undefined_tap_type_returns_STRING(self):
-        self.assertEqual('STRING', tap_type_to_target_type('random-type', 'random-type'))
+        self.assertEqual('STRING', tap_type_to_target_type('random-type'))
 
     @staticmethod
     def test_sync_table_runs_successfully_returns_true():
