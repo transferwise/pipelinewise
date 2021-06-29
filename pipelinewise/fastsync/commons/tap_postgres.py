@@ -20,9 +20,10 @@ class FastSyncTapPostgres:
     Common functions for fastsync from a Postgres database
     """
 
-    def __init__(self, connection_config, tap_type_to_target_type):
+    def __init__(self, connection_config, tap_type_to_target_type, target_quote=None):
         self.connection_config = connection_config
         self.tap_type_to_target_type = tap_type_to_target_type
+        self.target_quote = target_quote
         self.conn = None
         self.curr = None
         self.primary_host_conn = None
@@ -341,39 +342,62 @@ class FastSyncTapPostgres:
                     AND indisprimary""".format(schema_name, table_name)
         pk_specs = self.query(sql)
         if len(pk_specs) > 0:
-            return [safe_column_name(k[0]) for k in pk_specs]
+            return [safe_column_name(k[0], self.target_quote) for k in pk_specs]
 
         return None
 
-    def get_table_columns(self, table_name):
+    def get_table_columns(self, table_name, max_num=None, date_type='date'):
         """
         Get PG table column details from information_schema
         """
         table_dict = utils.tablename_to_dict(table_name)
-        sql = """
+
+        if max_num:
+            decimals = len(max_num.split('.')[1]) if '.' in max_num else 0
+            decimal_format = f"""
+              'CASE WHEN "' || column_name || '" IS NULL THEN NULL ELSE GREATEST(LEAST({max_num}, ROUND("' || column_name || '"::numeric , {decimals})), -{max_num}) END'
+            """
+            integer_format = """
+              '"' || column_name || '"'
+            """
+        else:
+            decimal_format = """
+              '"' || column_name || '"'
+            """
+            integer_format = decimal_format
+
+        schema_name = table_dict.get('schema_name')
+        table_name = table_dict.get('table_name')
+
+        sql = f"""
                 SELECT
                     column_name
                     ,data_type
                     ,safe_sql_value
+                    ,character_maximum_length
                 FROM (SELECT
                 column_name,
                 data_type,
                 CASE
                     WHEN data_type = 'ARRAY' THEN 'array_to_json("' || column_name || '") AS ' || column_name
+                    WHEN data_type = 'date' THEN column_name || '::{date_type} AS ' || column_name
                     WHEN udt_name = 'time' THEN 'replace("' || column_name || E'"::varchar,\\\'24:00:00\\\',\\\'00:00:00\\\') AS ' || column_name
                     WHEN udt_name = 'timetz' THEN 'replace(("' || column_name || E'" at time zone \'\'UTC\'\')::time::varchar,\\\'24:00:00\\\',\\\'00:00:00\\\') AS ' || column_name
                     WHEN udt_name in ('timestamp', 'timestamptz') THEN
                        'CASE WHEN "' ||column_name|| E'" < \\'0001-01-01 00:00:00.000\\' '
                             'OR "' ||column_name|| E'" > \\'9999-12-31 23:59:59.999\\' THEN \\'9999-12-31 23:59:59.999\\' '
                             'ELSE "' ||column_name|| '" END AS "' ||column_name|| '"'
+                    WHEN data_type IN ('double precision', 'numeric', 'decimal', 'real') THEN {decimal_format} || ' AS ' || column_name
+                    WHEN data_type IN ('smallint', 'integer', 'bigint', 'serial', 'bigserial') THEN {integer_format} || ' AS ' || column_name
                     ELSE '"'||column_name||'"'
-                END AS safe_sql_value
+                END AS safe_sql_value,
+                character_maximum_length
                 FROM information_schema.columns
-                WHERE table_schema = '{}'
-                    AND table_name = '{}'
+                WHERE table_schema = '{schema_name}'
+                    AND table_name = '{table_name}'
                 ORDER BY ordinal_position
                 ) AS x
-            """.format(table_dict.get('schema_name'), table_dict.get('table_name'))
+            """
         return self.query(sql)
 
     def map_column_types_to_target(self, table_name):
@@ -381,20 +405,32 @@ class FastSyncTapPostgres:
         Map PG column types to equivalent types in target
         """
         postgres_columns = self.get_table_columns(table_name)
-        mapped_columns = ['{} {}'.format(safe_column_name(pc[0]),
-                                         self.tap_type_to_target_type(pc[1])) for pc in postgres_columns]
+        mapped_columns = []
+        for pc in postgres_columns:
+            column_type = self.tap_type_to_target_type(pc[1])
+            # postgres bit type can have length greater than 1
+            # most targets would want to map length 1 to boolean and the rest to number
+            if isinstance(column_type, list):
+                column_type = column_type[1 if pc[3] > 1 else 0]
+            mapping = '{} {}'.format(safe_column_name(pc[0], self.target_quote), column_type)
+            mapped_columns.append(mapping)
 
         return {
             'columns': mapped_columns,
             'primary_key': self.get_primary_keys(table_name)
         }
 
+    # pylint: disable=too-many-arguments
     def copy_table(self,
                    table_name,
                    path,
+                   max_num=None,
+                   date_type='date',
                    split_large_files=False,
                    split_file_chunk_size_mb=1000,
-                   split_file_max_chunks=20):
+                   split_file_max_chunks=20,
+                   compress=True
+                   ):
         """
         Export data from table to a zipped csv
         Args:
@@ -405,7 +441,7 @@ class FastSyncTapPostgres:
             split_file_chunk_size_mb: File chunk sizes if `split_large_files` enabled. (Default: 1000)
             split_file_max_chunks: Max number of chunks if `split_large_files` enabled. (Default: 20)
         """
-        table_columns = self.get_table_columns(table_name)
+        table_columns = self.get_table_columns(table_name, max_num, date_type)
         column_safe_sql_values = [c.get('safe_sql_value') for c in table_columns]
 
         # If self.get_table_columns returns zero row then table not exist
@@ -425,7 +461,8 @@ class FastSyncTapPostgres:
         gzip_splitter = split_gzip.open(path,
                                         mode='wb',
                                         chunk_size_mb=split_file_chunk_size_mb,
-                                        max_chunks=split_file_max_chunks if split_large_files else 0)
+                                        max_chunks=split_file_max_chunks if split_large_files else 0,
+                                        compress=compress)
 
         with gzip_splitter as split_gzip_files:
             self.curr.copy_expert(sql, split_gzip_files, size=131072)

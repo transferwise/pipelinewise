@@ -2,6 +2,7 @@
 import io
 import logging
 import gzip
+import builtins
 
 LOGGER = logging.getLogger(__name__)
 
@@ -14,8 +15,8 @@ DEFAULT_MAX_CHUNKS = 20
 EST_COMPR_RATE = 0.12
 
 
-# pylint: disable=W0622
-def open(base_filename, mode='wb', chunk_size_mb=None, max_chunks=None, est_compr_rate=None):
+# pylint: disable=W0622,R1732
+def open(base_filename, mode='wb', chunk_size_mb=None, max_chunks=None, est_compr_rate=None, compress=True):
     """Open a gzip-compressed file in binary or text mode.
 
     Args:
@@ -39,7 +40,7 @@ def open(base_filename, mode='wb', chunk_size_mb=None, max_chunks=None, est_comp
         raise ValueError('Invalid chunk_size_mb: %d' % (chunk_size_mb,))
     if max_chunks is not None and max_chunks < 0:
         raise ValueError('Invalid max_chunks: %d' % (max_chunks,))
-    return SplitGzipFile(base_filename, mode, chunk_size_mb, max_chunks, est_compr_rate)
+    return SplitGzipFile(base_filename, mode, chunk_size_mb, max_chunks, est_compr_rate, compress)
 
 
 # pylint: disable=R0902
@@ -53,14 +54,19 @@ class SplitGzipFile(io.BufferedIOBase):
                  mode: str = None,
                  chunk_size_mb: int = None,
                  max_chunks: int = None,
-                 est_compr_rate: float = None):
+                 est_compr_rate: float = None,
+                 compress=True):
         super().__init__()
 
         self.base_filename = base_filename
         self.mode = mode
         self.chunk_size_mb = chunk_size_mb or DEFAULT_CHUNK_SIZE_MB
         self.max_chunks = max_chunks if max_chunks is not None else DEFAULT_MAX_CHUNKS
-        self.est_compr_rate = est_compr_rate if est_compr_rate is not None else EST_COMPR_RATE
+        self.compress= compress
+        if compress:
+            self.est_compr_rate = est_compr_rate if est_compr_rate is not None else EST_COMPR_RATE
+        else:
+            self.est_compr_rate = 1.0
         self.chunk_seq = 1
         self.current_chunk_size_mb = 0
         self.chunk_filename = None
@@ -100,7 +106,10 @@ class SplitGzipFile(io.BufferedIOBase):
 
             # Open the actual chunk file with gzip data writer
             self.chunk_filename = chunk_filename
-            self.chunk_file = gzip.open(self.chunk_filename, self.mode)
+            if self.compress:
+                self.chunk_file = gzip.open(self.chunk_filename, self.mode)
+            else:
+                self.chunk_file = builtins.open(self.chunk_filename, self.mode)
 
     @staticmethod
     def _bytes_to_megabytes(size: int) -> float:
