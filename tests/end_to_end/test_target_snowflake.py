@@ -147,6 +147,7 @@ class TestTargetSnowflake:
                                             mysql_to_snowflake.tap_type_to_target_type)
 
     # pylint: disable=invalid-name
+    @pytest.mark.dependency(depends=['import_config'])
     def test_resync_pg_to_sf_with_split_large_files(self, tap_postgres_id=TAP_POSTGRES_SPLIT_LARGE_FILES_ID):
         """Resync tables from Postgres to Snowflake using splitting large files option"""
         assertions.assert_resync_tables_success(tap_postgres_id, TARGET_ID, profiling=True)
