@@ -311,9 +311,63 @@ data only after the change.</p>
 </tr>
 </tbody>
 </table>
+<p>BigQuery versioning acts differently as it’s not possible to modify existing columns.
+After the data type change <code class="docutils literal notranslate"><span class="pre">COLUMN_THREE</span></code> remains <code class="docutils literal notranslate"><span class="pre">INTEGER</span></code> with
+the old data and a new <code class="docutils literal notranslate"><span class="pre">COLUMN_TREE__st</span></code> column created with <code class="docutils literal notranslate"><span class="pre">VARCHAR</span></code> type that keeps
+data only after the change.
+The suffix added to the new column indicates the new column type.</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 22%" />
+<col style="width: 22%" />
+<col style="width: 25%" />
+<col style="width: 31%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><strong>COLUMN_ONE</strong></p></td>
+<td><p><strong>COLUMN_TWO</strong></p></td>
+<td><dl class="simple">
+<dt><strong>COLUMN_THREE</strong></dt><dd><p>(INTEGER)</p>
+</dd>
+</dl>
+</td>
+<td><dl class="simple">
+<dt><strong>COLUMN_THREE__st</strong></dt><dd><p>(VARCHAR)</p>
+</dd>
+</dl>
+</td>
+</tr>
+<tr class="row-even"><td><p>text</p></td>
+<td><p>text</p></td>
+<td><p>111</p></td>
+<td></td>
+</tr>
+<tr class="row-odd"><td><p>text</p></td>
+<td><p>text</p></td>
+<td><p>222</p></td>
+<td></td>
+</tr>
+<tr class="row-even"><td><p>text</p></td>
+<td><p>text</p></td>
+<td><p>333</p></td>
+<td></td>
+</tr>
+<tr class="row-odd"><td><p>text</p></td>
+<td><p>text</p></td>
+<td></td>
+<td><p>444-ABC</p></td>
+</tr>
+<tr class="row-even"><td><p>text</p></td>
+<td><p>text</p></td>
+<td></td>
+<td><p>555-DEF</p></td>
+</tr>
+</tbody>
+</table>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
 <p>Please note the <code class="docutils literal notranslate"><span class="pre">NULL</span></code> values in <code class="docutils literal notranslate"><span class="pre">COLUMN_THREE_20190812</span></code> and <code class="docutils literal notranslate"><span class="pre">COLUMN_THREE</span></code> tables.
+(or <code class="docutils literal notranslate"><span class="pre">COLUMN_THREE</span></code> and <code class="docutils literal notranslate"><span class="pre">COLUMN_THREE__st</span></code> for BigQuery)
 <strong>Historical values are not converted to the new data types!</strong>
 If you need the actual representation of the table after data type changes then
 you need to <a class="reference internal" href="resync.html#resync"><span class="std std-ref">Resync Tables</span></a> the table.</p>

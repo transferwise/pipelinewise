@@ -65,9 +65,31 @@ data only after the change.
 | text           | text           |                                | 555-DEF          | 
 +----------------+----------------+--------------------------------+------------------+
 
+BigQuery versioning acts differently as it's not possible to modify existing columns.
+After the data type change ``COLUMN_THREE`` remains ``INTEGER`` with
+the old data and a new ``COLUMN_TREE__st`` column created with ``VARCHAR`` type that keeps
+data only after the change.
+The suffix added to the new column indicates the new column type.
+
++----------------+----------------+------------------+----------------------+
+| **COLUMN_ONE** | **COLUMN_TWO** | **COLUMN_THREE** | **COLUMN_THREE__st** |
+|                |                |     (INTEGER)    |    (VARCHAR)         |
++----------------+----------------+------------------+----------------------+
+| text           | text           | 111              |                      |
++----------------+----------------+------------------+----------------------+
+| text           | text           | 222              |                      |
++----------------+----------------+------------------+----------------------+
+| text           | text           | 333              |                      |
++----------------+----------------+------------------+----------------------+
+| text           | text           |                  | 444-ABC              |
++----------------+----------------+------------------+----------------------+
+| text           | text           |                  | 555-DEF              | 
++----------------+----------------+------------------+----------------------+
+
 .. warning::
 
   Please note the ``NULL`` values in ``COLUMN_THREE_20190812`` and ``COLUMN_THREE`` tables.
+  (or ``COLUMN_THREE`` and ``COLUMN_THREE__st`` for BigQuery)
   **Historical values are not converted to the new data types!**
   If you need the actual representation of the table after data type changes then
   you need to :ref:`resync` the table.
