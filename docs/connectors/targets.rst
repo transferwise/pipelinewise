@@ -47,6 +47,17 @@ PipelineWise can replicate data from every supported :ref:`taps_list` into the f
 
         :ref:`target-s3-csv` 
 
+.. container:: tile-wrapper
+
+    .. container:: tile
+
+        .. container:: img-hover-zoom
+
+          .. image:: ../img/bigquery-logo.png
+             :target: targets/bigquery.html
+
+        :ref:`target-bigquery`
+
 
 Configuring the targets
 -----------------------
@@ -57,4 +68,5 @@ Configuring the targets
    targets/redshift
    targets/postgres
    targets/s3_csv
+   targets/bigquery
 
