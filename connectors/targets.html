@@ -19,7 +19,7 @@
 
   
   
-    <link rel="shortcut icon" href="../_static/pipelinewise.png"/>
+    <link rel="shortcut icon" href="../_static/img/pipelinewise.png"/>
   
 
   
@@ -96,20 +96,20 @@
               
             
             
-              <p class="caption"><span class="caption-text">Installation</span></p>
+              <p class="caption" role="heading"><span class="caption-text">Installation</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../installation_guide/installation.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../installation_guide/creating_pipelines.html">Creating Pipelines</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../installation_guide/running_pipelines.html">Running Pipelines</a></li>
 </ul>
-<p class="caption"><span class="caption-text">Concept</span></p>
+<p class="caption" role="heading"><span class="caption-text">Concept</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../concept/singer.html">Singer.io</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../concept/replication_methods.html">Replication Methods</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../concept/fastsync.html">Fast Sync</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../concept/linux_pipes.html">Linux Pipes in PipelineWise</a></li>
 </ul>
-<p class="caption"><span class="caption-text">Using PipelineWise</span></p>
+<p class="caption" role="heading"><span class="caption-text">Using PipelineWise</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/yaml_config.html">YAML configuration</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/encrypting_passwords.html">Encrypting Passwords</a></li>
@@ -123,7 +123,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/alerts.html">Alerts</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/resync.html">Resync Tables</a></li>
 </ul>
-<p class="caption"><span class="caption-text">Connectors</span></p>
+<p class="caption" role="heading"><span class="caption-text">Connectors</span></p>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="taps.html">Taps (Data Sources)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="taps.html#configuring-taps">Configuring taps</a></li>
@@ -133,10 +133,11 @@
 <li class="toctree-l2"><a class="reference internal" href="targets/redshift.html">Target Redshift</a></li>
 <li class="toctree-l2"><a class="reference internal" href="targets/postgres.html">Target Postgres</a></li>
 <li class="toctree-l2"><a class="reference internal" href="targets/s3_csv.html">Target S3 CSV</a></li>
+<li class="toctree-l2"><a class="reference internal" href="targets/bigquery.html">Target Bigquery</a></li>
 </ul>
 </li>
 </ul>
-<p class="caption"><span class="caption-text">Project</span></p>
+<p class="caption" role="heading"><span class="caption-text">Project</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../project/contribution.html">Contribution</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../project/about.html">Project</a></li>
@@ -239,6 +240,14 @@
 <p><a class="reference internal" href="targets/s3_csv.html#target-s3-csv"><span class="std std-ref">Target S3 CSV</span></a></p>
 </div>
 </div>
+<div class="tile-wrapper docutils container">
+<div class="tile docutils container">
+<div class="img-hover-zoom docutils container">
+<a class="reference external image-reference" href="targets/bigquery.html"><img alt="../_images/bigquery-logo.png" src="../_images/bigquery-logo.png" /></a>
+</div>
+<p><a class="reference internal" href="targets/bigquery.html#target-bigquery"><span class="std std-ref">Target Bigquery</span></a></p>
+</div>
+</div>
 </div>
 <div class="section" id="configuring-the-targets">
 <h1>Configuring the targets<a class="headerlink" href="#configuring-the-targets" title="Permalink to this headline">¶</a></h1>
@@ -260,6 +269,11 @@
 </li>
 <li class="toctree-l1"><a class="reference internal" href="targets/s3_csv.html">Target S3 CSV</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="targets/s3_csv.html#configuring-where-to-replicate-data">Configuring where to replicate data</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="targets/bigquery.html">Target Bigquery</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="targets/bigquery.html#bigquery-setup-requirements">Bigquery setup requirements</a></li>
+<li class="toctree-l2"><a class="reference internal" href="targets/bigquery.html#configuring-where-to-replicate-data">Configuring where to replicate data</a></li>
 </ul>
 </li>
 </ul>
