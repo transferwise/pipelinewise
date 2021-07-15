@@ -37,7 +37,7 @@ def tap_type_to_target_type(csv_type):
         'number': 'NUMERIC',
         'string': 'STRING',
         'boolean': 'STRING',  # The guess sometimes can be wrong, we'll use string for now.
-        'date': 'TIMESTAMP',
+        'date': 'STRING',  # The guess sometimes can be wrong, we'll use string for now.
 
         'date_override': 'TIMESTAMP'  # Column type to use when date_override defined in YAML
     }.get(csv_type, 'STRING')
