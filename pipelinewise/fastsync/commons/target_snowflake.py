@@ -140,13 +140,6 @@ class FastSyncTargetSnowflake:
         archive_table = table_dict.get('table_name')
         archive_schema = table_dict.get('schema_name', '')
 
-        archive_metadata = {
-            'tap': tap_id,
-            'schema': archive_schema,
-            'table': archive_table,
-            'archived-by': 'pipelinewise_fastsync_postgres_to_snowflake'
-        }
-
         # Retain same filename
         archive_file_basename = os.path.basename(source_s3_key)
 
@@ -154,6 +147,15 @@ class FastSyncTargetSnowflake:
         archive_s3_prefix = self.connection_config.get('archive_load_files_s3_prefix', 'archive')
 
         source_s3_bucket = self.connection_config.get('s3_bucket')
+
+        # Combine existing metadata with archive related headers
+        metadata = self.s3.head_object(Bucket=source_s3_bucket, Key=source_s3_key).get('Metadata', {})
+        metadata.update({
+            'tap': tap_id,
+            'schema': archive_schema,
+            'table': archive_table,
+            'archived-by': 'pipelinewise_fastsync_postgres_to_snowflake'
+        })
 
         # Get archive s3 bucket from config, defaulting to same bucket used for Snowflake imports if not specified
         archive_s3_bucket = self.connection_config.get('archive_load_files_s3_bucket', source_s3_bucket)
@@ -163,7 +165,7 @@ class FastSyncTargetSnowflake:
         LOGGER.info('Archiving %s to %s', copy_source, archive_key)
 
         self.s3.copy_object(CopySource=copy_source, Bucket=archive_s3_bucket, Key=archive_key,
-                            Metadata=archive_metadata, MetadataDirective='REPLACE')
+                            Metadata=metadata, MetadataDirective='REPLACE')
 
     def create_schema(self, schema):
         sql = 'CREATE SCHEMA IF NOT EXISTS {}'.format(schema)
