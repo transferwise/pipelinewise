@@ -21,7 +21,7 @@ class S3Mock:
     def copy_object(self, **kwargs):
         """Mock if needed"""
 
-    # pylint: disable=no-self-use
+    # pylint: disable=no-self-use, unused-argument
     def head_object(self, **kwargs):
         """Mock if needed"""
         return {}
