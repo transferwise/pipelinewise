@@ -39,7 +39,8 @@ class FastSyncTargetBigquery:
 
     def open_connection(self):
         project_id = self.connection_config['project_id']
-        return bigquery.Client(project=project_id)
+        location = self.connection_config.get('location', None)
+        return bigquery.Client(project=project_id, location=location)
 
     def query(self, query, params=None):
         def to_query_parameter(value):

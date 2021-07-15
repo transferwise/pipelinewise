@@ -48,21 +48,24 @@ class TestFastSyncTargetBigquery:
     """
     def setup_method(self):
         """Initialise test FastSyncTargetPostgres object"""
-        self.bigquery = FastSyncTargetBigqueryMock(connection_config={'project_id': 'dummy-project'},
+        self.bigquery = FastSyncTargetBigqueryMock(connection_config={'project_id': 'dummy-project', 'location': 'EU'},
                                                    transformation_config={})
 
     @patch('pipelinewise.fastsync.commons.target_bigquery.bigquery.Client')
-    def test_create_schema(self, client, bigquery_job):
+    def test_open_connection(self, client):
         """Validate if create schema queries generated correctly"""
-        client().query.return_value = bigquery_job
+        self.bigquery.open_connection()
+        client.assert_called_with(project='dummy-project', location='EU')
+
+    @patch('pipelinewise.fastsync.commons.target_bigquery.bigquery.Client')
+    def test_create_schema(self, client):
+        """Validate if create schema queries generated correctly"""
         self.bigquery.create_schema('new_schema')
         client().create_dataset.assert_called_with('new_schema', exists_ok=True)
 
     @patch('pipelinewise.fastsync.commons.target_bigquery.bigquery.Client')
-    def test_drop_table(self, client, bigquery_job):
+    def test_drop_table(self, client):
         """Validate if drop table queries generated correctly"""
-        client().query.return_value = bigquery_job
-
         self.bigquery.drop_table('test_schema', 'test_table')
         client().query.assert_called_with(
             'DROP TABLE IF EXISTS test_schema.`test_table`', job_config=ANY)
@@ -88,10 +91,8 @@ class TestFastSyncTargetBigquery:
             'DROP TABLE IF EXISTS test_schema.`test_table_with_space_temp`', job_config=ANY)
 
     @patch('pipelinewise.fastsync.commons.target_bigquery.bigquery.Client')
-    def test_create_table(self, client, bigquery_job):
+    def test_create_table(self, client):
         """Validate if create table queries generated correctly"""
-        client().query.return_value = bigquery_job
-
         # Create table with standard table and column names
         self.bigquery.create_table(target_schema='test_schema',
                                     table_name='test_table',
@@ -232,7 +233,7 @@ class TestFastSyncTargetBigquery:
             'GRANT SELECT ON test_schema.`table_with_space_and_uppercase` TO ROLE test_role', job_config=ANY)
 
     @patch('pipelinewise.fastsync.commons.target_bigquery.bigquery.Client')
-    def test_grant_usage_on_schema(self, client, bigquery_job):
+    def test_grant_usage_on_schema(self, client):
         """Validate if GRANT command generated correctly"""
         self.bigquery.grant_usage_on_schema(target_schema='test_schema',
                                              role='test_role')
@@ -240,7 +241,7 @@ class TestFastSyncTargetBigquery:
             'GRANT USAGE ON SCHEMA test_schema TO ROLE test_role', job_config=ANY)
 
     @patch('pipelinewise.fastsync.commons.target_bigquery.bigquery.Client')
-    def test_grant_select_on_schema(self, client, bigquery_job):
+    def test_grant_select_on_schema(self, client):
         """Validate if GRANT command generated correctly"""
         self.bigquery.grant_select_on_schema(target_schema='test_schema',
                                               role='test_role')
