@@ -21,6 +21,9 @@ class S3Mock:
     def copy_object(self, **kwargs):
         """Mock if needed"""
 
+    def head_object(self, **kwargs):
+        """Mock if needed"""
+
 
 class FastSyncTargetSnowflakeMock(FastSyncTargetSnowflake):
     """
