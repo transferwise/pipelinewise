@@ -149,7 +149,7 @@ class FastSyncTargetSnowflake:
         source_s3_bucket = self.connection_config.get('s3_bucket')
 
         # Combine existing metadata with archive related headers
-        metadata = self.s3.head_object(Bucket=source_s3_bucket, Key=source_s3_key)['Metadata']
+        metadata = self.s3.head_object(Bucket=source_s3_bucket, Key=source_s3_key).get('Metadata', {})
         metadata.update({
             'tap': tap_id,
             'schema': archive_schema,
