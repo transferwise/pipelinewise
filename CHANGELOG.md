@@ -2,6 +2,8 @@
 -------------------
 - Bump `pipelinewise-target-snowflake` from `1.13.0` to `1.13.1`
     - Fixed an issue with S3 metadata required for decryption not being included in archived load files
+- Fixed an issue in fastsync to BigQuery data type mapping
+- Add `location` config parameter to fastsync to BigQuery
 
 0.34.0 (2021-06-24)
 -------------------
