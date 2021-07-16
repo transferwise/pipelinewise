@@ -1,3 +1,10 @@
+0.34.1 (2021-07-15)
+-------------------
+- Bump `pipelinewise-target-snowflake` from `1.13.0` to `1.13.1`
+    - Fixed an issue with S3 metadata required for decryption not being included in archived load files
+- Fixed an issue in fastsync to BigQuery data type mapping
+- Add `location` config parameter to fastsync to BigQuery
+
 0.34.0 (2021-06-24)
 -------------------
 - Add `split_large_files` option to FastSync target-snowflake to load large files in parallel into Snowflake
