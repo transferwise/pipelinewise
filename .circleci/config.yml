@@ -151,7 +151,7 @@ jobs:
             DEPLOY_SLACK_CHANNEL: "#analytics-platform-builds"
             DEPLOY_IMAGE_NAME: "pipelinewise"
             DEPLOY_DOCKERFILE: "./Dockerfile"
-            DEPLOY_IMAGE_ADDITIONAL_TAGS: ["latest"]
+            DEPLOY_IMAGE_ADDITIONAL_TAGS: "latest"
 
   promote_docker_image:
     <<: *docker_k8s_deployer
