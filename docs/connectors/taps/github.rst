@@ -42,13 +42,13 @@ Example YAML for ``tap-github``:
     # ------------------------------------------------------------------------------
     db_conn:
       access_token: "<ACCESS_TOKEN>"            # Github access token with at least the repo scope
-      organization: "transferwise"              # The organization you want to extract the data from
+      organization: "gnome"                     # The organization you want to extract the data from
                                                 # Required when repos_include/repository isn't present
                                                 # OR
                                                 # Required when repos_exclude contains wildcard matchers
                                                 # OR
                                                 # Required when repos_include/repository contains wildcard matchers
-      repos_include: "tap* pipelinewise"        # Allow list strategy to extract selected repos data from organization.
+      repos_include: "gnome* polari"            # Allow list strategy to extract selected repos data from organization.
                                                 # Each repo path should be space delimited.
                                                 # Supports wildcard matching
                                                 # Values also valid: singer-io/tap-github another-org/tap-octopus
@@ -58,12 +58,12 @@ Example YAML for ``tap-github``:
                                                 # Supports wildcard matching
                                                 # Requires organization
                                                 # Org prefix not allowed in repos_exclude
-      repository: "transferwise/pipelinewise"   # (DEPRECATED) Path to one or multiple repositories that you want to extract data from organization (has priority over repos_exclude))
+      repository: "gnome/gnome-software"        # (DEPRECATED) Path to one or multiple repositories that you want to extract data from organization (has priority over repos_exclude))
                                                 # Each repo path should be space delimited.
                                                 # Org prefix not allowed when organization is present
-      include_archived                          # Optional: true/false to include archived repos. Default false
-      include_disabled                          # Optional: true/false to include disabled repos. Default false
-      max_rate_limit_wait_seconds               # Optional: Max time to wait if you hit the github api limit. Default to 600s
+      include_archived: false                   # Optional: true/false to include archived repos. Default false
+      include_disabled: false                   # Optional: true/false to include disabled repos. Default false
+      max_rate_limit_wait_seconds: 600          # Optional: Max time to wait if you hit the github api limit. Default to 600s
 
 
     # ------------------------------------------------------------------------------
