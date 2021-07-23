@@ -232,6 +232,46 @@
         }
       },
       "required": ["type"]
+    },
+    "tap_github": {
+      "properties": {
+        "type": {
+          "enum": ["tap_github"]
+        },
+        "db_conn": {
+          "type": "object",
+          "required": ["access_token"],
+          "properties": {
+            "access_token": {
+              "type": "string"
+            },
+            "organization": {
+              "type": "string"
+            },
+            "repos_include": {
+              "type": "string"
+            },
+            "repos_exclude": {
+              "type": "string"
+            },
+            "repository": {
+              "type": "string"
+            },
+            "include_archived": {
+              "type": "boolean",
+              "default": false
+            },
+            "include_disabled": {
+              "type": "boolean",
+              "default": false
+            },
+            "max_rate_limit_wait_seconds": {
+              "type": "integer",
+              "default": 600
+            }
+          }
+        }
+      }
     }
   },
   "type": "object",
