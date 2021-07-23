@@ -252,6 +252,7 @@ following the steps in the <a class="reference internal" href="../../installatio
 <span class="nt">name</span><span class="p">:</span> <span class="s">&quot;Github&quot;</span>                         <span class="c1"># Name of the tap</span>
 <span class="nt">type</span><span class="p">:</span> <span class="s">&quot;tap-github&quot;</span>                     <span class="c1"># !! THIS SHOULD NOT CHANGE !!</span>
 <span class="nt">owner</span><span class="p">:</span> <span class="s">&quot;somebody@foo.com&quot;</span>              <span class="c1"># Data owner to contact</span>
+<span class="nt">sync_period</span><span class="p">:</span> <span class="s">&quot;*/90</span><span class="nv"> </span><span class="s">*</span><span class="nv"> </span><span class="s">*</span><span class="nv"> </span><span class="s">*</span><span class="nv"> </span><span class="s">*&quot;</span>            <span class="c1"># Period in which the tap will run</span>
 <span class="c1">#send_alert: False                     # Optional: Disable all configured alerts on this tap</span>
 
 
@@ -260,8 +261,29 @@ following the steps in the <a class="reference internal" href="../../installatio
 <span class="c1"># ------------------------------------------------------------------------------</span>
 <span class="nt">db_conn</span><span class="p">:</span>
   <span class="nt">access_token</span><span class="p">:</span> <span class="s">&quot;&lt;ACCESS_TOKEN&gt;&quot;</span>            <span class="c1"># Github access token with at least the repo scope</span>
-  <span class="nt">repository</span><span class="p">:</span> <span class="s">&quot;transferwise/pipelinewise&quot;</span>   <span class="c1"># Path to one or multiple repositories that you want to extract data from</span>
+  <span class="nt">organization</span><span class="p">:</span> <span class="s">&quot;gnome&quot;</span>                     <span class="c1"># The organization you want to extract the data from</span>
+                                            <span class="c1"># Required when repos_include/repository isn&#39;t present</span>
+                                            <span class="c1"># OR</span>
+                                            <span class="c1"># Required when repos_exclude contains wildcard matchers</span>
+                                            <span class="c1"># OR</span>
+                                            <span class="c1"># Required when repos_include/repository contains wildcard matchers</span>
+  <span class="nt">repos_include</span><span class="p">:</span> <span class="s">&quot;gnome*</span><span class="nv"> </span><span class="s">polari&quot;</span>            <span class="c1"># Allow list strategy to extract selected repos data from organization.</span>
                                             <span class="c1"># Each repo path should be space delimited.</span>
+                                            <span class="c1"># Supports wildcard matching</span>
+                                            <span class="c1"># Values also valid: singer-io/tap-github another-org/tap-octopus</span>
+                                            <span class="c1"># Org prefix not allowed when organization is present</span>
+  <span class="nt">repos_exclude</span><span class="p">:</span> <span class="s">&quot;*tests*</span><span class="nv"> </span><span class="s">api-docs&quot;</span>         <span class="c1"># Deny list to extract all repos from organization except the ones listed.</span>
+                                            <span class="c1"># Each repo path should be space delimited.</span>
+                                            <span class="c1"># Supports wildcard matching</span>
+                                            <span class="c1"># Requires organization</span>
+                                            <span class="c1"># Org prefix not allowed in repos_exclude</span>
+  <span class="nt">repository</span><span class="p">:</span> <span class="s">&quot;gnome/gnome-software&quot;</span>        <span class="c1"># (DEPRECATED) Path to one or multiple repositories that you want to extract data from organization (has priority over repos_exclude))</span>
+                                            <span class="c1"># Each repo path should be space delimited.</span>
+                                            <span class="c1"># Org prefix not allowed when organization is present</span>
+  <span class="nt">include_archived</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">false</span>                   <span class="c1"># Optional: true/false to include archived repos. Default false</span>
+  <span class="nt">include_disabled</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">false</span>                   <span class="c1"># Optional: true/false to include disabled repos. Default false</span>
+  <span class="nt">max_rate_limit_wait_seconds</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">600</span>          <span class="c1"># Optional: Max time to wait if you hit the github api limit. Default to 600s</span>
+
 
 <span class="c1"># ------------------------------------------------------------------------------</span>
 <span class="c1"># Destination (Target) - Target properties</span>
