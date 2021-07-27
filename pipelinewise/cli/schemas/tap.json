@@ -240,7 +240,7 @@
         },
         "db_conn": {
           "type": "object",
-          "required": ["access_token"],
+          "required": ["access_token", "start_date"],
           "properties": {
             "access_token": {
               "type": "string"
@@ -267,7 +267,9 @@
             },
             "max_rate_limit_wait_seconds": {
               "type": "integer",
-              "default": 600
+              "default": 600,
+              "min": 600,
+              "max": 3600
             }
           }
         }
