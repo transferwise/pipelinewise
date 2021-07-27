@@ -234,6 +234,22 @@
       "required": ["type"]
     },
     "tap_github": {
+      "anyOf": [
+        {
+          "properties": {
+            "organization": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "properties": {
+            "repository": {
+              "type": "string"
+            }
+          }
+        }
+      ],
       "properties": {
         "type": {
           "enum": ["tap_github"]
