@@ -5,7 +5,6 @@ owner: "somebody@foo.com"
 sync_period: "*/90 * * * *"
 
 db_conn:
-  access_token: "<ACCESS_TOKEN>"
   organization: "gnome"
   repos_include: "gnome* polari"
   repos_exclude: "*tests* api-docs"
