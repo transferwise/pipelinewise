@@ -1,0 +1,47 @@
+id: "github"
+name: "Github"
+type: "tap-github"
+owner: "somebody@foo.com"
+sync_period: "*/90 * * * *"
+
+db_conn:
+  access_token: "<ACCESS_TOKEN>"
+  organization: "gnome"
+  repos_include: "gnome* polari"
+  repos_exclude: "*tests* api-docs"
+  repository: "gnome/gnome-software"
+  include_archived: false
+  include_disabled: false
+  max_rate_limit_wait_seconds: 600
+
+target: "snowflake"
+batch_size_rows: 20000
+
+schemas:
+  - source_schema: "my_db"
+    target_schema: "repl_my_db"
+    target_schema_select_permissions:
+      - grp_stats
+
+
+
+
+
+    tables:
+      - table_name: "table_one"
+        replication_method: "INCREMENTAL"
+        replication_key: "last_update"
+
+
+
+
+
+
+
+      - table_name: "table_two"
+        replication_method: "LOG_BASED"
+
+
+
+
+

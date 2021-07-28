@@ -411,3 +411,10 @@ class TestUtils:
         """generate_random_string given a length greater than or eq to 8 expect result"""
         random_str = cli.utils.generate_random_string(10)
         assert len(random_str) == 10
+
+    def test_tap_github_with_valid_json_schema(self):
+        schema = cli.utils.load_schema('tap')
+
+        # Valid instance should return None
+        actual_yaml = cli.utils.load_yaml('{}/resources/tap-valid-github.yml'.format(os.path.dirname(__file__)))
+        assert cli.utils.validate(actual_yaml, schema) is None
