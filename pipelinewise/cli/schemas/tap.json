@@ -233,68 +233,83 @@
       },
       "required": ["type"]
     },
-    "tap_github": {
+    "is_tap_github": {
+      "required": ["type"],
       "properties": {
         "type": {
           "enum": ["tap-github"]
-        },
-        "db_conn": {
-          "type": "object",
-          "required": ["access_token", "start_date"],
-          "properties": {
-            "access_token": {
-              "type": "string"
-            },
-            "start_date": {
-              "type": "string"
-            },
-            "organization": {
-              "type": "string"
-            },
-            "repos_include": {
-              "type": "string"
-            },
-            "repos_exclude": {
-              "type": "string"
-            },
-            "repository": {
-              "type": "string"
-            },
-            "include_archived": {
-              "type": "boolean",
-              "default": false
-            },
-            "include_disabled": {
-              "type": "boolean",
-              "default": false
-            },
-            "max_rate_limit_wait_seconds": {
-              "type": "integer",
-              "default": 600,
-              "min": 600,
-              "max": 3600
-            }
-          },
-          "allOf": [
-            {
-              "if": {
-                "not": { "const": "repos_include" }
-              },
-              "then": {
-                "required": ["organization"]
-              }
-            },
-            {
-              "if": {
-                "not": { "const": "repository" }
-              },
-              "then": {
-                "required": ["organization"]
-              }
-            }
-          ]
         }
       }
+    },
+    "tap_github": {
+      "anyOf": [
+        {
+          "not": {
+            "$ref": "#/definitions/is_tap_github"
+          }
+        },
+        {
+          "required": ["db_conn", "schemas"],
+          "properties": {
+            "db_conn": {
+              "type": "object",
+              "required": ["access_token", "start_date"],
+              "properties": {
+                "access_token": {
+                  "type": "string"
+                },
+                "start_date": {
+                  "type": "string"
+                },
+                "organization": {
+                  "type": "string"
+                },
+                "repos_include": {
+                  "type": "string"
+                },
+                "repos_exclude": {
+                  "type": "string"
+                },
+                "repository": {
+                  "type": "string"
+                },
+                "include_archived": {
+                  "type": "boolean",
+                  "default": false
+                },
+                "include_disabled": {
+                  "type": "boolean",
+                  "default": false
+                },
+                "max_rate_limit_wait_seconds": {
+                  "type": "integer",
+                  "default": 600,
+                  "min": 600,
+                  "max": 3600
+                }
+              },
+              "allOf": [
+                {
+                  "if": {
+                    "not": { "const": "repos_include" }
+                  },
+                  "then": {
+                    "required": ["organization"]
+                  }
+                },
+                {
+                  "if": {
+                    "not": { "const": "repository" }
+                  },
+                  "then": {
+                    "required": ["organization"]
+                  }
+                }
+              ]
+            }
+          }
+        }
+      ]
     }
   },
   "type": "object",
