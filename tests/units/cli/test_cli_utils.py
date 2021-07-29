@@ -411,4 +411,3 @@ class TestUtils:
         """generate_random_string given a length greater than or eq to 8 expect result"""
         random_str = cli.utils.generate_random_string(10)
         assert len(random_str) == 10
-
