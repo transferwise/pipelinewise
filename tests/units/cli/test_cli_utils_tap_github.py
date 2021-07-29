@@ -18,12 +18,18 @@ class TestUtils:
         assert pytest_wrapped_e.value.code == 1
 
     def test_should_pass_with_valid_json_schema(self):
+        """
+        Test Should pass with valid json schema
+        """
         schema = cli.utils.load_schema('tap')
 
         actual_yaml = cli.utils.load_yaml(TAP_GITHUB_YAML)
         assert cli.utils.validate(actual_yaml, schema) is None
 
     def test_should_fail_when_access_token_is_missing(self):
+        """
+        Test Should fail when access token is missing
+        """
         schema = cli.utils.load_schema('tap')
 
         actual_yaml = cli.utils.load_yaml(TAP_GITHUB_YAML)
@@ -32,6 +38,9 @@ class TestUtils:
         self.assert_json_is_invalid(schema, actual_yaml)
 
     def test_should_fail_when_start_date_is_missing(self):
+        """
+        Test should fail when start date is missing
+        """
         schema = cli.utils.load_schema('tap')
 
         actual_yaml = cli.utils.load_yaml(TAP_GITHUB_YAML)
@@ -40,6 +49,9 @@ class TestUtils:
         self.assert_json_is_invalid(schema, actual_yaml)
 
     def test_should_fail_when_access_token_is_not_string(self):
+        """
+        Test should fail when acess token is not string
+        """
         schema = cli.utils.load_schema('tap')
 
         actual_yaml = cli.utils.load_yaml(TAP_GITHUB_YAML)
@@ -48,6 +60,9 @@ class TestUtils:
         self.assert_json_is_invalid(schema, actual_yaml)
 
     def test_should_fail_when_start_date_is_not_string(self):
+        """
+        Test should fail when start date is not string
+        """
         schema = cli.utils.load_schema('tap')
 
         actual_yaml = cli.utils.load_yaml(TAP_GITHUB_YAML)
@@ -56,6 +71,9 @@ class TestUtils:
         self.assert_json_is_invalid(schema, actual_yaml)
 
     def test_should_fail_when_organization_is_not_string(self):
+        """
+        Test should fail when organization is not string
+        """
         schema = cli.utils.load_schema('tap')
 
         actual_yaml = cli.utils.load_yaml(TAP_GITHUB_YAML)
@@ -64,6 +82,9 @@ class TestUtils:
         self.assert_json_is_invalid(schema, actual_yaml)
 
     def test_should_fail_when_repos_include_is_not_string(self):
+        """
+        Test should fail when repos include is not string
+        """
         schema = cli.utils.load_schema('tap')
 
         actual_yaml = cli.utils.load_yaml(TAP_GITHUB_YAML)
@@ -72,6 +93,9 @@ class TestUtils:
         self.assert_json_is_invalid(schema, actual_yaml)
 
     def test_should_fail_when_repos_exclude_is_not_string(self):
+        """
+        Test should fail when repos exclude is not string
+        """
         schema = cli.utils.load_schema('tap')
 
         actual_yaml = cli.utils.load_yaml(TAP_GITHUB_YAML)
@@ -80,6 +104,9 @@ class TestUtils:
         self.assert_json_is_invalid(schema, actual_yaml)
 
     def test_should_fail_when_repository_is_not_string(self):
+        """
+        Test should fail when repository is not string
+        """
         schema = cli.utils.load_schema('tap')
 
         actual_yaml = cli.utils.load_yaml(TAP_GITHUB_YAML)
@@ -88,6 +115,9 @@ class TestUtils:
         self.assert_json_is_invalid(schema, actual_yaml)
 
     def test_should_fail_when_include_archived_is_not_boolean(self):
+        """
+        Test should fail when include archived is not boolean
+        """
         schema = cli.utils.load_schema('tap')
 
         actual_yaml = cli.utils.load_yaml(TAP_GITHUB_YAML)
@@ -96,6 +126,9 @@ class TestUtils:
         self.assert_json_is_invalid(schema, actual_yaml)
 
     def test_should_fail_when_include_disabled_is_not_boolean(self):
+        """
+        Test should fail when include disabled is not boolean
+        """
         schema = cli.utils.load_schema('tap')
 
         actual_yaml = cli.utils.load_yaml(TAP_GITHUB_YAML)
@@ -104,6 +137,9 @@ class TestUtils:
         self.assert_json_is_invalid(schema, actual_yaml)
 
     def test_should_fail_when_max_rate_limit_wait_seconds_is_not_integer(self):
+        """
+        Test should fail when max rate limit wait seconds is not integer
+        """
         schema = cli.utils.load_schema('tap')
 
         actual_yaml = cli.utils.load_yaml(TAP_GITHUB_YAML)
