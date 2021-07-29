@@ -274,7 +274,25 @@
               "min": 600,
               "max": 3600
             }
-          }
+          },
+          "allOf": [
+            {
+              "if": {
+                "not": { "const": "repos_include" }
+              },
+              "then": {
+                "required": ["organization"]
+              }
+            },
+            {
+              "if": {
+                "not": { "const": "repository" }
+              },
+              "then": {
+                "required": ["organization"]
+              }
+            }
+          ]
         }
       }
     }

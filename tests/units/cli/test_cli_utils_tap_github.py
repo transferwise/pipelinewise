@@ -26,6 +26,18 @@ class TestUtils:
         actual_yaml = cli.utils.load_yaml(TAP_GITHUB_YAML)
         assert cli.utils.validate(actual_yaml, schema) is None
 
+    def test_should_fail_if_organization_missing_when_repos_include_is_missing(self):
+        """
+        Test should fail if organization is missing when repos include is missing
+        """
+        schema = cli.utils.load_schema('tap')
+
+        actual_yaml = cli.utils.load_yaml(TAP_GITHUB_YAML)
+        del actual_yaml['db_conn']['organization']
+        del actual_yaml['db_conn']['repos_include']
+
+        self.assert_json_is_invalid(schema, actual_yaml)
+
     def test_should_fail_when_access_token_is_missing(self):
         """
         Test Should fail when access token is missing
@@ -88,7 +100,7 @@ class TestUtils:
         schema = cli.utils.load_schema('tap')
 
         actual_yaml = cli.utils.load_yaml(TAP_GITHUB_YAML)
-        actual_yaml['db_conn']['repos_include'] = {}
+        actual_yaml['db_conn']['repos_include'] = []
 
         self.assert_json_is_invalid(schema, actual_yaml)
 
@@ -121,7 +133,7 @@ class TestUtils:
         schema = cli.utils.load_schema('tap')
 
         actual_yaml = cli.utils.load_yaml(TAP_GITHUB_YAML)
-        actual_yaml['db_conn']['include_archived'] = 'any string'
+        actual_yaml['db_conn']['include_archived'] = 'false'
 
         self.assert_json_is_invalid(schema, actual_yaml)
 
@@ -132,7 +144,7 @@ class TestUtils:
         schema = cli.utils.load_schema('tap')
 
         actual_yaml = cli.utils.load_yaml(TAP_GITHUB_YAML)
-        actual_yaml['db_conn']['include_archived'] = 'any string'
+        actual_yaml['db_conn']['include_archived'] = 'false'
 
         self.assert_json_is_invalid(schema, actual_yaml)
 
@@ -143,6 +155,6 @@ class TestUtils:
         schema = cli.utils.load_schema('tap')
 
         actual_yaml = cli.utils.load_yaml(TAP_GITHUB_YAML)
-        actual_yaml['db_conn']['max_rate_limit_wait_seconds'] = 'any number'
+        actual_yaml['db_conn']['max_rate_limit_wait_seconds'] = '111'
 
         self.assert_json_is_invalid(schema, actual_yaml)
