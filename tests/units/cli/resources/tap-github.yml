@@ -6,6 +6,7 @@ sync_period: "*/90 * * * *"
 
 db_conn:
   access_token: "<ACCESS_TOKEN>"
+  start_date: "2021-07-14T00:00:00Z"
   organization: "gnome"
   repos_include: "gnome* polari"
   repos_exclude: "*tests* api-docs"
@@ -26,17 +27,5 @@ schemas:
       - table_name: "table_one"
         replication_method: "INCREMENTAL"
         replication_key: "last_update"
-
-
-
-
-
-
-
       - table_name: "table_two"
         replication_method: "LOG_BASED"
-
-
-
-
-

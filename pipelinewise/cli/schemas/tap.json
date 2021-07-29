@@ -234,31 +234,18 @@
       "required": ["type"]
     },
     "tap_github": {
-      "anyOf": [
-        {
-          "properties": {
-            "organization": {
-              "type": "string"
-            }
-          }
-        },
-        {
-          "properties": {
-            "repository": {
-              "type": "string"
-            }
-          }
-        }
-      ],
       "properties": {
         "type": {
-          "enum": ["tap_github"]
+          "enum": ["tap-github"]
         },
         "db_conn": {
           "type": "object",
           "required": ["access_token", "start_date"],
           "properties": {
             "access_token": {
+              "type": "string"
+            },
+            "start_date": {
               "type": "string"
             },
             "organization": {
@@ -362,6 +349,9 @@
   "allOf": [
     {
       "$ref": "#/definitions/tap_mongo_implies_ft_and_lb"
+    },
+    {
+      "$ref": "#/definitions/tap_github"
     }
   ],
   "required": [

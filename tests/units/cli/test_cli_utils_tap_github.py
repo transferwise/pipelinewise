@@ -1,0 +1,112 @@
+import os
+import pipelinewise.cli as cli
+import pytest
+
+TAP_GITHUB_YAML = '{}/resources/tap-github.yml'.format(os.path.dirname(__file__))
+
+# pylint: disable=no-self-use,too-many-public-methods,fixme
+class TestUtils:
+    """
+    Unit Tests for Tap Github PipelineWise CLI utility functions
+    """
+    def assert_json_is_invalid(self, schema, invalid_yaml):
+        """Simple assertion to check if validate function exits with error"""
+        with pytest.raises(SystemExit) as pytest_wrapped_e:
+            cli.utils.validate(invalid_yaml, schema)
+
+        assert pytest_wrapped_e.type == SystemExit
+        assert pytest_wrapped_e.value.code == 1
+
+    def test_should_pass_with_valid_json_schema(self):
+        schema = cli.utils.load_schema('tap')
+
+        actual_yaml = cli.utils.load_yaml(TAP_GITHUB_YAML)
+        assert cli.utils.validate(actual_yaml, schema) is None
+
+    def test_should_fail_when_access_token_is_missing(self):
+        schema = cli.utils.load_schema('tap')
+
+        actual_yaml = cli.utils.load_yaml(TAP_GITHUB_YAML)
+        del actual_yaml['db_conn']['access_token']
+
+        self.assert_json_is_invalid(schema, actual_yaml)
+
+    def test_should_fail_when_start_date_is_missing(self):
+        schema = cli.utils.load_schema('tap')
+
+        actual_yaml = cli.utils.load_yaml(TAP_GITHUB_YAML)
+        del actual_yaml['db_conn']['start_date']
+
+        self.assert_json_is_invalid(schema, actual_yaml)
+
+    def test_should_fail_when_access_token_is_not_string(self):
+        schema = cli.utils.load_schema('tap')
+
+        actual_yaml = cli.utils.load_yaml(TAP_GITHUB_YAML)
+        actual_yaml['db_conn']['access_token'] = 123456
+
+        self.assert_json_is_invalid(schema, actual_yaml)
+
+    def test_should_fail_when_start_date_is_not_string(self):
+        schema = cli.utils.load_schema('tap')
+
+        actual_yaml = cli.utils.load_yaml(TAP_GITHUB_YAML)
+        actual_yaml['db_conn']['start_date'] = 123456
+
+        self.assert_json_is_invalid(schema, actual_yaml)
+
+    def test_should_fail_when_organization_is_not_string(self):
+        schema = cli.utils.load_schema('tap')
+
+        actual_yaml = cli.utils.load_yaml(TAP_GITHUB_YAML)
+        actual_yaml['db_conn']['organization'] = []
+
+        self.assert_json_is_invalid(schema, actual_yaml)
+
+    def test_should_fail_when_repos_include_is_not_string(self):
+        schema = cli.utils.load_schema('tap')
+
+        actual_yaml = cli.utils.load_yaml(TAP_GITHUB_YAML)
+        actual_yaml['db_conn']['repos_include'] = {}
+
+        self.assert_json_is_invalid(schema, actual_yaml)
+
+    def test_should_fail_when_repos_exclude_is_not_string(self):
+        schema = cli.utils.load_schema('tap')
+
+        actual_yaml = cli.utils.load_yaml(TAP_GITHUB_YAML)
+        actual_yaml['db_conn']['repos_include'] = {}
+
+        self.assert_json_is_invalid(schema, actual_yaml)
+
+    def test_should_fail_when_repository_is_not_string(self):
+        schema = cli.utils.load_schema('tap')
+
+        actual_yaml = cli.utils.load_yaml(TAP_GITHUB_YAML)
+        actual_yaml['db_conn']['repository'] = {}
+
+        self.assert_json_is_invalid(schema, actual_yaml)
+
+    def test_should_fail_when_include_archived_is_not_boolean(self):
+        schema = cli.utils.load_schema('tap')
+
+        actual_yaml = cli.utils.load_yaml(TAP_GITHUB_YAML)
+        actual_yaml['db_conn']['include_archived'] = 'any string'
+
+        self.assert_json_is_invalid(schema, actual_yaml)
+
+    def test_should_fail_when_include_disabled_is_not_boolean(self):
+        schema = cli.utils.load_schema('tap')
+
+        actual_yaml = cli.utils.load_yaml(TAP_GITHUB_YAML)
+        actual_yaml['db_conn']['include_archived'] = 'any string'
+
+        self.assert_json_is_invalid(schema, actual_yaml)
+
+    def test_should_fail_when_max_rate_limit_wait_seconds_is_not_integer(self):
+        schema = cli.utils.load_schema('tap')
+
+        actual_yaml = cli.utils.load_yaml(TAP_GITHUB_YAML)
+        actual_yaml['db_conn']['max_rate_limit_wait_seconds'] = 'any number'
+
+        self.assert_json_is_invalid(schema, actual_yaml)
