@@ -291,18 +291,18 @@
               "allOf": [
                 {
                   "if": {
-                    "not": { "const": "repos_include" }
+                    "const": "repos_include"
                   },
                   "then": {
-                    "required": ["organization"]
+                    "not": { "required": ["organization"] }
                   }
                 },
                 {
                   "if": {
-                    "not": { "const": "repository" }
+                    "const": "repository"
                   },
                   "then": {
-                    "required": ["organization"]
+                    "not": { "required": ["organization"] }
                   }
                 }
               ]

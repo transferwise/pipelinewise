@@ -26,9 +26,9 @@ class TestUtils:
         actual_yaml = cli.utils.load_yaml(TAP_GITHUB_YAML)
         assert cli.utils.validate(actual_yaml, schema) is None
 
-    def test_should_fail_if_organization_missing_when_repos_include_is_missing(self):
+    def test_should_pass_if_organization_and_repos_include_missing_but_repository_exists(self):
         """
-        Test should fail if organization is missing when repos include is missing
+        Test should pass if organization and repos include missing but repository exists
         """
         schema = cli.utils.load_schema('tap')
 
@@ -36,7 +36,19 @@ class TestUtils:
         del actual_yaml['db_conn']['organization']
         del actual_yaml['db_conn']['repos_include']
 
-        self.assert_json_is_invalid(schema, actual_yaml)
+        assert cli.utils.validate(actual_yaml, schema) is None
+
+    def test_should_pass_if_organization_and_repository_missing_but_repos_include_exists(self):
+        """
+        Test should pass if organization and repository missing but repos include_exists
+        """
+        schema = cli.utils.load_schema('tap')
+
+        actual_yaml = cli.utils.load_yaml(TAP_GITHUB_YAML)
+        del actual_yaml['db_conn']['organization']
+        del actual_yaml['db_conn']['repository']
+
+        assert cli.utils.validate(actual_yaml, schema) is None
 
     def test_should_fail_when_access_token_is_missing(self):
         """
