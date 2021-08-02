@@ -249,7 +249,7 @@
           }
         },
         {
-          "required": ["db_conn", "schemas"],
+          "required": ["db_conn"],
           "properties": {
             "db_conn": {
               "type": "object",
@@ -259,7 +259,8 @@
                   "type": "string"
                 },
                 "start_date": {
-                  "type": "string"
+                  "type": "string",
+                  "format": "date-time"
                 },
                 "organization": {
                   "type": "string"
@@ -284,8 +285,8 @@
                 "max_rate_limit_wait_seconds": {
                   "type": "integer",
                   "default": 600,
-                  "min": 600,
-                  "max": 3600
+                  "minimum": 600,
+                  "maximum": 3600
                 }
               },
               "allOf": [
