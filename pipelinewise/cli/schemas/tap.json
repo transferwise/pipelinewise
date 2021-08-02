@@ -253,7 +253,7 @@
           "properties": {
             "db_conn": {
               "type": "object",
-              "required": ["access_token", "start_date"],
+              "required": ["access_token"],
               "properties": {
                 "access_token": {
                   "type": "string"

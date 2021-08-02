@@ -79,17 +79,6 @@ class TestUtils(TestCase):
 
         self.assert_json_is_invalid(schema, actual_yaml)
 
-    def test_should_fail_when_start_date_is_missing(self):
-        """
-        Test should fail when start date is missing
-        """
-        schema = cli.utils.load_schema('tap')
-
-        actual_yaml = cli.utils.load_yaml(TAP_GITHUB_YAML)
-        del actual_yaml['db_conn']['start_date']
-
-        self.assert_json_is_invalid(schema, actual_yaml)
-
     def test_should_fail_when_access_token_is_not_string(self):
         """
         Test should fail when access token is not string
