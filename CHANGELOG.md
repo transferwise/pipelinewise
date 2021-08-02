@@ -1,7 +1,12 @@
 0.35.0 (2021-08-02)
 -------------------
-- Replaced github-tap with fork pipelinewise-tap-github:1.0.0 
+- Replaced `github-tap` with fork `pipelinewise-tap-github` version `1.0.0` 
 - Added schema validation for github tap
+- Increase batch_size_rows from 1M to 5M
+- Increase split_file_chunk_size_mb from 2500 to 5000
+- Added latest tag to docker image
+- Bump `pipelinewise-tap-s3-csv` from `1.2.1` to `1.2.2`
+- Update pymongo requirement from `<3.12,>=3.10` to `>=3.10,<3.13`
 
 0.34.1 (2021-07-15)
 -------------------
