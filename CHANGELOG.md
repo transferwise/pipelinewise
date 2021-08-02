@@ -1,4 +1,4 @@
-0.35.0 (2021-07-15)
+0.35.0 (2021-08-02)
 -------------------
 - Replaced github-tap with fork pipelinewise-tap-github:1.0.0 
 - Added schema validation for github tap
