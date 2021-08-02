@@ -188,3 +188,25 @@ class TestUtils(TestCase):
         actual_yaml['db_conn']['max_rate_limit_wait_seconds'] = '111'
 
         self.assert_json_is_invalid(schema, actual_yaml)
+
+    def test_should_fail_when_max_rate_limit_wait_seconds_is_above_max(self):
+        """
+        Test should fail when max rate limit wait seconds is above the max
+        """
+        schema = cli.utils.load_schema('tap')
+
+        actual_yaml = cli.utils.load_yaml(TAP_GITHUB_YAML)
+        actual_yaml['db_conn']['max_rate_limit_wait_seconds'] = 4000
+
+        self.assert_json_is_invalid(schema, actual_yaml)
+
+    def test_should_fail_when_max_rate_limit_wait_seconds_is_below_minx(self):
+        """
+        Test should fail when max rate limit wait seconds is below the min
+        """
+        schema = cli.utils.load_schema('tap')
+
+        actual_yaml = cli.utils.load_yaml(TAP_GITHUB_YAML)
+        actual_yaml['db_conn']['max_rate_limit_wait_seconds'] = 30
+
+        self.assert_json_is_invalid(schema, actual_yaml)
