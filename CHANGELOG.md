@@ -1,3 +1,8 @@
+0.35.0 (2021-07-15)
+-------------------
+- Replaced github-tap with fork pipelinewise-tap-github:1.0.0 
+- Added schema validation for github tap
+
 0.34.1 (2021-07-15)
 -------------------
 - Bump `pipelinewise-target-snowflake` from `1.13.0` to `1.13.1`
