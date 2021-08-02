@@ -1,21 +1,25 @@
 import os
-import pipelinewise.cli as cli
 import pytest
+
+from unittest import TestCase
+import pipelinewise.cli as cli
 
 TAP_GITHUB_YAML = '{}/resources/tap-github.yml'.format(os.path.dirname(__file__))
 
+
 # pylint: disable=no-self-use,too-many-public-methods,fixme
-class TestUtils:
+class TestUtils(TestCase):
     """
     Unit Tests for Tap Github PipelineWise CLI utility functions
     """
+
     def assert_json_is_invalid(self, schema, invalid_yaml):
         """Simple assertion to check if validate function exits with error"""
         with pytest.raises(SystemExit) as pytest_wrapped_e:
             cli.utils.validate(invalid_yaml, schema)
 
-        assert pytest_wrapped_e.type == SystemExit
-        assert pytest_wrapped_e.value.code == 1
+        self.assertEqual(pytest_wrapped_e.type, SystemExit)
+        self.assertEqual(pytest_wrapped_e.value.code, 1)
 
     def test_should_pass_with_valid_json_schema(self):
         """
@@ -24,7 +28,7 @@ class TestUtils:
         schema = cli.utils.load_schema('tap')
 
         actual_yaml = cli.utils.load_yaml(TAP_GITHUB_YAML)
-        assert cli.utils.validate(actual_yaml, schema) is None
+        self.assertIsNone(cli.utils.validate(actual_yaml, schema))
 
     def test_should_pass_if_organization_and_repos_include_missing_but_repository_exists(self):
         """
@@ -36,11 +40,11 @@ class TestUtils:
         del actual_yaml['db_conn']['organization']
         del actual_yaml['db_conn']['repos_include']
 
-        assert cli.utils.validate(actual_yaml, schema) is None
+        self.assertIsNone(cli.utils.validate(actual_yaml, schema))
 
     def test_should_pass_if_organization_and_repository_missing_but_repos_include_exists(self):
         """
-        Test should pass if organization and repository missing but repos include_exists
+        Test should pass if organization and repository missing but repos_include exists
         """
         schema = cli.utils.load_schema('tap')
 
@@ -48,7 +52,21 @@ class TestUtils:
         del actual_yaml['db_conn']['organization']
         del actual_yaml['db_conn']['repository']
 
-        assert cli.utils.validate(actual_yaml, schema) is None
+        self.assertIsNone(cli.utils.validate(actual_yaml, schema))
+
+    # Todo: make schema pass this test scenario
+    # def test_should_fail_if_organization_and_repository_and_repos_include_missing(self):
+    #     """
+    #     validation fails if organization, repository and repos include are all missing
+    #     """
+    #     schema = cli.utils.load_schema('tap')
+    #
+    #     actual_yaml = cli.utils.load_yaml(TAP_GITHUB_YAML)
+    #     del actual_yaml['db_conn']['organization']
+    #     del actual_yaml['db_conn']['repository']
+    #     del actual_yaml['db_conn']['repos_include']
+    #
+    #     self.assert_json_is_invalid(schema, actual_yaml)
 
     def test_should_fail_when_access_token_is_missing(self):
         """
@@ -74,7 +92,7 @@ class TestUtils:
 
     def test_should_fail_when_access_token_is_not_string(self):
         """
-        Test should fail when acess token is not string
+        Test should fail when access token is not string
         """
         schema = cli.utils.load_schema('tap')
 
