@@ -1,0 +1,13 @@
+FROM python:3.7-slim-buster
+
+COPY . /app
+
+RUN apt-get -qq update \
+    && apt-get -qqy --no-install-recommends install apt-utils alien libaio1 wget \
+    && rm -rf /var/lib/apt/lists/* \
+    && pip install -U --no-cache-dir pip \
+    && cd /app \
+    && ./install.sh --connectors=none --acceptlicenses --nousage --notestextras \
+    && ln -s /root/.pipelinewise /app/.pipelinewise
+
+ENTRYPOINT ["/app/entrypoint.sh"]
