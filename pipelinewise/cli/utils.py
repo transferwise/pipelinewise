@@ -275,8 +275,8 @@ def validate(instance, schema):
         # Serialise vault encrypted objects to string
         schema_safe_inst = json.loads(json.dumps(instance, cls=AnsibleJSONEncoder))
         jsonschema.validate(instance=schema_safe_inst, schema=schema)
-    except jsonschema.exceptions.ValidationError as exc:
-        LOGGER.critical('Invalid object %s', exc)
+    except jsonschema.exceptions.ValidationError:
+        LOGGER.critical('json object doesn\'t match schema %s', schema)
         sys.exit(1)
 
 
