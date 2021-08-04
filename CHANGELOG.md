@@ -1,4 +1,4 @@
-0.35.0 (2021-08-03)
+0.35.0 (2021-08-04)
 -------------------
 - Support `"none"` as a value for `--connectors` in `install.sh` script to install a stripped down Pipelinewise without any connectors.
 - Optimize Dockerfile
