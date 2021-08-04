@@ -1,3 +1,16 @@
+0.35.0 (2021-08-04)
+-------------------
+- Support `"none"` as a value for `--connectors` in `install.sh` script to install a stripped down Pipelinewise without any connectors.
+- Optimize Dockerfile
+- Do not log invalid json objects if they fail validation against json schema. 
+- Replace `github-tap` with fork `pipelinewise-tap-github` version `1.0.0` 
+- Add schema validation for github tap
+- Increase batch_size_rows from 1M to 5M
+- Increase split_file_chunk_size_mb from 2500 to 5000
+- Add latest tag to docker image
+- Bump `pipelinewise-tap-s3-csv` from `1.2.1` to `1.2.2`
+- Update pymongo requirement from `<3.12,>=3.10` to `>=3.10,<3.13`
+
 0.34.1 (2021-07-15)
 -------------------
 - Bump `pipelinewise-target-snowflake` from `1.13.0` to `1.13.1`
