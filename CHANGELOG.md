@@ -1,3 +1,7 @@
+0.35.1 (2021-08-12)
+-------------------
+- Bump `pipelinewise-tap-github` from `1.0.0` to `1.0.1`
+
 0.35.0 (2021-08-04)
 -------------------
 - Support `"none"` as a value for `--connectors` in `install.sh` script to install a stripped down Pipelinewise without any connectors.
