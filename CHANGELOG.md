@@ -1,6 +1,9 @@
-0.35.1 (2021-08-12)
+0.35.1 (2021-08-13)
 -------------------
 - Bump `pipelinewise-tap-github` from `1.0.0` to `1.0.1`
+- Bump `pipelinewise-tap-kafka` from `4.0.0` to `4.0.1`
+- Bump `tap-jira` from `2.0.0` to `2.0.1`
+- Bump `pipelinewise-target-s3-csv` from `1.4.0` to `1.5.0`
 
 0.35.0 (2021-08-04)
 -------------------
