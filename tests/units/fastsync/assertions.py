@@ -95,12 +95,13 @@ def assert_sync_table_exception_on_failed_copy(sync_table: callable,
             with patch(objects_to_mock.utils_module_nm) as utils_mock:
                 with patch(objects_to_mock.multiproc_module_nm) as multiproc_mock:
                     utils_mock.get_target_schema.return_value = 'my-target-schema'
+                    utils_mock.gen_export_filename.return_value = 'my-export-file'
                     tap_mock.return_value.copy_table.side_effect = Exception('Boooom')
 
                     assert sync_table('table_1', FASTSYNC_NS) == 'table_1: Boooom'
 
-                    utils_mock.get_target_schema.assert_called_once()
-                    tap_mock.return_value.copy_table.assert_called_once()
+                    assert utils_mock.get_target_schema.call_count == 1
+                    assert tap_mock.return_value.copy_table.call_count == 1
 
 
 # pylint: disable=missing-function-docstring,unused-variable,invalid-name
@@ -142,11 +143,11 @@ def assert_main_impl_exit_normally_on_success(main_impl: callable,
                         main_impl()
 
                         # assertions
-                        utils_mock.parse_args.assert_called_once()
                         utils_mock.get_pool_size.assert_called_once_with({})
-                        mock_enter.return_value.map.assert_called_once()
                         multiproc_mock.Pool.assert_called_once_with(10)
-                        tap_mock.return_value.drop_slot.assert_not_called()
+                        assert utils_mock.parse_args.call_count == 1
+                        assert mock_enter.return_value.map.call_count == 1
+                        assert tap_mock.return_value.drop_slot.call_count == 0
 
 
 # pylint: disable=missing-function-docstring,unused-variable,invalid-name
@@ -188,10 +189,10 @@ def assert_main_impl_should_exit_with_error_on_failure(main_impl: callable,
                             main_impl()
 
                             # assertions
-                            utils_mock.parse_args.assert_called_once()
+                            assert utils_mock.parse_args.call_count == 1
+                            assert mock_enter.return_value.map.call_count == 1
+                            assert tap_mock.return_value.drop_slot.call_count == 1
                             utils_mock.get_pool_size.assert_called_once_with({
                                 'fastsync_parallelism': 4,
                             })
-                            mock_enter.return_value.map.assert_called_once()
-                            tap_mock.return_value.drop_slot.assert_called_once()
                             multiproc_mock.Pool.assert_called_once_with(10)

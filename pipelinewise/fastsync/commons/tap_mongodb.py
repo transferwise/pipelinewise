@@ -17,7 +17,7 @@ from pymongo import MongoClient
 from pymongo.database import Database
 from singer.utils import strftime as singer_strftime
 
-from . import utils
+from . import utils, split_gzip
 from .errors import ExportError, TableNotFoundError, MongoDBInvalidDatetimeError
 
 LOGGER = logging.getLogger(__name__)
@@ -140,9 +140,26 @@ class FastSyncTapMongoDB:
         """
         self.database.client.close()
 
-    def copy_table(self, table_name: str, filepath: str, temp_dir: str):
+    # pylint: disable=R0914,R0913
+    def copy_table(self,
+                   table_name: str,
+                   filepath: str,
+                   temp_dir: str,
+                   split_large_files=False,
+                   split_file_chunk_size_mb=1000,
+                   split_file_max_chunks=20,
+                   compress=True
+                   ):
         """
         Export data from table to a zipped csv
+        Args:
+            table_name: Fully qualified table name to export
+            filepath: Path where to create the zip file(s) with the exported data
+            temp_dir: Temporary directory to export
+            split_large_files: Split large files to multiple pieces and create multiple zip files
+                               with -partXYZ postfix in the filename. (Default: False)
+            split_file_chunk_size_mb: File chunk sizes if `split_large_files` enabled. (Default: 1000)
+            split_file_max_chunks: Max number of chunks if `split_large_files` enabled. (Default: 20)
         """
         table_dict = utils.tablename_to_dict(table_name, '.')
 
@@ -156,7 +173,12 @@ class FastSyncTapMongoDB:
         exported_rows = 0
 
         try:
-            with gzip.open(export_file_path, 'rb') as export_file, gzip.open(filepath, 'wt') as gzfile:
+            gzip_splitter = split_gzip.open(filepath,
+                                            mode='wt',
+                                            chunk_size_mb=split_file_chunk_size_mb,
+                                            max_chunks=split_file_max_chunks if split_large_files else 0,
+                                            compress=compress)
+            with gzip.open(export_file_path, 'rb') as export_file, gzip_splitter as gzfile:
                 writer = csv.DictWriter(gzfile,
                                         fieldnames=[elem[0] for elem in self._get_collection_columns()],
                                         delimiter=',',

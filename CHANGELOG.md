@@ -1,3 +1,77 @@
+0.35.1 (2021-08-13)
+-------------------
+- Bump `pipelinewise-tap-github` from `1.0.0` to `1.0.1`
+- Bump `pipelinewise-tap-kafka` from `4.0.0` to `4.0.1`
+- Bump `tap-jira` from `2.0.0` to `2.0.1`
+- Bump `pipelinewise-target-s3-csv` from `1.4.0` to `1.5.0`
+
+0.35.0 (2021-08-04)
+-------------------
+- Support `"none"` as a value for `--connectors` in `install.sh` script to install a stripped down Pipelinewise without any connectors.
+- Optimize Dockerfile
+- Do not log invalid json objects if they fail validation against json schema. 
+- Replace `github-tap` with fork `pipelinewise-tap-github` version `1.0.0` 
+- Add schema validation for github tap
+- Increase batch_size_rows from 1M to 5M
+- Increase split_file_chunk_size_mb from 2500 to 5000
+- Add latest tag to docker image
+- Bump `pipelinewise-tap-s3-csv` from `1.2.1` to `1.2.2`
+- Update pymongo requirement from `<3.12,>=3.10` to `>=3.10,<3.13`
+
+0.34.1 (2021-07-15)
+-------------------
+- Bump `pipelinewise-target-snowflake` from `1.13.0` to `1.13.1`
+    - Fixed an issue with S3 metadata required for decryption not being included in archived load files
+- Fixed an issue in fastsync to BigQuery data type mapping
+- Add `location` config parameter to fastsync to BigQuery
+
+0.34.0 (2021-06-24)
+-------------------
+- Add `split_large_files` option to FastSync target-snowflake to load large files in parallel into Snowflake
+- Add `archive_load_files` option to FastSync target-snwoflake to archive load files on S3
+- Bump `pipelinewise-tap-postgres` from `1.7.1` to `1.8.0`
+    - Add discovering of partitioned table
+- Bump `pipelinewise-target-snowflake` from `1.12.0` to `1.13.0`
+    - Add `archive_load_files` parameter to optionally archive load files on S3
+
+0.33.0 (2021-04-12)
+-------------------
+
+- Add `batch_wait_limit_seconds` option to every tap/target combination
+- Bump `pipelinewise-target-snowflake` from `1.11.1` to `1.12.0`
+    - Add `batch_wait_limit_seconds` option
+- Bump `pipelinewise-tap-mysql` from `1.4.2` to `1.4.3`
+- Bump a few vulnerable and security outdated packages
+
+0.32.1 (2021-03-26)
+-------------------
+
+- Bump `pipelinewise-target-snowflake` from `1.11.0` to `1.11.1`
+
+0.32.0 (2021-03-22)
+-------------------
+
+- Add transformation validation post import check to detect and deny load time transformations that's changing data types
+- Fixed an issue when fastsync to Postgres and Snowflake were failing if multiple load time transformations defined on the same column
+- Fixed an issue when fastsync not using unique file names and causing table name collision in the target database
+- Bump `pipelinewise-tap-mysql` from `1.4.0` to `1.4.2`
+    - Fixed an issue when data sometimes lost during `LOG_BASED` replication
+- Bump `pipelinewise-tap-twilio` from `1.1.1` to `1.1.2`
+    - Fix missing elements for streams without ordered response
+- Bump `pipelinewsie-target-snowflake` from `1.10.1` to `1.11.0`
+
+0.31.1 (2021-02-26)
+-------------------
+
+- Add support for AWS profile based authentication to FastSync tap-s3-csv.
+
+0.31.0 (2021-02-23)
+-------------------
+
+- Update TransferWise references to Wise
+- Bump `pipelinewise-tap-twilio` to `1.1.1`
+- Bump `psycopg-binary` from `2.8.5` to `2.8.6`
+
 0.30.0 (2021-01-22)
 -------------------
 

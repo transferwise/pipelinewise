@@ -1,1 +1,1 @@
-tap-github==1.8.1
+pipelinewise-tap-github==1.0.1

@@ -1,21 +1,22 @@
 import logging
 import os
 import json
-import time
-from typing import List
-
 import boto3
 import snowflake.connector
+
+from typing import List, Dict
 from snowflake.connector.encryption_util import SnowflakeEncryptionUtil
 from snowflake.connector.remote_storage_util import \
     SnowflakeFileEncryptionMaterial
 
 from . import utils
+from .transform_utils import TransformationHelper, SQLFlavor
 
 LOGGER = logging.getLogger(__name__)
 
 # tone down snowflake connector logging level.
 logging.getLogger('snowflake.connector').setLevel(logging.WARNING)
+
 
 # pylint: disable=missing-function-docstring,no-self-use,too-many-arguments
 class FastSyncTargetSnowflake:
@@ -89,11 +90,11 @@ class FastSyncTargetSnowflake:
 
                 return []
 
-    def upload_to_s3(self, file, table, tmp_dir=None):
+    def upload_to_s3(self, file, tmp_dir=None):
         bucket = self.connection_config['s3_bucket']
         s3_acl = self.connection_config.get('s3_acl')
         s3_key_prefix = self.connection_config.get('s3_key_prefix', '')
-        s3_key = '{}pipelinewise_{}_{}.csv.gz'.format(s3_key_prefix, table, time.strftime('%Y%m%d-%H%M%S'))
+        s3_key = '{}{}'.format(s3_key_prefix, os.path.basename(file))
 
         LOGGER.info('Uploading to S3 bucket: %s, local file: %s, S3 key: %s', bucket, file, s3_key)
 
@@ -132,6 +133,39 @@ class FastSyncTargetSnowflake:
             self.s3.upload_file(file, bucket, s3_key, ExtraArgs=extra_args)
 
         return s3_key
+
+    def copy_to_archive(self, source_s3_key, tap_id, table):
+        """Copy load file to archive folder with metadata added"""
+        table_dict = utils.tablename_to_dict(table)
+        archive_table = table_dict.get('table_name')
+        archive_schema = table_dict.get('schema_name', '')
+
+        # Retain same filename
+        archive_file_basename = os.path.basename(source_s3_key)
+
+        # Get archive s3 prefix from config, defaulting to 'archive' if not specified
+        archive_s3_prefix = self.connection_config.get('archive_load_files_s3_prefix', 'archive')
+
+        source_s3_bucket = self.connection_config.get('s3_bucket')
+
+        # Combine existing metadata with archive related headers
+        metadata = self.s3.head_object(Bucket=source_s3_bucket, Key=source_s3_key).get('Metadata', {})
+        metadata.update({
+            'tap': tap_id,
+            'schema': archive_schema,
+            'table': archive_table,
+            'archived-by': 'pipelinewise_fastsync_postgres_to_snowflake'
+        })
+
+        # Get archive s3 bucket from config, defaulting to same bucket used for Snowflake imports if not specified
+        archive_s3_bucket = self.connection_config.get('archive_load_files_s3_bucket', source_s3_bucket)
+
+        archive_key = '{}/{}/{}/{}'.format(archive_s3_prefix, tap_id, archive_table, archive_file_basename)
+        copy_source = '{}/{}'.format(source_s3_bucket, source_s3_key)
+        LOGGER.info('Archiving %s to %s', copy_source, archive_key)
+
+        self.s3.copy_object(CopySource=copy_source, Bucket=archive_s3_bucket, Key=archive_key,
+                            Metadata=metadata, MetadataDirective='REPLACE')
 
     def create_schema(self, schema):
         sql = 'CREATE SCHEMA IF NOT EXISTS {}'.format(schema)
@@ -179,7 +213,6 @@ class FastSyncTargetSnowflake:
         table_dict = utils.tablename_to_dict(table_name)
         target_table = table_dict.get('table_name') if not is_temporary else table_dict.get('temp_table_name')
         inserts = 0
-        bucket = self.connection_config['s3_bucket']
 
         stage = self.connection_config['stage']
         sql = f'COPY INTO {target_schema}."{target_table.upper()}" FROM \'@{stage}/{s3_key}\'' \
@@ -190,15 +223,15 @@ class FastSyncTargetSnowflake:
         # Get number of inserted records - COPY does insert only
         results = self.query(sql, query_tag_props={'schema': target_schema, 'table': target_table})
         if len(results) > 0:
-            inserts = results[0].get('rows_loaded', 0)
+            inserts = sum([file_part.get('rows_loaded', 0) for file_part in results])
 
         LOGGER.info('Loading into %s."%s": %s',
                     target_schema,
                     target_table.upper(),
-                    json.dumps({'inserts': inserts, 'updates': 0, 'size_bytes': size_bytes}))
-
-        LOGGER.info('Deleting %s from S3...', s3_key)
-        self.s3.delete_object(Bucket=bucket, Key=s3_key)
+                    json.dumps({'inserts': inserts,
+                                'updates': 0,
+                                'file_parts': len(results),
+                                'size_bytes': size_bytes}))
 
     # grant_... functions are common functions called by utils.py: grant_privilege function
     # "to_group" is not used here but exists for compatibility reasons with other database types
@@ -226,64 +259,94 @@ class FastSyncTargetSnowflake:
             sql = 'GRANT SELECT ON ALL TABLES IN SCHEMA {} TO ROLE {}'.format(target_schema, role)
             self.query(sql, query_tag_props={'schema': target_schema})
 
-    # pylint: disable=duplicate-string-formatting-argument
-    def obfuscate_columns(self, target_schema, table_name):
-        LOGGER.info('Applying obfuscation rules')
+    def obfuscate_columns(self, target_schema: str, table_name: str):
+        """
+        Apply any configured transformations to the given table
+        Args:
+            target_schema: target schema name
+            table_name: table name
+        """
+        LOGGER.info('Starting obfuscation rules...')
+
         table_dict = utils.tablename_to_dict(table_name)
         temp_table = table_dict.get('temp_table_name')
         transformations = self.transformation_config.get('transformations', [])
-        trans_cols = []
 
-        # Find obfuscation rule for the current table
-        for trans in transformations:
-            # Input table_name is formatted as {{schema}}.{{table}}
-            # Stream name in taps transformation.json is formatted as {{schema}}-{{table}}
-            #
-            # We need to convert to the same format to find the transformation
-            # has that has to be applied
-            tap_stream_name_by_table_name = '{}-{}'.format(table_dict['schema_name'], table_dict['table_name']) \
-                if table_dict['schema_name'] is not None else table_dict['table_name']
+        # Input table_name is formatted as {{schema}}.{{table}}
+        # Stream name in taps transformation.json is formatted as {{schema}}-{{table}}
+        #
+        # We need to convert to the same format to find the transformation
+        # has that has to be applied
+        tap_stream_name_by_table_name = '{}-{}'.format(table_dict['schema_name'], table_dict['table_name']) \
+            if table_dict['schema_name'] is not None else table_dict['table_name']
 
-            if trans.get('tap_stream_name').lower() == tap_stream_name_by_table_name.lower():
-                # use safe field id in case the column to transform is has a name of a reserved word
-                # fallback to field_id if the safe id doesn't exist
-                column = trans.get('safe_field_id', trans.get('field_id'))
-                transform_type = trans.get('type')
-                if transform_type == 'SET-NULL':
-                    trans_cols.append('{} = NULL'.format(column))
-                elif transform_type == 'HASH':
-                    trans_cols.append('{} = SHA2({}, 256)'.format(column, column))
-                elif 'HASH-SKIP-FIRST' in transform_type:
-                    skip_first_n = transform_type[-1]
-                    trans_cols.append(
-                        '{} = CONCAT(SUBSTRING({}, 1, {}), SHA2(SUBSTRING({}, {} + 1), 256))'.format(column,
-                                                                                                     column,
-                                                                                                     skip_first_n,
-                                                                                                     column,
-                                                                                                     skip_first_n))
-                elif transform_type == 'MASK-DATE':
-                    trans_cols.append("{} = TO_CHAR({}::DATE,'YYYY-01-01')::DATE".format(column, column))
-                elif transform_type == 'MASK-NUMBER':
-                    trans_cols.append('{} = 0'.format(column))
-                elif transform_type == 'MASK-HIDDEN':
-                    trans_cols.append("{} = 'hidden'".format(column))
+        # Find obfuscation rules for the current table
+        # trans_map = self.__get_stream_transformation_map(tap_stream_name_by_table_name, transformations)
+        trans_map = TransformationHelper.get_trans_in_sql_flavor(
+            tap_stream_name_by_table_name,
+            transformations,
+            SQLFlavor('snowflake'))
 
-        # Generate and run UPDATE if at least one obfuscation rule found
-        if len(trans_cols) > 0:
-            sql = 'UPDATE {}.{} SET {}'.format(target_schema, temp_table, ','.join(trans_cols))
-            self.query(sql, query_tag_props={'schema': target_schema, 'table': temp_table})
+        self.__apply_transformations(trans_map, target_schema, temp_table)
 
-    def swap_tables(self, schema, table_name):
+        LOGGER.info('Obfuscation rules applied.')
+
+    def swap_tables(self, schema, table_name) -> None:
+        """
+        Swaps given target table with its temp version and drops the latter
+        Args:
+            schema: Snowflake schema name where table is
+            table_name: Target table name
+
+        """
         table_dict = utils.tablename_to_dict(table_name)
         target_table = table_dict.get('table_name')
         temp_table = table_dict.get('temp_table_name')
 
         # Swap tables and drop the temp tamp
-        self.query('ALTER TABLE {}."{}" SWAP WITH {}."{}"'.format(schema,
-                                                                  temp_table.upper(),
-                                                                  schema,
-                                                                  target_table.upper()),
+        self.query(f'ALTER TABLE {schema}."{temp_table.upper()}" SWAP WITH {schema}."{target_table.upper()}"',
                    query_tag_props={'schema': schema, 'table': target_table})
 
-        self.query('DROP TABLE IF EXISTS {}."{}"'.format(schema, temp_table.upper()),
+        self.query(f'DROP TABLE IF EXISTS {schema}."{temp_table.upper()}"',
                    query_tag_props={'schema': schema, 'table': temp_table})
+
+    def __apply_transformations(self, transformations: List[Dict], target_schema: str, table_name: str) -> None:
+        """
+        Generate and execute the SQL queries based on the given transformations.
+        Args:
+            transformations: List of dictionaries in the form {"trans": "", conditions: "... AND ..."}
+            target_schema: name of the target schema where the table lives
+            table_name: the table name on which we want to apply the transformations
+        """
+        full_qual_table_name = f'"{target_schema.upper()}"."{table_name.upper()}"'
+
+        if transformations:
+            all_cols_update_sql = ''
+
+            # Conditional transformations will have to be executed one at time separately
+
+            for trans_item in transformations:
+
+                # If we have conditions, then we need to construct the query and execute it to transform the
+                # single column conditionally
+                if trans_item['conditions']:
+                    sql = f'UPDATE {full_qual_table_name} ' \
+                          f'SET {trans_item["trans"]} WHERE {trans_item["conditions"]};'
+
+                    self.query(sql, query_tag_props={'schema': target_schema, 'table': table_name})
+
+                # Otherwise, we can add this column to a general UPDATE query with no predicates
+                else:
+
+                    # if the variable is empty, then initialize it otherwise append the
+                    # current transformation to it
+                    if not all_cols_update_sql:
+                        all_cols_update_sql = trans_item['trans']
+                    else:
+                        all_cols_update_sql = f'{all_cols_update_sql}, {trans_item["trans"]}'
+
+            # If we have some non-conditional transformations then construct and execute a query
+            if all_cols_update_sql:
+                all_cols_update_sql = f'UPDATE {full_qual_table_name} SET {all_cols_update_sql};'
+
+                self.query(all_cols_update_sql, query_tag_props={'schema': target_schema, 'table': table_name})

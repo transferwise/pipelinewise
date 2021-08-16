@@ -21,7 +21,7 @@ following the steps in the :ref:`generating_pipelines` section.
 
 Example YAML for tap-snowflake:
 
-.. code-block:: bash
+.. code-block:: yaml
 
     ---
 
@@ -53,6 +53,12 @@ Example YAML for tap-snowflake:
     target: "snowflake"                    # ID of the target connector where the data will be loaded
     batch_size_rows: 20000                 # Batch size for the stream to optimise load performance
     stream_buffer_size: 0                  # In-memory buffer size (MB) between taps and targets for asynchronous data pipes
+    #batch_wait_limit_seconds: 3600        # Optional: Maximum time to wait for `batch_size_rows`. Available only for snowflake target.
+
+    # Options only for Snowflake target
+    #archive_load_files: False                      # Optional: when enabled, the files loaded to Snowflake will also be stored in `archive_load_files_s3_bucket`
+    #archive_load_files_s3_prefix: "archive"        # Optional: When `archive_load_files` is enabled, the archived files will be placed in the archive S3 bucket under this prefix.
+    #archive_load_files_s3_bucket: "<BUCKET_NAME>"  # Optional: When `archive_load_files` is enabled, the archived files will be placed in this bucket. (Default: the value of `s3_bucket` in target snowflake YAML)
 
 
     # ------------------------------------------------------------------------------

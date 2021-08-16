@@ -328,6 +328,7 @@ class Config:
                 'table': '{{table}}'
             }),
             'batch_size_rows': tap.get('batch_size_rows', 20000),
+            'batch_wait_limit_seconds': tap.get('batch_wait_limit_seconds', None),
             'parallelism': tap.get('parallelism', 0),
             'parallelism_max': tap.get('parallelism_max', 4),
             'hard_delete': tap.get('hard_delete', True),
@@ -355,7 +356,13 @@ class Config:
             'data_flattening_max_level': tap.get('data_flattening_max_level',
                                                  utils.get_tap_property(tap, 'default_data_flattening_max_level') or 0),
             'validate_records': tap.get('validate_records', False),
-            'add_metadata_columns': tap.get('add_metadata_columns', False)
+            'add_metadata_columns': tap.get('add_metadata_columns', False),
+            'split_large_files': tap.get('split_large_files', False),
+            'split_file_chunk_size_mb': tap.get('split_file_chunk_size_mb', 1000),
+            'split_file_max_chunks': tap.get('split_file_max_chunks', 20),
+            'archive_load_files': tap.get('archive_load_files', False),
+            'archive_load_files_s3_bucket': tap.get('archive_load_files_s3_bucket', None),
+            'archive_load_files_s3_prefix': tap.get('archive_load_files_s3_prefix', None)
         })
 
         # Save the generated JSON files

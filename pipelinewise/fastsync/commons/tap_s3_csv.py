@@ -1,6 +1,7 @@
 import csv
 import gzip
 import logging
+import os
 import re
 import sys
 import boto3
@@ -8,7 +9,6 @@ import boto3
 from datetime import datetime
 from time import struct_time
 from typing import Callable, Dict, List, Optional, Set
-from botocore.credentials import DeferredRefreshableCredentials
 from messytables import (CSVTableSet, headers_guess, headers_processor, jts, offset_processor, type_guess)
 from singer.utils import strptime_with_tz
 from singer_encodings import csv as singer_encodings_csv
@@ -26,7 +26,7 @@ class FastSyncTapS3Csv:
     """
 
     # pylint: disable=bare-except
-    def __init__(self, connection_config: Dict, tap_type_to_target_type: Callable):
+    def __init__(self, connection_config: Dict, tap_type_to_target_type: Callable, target_quote=None):
         """
         Constructor
         :param connection_config: tap connection config
@@ -43,6 +43,7 @@ class FastSyncTapS3Csv:
 
         self.connection_config = connection_config
         self.tap_type_to_target_type = tap_type_to_target_type
+        self.target_quote = target_quote
         self.tables_last_modified = {}
 
     def _find_table_spec_by_name(self, table_name: str) -> Dict:
@@ -148,7 +149,7 @@ class FastSyncTapS3Csv:
             # make all columns safe
             # pylint: disable=invalid-name
             for k, v in row.items():
-                new_row[safe_column_name(k)] = v
+                new_row[safe_column_name(k, self.target_quote)] = v
 
             record = {**new_row, **custom_columns}
 
@@ -171,7 +172,7 @@ class FastSyncTapS3Csv:
         # use timestamp as a type instead if column is set in date_overrides configuration
         mapped_columns = []
         date_overrides = None if 'date_overrides' not in specs \
-            else {safe_column_name(c) for c in specs['date_overrides']}
+            else {safe_column_name(c, self.target_quote) for c in specs['date_overrides']}
 
         for column_name, column_type in csv_columns:
 
@@ -228,7 +229,7 @@ class FastSyncTapS3Csv:
         :return: the keys concatenated and separated by comma if keys are given, otherwise None
         """
         if table_specs.get('key_properties', False):
-            return [safe_column_name(k) for k in table_specs['key_properties']]
+            return [safe_column_name(k, self.target_quote) for k in table_specs['key_properties']]
 
         return None
 
@@ -243,28 +244,31 @@ class S3Helper:
     SDC_SOURCE_FILE_COLUMN = '_sdc_source_file'
     SDC_SOURCE_LINENO_COLUMN = '_sdc_source_lineno'
 
-    # pylint: disable=too-few-public-methods,missing-class-docstring
-    class AssumeRoleProvider:
-        METHOD = 'assume-role'
-
-        def __init__(self, fetcher):
-            self._fetcher = fetcher
-
-        def load(self):
-            return DeferredRefreshableCredentials(
-                self._fetcher.fetch_credentials,
-                self.METHOD
-            )
-
     @classmethod
     @retry_pattern()
-    def setup_aws_client(cls, config):
-        aws_access_key_id = config['aws_access_key_id']
-        aws_secret_access_key = config['aws_secret_access_key']
-
+    def setup_aws_client(cls, config: Dict) -> None:
+        """
+        Initialize a default AWS session
+        :param config: connection config
+        """
         LOGGER.info('Attempting to create AWS session')
-        boto3.setup_default_session(aws_access_key_id=aws_access_key_id,
-                                    aws_secret_access_key=aws_secret_access_key)
+
+        # Get the required parameters from config file and/or environment variables
+        aws_access_key_id = config.get('aws_access_key_id') or os.environ.get('AWS_ACCESS_KEY_ID')
+        aws_secret_access_key = config.get('aws_secret_access_key') or os.environ.get('AWS_SECRET_ACCESS_KEY')
+        aws_session_token = config.get('aws_session_token') or os.environ.get('AWS_SESSION_TOKEN')
+        aws_profile = config.get('aws_profile') or os.environ.get('AWS_PROFILE')
+
+        # AWS credentials based authentication
+        if aws_access_key_id and aws_secret_access_key:
+            boto3.setup_default_session(
+                aws_access_key_id=aws_access_key_id,
+                aws_secret_access_key=aws_secret_access_key,
+                aws_session_token=aws_session_token
+            )
+        # AWS Profile based authentication, will use IAM role if no profile is found
+        else:
+            boto3.setup_default_session(profile_name=aws_profile)
 
     @classmethod
     def get_input_files_for_table(cls, config: Dict, table_spec: Dict, modified_since: struct_time = None):
@@ -317,10 +321,10 @@ class S3Helper:
 
         if matched_files_count == 0:
             if prefix:
-                raise Exception('No files found in bucket "{}" that matches prefix "{}" and pattern "{}"'.format(
-                    bucket, prefix, pattern))
+                raise Exception(f'No files found in bucket "{bucket}" '
+                                f'that matches prefix "{prefix}" and pattern "{pattern}"')
 
-            raise Exception('No files found in bucket "{}" that matches pattern "{}"'.format(bucket, pattern))
+            raise Exception(f'No files found in bucket "{bucket}" that matches pattern "{pattern}"')
 
     @classmethod
     @retry_pattern()

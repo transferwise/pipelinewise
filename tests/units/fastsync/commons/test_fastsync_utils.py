@@ -437,7 +437,7 @@ class TestFastSyncUtils(TestCase):
 
         args = utils.parse_args({'tap': [], 'target': []})
 
-        get_tables_prop_mock.assert_called_once()
+        self.assertEqual(get_tables_prop_mock.call_count, 1)
         self.assertEqual(load_json_mock.call_count, 3)
         self.assertEqual(check_config_mock.call_count, 2)
 
@@ -477,7 +477,7 @@ class TestFastSyncUtils(TestCase):
 
         args = utils.parse_args({'tap': [], 'target': []})
 
-        get_tables_prop_mock.assert_called_once()
+        self.assertEqual(get_tables_prop_mock.call_count, 1)
         self.assertEqual(load_json_mock.call_count, 3)
         self.assertEqual(check_config_mock.call_count, 2)
 
@@ -517,7 +517,7 @@ class TestFastSyncUtils(TestCase):
 
         args = utils.parse_args({'tap': [], 'target': []})
 
-        get_tables_prop_mock.assert_called_once()
+        self.assertEqual(get_tables_prop_mock.call_count, 1)
         self.assertEqual(load_json_mock.call_count, 3)
         self.assertEqual(check_config_mock.call_count, 2)
 
@@ -558,6 +558,21 @@ class TestFastSyncUtils(TestCase):
         with pytest.raises(NotSelectedTableException):
             utils.parse_args({'tap': [], 'target': []})
 
-        get_tables_prop_mock.assert_called_once()
-        check_config_mock.assert_not_called()
+        self.assertEqual(get_tables_prop_mock.call_count, 1)
+        self.assertEqual(check_config_mock.call_count, 0)
         self.assertEqual(load_json_mock.call_count, 3)
+
+    def test_gen_export_filename(self):
+        """
+        Test unique file name generator function
+        """
+        # Adding tap id and table name should generate uniqe filenames
+        # including timestamps with milliseconds and random generated string
+        #
+        # Example: pipelinewise_tap_table_20210316-111338-878470_fastsync_L5C6VG9W.csv.gz
+        self.assertRegex(utils.gen_export_filename('tap', 'table'),
+                         r'pipelinewise_tap_table_(\d{8})-(\d{6})-(\d{6})_fastsync_(.{8}).csv.gz')
+
+        # Generate filename with custom suffic, postfix and extension
+        self.assertEqual(utils.gen_export_filename('tap', 'table', suffix='suffix', postfix='postfix', ext='ext'),
+                         'pipelinewise_tap_table_suffix_fastsync_postfix.ext')

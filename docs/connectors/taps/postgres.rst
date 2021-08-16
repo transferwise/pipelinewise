@@ -109,7 +109,7 @@ following the steps in the :ref:`generating_pipelines` section.
 
 Example YAML for ``tap-postgres``:
 
-.. code-block:: bash
+.. code-block:: yaml
 
     ---
 
@@ -158,6 +158,15 @@ Example YAML for ``tap-postgres``:
     target: "snowflake"                    # ID of the target connector where the data will be loaded
     batch_size_rows: 20000                 # Batch size for the stream to optimise load performance
     stream_buffer_size: 0                  # In-memory buffer size (MB) between taps and targets for asynchronous data pipes
+    #batch_wait_limit_seconds: 3600        # Optional: Maximum time to wait for `batch_size_rows`. Available only for snowflake target.
+
+    # Options only for Snowflake target
+    #split_large_files: False                       # Optional: split large files to multiple pieces and create multipart zip files. (Default: False)
+    #split_file_chunk_size_mb: 1000                 # Optional: File chunk sizes if `split_large_files` enabled. (Default: 1000)
+    #split_file_max_chunks: 20                      # Optional: Max number of chunks if `split_large_files` enabled. (Default: 20)
+    #archive_load_files: False                      # Optional: when enabled, the files loaded to Snowflake will also be stored in `archive_load_files_s3_bucket`
+    #archive_load_files_s3_prefix: "archive"        # Optional: When `archive_load_files` is enabled, the archived files will be placed in the archive S3 bucket under this prefix.
+    #archive_load_files_s3_bucket: "<BUCKET_NAME>"  # Optional: When `archive_load_files` is enabled, the archived files will be placed in this bucket. (Default: the value of `s3_bucket` in target snowflake YAML)
 
 
     # ------------------------------------------------------------------------------

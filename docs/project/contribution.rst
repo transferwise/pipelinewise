@@ -59,7 +59,7 @@ Adding new tap
 4. Add your tap to the `singer-connectors <https://github.com/transferwise/pipelinewise/tree/master/singer-connectors>`_ directory.
    The new directory should have only one ``requirements.txt`` file with a reference and version of the tap in PyPI.
    Some taps are forks of the community versions and customised to PipelineWise. If new fork or project required in PyPI please
-   mention this the PR. The TransferWise team will create the PyPi package.
+   mention this the PR. The Wise team will create the PyPi package.
 
 5. Document your tap in the :ref:`taps_list` section with some YAML examples.
    The editable documentation is at `GitHub Taps in RST format <https://github.com/transferwise/pipelinewise/tree/master/docs/connectors/taps>`_.
@@ -82,7 +82,7 @@ Adding new target
 2. Add your target to `singer-connectors <https://github.com/transferwise/pipelinewise/tree/master/singer-connectors>`_ directory.
    The new directory should have only one ``requirements.txt`` file with a reference and version of the tap in PyPI.
    Some taps are forks of the community versions and customised to PipelineWise. If new fork or project required in PyPI please
-   mention this the PR. The TransferWise team will create the PyPi package.
+   mention this the PR. The Wise team will create the PyPi package.
 
 3. Document your target in the :ref:`targets_list` section with some YAML examples.
    The editable documentation is at `GitHub Targets in RST format <https://github.com/transferwise/pipelinewise/tree/master/docs/connectors/targets>`_.

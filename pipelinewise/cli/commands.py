@@ -337,23 +337,23 @@ def run_command(command: str, log_file: str = None, line_callback: callable = No
         log_file_success = log_file_with_status(log_file, STATUS_SUCCESS)
 
         # Start command
-        proc = Popen(shlex.split(piped_command), stdout=PIPE, stderr=STDOUT)
-        with open(log_file_running, 'a+') as logfile:
-            stdout = ''
-            while True:
-                line = proc.stdout.readline()
-                if line:
-                    decoded_line = line.decode('utf-8')
+        with Popen(shlex.split(piped_command), stdout=PIPE, stderr=STDOUT) as proc:
+            with open(log_file_running, 'a+') as logfile:
+                stdout = ''
+                while True:
+                    line = proc.stdout.readline()
+                    if line:
+                        decoded_line = line.decode('utf-8')
 
-                    if line_callback is not None:
-                        decoded_line = line_callback(decoded_line)
+                        if line_callback is not None:
+                            decoded_line = line_callback(decoded_line)
 
-                    stdout += decoded_line
+                        stdout += decoded_line
 
-                    logfile.write(decoded_line)
-                    logfile.flush()
-                if proc.poll() is not None:
-                    break
+                        logfile.write(decoded_line)
+                        logfile.flush()
+                    if proc.poll() is not None:
+                        break
 
         proc_rc = proc.poll()
         if proc_rc != 0:
@@ -372,13 +372,13 @@ def run_command(command: str, log_file: str = None, line_callback: callable = No
         return [proc_rc, stdout, None]
 
     # No logfile needed: STDOUT and STDERR returns in an array once the command finished
-    proc = Popen(shlex.split(piped_command), stdout=PIPE, stderr=PIPE)
-    proc_tuple = proc.communicate()
-    proc_rc = proc.returncode
-    stdout = proc_tuple[0].decode('utf-8')
-    stderr = proc_tuple[1].decode('utf-8')
+    with Popen(shlex.split(piped_command), stdout=PIPE, stderr=PIPE) as proc:
+        proc_tuple = proc.communicate()
+        proc_rc = proc.returncode
+        stdout = proc_tuple[0].decode('utf-8')
+        stderr = proc_tuple[1].decode('utf-8')
 
-    if proc_rc != 0:
-        LOGGER.error(stderr)
+        if proc_rc != 0:
+            LOGGER.error(stderr)
 
     return [proc_rc, stdout, stderr]

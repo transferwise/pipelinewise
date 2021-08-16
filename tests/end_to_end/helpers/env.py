@@ -140,7 +140,20 @@ class E2EEnv:
                     'STAGE'                 : {'value': os.environ.get('TARGET_SNOWFLAKE_STAGE')},
                     'FILE_FORMAT'           : {'value': os.environ.get('TARGET_SNOWFLAKE_FILE_FORMAT')},
                     'CLIENT_SIDE_ENCRYPTION_MASTER_KEY':
-                        {'value': os.environ.get('TARGET_SNOWFLAKE_FILE_FORMAT'), 'optional': True},
+                        {'value': os.environ.get('TARGET_SNOWFLAKE_CLIENT_SIDE_ENCRYPTION_MASTER_KEY'),
+                         'optional': True},
+                }
+            },
+            # ------------------------------------------------------------------
+            # Target BigQuery is an OPTIONAL test connector because it's not open sourced and not part of
+            # the docker environment.
+            # To run the related test cases add real BigQuery credentials to ../../../dev-project/.env
+            # ------------------------------------------------------------------
+            'TARGET_BIGQUERY': {
+                'optional': True,
+                'template_patterns': ['target_bigquery', 'to_bq'],
+                'vars': {
+                    'PROJECT'               : {'value': os.environ.get('TARGET_BIGQUERY_PROJECT')},
                 }
             },
             # ------------------------------------------------------------------
@@ -181,10 +194,28 @@ class E2EEnv:
         self.env['TARGET_POSTGRES']['is_configured'] = self._is_env_connector_configured('TARGET_POSTGRES')
         self.env['TARGET_REDSHIFT']['is_configured'] = self._is_env_connector_configured('TARGET_REDSHIFT')
         self.env['TARGET_SNOWFLAKE']['is_configured'] = self._is_env_connector_configured('TARGET_SNOWFLAKE')
+        self.env['TARGET_BIGQUERY']['is_configured'] = self._is_env_connector_configured('TARGET_BIGQUERY')
 
     def _get_conn_env_var(self, connector, key):
         """Get the value of a specific variable in the self.env dict"""
         return self.env[connector]['vars'][key]['value']
+
+    def get_aws_session(self):
+        """Get AWS session with using access from TARGET_SNOWFLAKE_ env vars"""
+        if not self.env['TARGET_SNOWFLAKE']['is_configured']:
+            raise Exception('TARGET_SNOWFLAKE is not configured')
+
+        aws_access_key_id = os.environ.get('TARGET_SNOWFLAKE_AWS_ACCESS_KEY')
+        aws_secret_access_key = os.environ.get('TARGET_SNOWFLAKE_AWS_SECRET_ACCESS_KEY')
+        if aws_access_key_id is None or aws_secret_access_key is None:
+            raise Exception(
+                'Env vars TARGET_SNOWFLAKE_AWS_ACCESS_KEY and TARGET_SNOWFLAKE_AWS_SECRET_ACCESS_KEY are required')
+
+        return boto3.session.Session(
+            aws_access_key_id=aws_access_key_id,
+            aws_secret_access_key=aws_secret_access_key
+        )
+
 
     def _is_env_connector_configured(self, env_connector):
         """Detect if certain component(s) of env vars group is configured properly"""
@@ -198,15 +229,13 @@ class E2EEnv:
 
         for env_conn in env_conns:
             for key, value in self.env[env_conn]['vars'].items():
-                # If value not defined
-                if not value['value']:
-                    # Value is not optional
-                    if not value.get('optional'):
-                        # Value not defined but the entirely component is optional
-                        if self.env[env_conn].get('optional'):
-                            return False
-                        # Value not defined but it's a required property
-                        raise Exception(f'{env_conn}_{key} env var is required but not defined.')
+                # If value not defined and is not optional
+                if not value['value'] and not value.get('optional'):
+                    # Value not defined but the entirely component is optional
+                    if self.env[env_conn].get('optional'):
+                        return False
+                    # Value not defined but it's a required property
+                    raise Exception(f'{env_conn}_{key} env var is required but not defined.')
         return True
 
     def _find_env_conn_by_template_name(self, template_name):
@@ -221,7 +250,7 @@ class E2EEnv:
 
     # pylint: disable=invalid-name
     def _all_env_vars_to_dict(self):
-        """Tranform self.env dict to a simple key-value dictionary
+        """Transform self.env dict to a simple key-value dictionary
         From:
             {
                 'TAP_X': {'vars': {'HOST': {'value': 'my_host_x'}}},
@@ -344,6 +373,16 @@ class E2EEnv:
                                       user=self._get_conn_env_var('TARGET_SNOWFLAKE', 'USER'),
                                       password=self._get_conn_env_var('TARGET_SNOWFLAKE', 'PASSWORD'))
 
+    def delete_dataset_target_bigquery(self, dataset):
+        """Run and SQL query in target bigquery database"""
+        return db.delete_dataset_bigquery(dataset,
+                                          project=self._get_conn_env_var('TARGET_BIGQUERY', 'PROJECT'))
+
+    def run_query_target_bigquery(self, query):
+        """Run and SQL query in target bigquery database"""
+        return db.run_query_bigquery(query,
+                                     project=self._get_conn_env_var('TARGET_BIGQUERY', 'PROJECT'))
+
     # -------------------------------------------------------------------------
     # Setup methods to initialise source and target databases and to make them
     # ready running the tests
@@ -424,3 +463,13 @@ class E2EEnv:
 
         # Clean config directory
         shutil.rmtree(os.path.join(CONFIG_DIR, 'snowflake'), ignore_errors=True)
+
+    def setup_target_bigquery(self):
+        """Clean bigquery target database and prepare for test run"""
+        self.delete_dataset_target_bigquery('ppw_e2e_tap_postgres')
+        self.delete_dataset_target_bigquery('ppw_e2e_tap_postgres_public2')
+        self.delete_dataset_target_bigquery('ppw_e2e_tap_postgres_logical1')
+        self.delete_dataset_target_bigquery('ppw_e2e_tap_postgres_logical2')
+        self.delete_dataset_target_bigquery('ppw_e2e_tap_mysql')
+        self.delete_dataset_target_bigquery('ppw_e2e_tap_s3_csv')
+        self.delete_dataset_target_bigquery('ppw_e2e_tap_mongodb')

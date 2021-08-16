@@ -1,5 +1,5 @@
 {
-  "$schema": "http://json-schema.org/draft-04/schema#",
+  "$schema": "http://json-schema.org/draft-07/schema#",
   "definitions": {
     "schema": {
       "type": "object",
@@ -31,6 +31,34 @@
           "maximum": 1000
         }
       }
+    },
+    "condition": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "column": {
+              "type": "string"
+            },
+            "equals": {
+              "type": ["null", "integer", "string", "boolean", "number"]
+            }
+          },
+          "required": ["column", "equals"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "column": {
+              "type": "string"
+            },
+            "regex_match": {
+              "type": "string"
+            }
+          },
+          "required": ["column", "regex_match"]
+        }
+      ]
     },
     "table": {
       "type": "object",
@@ -116,6 +144,13 @@
             "MASK-NUMBER",
             "MASK-HIDDEN"
           ]
+        },
+        "when": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/condition"
+          },
+          "minItems": 1
         }
       },
       "required": [
@@ -197,6 +232,67 @@
         }
       },
       "required": ["type"]
+    },
+    "is_tap_github": {
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "enum": ["tap-github"]
+        }
+      }
+    },
+    "tap_github": {
+      "anyOf": [
+        {
+          "not": {
+            "$ref": "#/definitions/is_tap_github"
+          }
+        },
+        {
+          "required": ["db_conn"],
+          "properties": {
+            "db_conn": {
+              "type": "object",
+              "required": ["access_token", "start_date"],
+              "properties": {
+                "access_token": {
+                  "type": "string"
+                },
+                "start_date": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "organization": {
+                  "type": "string"
+                },
+                "repos_include": {
+                  "type": "string"
+                },
+                "repos_exclude": {
+                  "type": "string"
+                },
+                "repository": {
+                  "type": "string"
+                },
+                "include_archived": {
+                  "type": "boolean",
+                  "default": false
+                },
+                "include_disabled": {
+                  "type": "boolean",
+                  "default": false
+                },
+                "max_rate_limit_wait_seconds": {
+                  "type": "integer",
+                  "default": 600,
+                  "minimum": 600,
+                  "maximum": 3600
+                }
+              }
+            }
+          }
+        }
+      ]
     }
   },
   "type": "object",
@@ -239,12 +335,25 @@
     "batch_size_rows": {
       "type": "integer",
       "minimum": 1000,
-      "maximum": 1000000
+      "maximum": 5000000
     },
     "stream_buffer_size": {
       "type": "integer",
       "minimum": 0,
       "maximum": 2500
+    },
+    "split_large_files": {
+      "type": "boolean"
+    },
+    "split_file_chunk_size_mb": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 5000
+    },
+    "split_file_max_chunks": {
+      "type": "integer",
+      "min": 1,
+      "max": 100
     },
     "schemas": {
       "type": "array",
@@ -256,6 +365,9 @@
   "allOf": [
     {
       "$ref": "#/definitions/tap_mongo_implies_ft_and_lb"
+    },
+    {
+      "$ref": "#/definitions/tap_github"
     }
   ],
   "required": [

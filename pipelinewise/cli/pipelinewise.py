@@ -13,7 +13,7 @@ import pidfile
 
 from datetime import datetime
 from time import time
-from typing import Dict
+from typing import Dict, Optional, List
 from joblib import Parallel, delayed, parallel_backend
 from tabulate import tabulate
 
@@ -721,7 +721,7 @@ class PipelineWise:
             return f'Cannot load selection JSON at {tap_selection_file}. {str(exc)}'
 
         # Post import checks
-        post_import_errors = self._run_post_import_tap_checks(tap, schema_with_diff)
+        post_import_errors = self._run_post_import_tap_checks(tap, schema_with_diff, target_id)
         if len(post_import_errors) > 0:
             return f'Post import tap checks failed in tap {tap_id}: {post_import_errors}'
 
@@ -978,7 +978,7 @@ class PipelineWise:
             tap_properties,
             tap_state, {
                 'selected': True,
-                'target_type': ['target-snowflake', 'target-redshift', 'target-postgres'],
+                'target_type': ['target-snowflake', 'target-redshift', 'target-postgres', 'target-bigquery'],
                 'tap_type': ['tap-mysql', 'tap-postgres', 'tap-s3-csv', 'tap-mongodb'],
                 'initial_sync_required': True
             },
@@ -1397,14 +1397,25 @@ TAP RUN SUMMARY
                     logfile.write(summary)
 
     # pylint: disable=unused-variable
-    def _run_post_import_tap_checks(self, tap, catalog) -> list:
+    def _run_post_import_tap_checks(self, tap: Dict, catalog: Dict, target_id: str) -> List:
         """
-            Run post import checks on a tap properties object.
+        Run post import checks on a tap.
 
-        :param tap_properties: tap properties object
+        :param tap: dictionary containing all taps details
+        :param catalog: tap properties object
+        :param target_id: ID of the target used by the tap
         :return: List of errors. If no error returns an empty list
         """
         errors = []
+
+        error = self.__validate_transformations(
+            tap.get('files', {}).get('transformation'),
+            catalog,
+            tap['id'],
+            target_id)
+
+        if error:
+            errors.append(error)
 
         # Foreach stream (table) in the original properties
         for stream_idx, stream in enumerate(catalog.get('streams', catalog)):
@@ -1431,3 +1442,47 @@ TAP RUN SUMMARY
                 break
 
         return errors
+
+    def __validate_transformations(
+            self,
+            transformation_file: str,
+            catalog: Dict,
+            tap_id: str,
+            target_id: str) -> Optional[str]:
+        """
+        Run validation of transformation config
+        Args:
+            transformation_file: path to transformation config
+            catalog: Catalog object
+            tap_id: The ID of the tap to which the transformations belong
+            target_id: the ID of the target used by the tap
+
+        Returns: error as string
+        """
+        if transformation_file:
+
+            # create a temp file with the content being the given catalog object
+            # we need this file to execute the validation cli command
+            temp_catalog_file = utils.create_temp_file(dir=self.get_temp_dir(),
+                                                       prefix='properties_',
+                                                       suffix='.json')[1]
+
+            utils.save_json(catalog, temp_catalog_file)
+
+            command = f"""
+                {self.transform_field_bin} --validate --config {transformation_file} --catalog {temp_catalog_file}
+                """
+
+            if self.profiling_mode:
+                dump_file = os.path.join(self.profiling_dir, f'transformation_{tap_id}_{target_id}.pstat')
+                command = f'{self.transform_field_python_bin} -m cProfile -o {dump_file} {command}'
+
+            self.logger.debug('Transformation validation command: %s', command)
+
+            result = commands.run_command(command)
+
+            # Get output and errors from command
+            returncode, _, stderr = result
+
+            if returncode != 0:
+                return stderr

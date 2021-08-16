@@ -2,7 +2,6 @@
 import multiprocessing
 import os
 import sys
-import time
 from argparse import Namespace
 from datetime import datetime
 from functools import partial
@@ -18,8 +17,6 @@ LOGGER = Logger().get_logger(__name__)
 
 REQUIRED_CONFIG_KEYS = {
     'tap': [
-        'aws_access_key_id',
-        'aws_secret_access_key',
         'bucket',
         'start_date'
     ],
@@ -58,8 +55,7 @@ def sync_table(table_name: str, args: Namespace) -> Union[bool, str]:
     snowflake = FastSyncTargetSnowflake(args.target, args.transform)
 
     try:
-        filename = 'pipelinewise_fastsync_{}_{}_{}.csv.gz'.format(args.tap['bucket'], table_name,
-                                                                  time.strftime('%Y%m%d-%H%M%S'))
+        filename = utils.gen_export_filename(tap_id=args.target.get('tap_id'), table=table_name)
         filepath = os.path.join(args.temp_dir, filename)
 
         target_schema = utils.get_target_schema(args.target, table_name)
@@ -72,7 +68,7 @@ def sync_table(table_name: str, args: Namespace) -> Union[bool, str]:
         primary_key = snowflake_types['primary_key']
 
         # Uploading to S3
-        s3_key = snowflake.upload_to_s3(filepath, table_name, tmp_dir=args.temp_dir)
+        s3_key = snowflake.upload_to_s3(filepath, tmp_dir=args.temp_dir)
         os.remove(filepath)
 
         # Creating temp table in Snowflake

@@ -14,7 +14,7 @@ following the steps in the :ref:`generating_pipelines` section.
 
 Example YAML for tap-twilio:
 
-.. code-block:: bash
+.. code-block:: yaml
 
     ---
 
@@ -34,7 +34,7 @@ Example YAML for tap-twilio:
     db_conn:
       account_sid: <TWILIO_ACCOUNT_SID>         # Twilio Account SID
       auth_token: <TWILIO_AUTH_TOKEN>           # Twilio Auth token
-      start_date: "2020-10-01"                  # The default value to use if no bookmark exists for an endpoint
+      start_date: "2021-02-01T00:00:00Z"        # The default value to use if no bookmark exists for an endpoint. ISO-8601 datetime formatted string
       user_agent: "someone@transferwise.com"    # Optional: Process and email for API logging purposes.
 
 
@@ -48,6 +48,12 @@ Example YAML for tap-twilio:
     default_target_schema: "twilio"            # Target schema where the data will be loaded
     #default_target_schema_select_permission:  # Optional: Grant SELECT on schema and tables that created
     #  - grp_power
+    #batch_wait_limit_seconds: 3600            # Optional: Maximum time to wait for `batch_size_rows`. Available only for snowflake target.
+
+    # Options only for Snowflake target
+    #archive_load_files: False                      # Optional: when enabled, the files loaded to Snowflake will also be stored in `archive_load_files_s3_bucket`
+    #archive_load_files_s3_prefix: "archive"        # Optional: When `archive_load_files` is enabled, the archived files will be placed in the archive S3 bucket under this prefix.
+    #archive_load_files_s3_bucket: "<BUCKET_NAME>"  # Optional: When `archive_load_files` is enabled, the archived files will be placed in this bucket. (Default: the value of `s3_bucket` in target snowflake YAML)
 
 
     # ------------------------------------------------------------------------------

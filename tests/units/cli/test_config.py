@@ -82,6 +82,10 @@ class TestConfig:
                     'owner': 'somebody@foo.com',
                     'target': 'test_snowflake_target',
                     'batch_size_rows': 20000,
+                    'batch_wait_limit_seconds': 3600,
+                    'split_large_files': True,
+                    'split_file_chunk_size_mb': 500,
+                    'split_file_max_chunks': 25,
                     'db_conn': {
                         'dbname': '<DB_NAME>',
                         'host': '<HOST>',
@@ -287,6 +291,7 @@ class TestConfig:
         }
         assert cli.utils.load_json(tap_inheritable_config_json) == {
             'batch_size_rows': 20000,
+            'batch_wait_limit_seconds': 3600,
             'data_flattening_max_level': 0,
             'flush_all_streams': False,
             'hard_delete': True,
@@ -305,7 +310,11 @@ class TestConfig:
                 '{"ppw_component": "tap-mysql", "tap_id": "mysql_sample", '
                 '"database": "{{database}}", "schema": "{{schema}}", "table": "{{table}}"}',
             'validate_records': False,
-            'add_metadata_columns': False
+            'add_metadata_columns': False,
+            'split_large_files': True,
+            'split_file_chunk_size_mb': 500,
+            'split_file_max_chunks': 25,
+            'archive_load_files': False
         }
 
         # Delete the generated JSON config directory
