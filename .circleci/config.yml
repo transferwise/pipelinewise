@@ -151,6 +151,22 @@ jobs:
             DEPLOY_SLACK_CHANNEL: "#analytics-platform-builds"
             DEPLOY_IMAGE_NAME: "pipelinewise"
             DEPLOY_DOCKERFILE: "./Dockerfile"
+            DEPLOY_IMAGE_ADDITIONAL_TAGS: "latest"
+
+  upload_ci_docker_image:
+    <<: *docker_k8s_deployer
+    steps:
+      - checkout
+      - setup_remote_docker
+      - *attach_workspace
+      - run:
+          name: Push and release the new ci docker image to artifactory
+          command: k8s-deployment docker-build jfrog-cli-docker-push
+          environment:
+            DEPLOY_SLACK_CHANNEL: "#analytics-platform-builds"
+            DEPLOY_IMAGE_NAME: "pipelinewise-ci"
+            DEPLOY_DOCKERFILE: "./Dockerfile.ci"
+            DEPLOY_IMAGE_ADDITIONAL_TAGS: "latest"
 
   promote_docker_image:
     <<: *docker_k8s_deployer
@@ -174,6 +190,15 @@ workflows:
       - e2e_tests
 
       - upload_docker_image:
+          context: kubernetes-staging
+          requires:
+            - e2e_tests
+          filters:
+            branches:
+              only:
+                - master
+
+      - upload_ci_docker_image:
           context: kubernetes-staging
           requires:
             - e2e_tests
