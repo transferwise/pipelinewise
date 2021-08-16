@@ -40,6 +40,7 @@ class PipelineWise:
 
         self.profiling_mode = args.profiler
         self.profiling_dir = profiling_dir
+        self.enable_fastsync = args.enable_fastsync
         self.drop_pg_slot = False
         self.args = args
         self.logger = logging.getLogger(__name__)
@@ -199,6 +200,7 @@ class PipelineWise:
                 # Set the "selected" key to False if the actual values don't meet the filter criteria
                 # pylint: disable=too-many-boolean-expressions
                 if (
+                        self.enable_fastsync and
                         (f_selected is None or selected == f_selected) and
                         (f_target_type is None or target_type in f_target_type) and
                         (f_tap_type is None or tap_type in f_tap_type) and
@@ -1137,6 +1139,7 @@ class PipelineWise:
         tap_state = self.tap['files']['state']
         tap_transformation = self.tap['files']['transformation']
         target_config = self.target['files']['config']
+        stream_buffer_size = self.tap.get('stream_buffer_size', commands.DEFAULT_STREAM_BUFFER_SIZE)
 
         # Set drop_pg_slot to True if we want to sync the whole tap
         # This flag will be used by FastSync PG to (PG/SF/Redshift)
@@ -1181,9 +1184,15 @@ class PipelineWise:
                     target_id=target_id
                 )
 
-                self.run_tap_fastsync(tap=tap_params,
-                                      target=target_params,
-                                      transform=transform_params)
+                if self.enable_fastsync:
+                    self.run_tap_fastsync(tap=tap_params,
+                                        target=target_params,
+                                        transform=transform_params)
+                else:
+                    self.run_tap_singer(tap=tap_params,
+                                        target=target_params,
+                                        transform=transform_params,
+                                        stream_buffer_size=stream_buffer_size)
 
         except pidfile.AlreadyRunningError:
             self.logger.error('Another instance of the tap is already running.')
