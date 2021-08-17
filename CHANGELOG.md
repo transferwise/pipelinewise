@@ -1,3 +1,8 @@
+0.35.2 (2021-08-17)
+-------------------
+- Bump `pipelinewise-tap-github` from `1.0.1` to `1.0.2`
+- Update a few vulnerable or outdated dependencies to latest
+
 0.35.1 (2021-08-13)
 -------------------
 - Bump `pipelinewise-tap-github` from `1.0.0` to `1.0.1`
