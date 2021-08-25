@@ -2,12 +2,13 @@ import os
 import pytest
 
 from unittest import TestCase
-import pipelinewise.cli as cli
+from pipelinewise import cli
 
 TAP_GITHUB_YAML = '{}/resources/tap-github.yml'.format(os.path.dirname(__file__))
 
 
 # pylint: disable=no-self-use,too-many-public-methods,fixme
+# pylint: disable=E1136,E1137  # False positive when loading vault encrypted YAML
 class TestUtils(TestCase):
     """
     Unit Tests for Tap Github PipelineWise CLI utility functions

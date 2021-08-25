@@ -7,10 +7,10 @@ import psutil
 import pidfile
 from pathlib import Path
 
-import pipelinewise.cli as cli
 import pytest
 from unittest.mock import patch
 from tests.units.cli.cli_args import CliArgs
+from pipelinewise import cli
 from pipelinewise.cli.pipelinewise import PipelineWise
 
 RESOURCES_DIR = '{}/resources'.format(os.path.dirname(__file__))

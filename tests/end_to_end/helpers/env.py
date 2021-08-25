@@ -277,7 +277,7 @@ class E2EEnv:
         templates = glob.glob(f'{project_dir}/*.yml.template')
         for template_path in templates:
             # Replace env vars in template
-            with open(template_path, 'r') as f_template:
+            with open(template_path, 'r', encoding='utf-8') as f_template:
                 yaml = f_template.read()
 
                 # Detect if every env var configured for the template
@@ -293,7 +293,7 @@ class E2EEnv:
                         yaml = yaml.replace(f'${{{var}}}', self._all_env_vars_to_dict().get(var))
 
                     # Write the template replaced YAML file
-                    with open(yaml_path, 'w+') as f_render:
+                    with open(yaml_path, 'w+', encoding='utf-8') as f_render:
                         f_render.write(yaml)
 
                 # Delete if exists but not configured

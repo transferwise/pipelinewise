@@ -1,7 +1,7 @@
 import os
 import re
 
-import pipelinewise.cli as cli
+from pipelinewise import cli
 import pytest
 
 VIRTUALENVS_DIR = './virtualenvs-dummy'

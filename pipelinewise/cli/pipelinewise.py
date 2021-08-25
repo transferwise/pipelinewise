@@ -842,7 +842,7 @@ class PipelineWise:
                 nonlocal start, state
 
                 if start is None or time() - start >= 2:
-                    with open(tap.state, 'w') as state_file:
+                    with open(tap.state, 'w', encoding='utf-8') as state_file:
                         state_file.write(line)
 
                     # Update start time to be the current time.
@@ -870,7 +870,7 @@ class PipelineWise:
 
         # update the state file one last time to make sure it always has the last state message.
         if state is not None:
-            with open(tap.state, 'w') as statefile:
+            with open(tap.state, 'w', encoding='utf-8') as statefile:
                 statefile.write(state)
 
     def run_tap_fastsync(self, tap: TapParams, target: TargetParams, transform: TransformParams):
@@ -1074,7 +1074,7 @@ class PipelineWise:
         """
         pidfile_path = self.tap['files']['pidfile']
         try:
-            with open(pidfile_path) as pidf:
+            with open(pidfile_path, encoding='utf-8') as pidf:
                 pid = int(pidf.read())
                 parent = psutil.Process(pid)
 
@@ -1218,6 +1218,7 @@ class PipelineWise:
         vault_secret = self.args.secret
 
         target_ids = set()
+        # pylint: disable=E1136,E1137  # False positive when loading vault encrypted YAML
         # Validate target json schemas and that no duplicate IDs exist
         for yaml_file in target_yamls:
             self.logger.info('Started validating %s', yaml_file)
@@ -1232,6 +1233,7 @@ class PipelineWise:
             self.logger.info('Finished validating %s', yaml_file)
 
         tap_ids = set()
+        # pylint: disable=E1136,E1137  # False positive when loading vault encrypted YAML
         # Validate tap json schemas, check that every tap has valid 'target' and that no duplicate IDs exist
         for yaml_file in tap_yamls:
             self.logger.info('Started validating %s', yaml_file)
@@ -1393,7 +1395,7 @@ TAP RUN SUMMARY
 
             # Append the summary to the right log file
             if log_file_to_write_summary:
-                with open(log_file_to_write_summary, 'a') as logfile:
+                with open(log_file_to_write_summary, 'a', encoding='utf-8') as logfile:
                     logfile.write(summary)
 
     # pylint: disable=unused-variable

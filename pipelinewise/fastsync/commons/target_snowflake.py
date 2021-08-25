@@ -115,7 +115,7 @@ class FastSyncTargetSnowflake:
             )
 
             # Upload to s3
-            extra_args = {'ACL': s3_acl} if s3_acl else dict()
+            extra_args = {'ACL': s3_acl} if s3_acl else {}
 
             # Send key and iv in the metadata, that will be required to decrypt and upload the encrypted file
             extra_args['Metadata'] = {

@@ -1,8 +1,8 @@
 import os
 import sys
 import pytest
-import pipelinewise.cli.commands as commands
 
+from pipelinewise.cli import commands
 from pipelinewise.cli.errors import StreamBufferTooLargeException
 
 
