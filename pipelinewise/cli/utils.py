@@ -25,7 +25,7 @@ from ansible.module_utils.common._collections_compat import Mapping
 from ansible.parsing.dataloader import DataLoader
 from ansible.parsing.vault import (VaultLib, get_file_vault_secret, is_encrypted_file)
 from ansible.parsing.yaml.loader import AnsibleLoader
-from ansible.parsing.yaml.objects import AnsibleVaultEncryptedUnicode
+from ansible.parsing.yaml.objects import AnsibleMapping, AnsibleVaultEncryptedUnicode
 
 from . import tap_properties
 
@@ -74,7 +74,7 @@ def is_json_file(path):
     """
     try:
         if os.path.isfile(path):
-            with open(path) as jsonfile:
+            with open(path, encoding='utf-8') as jsonfile:
                 if json.load(jsonfile):
                     return True
         return False
@@ -89,7 +89,7 @@ def load_json(path):
     try:
         LOGGER.debug('Parsing file at %s', path)
         if os.path.isfile(path):
-            with open(path) as jsonfile:
+            with open(path, encoding='utf-8') as jsonfile:
                 return json.load(jsonfile)
         else:
             LOGGER.debug('No file at %s', path)
@@ -115,7 +115,7 @@ def save_json(data, path):
     """
     try:
         LOGGER.debug('Saving JSON %s', path)
-        with open(path, 'w') as jsonfile:
+        with open(path, 'w', encoding='utf-8') as jsonfile:
             return json.dump(data, jsonfile, cls=AnsibleJSONEncoder, indent=4, sort_keys=True)
     except Exception as exc:
         raise Exception(f'Cannot save JSON {path} {exc}') from exc
@@ -138,7 +138,7 @@ def is_yaml_file(path):
     """
     try:
         if os.path.isfile(path):
-            with open(path) as yamlfile:
+            with open(path, encoding='utf-8') as yamlfile:
                 if yaml.safe_load(yamlfile):
                     return True
         return False
@@ -182,7 +182,7 @@ def load_yaml(yaml_file, vault_secret=None):
 
     data = None
     if os.path.isfile(yaml_file):
-        with open(yaml_file, 'r') as stream:
+        with open(yaml_file, 'r', encoding='utf-8') as stream:
             # Render environment variables using jinja templates
             contents = stream.read()
             template = Template(contents)
@@ -203,6 +203,9 @@ def load_yaml(yaml_file, vault_secret=None):
                 raise Exception(f'Error when loading YAML config at {yaml_file} {exc}') from exc
     else:
         LOGGER.debug('No file at %s', yaml_file)
+
+    if isinstance(data, AnsibleMapping):
+        data = dict(data)
 
     return data
 
@@ -295,6 +298,7 @@ def delete_keys_from_dict(dic, keys):
         return dic
     if isinstance(dic, list):
         return [v for v in (delete_keys_from_dict(v, keys) for v in dic) if v]
+    # pylint: disable=C0325  # False positive on tuples
     return {k: v for k, v in ((k, delete_keys_from_dict(v, keys)) for k, v in dic.items()) if k not in keys}
 
 
@@ -502,7 +506,7 @@ def find_errors_in_log_file(file, max_errors=10, error_pattern=None):
 
     errors = []
     if file and os.path.isfile(file):
-        with open(file) as file_object:
+        with open(file, encoding='utf-8') as file_object:
             for line in file_object:
                 if len(re.findall(error_pattern, line)) > 0:
                     errors.append(line)

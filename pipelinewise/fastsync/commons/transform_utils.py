@@ -119,6 +119,7 @@ class TransformationHelper:
         return trans_map
 
     @classmethod
+    # pylint: disable=W0238  # False positive when it is used by another classmethod
     def __conditions_to_sql(
             cls,
             transform_conditions: List[Dict],
@@ -187,6 +188,7 @@ class TransformationHelper:
         return ' AND '.join(conditions)
 
     @classmethod
+    # pylint: disable=W0238  # False positive when it is used by another classmethod
     def __safe_column(cls, col: str, sql_flavor: SQLFlavor):
         # Make the field id safe in case it's a reserved word
         if sql_flavor == SQLFlavor.SNOWFLAKE:
@@ -204,6 +206,7 @@ class TransformationHelper:
         return column
 
     @classmethod
+    # pylint: disable=W0238  # False positive when it is used by another classmethod
     def __hash_to_sql(cls, column: str, sql_flavor: SQLFlavor) -> str:
         """
         convert HASH transformation into the right sql string
@@ -231,6 +234,7 @@ class TransformationHelper:
         return trans
 
     @classmethod
+    # pylint: disable=W0238  # False positive when it is used by another classmethod
     def __hash_skip_first_to_sql(cls, transform_type: TransformationType, column: str, sql_flavor: SQLFlavor) -> str:
         """
         convert HASH-SKIP-FIRST-n transformation into the right sql string
@@ -261,6 +265,7 @@ class TransformationHelper:
         return trans
 
     @classmethod
+    # pylint: disable=W0238  # False positive when it is used by another classmethod
     def __mask_date_to_sql(cls, column: str, sql_flavor: SQLFlavor) -> str:
         """
         convert MASK-DATE transformation into the right sql string

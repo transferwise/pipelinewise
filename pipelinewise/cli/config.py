@@ -22,8 +22,8 @@ class Config:
         self.logger = logging.getLogger(__name__)
         self.config_dir = config_dir
         self.config_path = os.path.join(self.config_dir, 'config.json')
-        self.global_config = dict()
-        self.targets = dict()
+        self.global_config = {}
+        self.targets = {}
 
     @classmethod
     # pylint: disable=too-many-locals
@@ -54,6 +54,7 @@ class Config:
             utils.validate(instance=global_config, schema=global_config_schema)
             config.global_config = global_config or {}
 
+        # pylint: disable=E1136,E1137  # False positive when loading vault encrypted YAML
         # Load every target yaml into targets dictionary
         for yaml_file in target_yamls:
             config.logger.info('LOADING TARGET: %s', yaml_file)
@@ -102,8 +103,8 @@ class Config:
             taps[tap_id] = tap_data
 
         # Link taps to targets
-        for target_key in targets:
-            targets[target_key]['taps'] = [tap for tap in taps.values() if tap['target'] == target_key]
+        for target_key, target in targets.items():
+            target['taps'] = [tap for tap in taps.values() if tap['target'] == target_key]
 
         # Final structure is ready
         config.targets = targets
@@ -173,9 +174,10 @@ class Config:
         targets = []
 
         # Generate dictionary for config.json
-        for key in self.targets:
+        for target_tuple in self.targets.items():
+            target = target_tuple[1]
             taps = []
-            for tap in self.targets[key].get('taps'):
+            for tap in target.get('taps'):
                 taps.append({
                     'id': tap.get('id'),
                     'name': tap.get('name'),
@@ -187,10 +189,10 @@ class Config:
                 })
 
             targets.append({
-                'id': self.targets[key].get('id'),
-                'name': self.targets[key].get('name'),
+                'id': target.get('id'),
+                'name': target.get('name'),
                 'status': 'ready',
-                'type': self.targets[key].get('type'),
+                'type': target.get('type'),
                 'taps': taps
             })
         main_config = {**self.global_config, **{'targets': targets}}

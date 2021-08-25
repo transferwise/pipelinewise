@@ -109,7 +109,7 @@ class SplitGzipFile(io.BufferedIOBase):
             if self.compress:
                 self.chunk_file = gzip.open(self.chunk_filename, self.mode)
             else:
-                self.chunk_file = builtins.open(self.chunk_filename, self.mode)
+                self.chunk_file = builtins.open(self.chunk_filename, self.mode, encoding='utf-8')
 
     @staticmethod
     def _bytes_to_megabytes(size: int) -> float:

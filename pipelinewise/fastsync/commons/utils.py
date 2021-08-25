@@ -35,13 +35,13 @@ def get_cpu_cores():
 
 
 def load_json(path):
-    with open(path) as fil:
+    with open(path, encoding='utf-8') as fil:
         return json.load(fil)
 
 
 def save_dict_to_json(path, data):
     LOGGER.info('Saving new state file to %s', path)
-    with open(path, 'w') as fil:
+    with open(path, 'w', encoding='utf-8') as fil:
         fil.write(json.dumps(data))
 
 

@@ -338,7 +338,7 @@ def run_command(command: str, log_file: str = None, line_callback: callable = No
 
         # Start command
         with Popen(shlex.split(piped_command), stdout=PIPE, stderr=STDOUT) as proc:
-            with open(log_file_running, 'a+') as logfile:
+            with open(log_file_running, 'a+', encoding='utf-8') as logfile:
                 stdout = ''
                 while True:
                     line = proc.stdout.readline()
