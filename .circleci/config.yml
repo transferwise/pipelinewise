@@ -108,7 +108,7 @@ jobs:
                   gettext-base \
                   mongodb-org-shell=4.2.7
 
-              /dev-project/mongo/init_rs.sh
+              ./dev-project/mongo/init_rs.sh
 
               ./tests/db/tap_mysql_db.sh
               ./tests/db/tap_postgres_db.sh
