@@ -67,7 +67,7 @@ def class_to_string(key_value: Any, key_type: str) -> str:
     if key_type in ['int', 'Int64', 'float', 'ObjectId', 'str', 'UUID']:
         return str(key_value)
 
-    raise UnsupportedKeyTypeException("{} is not a supported key type".format(key_type))
+    raise UnsupportedKeyTypeException('{} is not a supported key type'.format(key_type))
 
 
 def safe_transform_datetime(value: datetime.datetime, path) -> str:
@@ -85,19 +85,19 @@ def safe_transform_datetime(value: datetime.datetime, path) -> str:
         local_datetime = timezone.localize(value)
         utc_datetime = local_datetime.astimezone(pytz.UTC)
     except Exception as ex:
-        if str(ex) == "year is out of range" and value.year == 0:
+        if str(ex) == 'year is out of range' and value.year == 0:
             # NB: Since datetimes are persisted as strings, it doesn't
             # make sense to blow up on invalid Python datetimes (e.g.,
             # year=0). In this case we're formatting it as a string and
             # passing it along down the pipeline.
-            return "{:04d}-{:02d}-{:02d}T{:02d}:{:02d}:{:02d}.{:06d}Z".format(value.year,
+            return '{:04d}-{:02d}-{:02d}T{:02d}:{:02d}:{:02d}.{:06d}Z'.format(value.year,
                                                                               value.month,
                                                                               value.day,
                                                                               value.hour,
                                                                               value.minute,
                                                                               value.second,
                                                                               value.microsecond)
-        raise MongoDBInvalidDatetimeError("Found invalid datetime at [{}]: {}".format(".".join(map(str, path)),
+        raise MongoDBInvalidDatetimeError('Found invalid datetime at [{}]: {}'.format('.'.join(map(str, path)),
                                                                                       value)) from ex
     return singer_strftime(utc_datetime)
 
