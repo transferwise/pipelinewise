@@ -283,7 +283,7 @@ class FastSyncTapMongoDB:
             (utils.SDC_DELETED_AT, 'string'),
         )
 
-    def fetch_current_log_pos(self)->Dict:
+    def fetch_current_log_pos(self) -> Dict:
         """
         Find and returns the latest ChangeStream token.
         LOG_BASED method uses changes streams.
@@ -344,7 +344,7 @@ class FastSyncTapMongoDB:
             'primary_key': ['_ID']
         }
 
-    def _export_collection(self, export_dir: str, collection_name)->str:
+    def _export_collection(self, export_dir: str, collection_name) -> str:
         """
         Dump a collection data into a compressed bson file and returns the path
         Args:
@@ -381,7 +381,7 @@ class FastSyncTapMongoDB:
         if return_code != 0:
             raise ExportError(f'Export failed with code {return_code}')
 
-        #mongodump creates two files "{collection_name}.metadata.json.gz" & "{collection_name}.bson.gz"
+        # mongodump creates two files "{collection_name}.metadata.json.gz" & "{collection_name}.bson.gz"
         # we are only interested in the latter so we delete the former.
         os.remove(os.path.join(export_dir, self.connection_config['database'], f'{collection_name}.metadata.json.gz'))
         return os.path.join(export_dir, self.connection_config['database'], f'{collection_name}.bson.gz')
