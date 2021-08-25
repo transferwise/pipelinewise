@@ -100,13 +100,15 @@ jobs:
               sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv 4B7C549A058F8B6B
               echo "deb [ arch=amd64 ] https://repo.mongodb.org/apt/ubuntu bionic/mongodb-org/4.2 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb.list
               sudo apt-get update
-              sudo apt install \
+              sudo apt install --no-install-recommends \
                   mariadb-client \
                   postgresql-client \
                   mongo-tools \
                   mbuffer \
                   gettext-base \
                   mongodb-org-shell=4.2.7
+
+              /dev-project/mongo/init_rs.sh
 
               ./tests/db/tap_mysql_db.sh
               ./tests/db/tap_postgres_db.sh
