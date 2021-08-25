@@ -35,7 +35,8 @@ setup(name='pipelinewise',
           'pymongo>=3.10,<3.13',
           'tzlocal>=2.0,<2.2',
           'slackclient>=2.7,<2.10',
-          'psutil==5.8.0'
+          'psutil==5.8.0',
+          'ujson==4.1.*'
       ],
       extras_require={
           'test': [
@@ -43,7 +44,6 @@ setup(name='pipelinewise',
               'pytest-dependency==0.4.0',
               'pytest-cov==2.12.1',
               'python-dotenv==0.19.0',
-              'mock==4.0.3',
               'pylint==2.10.2',
               'unify==0.5'
           ]
