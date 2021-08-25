@@ -199,6 +199,7 @@ class FastSyncTapMongoDB:
                                with -partXYZ postfix in the filename. (Default: False)
             split_file_chunk_size_mb: File chunk sizes if `split_large_files` enabled. (Default: 1000)
             split_file_max_chunks: Max number of chunks if `split_large_files` enabled. (Default: 20)
+            compress: Flag to indicate whether to compress export files
         """
         table_dict = utils.tablename_to_dict(table_name, '.')
 
