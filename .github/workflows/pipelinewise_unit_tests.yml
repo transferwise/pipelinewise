@@ -44,4 +44,4 @@ jobs:
         if: steps.check.outcome == 'failure'
         run: |
           export PIPELINEWISE_HOME=$PWD
-          pytest --cov=pipelinewise --cov-fail-under=69 -v tests/units
+          pytest --cov=pipelinewise --cov-fail-under=72 -v tests/units
