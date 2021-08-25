@@ -97,11 +97,16 @@ jobs:
 
             if [[ $rc -eq 1 ]]
             then
+              sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv 4B7C549A058F8B6B
+              echo "deb [ arch=amd64 ] https://repo.mongodb.org/apt/ubuntu bionic/mongodb-org/4.2 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb.list
               sudo apt-get update
-              sudo apt install mariadb-client postgresql-client mongo-tools mbuffer gettext-base
-              wget https://repo.mongodb.org/apt/ubuntu/dists/bionic/mongodb-org/4.2/multiverse/binary-amd64/mongodb-org-shell_4.2.7_amd64.deb
-              sudo dpkg -i ./mongodb-org-shell_4.2.7_amd64.deb && rm mongodb-org-shell_4.2.7_amd64.deb
-              ./dev-project/mongo/init_rs.sh
+              sudo apt install \
+                  mariadb-client \
+                  postgresql-client \
+                  mongo-tools \
+                  mbuffer \
+                  gettext-base \
+                  mongodb-org-shell=4.2.7
 
               ./tests/db/tap_mysql_db.sh
               ./tests/db/tap_postgres_db.sh
@@ -109,8 +114,10 @@ jobs:
               ./tests/db/target_postgres.sh
 
               ./install.sh --acceptlicenses --connectors=all
-
               . .virtualenvs/pipelinewise/bin/activate
+
+              python3 mongo/populate_test_db.py
+
               export PIPELINEWISE_HOME=$PWD
               pytest tests/end_to_end -v
             fi
