@@ -262,13 +262,12 @@ class TestTargetSnowflake:
             'public.country': 1,    # FULL_TABLE : fastsync only
             'public2.wearehere': 1  # FULL_TABLE : fastsync only
         }
-        for schema_table in expected_archive_files_count:
+        for schema_table, expected_archive_files in expected_archive_files_count.items():
             schema, table = schema_table.split('.')
             files_in_s3_archive = s3_client.list_objects(
                 Bucket=s3_bucket,
                 Prefix=('{}/postgres_to_sf_archive_load_files/{}'.format(archive_s3_prefix, table))).get('Contents')
 
-            expected_archive_files = expected_archive_files_count[schema_table]
             if files_in_s3_archive is None or len(files_in_s3_archive) != expected_archive_files:
                 raise Exception('files_in_archive for {} is {}. Expected archive files count: {}'.format(
                     table,

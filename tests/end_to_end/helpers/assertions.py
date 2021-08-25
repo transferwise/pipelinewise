@@ -57,7 +57,7 @@ def assert_command_success(return_code, stdout, stderr, log_path=None):
         failed_log_path = f'{log_path}.failed'
         # Load failed log file if exists
         if os.path.isfile(failed_log_path):
-            with open(failed_log_path, 'r') as file:
+            with open(failed_log_path, 'r', encoding='utf-8') as file:
                 failed_log = file.read()
 
         print(f'STDOUT: {stdout}\nSTDERR: {stderr}\nFAILED LOG: {failed_log}')
@@ -81,14 +81,14 @@ def assert_state_file_valid(target_name, tap_name, log_path=None):
     if log_path:
         success_log_path = f'{log_path}.success'
         state_in_log = None
-        with open(success_log_path, 'r') as log_f:
+        with open(success_log_path, 'r', encoding='utf-8') as log_f:
             state_log_pattern = re.search(r'\nINFO STATE emitted from target: (.+\n)', '\n'.join(log_f.readlines()))
             if state_log_pattern:
                 state_in_log = state_log_pattern.groups()[-1]
 
         # If the emitted state message exists in the log then compare it to the actual state file
         if state_in_log:
-            with open(state_file, 'r') as state_f:
+            with open(state_file, 'r', encoding='utf-8') as state_f:
                 assert state_in_log == ''.join(state_f.readlines())
 
 

@@ -2,7 +2,7 @@ from unittest import TestCase
 from unittest.mock import patch
 import pymysql
 
-import pipelinewise.fastsync.commons.tap_mysql as tap_mysql
+from pipelinewise.fastsync.commons import tap_mysql
 from pipelinewise.fastsync.commons.tap_mysql import FastSyncTapMySql
 
 
