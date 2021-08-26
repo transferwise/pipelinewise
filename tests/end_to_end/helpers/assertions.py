@@ -1,5 +1,4 @@
 import glob
-import logging
 import os
 import re
 
@@ -107,9 +106,6 @@ def assert_cols_in_table(query_runner_fn: callable, table_schema: str, table_nam
     sql = sql_get_columns_for_table_fn(table_schema, table_name)
     result = query_runner_fn(sql)
     cols = [res[0] for res in result]
-
-    logging.info('Comparing given cols %s to table cols %s', columns, cols)
-
     try:
         assert all(col in cols for col in columns)
     except AssertionError as ex:
