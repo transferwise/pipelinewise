@@ -50,6 +50,7 @@ def generate_all_datatypes_doc():
 
 
 def populate_all_datatypes_collection(db_name, col_name, n=100):
+    print(f'Populating MongoDB collection {db_name}.{col_name} with {n} documents ...')
     for _ in range(n):
         client[db_name][col_name].insert_one(generate_all_datatypes_doc())
 
