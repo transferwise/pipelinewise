@@ -7,6 +7,7 @@ PWD="$(dirname "$0")"
 
 TEST_DB_DATA_1=${PWD}/mongodb_data/listings.csv
 TEST_DB_DATA_2=${PWD}/mongodb_data/my_collection.bson.gz
+TEST_DB_DATA_3=${PWD}/mongodb_data/all_datatypes.bson.gz
 echo "Building test Mongodb database..."
 
 # To run this script some environment variables must be set.
@@ -35,3 +36,10 @@ mongorestore --uri ${URL} \
   --drop \
   --gzip \
   ${TEST_DB_DATA_2}
+
+mongorestore --uri ${URL} \
+  --db ${TAP_MONGODB_DB} \
+  --collection all_datatypes \
+  --drop \
+  --gzip \
+  ${TEST_DB_DATA_3}
