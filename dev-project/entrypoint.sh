@@ -47,8 +47,6 @@ cd dev-project
 # further populate mongodb test DB
 $PIPELINEWISE_HOME/.virtualenvs/pipelinewise/bin/python3 mongo/populate_test_db.py
 
-# Install PipelineWise in the container
-../install.sh --acceptlicenses --nousage --connectors=target-snowflake,target-postgres,target-bigquery,tap-mysql,tap-postgres,tap-mongodb,transform-field,tap-s3-csv
 if [[ $? != 0 ]]; then
     echo
     echo "ERROR: Docker container not started. Failed to install one or more PipelineWise components."
