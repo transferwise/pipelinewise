@@ -1,3 +1,4 @@
+# Workflow to check if all singer connectors are installable
 name: Singer connectors
 
 on:
@@ -9,8 +10,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
-
+  check:
     runs-on: ubuntu-20.04
     strategy:
       matrix:

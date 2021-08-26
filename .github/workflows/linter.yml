@@ -9,8 +9,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
-
+  check:
     runs-on: ubuntu-20.04
     strategy:
       matrix:
