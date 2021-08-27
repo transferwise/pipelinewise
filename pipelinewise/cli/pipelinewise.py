@@ -13,16 +13,43 @@ import pidfile
 
 from datetime import datetime
 from time import time
-from typing import Dict, Optional, List
+from typing import Dict, Optional, List, Any
 from joblib import Parallel, delayed, parallel_backend
 from tabulate import tabulate
 
 from . import utils
+from .constants import ConnectorType
 from . import commands
 from .commands import TapParams, TargetParams, TransformParams
 from .config import Config
 from .alert_sender import AlertSender
 from .alert_handlers.base_alert_handler import BaseAlertHandler
+
+FASTSYNC_PAIRS = {
+    ConnectorType.TAP_MYSQL: {
+        ConnectorType.TARGET_SNOWFLAKE,
+        ConnectorType.TARGET_REDSHIFT,
+        ConnectorType.TARGET_POSTGRES,
+        ConnectorType.TARGET_BIGQUERY
+    },
+    ConnectorType.TAP_POSTGRES: {
+        ConnectorType.TARGET_SNOWFLAKE,
+        ConnectorType.TARGET_REDSHIFT,
+        ConnectorType.TARGET_POSTGRES,
+        ConnectorType.TARGET_BIGQUERY
+    },
+    ConnectorType.TAP_S3_CSV: {
+        ConnectorType.TARGET_SNOWFLAKE,
+        ConnectorType.TARGET_REDSHIFT,
+        ConnectorType.TARGET_POSTGRES,
+        ConnectorType.TARGET_BIGQUERY
+    },
+    ConnectorType.TAP_MONGODB: {
+        ConnectorType.TARGET_SNOWFLAKE,
+        ConnectorType.TARGET_POSTGRES,
+        ConnectorType.TARGET_BIGQUERY
+    },
+}
 
 
 # pylint: disable=too-many-lines,too-many-instance-attributes,too-many-public-methods
@@ -115,7 +142,12 @@ class PipelineWise:
             raise Exception(f'Cannot merge JSON files {dict_a} {dict_b} - {exc}') from exc
 
     # pylint: disable=too-many-statements,too-many-branches,too-many-nested-blocks,too-many-locals,too-many-arguments
-    def create_filtered_tap_properties(self, target_type, tap_type, tap_properties, tap_state, filters,
+    def create_filtered_tap_properties(self,
+                                       target_type: ConnectorType,
+                                       tap_type: ConnectorType,
+                                       tap_properties: str,
+                                       tap_state: str,
+                                       filters: Dict[str, Any],
                                        create_fallback=False):
         """
         Create a filtered version of tap properties file based on specific filter conditions.
@@ -132,11 +164,10 @@ class PipelineWise:
         """
         # Get filter conditions with default values from input dictionary
         # Nothing selected by default
-        f_selected = filters.get('selected', None)
-        f_target_type = filters.get('target_type', None)
-        f_tap_type = filters.get('tap_type', None)
+        f_selected: bool = filters.get('selected', False)
+        f_tap_target_pairs: Dict = filters.get('tap_target_pairs', {})
         f_replication_method = filters.get('replication_method', None)
-        f_initial_sync_required = filters.get('initial_sync_required', None)
+        f_initial_sync_required: bool = filters.get('initial_sync_required', False)
 
         # Lists of tables that meet and don't meet the filter criteria
         filtered_tap_stream_ids = []
@@ -200,8 +231,7 @@ class PipelineWise:
                 # pylint: disable=too-many-boolean-expressions
                 if (
                         (f_selected is None or selected == f_selected) and
-                        (f_target_type is None or target_type in f_target_type) and
-                        (f_tap_type is None or tap_type in f_tap_type) and
+                        (f_tap_target_pairs is None or target_type in f_tap_target_pairs.get(tap_type, set())) and
                         (f_replication_method is None or replication_method in f_replication_method) and
                         (f_initial_sync_required is None or initial_sync_required == f_initial_sync_required)
                 ):
@@ -958,13 +988,13 @@ class PipelineWise:
             tap_properties_singer,
             singer_stream_ids
         ) = self.create_filtered_tap_properties(
-            target_type,
-            tap_type,
+            ConnectorType(target_type),
+            ConnectorType(tap_type),
             tap_properties,
-            tap_state, {
+            tap_state,
+            {
                 'selected': True,
-                'target_type': ['target-snowflake', 'target-redshift', 'target-postgres', 'target-bigquery'],
-                'tap_type': ['tap-mysql', 'tap-postgres', 'tap-s3-csv', 'tap-mongodb'],
+                'tap_target_pairs': FASTSYNC_PAIRS,
                 'initial_sync_required': True
             },
             create_fallback=True)

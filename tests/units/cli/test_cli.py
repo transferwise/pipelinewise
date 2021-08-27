@@ -5,12 +5,17 @@ import shutil
 import signal
 import psutil
 import pidfile
+import pytest
+
 from pathlib import Path
 
 import pytest
 from unittest.mock import patch
+
 from tests.units.cli.cli_args import CliArgs
 from pipelinewise import cli
+from pipelinewise.cli.constants import ConnectorType
+from pipelinewise.cli.config import Config
 from pipelinewise.cli.pipelinewise import PipelineWise
 
 RESOURCES_DIR = '{}/resources'.format(os.path.dirname(__file__))
@@ -20,6 +25,9 @@ TEST_PROJECT_NAME = 'test-project'
 TEST_PROJECT_DIR = '{}/{}'.format(os.getcwd(), TEST_PROJECT_NAME)
 PROFILING_DIR = './profiling'
 
+
+# Can't inherit from unittest.TestCase because it breaks pytest fixture
+# https://github.com/pytest-dev/pytest/issues/2504#issuecomment-308828149
 
 # pylint: disable=no-self-use,too-many-public-methods,attribute-defined-outside-init,fixme
 class TestCli:
@@ -159,16 +167,18 @@ class TestCli:
             tap_properties_singer,
             singer_stream_ids
         ) = self.pipelinewise.create_filtered_tap_properties(
-             target_type='target-snowflake',
-             tap_type='tap-mysql',
+            target_type=ConnectorType('target-snowflake'),
+            tap_type=ConnectorType('tap-mysql'),
              tap_properties='{}/resources/sample_json_config/target_one/tap_one/properties.json'.format(
                  os.path.dirname(__file__)),
              tap_state='{}/resources/sample_json_config/target_one/tap_one/state.json'.format(
                  os.path.dirname(__file__)),
              filters={
                  'selected': True,
-                 'target_type': ['target-snowflake'],
-                 'tap_type': ['tap-mysql', 'tap-postgres'],
+                 'tap_target_pairs': {
+                     ConnectorType.TAP_MYSQL: {ConnectorType.TARGET_SNOWFLAKE},
+                     ConnectorType.TAP_POSTGRES: {ConnectorType.TARGET_SNOWFLAKE}
+                 },
                  'initial_sync_required': True
              },
              create_fallback=True)
@@ -183,6 +193,42 @@ class TestCli:
 
         # Fastsync and singer properties should be created
         assert fastsync_stream_ids == ['db_test_mysql-table_one', 'db_test_mysql-table_two']
+        assert singer_stream_ids == ['db_test_mysql-table_one', 'db_test_mysql-table_two']
+
+    def test_create_filtered_tap_props_no_fastsync(self):
+        """Test creating only singer specific properties file"""
+        (
+            tap_properties_fastsync,
+            fastsync_stream_ids,
+            tap_properties_singer,
+            singer_stream_ids
+        ) = self.pipelinewise.create_filtered_tap_properties(
+            target_type=ConnectorType('target-snowflake'),
+            tap_type=ConnectorType('tap-mysql'),
+            tap_properties='{}/resources/sample_json_config/target_one/tap_one/properties.json'.format(
+                os.path.dirname(__file__)),
+            tap_state='{}/resources/sample_json_config/target_one/tap_one/state.json'.format(
+                os.path.dirname(__file__)),
+            filters={
+                'selected': True,
+                'tap_target_pairs': {
+                    ConnectorType.TAP_MYSQL: {ConnectorType.TARGET_REDSHIFT},
+                    ConnectorType.TAP_POSTGRES: {ConnectorType.TARGET_SNOWFLAKE}
+                },
+                'initial_sync_required': True
+            },
+            create_fallback=True)
+
+        # fastsync and singer properties should be created
+        assert os.path.isfile(tap_properties_fastsync)
+        assert os.path.isfile(tap_properties_singer)
+
+        # Delete generated properties file
+        os.remove(tap_properties_fastsync)
+        os.remove(tap_properties_singer)
+
+        # only singer properties should be created
+        assert fastsync_stream_ids == []
         assert singer_stream_ids == ['db_test_mysql-table_one', 'db_test_mysql-table_two']
 
     def test_merge_empty_catalog(self):
