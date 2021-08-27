@@ -400,7 +400,7 @@ class PipelineWise:
 
         return taps
 
-    def get_tap(self, target_id, tap_id):
+    def get_tap(self, target_id: str, tap_id: str) -> Dict:
         """
         Get tap by id from a specific target
         """
