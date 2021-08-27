@@ -580,7 +580,7 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
             assert len(pipelinewise._run_post_import_tap_checks(tap_with_trans, tap_with_no_pk_incremental,
                                                                 'snowflake')) == 2
 
-            # mock successfull transformation validation command
+            # mock successful transformation validation command
             run_command_mock.return_value = (0, None, None)
 
             assert len(pipelinewise._run_post_import_tap_checks(tap_with_trans, tap_with_no_pk_not_selected,
