@@ -64,22 +64,6 @@ class TestCli:
             self.pipelinewise.get_connector_bin('dummy-type') == \
             '{}/dummy-type/bin/dummy-type'.format(VIRTUALENVS_DIR)
 
-    def test_connector_files(self):
-        """Every singer connector must have a list of JSON files at certain locations"""
-        # TODO: get_connector_files is duplicated in config.py and pipelinewise.py
-        #       Refactor to use only one
-        assert \
-            self.pipelinewise.get_connector_files('/var/singer-connector') == \
-            {
-                'config': '/var/singer-connector/config.json',
-                'inheritable_config': '/var/singer-connector/inheritable_config.json',
-                'properties': '/var/singer-connector/properties.json',
-                'state': '/var/singer-connector/state.json',
-                'transformation': '/var/singer-connector/transformation.json',
-                'selection': '/var/singer-connector/selection.json',
-                'pidfile': '/var/singer-connector/pipelinewise.pid'
-            }
-
     def test_not_existing_config_dir(self):
         """Test with not existing config dir"""
         # Create a new pipelinewise object pointing to a not existing config directory
@@ -103,8 +87,8 @@ class TestCli:
         exp_target_two = next((item for item in targets if item['id'] == 'target_two'), False)
 
         # Append the connector file paths to the expected targets
-        exp_target_one['files'] = self.pipelinewise.get_connector_files('{}/target_one'.format(CONFIG_DIR))
-        exp_target_two['files'] = self.pipelinewise.get_connector_files('{}/target_two'.format(CONFIG_DIR))
+        exp_target_one['files'] = Config.get_connector_files('{}/target_one'.format(CONFIG_DIR))
+        exp_target_two['files'] = Config.get_connector_files('{}/target_two'.format(CONFIG_DIR))
 
         # Getting target by ID should match to original JSON and should contains the connector files list
         assert self.pipelinewise.get_target('target_one') == exp_target_one
@@ -140,7 +124,7 @@ class TestCli:
         # Append the tap status, files and target keys to the tap
         exp_tap_one = target_one['taps'][0]
         exp_tap_one['status'] = self.pipelinewise.detect_tap_status('target_one', exp_tap_one['id'])
-        exp_tap_one['files'] = self.pipelinewise.get_connector_files('{}/target_one/tap_one'.format(CONFIG_DIR))
+        exp_tap_one['files'] = Config.get_connector_files('{}/target_one/tap_one'.format(CONFIG_DIR))
         exp_tap_one['target'] = self.pipelinewise.get_target('target_one')
 
         # Getting tap by ID should match to original JSON and should contain  status, connector files and target props

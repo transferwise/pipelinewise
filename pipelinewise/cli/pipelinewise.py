@@ -318,21 +318,6 @@ class PipelineWise:
         """
         return os.path.join(self.venv_dir, connector_type, 'bin', 'python')
 
-    @classmethod
-    def get_connector_files(cls, connector_dir):
-        """
-        Get connector file paths
-        """
-        return {
-            'config': os.path.join(connector_dir, 'config.json'),
-            'inheritable_config': os.path.join(connector_dir, 'inheritable_config.json'),
-            'properties': os.path.join(connector_dir, 'properties.json'),
-            'state': os.path.join(connector_dir, 'state.json'),
-            'transformation': os.path.join(connector_dir, 'transformation.json'),
-            'selection': os.path.join(connector_dir, 'selection.json'),
-            'pidfile': os.path.join(connector_dir, 'pipelinewise.pid')
-        }
-
     def get_targets(self):
         """
         Get every target
@@ -360,7 +345,7 @@ class PipelineWise:
 
         target_dir = self.get_target_dir(target_id)
         if os.path.isdir(target_dir):
-            target['files'] = self.get_connector_files(target_dir)
+            target['files'] = Config.get_connector_files(target_dir)
         else:
             raise Exception(f'Cannot find target at {target_dir}')
 
@@ -399,7 +384,7 @@ class PipelineWise:
 
         tap_dir = self.get_tap_dir(target_id, tap_id)
         if os.path.isdir(tap_dir):
-            tap['files'] = self.get_connector_files(tap_dir)
+            tap['files'] = Config.get_connector_files(tap_dir)
         else:
             raise Exception(f'Cannot find tap at {tap_dir}')
 
@@ -739,7 +724,7 @@ class PipelineWise:
         self.logger.debug('Detecting %s tap status in %s target', tap_id, target_id)
         tap_dir = self.get_tap_dir(target_id, tap_id)
         log_dir = self.get_tap_log_dir(target_id, tap_id)
-        connector_files = self.get_connector_files(tap_dir)
+        connector_files = Config.get_connector_files(tap_dir)
         status = {
             'currentStatus': 'unknown',
             'lastStatus': 'unknown',
