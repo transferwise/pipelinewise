@@ -284,10 +284,10 @@ class PipelineWise:
                                                                        suffix='.json')[1]
                 utils.save_json(fallback_properties, temp_fallback_properties_path)
 
-                return temp_properties_path, \
-                       filtered_tap_stream_ids, \
-                       temp_fallback_properties_path, \
-                       fallback_filtered_stream_ids
+                return (temp_properties_path,
+                        filtered_tap_stream_ids,
+                        temp_fallback_properties_path,
+                        fallback_filtered_stream_ids)
 
             # Fallback not required: Save only the filtered properties JSON
             temp_properties_path = utils.create_temp_file(dir=self.get_temp_dir(),
@@ -1361,13 +1361,13 @@ class PipelineWise:
         :return: Boolean, True if needs initial sync, False otherwise
         """
         return replication_method == self.FULL_TABLE \
-                or (replication_method == self.INCREMENTAL and
-                    'replication_key_value' not in stream_bookmark and
-                    'modified_since' not in stream_bookmark) \
-                or (replication_method == self.LOG_BASED and
-                    'lsn' not in stream_bookmark and
-                    'log_pos' not in stream_bookmark and
-                    'token' not in stream_bookmark)
+               or (replication_method == self.INCREMENTAL and
+                   'replication_key_value' not in stream_bookmark and
+                   'modified_since' not in stream_bookmark) \
+               or (replication_method == self.LOG_BASED and
+                   'lsn' not in stream_bookmark and
+                   'log_pos' not in stream_bookmark and
+                   'token' not in stream_bookmark)
 
     # pylint: disable=unused-argument
     def _exit_gracefully(self, sig, frame, exit_code=1):
