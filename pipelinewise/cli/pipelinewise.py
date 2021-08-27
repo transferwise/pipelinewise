@@ -368,7 +368,7 @@ class PipelineWise:
         self.logger.debug('Getting %s target', target_id)
         targets = self.get_targets()
 
-        target = next((item for item in targets if item['id'] == target_id), False)
+        target = next((item for item in targets if item['id'] == target_id), None)
 
         if not target:
             raise Exception(f'Cannot find {target_id} target')
@@ -407,7 +407,7 @@ class PipelineWise:
         self.logger.debug('Getting %s tap from target %s', tap_id, target_id)
         taps = self.get_taps(target_id)
 
-        tap = next((item for item in taps if item['id'] == tap_id), False)
+        tap = next((item for item in taps if item['id'] == tap_id), None)
 
         if not tap:
             raise Exception(f'Cannot find {tap_id} tap in {target_id} target')
@@ -439,7 +439,7 @@ class PipelineWise:
             for new_stream_idx, new_stream in enumerate(new_streams):
                 new_tap_stream_id = new_stream['tap_stream_id']
 
-                old_stream = next((item for item in old_streams if item['tap_stream_id'] == new_tap_stream_id), False)
+                old_stream = next((item for item in old_streams if item['tap_stream_id'] == new_tap_stream_id), None)
 
                 # Is this a new stream?
                 if not old_stream:
@@ -577,7 +577,7 @@ class PipelineWise:
             streams = schema['streams']
             for stream_idx, stream in enumerate(streams):
                 tap_stream_id = stream.get('tap_stream_id')
-                tap_stream_sel = False
+                tap_stream_sel = None
                 for sel in selection:
                     if 'tap_stream_id' in sel and tap_stream_id.lower() == sel['tap_stream_id'].lower():
                         tap_stream_sel = sel
