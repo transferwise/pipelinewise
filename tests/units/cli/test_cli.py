@@ -8,8 +8,6 @@ import pidfile
 import pytest
 
 from pathlib import Path
-
-import pytest
 from unittest.mock import patch
 
 from tests.units.cli.cli_args import CliArgs
