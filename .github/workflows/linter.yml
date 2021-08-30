@@ -9,8 +9,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
-
+  check:
     runs-on: ubuntu-20.04
     strategy:
       matrix:
@@ -28,7 +27,7 @@ jobs:
         continue-on-error: true
         run: ./scripts/ci_check_no_file_changes.sh python
 
-      - name: Set up Python ${{ matrix.container[1] }}
+      - name: Set up Python ${{ matrix.python-version }}
         if: steps.check.outcome == 'failure'
         uses: actions/setup-python@v2
         with:

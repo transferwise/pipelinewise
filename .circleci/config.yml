@@ -97,10 +97,17 @@ jobs:
 
             if [[ $rc -eq 1 ]]
             then
+              sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv 4B7C549A058F8B6B
+              echo "deb [ arch=amd64 ] https://repo.mongodb.org/apt/ubuntu bionic/mongodb-org/4.2 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb.list
               sudo apt-get update
-              sudo apt install mariadb-client postgresql-client mongo-tools mbuffer gettext-base
-              wget https://repo.mongodb.org/apt/ubuntu/dists/bionic/mongodb-org/4.2/multiverse/binary-amd64/mongodb-org-shell_4.2.7_amd64.deb
-              sudo dpkg -i ./mongodb-org-shell_4.2.7_amd64.deb && rm mongodb-org-shell_4.2.7_amd64.deb
+              sudo apt install --no-install-recommends \
+                  mariadb-client \
+                  postgresql-client \
+                  mongo-tools \
+                  mbuffer \
+                  gettext-base \
+                  mongodb-org-shell=4.2.7
+
               ./dev-project/mongo/init_rs.sh
 
               ./tests/db/tap_mysql_db.sh
@@ -108,11 +115,10 @@ jobs:
               ./tests/db/tap_mongodb.sh
               ./tests/db/target_postgres.sh
 
-              ./install.sh --acceptlicenses --connectors=all
-
+              ./install.sh --acceptlicenses --connectors=target-snowflake,target-postgres,target-bigquery,tap-mysql,tap-postgres,tap-mongodb,transform-field,tap-s3-csv
               . .virtualenvs/pipelinewise/bin/activate
               export PIPELINEWISE_HOME=$PWD
-              pytest tests/end_to_end -v
+              pytest tests/end_to_end -vx
             fi
           no_output_timeout: 30m
 

@@ -1,3 +1,4 @@
+import decimal
 import os
 import uuid
 from datetime import datetime, timezone
@@ -265,12 +266,15 @@ class TestTargetBigquery:
         assertions.assert_run_tap_success(TAP_MONGODB_ID, TARGET_ID, ['fastsync', 'singer'])
         assert_columns_exist('listings')
         assert_columns_exist('my_collection')
+        assert_columns_exist('all_datatypes')
 
         listing_count = self.mongodb_con['listings'].count_documents({})
         my_coll_count = self.mongodb_con['my_collection'].count_documents({})
+        all_datatypes_count = self.mongodb_con['all_datatypes'].count_documents({})
 
         assert_row_counts_equal('ppw_e2e_tap_mongodb', 'listings', listing_count)
         assert_row_counts_equal('ppw_e2e_tap_mongodb', 'my_collection', my_coll_count)
+        assert_row_counts_equal('ppw_e2e_tap_mongodb', 'all_datatypes', all_datatypes_count)
 
         result_insert = self.mongodb_con.my_collection.insert_many([
             {
@@ -288,6 +292,7 @@ class TestTargetBigquery:
             {
                 'uuid': uuid.uuid4(),
                 'id': 1003,
+                'decimal': bson.Decimal128(decimal.Decimal('5.64547548425446546546644')),
                 'nested_json': {'a': 1, 'b': 3, 'c': {'key': bson.datetime.datetime(2020, 5, 3, 10, 0, 0)}}
             }
         ])

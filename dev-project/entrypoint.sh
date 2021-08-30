@@ -1,14 +1,24 @@
 #!/usr/bin/env bash
 
+set -e
+
+# Add Mongodb ppa
+apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv 4B7C549A058F8B6B
+echo "deb [ arch=amd64 ] https://repo.mongodb.org/apt/ubuntu bionic/mongodb-org/4.2 multiverse" | tee /etc/apt/sources.list.d/mongodb.list
+
 # Install OS dependencies
 apt-get update
-apt-get install -y mariadb-client postgresql-client alien libaio1 mongo-tools mbuffer gettext-base
+apt-get install -y --no-install-recommends \
+  alien \
+  gettext-base \
+  libaio1 \
+  mariadb-client \
+  mbuffer \
+  mongo-tools \
+  mongodb-org-shell=4.2.7 \
+  postgresql-client
 
-wget https://repo.mongodb.org/apt/ubuntu/dists/bionic/mongodb-org/4.2/multiverse/binary-amd64/mongodb-org-shell_4.2.7_amd64.deb
-dpkg -i ./mongodb-org-shell_4.2.7_amd64.deb && rm mongodb-org-shell_4.2.7_amd64.deb
-
-# Change to dev-project folder
-cd dev-project
+rm -rf /var/lib/apt/lists/* \
 
 # Install Oracle Instant Client required for tap-oracle
 # ORA_INSTACLIENT_URL=https://download.oracle.com/otn_software/linux/instantclient/193000/oracle-instantclient19.3-basiclite-19.3.0.0.0-1.x86_64.rpm
@@ -17,16 +27,21 @@ cd dev-project
 # alien -i oracle-instantclient.rpm --scripts
 # rm -f oracle-instantclient.rpm
 
+
+# Change to dev-project folder
+cd dev-project
+
+# Install PipelineWise in the container
+
 # Build test databasese
 ../tests/db/tap_mysql_db.sh
 ../tests/db/tap_postgres_db.sh
 
 ./mongo/init_rs.sh
 ../tests/db/tap_mongodb.sh
-
 ../tests/db/target_postgres.sh
 
-# Install PipelineWise in the container
+# Install PipelineWise and connectors in the container
 ../install.sh --acceptlicenses --nousage --connectors=target-snowflake,target-postgres,target-bigquery,tap-mysql,tap-postgres,tap-mongodb,transform-field,tap-s3-csv
 if [[ $? != 0 ]]; then
     echo

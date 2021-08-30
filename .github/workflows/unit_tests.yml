@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  test:
 
     runs-on: ubuntu-20.04
     strategy:
@@ -28,7 +28,7 @@ jobs:
         continue-on-error: true
         run: ./scripts/ci_check_no_file_changes.sh python
 
-      - name: Set up Python ${{ matrix.container[1] }}
+      - name: Set up Python ${{ matrix.python-version }}
         if: steps.check.outcome == 'failure'
         uses: actions/setup-python@v2
         with:
@@ -44,4 +44,4 @@ jobs:
         if: steps.check.outcome == 'failure'
         run: |
           export PIPELINEWISE_HOME=$PWD
-          pytest --cov=pipelinewise --cov-fail-under=69 -v tests/units
+          pytest --cov=pipelinewise --cov-fail-under=72 -v tests/units
