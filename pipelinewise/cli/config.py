@@ -6,6 +6,8 @@ import os
 import sys
 import json
 
+from typing import Dict
+
 from pipelinewise.utils import safe_column_name
 from . import utils
 
@@ -130,7 +132,7 @@ class Config:
         return os.path.join(self.config_dir, target_id, tap_id)
 
     @staticmethod
-    def get_connector_files(connector_dir):
+    def get_connector_files(connector_dir: str) -> Dict:
         """
         Returns the absolute paths of a tap/target configuration files
         """
@@ -141,6 +143,7 @@ class Config:
             'state': os.path.join(connector_dir, 'state.json'),
             'transformation': os.path.join(connector_dir, 'transformation.json'),
             'selection': os.path.join(connector_dir, 'selection.json'),
+            'pidfile': os.path.join(connector_dir, 'pipelinewise.pid')
         }
 
     def save(self):
