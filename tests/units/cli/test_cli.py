@@ -5,12 +5,15 @@ import shutil
 import signal
 import psutil
 import pidfile
-from pathlib import Path
-
 import pytest
+
+from pathlib import Path
 from unittest.mock import patch
+
 from tests.units.cli.cli_args import CliArgs
 from pipelinewise import cli
+from pipelinewise.cli.constants import ConnectorType
+from pipelinewise.cli.config import Config
 from pipelinewise.cli.pipelinewise import PipelineWise
 
 RESOURCES_DIR = '{}/resources'.format(os.path.dirname(__file__))
@@ -20,6 +23,9 @@ TEST_PROJECT_NAME = 'test-project'
 TEST_PROJECT_DIR = '{}/{}'.format(os.getcwd(), TEST_PROJECT_NAME)
 PROFILING_DIR = './profiling'
 
+
+# Can't inherit from unittest.TestCase because it breaks pytest fixture
+# https://github.com/pytest-dev/pytest/issues/2504#issuecomment-308828149
 
 # pylint: disable=no-self-use,too-many-public-methods,attribute-defined-outside-init,fixme
 class TestCli:
@@ -64,22 +70,6 @@ class TestCli:
             self.pipelinewise.get_connector_bin('dummy-type') == \
             '{}/dummy-type/bin/dummy-type'.format(VIRTUALENVS_DIR)
 
-    def test_connector_files(self):
-        """Every singer connector must have a list of JSON files at certain locations"""
-        # TODO: get_connector_files is duplicated in config.py and pipelinewise.py
-        #       Refactor to use only one
-        assert \
-            self.pipelinewise.get_connector_files('/var/singer-connector') == \
-            {
-                'config': '/var/singer-connector/config.json',
-                'inheritable_config': '/var/singer-connector/inheritable_config.json',
-                'properties': '/var/singer-connector/properties.json',
-                'state': '/var/singer-connector/state.json',
-                'transformation': '/var/singer-connector/transformation.json',
-                'selection': '/var/singer-connector/selection.json',
-                'pidfile': '/var/singer-connector/pipelinewise.pid'
-            }
-
     def test_not_existing_config_dir(self):
         """Test with not existing config dir"""
         # Create a new pipelinewise object pointing to a not existing config directory
@@ -103,8 +93,8 @@ class TestCli:
         exp_target_two = next((item for item in targets if item['id'] == 'target_two'), False)
 
         # Append the connector file paths to the expected targets
-        exp_target_one['files'] = self.pipelinewise.get_connector_files('{}/target_one'.format(CONFIG_DIR))
-        exp_target_two['files'] = self.pipelinewise.get_connector_files('{}/target_two'.format(CONFIG_DIR))
+        exp_target_one['files'] = Config.get_connector_files('{}/target_one'.format(CONFIG_DIR))
+        exp_target_two['files'] = Config.get_connector_files('{}/target_two'.format(CONFIG_DIR))
 
         # Getting target by ID should match to original JSON and should contains the connector files list
         assert self.pipelinewise.get_target('target_one') == exp_target_one
@@ -140,7 +130,7 @@ class TestCli:
         # Append the tap status, files and target keys to the tap
         exp_tap_one = target_one['taps'][0]
         exp_tap_one['status'] = self.pipelinewise.detect_tap_status('target_one', exp_tap_one['id'])
-        exp_tap_one['files'] = self.pipelinewise.get_connector_files('{}/target_one/tap_one'.format(CONFIG_DIR))
+        exp_tap_one['files'] = Config.get_connector_files('{}/target_one/tap_one'.format(CONFIG_DIR))
         exp_tap_one['target'] = self.pipelinewise.get_target('target_one')
 
         # Getting tap by ID should match to original JSON and should contain  status, connector files and target props
@@ -175,16 +165,18 @@ class TestCli:
             tap_properties_singer,
             singer_stream_ids
         ) = self.pipelinewise.create_filtered_tap_properties(
-             target_type='target-snowflake',
-             tap_type='tap-mysql',
+            target_type=ConnectorType('target-snowflake'),
+            tap_type=ConnectorType('tap-mysql'),
              tap_properties='{}/resources/sample_json_config/target_one/tap_one/properties.json'.format(
                  os.path.dirname(__file__)),
              tap_state='{}/resources/sample_json_config/target_one/tap_one/state.json'.format(
                  os.path.dirname(__file__)),
              filters={
                  'selected': True,
-                 'target_type': ['target-snowflake'],
-                 'tap_type': ['tap-mysql', 'tap-postgres'],
+                 'tap_target_pairs': {
+                     ConnectorType.TAP_MYSQL: {ConnectorType.TARGET_SNOWFLAKE},
+                     ConnectorType.TAP_POSTGRES: {ConnectorType.TARGET_SNOWFLAKE}
+                 },
                  'initial_sync_required': True
              },
              create_fallback=True)
@@ -199,6 +191,42 @@ class TestCli:
 
         # Fastsync and singer properties should be created
         assert fastsync_stream_ids == ['db_test_mysql-table_one', 'db_test_mysql-table_two']
+        assert singer_stream_ids == ['db_test_mysql-table_one', 'db_test_mysql-table_two']
+
+    def test_create_filtered_tap_props_no_fastsync(self):
+        """Test creating only singer specific properties file"""
+        (
+            tap_properties_fastsync,
+            fastsync_stream_ids,
+            tap_properties_singer,
+            singer_stream_ids
+        ) = self.pipelinewise.create_filtered_tap_properties(
+            target_type=ConnectorType('target-snowflake'),
+            tap_type=ConnectorType('tap-mysql'),
+            tap_properties='{}/resources/sample_json_config/target_one/tap_one/properties.json'.format(
+                os.path.dirname(__file__)),
+            tap_state='{}/resources/sample_json_config/target_one/tap_one/state.json'.format(
+                os.path.dirname(__file__)),
+            filters={
+                'selected': True,
+                'tap_target_pairs': {
+                    ConnectorType.TAP_MYSQL: {ConnectorType.TARGET_REDSHIFT},
+                    ConnectorType.TAP_POSTGRES: {ConnectorType.TARGET_SNOWFLAKE}
+                },
+                'initial_sync_required': True
+            },
+            create_fallback=True)
+
+        # fastsync and singer properties should be created
+        assert os.path.isfile(tap_properties_fastsync)
+        assert os.path.isfile(tap_properties_singer)
+
+        # Delete generated properties file
+        os.remove(tap_properties_fastsync)
+        os.remove(tap_properties_singer)
+
+        # only singer properties should be created
+        assert fastsync_stream_ids == []
         assert singer_stream_ids == ['db_test_mysql-table_one', 'db_test_mysql-table_two']
 
     def test_merge_empty_catalog(self):
@@ -550,7 +578,7 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
             assert len(pipelinewise._run_post_import_tap_checks(tap_with_trans, tap_with_no_pk_incremental,
                                                                 'snowflake')) == 2
 
-            # mock successfull transformation validation command
+            # mock successful transformation validation command
             run_command_mock.return_value = (0, None, None)
 
             assert len(pipelinewise._run_post_import_tap_checks(tap_with_trans, tap_with_no_pk_not_selected,
