@@ -13,16 +13,43 @@ import pidfile
 
 from datetime import datetime
 from time import time
-from typing import Dict, Optional, List
+from typing import Dict, Optional, List, Any
 from joblib import Parallel, delayed, parallel_backend
 from tabulate import tabulate
 
 from . import utils
+from .constants import ConnectorType
 from . import commands
 from .commands import TapParams, TargetParams, TransformParams
 from .config import Config
 from .alert_sender import AlertSender
 from .alert_handlers.base_alert_handler import BaseAlertHandler
+
+FASTSYNC_PAIRS = {
+    ConnectorType.TAP_MYSQL: {
+        ConnectorType.TARGET_SNOWFLAKE,
+        ConnectorType.TARGET_REDSHIFT,
+        ConnectorType.TARGET_POSTGRES,
+        ConnectorType.TARGET_BIGQUERY
+    },
+    ConnectorType.TAP_POSTGRES: {
+        ConnectorType.TARGET_SNOWFLAKE,
+        ConnectorType.TARGET_REDSHIFT,
+        ConnectorType.TARGET_POSTGRES,
+        ConnectorType.TARGET_BIGQUERY
+    },
+    ConnectorType.TAP_S3_CSV: {
+        ConnectorType.TARGET_SNOWFLAKE,
+        ConnectorType.TARGET_REDSHIFT,
+        ConnectorType.TARGET_POSTGRES,
+        ConnectorType.TARGET_BIGQUERY
+    },
+    ConnectorType.TAP_MONGODB: {
+        ConnectorType.TARGET_SNOWFLAKE,
+        ConnectorType.TARGET_POSTGRES,
+        ConnectorType.TARGET_BIGQUERY
+    },
+}
 
 
 # pylint: disable=too-many-lines,too-many-instance-attributes,too-many-public-methods
@@ -115,7 +142,12 @@ class PipelineWise:
             raise Exception(f'Cannot merge JSON files {dict_a} {dict_b} - {exc}') from exc
 
     # pylint: disable=too-many-statements,too-many-branches,too-many-nested-blocks,too-many-locals,too-many-arguments
-    def create_filtered_tap_properties(self, target_type, tap_type, tap_properties, tap_state, filters,
+    def create_filtered_tap_properties(self,
+                                       target_type: ConnectorType,
+                                       tap_type: ConnectorType,
+                                       tap_properties: str,
+                                       tap_state: str,
+                                       filters: Dict[str, Any],
                                        create_fallback=False):
         """
         Create a filtered version of tap properties file based on specific filter conditions.
@@ -132,11 +164,10 @@ class PipelineWise:
         """
         # Get filter conditions with default values from input dictionary
         # Nothing selected by default
-        f_selected = filters.get('selected', None)
-        f_target_type = filters.get('target_type', None)
-        f_tap_type = filters.get('tap_type', None)
+        f_selected: bool = filters.get('selected', False)
+        f_tap_target_pairs: Dict = filters.get('tap_target_pairs', {})
         f_replication_method = filters.get('replication_method', None)
-        f_initial_sync_required = filters.get('initial_sync_required', None)
+        f_initial_sync_required: bool = filters.get('initial_sync_required', False)
 
         # Lists of tables that meet and don't meet the filter criteria
         filtered_tap_stream_ids = []
@@ -200,8 +231,7 @@ class PipelineWise:
                 # pylint: disable=too-many-boolean-expressions
                 if (
                         (f_selected is None or selected == f_selected) and
-                        (f_target_type is None or target_type in f_target_type) and
-                        (f_tap_type is None or tap_type in f_tap_type) and
+                        (f_tap_target_pairs is None or target_type in f_tap_target_pairs.get(tap_type, set())) and
                         (f_replication_method is None or replication_method in f_replication_method) and
                         (f_initial_sync_required is None or initial_sync_required == f_initial_sync_required)
                 ):
@@ -254,10 +284,10 @@ class PipelineWise:
                                                                        suffix='.json')[1]
                 utils.save_json(fallback_properties, temp_fallback_properties_path)
 
-                return temp_properties_path, \
-                       filtered_tap_stream_ids, \
-                       temp_fallback_properties_path, \
-                       fallback_filtered_stream_ids
+                return (temp_properties_path,
+                        filtered_tap_stream_ids,
+                        temp_fallback_properties_path,
+                        fallback_filtered_stream_ids)
 
             # Fallback not required: Save only the filtered properties JSON
             temp_properties_path = utils.create_temp_file(dir=self.get_temp_dir(),
@@ -318,21 +348,6 @@ class PipelineWise:
         """
         return os.path.join(self.venv_dir, connector_type, 'bin', 'python')
 
-    @classmethod
-    def get_connector_files(cls, connector_dir):
-        """
-        Get connector file paths
-        """
-        return {
-            'config': os.path.join(connector_dir, 'config.json'),
-            'inheritable_config': os.path.join(connector_dir, 'inheritable_config.json'),
-            'properties': os.path.join(connector_dir, 'properties.json'),
-            'state': os.path.join(connector_dir, 'state.json'),
-            'transformation': os.path.join(connector_dir, 'transformation.json'),
-            'selection': os.path.join(connector_dir, 'selection.json'),
-            'pidfile': os.path.join(connector_dir, 'pipelinewise.pid')
-        }
-
     def get_targets(self):
         """
         Get every target
@@ -353,14 +368,14 @@ class PipelineWise:
         self.logger.debug('Getting %s target', target_id)
         targets = self.get_targets()
 
-        target = next((item for item in targets if item['id'] == target_id), False)
+        target = next((item for item in targets if item['id'] == target_id), None)
 
         if not target:
             raise Exception(f'Cannot find {target_id} target')
 
         target_dir = self.get_target_dir(target_id)
         if os.path.isdir(target_dir):
-            target['files'] = self.get_connector_files(target_dir)
+            target['files'] = Config.get_connector_files(target_dir)
         else:
             raise Exception(f'Cannot find target at {target_dir}')
 
@@ -385,21 +400,21 @@ class PipelineWise:
 
         return taps
 
-    def get_tap(self, target_id, tap_id):
+    def get_tap(self, target_id: str, tap_id: str) -> Dict:
         """
         Get tap by id from a specific target
         """
         self.logger.debug('Getting %s tap from target %s', tap_id, target_id)
         taps = self.get_taps(target_id)
 
-        tap = next((item for item in taps if item['id'] == tap_id), False)
+        tap = next((item for item in taps if item['id'] == tap_id), None)
 
         if not tap:
             raise Exception(f'Cannot find {tap_id} tap in {target_id} target')
 
         tap_dir = self.get_tap_dir(target_id, tap_id)
         if os.path.isdir(tap_dir):
-            tap['files'] = self.get_connector_files(tap_dir)
+            tap['files'] = Config.get_connector_files(tap_dir)
         else:
             raise Exception(f'Cannot find tap at {tap_dir}')
 
@@ -424,7 +439,7 @@ class PipelineWise:
             for new_stream_idx, new_stream in enumerate(new_streams):
                 new_tap_stream_id = new_stream['tap_stream_id']
 
-                old_stream = next((item for item in old_streams if item['tap_stream_id'] == new_tap_stream_id), False)
+                old_stream = next((item for item in old_streams if item['tap_stream_id'] == new_tap_stream_id), None)
 
                 # Is this a new stream?
                 if not old_stream:
@@ -562,7 +577,7 @@ class PipelineWise:
             streams = schema['streams']
             for stream_idx, stream in enumerate(streams):
                 tap_stream_id = stream.get('tap_stream_id')
-                tap_stream_sel = False
+                tap_stream_sel = None
                 for sel in selection:
                     if 'tap_stream_id' in sel and tap_stream_id.lower() == sel['tap_stream_id'].lower():
                         tap_stream_sel = sel
@@ -739,7 +754,7 @@ class PipelineWise:
         self.logger.debug('Detecting %s tap status in %s target', tap_id, target_id)
         tap_dir = self.get_tap_dir(target_id, tap_id)
         log_dir = self.get_tap_log_dir(target_id, tap_id)
-        connector_files = self.get_connector_files(tap_dir)
+        connector_files = Config.get_connector_files(tap_dir)
         status = {
             'currentStatus': 'unknown',
             'lastStatus': 'unknown',
@@ -842,7 +857,7 @@ class PipelineWise:
                 nonlocal start, state
 
                 if start is None or time() - start >= 2:
-                    with open(tap.state, 'w') as state_file:
+                    with open(tap.state, 'w', encoding='utf-8') as state_file:
                         state_file.write(line)
 
                     # Update start time to be the current time.
@@ -870,7 +885,7 @@ class PipelineWise:
 
         # update the state file one last time to make sure it always has the last state message.
         if state is not None:
-            with open(tap.state, 'w') as statefile:
+            with open(tap.state, 'w', encoding='utf-8') as statefile:
                 statefile.write(state)
 
     def run_tap_fastsync(self, tap: TapParams, target: TargetParams, transform: TransformParams):
@@ -973,13 +988,13 @@ class PipelineWise:
             tap_properties_singer,
             singer_stream_ids
         ) = self.create_filtered_tap_properties(
-            target_type,
-            tap_type,
+            ConnectorType(target_type),
+            ConnectorType(tap_type),
             tap_properties,
-            tap_state, {
+            tap_state,
+            {
                 'selected': True,
-                'target_type': ['target-snowflake', 'target-redshift', 'target-postgres'],
-                'tap_type': ['tap-mysql', 'tap-postgres', 'tap-s3-csv', 'tap-mongodb'],
+                'tap_target_pairs': FASTSYNC_PAIRS,
                 'initial_sync_required': True
             },
             create_fallback=True)
@@ -1074,7 +1089,7 @@ class PipelineWise:
         """
         pidfile_path = self.tap['files']['pidfile']
         try:
-            with open(pidfile_path) as pidf:
+            with open(pidfile_path, encoding='utf-8') as pidf:
                 pid = int(pidf.read())
                 parent = psutil.Process(pid)
 
@@ -1218,6 +1233,7 @@ class PipelineWise:
         vault_secret = self.args.secret
 
         target_ids = set()
+        # pylint: disable=E1136,E1137  # False positive when loading vault encrypted YAML
         # Validate target json schemas and that no duplicate IDs exist
         for yaml_file in target_yamls:
             self.logger.info('Started validating %s', yaml_file)
@@ -1232,6 +1248,7 @@ class PipelineWise:
             self.logger.info('Finished validating %s', yaml_file)
 
         tap_ids = set()
+        # pylint: disable=E1136,E1137  # False positive when loading vault encrypted YAML
         # Validate tap json schemas, check that every tap has valid 'target' and that no duplicate IDs exist
         for yaml_file in tap_yamls:
             self.logger.info('Started validating %s', yaml_file)
@@ -1344,13 +1361,13 @@ class PipelineWise:
         :return: Boolean, True if needs initial sync, False otherwise
         """
         return replication_method == self.FULL_TABLE \
-                or (replication_method == self.INCREMENTAL and
-                    'replication_key_value' not in stream_bookmark and
-                    'modified_since' not in stream_bookmark) \
-                or (replication_method == self.LOG_BASED and
-                    'lsn' not in stream_bookmark and
-                    'log_pos' not in stream_bookmark and
-                    'token' not in stream_bookmark)
+               or (replication_method == self.INCREMENTAL and
+                   'replication_key_value' not in stream_bookmark and
+                   'modified_since' not in stream_bookmark) \
+               or (replication_method == self.LOG_BASED and
+                   'lsn' not in stream_bookmark and
+                   'log_pos' not in stream_bookmark and
+                   'token' not in stream_bookmark)
 
     # pylint: disable=unused-argument
     def _exit_gracefully(self, sig, frame, exit_code=1):
@@ -1393,7 +1410,7 @@ TAP RUN SUMMARY
 
             # Append the summary to the right log file
             if log_file_to_write_summary:
-                with open(log_file_to_write_summary, 'a') as logfile:
+                with open(log_file_to_write_summary, 'a', encoding='utf-8') as logfile:
                     logfile.write(summary)
 
     # pylint: disable=unused-variable

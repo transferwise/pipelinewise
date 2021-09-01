@@ -145,6 +145,18 @@ class E2EEnv:
                 }
             },
             # ------------------------------------------------------------------
+            # Target BigQuery is an OPTIONAL test connector because it's not open sourced and not part of
+            # the docker environment.
+            # To run the related test cases add real BigQuery credentials to ../../../dev-project/.env
+            # ------------------------------------------------------------------
+            'TARGET_BIGQUERY': {
+                'optional': True,
+                'template_patterns': ['target_bigquery', 'to_bq'],
+                'vars': {
+                    'PROJECT'               : {'value': os.environ.get('TARGET_BIGQUERY_PROJECT')},
+                }
+            },
+            # ------------------------------------------------------------------
             # Target Redshift is an OPTIONAL test connector because it's not open sourced and not part of
             # the docker environment.
             # To run the related test cases add real Amazon Redshift credentials to ../../../dev-project/.env
@@ -182,10 +194,28 @@ class E2EEnv:
         self.env['TARGET_POSTGRES']['is_configured'] = self._is_env_connector_configured('TARGET_POSTGRES')
         self.env['TARGET_REDSHIFT']['is_configured'] = self._is_env_connector_configured('TARGET_REDSHIFT')
         self.env['TARGET_SNOWFLAKE']['is_configured'] = self._is_env_connector_configured('TARGET_SNOWFLAKE')
+        self.env['TARGET_BIGQUERY']['is_configured'] = self._is_env_connector_configured('TARGET_BIGQUERY')
 
     def _get_conn_env_var(self, connector, key):
         """Get the value of a specific variable in the self.env dict"""
         return self.env[connector]['vars'][key]['value']
+
+    def get_aws_session(self):
+        """Get AWS session with using access from TARGET_SNOWFLAKE_ env vars"""
+        if not self.env['TARGET_SNOWFLAKE']['is_configured']:
+            raise Exception('TARGET_SNOWFLAKE is not configured')
+
+        aws_access_key_id = os.environ.get('TARGET_SNOWFLAKE_AWS_ACCESS_KEY')
+        aws_secret_access_key = os.environ.get('TARGET_SNOWFLAKE_AWS_SECRET_ACCESS_KEY')
+        if aws_access_key_id is None or aws_secret_access_key is None:
+            raise Exception(
+                'Env vars TARGET_SNOWFLAKE_AWS_ACCESS_KEY and TARGET_SNOWFLAKE_AWS_SECRET_ACCESS_KEY are required')
+
+        return boto3.session.Session(
+            aws_access_key_id=aws_access_key_id,
+            aws_secret_access_key=aws_secret_access_key
+        )
+
 
     def _is_env_connector_configured(self, env_connector):
         """Detect if certain component(s) of env vars group is configured properly"""
@@ -247,7 +277,7 @@ class E2EEnv:
         templates = glob.glob(f'{project_dir}/*.yml.template')
         for template_path in templates:
             # Replace env vars in template
-            with open(template_path, 'r') as f_template:
+            with open(template_path, 'r', encoding='utf-8') as f_template:
                 yaml = f_template.read()
 
                 # Detect if every env var configured for the template
@@ -263,7 +293,7 @@ class E2EEnv:
                         yaml = yaml.replace(f'${{{var}}}', self._all_env_vars_to_dict().get(var))
 
                     # Write the template replaced YAML file
-                    with open(yaml_path, 'w+') as f_render:
+                    with open(yaml_path, 'w+', encoding='utf-8') as f_render:
                         f_render.write(yaml)
 
                 # Delete if exists but not configured
@@ -342,6 +372,16 @@ class E2EEnv:
                                       warehouse=self._get_conn_env_var('TARGET_SNOWFLAKE', 'WAREHOUSE'),
                                       user=self._get_conn_env_var('TARGET_SNOWFLAKE', 'USER'),
                                       password=self._get_conn_env_var('TARGET_SNOWFLAKE', 'PASSWORD'))
+
+    def delete_dataset_target_bigquery(self, dataset):
+        """Run and SQL query in target bigquery database"""
+        return db.delete_dataset_bigquery(dataset,
+                                          project=self._get_conn_env_var('TARGET_BIGQUERY', 'PROJECT'))
+
+    def run_query_target_bigquery(self, query):
+        """Run and SQL query in target bigquery database"""
+        return db.run_query_bigquery(query,
+                                     project=self._get_conn_env_var('TARGET_BIGQUERY', 'PROJECT'))
 
     # -------------------------------------------------------------------------
     # Setup methods to initialise source and target databases and to make them
@@ -423,3 +463,13 @@ class E2EEnv:
 
         # Clean config directory
         shutil.rmtree(os.path.join(CONFIG_DIR, 'snowflake'), ignore_errors=True)
+
+    def setup_target_bigquery(self):
+        """Clean bigquery target database and prepare for test run"""
+        self.delete_dataset_target_bigquery('ppw_e2e_tap_postgres')
+        self.delete_dataset_target_bigquery('ppw_e2e_tap_postgres_public2')
+        self.delete_dataset_target_bigquery('ppw_e2e_tap_postgres_logical1')
+        self.delete_dataset_target_bigquery('ppw_e2e_tap_postgres_logical2')
+        self.delete_dataset_target_bigquery('ppw_e2e_tap_mysql')
+        self.delete_dataset_target_bigquery('ppw_e2e_tap_s3_csv')
+        self.delete_dataset_target_bigquery('ppw_e2e_tap_mongodb')

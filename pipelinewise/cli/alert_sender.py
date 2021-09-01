@@ -39,7 +39,7 @@ class AlertSender:
     def __init__(self, alert_handlers: Dict = None) -> None:
         # Initialise alert_handlers as empty dictionary if None provided
         if not alert_handlers:
-            self.alert_handlers = dict()
+            self.alert_handlers = {}
         else:
             self.alert_handlers = alert_handlers
 

@@ -1,12 +1,13 @@
 import os
 import shutil
-
-import pipelinewise.cli as cli
 import pytest
+
+from pipelinewise import cli
+from pipelinewise.cli.config import Config
 
 PIPELINEWISE_TEST_HOME = '/tmp/.pipelinewise'
 
-
+# Todo: Inherit from unittest.TestCase
 # pylint: disable=no-self-use,fixme
 class TestConfig:
     """
@@ -15,12 +16,25 @@ class TestConfig:
 
     def test_constructor(self):
         """Test Config construction functions"""
-        config = cli.config.Config(PIPELINEWISE_TEST_HOME)
+        config = Config(PIPELINEWISE_TEST_HOME)
 
         # config dir and path should be generated automatically
         assert config.config_dir == PIPELINEWISE_TEST_HOME
         assert config.config_path == '{}/config.json'.format(PIPELINEWISE_TEST_HOME)
         assert config.targets == {}
+
+    def test_connector_files(self):
+        """Every singer connector must have a list of JSON files at certain locations"""
+        assert Config.get_connector_files('/var/singer-connector') == \
+            {
+                'config': '/var/singer-connector/config.json',
+                'inheritable_config': '/var/singer-connector/inheritable_config.json',
+                'properties': '/var/singer-connector/properties.json',
+                'state': '/var/singer-connector/state.json',
+                'transformation': '/var/singer-connector/transformation.json',
+                'selection': '/var/singer-connector/selection.json',
+                'pidfile': '/var/singer-connector/pipelinewise.pid'
+            }
 
     def test_from_yamls(self):
         """Test creating Config object using YAML configuration directory as the input"""
@@ -30,7 +44,7 @@ class TestConfig:
         vault_secret = '{}/resources/vault-secret.txt'.format(os.path.dirname(__file__))
 
         # Parse YAML files and create the config object
-        config = cli.config.Config.from_yamls(PIPELINEWISE_TEST_HOME, yaml_config_dir, vault_secret)
+        config = Config.from_yamls(PIPELINEWISE_TEST_HOME, yaml_config_dir, vault_secret)
 
         # config dir and path should be generated automatically
         assert config.config_dir == PIPELINEWISE_TEST_HOME
@@ -73,7 +87,8 @@ class TestConfig:
                     'properties': '{}/test_snowflake_target/properties.json'.format(PIPELINEWISE_TEST_HOME),
                     'selection': '{}/test_snowflake_target/selection.json'.format(PIPELINEWISE_TEST_HOME),
                     'state': '{}/test_snowflake_target/state.json'.format(PIPELINEWISE_TEST_HOME),
-                    'transformation': '{}/test_snowflake_target/transformation.json'.format(PIPELINEWISE_TEST_HOME)
+                    'transformation': '{}/test_snowflake_target/transformation.json'.format(PIPELINEWISE_TEST_HOME),
+                    'pidfile': '{}/test_snowflake_target/pipelinewise.pid'.format(PIPELINEWISE_TEST_HOME),
                 },
                 'taps': [{
                     'id': 'mysql_sample',
@@ -83,6 +98,9 @@ class TestConfig:
                     'target': 'test_snowflake_target',
                     'batch_size_rows': 20000,
                     'batch_wait_limit_seconds': 3600,
+                    'split_large_files': True,
+                    'split_file_chunk_size_mb': 500,
+                    'split_file_max_chunks': 25,
                     'db_conn': {
                         'dbname': '<DB_NAME>',
                         'host': '<HOST>',
@@ -103,7 +121,9 @@ class TestConfig:
                         'state':
                             '{}/test_snowflake_target/mysql_sample/state.json'.format(PIPELINEWISE_TEST_HOME),
                         'transformation':
-                            '{}/test_snowflake_target/mysql_sample/transformation.json'.format(PIPELINEWISE_TEST_HOME)
+                            '{}/test_snowflake_target/mysql_sample/transformation.json'.format(PIPELINEWISE_TEST_HOME),
+                        'pidfile': '{}/test_snowflake_target/mysql_sample/pipelinewise.pid'.format(
+                            PIPELINEWISE_TEST_HOME)
                     },
                     'schemas': [{
                         'source_schema': 'my_db',
@@ -130,7 +150,7 @@ class TestConfig:
         vault_secret = '{}/resources/vault-secret.txt'.format(os.path.dirname(__file__))
         print(yaml_config_dir)
         with pytest.raises(SystemExit) as pytest_wrapped_e:
-            cli.config.Config.from_yamls(PIPELINEWISE_TEST_HOME, yaml_config_dir, vault_secret)
+            Config.from_yamls(PIPELINEWISE_TEST_HOME, yaml_config_dir, vault_secret)
 
         assert pytest_wrapped_e.type == SystemExit
         assert pytest_wrapped_e.value.code == 1
@@ -143,14 +163,14 @@ class TestConfig:
 
         # Initialising Config object with a not existing directory should raise an exception
         with pytest.raises(Exception):
-            cli.config.Config.from_yamls(PIPELINEWISE_TEST_HOME, 'not-existing-yaml-config-directory')
+            Config.from_yamls(PIPELINEWISE_TEST_HOME, 'not-existing-yaml-config-directory')
 
         # Initialising config object with a tap that's referencing an unknown target should exit
         yaml_config_dir = '{}/resources/test_invalid_yaml_config'.format(os.path.dirname(__file__))
         vault_secret = '{}/resources/vault-secret.txt'.format(os.path.dirname(__file__))
 
         with pytest.raises(SystemExit) as pytest_wrapped_e:
-            cli.config.Config.from_yamls(PIPELINEWISE_TEST_HOME, yaml_config_dir, vault_secret)
+            Config.from_yamls(PIPELINEWISE_TEST_HOME, yaml_config_dir, vault_secret)
         assert pytest_wrapped_e.type == SystemExit
         assert pytest_wrapped_e.value.code == 1
 
@@ -165,20 +185,20 @@ class TestConfig:
 
         # Initialising Config object with a not existing directory should raise an exception
         with pytest.raises(Exception):
-            cli.config.Config.from_yamls(PIPELINEWISE_TEST_HOME, 'not-existing-yaml-config-directory')
+            Config.from_yamls(PIPELINEWISE_TEST_HOME, 'not-existing-yaml-config-directory')
 
         # Initialising config object with a tap that's referencing an unknown target should exit
         yaml_config_dir = f'{os.path.dirname(__file__)}/resources/test_invalid_yaml_config_with_duplicate_targets'
         vault_secret = f'{os.path.dirname(__file__)}/resources/vault-secret.txt'
 
         with pytest.raises(SystemExit) as pytest_wrapped_e:
-            cli.config.Config.from_yamls(PIPELINEWISE_TEST_HOME, yaml_config_dir, vault_secret)
+            Config.from_yamls(PIPELINEWISE_TEST_HOME, yaml_config_dir, vault_secret)
         assert pytest_wrapped_e.type == SystemExit
         assert pytest_wrapped_e.value.code == 1
 
     def test_getters(self):
         """Test Config getter functions"""
-        config = cli.config.Config(PIPELINEWISE_TEST_HOME)
+        config = Config(PIPELINEWISE_TEST_HOME)
 
         # Target and tap directory should be g
         assert config.get_temp_dir() == '{}/tmp'.format(PIPELINEWISE_TEST_HOME)
@@ -186,8 +206,6 @@ class TestConfig:
         assert config.get_tap_dir('test-target-id',
                                   'test-tap-id') == '{}/test-target-id/test-tap-id'.format(PIPELINEWISE_TEST_HOME)
 
-        # TODO: get_connector_files is duplicated in config.py and pipelinewise.py
-        #       Refactor to use only one
         assert \
             config.get_connector_files('/var/singer-connector') == \
             {
@@ -196,7 +214,8 @@ class TestConfig:
                 'properties': '/var/singer-connector/properties.json',
                 'state': '/var/singer-connector/state.json',
                 'transformation': '/var/singer-connector/transformation.json',
-                'selection': '/var/singer-connector/selection.json'
+                'selection': '/var/singer-connector/selection.json',
+                'pidfile': '/var/singer-connector/pipelinewise.pid'
             }
 
     def test_save_config(self):
@@ -207,7 +226,7 @@ class TestConfig:
         vault_secret = '{}/resources/vault-secret.txt'.format(os.path.dirname(__file__))
 
         json_config_dir = './pipelinewise-test-config'
-        config = cli.config.Config.from_yamls(json_config_dir, yaml_config_dir, vault_secret)
+        config = Config.from_yamls(json_config_dir, yaml_config_dir, vault_secret)
 
         # Save the config as singer compatible JSON files
         config.save()
@@ -307,7 +326,11 @@ class TestConfig:
                 '{"ppw_component": "tap-mysql", "tap_id": "mysql_sample", '
                 '"database": "{{database}}", "schema": "{{schema}}", "table": "{{table}}"}',
             'validate_records': False,
-            'add_metadata_columns': False
+            'add_metadata_columns': False,
+            'split_large_files': True,
+            'split_file_chunk_size_mb': 500,
+            'split_file_max_chunks': 25,
+            'archive_load_files': False
         }
 
         # Delete the generated JSON config directory

@@ -115,7 +115,7 @@ class FastSyncTargetSnowflake:
             )
 
             # Upload to s3
-            extra_args = {'ACL': s3_acl} if s3_acl else dict()
+            extra_args = {'ACL': s3_acl} if s3_acl else {}
 
             # Send key and iv in the metadata, that will be required to decrypt and upload the encrypted file
             extra_args['Metadata'] = {
@@ -133,6 +133,39 @@ class FastSyncTargetSnowflake:
             self.s3.upload_file(file, bucket, s3_key, ExtraArgs=extra_args)
 
         return s3_key
+
+    def copy_to_archive(self, source_s3_key, tap_id, table):
+        """Copy load file to archive folder with metadata added"""
+        table_dict = utils.tablename_to_dict(table)
+        archive_table = table_dict.get('table_name')
+        archive_schema = table_dict.get('schema_name', '')
+
+        # Retain same filename
+        archive_file_basename = os.path.basename(source_s3_key)
+
+        # Get archive s3 prefix from config, defaulting to 'archive' if not specified
+        archive_s3_prefix = self.connection_config.get('archive_load_files_s3_prefix', 'archive')
+
+        source_s3_bucket = self.connection_config.get('s3_bucket')
+
+        # Combine existing metadata with archive related headers
+        metadata = self.s3.head_object(Bucket=source_s3_bucket, Key=source_s3_key).get('Metadata', {})
+        metadata.update({
+            'tap': tap_id,
+            'schema': archive_schema,
+            'table': archive_table,
+            'archived-by': 'pipelinewise_fastsync_postgres_to_snowflake'
+        })
+
+        # Get archive s3 bucket from config, defaulting to same bucket used for Snowflake imports if not specified
+        archive_s3_bucket = self.connection_config.get('archive_load_files_s3_bucket', source_s3_bucket)
+
+        archive_key = '{}/{}/{}/{}'.format(archive_s3_prefix, tap_id, archive_table, archive_file_basename)
+        copy_source = '{}/{}'.format(source_s3_bucket, source_s3_key)
+        LOGGER.info('Archiving %s to %s', copy_source, archive_key)
+
+        self.s3.copy_object(CopySource=copy_source, Bucket=archive_s3_bucket, Key=archive_key,
+                            Metadata=metadata, MetadataDirective='REPLACE')
 
     def create_schema(self, schema):
         sql = 'CREATE SCHEMA IF NOT EXISTS {}'.format(schema)
@@ -180,7 +213,6 @@ class FastSyncTargetSnowflake:
         table_dict = utils.tablename_to_dict(table_name)
         target_table = table_dict.get('table_name') if not is_temporary else table_dict.get('temp_table_name')
         inserts = 0
-        bucket = self.connection_config['s3_bucket']
 
         stage = self.connection_config['stage']
         sql = f'COPY INTO {target_schema}."{target_table.upper()}" FROM \'@{stage}/{s3_key}\'' \
@@ -191,15 +223,15 @@ class FastSyncTargetSnowflake:
         # Get number of inserted records - COPY does insert only
         results = self.query(sql, query_tag_props={'schema': target_schema, 'table': target_table})
         if len(results) > 0:
-            inserts = results[0].get('rows_loaded', 0)
+            inserts = sum([file_part.get('rows_loaded', 0) for file_part in results])
 
         LOGGER.info('Loading into %s."%s": %s',
                     target_schema,
                     target_table.upper(),
-                    json.dumps({'inserts': inserts, 'updates': 0, 'size_bytes': size_bytes}))
-
-        LOGGER.info('Deleting %s from S3...', s3_key)
-        self.s3.delete_object(Bucket=bucket, Key=s3_key)
+                    json.dumps({'inserts': inserts,
+                                'updates': 0,
+                                'file_parts': len(results),
+                                'size_bytes': size_bytes}))
 
     # grant_... functions are common functions called by utils.py: grant_privilege function
     # "to_group" is not used here but exists for compatibility reasons with other database types

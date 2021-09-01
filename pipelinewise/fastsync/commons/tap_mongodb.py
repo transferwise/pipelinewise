@@ -2,7 +2,7 @@ import base64
 import csv
 import datetime
 import gzip
-import json
+import ujson
 import logging
 import os
 import ssl
@@ -12,87 +12,126 @@ import bson
 import pytz
 import tzlocal
 
-from typing import Tuple, Optional, Dict, Callable
+from typing import Tuple, Optional, Dict, Callable, Any
 from pymongo import MongoClient
 from pymongo.database import Database
 from singer.utils import strftime as singer_strftime
 
-from . import utils
-from .errors import ExportError, TableNotFoundError, MongoDBInvalidDatetimeError
+from . import utils, split_gzip
+from .errors import ExportError, TableNotFoundError, MongoDBInvalidDatetimeError, UnsupportedKeyTypeException
 
 LOGGER = logging.getLogger(__name__)
 DEFAULT_WRITE_BATCH_ROWS = 50000
 
 
-class MongoDBJsonEncoder(json.JSONEncoder):
+def serialize_document(document: Dict) -> Dict:
     """
-    Custom JSON encoder to be used to serialize data from MongoDB
+    serialize mongodb Document into a json object
+
+    Args:
+        document: MongoDB document
+
+    Returns: Dict
     """
-    @staticmethod
-    def _serialize_datetime(val):
-        """
-        Serialize Bson and python datetime types
-        Args:
-            val: datetime value
+    return {key: transform_value(val, [key]) for key, val in document.items()
+            if not isinstance(val, (bson.min_key.MinKey, bson.max_key.MaxKey))}
 
-        Returns: serialized datetime value
 
-        """
-        if isinstance(val, bson.datetime.datetime):
+def class_to_string(key_value: Any, key_type: str) -> str:
+    """
+    Converts specific types to string equivalent
+    The supported types are: datetime, bson Timestamp, bytes, int, Int64, float, ObjectId, str and UUID
+    Args:
+        key_value: The value to convert to string
+        key_type: the value type
+
+    Returns: string equivalent of key value
+    Raises: UnsupportedKeyTypeException if key_type is not supported
+    """
+    if key_type == 'datetime':
+        if key_value.tzinfo is None:
             timezone = tzlocal.get_localzone()
-            try:
-                local_datetime = timezone.localize(val)
-                utc_datetime = local_datetime.astimezone(pytz.UTC)
-            except Exception as exc:
-                if str(exc) == 'year is out of range' and val.year == 0:
-                    # NB: Since datetimes are persisted as strings, it doesn't
-                    # make sense to blow up on invalid Python datetimes (e.g.,
-                    # year=0). In this case we're formatting it as a string and
-                    # passing it along down the pipeline.
-                    return '{:04d}-{:02d}-{:02d}T{:02d}:{:02d}:{:02d}.{:06d}Z'.format(val.year,
-                                                                                      val.month,
-                                                                                      val.day,
-                                                                                      val.hour,
-                                                                                      val.minute,
-                                                                                      val.second,
-                                                                                      val.microsecond)
-                raise MongoDBInvalidDatetimeError('Found invalid datetime {}'.format(val)) from exc
-
-            return singer_strftime(utc_datetime)
-
-        if isinstance(val, datetime.datetime):
-            timezone = tzlocal.get_localzone()
-            local_datetime = timezone.localize(val)
+            local_datetime = timezone.localize(key_value)
             utc_datetime = local_datetime.astimezone(pytz.UTC)
-            return singer_strftime(utc_datetime)
-        return None
+        else:
+            utc_datetime = key_value.astimezone(pytz.UTC)
 
-    def default(self, o): # false positive complaint -> pylint: disable=E0202
-        """
-        Custom function to serialize several sort of BSON and Python types
-        Args:
-            obj: Object to serialize
+        return singer_strftime(utc_datetime)
 
-        Returns: Serialized value
-        """
-        encoding_map = {
-            bson.objectid.ObjectId: str,
-            uuid.UUID: str,
-            bson.int64.Int64: str,
-            bson.timestamp.Timestamp: lambda value: singer_strftime(value.as_datetime()),
-            bytes: lambda value: base64.b64encode(value).decode('utf-8'),
-            bson.decimal128.Decimal128: lambda val: val.to_decimal(),
-            bson.regex.Regex: lambda val: dict(pattern=val.pattern, flags=val.flags),
-            bson.code.Code: lambda val: dict(value=str(val), scope=str(val.scope)) if val.scope else str(val),
-            bson.dbref.DBRef: lambda val: dict(id=str(val.id), collection=val.collection, database=val.database),
-            datetime.datetime: self._serialize_datetime,
-            bson.datetime.datetime: self._serialize_datetime
-        }
+    if key_type == 'Timestamp':
+        return '{}.{}'.format(key_value.time, key_value.inc)
 
-        if o.__class__ in encoding_map:
-            return encoding_map[o.__class__](o)
+    if key_type == 'bytes':
+        return base64.b64encode(key_value).decode('utf-8')
 
-        return super().default(o)
+    if key_type in ['int', 'Int64', 'float', 'ObjectId', 'str', 'UUID']:
+        return str(key_value)
+
+    raise UnsupportedKeyTypeException('{} is not a supported key type'.format(key_type))
+
+
+def safe_transform_datetime(value: datetime.datetime, path) -> str:
+    """
+    Safely transform datetime from local tz to UTC if applicable
+    Args:
+        value: datetime value to transform
+        path:
+
+    Returns: utc datetime as string
+
+    """
+    timezone = tzlocal.get_localzone()
+    try:
+        local_datetime = timezone.localize(value)
+        utc_datetime = local_datetime.astimezone(pytz.UTC)
+    except Exception as ex:
+        if str(ex) == 'year is out of range' and value.year == 0:
+            # NB: Since datetimes are persisted as strings, it doesn't
+            # make sense to blow up on invalid Python datetimes (e.g.,
+            # year=0). In this case we're formatting it as a string and
+            # passing it along down the pipeline.
+            return '{:04d}-{:02d}-{:02d}T{:02d}:{:02d}:{:02d}.{:06d}Z'.format(value.year,
+                                                                              value.month,
+                                                                              value.day,
+                                                                              value.hour,
+                                                                              value.minute,
+                                                                              value.second,
+                                                                              value.microsecond)
+        raise MongoDBInvalidDatetimeError('Found invalid datetime at [{}]: {}'.format('.'.join(map(str, path)),
+                                                                                      value)) from ex
+    return singer_strftime(utc_datetime)
+
+
+def transform_value(value: Any, path) -> Any:
+    """
+    transform values to json friendly ones
+    Args:
+        value: value to transform
+        path:
+
+    Returns: transformed value
+
+    """
+    conversion = {
+        list: lambda val, pat: list(map(lambda v: transform_value(v[1], pat + [v[0]]), enumerate(val))),
+        dict: lambda val, pat: {k: transform_value(v, pat + [k]) for k, v in val.items()},
+        uuid.UUID: lambda val, _: class_to_string(val, 'UUID'),
+        bson.objectid.ObjectId: lambda val, _: class_to_string(val, 'ObjectId'),
+        bson.datetime.datetime: safe_transform_datetime,
+        bson.timestamp.Timestamp: lambda val, _: singer_strftime(val.as_datetime()),
+        bson.int64.Int64: lambda val, _: class_to_string(val, 'Int64'),
+        bytes: lambda val, _: class_to_string(val, 'bytes'),
+        datetime.datetime: lambda val, _: class_to_string(val, 'datetime'),
+        bson.decimal128.Decimal128: lambda val, _: val.to_decimal(),
+        bson.regex.Regex: lambda val, _: dict(pattern=val.pattern, flags=val.flags),
+        bson.code.Code: lambda val, _: dict(value=str(val), scope=str(val.scope)) if val.scope else str(val),
+        bson.dbref.DBRef: lambda val, _: dict(id=str(val.id), collection=val.collection, database=val.database),
+    }
+
+    if isinstance(value, tuple(conversion.keys())):
+        return conversion[type(value)](value, path)
+
+    return value
 
 
 class FastSyncTapMongoDB:
@@ -140,9 +179,27 @@ class FastSyncTapMongoDB:
         """
         self.database.client.close()
 
-    def copy_table(self, table_name: str, filepath: str, temp_dir: str):
+    # pylint: disable=R0914,R0913
+    def copy_table(self,
+                   table_name: str,
+                   filepath: str,
+                   temp_dir: str,
+                   split_large_files=False,
+                   split_file_chunk_size_mb=1000,
+                   split_file_max_chunks=20,
+                   compress=True
+                   ):
         """
         Export data from table to a zipped csv
+        Args:
+            table_name: Fully qualified table name to export
+            filepath: Path where to create the zip file(s) with the exported data
+            temp_dir: Temporary directory to export
+            split_large_files: Split large files to multiple pieces and create multiple zip files
+                               with -partXYZ postfix in the filename. (Default: False)
+            split_file_chunk_size_mb: File chunk sizes if `split_large_files` enabled. (Default: 1000)
+            split_file_max_chunks: Max number of chunks if `split_large_files` enabled. (Default: 20)
+            compress: Flag to indicate whether to compress export files
         """
         table_dict = utils.tablename_to_dict(table_name, '.')
 
@@ -156,7 +213,12 @@ class FastSyncTapMongoDB:
         exported_rows = 0
 
         try:
-            with gzip.open(export_file_path, 'rb') as export_file, gzip.open(filepath, 'wt') as gzfile:
+            gzip_splitter = split_gzip.open(filepath,
+                                            mode='wt',
+                                            chunk_size_mb=split_file_chunk_size_mb,
+                                            max_chunks=split_file_max_chunks if split_large_files else 0,
+                                            compress=compress)
+            with gzip.open(export_file_path, 'rb') as export_file, gzip_splitter as gzfile:
                 writer = csv.DictWriter(gzfile,
                                         fieldnames=[elem[0] for elem in self._get_collection_columns()],
                                         delimiter=',',
@@ -170,13 +232,17 @@ class FastSyncTapMongoDB:
 
                 # bson.decode_file_iter will generate one document at a time from the exported file
                 for document in bson.decode_file_iter(export_file):
-                    rows.append({
-                        '_ID': str(document['_id']),
-                        'DOCUMENT': json.dumps(document, cls=MongoDBJsonEncoder, separators=(',', ':')),
-                        utils.SDC_EXTRACTED_AT: extracted_at,
-                        utils.SDC_BATCHED_AT: datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f'),
-                        utils.SDC_DELETED_AT: None
-                    })
+                    try:
+                        rows.append({
+                            '_ID': str(document['_id']),
+                            'DOCUMENT': ujson.dumps(serialize_document(document)),
+                            utils.SDC_EXTRACTED_AT: extracted_at,
+                            utils.SDC_BATCHED_AT: datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f'),
+                            utils.SDC_DELETED_AT: None
+                        })
+                    except TypeError:
+                        LOGGER.error('TypeError encountered when processing document ID: %s', document['_id'])
+                        raise
 
                     exported_rows += 1
 
@@ -217,7 +283,7 @@ class FastSyncTapMongoDB:
             (utils.SDC_DELETED_AT, 'string'),
         )
 
-    def fetch_current_log_pos(self)->Dict:
+    def fetch_current_log_pos(self) -> Dict:
         """
         Find and returns the latest ChangeStream token.
         LOG_BASED method uses changes streams.
@@ -278,7 +344,7 @@ class FastSyncTapMongoDB:
             'primary_key': ['_ID']
         }
 
-    def _export_collection(self, export_dir: str, collection_name)->str:
+    def _export_collection(self, export_dir: str, collection_name) -> str:
         """
         Dump a collection data into a compressed bson file and returns the path
         Args:
@@ -315,7 +381,7 @@ class FastSyncTapMongoDB:
         if return_code != 0:
             raise ExportError(f'Export failed with code {return_code}')
 
-        #mongodump creates two files "{collection_name}.metadata.json.gz" & "{collection_name}.bson.gz"
+        # mongodump creates two files "{collection_name}.metadata.json.gz" & "{collection_name}.bson.gz"
         # we are only interested in the latter so we delete the former.
         os.remove(os.path.join(export_dir, self.connection_config['database'], f'{collection_name}.metadata.json.gz'))
         return os.path.join(export_dir, self.connection_config['database'], f'{collection_name}.bson.gz')

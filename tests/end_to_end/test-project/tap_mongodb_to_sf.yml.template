@@ -44,3 +44,6 @@ schemas:
 
       - table_name: "my_collection"
         replication_method: "LOG_BASED"
+
+      - table_name: "all_datatypes"
+        replication_method: "LOG_BASED"

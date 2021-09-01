@@ -1,5 +1,6 @@
 import json
 from unittest import TestCase
+from unittest.mock import MagicMock
 
 from pipelinewise.fastsync.commons.target_snowflake import FastSyncTargetSnowflake
 
@@ -17,10 +18,18 @@ class S3Mock:
     def delete_object(self, Bucket, Key):
         """Do nothing when trying to delete file on s3"""
 
+    def copy_object(self, **kwargs):
+        """Mock if needed"""
+
+    # pylint: disable=no-self-use, unused-argument
+    def head_object(self, **kwargs):
+        """Mock if needed"""
+        return {}
+
 
 class FastSyncTargetSnowflakeMock(FastSyncTargetSnowflake):
     """
-    Mocked FastSyncTargetPostgres class
+    Mocked FastSyncTargetSnowflake class
     """
 
     def __init__(self, connection_config, transformation_config=None):
@@ -261,7 +270,7 @@ class TestFastSyncTargetSnowflake(TestCase):
             'DROP TABLE IF EXISTS test_schema."TABLE WITH SPACE AND UPPERCASE_TEMP"']
 
     def test_create_query_tag(self):
-        """Validate if query tag genrated correctly"""
+        """Validate if query tag generated correctly"""
         self.snowflake.connection_config['dbname'] = 'fake_db'
 
         # not passing query_tag_props
@@ -532,3 +541,78 @@ class TestFastSyncTargetSnowflake(TestCase):
                 'UPDATE "MY_SCHEMA"."MY_TABLE_TEMP" SET "COL_1" = NULL, "COL_4" = 0, "COL_5" = SHA2("COL_5", 256);'
             ]
         )
+
+    # pylint: disable=invalid-name
+    def test_default_archive_destination(self):
+        """
+        Validate parameters passed to s3 copy_object method when custom s3 bucket and folder are not defined
+        """
+        mock_copy_object = MagicMock()
+        self.snowflake.s3.copy_object = mock_copy_object
+        self.snowflake.connection_config['s3_bucket'] = 'some_bucket'
+        self.snowflake.copy_to_archive(
+            'snowflake-import/ppw_20210615115603_fastsync.csv.gz', 'some-tap', 'some_schema.some_table')
+
+        mock_copy_object.assert_called_with(
+            Bucket='some_bucket',
+            CopySource='some_bucket/snowflake-import/ppw_20210615115603_fastsync.csv.gz',
+            Key='archive/some-tap/some_table/ppw_20210615115603_fastsync.csv.gz',
+            Metadata={
+                'tap': 'some-tap',
+                'schema': 'some_schema',
+                'table': 'some_table',
+                'archived-by': 'pipelinewise_fastsync_postgres_to_snowflake'
+            },
+            MetadataDirective='REPLACE')
+
+    # pylint: disable=invalid-name
+    def test_custom_archive_destination(self):
+        """
+        Validate parameters passed to s3 copy_object method when using custom s3 bucket and folder
+        """
+        mock_copy_object = MagicMock()
+        self.snowflake.s3.copy_object = mock_copy_object
+        self.snowflake.connection_config['s3_bucket'] = 'some_bucket'
+        self.snowflake.connection_config['archive_load_files_s3_bucket'] = 'archive_bucket'
+        self.snowflake.connection_config['archive_load_files_s3_prefix'] = 'archive_folder'
+        self.snowflake.copy_to_archive(
+            'snowflake-import/ppw_20210615115603_fastsync.csv.gz', 'some-tap', 'some_schema.some_table')
+
+        mock_copy_object.assert_called_with(
+            Bucket='archive_bucket',
+            CopySource='some_bucket/snowflake-import/ppw_20210615115603_fastsync.csv.gz',
+            Key='archive_folder/some-tap/some_table/ppw_20210615115603_fastsync.csv.gz',
+            Metadata={
+                'tap': 'some-tap',
+                'schema': 'some_schema',
+                'table': 'some_table',
+                'archived-by': 'pipelinewise_fastsync_postgres_to_snowflake'
+            },
+            MetadataDirective='REPLACE')
+
+    # pylint: disable=invalid-name
+    def test_copied_archive_metadata(self):
+        """
+        Validate parameters passed to s3 copy_object method when custom s3 bucket and folder are not defined
+        """
+        mock_head_object = MagicMock()
+        mock_head_object.return_value = {'Metadata': {'copied-old-key': 'copied-old-value'}}
+        mock_copy_object = MagicMock()
+        self.snowflake.s3.copy_object = mock_copy_object
+        self.snowflake.s3.head_object = mock_head_object
+        self.snowflake.connection_config['s3_bucket'] = 'some_bucket'
+        self.snowflake.copy_to_archive(
+            'snowflake-import/ppw_20210615115603_fastsync.csv.gz', 'some-tap', 'some_schema.some_table')
+
+        mock_copy_object.assert_called_with(
+            Bucket='some_bucket',
+            CopySource='some_bucket/snowflake-import/ppw_20210615115603_fastsync.csv.gz',
+            Key='archive/some-tap/some_table/ppw_20210615115603_fastsync.csv.gz',
+            Metadata={
+                'copied-old-key': 'copied-old-value',
+                'tap': 'some-tap',
+                'schema': 'some_schema',
+                'table': 'some_table',
+                'archived-by': 'pipelinewise_fastsync_postgres_to_snowflake'
+            },
+            MetadataDirective='REPLACE')

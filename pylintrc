@@ -162,7 +162,6 @@ enable=import-error,
        nonzero-method,
        t-method,
        setslice-method,
-       old-division,
        logging-format-truncated,
        logging-too-few-args,
        logging-too-many-args,
@@ -455,10 +454,10 @@ module-rgx=(([a-z_][a-z0-9_]*)|([A-Z][a-zA-Z0-9]+))$
 module-name-hint=(([a-z_][a-z0-9_]*)|([A-Z][a-zA-Z0-9]+))$
 
 # Regular expression matching correct method names
-method-rgx=[a-z_][a-z0-9_]{2,30}$
+method-rgx=[a-z_][a-z0-9_]{2,80}$
 
 # Naming hint for method names
-method-name-hint=[a-z_][a-z0-9_]{2,30}$
+method-name-hint=[a-z_][a-z0-9_]{2,80}$
 
 # Regular expression which should only match function or class names that do
 # not require a docstring.

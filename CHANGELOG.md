@@ -1,3 +1,44 @@
+0.35.2 (2021-08-17)
+-------------------
+- Bump `pipelinewise-tap-github` from `1.0.1` to `1.0.2`
+- Update a few vulnerable or outdated dependencies to latest
+
+0.35.1 (2021-08-13)
+-------------------
+- Bump `pipelinewise-tap-github` from `1.0.0` to `1.0.1`
+- Bump `pipelinewise-tap-kafka` from `4.0.0` to `4.0.1`
+- Bump `tap-jira` from `2.0.0` to `2.0.1`
+- Bump `pipelinewise-target-s3-csv` from `1.4.0` to `1.5.0`
+
+0.35.0 (2021-08-04)
+-------------------
+- Support `"none"` as a value for `--connectors` in `install.sh` script to install a stripped down Pipelinewise without any connectors.
+- Optimize Dockerfile
+- Do not log invalid json objects if they fail validation against json schema. 
+- Replace `github-tap` with fork `pipelinewise-tap-github` version `1.0.0` 
+- Add schema validation for github tap
+- Increase batch_size_rows from 1M to 5M
+- Increase split_file_chunk_size_mb from 2500 to 5000
+- Add latest tag to docker image
+- Bump `pipelinewise-tap-s3-csv` from `1.2.1` to `1.2.2`
+- Update pymongo requirement from `<3.12,>=3.10` to `>=3.10,<3.13`
+
+0.34.1 (2021-07-15)
+-------------------
+- Bump `pipelinewise-target-snowflake` from `1.13.0` to `1.13.1`
+    - Fixed an issue with S3 metadata required for decryption not being included in archived load files
+- Fixed an issue in fastsync to BigQuery data type mapping
+- Add `location` config parameter to fastsync to BigQuery
+
+0.34.0 (2021-06-24)
+-------------------
+- Add `split_large_files` option to FastSync target-snowflake to load large files in parallel into Snowflake
+- Add `archive_load_files` option to FastSync target-snwoflake to archive load files on S3
+- Bump `pipelinewise-tap-postgres` from `1.7.1` to `1.8.0`
+    - Add discovering of partitioned table
+- Bump `pipelinewise-target-snowflake` from `1.12.0` to `1.13.0`
+    - Add `archive_load_files` parameter to optionally archive load files on S3
+
 0.33.0 (2021-04-12)
 -------------------
 

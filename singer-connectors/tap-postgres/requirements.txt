@@ -1,1 +1,1 @@
-pipelinewise-tap-postgres==1.7.1
+pipelinewise-tap-postgres==1.8.0

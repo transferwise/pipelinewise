@@ -1,13 +1,12 @@
 import csv
 import datetime
 import decimal
-import gzip
 import logging
 import pymysql
 
 from pymysql import InterfaceError, OperationalError
 
-from . import utils
+from . import utils, split_gzip
 from ...utils import safe_column_name
 
 LOGGER = logging.getLogger(__name__)
@@ -25,13 +24,14 @@ class FastSyncTapMySql:
     Common functions for fastsync from a MySQL database
     """
 
-    def __init__(self, connection_config, tap_type_to_target_type):
+    def __init__(self, connection_config, tap_type_to_target_type, target_quote=None):
         self.connection_config = connection_config
         self.connection_config['charset'] = connection_config.get('charset', DEFAULT_CHARSET)
         self.connection_config['export_batch_rows'] = connection_config.get('export_batch_rows',
                                                                             DEFAULT_EXPORT_BATCH_ROWS)
         self.connection_config['session_sqls'] = connection_config.get('session_sqls', DEFAULT_SESSION_SQLS)
         self.tap_type_to_target_type = tap_type_to_target_type
+        self.target_quote = target_quote
         self.conn = None
         self.conn_unbuffered = None
 
@@ -187,16 +187,34 @@ class FastSyncTapMySql:
                                                                            table_dict['table_name'])
         pk_specs = self.query(sql)
         if len(pk_specs) > 0:
-            return [safe_column_name(k.get('Column_name')) for k in pk_specs]
+            return [safe_column_name(k.get('Column_name'), self.target_quote) for k in pk_specs]
 
         return None
 
-    def get_table_columns(self, table_name):
+    def get_table_columns(self, table_name, max_num=None, date_type='date'):
         """
         Get MySQL table column details from information_schema
         """
         table_dict = utils.tablename_to_dict(table_name)
-        sql = """
+
+        if max_num:
+            decimals = len(max_num.split('.')[1]) if '.' in max_num else 0
+            decimal_format = f"""
+              CONCAT('GREATEST(LEAST({max_num}, ROUND(`', column_name, '`, {decimals})), -{max_num})')
+            """
+            integer_format = """
+              CONCAT('`', column_name, '`')
+            """
+        else:
+            decimal_format = """
+              CONCAT('`', column_name, '`')
+            """
+            integer_format = decimal_format
+
+        schema_name = table_dict.get('schema_name')
+        table_name = table_dict.get('table_name')
+
+        sql = f"""
                 SELECT column_name,
                     data_type,
                     column_type,
@@ -208,26 +226,32 @@ class FastSyncTapMySql:
                             WHEN data_type IN ('blob', 'tinyblob', 'mediumblob', 'longblob')
                                     THEN CONCAT('REPLACE(hex(`', column_name, '`)', ", '\n', ' ')")
                             WHEN data_type IN ('binary', 'varbinary')
-                                    THEN concat('REPLACE(hex(trim(trailing CHAR(0x00) from `',COLUMN_NAME,'`))', ", '\n', ' ')")
+                                    THEN concat('REPLACE(REPLACE(hex(trim(trailing CHAR(0x00) from `',COLUMN_NAME,'`))', ", '\n', ' '), '\r', '')")
                             WHEN data_type IN ('bit')
                                     THEN concat('cast(`', column_name, '` AS unsigned)')
-                            WHEN data_type IN ('datetime', 'timestamp', 'date')
+                            WHEN data_type IN ('date')
+                                    THEN concat('nullif(CAST(`', column_name, '` AS {date_type}),STR_TO_DATE("0000-00-00 00:00:00", "%Y-%m-%d %T"))')
+                            WHEN data_type IN ('datetime', 'timestamp')
                                     THEN concat('nullif(`', column_name, '`,STR_TO_DATE("0000-00-00 00:00:00", "%Y-%m-%d %T"))')
                             WHEN column_type IN ('tinyint(1)')
                                     THEN concat('CASE WHEN `' , column_name , '` is null THEN null WHEN `' , column_name , '` = 0 THEN 0 ELSE 1 END')
                             WHEN column_type IN ('geometry', 'point', 'linestring', 'polygon', 'multipoint', 'multilinestring', 'multipolygon', 'geometrycollection')
                                     THEN concat('ST_AsGeoJSON(', column_name, ')')
                             WHEN column_name = 'raw_data_hash'
-                                    THEN concat('REPLACE(hex(`', column_name, '`)', ", '\n', ' ')")
-                            ELSE concat('REPLACE(REPLACE(cast(`', column_name, '` AS char CHARACTER SET utf8)', ", '\n', ' '), '\0', '')")
+                                    THEN concat('REPLACE(REPLACE(hex(`', column_name, '`)', ", '\n', ' '), '\r', '')")
+                            WHEN data_type IN ('double', 'numeric', 'float', 'decimal', 'real')
+                                    THEN {decimal_format}
+                            WHEN data_type IN ('smallint', 'integer', 'bigint', 'mediumint', 'int')
+                                    THEN {integer_format}
+                            ELSE concat('REPLACE(REPLACE(REPLACE(cast(`', column_name, '` AS char CHARACTER SET utf8)', ", '\n', ' '), '\r', ''), '\0', '')")
                                 END AS safe_sql_value,
                             ordinal_position
                     FROM information_schema.columns
-                    WHERE table_schema = '{}'
-                        AND table_name = '{}') x
+                    WHERE table_schema = '{schema_name}'
+                        AND table_name = '{table_name}') x
                 ORDER BY
                         ordinal_position
-            """.format(table_dict.get('schema_name'), table_dict.get('table_name'))
+            """
         return self.query(sql)
 
     def map_column_types_to_target(self, table_name):
@@ -236,7 +260,7 @@ class FastSyncTapMySql:
         """
         mysql_columns = self.get_table_columns(table_name)
         mapped_columns = [
-            '{} {}'.format(safe_column_name(pc.get('column_name')),
+            '{} {}'.format(safe_column_name(pc.get('column_name'), self.target_quote),
                            self.tap_type_to_target_type(pc.get('data_type'), pc.get('column_type')))
             for pc in mysql_columns]
 
@@ -246,11 +270,27 @@ class FastSyncTapMySql:
         }
 
     # pylint: disable=too-many-locals
-    def copy_table(self, table_name, path):
+    def copy_table(self,
+                   table_name,
+                   path,
+                   max_num=None,
+                   date_type='date',
+                   split_large_files=False,
+                   split_file_chunk_size_mb=1000,
+                   split_file_max_chunks=20,
+                   compress=True,
+                   ):
         """
         Export data from table to a zipped csv
+        Args:
+            table_name: Fully qualified table name to export
+            path: Path where to create the zip file(s) with the exported data
+            split_large_files: Split large files to multiple pieces and create multiple zip files
+                               with -partXYZ postfix in the filename. (Default: False)
+            split_file_chunk_size_mb: File chunk sizes if `split_large_files` enabled. (Default: 1000)
+            split_file_max_chunks: Max number of chunks if `split_large_files` enabled. (Default: 20)
         """
-        table_columns = self.get_table_columns(table_name)
+        table_columns = self.get_table_columns(table_name, max_num, date_type)
         column_safe_sql_values = [c.get('safe_sql_value') for c in table_columns]
 
         # If self.get_table_columns returns zero row then table not exist
@@ -270,8 +310,14 @@ class FastSyncTapMySql:
         exported_rows = 0
         with self.conn_unbuffered as cur:
             cur.execute(sql)
-            with gzip.open(path, 'wt') as gzfile:
-                writer = csv.writer(gzfile,
+            gzip_splitter = split_gzip.open(path,
+                                            mode='wt',
+                                            chunk_size_mb=split_file_chunk_size_mb,
+                                            max_chunks=split_file_max_chunks if split_large_files else 0,
+                                            compress=compress)
+
+            with gzip_splitter as split_gzip_files:
+                writer = csv.writer(split_gzip_files,
                                     delimiter=',',
                                     quotechar='"',
                                     quoting=csv.QUOTE_MINIMAL)

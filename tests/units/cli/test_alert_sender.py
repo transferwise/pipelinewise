@@ -3,8 +3,7 @@ import collections
 from unittest.mock import patch
 from slack.errors import SlackApiError
 
-import pipelinewise.cli.alert_handlers.errors as errors
-
+from pipelinewise.cli.alert_handlers import errors
 from pipelinewise.cli.alert_sender import AlertHandler, AlertSender
 from pipelinewise.cli.alert_handlers.slack_alert_handler import SlackAlertHandler
 from pipelinewise.cli.alert_handlers.victorops_alert_handler import VictoropsAlertHandler
