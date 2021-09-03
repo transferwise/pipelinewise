@@ -1,1 +1,1 @@
-git+git://github.com/entera-ai/pipelinewise-tap-s3-csv.git@a990a054530e40a9eb8cea3adc394b4368db9c32#egg=pipelinewise-tap-s3-csv
+git+git://github.com/entera-ai/pipelinewise-tap-s3-csv.git@4d92b32db9205b5acf9c4059b4f99a08731d48f7#egg=pipelinewise-tap-s3-csv
