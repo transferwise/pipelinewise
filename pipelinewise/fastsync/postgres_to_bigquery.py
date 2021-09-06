@@ -14,58 +14,52 @@ from .commons import utils
 from .commons.tap_postgres import FastSyncTapPostgres
 from .commons.target_bigquery import FastSyncTargetBigquery
 
-MAX_NUM='99999999999999999999999999999.999999999'
+MAX_NUM = '99999999999999999999999999999.999999999'
 
 LOGGER = logging.getLogger(__name__)
 
 REQUIRED_CONFIG_KEYS = {
-    'tap': [
-        'host',
-        'port',
-        'user',
-        'password'
-    ],
-    'target': [
-        'project_id'
-    ]
+    'tap': ['host', 'port', 'user', 'password'],
+    'target': ['project_id'],
 }
 
 LOCK = multiprocessing.Lock()
 
+
 def tap_type_to_target_type(pg_type):
     """Data type mapping from Postgres to Bigquery"""
     return {
-        'char':'STRING',
-        'character':'STRING',
-        'varchar':'STRING',
-        'character varying':'STRING',
-        'text':'STRING',
+        'char': 'STRING',
+        'character': 'STRING',
+        'varchar': 'STRING',
+        'character varying': 'STRING',
+        'text': 'STRING',
         'bit': ['BOOL', 'NUMERIC'],
-        'varbit':'NUMERIC',
-        'bit varying':'NUMERIC',
-        'smallint':'INT64',
-        'int':'INT64',
-        'integer':'INT64',
-        'bigint':'INT64',
-        'smallserial':'INT64',
-        'serial':'INT64',
-        'bigserial':'INT64',
-        'numeric':'NUMERIC',
-        'double precision':'NUMERIC',
-        'real':'NUMERIC',
-        'bool':'BOOL',
-        'boolean':'BOOL',
-        'date':'TIMESTAMP',
-        'timestamp':'TIMESTAMP',
-        'timestamp without time zone':'TIMESTAMP',
-        'timestamp with time zone':'TIMESTAMP',
-        'time':'TIME',
-        'time without time zone':'TIME',
-        'time with time zone':'TIME',
+        'varbit': 'NUMERIC',
+        'bit varying': 'NUMERIC',
+        'smallint': 'INT64',
+        'int': 'INT64',
+        'integer': 'INT64',
+        'bigint': 'INT64',
+        'smallserial': 'INT64',
+        'serial': 'INT64',
+        'bigserial': 'INT64',
+        'numeric': 'NUMERIC',
+        'double precision': 'NUMERIC',
+        'real': 'NUMERIC',
+        'bool': 'BOOL',
+        'boolean': 'BOOL',
+        'date': 'TIMESTAMP',
+        'timestamp': 'TIMESTAMP',
+        'timestamp without time zone': 'TIMESTAMP',
+        'timestamp with time zone': 'TIMESTAMP',
+        'time': 'TIME',
+        'time without time zone': 'TIME',
+        'time with time zone': 'TIME',
         # This is all uppercase, because postgres stores it in this format in information_schema.columns.data_type
-        'ARRAY':'STRING',
-        'json':'STRING',
-        'jsonb':'STRING'
+        'ARRAY': 'STRING',
+        'json': 'STRING',
+        'jsonb': 'STRING',
     }.get(pg_type, 'STRING')
 
 
@@ -77,7 +71,9 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
 
     try:
         dbname = args.tap.get('dbname')
-        filename = 'pipelinewise_fastsync_{}_{}_{}.csv'.format(dbname, table, time.strftime('%Y%m%d-%H%M%S'))
+        filename = 'pipelinewise_fastsync_{}_{}_{}.csv'.format(
+            dbname, table, time.strftime('%Y%m%d-%H%M%S')
+        )
         filepath = os.path.join(args.temp_dir, filename)
         target_schema = utils.get_target_schema(args.target, table)
 
@@ -85,14 +81,14 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
         postgres.open_connection()
 
         # Get bookmark - LSN position or Incremental Key value
-        bookmark = utils.get_bookmark_for_table(table, args.properties, postgres, dbname=dbname)
+        bookmark = utils.get_bookmark_for_table(
+            table, args.properties, postgres, dbname=dbname
+        )
 
         # Exporting table data, get table definitions and close connection to avoid timeouts
-        postgres.copy_table(table,
-                            filepath,
-                            compress=False,
-                            max_num=MAX_NUM,
-                            date_type='timestamp')
+        postgres.copy_table(
+            table, filepath, compress=False, max_num=MAX_NUM, date_type='timestamp'
+        )
         file_parts = glob.glob(f'{filepath}*')
         size_bytes = sum([os.path.getsize(file_part) for file_part in file_parts])
 
@@ -113,7 +109,8 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
                 table,
                 size_bytes,
                 is_temporary=True,
-                write_truncate=write_truncate)
+                write_truncate=write_truncate,
+            )
             os.remove(file_part)
 
         # Obfuscate columns
@@ -151,7 +148,8 @@ def main_impl():
     table_sync_excs = []
 
     # Log start info
-    LOGGER.info("""
+    LOGGER.info(
+        """
         -------------------------------------------------------
         STARTING SYNC
         -------------------------------------------------------
@@ -159,7 +157,11 @@ def main_impl():
             Total tables selected to sync  : %s
             Pool size                      : %s
         -------------------------------------------------------
-        """, args.tables, len(args.tables), pool_size)
+        """,
+        args.tables,
+        len(args.tables),
+        pool_size,
+    )
 
     # if internal arg drop_pg_slot is set to True, then we drop the slot before starting resync
     if args.drop_pg_slot:
@@ -168,11 +170,16 @@ def main_impl():
     # Start loading tables in parallel in spawning processes
     with multiprocessing.Pool(pool_size) as proc:
         table_sync_excs = list(
-            filter(lambda x: not isinstance(x, bool), proc.map(partial(sync_table, args=args), args.tables)))
+            filter(
+                lambda x: not isinstance(x, bool),
+                proc.map(partial(sync_table, args=args), args.tables),
+            )
+        )
 
     # Log summary
     end_time = datetime.now()
-    LOGGER.info("""
+    LOGGER.info(
+        """
         -------------------------------------------------------
         SYNC FINISHED - SUMMARY
         -------------------------------------------------------
@@ -183,8 +190,13 @@ def main_impl():
             Pool size                      : %s
             Runtime                        : %s
         -------------------------------------------------------
-        """, len(args.tables), len(args.tables) - len(table_sync_excs), str(table_sync_excs),
-                pool_size, end_time - start_time)
+        """,
+        len(args.tables),
+        len(args.tables) - len(table_sync_excs),
+        str(table_sync_excs),
+        pool_size,
+        end_time - start_time,
+    )
 
     if len(table_sync_excs) > 0:
         sys.exit(1)

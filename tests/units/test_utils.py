@@ -7,6 +7,7 @@ class TestUtils(unittest.TestCase):
     """
     Unit Tests for PipelineWise common utils
     """
+
     def test_safe_column_name_case_1(self):
         """
         Given an all lower case word would be wrapped in double quotes and capitalized
@@ -46,6 +47,7 @@ class TestUtils(unittest.TestCase):
         input_name = None
 
         self.assertIsNone(utils.safe_column_name(input_name))
+
 
 if __name__ == '__main__':
     unittest.main()

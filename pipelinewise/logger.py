@@ -4,6 +4,7 @@ import logging
 from logging.config import fileConfig
 from pathlib import Path
 
+
 # pylint: disable=too-few-public-methods
 class Logger:
     """PipelineWise logger class"""

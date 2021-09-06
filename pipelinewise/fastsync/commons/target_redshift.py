@@ -28,11 +28,18 @@ class FastSyncTargetRedshift:
         self.transformation_config = transformation_config
 
         # Get the required parameters from config file and/or environment variables
-        aws_profile = self.connection_config.get('aws_profile') or os.environ.get('AWS_PROFILE')
-        aws_access_key_id = self.connection_config.get('aws_access_key_id') or os.environ.get('AWS_ACCESS_KEY_ID')
-        aws_secret_access_key = self.connection_config.get('aws_secret_access_key') or \
-                                os.environ.get('AWS_SECRET_ACCESS_KEY')
-        aws_session_token = self.connection_config.get('aws_session_token') or os.environ.get('AWS_SESSION_TOKEN')
+        aws_profile = self.connection_config.get('aws_profile') or os.environ.get(
+            'AWS_PROFILE'
+        )
+        aws_access_key_id = self.connection_config.get(
+            'aws_access_key_id'
+        ) or os.environ.get('AWS_ACCESS_KEY_ID')
+        aws_secret_access_key = self.connection_config.get(
+            'aws_secret_access_key'
+        ) or os.environ.get('AWS_SECRET_ACCESS_KEY')
+        aws_session_token = self.connection_config.get(
+            'aws_session_token'
+        ) or os.environ.get('AWS_SESSION_TOKEN')
 
         # Init S3 client
         # Conditionally pass keys as this seems to affect whether instance credentials
@@ -41,7 +48,7 @@ class FastSyncTargetRedshift:
             aws_session = boto3.session.Session(
                 aws_access_key_id=aws_access_key_id,
                 aws_secret_access_key=aws_secret_access_key,
-                aws_session_token=aws_session_token
+                aws_session_token=aws_session_token,
             )
             credentials = aws_session.get_credentials().get_frozen_credentials()
 
@@ -60,7 +67,7 @@ class FastSyncTargetRedshift:
             self.connection_config['dbname'],
             self.connection_config['user'],
             self.connection_config['password'],
-            self.connection_config['port']
+            self.connection_config['port'],
         )
 
         return psycopg2.connect(conn_string)
@@ -84,7 +91,12 @@ class FastSyncTargetRedshift:
 
         extra_args = {'ACL': s3_acl} if s3_acl else None
 
-        LOGGER.info('Uploading to S3 bucket: %s, local file: %s, S3 key: %s', bucket, file, s3_key)
+        LOGGER.info(
+            'Uploading to S3 bucket: %s, local file: %s, S3 key: %s',
+            bucket,
+            file,
+            s3_key,
+        )
 
         self.s3.upload_file(file, bucket, s3_key, ExtraArgs=extra_args)
 
@@ -101,25 +113,48 @@ class FastSyncTargetRedshift:
 
     def drop_table(self, target_schema, table_name, is_temporary=False):
         table_dict = utils.tablename_to_dict(table_name)
-        target_table = table_dict.get('table_name') if not is_temporary else table_dict.get('temp_table_name')
+        target_table = (
+            table_dict.get('table_name')
+            if not is_temporary
+            else table_dict.get('temp_table_name')
+        )
 
         sql = 'DROP TABLE IF EXISTS {}."{}"'.format(target_schema, target_table.upper())
         self.query(sql)
 
-    def create_table(self, target_schema: str, table_name: str, columns: List[str], primary_key: List[str],
-                     is_temporary: bool = False, sort_columns=False):
+    def create_table(
+        self,
+        target_schema: str,
+        table_name: str,
+        columns: List[str],
+        primary_key: List[str],
+        is_temporary: bool = False,
+        sort_columns=False,
+    ):
 
         table_dict = utils.tablename_to_dict(table_name)
-        target_table = table_dict.get('table_name') if not is_temporary else table_dict.get('temp_table_name')
+        target_table = (
+            table_dict.get('table_name')
+            if not is_temporary
+            else table_dict.get('temp_table_name')
+        )
 
         # skip the EXTRACTED, BATCHED and DELETED columns in case they exist because they gonna be added later
-        columns = [c for c in columns if not (c.startswith(self.EXTRACTED_AT_COLUMN) or
-                                              c.startswith(self.BATCHED_AT_COLUMN) or
-                                              c.startswith(self.DELETED_AT_COLUMN))]
+        columns = [
+            c
+            for c in columns
+            if not (
+                c.startswith(self.EXTRACTED_AT_COLUMN)
+                or c.startswith(self.BATCHED_AT_COLUMN)
+                or c.startswith(self.DELETED_AT_COLUMN)
+            )
+        ]
 
-        columns += [f'{self.EXTRACTED_AT_COLUMN} TIMESTAMP WITHOUT TIME ZONE',
-                    f'{self.BATCHED_AT_COLUMN} TIMESTAMP WITHOUT TIME ZONE',
-                    f'{self.DELETED_AT_COLUMN} CHARACTER VARYING']
+        columns += [
+            f'{self.EXTRACTED_AT_COLUMN} TIMESTAMP WITHOUT TIME ZONE',
+            f'{self.BATCHED_AT_COLUMN} TIMESTAMP WITHOUT TIME ZONE',
+            f'{self.DELETED_AT_COLUMN} CHARACTER VARYING',
+        ]
 
         # We need the sort the columns for some taps( for now tap-s3-csv)
         # because later on when copying a csv file into Snowflake
@@ -129,80 +164,121 @@ class FastSyncTargetRedshift:
 
         sql_columns = ','.join(columns)
         sql_primary_keys = ','.join(primary_key) if primary_key else None
-        sql = f'CREATE TABLE IF NOT EXISTS {target_schema}."{target_table.upper()}" (' \
-              f'{sql_columns}' \
-              f'{f", PRIMARY KEY ({sql_primary_keys}))" if primary_key else ")"}'
+        sql = (
+            f'CREATE TABLE IF NOT EXISTS {target_schema}."{target_table.upper()}" ('
+            f'{sql_columns}'
+            f'{f", PRIMARY KEY ({sql_primary_keys}))" if primary_key else ")"}'
+        )
 
         self.query(sql)
 
-    def copy_to_table(self, s3_key, target_schema, table_name, size_bytes, is_temporary, skip_csv_header=False):
+    def copy_to_table(
+        self,
+        s3_key,
+        target_schema,
+        table_name,
+        size_bytes,
+        is_temporary,
+        skip_csv_header=False,
+    ):
         LOGGER.info('Loading %s into Redshift...', s3_key)
         table_dict = utils.tablename_to_dict(table_name)
-        target_table = table_dict.get('table_name') if not is_temporary else table_dict.get('temp_table_name')
+        target_table = (
+            table_dict.get('table_name')
+            if not is_temporary
+            else table_dict.get('temp_table_name')
+        )
         inserts = 0
         bucket = self.connection_config['s3_bucket']
 
         # Step 1: Generate copy credentials - prefer role if provided, otherwise use access and secret keys
-        copy_credentials = """
+        copy_credentials = (
+            """
             iam_role '{aws_role_arn}'
-        """.format(aws_role_arn=self.connection_config['aws_redshift_copy_role_arn']) \
-            if self.connection_config.get('aws_redshift_copy_role_arn') else """
+        """.format(
+                aws_role_arn=self.connection_config['aws_redshift_copy_role_arn']
+            )
+            if self.connection_config.get('aws_redshift_copy_role_arn')
+            else """
             ACCESS_KEY_ID '{aws_access_key_id}'
             SECRET_ACCESS_KEY '{aws_secret_access_key}'
             {aws_session_token}
         """.format(
-            aws_access_key_id=self.connection_config['aws_access_key_id'],
-            aws_secret_access_key=self.connection_config['aws_secret_access_key'],
-            aws_session_token="SESSION_TOKEN '{}'".format(self.connection_config['aws_session_token']) \
-                if self.connection_config.get('aws_session_token') else '',
+                aws_access_key_id=self.connection_config['aws_access_key_id'],
+                aws_secret_access_key=self.connection_config['aws_secret_access_key'],
+                aws_session_token="SESSION_TOKEN '{}'".format(
+                    self.connection_config['aws_session_token']
+                )
+                if self.connection_config.get('aws_session_token')
+                else '',
+            )
         )
 
         # Step 2: Generate copy options - Override defaults from config.json if defined
-        copy_options = self.connection_config.get('copy_options', f"""
+        copy_options = self.connection_config.get(
+            'copy_options',
+            f"""
             EMPTYASNULL BLANKSASNULL TRIMBLANKS TRUNCATECOLUMNS IGNOREHEADER {int(skip_csv_header)}
             TIMEFORMAT 'auto'
-        """)
+        """,
+        )
 
         # Step3: Using the built-in CSV COPY option to load
-        copy_sql = f'COPY {target_schema}."{target_table.upper()}" FROM \'s3://{bucket}/{s3_key}\'' \
-                   f'{copy_credentials}' \
-                   f'{copy_options}' \
-                   f'CSV GZIP'
+        copy_sql = (
+            f'COPY {target_schema}."{target_table.upper()}" FROM \'s3://{bucket}/{s3_key}\''
+            f'{copy_credentials}'
+            f'{copy_options}'
+            f'CSV GZIP'
+        )
 
         # Get number of inserted records - COPY does insert only
         results = self.query(copy_sql)
         if len(results) > 0:
             inserts = results[0].get('rows_loaded', 0)
 
-        LOGGER.info('Loading into %s."%s": %s',
-                    target_schema,
-                    target_table.upper(),
-                    json.dumps({'inserts': inserts, 'updates': 0, 'size_bytes': size_bytes}))
+        LOGGER.info(
+            'Loading into %s."%s": %s',
+            target_schema,
+            target_table.upper(),
+            json.dumps({'inserts': inserts, 'updates': 0, 'size_bytes': size_bytes}),
+        )
 
         LOGGER.info('Deleting %s from S3...', s3_key)
         self.s3.delete_object(Bucket=bucket, Key=s3_key)
 
-    def grant_select_on_table(self, target_schema, table_name, grantee, is_temporary, to_group=False):
+    def grant_select_on_table(
+        self, target_schema, table_name, grantee, is_temporary, to_group=False
+    ):
         # Grant role is not mandatory parameter, do nothing if not specified
         if grantee:
             table_dict = utils.tablename_to_dict(table_name)
-            target_table = table_dict.get('table_name') if not is_temporary else table_dict.get('temp_table_name')
-            sql = 'GRANT SELECT ON {}."{}" TO {} {}'.format(target_schema,
-                                                            target_table.upper(), 'GROUP' if to_group else '',
-                                                            grantee)
+            target_table = (
+                table_dict.get('table_name')
+                if not is_temporary
+                else table_dict.get('temp_table_name')
+            )
+            sql = 'GRANT SELECT ON {}."{}" TO {} {}'.format(
+                target_schema,
+                target_table.upper(),
+                'GROUP' if to_group else '',
+                grantee,
+            )
             self.query(sql)
 
     def grant_usage_on_schema(self, target_schema, grantee, to_group=False):
         # Grant role is not mandatory parameter, do nothing if not specified
         if grantee:
-            sql = 'GRANT USAGE ON SCHEMA {} TO {} {}'.format(target_schema, 'GROUP' if to_group else '', grantee)
+            sql = 'GRANT USAGE ON SCHEMA {} TO {} {}'.format(
+                target_schema, 'GROUP' if to_group else '', grantee
+            )
             self.query(sql)
 
     def grant_select_on_schema(self, target_schema, grantee, to_group=False):
         # Grant role is not mandatory parameter, do nothing if not specified
         if grantee:
-            sql = 'GRANT SELECT ON ALL TABLES IN SCHEMA {} TO {} {}'.format(target_schema, 'GROUP' if to_group else '',
-                                                                            grantee)
+            sql = 'GRANT SELECT ON ALL TABLES IN SCHEMA {} TO {} {}'.format(
+                target_schema, 'GROUP' if to_group else '', grantee
+            )
             self.query(sql)
 
     # pylint: disable=duplicate-string-formatting-argument
@@ -220,7 +296,9 @@ class FastSyncTargetRedshift:
             #
             # We need to convert to the same format to find the transformation
             # has that has to be applied
-            tap_stream_name_by_table_name = '{}-{}'.format(table_dict.get('schema_name'), table_dict.get('table_name'))
+            tap_stream_name_by_table_name = '{}-{}'.format(
+                table_dict.get('schema_name'), table_dict.get('table_name')
+            )
             if trans.get('tap_stream_name') == tap_stream_name_by_table_name:
                 column = trans.get('field_id')
                 transform_type = trans.get('type')
@@ -230,10 +308,17 @@ class FastSyncTargetRedshift:
                     trans_cols.append('"{}" = FUNC_SHA1("{}")'.format(column, column))
                 elif 'HASH-SKIP-FIRST' in transform_type:
                     skip_first_n = transform_type[-1]
-                    trans_cols.append('"{}" = CONCAT(SUBSTRING("{}", 1, {}), FUNC_SHA1(SUBSTRING("{}", {} + 1)))'
-                                      .format(column, column, skip_first_n, column, skip_first_n))
+                    trans_cols.append(
+                        '"{}" = CONCAT(SUBSTRING("{}", 1, {}), FUNC_SHA1(SUBSTRING("{}", {} + 1)))'.format(
+                            column, column, skip_first_n, column, skip_first_n
+                        )
+                    )
                 elif transform_type == 'MASK-DATE':
-                    trans_cols.append('"{}" = TO_CHAR("{}"::DATE, \'YYYY-01-01\')::DATE'.format(column, column))
+                    trans_cols.append(
+                        '"{}" = TO_CHAR("{}"::DATE, \'YYYY-01-01\')::DATE'.format(
+                            column, column
+                        )
+                    )
                 elif transform_type == 'MASK-NUMBER':
                     trans_cols.append('"{}" = 0'.format(column))
 
@@ -252,4 +337,8 @@ class FastSyncTargetRedshift:
 
         # Swap tables and drop the temp tamp
         self.query('DROP TABLE IF EXISTS {}."{}"'.format(schema, target_table.upper()))
-        self.query('ALTER TABLE {}."{}" RENAME TO "{}"'.format(schema, temp_table.upper(), target_table.upper()))
+        self.query(
+            'ALTER TABLE {}."{}" RENAME TO "{}"'.format(
+                schema, temp_table.upper(), target_table.upper()
+            )
+        )

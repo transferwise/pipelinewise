@@ -19,18 +19,14 @@ class MySqlMock:
     """
 
     def fetch_current_log_pos(self):
-        return {
-            'log_file': 'mysqld-bin.000001',
-            'log_pos': '123456',
-            'version': 1
-        }
+        return {'log_file': 'mysqld-bin.000001', 'log_pos': '123456', 'version': 1}
 
     # pylint: disable=unused-argument
     def fetch_current_incremental_key_pos(self, table, replication_key):
         return {
             'replication_key': replication_key,
             'replication_key_value': 123456,
-            'version': 1
+            'version': 1,
         }
 
 
@@ -40,17 +36,14 @@ class PostgresMock:
     """
 
     def fetch_current_log_pos(self):
-        return {
-            'lsn': '16/B374D848',
-            'version': 1
-        }
+        return {'lsn': '16/B374D848', 'version': 1}
 
     # pylint: disable=unused-argument
     def fetch_current_incremental_key_pos(self, table, replication_key):
         return {
             'replication_key': replication_key,
             'replication_key_value': 123456,
-            'version': 1
+            'version': 1,
         }
 
 
@@ -61,9 +54,7 @@ class S3CsvMock:
 
     # pylint: disable=unused-argument
     def fetch_current_incremental_key_pos(self, table, replication_key):
-        return {
-            'modified_since': '2019-11-15T07:39:44.171098'
-        }
+        return {'modified_since': '2019-11-15T07:39:44.171098'}
 
 
 class TestFastSyncUtils(TestCase):
@@ -75,56 +66,57 @@ class TestFastSyncUtils(TestCase):
         """Test identifying schema and table names from fully qualified table names"""
 
         # Format: <CATALOG>.<SCHEMA>.<TABLE>
-        assert utils.tablename_to_dict('my_catalog.my_schema.my_table') == \
-               {
-                   'catalog_name': 'my_catalog',
-                   'schema_name': 'my_schema',
-                   'table_name': 'my_table',
-                   'temp_table_name': 'my_table_temp'
-               }
+        assert utils.tablename_to_dict('my_catalog.my_schema.my_table') == {
+            'catalog_name': 'my_catalog',
+            'schema_name': 'my_schema',
+            'table_name': 'my_table',
+            'temp_table_name': 'my_table_temp',
+        }
 
         # Format: <SCHEMA>.<TABLE>
-        assert utils.tablename_to_dict('my_schema.my_table') == \
-               {
-                   'catalog_name': None,
-                   'schema_name': 'my_schema',
-                   'table_name': 'my_table',
-                   'temp_table_name': 'my_table_temp'
-               }
+        assert utils.tablename_to_dict('my_schema.my_table') == {
+            'catalog_name': None,
+            'schema_name': 'my_schema',
+            'table_name': 'my_table',
+            'temp_table_name': 'my_table_temp',
+        }
 
         # Format: <TABLE>
-        assert utils.tablename_to_dict('my_table') == \
-               {
-                   'catalog_name': None,
-                   'schema_name': None,
-                   'table_name': 'my_table',
-                   'temp_table_name': 'my_table_temp'
-               }
+        assert utils.tablename_to_dict('my_table') == {
+            'catalog_name': None,
+            'schema_name': None,
+            'table_name': 'my_table',
+            'temp_table_name': 'my_table_temp',
+        }
 
         # Format: <CATALOG>.<SCHEMA>.<TABLE>.<SOMETHING>
-        assert utils.tablename_to_dict('my_catalog.my_schema.my_table.foo') == \
-               {
-                   'catalog_name': 'my_catalog',
-                   'schema_name': 'my_schema',
-                   'table_name': 'my_table_foo',
-                   'temp_table_name': 'my_table_foo_temp'
-               }
+        assert utils.tablename_to_dict('my_catalog.my_schema.my_table.foo') == {
+            'catalog_name': 'my_catalog',
+            'schema_name': 'my_schema',
+            'table_name': 'my_table_foo',
+            'temp_table_name': 'my_table_foo_temp',
+        }
 
         # Format: <CATALOG>.<SCHEMA>.<TABLE>.<SOMETHING>
         # Custom separator
-        assert utils.tablename_to_dict('my_catalog-my_schema-my_table-foo', separator='-') == \
-               {
-                   'catalog_name': 'my_catalog',
-                   'schema_name': 'my_schema',
-                   'table_name': 'my_table_foo',
-                   'temp_table_name': 'my_table_foo_temp'
-               }
+        assert utils.tablename_to_dict(
+            'my_catalog-my_schema-my_table-foo', separator='-'
+        ) == {
+            'catalog_name': 'my_catalog',
+            'schema_name': 'my_schema',
+            'table_name': 'my_table_foo',
+            'temp_table_name': 'my_table_foo_temp',
+        }
 
     def test_get_tables_from_properties(self):
         """Test getting selected tables from tap properties JSON"""
         # Load MySQL and Postgres properties JSON
-        mysql_properties = utils.load_json('{}/properties_mysql.json'.format(RESOURCES_DIR))
-        postgres_properties = utils.load_json('{}/properties_postgres.json'.format(RESOURCES_DIR))
+        mysql_properties = utils.load_json(
+            '{}/properties_mysql.json'.format(RESOURCES_DIR)
+        )
+        postgres_properties = utils.load_json(
+            '{}/properties_postgres.json'.format(RESOURCES_DIR)
+        )
 
         # Get list of selected tables
         # MySQL and Postgres schemas defined at different keys. get_tables_from_properties function
@@ -133,18 +125,13 @@ class TestFastSyncUtils(TestCase):
         postgres_tables = utils.get_tables_from_properties(postgres_properties)
 
         # MySQL schema
-        assert mysql_tables == \
-               {
-                   'mysql_source_db.address',
-                   'mysql_source_db.order',
-                   'mysql_source_db.weight_unit'
-               }
+        assert mysql_tables == {
+            'mysql_source_db.address',
+            'mysql_source_db.order',
+            'mysql_source_db.weight_unit',
+        }
 
-        assert postgres_tables == \
-               {
-                   'public.city',
-                   'public.country'
-               }
+        assert postgres_tables == {'public.city', 'public.country'}
 
     def test_get_tables_from_properties_for_s3_csv(self):
         properties = utils.load_json('{}/properties_s3_csv.json'.format(RESOURCES_DIR))
@@ -152,61 +139,71 @@ class TestFastSyncUtils(TestCase):
         s3_csv_tables = utils.get_tables_from_properties(properties)
 
         # MySQL schema
-        assert s3_csv_tables == \
-               {
-                   'applications',
-                   'candidate_survey_questions',
-                   'interviews',
-               }
+        assert s3_csv_tables == {
+            'applications',
+            'candidate_survey_questions',
+            'interviews',
+        }
 
     def test_get_bookmark_for_table_mysql(self):
         """Test bookmark extractors for MySQL taps"""
         # Load MySQL and Postgres properties JSON
-        mysql_properties = utils.load_json('{}/properties_mysql.json'.format(RESOURCES_DIR))
+        mysql_properties = utils.load_json(
+            '{}/properties_mysql.json'.format(RESOURCES_DIR)
+        )
 
         # MySQL: mysql_source_db.order is LOG_BASED
-        assert utils.get_bookmark_for_table('mysql_source_db.order', mysql_properties, MySqlMock()) == {
-            'log_file': 'mysqld-bin.000001',
-            'log_pos': '123456',
-            'version': 1
-        }
+        assert utils.get_bookmark_for_table(
+            'mysql_source_db.order', mysql_properties, MySqlMock()
+        ) == {'log_file': 'mysqld-bin.000001', 'log_pos': '123456', 'version': 1}
 
         # MySQL: mysql_source_db.address is INCREMENTAL
-        assert utils.get_bookmark_for_table('mysql_source_db.address', mysql_properties, MySqlMock()) == {
+        assert utils.get_bookmark_for_table(
+            'mysql_source_db.address', mysql_properties, MySqlMock()
+        ) == {
             'replication_key': 'date_updated',
             'replication_key_value': 123456,
-            'version': 1
+            'version': 1,
         }
 
         # MySQL mysql_source_db.foo not exists
-        assert utils.get_bookmark_for_table('mysql_source_db.foo', mysql_properties, MySqlMock()) == {}
+        assert (
+            utils.get_bookmark_for_table(
+                'mysql_source_db.foo', mysql_properties, MySqlMock()
+            )
+            == {}
+        )
 
     def test_get_bookmark_for_table_postgresl(self):
         """Test bookmark extractors for Postgres taps"""
         # Load Postgres properties JSON
-        postgres_properties = utils.load_json('{}/properties_postgres.json'.format(RESOURCES_DIR))
+        postgres_properties = utils.load_json(
+            '{}/properties_postgres.json'.format(RESOURCES_DIR)
+        )
 
         # Postgres: public.countrylanguage is LOG_BASED
-        assert utils.get_bookmark_for_table('public.countrylanguage', postgres_properties, PostgresMock()) == {
-            'lsn': '16/B374D848',
-            'version': 1
-        }
+        assert utils.get_bookmark_for_table(
+            'public.countrylanguage', postgres_properties, PostgresMock()
+        ) == {'lsn': '16/B374D848', 'version': 1}
 
         # Postgres: postgres_source_db.public.city is INCREMENTAL
-        assert utils.get_bookmark_for_table('public.city',
-                                            postgres_properties,
-                                            PostgresMock(),
-                                            dbname='postgres_source_db') == {
-                                                'replication_key': 'id',
-                                                'replication_key_value': 123456,
-                                                'version': 1
-                                            }
+        assert utils.get_bookmark_for_table(
+            'public.city',
+            postgres_properties,
+            PostgresMock(),
+            dbname='postgres_source_db',
+        ) == {'replication_key': 'id', 'replication_key_value': 123456, 'version': 1}
 
         # Postgres: postgres_source_db.public.foo not exists
-        assert utils.get_bookmark_for_table('public.foo',
-                                            postgres_properties,
-                                            PostgresMock(),
-                                            dbname='postgres_source_db') == {}
+        assert (
+            utils.get_bookmark_for_table(
+                'public.foo',
+                postgres_properties,
+                PostgresMock(),
+                dbname='postgres_source_db',
+            )
+            == {}
+        )
 
     def test_get_bookmark_for_table_tap_s3_csv(self):
         """Test bookmark extractors for S3 CSV taps"""
@@ -214,12 +211,19 @@ class TestFastSyncUtils(TestCase):
         properties = utils.load_json('{}/properties_s3_csv.json'.format(RESOURCES_DIR))
 
         # applications is INCREMENTAL
-        assert utils.get_bookmark_for_table('applications', properties, S3CsvMock()) == {
+        assert utils.get_bookmark_for_table(
+            'applications', properties, S3CsvMock()
+        ) == {
             'modified_since': '2019-11-15T07:39:44.171098',
         }
 
         # candidate_survey_questions is Full table
-        assert utils.get_bookmark_for_table('candidate_survey_questions', properties, S3CsvMock()) == {}
+        assert (
+            utils.get_bookmark_for_table(
+                'candidate_survey_questions', properties, S3CsvMock()
+            )
+            == {}
+        )
 
         # foo not exists
         assert utils.get_bookmark_for_table('foo', properties, S3CsvMock()) == {}
@@ -238,7 +242,10 @@ class TestFastSyncUtils(TestCase):
 
         # Default_target_schema should define the target_schema
         target_config_with_default = {'default_target_schema': 'target_schema'}
-        assert utils.get_target_schema(target_config_with_default, 'foo.foo') == 'target_schema'
+        assert (
+            utils.get_target_schema(target_config_with_default, 'foo.foo')
+            == 'target_schema'
+        )
 
         # Empty schema_mapping should raise exception
         with pytest.raises(Exception):
@@ -247,28 +254,33 @@ class TestFastSyncUtils(TestCase):
 
         # Missing schema in schema_mapping should raise exception
         with pytest.raises(Exception):
-            target_config_with_missing_schema_mapping = {'schema_mapping': {'foo2': {'target_schema': 'foo2'}}}
-            utils.get_target_schema(target_config_with_missing_schema_mapping, 'foo.foo')
+            target_config_with_missing_schema_mapping = {
+                'schema_mapping': {'foo2': {'target_schema': 'foo2'}}
+            }
+            utils.get_target_schema(
+                target_config_with_missing_schema_mapping, 'foo.foo'
+            )
 
         # Target schema should be extracted from schema_mapping
-        target_config_with_schema_mapping = {'schema_mapping': {'foo': {'target_schema': 'foo'}}}
-        assert utils.get_target_schema(target_config_with_schema_mapping, 'foo.foo') == 'foo'
+        target_config_with_schema_mapping = {
+            'schema_mapping': {'foo': {'target_schema': 'foo'}}
+        }
+        assert (
+            utils.get_target_schema(target_config_with_schema_mapping, 'foo.foo')
+            == 'foo'
+        )
 
         # If target schema exist in schema_mapping then should not use the default_target_schema
         target_config = {
             'default_target_schema': 'target_schema',
-            'schema_mapping': {'foo': {'target_schema': 'foo'}}
+            'schema_mapping': {'foo': {'target_schema': 'foo'}},
         }
         assert utils.get_target_schema(target_config, 'foo.foo') == 'foo'
 
         # If target schema not exist in schema_mapping then should return the default_target_schema
         target_config = {
             'default_target_schema': 'target_schema',
-            'schema_mapping': {
-                'foo2': {
-                    'target_schema': 'foo2'
-                }
-            }
+            'schema_mapping': {'foo2': {'target_schema': 'foo2'}},
         }
         assert utils.get_target_schema(target_config, 'foo.foo') == 'target_schema'
 
@@ -279,63 +291,75 @@ class TestFastSyncUtils(TestCase):
         assert utils.get_grantees(target_config_with_empty_grantees, 'foo.foo') == []
 
         # Empty default_target_schema_select_permissions should return empty list
-        target_config_with_default_empty = {'default_target_schema_select_permissions': ''}
+        target_config_with_default_empty = {
+            'default_target_schema_select_permissions': ''
+        }
         assert utils.get_grantees(target_config_with_default_empty, 'foo.foo') == []
 
         # default_target_schema_select_permissions as string should return list
-        target_config_with_default_as_string = {'default_target_schema_select_permissions': 'grantee'}
-        assert utils.get_grantees(target_config_with_default_as_string, 'foo.foo') == ['grantee']
+        target_config_with_default_as_string = {
+            'default_target_schema_select_permissions': 'grantee'
+        }
+        assert utils.get_grantees(target_config_with_default_as_string, 'foo.foo') == [
+            'grantee'
+        ]
 
         # default_target_schema_select_permissions as list should return list
-        target_config_with_default_as_list = {'default_target_schema_select_permissions': ['grantee1']}
-        assert utils.get_grantees(target_config_with_default_as_list, 'foo.foo') == ['grantee1']
+        target_config_with_default_as_list = {
+            'default_target_schema_select_permissions': ['grantee1']
+        }
+        assert utils.get_grantees(target_config_with_default_as_list, 'foo.foo') == [
+            'grantee1'
+        ]
 
         # default_target_schema_select_permissions as list should return list
-        target_config_with_default_as_list = {'default_target_schema_select_permissions': ['grantee1', 'grantee2']}
-        assert utils.get_grantees(target_config_with_default_as_list, 'foo.foo') == ['grantee1', 'grantee2']
+        target_config_with_default_as_list = {
+            'default_target_schema_select_permissions': ['grantee1', 'grantee2']
+        }
+        assert utils.get_grantees(target_config_with_default_as_list, 'foo.foo') == [
+            'grantee1',
+            'grantee2',
+        ]
 
         # Empty schema_mapping should return empty list
         target_config_with_empty_schema_mapping = {'schema_mapping': {}}
-        assert utils.get_grantees(target_config_with_empty_schema_mapping, 'foo.foo') == []
+        assert (
+            utils.get_grantees(target_config_with_empty_schema_mapping, 'foo.foo') == []
+        )
 
         # Missing schema in schema_mapping should return empty list
         target_config_with_missing_schema_mapping = {
-            'schema_mapping': {
-                'foo2': {
-                    'target_schema_select_permissions': 'grantee'
-                }
-            }
+            'schema_mapping': {'foo2': {'target_schema_select_permissions': 'grantee'}}
         }
-        assert utils.get_grantees(target_config_with_missing_schema_mapping, 'foo.foo') == []
+        assert (
+            utils.get_grantees(target_config_with_missing_schema_mapping, 'foo.foo')
+            == []
+        )
 
         # Grantees as string should be extracted from schema_mapping
         target_config_with_missing_schema_mapping = {
-            'schema_mapping': {
-                'foo': {
-                    'target_schema_select_permissions': 'grantee'
-                }
-            }
+            'schema_mapping': {'foo': {'target_schema_select_permissions': 'grantee'}}
         }
-        assert utils.get_grantees(target_config_with_missing_schema_mapping, 'foo.foo') == ['grantee']
+        assert utils.get_grantees(
+            target_config_with_missing_schema_mapping, 'foo.foo'
+        ) == ['grantee']
 
         # Grantees as list should be extracted from schema_mapping
         target_config_with_missing_schema_mapping = {
             'schema_mapping': {
-                'foo': {
-                    'target_schema_select_permissions': ['grantee1', 'grantee2']
-                }
+                'foo': {'target_schema_select_permissions': ['grantee1', 'grantee2']}
             }
         }
-        assert utils.get_grantees(target_config_with_missing_schema_mapping, 'foo.foo') == ['grantee1', 'grantee2']
+        assert utils.get_grantees(
+            target_config_with_missing_schema_mapping, 'foo.foo'
+        ) == ['grantee1', 'grantee2']
 
         # If grantees exist in schema_mapping then should not use the default_target_schema_select_permissions
         target_config = {
             'default_target_schema_select_permissions': ['grantee1', 'grantee2'],
             'schema_mapping': {
-                'foo': {
-                    'target_schema_select_permissions': ['grantee3', 'grantee4']
-                }
-            }
+                'foo': {'target_schema_select_permissions': ['grantee3', 'grantee4']}
+            },
         }
         assert utils.get_grantees(target_config, 'foo.foo') == ['grantee3', 'grantee4']
 
@@ -343,10 +367,8 @@ class TestFastSyncUtils(TestCase):
         target_config = {
             'default_target_schema_select_permissions': ['grantee1', 'grantee2'],
             'schema_mapping': {
-                'foo2': {
-                    'target_schema_select_permissions': ['grantee3', 'grantee4']
-                }
-            }
+                'foo2': {'target_schema_select_permissions': ['grantee3', 'grantee4']}
+            },
         }
         assert utils.get_grantees(target_config, 'foo.foo') == ['grantee1', 'grantee2']
 
@@ -354,27 +376,29 @@ class TestFastSyncUtils(TestCase):
         target_config_with_default_as_dict = {
             'default_target_schema_select_permissions': {
                 'users': 'grantee_user1',
-                'groups': 'grantee_group1'
+                'groups': 'grantee_group1',
             }
         }
         assert utils.get_grantees(target_config_with_default_as_dict, 'foo.foo') == {
             'users': ['grantee_user1'],
-            'groups': ['grantee_group1']
+            'groups': ['grantee_group1'],
         }
 
         # default_target_schema_select_permissions as dict with list should return dict
         target_config_with_default_as_dict = {
             'default_target_schema_select_permissions': {
                 'users': ['grantee_user1', 'grantee_user2'],
-                'groups': ['grantee_group1', 'grantee_group2']
+                'groups': ['grantee_group1', 'grantee_group2'],
             }
         }
         assert utils.get_grantees(target_config_with_default_as_dict, 'foo.foo') == {
             'users': ['grantee_user1', 'grantee_user2'],
-            'groups': ['grantee_group1', 'grantee_group2']
+            'groups': ['grantee_group1', 'grantee_group2'],
         }
 
-    @patch('pipelinewise.fastsync.commons.utils.multiprocessing.cpu_count', return_value=10)
+    @patch(
+        'pipelinewise.fastsync.commons.utils.multiprocessing.cpu_count', return_value=10
+    )
     def test_get_cpu_cores_should_succeed(self, _):
         assert utils.get_cpu_cores() == 10
 
@@ -384,29 +408,36 @@ class TestFastSyncUtils(TestCase):
 
         utils.check_config(config, required_keys)
 
-    def test_check_config_with_some_required_keys_not_present_should_raise_exception(self):
+    def test_check_config_with_some_required_keys_not_present_should_raise_exception(
+        self,
+    ):
         config = {'key1': 1, 'key2': 2, 'key3': 3}
         required_keys = {'key1', 'key4'}
 
         with pytest.raises(Exception):
             utils.check_config(config, required_keys)
 
-    @patch('pipelinewise.fastsync.commons.utils.multiprocessing.cpu_count', return_value=10)
+    @patch(
+        'pipelinewise.fastsync.commons.utils.multiprocessing.cpu_count', return_value=10
+    )
     def test_get_pool_size_without_custom_size(self, _):
         """
         Calling get_pool_size without providing fastsync_parallelism return cpu core count
         """
         assert utils.get_pool_size({}) == 10
 
-    @patch('pipelinewise.fastsync.commons.utils.multiprocessing.cpu_count', return_value=10)
+    @patch(
+        'pipelinewise.fastsync.commons.utils.multiprocessing.cpu_count', return_value=10
+    )
     def test_get_pool_size_with_custom_size_small(self, _):
         """
         Calling get_pool_size with fastsync_parallelism smaller than cpu core count return the fastsync_parallelism
         """
         assert utils.get_pool_size({'fastsync_parallelism': 2}) == 2
 
-
-    @patch('pipelinewise.fastsync.commons.utils.multiprocessing.cpu_count', return_value=10)
+    @patch(
+        'pipelinewise.fastsync.commons.utils.multiprocessing.cpu_count', return_value=10
+    )
     def test_get_pool_size_with_custom_size_big(self, _):
         """
         Calling get_pool_size with fastsync_parallelism greater than cpu core count return the cpu core count
@@ -417,19 +448,23 @@ class TestFastSyncUtils(TestCase):
     @mock.patch('pipelinewise.fastsync.commons.utils.check_config')
     @mock.patch('pipelinewise.fastsync.commons.utils.load_json')
     @mock.patch('argparse.ArgumentParser.parse_args')
-    def test_parse_args_without_tables(self, mock_args, load_json_mock, check_config_mock, get_tables_prop_mock):
+    def test_parse_args_without_tables(
+        self, mock_args, load_json_mock, check_config_mock, get_tables_prop_mock
+    ):
         """
         test args parsing:
             not tables are specified, this should return a tables equal to the list of selected tables
         """
-        mock_args.return_value = argparse.Namespace(**{
-            'tap': './tap.yml',
-            'properties': './prop.json',
-            'transform': None,
-            'target': './target.yml',
-            'tables': None,
-            'temp_dir': './'
-        })
+        mock_args.return_value = argparse.Namespace(
+            **{
+                'tap': './tap.yml',
+                'properties': './prop.json',
+                'transform': None,
+                'target': './target.yml',
+                'tables': None,
+                'temp_dir': './',
+            }
+        )
 
         load_json_mock.return_value = {}
         check_config_mock.return_value = None
@@ -442,34 +477,39 @@ class TestFastSyncUtils(TestCase):
         self.assertEqual(check_config_mock.call_count, 2)
 
         self.assertDictEqual(
-            vars(args), {
+            vars(args),
+            {
                 'tables': {'schema.table_1', 'schema.table_2'},
                 'tap': {},
                 'target': {},
                 'transform': {},
                 'properties': {},
-                'temp_dir': './'
-            }
+                'temp_dir': './',
+            },
         )
 
     @mock.patch('pipelinewise.fastsync.commons.utils.get_tables_from_properties')
     @mock.patch('pipelinewise.fastsync.commons.utils.check_config')
     @mock.patch('pipelinewise.fastsync.commons.utils.load_json')
     @mock.patch('argparse.ArgumentParser.parse_args')
-    def test_parse_args_with_all_tables(self, mock_args, load_json_mock, check_config_mock, get_tables_prop_mock):
+    def test_parse_args_with_all_tables(
+        self, mock_args, load_json_mock, check_config_mock, get_tables_prop_mock
+    ):
         """
         test args parsing:
             all selected tables are specified
         """
-        mock_args.return_value = argparse.Namespace(**{
-            'tap': './tap.yml',
-            'properties': './prop.json',
-            'transform': None,
-            'drop_pg_slot': True,
-            'target': './target.yml',
-            'tables': 'schema.table_1,schema.table_2',
-            'temp_dir': './'
-        })
+        mock_args.return_value = argparse.Namespace(
+            **{
+                'tap': './tap.yml',
+                'properties': './prop.json',
+                'transform': None,
+                'drop_pg_slot': True,
+                'target': './target.yml',
+                'tables': 'schema.table_1,schema.table_2',
+                'temp_dir': './',
+            }
+        )
 
         load_json_mock.return_value = {}
         check_config_mock.return_value = None
@@ -482,34 +522,39 @@ class TestFastSyncUtils(TestCase):
         self.assertEqual(check_config_mock.call_count, 2)
 
         self.assertDictEqual(
-            vars(args), {
+            vars(args),
+            {
                 'tables': {'schema.table_1', 'schema.table_2'},
                 'drop_pg_slot': True,
                 'tap': {},
                 'target': {},
                 'transform': {},
                 'properties': {},
-                'temp_dir': './'
-            }
+                'temp_dir': './',
+            },
         )
 
     @mock.patch('pipelinewise.fastsync.commons.utils.get_tables_from_properties')
     @mock.patch('pipelinewise.fastsync.commons.utils.check_config')
     @mock.patch('pipelinewise.fastsync.commons.utils.load_json')
     @mock.patch('argparse.ArgumentParser.parse_args')
-    def test_parse_args_with_table_found(self, mock_args, load_json_mock, check_config_mock, get_tables_prop_mock):
+    def test_parse_args_with_table_found(
+        self, mock_args, load_json_mock, check_config_mock, get_tables_prop_mock
+    ):
         """
         test args parsing:
             one table is specified out of 2, this should return a drop_pg_slot = False
         """
-        mock_args.return_value = argparse.Namespace(**{
-            'tap': './tap.yml',
-            'properties': './prop.json',
-            'transform': None,
-            'target': './target.yml',
-            'tables': 'schema.table_2',
-            'temp_dir': './'
-        })
+        mock_args.return_value = argparse.Namespace(
+            **{
+                'tap': './tap.yml',
+                'properties': './prop.json',
+                'transform': None,
+                'target': './target.yml',
+                'tables': 'schema.table_2',
+                'temp_dir': './',
+            }
+        )
 
         load_json_mock.return_value = {}
         check_config_mock.return_value = None
@@ -522,34 +567,38 @@ class TestFastSyncUtils(TestCase):
         self.assertEqual(check_config_mock.call_count, 2)
 
         self.assertDictEqual(
-            vars(args), {
+            vars(args),
+            {
                 'tables': {'schema.table_2'},
                 'tap': {},
                 'target': {},
                 'transform': {},
                 'properties': {},
-                'temp_dir': './'
-            }
+                'temp_dir': './',
+            },
         )
 
     @mock.patch('pipelinewise.fastsync.commons.utils.get_tables_from_properties')
     @mock.patch('pipelinewise.fastsync.commons.utils.check_config')
     @mock.patch('pipelinewise.fastsync.commons.utils.load_json')
     @mock.patch('argparse.ArgumentParser.parse_args')
-    def test_parse_args_with_table_not_selected(self, mock_args, load_json_mock, check_config_mock,
-                                                get_tables_prop_mock):
+    def test_parse_args_with_table_not_selected(
+        self, mock_args, load_json_mock, check_config_mock, get_tables_prop_mock
+    ):
         """
         test args parsing:
             one table not found in selected tables, this should throw a  NotSelectedTableException exception
         """
-        mock_args.return_value = argparse.Namespace(**{
-            'tap': './tap.yml',
-            'properties': './prop.json',
-            'transform': None,
-            'target': './target.yml',
-            'tables': 'schema.table_not_selected',
-            'temp_dir': './'
-        })
+        mock_args.return_value = argparse.Namespace(
+            **{
+                'tap': './tap.yml',
+                'properties': './prop.json',
+                'transform': None,
+                'target': './target.yml',
+                'tables': 'schema.table_not_selected',
+                'temp_dir': './',
+            }
+        )
 
         load_json_mock.return_value = {}
         check_config_mock.return_value = None
@@ -570,9 +619,15 @@ class TestFastSyncUtils(TestCase):
         # including timestamps with milliseconds and random generated string
         #
         # Example: pipelinewise_tap_table_20210316-111338-878470_fastsync_L5C6VG9W.csv.gz
-        self.assertRegex(utils.gen_export_filename('tap', 'table'),
-                         r'pipelinewise_tap_table_(\d{8})-(\d{6})-(\d{6})_fastsync_(.{8}).csv.gz')
+        self.assertRegex(
+            utils.gen_export_filename('tap', 'table'),
+            r'pipelinewise_tap_table_(\d{8})-(\d{6})-(\d{6})_fastsync_(.{8}).csv.gz',
+        )
 
         # Generate filename with custom suffic, postfix and extension
-        self.assertEqual(utils.gen_export_filename('tap', 'table', suffix='suffix', postfix='postfix', ext='ext'),
-                         'pipelinewise_tap_table_suffix_fastsync_postfix.ext')
+        self.assertEqual(
+            utils.gen_export_filename(
+                'tap', 'table', suffix='suffix', postfix='postfix', ext='ext'
+            ),
+            'pipelinewise_tap_table_suffix_fastsync_postfix.ext',
+        )

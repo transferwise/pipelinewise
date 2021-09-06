@@ -1,6 +1,9 @@
 import unittest
 
-from pipelinewise.fastsync.commons.transform_utils import TransformationHelper, SQLFlavor
+from pipelinewise.fastsync.commons.transform_utils import (
+    TransformationHelper,
+    SQLFlavor,
+)
 
 
 class TestTransformHelper(unittest.TestCase):
@@ -17,9 +20,9 @@ class TestTransformHelper(unittest.TestCase):
 
         transformations = []
 
-        trans = TransformationHelper.get_trans_in_sql_flavor(table_name,
-                                                             transformations,
-                                                             SQLFlavor('snowflake'))
+        trans = TransformationHelper.get_trans_in_sql_flavor(
+            table_name, transformations, SQLFlavor('snowflake')
+        )
         self.assertFalse(trans)
 
     def test_get_trans_in_sql_case2(self):
@@ -31,9 +34,9 @@ class TestTransformHelper(unittest.TestCase):
 
         transformations = []
 
-        trans = TransformationHelper.get_trans_in_sql_flavor(table_name,
-                                                             transformations,
-                                                             SQLFlavor('postgres'))
+        trans = TransformationHelper.get_trans_in_sql_flavor(
+            table_name, transformations, SQLFlavor('postgres')
+        )
         self.assertFalse(trans)
 
     def test_get_trans_in_sql_case3(self):
@@ -47,19 +50,19 @@ class TestTransformHelper(unittest.TestCase):
             {
                 'field_id': 'col_7',
                 'tap_stream_name': 'public-my_table',
-                'type': 'RANDOM'
+                'type': 'RANDOM',
             },
             {
                 'field_id': 'col_1',
                 'tap_stream_name': 'public-my_other_table',
-                'type': 'HASH'
-            }
+                'type': 'HASH',
+            },
         ]
 
         with self.assertRaises(ValueError):
-            TransformationHelper.get_trans_in_sql_flavor(table_name,
-                                                         transformations,
-                                                         SQLFlavor('snowflake'))
+            TransformationHelper.get_trans_in_sql_flavor(
+                table_name, transformations, SQLFlavor('snowflake')
+            )
 
     def test_get_trans_in_sql_case4(self):
         """
@@ -72,75 +75,59 @@ class TestTransformHelper(unittest.TestCase):
             {
                 'field_id': 'col_1',
                 'tap_stream_name': 'public-my_table',
-                'type': 'SET-NULL'
+                'type': 'SET-NULL',
             },
             {
                 'field_id': 'col_2',
                 'tap_stream_name': 'public-my_table',
-                'type': 'MASK-HIDDEN'
+                'type': 'MASK-HIDDEN',
             },
             {
                 'field_id': 'col_3',
                 'tap_stream_name': 'public-my_table',
-                'type': 'MASK-DATE'
+                'type': 'MASK-DATE',
             },
             {
                 'field_id': 'col_4',
                 'tap_stream_name': 'public-my_table',
                 'safe_field_id': '"COL_4"',
-                'type': 'MASK-NUMBER'
+                'type': 'MASK-NUMBER',
             },
-            {
-                'field_id': 'col_5',
-                'tap_stream_name': 'public-my_table',
-                'type': 'HASH'
-            },
+            {'field_id': 'col_5', 'tap_stream_name': 'public-my_table', 'type': 'HASH'},
             {
                 'field_id': 'col_1',
                 'tap_stream_name': 'public-my_other_table',
-                'type': 'HASH'
+                'type': 'HASH',
             },
             {
                 'field_id': 'col_6',
                 'tap_stream_name': 'public-my_table',
-                'type': 'HASH-SKIP-FIRST-5'
-            }
+                'type': 'HASH-SKIP-FIRST-5',
+            },
         ]
 
         trans = TransformationHelper.get_trans_in_sql_flavor(
-            table_name,
-            transformations,
-            SQLFlavor('snowflake'))
+            table_name, transformations, SQLFlavor('snowflake')
+        )
 
         self.assertListEqual(
             trans,
             [
-                {
-                    'trans': '"COL_1" = NULL',
-                    'conditions': None
-                },
-                {
-                    'trans': '"COL_2" = \'hidden\'',
-                    'conditions': None
-                },
+                {'trans': '"COL_1" = NULL', 'conditions': None},
+                {'trans': '"COL_2" = \'hidden\'', 'conditions': None},
                 {
                     'trans': '"COL_3" = TIMESTAMP_NTZ_FROM_PARTS(DATE_FROM_PARTS(YEAR("COL_3"), 1, 1),'
-                             'TO_TIME("COL_3"))',
-                    'conditions': None
+                    'TO_TIME("COL_3"))',
+                    'conditions': None,
                 },
-                {
-                    'trans': '"COL_4" = 0',
-                    'conditions': None
-                },
-                {
-                    'trans': '"COL_5" = SHA2("COL_5", 256)',
-                    'conditions': None
-                },
+                {'trans': '"COL_4" = 0', 'conditions': None},
+                {'trans': '"COL_5" = SHA2("COL_5", 256)', 'conditions': None},
                 {
                     'trans': '"COL_6" = CONCAT(SUBSTRING("COL_6", 1, 5), SHA2(SUBSTRING("COL_6", 5 + 1), 256))',
-                    'conditions': None
-                }
-            ])
+                    'conditions': None,
+                },
+            ],
+        )
 
     def test_get_trans_in_sql_case5(self):
         """
@@ -153,82 +140,69 @@ class TestTransformHelper(unittest.TestCase):
             {
                 'field_id': 'col_1',
                 'tap_stream_name': 'public-my_table',
-                'type': 'SET-NULL'
+                'type': 'SET-NULL',
             },
             {
                 'field_id': 'col_2',
                 'tap_stream_name': 'public-my_table',
-                'type': 'MASK-HIDDEN'
+                'type': 'MASK-HIDDEN',
             },
             {
                 'field_id': 'col_3',
                 'tap_stream_name': 'public-my_table',
-                'type': 'MASK-DATE'
+                'type': 'MASK-DATE',
             },
             {
                 'field_id': 'col_4',
                 'tap_stream_name': 'public-my_table',
                 'safe_field_id': '"COL_4"',
-                'type': 'MASK-NUMBER'
+                'type': 'MASK-NUMBER',
             },
-            {
-                'field_id': 'col_5',
-                'tap_stream_name': 'public-my_table',
-                'type': 'HASH'
-            },
+            {'field_id': 'col_5', 'tap_stream_name': 'public-my_table', 'type': 'HASH'},
             {
                 'field_id': 'col_1',
                 'tap_stream_name': 'public-my_other_table',
-                'type': 'HASH'
+                'type': 'HASH',
             },
             {
                 'field_id': 'col_6',
                 'tap_stream_name': 'public-my_table',
-                'type': 'HASH-SKIP-FIRST-5'
-            }
+                'type': 'HASH-SKIP-FIRST-5',
+            },
         ]
 
         trans = TransformationHelper.get_trans_in_sql_flavor(
-            table_name,
-            transformations,
-            SQLFlavor('postgres'))
+            table_name, transformations, SQLFlavor('postgres')
+        )
 
         self.assertListEqual(
             trans,
             [
-                {
-                    'trans': '"col_1" = NULL',
-                    'conditions': None
-                },
-                {
-                    'trans': '"col_2" = \'hidden\'',
-                    'conditions': None
-                },
+                {'trans': '"col_1" = NULL', 'conditions': None},
+                {'trans': '"col_2" = \'hidden\'', 'conditions': None},
                 {
                     'trans': '"col_3" = MAKE_TIMESTAMP('
-                             'DATE_PART(\'year\', "col_3")::int, '
-                             '1, '
-                             '1, '
-                             'DATE_PART(\'hour\', "col_3")::int, '
-                             'DATE_PART(\'minute\', "col_3")::int, '
-                             'DATE_PART(\'second\', "col_3")::double precision'
-                             ')',
-                    'conditions': None
+                    'DATE_PART(\'year\', "col_3")::int, '
+                    '1, '
+                    '1, '
+                    'DATE_PART(\'hour\', "col_3")::int, '
+                    'DATE_PART(\'minute\', "col_3")::int, '
+                    'DATE_PART(\'second\', "col_3")::double precision'
+                    ')',
+                    'conditions': None,
                 },
-                {
-                    'trans': '"col_4" = 0',
-                    'conditions': None
-                },
+                {'trans': '"col_4" = 0', 'conditions': None},
                 {
                     'trans': '"col_5" = ENCODE(DIGEST("col_5", \'sha256\'), \'hex\')',
-                    'conditions': None
+                    'conditions': None,
                 },
                 {
                     'trans': '"col_6" = CONCAT(SUBSTRING("col_6", 1, 5), '
-                             'ENCODE(DIGEST(SUBSTRING("col_6", 5 + 1), \'sha256\'), \'hex\'))',
-                    'conditions': None
-                }
-            ])
+                    'ENCODE(DIGEST(SUBSTRING("col_6", 5 + 1), \'sha256\'), \'hex\'))',
+                    'conditions': None,
+                },
+            ],
+        )
 
     def test_get_trans_in_sql_case6(self):
         """
@@ -241,70 +215,50 @@ class TestTransformHelper(unittest.TestCase):
             {
                 'field_id': 'col_1',
                 'tap_stream_name': 'public-my_table',
-                'type': 'SET-NULL'
+                'type': 'SET-NULL',
             },
             {
                 'field_id': 'col_2',
                 'tap_stream_name': 'public-my_table',
                 'type': 'MASK-HIDDEN',
                 'when': [
-                    {
-                        'column': 'col_4',
-                        'safe_column': '"COL_4"',
-                        'equals': None
-                    },
+                    {'column': 'col_4', 'safe_column': '"COL_4"', 'equals': None},
                     {
                         'column': 'col_1',
-                    }
-                ]
+                    },
+                ],
             },
             {
                 'field_id': 'col_3',
                 'tap_stream_name': 'public-my_table',
                 'type': 'MASK-DATE',
-                'when': [
-                    {
-                        'column': 'col_5',
-                        'equals': 'some_value'
-                    }
-                ]
+                'when': [{'column': 'col_5', 'equals': 'some_value'}],
             },
             {
                 'field_id': 'col_4',
                 'tap_stream_name': 'public-my_table',
-                'type': 'MASK-NUMBER'
+                'type': 'MASK-NUMBER',
             },
-            {
-                'field_id': 'col_5',
-                'tap_stream_name': 'public-my_table',
-                'type': 'HASH'
-            },
+            {'field_id': 'col_5', 'tap_stream_name': 'public-my_table', 'type': 'HASH'},
             {
                 'field_id': 'col_10',
                 'tap_stream_name': 'public-my_other_table',
-                'type': 'HASH'
+                'type': 'HASH',
             },
             {
                 'field_id': 'col_6',
                 'tap_stream_name': 'public-my_table',
                 'type': 'HASH-SKIP-FIRST-5',
                 'when': [
-                    {
-                        'column': 'col_1',
-                        'equals': 30
-                    },
-                    {
-                        'column': 'col_2',
-                        'regex_match': r'[0-9]{3}\.[0-9]{3}'
-                    }
-                ]
-            }
+                    {'column': 'col_1', 'equals': 30},
+                    {'column': 'col_2', 'regex_match': r'[0-9]{3}\.[0-9]{3}'},
+                ],
+            },
         ]
 
         trans = TransformationHelper.get_trans_in_sql_flavor(
-            table_name,
-            transformations,
-            SQLFlavor('snowflake'))
+            table_name, transformations, SQLFlavor('snowflake')
+        )
 
         self.assertListEqual(
             trans,
@@ -319,7 +273,7 @@ class TestTransformHelper(unittest.TestCase):
                 },
                 {
                     'trans': '"COL_3" = TIMESTAMP_NTZ_FROM_PARTS(DATE_FROM_PARTS(YEAR("COL_3"), 1, 1),'
-                             'TO_TIME("COL_3"))',
+                    'TO_TIME("COL_3"))',
                     'conditions': '("COL_5" = \'some_value\')',
                 },
                 {
@@ -333,9 +287,9 @@ class TestTransformHelper(unittest.TestCase):
                 {
                     'trans': '"COL_6" = CONCAT(SUBSTRING("COL_6", 1, 5), SHA2(SUBSTRING("COL_6", 5 + 1), 256))',
                     'conditions': '("COL_1" = 30) AND ("COL_2" '
-                                  'REGEXP \'[0-9]{3}\.[0-9]{3}\')',  # pylint: disable=W1401
+                    'REGEXP \'[0-9]{3}\.[0-9]{3}\')',  # pylint: disable=W1401  # noqa: W605
                 },
-            ]
+            ],
         )
 
     def test_get_trans_in_sql_case7(self):
@@ -349,70 +303,50 @@ class TestTransformHelper(unittest.TestCase):
             {
                 'field_id': 'col_1',
                 'tap_stream_name': 'public-my_table',
-                'type': 'SET-NULL'
+                'type': 'SET-NULL',
             },
             {
                 'field_id': 'col_2',
                 'tap_stream_name': 'public-my_table',
                 'type': 'MASK-HIDDEN',
                 'when': [
-                    {
-                        'column': 'col_4',
-                        'safe_column': '"COL_4"',
-                        'equals': None
-                    },
+                    {'column': 'col_4', 'safe_column': '"COL_4"', 'equals': None},
                     {
                         'column': 'col_1',
-                    }
-                ]
+                    },
+                ],
             },
             {
                 'field_id': 'col_3',
                 'tap_stream_name': 'public-my_table',
                 'type': 'MASK-DATE',
-                'when': [
-                    {
-                        'column': 'col_5',
-                        'equals': 'some_value'
-                    }
-                ]
+                'when': [{'column': 'col_5', 'equals': 'some_value'}],
             },
             {
                 'field_id': 'col_4',
                 'tap_stream_name': 'public-my_table',
-                'type': 'MASK-NUMBER'
+                'type': 'MASK-NUMBER',
             },
-            {
-                'field_id': 'col_5',
-                'tap_stream_name': 'public-my_table',
-                'type': 'HASH'
-            },
+            {'field_id': 'col_5', 'tap_stream_name': 'public-my_table', 'type': 'HASH'},
             {
                 'field_id': 'col_10',
                 'tap_stream_name': 'public-my_other_table',
-                'type': 'HASH'
+                'type': 'HASH',
             },
             {
                 'field_id': 'col_6',
                 'tap_stream_name': 'public-my_table',
                 'type': 'HASH-SKIP-FIRST-5',
                 'when': [
-                    {
-                        'column': 'col_1',
-                        'equals': 30
-                    },
-                    {
-                        'column': 'col_2',
-                        'regex_match': r'[0-9]{3}\.[0-9]{3}'
-                    }
-                ]
-            }
+                    {'column': 'col_1', 'equals': 30},
+                    {'column': 'col_2', 'regex_match': r'[0-9]{3}\.[0-9]{3}'},
+                ],
+            },
         ]
 
         trans = TransformationHelper.get_trans_in_sql_flavor(
-            table_name,
-            transformations,
-            SQLFlavor('postgres'))
+            table_name, transformations, SQLFlavor('postgres')
+        )
 
         self.assertListEqual(
             trans,
@@ -427,13 +361,13 @@ class TestTransformHelper(unittest.TestCase):
                 },
                 {
                     'trans': '"col_3" = MAKE_TIMESTAMP('
-                             'DATE_PART(\'year\', "col_3")::int, '
-                             '1, '
-                             '1, '
-                             'DATE_PART(\'hour\', "col_3")::int, '
-                             'DATE_PART(\'minute\', "col_3")::int, '
-                             'DATE_PART(\'second\', "col_3")::double precision'
-                             ')',
+                    'DATE_PART(\'year\', "col_3")::int, '
+                    '1, '
+                    '1, '
+                    'DATE_PART(\'hour\', "col_3")::int, '
+                    'DATE_PART(\'minute\', "col_3")::int, '
+                    'DATE_PART(\'second\', "col_3")::double precision'
+                    ')',
                     'conditions': '("col_5" = \'some_value\')',
                 },
                 {
@@ -446,8 +380,8 @@ class TestTransformHelper(unittest.TestCase):
                 },
                 {
                     'trans': '"col_6" = CONCAT(SUBSTRING("col_6", 1, 5), ENCODE(DIGEST(SUBSTRING("col_6", 5 + 1), '
-                             '\'sha256\'), \'hex\'))',
-                    'conditions': '("col_1" = 30) AND ("col_2" ~ \'[0-9]{3}\.[0-9]{3}\')',  # pylint: disable=W1401
+                    '\'sha256\'), \'hex\'))',
+                    'conditions': '("col_1" = 30) AND ("col_2" ~ \'[0-9]{3}\.[0-9]{3}\')',  # pylint: disable=W1401  # noqa: W605, E501
                 },
-            ]
+            ],
         )

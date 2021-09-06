@@ -9,6 +9,7 @@ class BaseAlertHandler(ABC):
     """
     Abstract base class for alert handlers
     """
+
     LOG = 'log'
     INFO = 'info'
     WARNING = 'warning'

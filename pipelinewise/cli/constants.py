@@ -6,6 +6,7 @@ class ConnectorType(enum.Enum):
     Enums for various Singer connector type names
     Todo: add more
     """
+
     TAP_MYSQL = 'tap-mysql'
     TAP_POSTGRES = 'tap-postgres'
     TAP_MONGODB = 'tap-mongodb'

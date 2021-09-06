@@ -9,7 +9,14 @@ import boto3
 from datetime import datetime
 from time import struct_time
 from typing import Callable, Dict, List, Optional, Set
-from messytables import (CSVTableSet, headers_guess, headers_processor, jts, offset_processor, type_guess)
+from messytables import (
+    CSVTableSet,
+    headers_guess,
+    headers_processor,
+    jts,
+    offset_processor,
+    type_guess,
+)
 from singer.utils import strptime_with_tz
 from singer_encodings import csv as singer_encodings_csv
 
@@ -26,7 +33,12 @@ class FastSyncTapS3Csv:
     """
 
     # pylint: disable=bare-except
-    def __init__(self, connection_config: Dict, tap_type_to_target_type: Callable, target_quote=None):
+    def __init__(
+        self,
+        connection_config: Dict,
+        tap_type_to_target_type: Callable,
+        target_quote=None,
+    ):
         """
         Constructor
         :param connection_config: tap connection config
@@ -34,10 +46,16 @@ class FastSyncTapS3Csv:
         """
         try:
             # Check if bucket can be accessed without credentials/assuming role
-            list(S3Helper.list_files_in_bucket(connection_config['bucket'],
-                                               connection_config.get('aws_endpoint_url', None)))
-            LOGGER.info('I have direct access to the bucket without assuming the configured role.')
-        except:
+            list(
+                S3Helper.list_files_in_bucket(
+                    connection_config['bucket'],
+                    connection_config.get('aws_endpoint_url', None),
+                )
+            )
+            LOGGER.info(
+                'I have direct access to the bucket without assuming the configured role.'
+            )
+        except Exception:
             # Setup AWS session
             S3Helper.setup_aws_client(connection_config)
 
@@ -48,7 +66,12 @@ class FastSyncTapS3Csv:
 
     def _find_table_spec_by_name(self, table_name: str) -> Dict:
         # look in tables array for the full specs dict of given table
-        return next(filter(lambda x: x['table_name'] == table_name, self.connection_config['tables']))
+        return next(
+            filter(
+                lambda x: x['table_name'] == table_name,
+                self.connection_config['tables'],
+            )
+        )
 
     def copy_table(self, table_name: str, file_path: str) -> None:
         """
@@ -67,7 +90,9 @@ class FastSyncTapS3Csv:
         modified_since = strptime_with_tz(self.connection_config['start_date'])
 
         # get all the files in the bucket that match the criteria and were modified after start date
-        s3_files = S3Helper.get_input_files_for_table(self.connection_config, table_spec, modified_since)
+        s3_files = S3Helper.get_input_files_for_table(
+            self.connection_config, table_spec, modified_since
+        )
 
         # variable to hold all the records from all matching files
         records = []
@@ -84,7 +109,10 @@ class FastSyncTapS3Csv:
             self._get_file_records(s3_file['key'], table_spec, records, headers)
 
             # check if the current file has the most recent modification date
-            if max_last_modified is None or max_last_modified < s3_file['last_modified']:
+            if (
+                max_last_modified is None
+                or max_last_modified < s3_file['last_modified']
+            ):
                 max_last_modified = s3_file['last_modified']
 
         # add the found last modified date to the dictionary
@@ -93,19 +121,23 @@ class FastSyncTapS3Csv:
         # write to the given compressed csv file
         with gzip.open(file_path, 'wt') as gzfile:
 
-            writer = csv.DictWriter(gzfile,
-                                    fieldnames=sorted(list(headers)),
-                                    # we need to sort the headers so that copying into snowflake works
-                                    delimiter=',',
-                                    quotechar='"',
-                                    quoting=csv.QUOTE_MINIMAL)
+            writer = csv.DictWriter(
+                gzfile,
+                fieldnames=sorted(list(headers)),
+                # we need to sort the headers so that copying into snowflake works
+                delimiter=',',
+                quotechar='"',
+                quoting=csv.QUOTE_MINIMAL,
+            )
             # write the header
             writer.writeheader()
             # write all records at once
             writer.writerows(records)
 
     # pylint: disable=too-many-locals
-    def _get_file_records(self, s3_path: str, table_spec: Dict, records: List[Dict], headers: Set) -> None:
+    def _get_file_records(
+        self, s3_path: str, table_spec: Dict, records: List[Dict], headers: Set
+    ) -> None:
         """
         Reads the file in s3_path and inserts the rows in records
         :param config: tap connection configuration
@@ -129,7 +161,9 @@ class FastSyncTapS3Csv:
         csv.field_size_limit(sys.maxsize)
 
         # pylint:disable=protected-access
-        iterator = singer_encodings_csv.get_row_iterator(s3_file_handle._raw_stream, table_spec)
+        iterator = singer_encodings_csv.get_row_iterator(
+            s3_file_handle._raw_stream, table_spec
+        )
 
         records_copied = len(records)
 
@@ -141,7 +175,7 @@ class FastSyncTapS3Csv:
                 S3Helper.SDC_SOURCE_LINENO_COLUMN: records_copied + 1,
                 '_SDC_EXTRACTED_AT': now_datetime,
                 '_SDC_BATCHED_AT': now_datetime,
-                '_SDC_DELETED_AT': None
+                '_SDC_DELETED_AT': None,
             }
 
             new_row = {}
@@ -171,20 +205,26 @@ class FastSyncTapS3Csv:
 
         # use timestamp as a type instead if column is set in date_overrides configuration
         mapped_columns = []
-        date_overrides = None if 'date_overrides' not in specs \
-            else {safe_column_name(c, self.target_quote) for c in specs['date_overrides']}
+        date_overrides = (
+            None
+            if 'date_overrides' not in specs
+            else {
+                safe_column_name(c, self.target_quote) for c in specs['date_overrides']
+            }
+        )
 
         for column_name, column_type in csv_columns:
 
             if date_overrides and column_name in date_overrides:
-                mapped_columns.append(f'{column_name} {self.tap_type_to_target_type("date_override")}')
+                mapped_columns.append(
+                    f'{column_name} {self.tap_type_to_target_type("date_override")}'
+                )
             else:
-                mapped_columns.append(f'{column_name} {self.tap_type_to_target_type(column_type)}')
+                mapped_columns.append(
+                    f'{column_name} {self.tap_type_to_target_type(column_type)}'
+                )
 
-        return {
-            'columns': mapped_columns,
-            'primary_key': self._get_primary_keys(specs)
-        }
+        return {'columns': mapped_columns, 'primary_key': self._get_primary_keys(specs)}
 
     def _get_table_columns(self, csv_file_path: str) -> zip:
         """
@@ -203,12 +243,15 @@ class FastSyncTapS3Csv:
 
             row_set.register_processor(offset_processor(offset + 1))
 
-            types = list(map(jts.celltype_as_string, type_guess(row_set.sample, strict=True)))
+            types = list(
+                map(jts.celltype_as_string, type_guess(row_set.sample, strict=True))
+            )
             return zip(headers, types)
 
     # pylint: disable=invalid-name
-    def fetch_current_incremental_key_pos(self, table: str,
-                                          replication_key: Optional[str] = 'modified_since') -> Optional[Dict]:
+    def fetch_current_incremental_key_pos(
+        self, table: str, replication_key: Optional[str] = 'modified_since'
+    ) -> Optional[Dict]:
         """
         Returns the last time a the table has been modified in ISO format.
         :param table: table name
@@ -217,9 +260,11 @@ class FastSyncTapS3Csv:
         """
         replication_key = 'modified_since'
 
-        return {
-            replication_key: self.tables_last_modified[table].isoformat()
-        } if table in self.tables_last_modified else {}
+        return (
+            {replication_key: self.tables_last_modified[table].isoformat()}
+            if table in self.tables_last_modified
+            else {}
+        )
 
     def _get_primary_keys(self, table_specs: Dict) -> Optional[List]:
         """
@@ -229,7 +274,10 @@ class FastSyncTapS3Csv:
         :return: the keys concatenated and separated by comma if keys are given, otherwise None
         """
         if table_specs.get('key_properties', False):
-            return [safe_column_name(k, self.target_quote) for k in table_specs['key_properties']]
+            return [
+                safe_column_name(k, self.target_quote)
+                for k in table_specs['key_properties']
+            ]
 
         return None
 
@@ -240,6 +288,7 @@ class S3Helper:
     """
     S3 helper methods
     """
+
     SDC_SOURCE_BUCKET_COLUMN = '_sdc_source_bucket'
     SDC_SOURCE_FILE_COLUMN = '_sdc_source_file'
     SDC_SOURCE_LINENO_COLUMN = '_sdc_source_lineno'
@@ -254,9 +303,15 @@ class S3Helper:
         LOGGER.info('Attempting to create AWS session')
 
         # Get the required parameters from config file and/or environment variables
-        aws_access_key_id = config.get('aws_access_key_id') or os.environ.get('AWS_ACCESS_KEY_ID')
-        aws_secret_access_key = config.get('aws_secret_access_key') or os.environ.get('AWS_SECRET_ACCESS_KEY')
-        aws_session_token = config.get('aws_session_token') or os.environ.get('AWS_SESSION_TOKEN')
+        aws_access_key_id = config.get('aws_access_key_id') or os.environ.get(
+            'AWS_ACCESS_KEY_ID'
+        )
+        aws_secret_access_key = config.get('aws_secret_access_key') or os.environ.get(
+            'AWS_SECRET_ACCESS_KEY'
+        )
+        aws_session_token = config.get('aws_session_token') or os.environ.get(
+            'AWS_SESSION_TOKEN'
+        )
         aws_profile = config.get('aws_profile') or os.environ.get('AWS_PROFILE')
 
         # AWS credentials based authentication
@@ -264,14 +319,16 @@ class S3Helper:
             boto3.setup_default_session(
                 aws_access_key_id=aws_access_key_id,
                 aws_secret_access_key=aws_secret_access_key,
-                aws_session_token=aws_session_token
+                aws_session_token=aws_session_token,
             )
         # AWS Profile based authentication, will use IAM role if no profile is found
         else:
             boto3.setup_default_session(profile_name=aws_profile)
 
     @classmethod
-    def get_input_files_for_table(cls, config: Dict, table_spec: Dict, modified_since: struct_time = None):
+    def get_input_files_for_table(
+        cls, config: Dict, table_spec: Dict, modified_since: struct_time = None
+    ):
         bucket = config['bucket']
         prefix = table_spec.get('search_prefix')
         pattern = table_spec['search_pattern']
@@ -279,10 +336,14 @@ class S3Helper:
         try:
             matcher = re.compile(pattern)
         except re.error as exc:
-            raise ValueError((f'search_pattern for table `{table_spec["table_name"]}` is not a valid regular '
-                              'expression. See '
-                              'https://docs.python.org/3.5/library/re.html#regular-expression-syntax'),
-                             pattern) from exc
+            raise ValueError(
+                (
+                    f'search_pattern for table `{table_spec["table_name"]}` is not a valid regular '
+                    'expression. See '
+                    'https://docs.python.org/3.5/library/re.html#regular-expression-syntax'
+                ),
+                pattern,
+            ) from exc
 
         LOGGER.info('Checking bucket "%s" for keys matching "%s"', bucket, pattern)
 
@@ -290,7 +351,9 @@ class S3Helper:
         unmatched_files_count = 0
         max_files_before_log = 30000
 
-        for s3_object in cls.list_files_in_bucket(bucket, prefix, aws_endpoint_url=config.get('aws_endpoint_url')):
+        for s3_object in cls.list_files_in_bucket(
+            bucket, prefix, aws_endpoint_url=config.get('aws_endpoint_url')
+        ):
             key = s3_object['Key']
             last_modified = s3_object['LastModified']
 
@@ -302,29 +365,48 @@ class S3Helper:
             if matcher.search(key):
                 matched_files_count += 1
                 if modified_since is None or modified_since < last_modified:
-                    LOGGER.info('Will download key "%s" as it was last modified %s', key, last_modified)
+                    LOGGER.info(
+                        'Will download key "%s" as it was last modified %s',
+                        key,
+                        last_modified,
+                    )
                     yield {'key': key, 'last_modified': last_modified}
             else:
                 unmatched_files_count += 1
 
-            if (unmatched_files_count + matched_files_count) % max_files_before_log == 0:
+            if (
+                unmatched_files_count + matched_files_count
+            ) % max_files_before_log == 0:
                 # Are we skipping greater than 50% of the files?
                 # pylint: disable=old-division
-                if (unmatched_files_count / (matched_files_count + unmatched_files_count)) > 0.5:
-                    LOGGER.info('Found %s matching files and %s non-matching files. '
-                                'You should consider adding a `search_prefix` to the config '
-                                'or removing non-matching files from the bucket.',
-                                matched_files_count, unmatched_files_count)
+                if (
+                    unmatched_files_count
+                    / (matched_files_count + unmatched_files_count)
+                ) > 0.5:
+                    LOGGER.info(
+                        'Found %s matching files and %s non-matching files. '
+                        'You should consider adding a `search_prefix` to the config '
+                        'or removing non-matching files from the bucket.',
+                        matched_files_count,
+                        unmatched_files_count,
+                    )
                 else:
-                    LOGGER.info('Found %s matching files and %s non-matching files',
-                                matched_files_count, unmatched_files_count)
+                    LOGGER.info(
+                        'Found %s matching files and %s non-matching files',
+                        matched_files_count,
+                        unmatched_files_count,
+                    )
 
         if matched_files_count == 0:
             if prefix:
-                raise Exception(f'No files found in bucket "{bucket}" '
-                                f'that matches prefix "{prefix}" and pattern "{pattern}"')
+                raise Exception(
+                    f'No files found in bucket "{bucket}" '
+                    f'that matches prefix "{prefix}" and pattern "{pattern}"'
+                )
 
-            raise Exception(f'No files found in bucket "{bucket}" that matches pattern "{pattern}"')
+            raise Exception(
+                f'No files found in bucket "{bucket}" that matches pattern "{pattern}"'
+            )
 
     @classmethod
     @retry_pattern()
@@ -356,7 +438,11 @@ class S3Helper:
         if s3_object_count > 0:
             LOGGER.info('Found %s files.', s3_object_count)
         else:
-            LOGGER.info('Found no files for bucket "%s" that match prefix "%s"', bucket, search_prefix)
+            LOGGER.info(
+                'Found no files for bucket "%s" that match prefix "%s"',
+                bucket,
+                search_prefix,
+            )
 
     @classmethod
     @retry_pattern()
