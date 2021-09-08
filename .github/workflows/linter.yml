@@ -46,3 +46,10 @@ jobs:
       - name: Pylinting
         if: steps.check.outcome == 'failure'
         run: pylint pipelinewise tests
+
+      - name: Pep8
+        if: steps.check.outcome == 'failure'
+        run: |
+          # stop the build if there are Python syntax errors or undefined names
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 . --count --max-complexity=15 --max-line-length=120 --statistics

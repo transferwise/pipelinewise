@@ -40,6 +40,7 @@ setup(name='pipelinewise',
       ],
       extras_require={
           'test': [
+              'flake8==3.9.2',
               'pytest==6.2.4',
               'pytest-dependency==0.4.0',
               'pytest-cov==2.12.1',
