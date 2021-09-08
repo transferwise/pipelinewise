@@ -10,7 +10,7 @@ include = ["pipelinewise/cli/schemas/*.json", "pipelinewise/logging.conf"]
 exclude = ["tests*"]
 
 [tool.poetry.dependencies]
-python = "3.8"
+python = "^3.8"
 ansible = "==2.7.16"
 argparse = "==1.4.0"
 idna = "==2.7"
@@ -27,10 +27,10 @@ python-pidfile = "==3.0.0"
 pyyaml = "==5.1.0"
 singer-encodings = "==0.0.*"
 slackclient = "==2.7.*"
-snowflake-connector-python = "==2.0.3"
 tabulate = "==0.8.2"
 tzlocal = "==2.0.*"
 ujson = "==2.0.*"
+snowflake-connector-python = {version = "2.4.6", extras = ["pandas"]}
 
 [tool.poetry.dev-dependencies]
 coverage = {version = "==4.5.3", optional = true}
