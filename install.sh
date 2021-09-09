@@ -61,6 +61,9 @@ make_virtualenv() {
     source $VENV_DIR/$1/bin/activate
     python3 -m pip install --upgrade pip setuptools wheel
 
+    if [ -f "pre_requirements.txt" ]; then
+        python3 -m pip install --upgrade -r pre_requirements.txt
+    fi
     if [ -f "requirements.txt" ]; then
         python3 -m pip install --upgrade -r requirements.txt
     fi
