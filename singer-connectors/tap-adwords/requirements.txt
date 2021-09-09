@@ -1,2 +1,1 @@
-setuptools<=57.0.5
 tap-adwords==1.11.2
