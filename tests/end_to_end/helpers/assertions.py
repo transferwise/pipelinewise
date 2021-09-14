@@ -240,7 +240,7 @@ def assert_row_counts_equal(
     assert row_counts_in_target == row_counts_in_source
 
 
-# pylint: disable=too-many-locals
+# pylint: disable=too-many-locals,too-many-statements
 def assert_all_columns_exist(
     tap_query_runner_fn: callable,
     target_query_runner_fn: callable,
