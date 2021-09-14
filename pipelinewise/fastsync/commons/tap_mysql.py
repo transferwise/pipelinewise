@@ -2,11 +2,14 @@ import csv
 import datetime
 import decimal
 import logging
+from typing import Dict, Callable
+
 import pymysql
 
 from pymysql import InterfaceError, OperationalError
 
 from . import utils, split_gzip
+from .type_mapping import SUPPORTED_MYSQL_DATATYPES
 from ...utils import safe_column_name
 
 LOGGER = logging.getLogger(__name__)
@@ -27,7 +30,7 @@ class FastSyncTapMySql:
     """
 
     def __init__(self, connection_config, tap_type_to_target_type, target_quote=None):
-        self.connection_config = connection_config
+        self.connection_config: Dict = connection_config
         self.connection_config['charset'] = connection_config.get(
             'charset', DEFAULT_CHARSET
         )
@@ -37,7 +40,7 @@ class FastSyncTapMySql:
         self.connection_config['session_sqls'] = connection_config.get(
             'session_sqls', DEFAULT_SESSION_SQLS
         )
-        self.tap_type_to_target_type = tap_type_to_target_type
+        self.tap_type_to_target_type: Callable = tap_type_to_target_type
         self.target_quote = target_quote
         self.conn = None
         self.conn_unbuffered = None
@@ -268,8 +271,6 @@ class FastSyncTapMySql:
                             data_type,
                             column_type,
                             CASE
-                            WHEN data_type IN ('blob', 'tinyblob', 'mediumblob', 'longblob')
-                                    THEN CONCAT('REPLACE(hex(`', column_name, '`)', ", '\n', ' ')")
                             WHEN data_type IN ('binary', 'varbinary')
                                     THEN concat('REPLACE(REPLACE(hex(trim(trailing CHAR(0x00) from `',COLUMN_NAME,'`))', ", '\n', ' '), '\r', '')")
                             WHEN data_type IN ('bit')
@@ -293,7 +294,9 @@ class FastSyncTapMySql:
                             ordinal_position
                     FROM information_schema.columns
                     WHERE table_schema = '{schema_name}'
-                        AND table_name = '{table_name}') x
+                        AND table_name = '{table_name}'
+                        AND data_type IN ('{"','".join(SUPPORTED_MYSQL_DATATYPES)}')
+                    ) x
                 ORDER BY
                         ordinal_position
             """  # noqa: E501
