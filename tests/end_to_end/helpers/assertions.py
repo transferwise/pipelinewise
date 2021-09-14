@@ -311,11 +311,39 @@ def assert_all_columns_exist(
         target_cols_dict = _cols_list_to_dict(target_cols)
         print(target_cols_dict)
         for col_name, col_props in source_cols_dict.items():
-            # Check if column exists in the target table
 
+            # Check if ignored column not in the target table
             if ignore_cols and col_name in ignore_cols:
-                continue
+                try:
+                    assert col_name not in target_cols_dict
+                    continue
+                except AssertionError as ex:
+                    ex.args += (
+                        'Error',
+                        f'{col_name} column is ignored but has been found in target table {table_to_check}',
+                    )
+                    raise
 
+            exp_col_type = None
+
+            # if column mapping returns None, then we know this column type is unsupported in source and
+            # shouldn't exist in the target table
+            if column_type_mapper_fn:
+                exp_col_type = column_type_mapper_fn(col_props['type'], col_props['type_extra'])
+
+                if exp_col_type is None:
+                    try:
+                        assert col_name not in target_cols_dict
+                        continue
+                    except AssertionError as ex:
+                        ex.args += (
+                            'Error',
+                            f'{col_name} column is of an unsupported type but has been '
+                            f'found in target table {table_to_check}',
+                        )
+                        raise
+
+            # Check if column exists in the target table
             try:
                 assert col_name in target_cols_dict
             except AssertionError as ex:
@@ -325,18 +353,11 @@ def assert_all_columns_exist(
                 )
                 raise
 
-            # Check if column type is expected in the target table, if mapper function provided
-            if column_type_mapper_fn:
+            # Check if column type has been mapped correctly in the target table
+            if exp_col_type:
+                act_col_type = target_cols_dict[col_name]['type'].lower()
+                exp_col_type = exp_col_type.replace(' NULL', '').lower()
                 try:
-                    target_col = target_cols_dict[col_name]
-                    exp_col_type = (
-                        column_type_mapper_fn(
-                            col_props['type'], col_props['type_extra']
-                        )
-                        .replace(' NULL', '')
-                        .lower()
-                    )
-                    act_col_type = target_col['type'].lower()
                     assert act_col_type == exp_col_type
                 except AssertionError as ex:
                     ex.args += (
