@@ -2,7 +2,7 @@ import glob
 import os
 import re
 
-from typing import List, Set, Union
+from typing import List, Set, Union, Any, Dict
 from pathlib import Path
 
 from . import tasks
@@ -240,12 +240,12 @@ def assert_row_counts_equal(
     assert row_counts_in_target == row_counts_in_source
 
 
-# pylint: disable=too-many-locals,too-many-statements
+# pylint: disable=too-many-locals
 def assert_all_columns_exist(
-    tap_query_runner_fn: callable,
-    target_query_runner_fn: callable,
-    column_type_mapper_fn: callable = None,
-    ignore_cols: Union[Set, List] = None,
+        tap_query_runner_fn: callable,
+        target_query_runner_fn: callable,
+        column_type_mapper_fn: callable = None,
+        ignore_cols: Union[Set, List] = None,
 ) -> None:
     """Takes two query runner methods, gets the columns list for every table in both the
     source and target database and tests if every column in source exists in the target database.
@@ -310,20 +310,37 @@ def assert_all_columns_exist(
         source_cols_dict = _cols_list_to_dict(source_cols)
         target_cols_dict = _cols_list_to_dict(target_cols)
         print(target_cols_dict)
-        for col_name, col_props in source_cols_dict.items():
+        assert_table_structure_is_same_in_target(
+            table_to_check,
+            source_cols_dict,
+            target_cols_dict,
+            column_type_mapper_fn,
+            ignore_cols
+        )
 
-            # Check if ignored column not in the target table
-            if ignore_cols and col_name in ignore_cols:
-                try:
-                    assert col_name not in target_cols_dict
-                    continue
-                except AssertionError as ex:
-                    ex.args += (
-                        'Error',
-                        f'{col_name} column is ignored but has been found in target table {table_to_check}',
-                    )
-                    raise
 
+def assert_table_structure_is_same_in_target(
+        table_name: str,
+        source_cols_dict: Dict[str, Any],
+        target_cols_dict: Dict[str, Any],
+        column_type_mapper_fn: callable,
+        ignore_cols: set):
+    """
+    Asserts that given source table has the same structure as the target one
+    """
+    for col_name, col_props in source_cols_dict.items():
+
+        # Check if ignored column not in the target table
+        if ignore_cols and col_name in ignore_cols:
+            try:
+                assert col_name not in target_cols_dict
+            except AssertionError as ex:
+                ex.args += (
+                    'Error',
+                    f'{col_name} column is ignored but has been found in target table {table_name}',
+                )
+                raise
+        else:
             exp_col_type = None
 
             # if column mapping returns None, then we know this column type is unsupported in source and
@@ -339,7 +356,7 @@ def assert_all_columns_exist(
                         ex.args += (
                             'Error',
                             f'{col_name} column is of an unsupported type but has been '
-                            f'found in target table {table_to_check}',
+                            f'found in target table {table_name}',
                         )
                         raise
 
@@ -349,7 +366,7 @@ def assert_all_columns_exist(
             except AssertionError as ex:
                 ex.args += (
                     'Error',
-                    f'{col_name} column not found in target table {table_to_check}',
+                    f'{col_name} column not found in target table {table_name}',
                 )
                 raise
 
@@ -362,7 +379,7 @@ def assert_all_columns_exist(
                 except AssertionError as ex:
                     ex.args += (
                         'Error',
-                        f'{col_name} column type is not as expected. '
+                        f'{col_name} column type is not as expected. (table {table_name}) '
                         f'Expected: {exp_col_type} '
                         f'Actual: {act_col_type}',
                     )
