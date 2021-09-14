@@ -1,82 +1,40 @@
-
-
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" />
-  
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  
   <title>Singer.io &mdash; PipelineWise  documentation</title>
-  
-
-  
-  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
-  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
-  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
-  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
-  <link rel="stylesheet" href="../_static/css/custom.css" type="text/css" />
-
-  
-  
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/custom.css" type="text/css" />
     <link rel="shortcut icon" href="../_static/pipelinewise.png"/>
-  
-
-  
-  
     <link rel="canonical" href="https://docs.ansible.com/ansible/latest/concept/singer.html"/>
-  
-
-  
-
-  
   <!--[if lt IE 9]>
     <script src="../_static/js/html5shiv.min.js"></script>
   <![endif]-->
   
-    
-      <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
         <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
         <script src="../_static/jquery.js"></script>
         <script src="../_static/underscore.js"></script>
         <script src="../_static/doctools.js"></script>
-    
-    <script type="text/javascript" src="../_static/js/theme.js"></script>
-
-    
+    <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="Replication Methods" href="replication_methods.html" />
     <link rel="prev" title="Running Pipelines" href="../installation_guide/running_pipelines.html" /> 
 </head>
 
-<body class="wy-body-for-nav">
-
-   
+<body class="wy-body-for-nav"> 
   <div class="wy-grid-for-nav">
-    
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
         <div class="wy-side-nav-search" >
-          
-
-          
             <a href="../index.html" class="icon icon-home"> PipelineWise
-          
-
-          
           </a>
-
-          
-            
-            
               <div class="version">
                 0.35.2
               </div>
-            
-          
-
-          
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
     <input type="text" name="q" placeholder="Search docs" />
@@ -84,18 +42,7 @@
     <input type="hidden" name="area" value="default" />
   </form>
 </div>
-
-          
-        </div>
-
-        
-        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
-          
-            
-            
-              
-            
-            
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <p class="caption" role="heading"><span class="caption-text">Installation</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../installation_guide/installation.html">Installation</a></li>
@@ -144,73 +91,32 @@
 <li class="toctree-l1"><a class="reference internal" href="../project/licenses.html">Licenses</a></li>
 </ul>
 
-            
-          
         </div>
-        
       </div>
     </nav>
 
-    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
-
-      
-      <nav class="wy-nav-top" aria-label="top navigation">
-        
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
           <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
           <a href="../index.html">PipelineWise</a>
-        
       </nav>
 
-
       <div class="wy-nav-content">
-        
         <div class="rst-content">
-        
-          
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-<div role="navigation" aria-label="breadcrumbs navigation">
-
+          <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
-    
       <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
-        
       <li>Singer.io</li>
-    
-    
       <li class="wy-breadcrumbs-aside">
-        
-          
             <a href="../_sources/concept/singer.rst.txt" rel="nofollow"> View page source</a>
-          
-        
       </li>
-    
   </ul>
-
-  
   <hr/>
 </div>
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
-            
-  <div class="section" id="singer-io">
-<span id="singer"></span><h1>Singer.io<a class="headerlink" href="#singer-io" title="Permalink to this headline">¶</a></h1>
+             
+  <section id="singer-io">
+<span id="singer"></span><h1>Singer.io<a class="headerlink" href="#singer-io" title="Permalink to this headline"></a></h1>
 <p>PipelineWise is using the <a class="reference external" href="https://www.singer.io/">Singer.io</a>
 specification to replicate data from various sources to various destinations.</p>
 <p>Singer is an <a class="reference external" href="https://github.com/singer-io/getting-started/blob/master/docs/SPEC.md">Open Source Standard</a>
@@ -220,10 +126,10 @@ you can think of. The Singer spec describes how data extraction scripts — call
 JSON-based data format over stdout. By conforming to this spec, Taps and Targets can be
 used in any combination to move data from any source to any destination.</p>
 <p>Original article and further details at <a class="reference external" href="https://github.com/singer-io/getting-started">https://github.com/singer-io/getting-started</a></p>
-<div class="section" id="core-concepts">
-<h2>Core Concepts<a class="headerlink" href="#core-concepts" title="Permalink to this headline">¶</a></h2>
-<div class="section" id="taps">
-<span id="id2"></span><h3>Taps<a class="headerlink" href="#taps" title="Permalink to this headline">¶</a></h3>
+<section id="core-concepts">
+<h2>Core Concepts<a class="headerlink" href="#core-concepts" title="Permalink to this headline"></a></h2>
+<section id="taps">
+<span id="id2"></span><h3>Taps<a class="headerlink" href="#taps" title="Permalink to this headline"></a></h3>
 <p>Taps are designed to produce a stream of data from sources like databases and web service APIs
 for use in a data integration or ETL pipeline.</p>
 <p>A Tap is an application that takes a configuration file and an optional state file as input
@@ -235,64 +141,47 @@ interested you can find more details in the official <a class="reference externa
 A number of of taps developed by Singer.io or by other members of the community are open
 sourced and can be added to PipelineWise relatively easily.</p>
 <p>List of the currently supported and built-in taps in PipelineWise is in the <a class="reference internal" href="../connectors/taps.html#taps-list"><span class="std std-ref">Taps (Data Sources)</span></a> section.</p>
-</div>
-<div class="section" id="targets">
-<span id="id3"></span><h3>Targets<a class="headerlink" href="#targets" title="Permalink to this headline">¶</a></h3>
+</section>
+<section id="targets">
+<span id="id3"></span><h3>Targets<a class="headerlink" href="#targets" title="Permalink to this headline"></a></h3>
 <p>Targets are designed to consume streams that generated by a Tap like loading data into a Postgres
 or Snowflake database.</p>
 <p>Following the singer specification every Target can consume messages from every Tap, making it
 possible to replicate data from various sources to various destinations.</p>
 <p>List of the supported targets and built-in taps in PipelineWise can be found in the <a class="reference internal" href="../connectors/targets.html#targets-list"><span class="std std-ref">Targets (Destinations)</span></a> section.</p>
-</div>
-</div>
-</div>
+</section>
+</section>
+</section>
 
 
            </div>
-           
           </div>
-          <footer>
-    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
-        <a href="replication_methods.html" class="btn btn-neutral float-right" title="Replication Methods" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="../installation_guide/running_pipelines.html" class="btn btn-neutral float-left" title="Running Pipelines" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="replication_methods.html" class="btn btn-neutral float-right" title="Replication Methods" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>
 
   <div role="contentinfo">
-    <p>
-        &#169; Copyright 2021, Wise Ltd..
-
-    </p>
+    <p>&#169; Copyright 2021, Wise Ltd..</p>
   </div>
-    
-    
-    
-    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
-    
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
     <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
-    
-    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
 
 </footer>
         </div>
       </div>
-
     </section>
-
   </div>
-  
-
-  <script type="text/javascript">
+  <script>
       jQuery(function () {
           SphinxRtdTheme.Navigation.enable(true);
       });
-  </script>
-
-  
-  
-    
-   
+  </script> 
 
 </body>
 </html>
