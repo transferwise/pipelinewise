@@ -15,7 +15,7 @@ TARGET = 'FastSyncTargetBigquery'
 # pylint: disable=missing-function-docstring,invalid-name,no-self-use
 class MongoDBToBigquery(unittest.TestCase):
     """
-    Unit tests for fastsync MongoDB to postgres
+    Unit tests for fastsync MongoDB to BigQuery
     """
 
     def test_tap_type_to_target_type_with_defined_tap_type_returns_equivalent_target_type(
