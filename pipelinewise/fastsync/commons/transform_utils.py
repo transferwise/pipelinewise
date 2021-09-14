@@ -7,6 +7,7 @@ class TransformationType(Enum):
     """
     List of supported transformation types
     """
+
     SET_NULL = 'SET-NULL'
     MASK_HIDDEN = 'MASK-HIDDEN'
     MASK_DATE = 'MASK-DATE'
@@ -28,6 +29,7 @@ class SQLFlavor(Enum):
     """
     List of supported sql flavors
     """
+
     SNOWFLAKE = 'snowflake'
     POSTGRES = 'postgres'
     BIGQUERY = 'bigquery'
@@ -41,10 +43,8 @@ class TransformationHelper:
 
     @classmethod
     def get_trans_in_sql_flavor(
-            cls,
-            stream_name: str,
-            transformations: List[Dict],
-            sql_flavor: SQLFlavor) -> List[Dict]:
+        cls, stream_name: str, transformations: List[Dict], sql_flavor: SQLFlavor
+    ) -> List[Dict]:
 
         """
         Find the transformations to apply to the given stream and does proper formatting and mapping
@@ -78,52 +78,56 @@ class TransformationHelper:
                 conditions = cls.__conditions_to_sql(transform_conditions, sql_flavor)
 
                 if transform_type == TransformationType.SET_NULL:
-                    trans_map.append({
-                        'trans': f'{column} = NULL',
-                        'conditions': conditions
-                    })
+                    trans_map.append(
+                        {'trans': f'{column} = NULL', 'conditions': conditions}
+                    )
 
                 elif transform_type == TransformationType.HASH:
 
-                    trans_map.append({
-                        'trans': cls.__hash_to_sql(column, sql_flavor),
-                        'conditions': conditions
-                    })
+                    trans_map.append(
+                        {
+                            'trans': cls.__hash_to_sql(column, sql_flavor),
+                            'conditions': conditions,
+                        }
+                    )
 
                 elif transform_type.value.startswith('HASH-SKIP-FIRST-'):
 
-                    trans_map.append({
-                        'trans': cls.__hash_skip_first_to_sql(transform_type, column, sql_flavor),
-                        'conditions': conditions
-                    })
+                    trans_map.append(
+                        {
+                            'trans': cls.__hash_skip_first_to_sql(
+                                transform_type, column, sql_flavor
+                            ),
+                            'conditions': conditions,
+                        }
+                    )
 
                 elif transform_type == TransformationType.MASK_DATE:
 
-                    trans_map.append({
-                        'trans': cls.__mask_date_to_sql(column, sql_flavor),
-                        'conditions': conditions
-                    })
+                    trans_map.append(
+                        {
+                            'trans': cls.__mask_date_to_sql(column, sql_flavor),
+                            'conditions': conditions,
+                        }
+                    )
 
                 elif transform_type == TransformationType.MASK_NUMBER:
-                    trans_map.append({
-                        'trans': f'{column} = 0',
-                        'conditions': conditions
-                    })
+                    trans_map.append(
+                        {'trans': f'{column} = 0', 'conditions': conditions}
+                    )
 
                 elif transform_type == TransformationType.MASK_HIDDEN:
-                    trans_map.append({
-                        'trans': f"{column} = 'hidden'",
-                        'conditions': conditions
-                    })
+                    trans_map.append(
+                        {'trans': f"{column} = 'hidden'", 'conditions': conditions}
+                    )
 
         return trans_map
 
     @classmethod
     # pylint: disable=W0238  # False positive when it is used by another classmethod
     def __conditions_to_sql(
-            cls,
-            transform_conditions: List[Dict],
-            sql_flavor: SQLFlavor) -> Optional[str]:
+        cls, transform_conditions: List[Dict], sql_flavor: SQLFlavor
+    ) -> Optional[str]:
         """
         Convert the conditional transformations into equivalent form in SF SQL.
         Args:
@@ -160,7 +164,11 @@ class TransformationHelper:
 
                 else:
                     operator = '='
-                    value = f"'{condition['equals']}'" if isinstance(condition['equals'], str) else condition['equals']
+                    value = (
+                        f"'{condition['equals']}'"
+                        if isinstance(condition['equals'], str)
+                        else condition['equals']
+                    )
 
             elif 'regex_match' in condition:
 
@@ -173,17 +181,23 @@ class TransformationHelper:
                     operator = '~'
 
                 elif sql_flavor == SQLFlavor.BIGQUERY:
-                    conditions.append(f"REGEXP_CONTAINS({cls.__safe_column(condition['column'], sql_flavor)}, {value})")
+                    conditions.append(
+                        f"REGEXP_CONTAINS({cls.__safe_column(condition['column'], sql_flavor)}, {value})"
+                    )
                     continue
 
                 else:
-                    raise NotImplementedError(f'regex_match conditional transformation in {sql_flavor.value} SQL '
-                                              f'flavor not implemented!')
+                    raise NotImplementedError(
+                        f'regex_match conditional transformation in {sql_flavor.value} SQL '
+                        f'flavor not implemented!'
+                    )
 
             else:
                 continue
 
-            conditions.append(f"({cls.__safe_column(condition['column'], sql_flavor)} {operator} {value})")
+            conditions.append(
+                f"({cls.__safe_column(condition['column'], sql_flavor)} {operator} {value})"
+            )
 
         return ' AND '.join(conditions)
 
@@ -229,13 +243,16 @@ class TransformationHelper:
 
         else:
             raise NotImplementedError(
-                f'HASH transformation in {sql_flavor.value} SQL flavor not implemented!')
+                f'HASH transformation in {sql_flavor.value} SQL flavor not implemented!'
+            )
 
         return trans
 
     @classmethod
     # pylint: disable=W0238  # False positive when it is used by another classmethod
-    def __hash_skip_first_to_sql(cls, transform_type: TransformationType, column: str, sql_flavor: SQLFlavor) -> str:
+    def __hash_skip_first_to_sql(
+        cls, transform_type: TransformationType, column: str, sql_flavor: SQLFlavor
+    ) -> str:
         """
         convert HASH-SKIP-FIRST-n transformation into the right sql string
         Args:
@@ -251,16 +268,22 @@ class TransformationHelper:
 
         if sql_flavor == SQLFlavor.SNOWFLAKE:
             trans = '{0} = CONCAT(SUBSTRING({0}, 1, {1}), SHA2(SUBSTRING({0}, {1} + 1), 256))'.format(
-                column, skip_first_n)
+                column, skip_first_n
+            )
         elif sql_flavor == SQLFlavor.POSTGRES:
-            trans = '{0} = CONCAT(SUBSTRING({0}, 1, {1}), ENCODE(DIGEST(SUBSTRING({0}, {1} + 1), ' \
-                    '\'sha256\'), \'hex\'))'.format(column, skip_first_n)
+            trans = (
+                '{0} = CONCAT(SUBSTRING({0}, 1, {1}), ENCODE(DIGEST(SUBSTRING({0}, {1} + 1), '
+                '\'sha256\'), \'hex\'))'.format(column, skip_first_n)
+            )
         elif sql_flavor == SQLFlavor.BIGQUERY:
             trans = '{0} = CONCAT(SUBSTRING({0}, 1, {1}), TO_BASE64(SHA256(SUBSTRING({0}, {1} + 1))))'.format(
-                column, skip_first_n)
+                column, skip_first_n
+            )
         else:
-            raise NotImplementedError(f'HASH-SKIP-FIRST-{skip_first_n} transformation in {sql_flavor.value} SQL flavor '
-                                      f'not implemented!')
+            raise NotImplementedError(
+                f'HASH-SKIP-FIRST-{skip_first_n} transformation in {sql_flavor.value} SQL flavor '
+                f'not implemented!'
+            )
 
         return trans
 
@@ -278,24 +301,32 @@ class TransformationHelper:
         Returns: sql string equivalent of the mask date
         """
         if sql_flavor == SQLFlavor.SNOWFLAKE:
-            trans = f'{column} = TIMESTAMP_NTZ_FROM_PARTS(' \
-                    f'DATE_FROM_PARTS(YEAR({column}), 1, 1),' \
-                    f'TO_TIME({column}))'
+            trans = (
+                f'{column} = TIMESTAMP_NTZ_FROM_PARTS('
+                f'DATE_FROM_PARTS(YEAR({column}), 1, 1),'
+                f'TO_TIME({column}))'
+            )
 
         elif sql_flavor == SQLFlavor.POSTGRES:
-            trans = '{0} = MAKE_TIMESTAMP(' \
-                    'DATE_PART(\'year\', {0})::int, ' \
-                    '1, ' \
-                    '1, ' \
-                    'DATE_PART(\'hour\', {0})::int, ' \
-                    'DATE_PART(\'minute\', {0})::int, ' \
-                    'DATE_PART(\'second\', {0})::double precision)'.format(column)
+            trans = (
+                '{0} = MAKE_TIMESTAMP('
+                'DATE_PART(\'year\', {0})::int, '
+                '1, '
+                '1, '
+                'DATE_PART(\'hour\', {0})::int, '
+                'DATE_PART(\'minute\', {0})::int, '
+                'DATE_PART(\'second\', {0})::double precision)'.format(column)
+            )
         elif sql_flavor == SQLFlavor.BIGQUERY:
-            trans = f'{column} = TIMESTAMP(DATETIME(' \
-                    f'DATE(EXTRACT(YEAR FROM {column}), 1, 1),' \
-                    f'TIME({column})))'
+            trans = (
+                f'{column} = TIMESTAMP(DATETIME('
+                f'DATE(EXTRACT(YEAR FROM {column}), 1, 1),'
+                f'TIME({column})))'
+            )
         else:
-            raise NotImplementedError(f'MASK-DATE transformation in {sql_flavor.value} SQL flavor '
-                                      f'not implemented!')
+            raise NotImplementedError(
+                f'MASK-DATE transformation in {sql_flavor.value} SQL flavor '
+                f'not implemented!'
+            )
 
         return trans

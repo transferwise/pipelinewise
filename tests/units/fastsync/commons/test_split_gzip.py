@@ -32,6 +32,7 @@ class TestSplitGzipFile(TestCase):
     """
     Unit tests for SplitGzipFile
     """
+
     filename = '{}_{}_tmp'.format('@test', os.getpid())
 
     def setUp(self):
@@ -55,8 +56,12 @@ class TestSplitGzipFile(TestCase):
 
         # Using SI kilo unit
         self.assertEqual(round(gzip_splitter._bytes_to_megabytes(1000), 5), 0.00095)
-        self.assertEqual(round(gzip_splitter._bytes_to_megabytes(1000 ** 2 * 10), 5), 9.53674)
-        self.assertEqual(round(gzip_splitter._bytes_to_megabytes(1000 ** 3), 5), 953.67432)
+        self.assertEqual(
+            round(gzip_splitter._bytes_to_megabytes(1000 ** 2 * 10), 5), 9.53674
+        )
+        self.assertEqual(
+            round(gzip_splitter._bytes_to_megabytes(1000 ** 3), 5), 953.67432
+        )
 
     def test_parameter_validation(self):
         """
@@ -75,10 +80,14 @@ class TestSplitGzipFile(TestCase):
         Test generating chunked filenames
         """
         # split_large_files should be disabled when max_chunks is zero
-        gzip_splitter = split_gzip.SplitGzipFile('basefile', chunk_size_mb=1000, max_chunks=0)
+        gzip_splitter = split_gzip.SplitGzipFile(
+            'basefile', chunk_size_mb=1000, max_chunks=0
+        )
         self.assertEqual(gzip_splitter._gen_chunk_filename(), 'basefile')
         # first chunk should be part nr 1
-        gzip_splitter = split_gzip.SplitGzipFile('basefile', chunk_size_mb=1000, max_chunks=20)
+        gzip_splitter = split_gzip.SplitGzipFile(
+            'basefile', chunk_size_mb=1000, max_chunks=20
+        )
         self.assertEqual(gzip_splitter._gen_chunk_filename(), 'basefile.part00001')
         # generated file part should be in sync with chunk_seq
         gzip_splitter.chunk_seq = 5
@@ -116,7 +125,9 @@ class TestSplitGzipFile(TestCase):
         Write all data into one chunk
         """
         # test data fits into one chunk
-        with split_gzip.SplitGzipFile(self.filename, 'wb', chunk_size_mb=1000, max_chunks=20) as f_write:
+        with split_gzip.SplitGzipFile(
+            self.filename, 'wb', chunk_size_mb=1000, max_chunks=20
+        ) as f_write:
             f_write.write(DATA_WITH_100_BYTES * 50)
 
         with gzip.open(f'{self.filename}.part00001', 'rb') as f_read:
@@ -129,10 +140,13 @@ class TestSplitGzipFile(TestCase):
         Write data into multiple gzip files
         """
         # test data fits into one chunk
-        with split_gzip.SplitGzipFile(self.filename, 'wb',
-                                      chunk_size_mb=split_gzip.SplitGzipFile._bytes_to_megabytes(200),
-                                      max_chunks=20,
-                                      est_compr_rate=1) as f_write:
+        with split_gzip.SplitGzipFile(
+            self.filename,
+            'wb',
+            chunk_size_mb=split_gzip.SplitGzipFile._bytes_to_megabytes(200),
+            max_chunks=20,
+            est_compr_rate=1,
+        ) as f_write:
             # Write 1100 bytes of test data
             for _ in itertools.repeat(None, 11):
                 f_write.write(DATA_WITH_100_BYTES)

@@ -105,31 +105,33 @@ def get_tap_properties(tap=None, temp_dir=None):
             'tap_stream_name_pattern': '{{schema_name}}-{{table_name}}',
             'tap_catalog_argument': '--properties',
             'default_replication_method': 'LOG_BASED',
-            'default_data_flattening_max_level': 0
+            'default_data_flattening_max_level': 0,
         },
         'tap-postgres': {
             'tap_config_extras': {
                 # Set tap_id to locate the corresponding replication slot
-                'tap_id': tap['id'] if tap else None,
+                'tap_id': tap['id']
+                if tap
+                else None,
             },
             'tap_stream_id_pattern': '{{schema_name}}-{{table_name}}',
             'tap_stream_name_pattern': '{{schema_name}}-{{table_name}}',
             'tap_catalog_argument': '--properties',
             'default_replication_method': 'LOG_BASED',
-            'default_data_flattening_max_level': 0
+            'default_data_flattening_max_level': 0,
         },
         'tap-zuora': {
             'tap_config_extras': {
                 'username': tap.get('db_conn', {}).get('username') if tap else None,
                 'password': tap.get('db_conn', {}).get('password') if tap else None,
                 'start_date': tap.get('db_conn', {}).get('start_date') if tap else None,
-                'api_type': tap.get('db_conn', {}).get('api_type') if tap else None
+                'api_type': tap.get('db_conn', {}).get('api_type') if tap else None,
             },
             'tap_stream_id_pattern': '{{table_name}}',
             'tap_stream_name_pattern': '{{table_name}}',
             'tap_catalog_argument': '--catalog',
             'default_replication_method': 'FULL_TABLE',
-            'default_data_flattening_max_level': 10
+            'default_data_flattening_max_level': 10,
         },
         'tap-oracle': {
             'tap_config_extras': {},
@@ -137,18 +139,15 @@ def get_tap_properties(tap=None, temp_dir=None):
             'tap_stream_name_pattern': '{{schema_name}}-{{table_name}}',
             'tap_catalog_argument': '--catalog',
             'default_replication_method': 'LOG_BASED',
-            'default_data_flattening_max_level': 0
+            'default_data_flattening_max_level': 0,
         },
         'tap-kafka': {
-            'tap_config_extras': {
-                'local_store_dir': temp_dir,
-                'encoding': 'utf-8'
-            },
+            'tap_config_extras': {'local_store_dir': temp_dir, 'encoding': 'utf-8'},
             'tap_stream_id_pattern': '{{table_name}}',
             'tap_stream_name_pattern': '{{table_name}}',
             'tap_catalog_argument': '--properties',
             'default_replication_method': 'LOG_BASED',
-            'default_data_flattening_max_level': 0
+            'default_data_flattening_max_level': 0,
         },
         'tap-zendesk': {
             'tap_config_extras': {},
@@ -156,7 +155,7 @@ def get_tap_properties(tap=None, temp_dir=None):
             'tap_stream_name_pattern': '{{table_name}}',
             'tap_catalog_argument': '--catalog',
             'default_replication_method': 'INCREMENTAL',
-            'default_data_flattening_max_level': 10
+            'default_data_flattening_max_level': 10,
         },
         'tap-adwords': {
             'tap_config_extras': {},
@@ -164,27 +163,23 @@ def get_tap_properties(tap=None, temp_dir=None):
             'tap_stream_name_pattern': '{{table_name}}',
             'tap_catalog_argument': '--catalog',
             'default_replication_method': 'INCREMENTAL',
-            'default_data_flattening_max_level': 0
+            'default_data_flattening_max_level': 0,
         },
         'tap-jira': {
-            'tap_config_extras': {
-                'user_agent': 'PipelineWise - Tap Jira'
-            },
+            'tap_config_extras': {'user_agent': 'PipelineWise - Tap Jira'},
             'tap_stream_id_pattern': '{{table_name}}',
             'tap_stream_name_pattern': '{{table_name}}',
             'tap_catalog_argument': '--properties',
             'default_replication_method': 'INCREMENTAL',
-            'default_data_flattening_max_level': 0
+            'default_data_flattening_max_level': 0,
         },
         'tap-s3-csv': {
-            'tap_config_extras': {
-                'tables': generate_tap_s3_csv_to_table_mappings(tap)
-            },
+            'tap_config_extras': {'tables': generate_tap_s3_csv_to_table_mappings(tap)},
             'tap_stream_id_pattern': '{{table_name}}',
             'tap_stream_name_pattern': '{{table_name}}',
             'tap_catalog_argument': '--properties',
             'default_replication_method': 'INCREMENTAL',
-            'default_data_flattening_max_level': 0
+            'default_data_flattening_max_level': 0,
         },
         'tap-snowflake': {
             'tap_config_extras': {
@@ -195,28 +190,26 @@ def get_tap_properties(tap=None, temp_dir=None):
             'tap_stream_name_pattern': '{{schema_name}}-{{table_name}}',
             'tap_catalog_argument': '--properties',
             'default_replication_method': 'INCREMENTAL',
-            'default_data_flattening_max_level': 0
+            'default_data_flattening_max_level': 0,
         },
         'tap-salesforce': {
-            'tap_config_extras': {
-                'select_fields_by_default': True
-            },
+            'tap_config_extras': {'select_fields_by_default': True},
             'tap_stream_id_pattern': '{{table_name}}',
             'tap_stream_name_pattern': '{{table_name}}',
             'tap_catalog_argument': '--properties',
             'default_replication_method': 'INCREMENTAL',
-            'default_data_flattening_max_level': 10
+            'default_data_flattening_max_level': 10,
         },
         'tap-mongodb': {
             'tap_config_extras': {
                 'database': tap.get('db_conn', {}).get('dbname') if tap else None,
-                'include_schemas_in_destination_stream_name': 'true'
+                'include_schemas_in_destination_stream_name': 'true',
             },
             'tap_stream_id_pattern': '{{database_name}}-{{table_name}}',
             'tap_stream_name_pattern': '{{database_name}}-{{table_name}}',
             'tap_catalog_argument': '--catalog',
             'default_replication_method': 'LOG_BASED',
-            'default_data_flattening_max_level': 0
+            'default_data_flattening_max_level': 0,
         },
         'tap-google-analytics': {
             'tap_config_extras': {},
@@ -224,7 +217,7 @@ def get_tap_properties(tap=None, temp_dir=None):
             'tap_stream_name_pattern': '{{table_name}}',
             'tap_catalog_argument': '--catalog',
             'default_replication_method': 'INCREMENTAL',
-            'default_data_flattening_max_level': 0
+            'default_data_flattening_max_level': 0,
         },
         'tap-github': {
             'tap_config_extras': {
@@ -236,7 +229,7 @@ def get_tap_properties(tap=None, temp_dir=None):
             'tap_stream_name_pattern': '{{table_name}}',
             'tap_catalog_argument': '--properties',
             'default_replication_method': 'LOG_BASED',
-            'default_data_flattening_max_level': 0
+            'default_data_flattening_max_level': 0,
         },
         'tap-shopify': {
             'tap_config_extras': {},
@@ -244,7 +237,7 @@ def get_tap_properties(tap=None, temp_dir=None):
             'tap_stream_name_pattern': '{{table_name}}',
             'tap_catalog_argument': '--catalog',
             'default_replication_method': 'INCREMENTAL',
-            'default_data_flattening_max_level': 0
+            'default_data_flattening_max_level': 0,
         },
         'tap-slack': {
             'tap_config_extras': {},
@@ -252,19 +245,23 @@ def get_tap_properties(tap=None, temp_dir=None):
             'tap_stream_name_pattern': '{{table_name}}',
             'tap_catalog_argument': '--catalog',
             'default_replication_method': 'LOG_BASED',
-            'default_data_flattening_max_level': 0
+            'default_data_flattening_max_level': 0,
         },
         'tap-mixpanel': {
             'tap_config_extras': {
                 'user_agent': 'PipelineWise - Tap Mixpanel',
                 # Do not denest properties by default
-                'denest_properties': tap.get('db_conn', {}).get('denest_properties', 'false') if tap else None
+                'denest_properties': tap.get('db_conn', {}).get(
+                    'denest_properties', 'false'
+                )
+                if tap
+                else None,
             },
             'tap_stream_id_pattern': '{{table_name}}',
             'tap_stream_name_pattern': '{{table_name}}',
             'tap_catalog_argument': '--catalog',
             'default_replication_method': 'LOG_BASED',
-            'default_data_flattening_max_level': 0
+            'default_data_flattening_max_level': 0,
         },
         'tap-twilio': {
             'tap_config_extras': {},
@@ -272,7 +269,7 @@ def get_tap_properties(tap=None, temp_dir=None):
             'tap_stream_name_pattern': '{{table_name}}',
             'tap_catalog_argument': '--catalog',
             'default_replication_method': 'INCREMENTAL',
-            'default_data_flattening_max_level': 0
+            'default_data_flattening_max_level': 0,
         },
         # Default values to use as a fallback method
         'DEFAULT': {
@@ -281,6 +278,6 @@ def get_tap_properties(tap=None, temp_dir=None):
             'tap_stream_name_pattern': '{{schema_name}}-{{table_name}}',
             'tap_catalog_argument': '--catalog',
             'default_replication_method': 'LOG_BASED',
-            'default_data_flattening_max_level': 0
+            'default_data_flattening_max_level': 0,
         },
     }

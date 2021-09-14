@@ -23,7 +23,7 @@ AlertHandler = namedtuple('AlertHandler', ['type', 'config'])
 # Every alert handler class needs to implement the BaseAlertHandler base class
 ALERT_HANDLER_TYPES_TO_CLASS = {
     'slack': SlackAlertHandler,
-    'victorops': VictoropsAlertHandler
+    'victorops': VictoropsAlertHandler,
 }
 
 
@@ -45,7 +45,9 @@ class AlertSender:
 
         # Raise an exception if alert_handlers is not a dictionary
         if not isinstance(self.alert_handlers, dict):
-            raise InvalidAlertHandlerException('alert_handlers needs to be a dictionary')
+            raise InvalidAlertHandlerException(
+                'alert_handlers needs to be a dictionary'
+            )
 
     @staticmethod
     def __init_handler_class(alert_handler: AlertHandler) -> BaseAlertHandler:
@@ -63,8 +65,9 @@ class AlertSender:
             alert_handler_class = ALERT_HANDLER_TYPES_TO_CLASS[alert_handler.type]
             handler = alert_handler_class(alert_handler.config)
         except KeyError as key_error:
-            raise NotImplementedAlertHandlerException(f'Alert handler type not implemented: {alert_handler.type}') \
-                from key_error
+            raise NotImplementedAlertHandlerException(
+                f'Alert handler type not implemented: {alert_handler.type}'
+            ) from key_error
 
         return handler
 
@@ -80,16 +83,22 @@ class AlertSender:
         """
         if alert_handler_type in self.alert_handlers:
             alert_handler_config = self.alert_handlers[alert_handler_type]
-            alert_handler = AlertHandler(type=alert_handler_type, config=alert_handler_config)
+            alert_handler = AlertHandler(
+                type=alert_handler_type, config=alert_handler_config
+            )
             return alert_handler
 
-        raise NotConfiguredAlertHandlerException(f'Alert handler type not configured: {alert_handler_type}')
+        raise NotConfiguredAlertHandlerException(
+            f'Alert handler type not configured: {alert_handler_type}'
+        )
 
-    def send_to_handler(self,
-                        alert_handler_type: str,
-                        message: str,
-                        level: str = BaseAlertHandler.ERROR,
-                        exc: Exception = None) -> bool:
+    def send_to_handler(
+        self,
+        alert_handler_type: str,
+        message: str,
+        level: str = BaseAlertHandler.ERROR,
+        exc: Exception = None,
+    ) -> bool:
         """
         Sends an alert message to a specific alert handler type
 
@@ -112,10 +121,9 @@ class AlertSender:
         # Alert sent successfully
         return True
 
-    def send_to_all_handlers(self,
-                             message: str,
-                             level: str = BaseAlertHandler.ERROR,
-                             exc: Exception = None) -> dict:
+    def send_to_all_handlers(
+        self, message: str, level: str = BaseAlertHandler.ERROR, exc: Exception = None
+    ) -> dict:
         """
         Get all the configured alert handlers and send alert
         message to all of them
@@ -128,5 +136,8 @@ class AlertSender:
         Returns:
             Dictionary with number of successfully sent alerts
         """
-        sents = [self.send_to_handler(handler_type, message, level, exc) for handler_type in self.alert_handlers]
+        sents = [
+            self.send_to_handler(handler_type, message, level, exc)
+            for handler_type in self.alert_handlers
+        ]
         return {'sent': len(sents)}

@@ -15,18 +15,8 @@ from .commons.target_postgres import FastSyncTargetPostgres
 LOGGER = Logger().get_logger(__name__)
 
 REQUIRED_CONFIG_KEYS = {
-    'tap': [
-        'host',
-        'port',
-        'user',
-        'password'
-    ],
-    'target': [
-        'host',
-        'port',
-        'user',
-        'password'
-    ]
+    'tap': ['host', 'port', 'user', 'password'],
+    'target': ['host', 'port', 'user', 'password'],
 }
 
 LOCK = multiprocessing.Lock()
@@ -57,7 +47,9 @@ def tap_type_to_target_type(mysql_type, mysql_column_type):
         'longtext': 'CHARACTER VARYING',
         'enum': 'CHARACTER VARYING',
         'int': 'INTEGER NULL',
-        'tinyint': 'BOOLEAN' if mysql_column_type and mysql_column_type.startswith('tinyint(1)') else 'SMALLINT NULL',
+        'tinyint': 'BOOLEAN'
+        if mysql_column_type and mysql_column_type.startswith('tinyint(1)')
+        else 'SMALLINT NULL',
         'smallint': 'SMALLINT NULL',
         'mediumint': 'INTEGER NULL',
         'bigint': 'BIGINT NULL',
@@ -84,7 +76,9 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
     postgres = FastSyncTargetPostgres(args.target, args.transform)
 
     try:
-        filename = utils.gen_export_filename(tap_id=args.target.get('tap_id'), table=table)
+        filename = utils.gen_export_filename(
+            tap_id=args.target.get('tap_id'), table=table
+        )
         filepath = os.path.join(args.temp_dir, filename)
         target_schema = utils.get_target_schema(args.target, table)
 
@@ -104,10 +98,14 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
 
         # Creating temp table in Postgres
         postgres.drop_table(target_schema, table, is_temporary=True)
-        postgres.create_table(target_schema, table, postgres_columns, primary_key, is_temporary=True)
+        postgres.create_table(
+            target_schema, table, postgres_columns, primary_key, is_temporary=True
+        )
 
         # Load into Postgres table
-        postgres.copy_to_table(filepath, target_schema, table, size_bytes, is_temporary=True)
+        postgres.copy_to_table(
+            filepath, target_schema, table, size_bytes, is_temporary=True
+        )
         os.remove(filepath)
 
         # Obfuscate columns
@@ -144,7 +142,8 @@ def main_impl():
     table_sync_excs = []
 
     # Log start info
-    LOGGER.info("""
+    LOGGER.info(
+        """
         -------------------------------------------------------
         STARTING SYNC
         -------------------------------------------------------
@@ -152,7 +151,11 @@ def main_impl():
             Total tables selected to sync  : %s
             Pool size                      : %s
         -------------------------------------------------------
-        """, args.tables, len(args.tables), pool_size)
+        """,
+        args.tables,
+        len(args.tables),
+        pool_size,
+    )
 
     # Create target schemas sequentially, Postgres doesn't like it running in parallel
     postgres_target = FastSyncTargetPostgres(args.target, args.transform)
@@ -161,11 +164,16 @@ def main_impl():
     # Start loading tables in parallel in spawning processes
     with multiprocessing.Pool(pool_size) as proc:
         table_sync_excs = list(
-            filter(lambda x: not isinstance(x, bool), proc.map(partial(sync_table, args=args), args.tables)))
+            filter(
+                lambda x: not isinstance(x, bool),
+                proc.map(partial(sync_table, args=args), args.tables),
+            )
+        )
 
     # Log summary
     end_time = datetime.now()
-    LOGGER.info("""
+    LOGGER.info(
+        """
         -------------------------------------------------------
         SYNC FINISHED - SUMMARY
         -------------------------------------------------------
@@ -176,8 +184,13 @@ def main_impl():
             Pool size                      : %s
             Runtime                        : %s
         -------------------------------------------------------
-        """, len(args.tables), len(args.tables) - len(table_sync_excs), str(table_sync_excs),
-                pool_size, end_time - start_time)
+        """,
+        len(args.tables),
+        len(args.tables) - len(table_sync_excs),
+        str(table_sync_excs),
+        pool_size,
+        end_time - start_time,
+    )
 
     if len(table_sync_excs) > 0:
         sys.exit(1)

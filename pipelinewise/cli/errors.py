@@ -10,6 +10,8 @@ class StreamBufferTooLargeException(Exception):
     """Raised if stream buffer size is greater than the max allowed size"""
 
     def __init__(self, buffer_size, max_buffer_size):
-        msg = f'{buffer_size}M buffer size is too large. The maximum allowed stream buffer size is ' \
-              f'{max_buffer_size}M'
+        msg = (
+            f'{buffer_size}M buffer size is too large. The maximum allowed stream buffer size is '
+            f'{max_buffer_size}M'
+        )
         super().__init__(msg)

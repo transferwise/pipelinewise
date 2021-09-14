@@ -270,9 +270,8 @@ class TestUtils:
         # Delete multiple keys from list of nested dictionaries
         assert cli.utils.delete_keys_from_dict(
             [{'foo': 'bar', 'foo2': 'bar2'},
-             {'foo3': {'nested_foo': 'nested_bar', 'nested_foo2': 'nested_bar2'}}], ['foo2', 'nested_foo']) == \
-               [{'foo': 'bar'},
-                {'foo3': {'nested_foo2': 'nested_bar2'}}]
+             {'foo3': {'nested_foo': 'nested_bar', 'nested_foo2': 'nested_bar2'}}],
+            ['foo2', 'nested_foo']) == [{'foo': 'bar'}, {'foo3': {'nested_foo2': 'nested_bar2'}}]
 
     def test_silentremove(self):
         """Test removing functions"""
