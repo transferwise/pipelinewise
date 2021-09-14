@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 import os
 import sys
+import multiprocessing
+
 from functools import partial
 from argparse import Namespace
-import multiprocessing
 from typing import Union
-
 from datetime import datetime
+
 from ..logger import Logger
 from .commons import utils
+from .commons.type_mapping import MYSQL_TO_REDSHIFT_MAPPER
 from .commons.tap_mysql import FastSyncTapMySql
 from .commons.target_redshift import FastSyncTargetRedshift
 
@@ -19,63 +21,12 @@ REQUIRED_CONFIG_KEYS = {
     'target': ['host', 'port', 'user', 'password', 'dbname', 's3_bucket'],
 }
 
-DEFAULT_VARCHAR_LENGTH = 10000
-SHORT_VARCHAR_LENGTH = 256
-LONG_VARCHAR_LENGTH = 65535
-
 LOCK = multiprocessing.Lock()
-
-
-def tap_type_to_target_type(mysql_type, mysql_column_type):
-    """Data type mapping from MySQL to Redshift"""
-    return {
-        'char': 'CHARACTER VARYING({})'.format(SHORT_VARCHAR_LENGTH),
-        'varchar': 'CHARACTER VARYING({})'.format(SHORT_VARCHAR_LENGTH),
-        'binary': 'CHARACTER VARYING({})'.format(LONG_VARCHAR_LENGTH),
-        'varbinary': 'CHARACTER VARYING({})'.format(LONG_VARCHAR_LENGTH),
-        'blob': 'CHARACTER VARYING({})'.format(LONG_VARCHAR_LENGTH),
-        'tinyblob': 'CHARACTER VARYING({})'.format(LONG_VARCHAR_LENGTH),
-        'mediumblob': 'CHARACTER VARYING({})'.format(LONG_VARCHAR_LENGTH),
-        'longblob': 'CHARACTER VARYING({})'.format(LONG_VARCHAR_LENGTH),
-        'geometry': 'CHARACTER VARYING({})'.format(DEFAULT_VARCHAR_LENGTH),
-        'point': 'CHARACTER VARYING({})'.format(DEFAULT_VARCHAR_LENGTH),
-        'linestring': 'CHARACTER VARYING({})'.format(DEFAULT_VARCHAR_LENGTH),
-        'polygon': 'CHARACTER VARYING({})'.format(DEFAULT_VARCHAR_LENGTH),
-        'multipoint': 'CHARACTER VARYING({})'.format(DEFAULT_VARCHAR_LENGTH),
-        'multilinestring': 'CHARACTER VARYING({})'.format(DEFAULT_VARCHAR_LENGTH),
-        'multipolygon': 'CHARACTER VARYING({})'.format(DEFAULT_VARCHAR_LENGTH),
-        'geometrycollection': 'CHARACTER VARYING({})'.format(DEFAULT_VARCHAR_LENGTH),
-        'text': 'CHARACTER VARYING({})'.format(LONG_VARCHAR_LENGTH),
-        'tinytext': 'CHARACTER VARYING({})'.format(SHORT_VARCHAR_LENGTH),
-        'mediumtext': 'CHARACTER VARYING({})'.format(LONG_VARCHAR_LENGTH),
-        'longtext': 'CHARACTER VARYING({})'.format(LONG_VARCHAR_LENGTH),
-        'enum': 'CHARACTER VARYING({})'.format(DEFAULT_VARCHAR_LENGTH),
-        'int': 'NUMERIC NULL',
-        'tinyint': 'BOOLEAN'
-        if mysql_column_type and mysql_column_type.startswith('tinyint(1)')
-        else 'NUMERIC NULL',
-        'smallint': 'NUMERIC NULL',
-        'mediumint': 'NUMERIC NULL',
-        'bigint': 'NUMERIC NULL',
-        'bit': 'BOOLEAN',
-        'decimal': 'FLOAT',
-        'double': 'FLOAT',
-        'float': 'FLOAT',
-        'bool': 'BOOLEAN',
-        'boolean': 'BOOLEAN',
-        'date': 'TIMESTAMP WITHOUT TIME ZONE',
-        'datetime': 'TIMESTAMP WITHOUT TIME ZONE',
-        'timestamp': 'TIMESTAMP WITHOUT TIME ZONE',
-        'json': 'CHARACTER VARYING({})'.format(LONG_VARCHAR_LENGTH),
-    }.get(
-        mysql_type,
-        'CHARACTER VARYING({})'.format(DEFAULT_VARCHAR_LENGTH),
-    )
 
 
 def sync_table(table: str, args: Namespace) -> Union[bool, str]:
     """Sync one table"""
-    mysql = FastSyncTapMySql(args.tap, tap_type_to_target_type)
+    mysql = FastSyncTapMySql(args.tap, MYSQL_TO_REDSHIFT_MAPPER)
     redshift = FastSyncTargetRedshift(args.target, args.transform)
 
     try:

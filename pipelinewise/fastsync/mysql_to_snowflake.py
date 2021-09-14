@@ -11,6 +11,7 @@ from typing import Union
 from datetime import datetime
 from ..logger import Logger
 from .commons import utils
+from .commons.type_mapping import MYSQL_TO_SNOWFLAKE_MAPPER
 from .commons.tap_mysql import FastSyncTapMySql
 from .commons.target_snowflake import FastSyncTargetSnowflake
 
@@ -33,55 +34,10 @@ REQUIRED_CONFIG_KEYS = {
 LOCK = multiprocessing.Lock()
 
 
-def tap_type_to_target_type(mysql_type, mysql_column_type):
-    """Data type mapping from MySQL to Snowflake"""
-    return {
-        'char': 'VARCHAR',
-        'varchar': 'VARCHAR',
-        'binary': 'BINARY',
-        'varbinary': 'BINARY',
-        'blob': 'VARCHAR',
-        'tinyblob': 'VARCHAR',
-        'mediumblob': 'VARCHAR',
-        'longblob': 'VARCHAR',
-        'geometry': 'VARIANT',
-        'point': 'VARIANT',
-        'linestring': 'VARIANT',
-        'polygon': 'VARIANT',
-        'multipoint': 'VARIANT',
-        'multilinestring': 'VARIANT',
-        'multipolygon': 'VARIANT',
-        'geometrycollection': 'VARIANT',
-        'text': 'VARCHAR',
-        'tinytext': 'VARCHAR',
-        'mediumtext': 'VARCHAR',
-        'longtext': 'VARCHAR',
-        'enum': 'VARCHAR',
-        'int': 'NUMBER',
-        'tinyint': 'BOOLEAN'
-        if mysql_column_type and mysql_column_type.startswith('tinyint(1)')
-        else 'NUMBER',
-        'smallint': 'NUMBER',
-        'mediumint': 'NUMBER',
-        'bigint': 'NUMBER',
-        'bit': 'BOOLEAN',
-        'decimal': 'FLOAT',
-        'double': 'FLOAT',
-        'float': 'FLOAT',
-        'bool': 'BOOLEAN',
-        'boolean': 'BOOLEAN',
-        'date': 'TIMESTAMP_NTZ',
-        'datetime': 'TIMESTAMP_NTZ',
-        'timestamp': 'TIMESTAMP_NTZ',
-        'time': 'TIME',
-        'json': 'VARIANT',
-    }.get(mysql_type, 'VARCHAR')
-
-
 # pylint: disable=too-many-locals
 def sync_table(table: str, args: Namespace) -> Union[bool, str]:
     """Sync one table"""
-    mysql = FastSyncTapMySql(args.tap, tap_type_to_target_type)
+    mysql = FastSyncTapMySql(args.tap, MYSQL_TO_SNOWFLAKE_MAPPER)
     snowflake = FastSyncTargetSnowflake(args.target, args.transform)
     tap_id = args.target.get('tap_id')
     archive_load_files = args.target.get('archive_load_files', False)
