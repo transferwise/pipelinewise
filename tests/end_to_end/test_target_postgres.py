@@ -1,13 +1,14 @@
 import decimal
 import os
 import uuid
-from datetime import datetime
-from random import randint
-
 import bson
 import pytest
+
+from datetime import datetime
+from random import randint
 from bson import Timestamp
-from pipelinewise.fastsync import mysql_to_postgres
+
+from pipelinewise.fastsync.commons.type_mapping import MYSQL_TO_POSTGRES_MAPPER
 
 from .helpers import tasks
 from .helpers import assertions
@@ -81,7 +82,7 @@ class TestTargetPostgres:
         assertions.assert_all_columns_exist(
             self.run_query_tap_mysql,
             self.run_query_target_postgres,
-            mysql_to_postgres.tap_type_to_target_type,
+            MYSQL_TO_POSTGRES_MAPPER,
         )
 
         # 2. Make changes in MariaDB source database
@@ -145,7 +146,7 @@ class TestTargetPostgres:
         assertions.assert_all_columns_exist(
             self.run_query_tap_mysql,
             self.run_query_target_postgres,
-            mysql_to_postgres.tap_type_to_target_type,
+            MYSQL_TO_POSTGRES_MAPPER,
             {'blob_col'},
         )
 
@@ -185,7 +186,7 @@ class TestTargetPostgres:
         assertions.assert_all_columns_exist(
             self.run_query_tap_mysql,
             self.run_query_target_postgres,
-            mysql_to_postgres.tap_type_to_target_type,
+            MYSQL_TO_POSTGRES_MAPPER,
         )
 
     # pylint: disable=invalid-name

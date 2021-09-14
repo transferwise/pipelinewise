@@ -7,7 +7,7 @@ from random import randint
 import bson
 import pytest
 from bson import Timestamp
-from pipelinewise.fastsync import mysql_to_bigquery
+from pipelinewise.fastsync.commons.type_mapping import MYSQL_TO_BIGQUERY_MAPPER
 
 from .helpers import tasks
 from .helpers import assertions
@@ -81,7 +81,7 @@ class TestTargetBigquery:
         assertions.assert_all_columns_exist(
             self.run_query_tap_mysql,
             self.e2e.run_query_target_bigquery,
-            mysql_to_bigquery.tap_type_to_target_type,
+            MYSQL_TO_BIGQUERY_MAPPER,
         )
 
         # 2. Make changes in MariaDB source database
@@ -128,7 +128,7 @@ class TestTargetBigquery:
         assertions.assert_all_columns_exist(
             self.run_query_tap_mysql,
             self.e2e.run_query_target_bigquery,
-            mysql_to_bigquery.tap_type_to_target_type,
+            MYSQL_TO_BIGQUERY_MAPPER,
             {'blob_col'},
         )
 
@@ -168,7 +168,7 @@ class TestTargetBigquery:
         assertions.assert_all_columns_exist(
             self.run_query_tap_mysql,
             self.run_query_target_bigquery,
-            mysql_to_bigquery.tap_type_to_target_type,
+            MYSQL_TO_BIGQUERY_MAPPER,
         )
 
     # pylint: disable=invalid-name
@@ -186,7 +186,7 @@ class TestTargetBigquery:
         assertions.assert_all_columns_exist(
             self.run_query_tap_mysql,
             self.run_query_target_bigquery,
-            mysql_to_bigquery.tap_type_to_target_type,
+            MYSQL_TO_BIGQUERY_MAPPER,
         )
 
     # pylint: disable=invalid-name
@@ -204,7 +204,7 @@ class TestTargetBigquery:
         assertions.assert_all_columns_exist(
             self.run_query_tap_mysql,
             self.run_query_target_bigquery,
-            mysql_to_bigquery.tap_type_to_target_type,
+            MYSQL_TO_BIGQUERY_MAPPER,
         )
 
     # pylint: disable=invalid-name
