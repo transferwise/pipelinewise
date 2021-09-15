@@ -22,6 +22,15 @@ class TransformationType(Enum):
     HASH_SKIP_FIRST_7 = 'HASH-SKIP-FIRST-7'
     HASH_SKIP_FIRST_8 = 'HASH-SKIP-FIRST-8'
     HASH_SKIP_FIRST_9 = 'HASH-SKIP-FIRST-9'
+    MASK_SKIP_ENDS_1 = 'MASK-SKIP-ENDS-1'
+    MASK_SKIP_ENDS_2 = 'MASK-SKIP-ENDS-2'
+    MASK_SKIP_ENDS_3 = 'MASK-SKIP-ENDS-3'
+    MASK_SKIP_ENDS_4 = 'MASK-SKIP-ENDS-4'
+    MASK_SKIP_ENDS_5 = 'MASK-SKIP-ENDS-5'
+    MASK_SKIP_ENDS_6 = 'MASK-SKIP-ENDS-6'
+    MASK_SKIP_ENDS_7 = 'MASK-SKIP-ENDS-7'
+    MASK_SKIP_ENDS_8 = 'MASK-SKIP-ENDS-8'
+    MASK_SKIP_ENDS_9 = 'MASK-SKIP-ENDS-9'
 
 
 @unique
@@ -114,6 +123,17 @@ class TransformationHelper:
                 elif transform_type == TransformationType.MASK_NUMBER:
                     trans_map.append(
                         {'trans': f'{column} = 0', 'conditions': conditions}
+                    )
+
+                elif transform_type.value.startswith('MASK-SKIP-ENDS-'):
+
+                    trans_map.append(
+                        {
+                            'trans': cls.__mask_skip_ends_to_sql(
+                                transform_type, column, sql_flavor
+                            ),
+                            'conditions': conditions,
+                        }
                     )
 
                 elif transform_type == TransformationType.MASK_HIDDEN:
@@ -328,5 +348,36 @@ class TransformationHelper:
                 f'MASK-DATE transformation in {sql_flavor.value} SQL flavor '
                 f'not implemented!'
             )
+
+        return trans
+
+    @classmethod
+    # pylint: disable=W0238  # False positive when it is used by another classmethod
+    def __mask_skip_ends_to_sql(
+        cls, transform_type: TransformationType, column: str, sql_flavor: SQLFlavor
+    ) -> str:
+        """
+        convert MASK-SKIP-ENDS-n transformation into the right sql string
+        Args:
+            column: column to apply the masking to
+            sql_flavor: the sql flavor to use
+
+        Raises: NotImplementedError if mask-skip-ends is not implemented for the given sql flavor
+
+        Returns: sql string equivalent of the mask-skip-ends
+        """
+        skip_ends_n = int(transform_type.value[-1])
+
+        if sql_flavor == SQLFlavor.SNOWFLAKE:
+            trans = '{0} = CASE WHEN LENGTH({0}) > 2 * {1} THEN ' \
+                    'CONCAT(SUBSTRING({0}, 1, {1}), REPEAT(\'*\', LENGTH({0})-(2 * {1})), SUBSTRING({0}, LENGTH({0})-{1}+1, {1})) ' \
+                    'ELSE {0} END'.format(column, skip_ends_n)
+        elif sql_flavor == SQLFlavor.POSTGRES:
+            trans = '{0} = CASE WHEN LENGTH({0}) > 2 * {1} THEN ' \
+                    'CONCAT(SUBSTRING({0}, 1, {1}), REPEAT(\'*\', LENGTH({0})-(2 * {1})), SUBSTRING({0}, LENGTH({0})-{1}+1, {1})) ' \
+                    'ELSE {0} END'.format(column, skip_ends_n)
+        else:
+            raise NotImplementedError(f'MASK-SKIP-ENDS transformation in {sql_flavor.value} SQL flavor '
+                                      f'not implemented!')
 
         return trans

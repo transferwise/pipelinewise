@@ -142,7 +142,16 @@
             "HASH-SKIP-FIRST-9",
             "MASK-DATE",
             "MASK-NUMBER",
-            "MASK-HIDDEN"
+            "MASK-HIDDEN",
+            "MASK-SKIP-ENDS-1",
+            "MASK-SKIP-ENDS-2",
+            "MASK-SKIP-ENDS-3",
+            "MASK-SKIP-ENDS-4",
+            "MASK-SKIP-ENDS-5",
+            "MASK-SKIP-ENDS-6",
+            "MASK-SKIP-ENDS-7",
+            "MASK-SKIP-ENDS-8",
+            "MASK-SKIP-ENDS-9"
           ]
         },
         "when": {
