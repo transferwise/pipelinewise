@@ -104,6 +104,11 @@ class TestTransformHelper(unittest.TestCase):
                 'tap_stream_name': 'public-my_table',
                 'type': 'HASH-SKIP-FIRST-5',
             },
+            {
+                'field_id': 'col_7',
+                'tap_stream_name': 'public-my_table',
+                'type': 'MASK-SKIP-ENDS-3',
+            },
         ]
 
         trans = TransformationHelper.get_trans_in_sql_flavor(
@@ -124,6 +129,13 @@ class TestTransformHelper(unittest.TestCase):
                 {'trans': '"COL_5" = SHA2("COL_5", 256)', 'conditions': None},
                 {
                     'trans': '"COL_6" = CONCAT(SUBSTRING("COL_6", 1, 5), SHA2(SUBSTRING("COL_6", 5 + 1), 256))',
+                    'conditions': None,
+                },
+                {
+                    'trans': '"COL_7" = CASE WHEN LENGTH("COL_7") > 2 * 3 THEN '
+                        'CONCAT(SUBSTRING("COL_7", 1, 3), REPEAT(\'*\', LENGTH("COL_7")-(2 * 3)), '
+                        'SUBSTRING("COL_7", LENGTH("COL_7")-3+1, 3)) '
+                        'ELSE "COL_7" END',
                     'conditions': None,
                 },
             ],
@@ -169,6 +181,11 @@ class TestTransformHelper(unittest.TestCase):
                 'tap_stream_name': 'public-my_table',
                 'type': 'HASH-SKIP-FIRST-5',
             },
+            {
+                'field_id': 'col_7',
+                'tap_stream_name': 'public-my_table',
+                'type': 'MASK-SKIP-ENDS-3',
+            },
         ]
 
         trans = TransformationHelper.get_trans_in_sql_flavor(
@@ -199,6 +216,13 @@ class TestTransformHelper(unittest.TestCase):
                 {
                     'trans': '"col_6" = CONCAT(SUBSTRING("col_6", 1, 5), '
                     'ENCODE(DIGEST(SUBSTRING("col_6", 5 + 1), \'sha256\'), \'hex\'))',
+                    'conditions': None,
+                },
+                {
+                    'trans': '"col_7" = CASE WHEN LENGTH("col_7") > 2 * 3 THEN '
+                        'CONCAT(SUBSTRING("col_7", 1, 3), REPEAT(\'*\', LENGTH("col_7")-(2 * 3)), '
+                        'SUBSTRING("col_7", LENGTH("col_7")-3+1, 3)) '
+                        'ELSE "col_7" END',
                     'conditions': None,
                 },
             ],
@@ -254,6 +278,16 @@ class TestTransformHelper(unittest.TestCase):
                     {'column': 'col_2', 'regex_match': r'[0-9]{3}\.[0-9]{3}'},
                 ],
             },
+            {
+                'field_id': 'col_7',
+                'tap_stream_name': 'public-my_table',
+                'type': 'MASK-SKIP-ENDS-3',
+                'when': [
+                    {'column': 'col_1', 'equals': 30},
+                    {'column': 'col_2', 'regex_match': r'[0-9]{3}\.[0-9]{3}'},
+                    {'column': 'col_4', 'equals': None},
+                ],
+            },
         ]
 
         trans = TransformationHelper.get_trans_in_sql_flavor(
@@ -287,7 +321,15 @@ class TestTransformHelper(unittest.TestCase):
                 {
                     'trans': '"COL_6" = CONCAT(SUBSTRING("COL_6", 1, 5), SHA2(SUBSTRING("COL_6", 5 + 1), 256))',
                     'conditions': '("COL_1" = 30) AND ("COL_2" '
-                    'REGEXP \'[0-9]{3}\.[0-9]{3}\')',  # pylint: disable=W1401  # noqa: W605
+                        'REGEXP \'[0-9]{3}\.[0-9]{3}\')',  # pylint: disable=W1401  # noqa: W605
+                },
+                {
+                    'trans': '"COL_7" = CASE WHEN LENGTH("COL_7") > 2 * 3 THEN '
+                        'CONCAT(SUBSTRING("COL_7", 1, 3), REPEAT(\'*\', LENGTH("COL_7")-(2 * 3)), '
+                        'SUBSTRING("COL_7", LENGTH("COL_7")-3+1, 3)) '
+                        'ELSE "COL_7" END',
+                    'conditions': '("COL_1" = 30) AND ("COL_2" '
+                        'REGEXP \'[0-9]{3}\.[0-9]{3}\') AND ("COL_4" IS NULL)',  # pylint: disable=W1401  # noqa: W605
                 },
             ],
         )
@@ -342,6 +384,16 @@ class TestTransformHelper(unittest.TestCase):
                     {'column': 'col_2', 'regex_match': r'[0-9]{3}\.[0-9]{3}'},
                 ],
             },
+            {
+                'field_id': 'col_7',
+                'tap_stream_name': 'public-my_table',
+                'type': 'MASK-SKIP-ENDS-3',
+                'when': [
+                    {'column': 'col_1', 'equals': 30},
+                    {'column': 'col_2', 'regex_match': r'[0-9]{3}\.[0-9]{3}'},
+                    {'column': 'col_4', 'equals': None},
+                ],
+            },
         ]
 
         trans = TransformationHelper.get_trans_in_sql_flavor(
@@ -382,6 +434,14 @@ class TestTransformHelper(unittest.TestCase):
                     'trans': '"col_6" = CONCAT(SUBSTRING("col_6", 1, 5), ENCODE(DIGEST(SUBSTRING("col_6", 5 + 1), '
                     '\'sha256\'), \'hex\'))',
                     'conditions': '("col_1" = 30) AND ("col_2" ~ \'[0-9]{3}\.[0-9]{3}\')',  # pylint: disable=W1401  # noqa: W605, E501
+                },
+                {
+                    'trans': '"col_7" = CASE WHEN LENGTH("col_7") > 2 * 3 THEN '
+                        'CONCAT(SUBSTRING("col_7", 1, 3), REPEAT(\'*\', LENGTH("col_7")-(2 * 3)), '
+                        'SUBSTRING("col_7", LENGTH("col_7")-3+1, 3)) '
+                        'ELSE "col_7" END',
+                    'conditions': '("col_1" = 30) AND ("col_2" ~ \'[0-9]{3}\.[0-9]{3}\') ' # pylint: disable=W1401  # noqa: W605, E501
+                        'AND ("col_4" IS NULL)',
                 },
             ],
         )

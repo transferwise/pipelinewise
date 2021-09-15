@@ -488,6 +488,11 @@ class TestFastSyncTargetSnowflake(TestCase):
                     'tap_stream_name': 'public-my_table',
                     'type': 'HASH-SKIP-FIRST-5',
                 },
+                {
+                    'field_id': 'col_7',
+                    'tap_stream_name': 'public-my_table',
+                    'type': 'MASK-SKIP-ENDS-3',
+                },
             ]
         }
 
@@ -502,7 +507,11 @@ class TestFastSyncTargetSnowflake(TestCase):
                 '"COL_3" = TIMESTAMP_NTZ_FROM_PARTS(DATE_FROM_PARTS(YEAR("COL_3"), 1, 1),TO_TIME("COL_3")), '
                 '"COL_4" = 0, '
                 '"COL_5" = SHA2("COL_5", 256), '
-                '"COL_6" = CONCAT(SUBSTRING("COL_6", 1, 5), SHA2(SUBSTRING("COL_6", 5 + 1), 256));'
+                '"COL_6" = CONCAT(SUBSTRING("COL_6", 1, 5), SHA2(SUBSTRING("COL_6", 5 + 1), 256)), '
+                '"COL_7" = CASE WHEN LENGTH("COL_7") > 2 * 3 THEN '
+                'CONCAT(SUBSTRING("COL_7", 1, 3), REPEAT(\'*\', LENGTH("COL_7")-(2 * 3)), '
+                'SUBSTRING("COL_7", LENGTH("COL_7")-3+1, 3)) '
+                'ELSE "COL_7" END;'
             ],
         )
 
@@ -557,6 +566,16 @@ class TestFastSyncTargetSnowflake(TestCase):
                         {'column': 'col_2', 'regex_match': r'[0-9]{3}\.[0-9]{3}'},
                     ],
                 },
+                {
+                    'field_id': 'col_7',
+                    'tap_stream_name': 'public-my_table',
+                    'type': 'MASK-SKIP-ENDS-3',
+                    'when': [
+                        {'column': 'col_1', 'equals': 30},
+                        {'column': 'col_2', 'regex_match': r'[0-9]{3}\.[0-9]{3}'},
+                        {'column': 'col_4', 'equals': None},
+                    ],
+                },
             ]
         }
 
@@ -572,6 +591,12 @@ class TestFastSyncTargetSnowflake(TestCase):
                 '"COL_6" = CONCAT(SUBSTRING("COL_6", 1, 5), SHA2(SUBSTRING("COL_6", 5 + 1), 256)) '
                 'WHERE ("COL_1" = 30) AND ("COL_2" '
                 'REGEXP \'[0-9]{3}\.[0-9]{3}\');',  # pylint: disable=W1401  # noqa: W605
+                'UPDATE "MY_SCHEMA"."MY_TABLE_TEMP" SET '
+                '"COL_7" = CASE WHEN LENGTH("COL_7") > 2 * 3 THEN '
+                'CONCAT(SUBSTRING("COL_7", 1, 3), REPEAT(\'*\', LENGTH("COL_7")-(2 * 3)), '
+                'SUBSTRING("COL_7", LENGTH("COL_7")-3+1, 3)) '
+                'ELSE "COL_7" END WHERE ("COL_1" = 30) AND ("COL_2" '
+                'REGEXP \'[0-9]{3}\.[0-9]{3}\') AND ("COL_4" IS NULL);',  # pylint: disable=W1401  # noqa: W605
                 'UPDATE "MY_SCHEMA"."MY_TABLE_TEMP" SET "COL_1" = NULL, "COL_4" = 0, "COL_5" = SHA2("COL_5", 256);',
             ],
         )
