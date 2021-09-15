@@ -413,7 +413,10 @@ class FastSyncTapPostgres:
                 data_type,
                 CASE
                     WHEN data_type = 'ARRAY' THEN 'array_to_json("' || column_name || '") AS ' || column_name
-                    WHEN data_type = 'date' THEN column_name || '::{date_type} AS ' || column_name
+                    WHEN data_type = 'date' THEN
+                       'CASE WHEN "' ||column_name|| E'" < \\'0001-01-01\\' '
+                            'OR "' ||column_name|| E'" > \\'9999-12-31\\' THEN \\'9999-12-31\\' '
+                            'ELSE "' ||column_name|| '"::{date_type} END AS "' ||column_name|| '"'
                     WHEN udt_name = 'time' THEN 'replace("' || column_name || E'"::varchar,\\\'24:00:00\\\',\\\'00:00:00\\\') AS ' || column_name
                     WHEN udt_name = 'timetz' THEN 'replace(("' || column_name || E'" at time zone \'\'UTC\'\')::time::varchar,\\\'24:00:00\\\',\\\'00:00:00\\\') AS ' || column_name
                     WHEN udt_name in ('timestamp', 'timestamptz') THEN
