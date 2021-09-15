@@ -370,11 +370,13 @@ class TransformationHelper:
 
         if sql_flavor == SQLFlavor.SNOWFLAKE:
             trans = '{0} = CASE WHEN LENGTH({0}) > 2 * {1} THEN ' \
-                    'CONCAT(SUBSTRING({0}, 1, {1}), REPEAT(\'*\', LENGTH({0})-(2 * {1})), SUBSTRING({0}, LENGTH({0})-{1}+1, {1})) ' \
+                    'CONCAT(SUBSTRING({0}, 1, {1}), REPEAT(\'*\', LENGTH({0})-(2 * {1})), ' \
+                    'SUBSTRING({0}, LENGTH({0})-{1}+1, {1})) ' \
                     'ELSE {0} END'.format(column, skip_ends_n)
         elif sql_flavor == SQLFlavor.POSTGRES:
             trans = '{0} = CASE WHEN LENGTH({0}) > 2 * {1} THEN ' \
-                    'CONCAT(SUBSTRING({0}, 1, {1}), REPEAT(\'*\', LENGTH({0})-(2 * {1})), SUBSTRING({0}, LENGTH({0})-{1}+1, {1})) ' \
+                    'CONCAT(SUBSTRING({0}, 1, {1}), REPEAT(\'*\', LENGTH({0})-(2 * {1})), ' \
+                    'SUBSTRING({0}, LENGTH({0})-{1}+1, {1})) ' \
                     'ELSE {0} END'.format(column, skip_ends_n)
         else:
             raise NotImplementedError(f'MASK-SKIP-ENDS transformation in {sql_flavor.value} SQL flavor '
