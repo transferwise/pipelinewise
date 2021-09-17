@@ -440,7 +440,7 @@ class TestTransformHelper(unittest.TestCase):
                         'CONCAT(SUBSTRING("col_7", 1, 3), REPEAT(\'*\', LENGTH("col_7")-(2 * 3)), '
                         'SUBSTRING("col_7", LENGTH("col_7")-3+1, 3)) '
                         'ELSE "col_7" END',
-                    'conditions': '("col_1" = 30) AND ("col_2" ~ \'[0-9]{3}\.[0-9]{3}\') ' # pylint: disable=W1401  # noqa: W605, E501
+                    'conditions': '("col_1" = 30) AND ("col_2" ~ \'[0-9]{3}\.[0-9]{3}\') '  # pylint: disable=W1401  # noqa: W605, E501
                         'AND ("col_4" IS NULL)',
                 },
             ],
