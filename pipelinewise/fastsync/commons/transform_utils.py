@@ -22,15 +22,15 @@ class TransformationType(Enum):
     HASH_SKIP_FIRST_7 = 'HASH-SKIP-FIRST-7'
     HASH_SKIP_FIRST_8 = 'HASH-SKIP-FIRST-8'
     HASH_SKIP_FIRST_9 = 'HASH-SKIP-FIRST-9'
-    MASK_SKIP_ENDS_1 = 'MASK-SKIP-ENDS-1'
-    MASK_SKIP_ENDS_2 = 'MASK-SKIP-ENDS-2'
-    MASK_SKIP_ENDS_3 = 'MASK-SKIP-ENDS-3'
-    MASK_SKIP_ENDS_4 = 'MASK-SKIP-ENDS-4'
-    MASK_SKIP_ENDS_5 = 'MASK-SKIP-ENDS-5'
-    MASK_SKIP_ENDS_6 = 'MASK-SKIP-ENDS-6'
-    MASK_SKIP_ENDS_7 = 'MASK-SKIP-ENDS-7'
-    MASK_SKIP_ENDS_8 = 'MASK-SKIP-ENDS-8'
-    MASK_SKIP_ENDS_9 = 'MASK-SKIP-ENDS-9'
+    MASK_STRING_SKIP_ENDS_1 = 'MASK-STRING-SKIP-ENDS-1'
+    MASK_STRING_SKIP_ENDS_2 = 'MASK-STRING-SKIP-ENDS-2'
+    MASK_STRING_SKIP_ENDS_3 = 'MASK-STRING-SKIP-ENDS-3'
+    MASK_STRING_SKIP_ENDS_4 = 'MASK-STRING-SKIP-ENDS-4'
+    MASK_STRING_SKIP_ENDS_5 = 'MASK-STRING-SKIP-ENDS-5'
+    MASK_STRING_SKIP_ENDS_6 = 'MASK-STRING-SKIP-ENDS-6'
+    MASK_STRING_SKIP_ENDS_7 = 'MASK-STRING-SKIP-ENDS-7'
+    MASK_STRING_SKIP_ENDS_8 = 'MASK-STRING-SKIP-ENDS-8'
+    MASK_STRING_SKIP_ENDS_9 = 'MASK-STRING-SKIP-ENDS-9'
 
 
 @unique
@@ -125,11 +125,11 @@ class TransformationHelper:
                         {'trans': f'{column} = 0', 'conditions': conditions}
                     )
 
-                elif transform_type.value.startswith('MASK-SKIP-ENDS-'):
+                elif transform_type.value.startswith('MASK-STRING-SKIP-ENDS-'):
 
                     trans_map.append(
                         {
-                            'trans': cls.__mask_skip_ends_to_sql(
+                            'trans': cls.__mask_string_skip_ends_to_sql(
                                 transform_type, column, sql_flavor
                             ),
                             'conditions': conditions,
@@ -353,18 +353,18 @@ class TransformationHelper:
 
     @classmethod
     # pylint: disable=W0238  # False positive when it is used by another classmethod
-    def __mask_skip_ends_to_sql(
+    def __mask_string_skip_ends_to_sql(
         cls, transform_type: TransformationType, column: str, sql_flavor: SQLFlavor
     ) -> str:
         """
-        convert MASK-SKIP-ENDS-n transformation into the right sql string
+        convert MASK-STRING-SKIP-ENDS-n transformation into the right sql string
         Args:
             column: column to apply the masking to
             sql_flavor: the sql flavor to use
 
-        Raises: NotImplementedError if mask-skip-ends is not implemented for the given sql flavor
+        Raises: NotImplementedError if mask-string-skip-ends is not implemented for the given sql flavor
 
-        Returns: sql string equivalent of the mask-skip-ends
+        Returns: sql string equivalent of the mask-string-skip-ends
         """
         skip_ends_n = int(transform_type.value[-1])
 
@@ -379,7 +379,7 @@ class TransformationHelper:
                     'SUBSTRING({0}, LENGTH({0})-{1}+1, {1})) ' \
                     'ELSE {0} END'.format(column, skip_ends_n)
         else:
-            raise NotImplementedError(f'MASK-SKIP-ENDS transformation in {sql_flavor.value} SQL flavor '
+            raise NotImplementedError(f'MASK-STRING-SKIP-ENDS transformation in {sql_flavor.value} SQL flavor '
                                       f'not implemented!')
 
         return trans

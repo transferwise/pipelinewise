@@ -107,7 +107,7 @@ class TestTransformHelper(unittest.TestCase):
             {
                 'field_id': 'col_7',
                 'tap_stream_name': 'public-my_table',
-                'type': 'MASK-SKIP-ENDS-3',
+                'type': 'MASK-STRING-SKIP-ENDS-3',
             },
         ]
 
@@ -184,7 +184,7 @@ class TestTransformHelper(unittest.TestCase):
             {
                 'field_id': 'col_7',
                 'tap_stream_name': 'public-my_table',
-                'type': 'MASK-SKIP-ENDS-3',
+                'type': 'MASK-STRING-SKIP-ENDS-3',
             },
         ]
 
@@ -281,7 +281,7 @@ class TestTransformHelper(unittest.TestCase):
             {
                 'field_id': 'col_7',
                 'tap_stream_name': 'public-my_table',
-                'type': 'MASK-SKIP-ENDS-3',
+                'type': 'MASK-STRING-SKIP-ENDS-3',
                 'when': [
                     {'column': 'col_1', 'equals': 30},
                     {'column': 'col_2', 'regex_match': r'[0-9]{3}\.[0-9]{3}'},
@@ -387,7 +387,7 @@ class TestTransformHelper(unittest.TestCase):
             {
                 'field_id': 'col_7',
                 'tap_stream_name': 'public-my_table',
-                'type': 'MASK-SKIP-ENDS-3',
+                'type': 'MASK-STRING-SKIP-ENDS-3',
                 'when': [
                     {'column': 'col_1', 'equals': 30},
                     {'column': 'col_2', 'regex_match': r'[0-9]{3}\.[0-9]{3}'},
