@@ -133,9 +133,9 @@ class TestTransformHelper(unittest.TestCase):
                 },
                 {
                     'trans': '"COL_7" = CASE WHEN LENGTH("COL_7") > 2 * 3 THEN '
-                        'CONCAT(SUBSTRING("COL_7", 1, 3), REPEAT(\'*\', LENGTH("COL_7")-(2 * 3)), '
-                        'SUBSTRING("COL_7", LENGTH("COL_7")-3+1, 3)) '
-                        'ELSE REPEAT(\'*\', LENGTH("COL_7")) END',
+                    'CONCAT(SUBSTRING("COL_7", 1, 3), REPEAT(\'*\', LENGTH("COL_7")-(2 * 3)), '
+                    'SUBSTRING("COL_7", LENGTH("COL_7")-3+1, 3)) '
+                    'ELSE REPEAT(\'*\', LENGTH("COL_7")) END',
                     'conditions': None,
                 },
             ],
@@ -220,9 +220,9 @@ class TestTransformHelper(unittest.TestCase):
                 },
                 {
                     'trans': '"col_7" = CASE WHEN LENGTH("col_7") > 2 * 3 THEN '
-                        'CONCAT(SUBSTRING("col_7", 1, 3), REPEAT(\'*\', LENGTH("col_7")-(2 * 3)), '
-                        'SUBSTRING("col_7", LENGTH("col_7")-3+1, 3)) '
-                        'ELSE REPEAT(\'*\', LENGTH("col_7")) END',
+                    'CONCAT(SUBSTRING("col_7", 1, 3), REPEAT(\'*\', LENGTH("col_7")-(2 * 3)), '
+                    'SUBSTRING("col_7", LENGTH("col_7")-3+1, 3)) '
+                    'ELSE REPEAT(\'*\', LENGTH("col_7")) END',
                     'conditions': None,
                 },
             ],
@@ -321,15 +321,15 @@ class TestTransformHelper(unittest.TestCase):
                 {
                     'trans': '"COL_6" = CONCAT(SUBSTRING("COL_6", 1, 5), SHA2(SUBSTRING("COL_6", 5 + 1), 256))',
                     'conditions': '("COL_1" = 30) AND ("COL_2" '
-                        'REGEXP \'[0-9]{3}\.[0-9]{3}\')',  # pylint: disable=W1401  # noqa: W605
+                    'REGEXP \'[0-9]{3}\.[0-9]{3}\')',  # pylint: disable=W1401  # noqa: W605
                 },
                 {
                     'trans': '"COL_7" = CASE WHEN LENGTH("COL_7") > 2 * 3 THEN '
-                        'CONCAT(SUBSTRING("COL_7", 1, 3), REPEAT(\'*\', LENGTH("COL_7")-(2 * 3)), '
-                        'SUBSTRING("COL_7", LENGTH("COL_7")-3+1, 3)) '
-                        'ELSE REPEAT(\'*\', LENGTH("COL_7")) END',
+                    'CONCAT(SUBSTRING("COL_7", 1, 3), REPEAT(\'*\', LENGTH("COL_7")-(2 * 3)), '
+                    'SUBSTRING("COL_7", LENGTH("COL_7")-3+1, 3)) '
+                    'ELSE REPEAT(\'*\', LENGTH("COL_7")) END',
                     'conditions': '("COL_1" = 30) AND ("COL_2" '
-                        'REGEXP \'[0-9]{3}\.[0-9]{3}\') AND ("COL_4" IS NULL)',  # pylint: disable=W1401  # noqa: W605
+                    'REGEXP \'[0-9]{3}\.[0-9]{3}\') AND ("COL_4" IS NULL)',  # pylint: disable=W1401  # noqa: W605
                 },
             ],
         )
@@ -437,11 +437,11 @@ class TestTransformHelper(unittest.TestCase):
                 },
                 {
                     'trans': '"col_7" = CASE WHEN LENGTH("col_7") > 2 * 3 THEN '
-                        'CONCAT(SUBSTRING("col_7", 1, 3), REPEAT(\'*\', LENGTH("col_7")-(2 * 3)), '
-                        'SUBSTRING("col_7", LENGTH("col_7")-3+1, 3)) '
-                        'ELSE REPEAT(\'*\', LENGTH("col_7")) END',
+                    'CONCAT(SUBSTRING("col_7", 1, 3), REPEAT(\'*\', LENGTH("col_7")-(2 * 3)), '
+                    'SUBSTRING("col_7", LENGTH("col_7")-3+1, 3)) '
+                    'ELSE REPEAT(\'*\', LENGTH("col_7")) END',
                     'conditions': '("col_1" = 30) AND ("col_2" ~ \'[0-9]{3}\.[0-9]{3}\') '  # pylint: disable=W1401  # noqa: W605, E501
-                        'AND ("col_4" IS NULL)',
+                    'AND ("col_4" IS NULL)',
                 },
             ],
         )
