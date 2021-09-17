@@ -511,7 +511,7 @@ class TestFastSyncTargetSnowflake(TestCase):
                 '"COL_7" = CASE WHEN LENGTH("COL_7") > 2 * 3 THEN '
                 'CONCAT(SUBSTRING("COL_7", 1, 3), REPEAT(\'*\', LENGTH("COL_7")-(2 * 3)), '
                 'SUBSTRING("COL_7", LENGTH("COL_7")-3+1, 3)) '
-                'ELSE "COL_7" END;'
+                'ELSE REPEAT(\'*\', LENGTH("COL_7")) END;'
             ],
         )
 
@@ -595,7 +595,7 @@ class TestFastSyncTargetSnowflake(TestCase):
                 '"COL_7" = CASE WHEN LENGTH("COL_7") > 2 * 3 THEN '
                 'CONCAT(SUBSTRING("COL_7", 1, 3), REPEAT(\'*\', LENGTH("COL_7")-(2 * 3)), '
                 'SUBSTRING("COL_7", LENGTH("COL_7")-3+1, 3)) '
-                'ELSE "COL_7" END WHERE ("COL_1" = 30) AND ("COL_2" '
+                'ELSE REPEAT(\'*\', LENGTH("COL_7")) END WHERE ("COL_1" = 30) AND ("COL_2" '
                 'REGEXP \'[0-9]{3}\.[0-9]{3}\') AND ("COL_4" IS NULL);',  # pylint: disable=W1401  # noqa: W605
                 'UPDATE "MY_SCHEMA"."MY_TABLE_TEMP" SET "COL_1" = NULL, "COL_4" = 0, "COL_5" = SHA2("COL_5", 256);',
             ],
