@@ -165,8 +165,8 @@ endef
 
 help: .pw_logo
 	@echo
-	@echo "  Rules"
-	@echo "  ====="
+	@echo "  Targets"
+	@echo "  ======="
 	@echo "     pipelinewise                                               Install the main PipelineWise component"
 	@echo "     pipelinewise_no_test_extras                                Install the main Pipelinewise component without test extras"
 	@echo
@@ -184,7 +184,7 @@ help: .pw_logo
 	@echo "   Options"
 	@echo "   ======="
 	@echo "      -e pw_connector=connector1,connector2,...                 Define a list of connectors for installing or cleaning"
-	@echo "      -e pw_acceptliceses=y/Y/Yes/YES                           Forcing to accept the licenses automatically"
+	@echo "      -e pw_acceptlicenses=y/Y/Yes/YES                           Forcing to accept the licenses automatically"
 	@echo
 	@echo "   To start CLI"
 	@echo "   ============"
@@ -252,6 +252,7 @@ list_components:
 
 list_default_connectors:
 	@echo
+	@echo "   ============================"
 	@echo "   Available Default Connectors"
 	@echo "   ============================"
 	@$(foreach var,$(DEFAULT_CONNECTORS), $(call print_list_of_connectors,$(var));)
@@ -259,6 +260,7 @@ list_default_connectors:
 
 list_extra_connectors:
 	@echo
+	@echo "   ============================"
 	@echo "   Available Extra Connectors"
 	@echo "   ============================"
 	@$(foreach var,$(EXTRA_CONNECTORS), $(call print_list_of_connectors,$(var));)

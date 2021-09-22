@@ -7,7 +7,7 @@ RUN apt-get -qq update \
     && rm -rf /var/lib/apt/lists/* \
     && pip install -U --no-cache-dir pip \
     && cd /app \
-    && ./install.sh --connectors=none --acceptlicenses --nousage --notestextras \
+    && make pipelinewise_no_test_extras -e pw_acceptlicenses=y \
     && ln -s /root/.pipelinewise /app/.pipelinewise
 
 ENTRYPOINT ["/app/entrypoint.sh"]
