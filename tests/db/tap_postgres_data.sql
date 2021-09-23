@@ -20,39 +20,40 @@ CREATE TABLE edgydata(
     cjson json,
     cjsonb jsonb,
     cvarchar varchar,
+    "date" date,
     PRIMARY KEY (cid)
 );
 
-insert into edgydata (ctimentz, ctimetz, cjson, cjsonb, cvarchar) values
-    (null, null, null, null, null),
-    ('23:00:15', '23:00:15+00', null, null, null),
-    ('12:00:15', '12:00:15+00:00', null, null, null),
-    ('12:00:15', '12:00:15+0300', null, null, null),
-    ('12:00:15', '12:00:15-0300', null, null, null),
-    ('24:00:00', '24:00:00', null, null, null),
-    ('24:00:00', '24:00:00+0000', null, null, null),
-    ('24:00:00', '24:00:00-0100', null, null, null),
-    ('00:00:00', '00:00:00', null, null, null),
-    (null, null, null, null,'Lorem ipsum dolor sit amet'),
-    (null, null, null, null,'Chinese: 和毛泽东 <<重上井冈山>>. 严永欣, 一九八八年.'),
-    (null, null, null, null,'Thai: แผ่นดินฮั่นเสื่อมโทรมแสนสังเวช'),
-    (null, null, null, null,E'Special Characters: ["/\\,!@£$%^&*()]'),
-    (null, null, '[]', '[]', '[]' ),
-    (null, null, '{}', '{}', '{}'),
-    (null, null, '[{}, {}]', '[{}, {}]',  '[{}, {}]'),
+insert into edgydata (ctimentz, ctimetz, cjson, cjsonb, cvarchar, "date") values
+    (null, null, null, null, null, DATE '20107-05-28'),
+    ('23:00:15', '23:00:15+00', null, null, null, DATE '2011-09-10'),
+    ('12:00:15', '12:00:15+00:00', null, null, null, DATE '2019-12-10'),
+    ('12:00:15', '12:00:15+0300', null, null, null, DATE '0001-09-10'),
+    ('12:00:15', '12:00:15-0300', null, null, null, DATE '1990-09-30'),
+    ('24:00:00', '24:00:00', null, null, null, null),
+    ('24:00:00', '24:00:00+0000', null, null, null, DATE '333333-09-30'),
+    ('24:00:00', '24:00:00-0100', null, null, null, DATE '1990-09-30'),
+    ('00:00:00', '00:00:00', null, null, null, DATE '2021-01-30'),
+    (null, null, null, null,'Lorem ipsum dolor sit amet', DATE '2021-01-30'),
+    (null, null, null, null,'Chinese: 和毛泽东 <<重上井冈山>>. 严永欣, 一九八八年.', DATE '2021-01-30'),
+    (null, null, null, null,'Thai: แผ่นดินฮั่นเสื่อมโทรมแสนสังเวช', DATE '2021-01-30'),
+    (null, null, null, null,E'Special Characters: ["/\\,!@£$%^&*()]', DATE '2021-01-30'),
+    (null, null, '[]', '[]', '[]' , DATE '2021-01-30'),
+    (null, null, '{}', '{}', '{}', DATE '2021-01-30'),
+    (null, null, '[{}, {}]', '[{}, {}]',  '[{}, {}]', DATE '2021-01-30'),
     (null, null, '[{"key": "ValueOne", "actions": []}, {"key": "ValueTwo", "actions": []}]',
         '[{"key": "ValueOne", "actions": []}, {"key": "ValueTwo", "actions": []}]',
-        '[{"key": "ValueOne", "actions": []}, {"key": "ValueTwo", "actions": []}]'),
-    (null, null, E'{"key": "Value\'s One"}', E'{"key": "Value\'s One"}', E'{"key": "Value\'s One"}'),
+        '[{"key": "ValueOne", "actions": []}, {"key": "ValueTwo", "actions": []}]', DATE '2021-01-30'),
+    (null, null, E'{"key": "Value\'s One"}', E'{"key": "Value\'s One"}', E'{"key": "Value\'s One"}', DATE '2021-01-30'),
     (null, null, E'[{"key": "Value\'s One", "actions": []},{"key": "Value\U00000027s Two", "actions": []}]',
         E'[{"key": "Value\'s One", "actions": []},{"key": "Value\U00000027s Two", "actions": []}]',
-        E'[{"key": "Value\'s One", "actions": []},{"key": "Value\U00000027s Two", "actions": []}]'),
-    (null, null, null, null,'	'),
+        E'[{"key": "Value\'s One", "actions": []},{"key": "Value\U00000027s Two", "actions": []}]', DATE '2021-01-30'),
+    (null, null, null, null,'	', DATE '2021-01-30'),
     (null, null, null, null,'Enter	The
-Ninja'),
+Ninja', DATE '2021-01-30'),
     (null, null, null, null,'Liewe
-Maatjies'),
-    (null, null, null, null,'Liewe	Maatjies')
+Maatjies', DATE '2021-01-30'),
+    (null, null, null, null,'Liewe	Maatjies', DATE '2021-01-30')
 ;
 
 COMMIT;
