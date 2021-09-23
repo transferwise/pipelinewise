@@ -20,15 +20,20 @@ STATUS_RUNNING = 'running'
 STATUS_FAILED = 'failed'
 STATUS_SUCCESS = 'success'
 
-TapParams = namedtuple('TapParams', ['id', 'type', 'bin', 'python_bin', 'config', 'properties', 'state'])
+TapParams = namedtuple(
+    'TapParams', ['id', 'type', 'bin', 'python_bin', 'config', 'properties', 'state']
+)
 TargetParams = namedtuple('TargetParams', ['id', 'type', 'bin', 'python_bin', 'config'])
-TransformParams = namedtuple('TransformParams', ['bin', 'python_bin', 'config', 'tap_id', 'target_id'])
+TransformParams = namedtuple(
+    'TransformParams', ['bin', 'python_bin', 'config', 'tap_id', 'target_id']
+)
 
 
 class RunCommandException(Exception):
     """
     Custom exception to raise when run command fails
     """
+
     def __init__(self, *args, **kwargs):
         Exception.__init__(self, *args, **kwargs)
 
@@ -56,9 +61,9 @@ def exists_and_executable(bin_path: str) -> bool:
     return True
 
 
-def build_tap_command(tap: TapParams,
-                      profiling_mode: bool = False,
-                      profiling_dir: str = None) -> str:
+def build_tap_command(
+    tap: TapParams, profiling_mode: bool = False, profiling_dir: str = None
+) -> str:
     """
     Builds a command that starts a singer tap connector with the
     required command line arguments
@@ -73,7 +78,9 @@ def build_tap_command(tap: TapParams,
     # Following the singer spec the catalog JSON file needs to be passed by the --catalog argument
     # However some tap (i.e. tap-mysql and tap-postgres) requires it as --properties
     # This is probably for historical reasons and need to clarify on Singer slack channels
-    catalog_argument = utils.get_tap_property_by_tap_type(tap.type, 'tap_catalog_argument')
+    catalog_argument = utils.get_tap_property_by_tap_type(
+        tap.type, 'tap_catalog_argument'
+    )
 
     state_arg = ''
     if tap.state and os.path.isfile(tap.state):
@@ -88,9 +95,9 @@ def build_tap_command(tap: TapParams,
     return tap_command
 
 
-def build_target_command(target: TargetParams,
-                         profiling_mode: bool = False,
-                         profiling_dir: str = None) -> str:
+def build_target_command(
+    target: TargetParams, profiling_mode: bool = False, profiling_dir: str = None
+) -> str:
     """
     Builds a command that starts a singer target connector with the
     required command line arguments
@@ -107,14 +114,16 @@ def build_target_command(target: TargetParams,
 
     if profiling_mode:
         dump_file = os.path.join(profiling_dir, f'target_{target.id}.pstat')
-        target_command = f'{target.python_bin} -m cProfile -o {dump_file} {target_command}'
+        target_command = (
+            f'{target.python_bin} -m cProfile -o {dump_file} {target_command}'
+        )
 
     return target_command
 
 
-def build_transformation_command(transform: TransformParams,
-                                 profiling_mode: bool = False,
-                                 profiling_dir: str = None) -> str:
+def build_transformation_command(
+    transform: TransformParams, profiling_mode: bool = False, profiling_dir: str = None
+) -> str:
     """
     Builds a command that starts a singer transformation connector
     with the required command line arguments
@@ -138,16 +147,21 @@ def build_transformation_command(transform: TransformParams,
             if profiling_mode:
                 dump_file = os.path.join(
                     profiling_dir,
-                    f'transformation_{transform.tap_id}_{transform.target_id}.pstat')
+                    f'transformation_{transform.tap_id}_{transform.target_id}.pstat',
+                )
 
-                trans_command = f'{transform.python_bin} -m cProfile -o {dump_file} {trans_command}'
+                trans_command = (
+                    f'{transform.python_bin} -m cProfile -o {dump_file} {trans_command}'
+                )
 
     return trans_command
 
 
-def build_stream_buffer_command(buffer_size: int = 0,
-                                log_file: str = None,
-                                stream_buffer_bin: str = DEFAULT_STREAM_BUFFER_BIN) -> str:
+def build_stream_buffer_command(
+    buffer_size: int = 0,
+    log_file: str = None,
+    stream_buffer_bin: str = DEFAULT_STREAM_BUFFER_BIN,
+) -> str:
     """
     Builds a command that buffers data between tap and target
     connectors to stream data asynchronously. Buffering streams
@@ -188,11 +202,15 @@ def build_stream_buffer_command(buffer_size: int = 0,
     return buffer_command
 
 
-def build_singer_command(tap: TapParams, target: TargetParams, transform: TransformParams,
-                         stream_buffer_size: int = 0,
-                         stream_buffer_log_file: str = None,
-                         profiling_mode: bool = False,
-                         profiling_dir: str = None) -> str:
+def build_singer_command(
+    tap: TapParams,
+    target: TargetParams,
+    transform: TransformParams,
+    stream_buffer_size: int = 0,
+    stream_buffer_log_file: str = None,
+    profiling_mode: bool = False,
+    profiling_dir: str = None,
+) -> str:
     """
     Builds a command that starts a full singer command with tap,
     target and optional transformation connectors. The connectors are
@@ -211,46 +229,49 @@ def build_singer_command(tap: TapParams, target: TargetParams, transform: Transf
     Returns:
         string of command line executable
     """
-    tap_command = build_tap_command(tap,
-                                    profiling_mode,
-                                    profiling_dir)
+    tap_command = build_tap_command(tap, profiling_mode, profiling_dir)
 
     LOGGER.debug('Tap command: %s', tap_command)
 
-    target_command = build_target_command(target,
-                                          profiling_mode,
-                                          profiling_dir)
+    target_command = build_target_command(target, profiling_mode, profiling_dir)
 
     LOGGER.debug('Target command: %s', target_command)
 
-    transformation_command = build_transformation_command(transform,
-                                                          profiling_mode,
-                                                          profiling_dir)
+    transformation_command = build_transformation_command(
+        transform, profiling_mode, profiling_dir
+    )
     LOGGER.debug('Transformation command: %s', transformation_command)
 
-    stream_buffer_command = build_stream_buffer_command(stream_buffer_size,
-                                                        stream_buffer_log_file)
+    stream_buffer_command = build_stream_buffer_command(
+        stream_buffer_size, stream_buffer_log_file
+    )
 
     LOGGER.debug('Buffer command: %s', stream_buffer_command)
 
     # Generate the final piped command with all the required components
-    sub_commands = [tap_command, transformation_command, stream_buffer_command, target_command]
+    sub_commands = [
+        tap_command,
+        transformation_command,
+        stream_buffer_command,
+        target_command,
+    ]
     command = ' | '.join(list(filter(None, sub_commands)))
 
     return command
 
 
 # pylint: disable=too-many-arguments
-def build_fastsync_command(tap: TapParams,
-                           target: TargetParams,
-                           transform: TransformParams,
-                           venv_dir: str,
-                           temp_dir: str,
-                           tables: str = None,
-                           profiling_mode: bool = False,
-                           profiling_dir: str = None,
-                           drop_pg_slot: bool = False
-                           ) -> str:
+def build_fastsync_command(
+    tap: TapParams,
+    target: TargetParams,
+    transform: TransformParams,
+    venv_dir: str,
+    temp_dir: str,
+    tables: str = None,
+    profiling_mode: bool = False,
+    profiling_dir: str = None,
+    drop_pg_slot: bool = False,
+) -> str:
     """
     Builds a command that starts fastsync from a given tap to a
     given target with optional transformations.
@@ -273,16 +294,25 @@ def build_fastsync_command(tap: TapParams,
     fastsync_bin = utils.get_fastsync_bin(venv_dir, tap.type, target.type)
     ppw_python_bin = utils.get_pipelinewise_python_bin(venv_dir)
 
-    command_args = ' '.join(list(filter(None, [
-        f'--tap {tap.config}',
-        f'--properties {tap.properties}',
-        f'--state {tap.state}',
-        f'--target {target.config}',
-        f'--temp_dir {temp_dir}',
-        f'--transform {transform.config}' if transform.config and os.path.isfile(transform.config) else '',
-        f'--tables {tables}' if tables else '',
-        '--drop_pg_slot' if drop_pg_slot else '',
-    ])))
+    command_args = ' '.join(
+        list(
+            filter(
+                None,
+                [
+                    f'--tap {tap.config}',
+                    f'--properties {tap.properties}',
+                    f'--state {tap.state}',
+                    f'--target {target.config}',
+                    f'--temp_dir {temp_dir}',
+                    f'--transform {transform.config}'
+                    if transform.config and os.path.isfile(transform.config)
+                    else '',
+                    f'--tables {tables}' if tables else '',
+                    '--drop_pg_slot' if drop_pg_slot else '',
+                ],
+            )
+        )
+    )
 
     command = f'{fastsync_bin} {command_args}'
 
@@ -362,9 +392,11 @@ def run_command(command: str, log_file: str = None, line_callback: callable = No
 
             # Raise run command exception
             errors = ''.join(utils.find_errors_in_log_file(log_file_failed))
-            raise RunCommandException(f'Command failed. Return code: {proc_rc}\n'
-                                      f'Error(s) found:\n{errors}\n'
-                                      f'Full log: {log_file_failed}')
+            raise RunCommandException(
+                f'Command failed. Return code: {proc_rc}\n'
+                f'Error(s) found:\n{errors}\n'
+                f'Full log: {log_file_failed}'
+            )
 
         # Add success status to the log file name
         os.rename(log_file_running, log_file_success)

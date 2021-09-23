@@ -22,7 +22,9 @@ USER_HOME = os.path.expanduser('~')
 CONFIG_DIR = os.path.join(USER_HOME, '.pipelinewise')
 PROFILING_DIR = os.path.join(CONFIG_DIR, 'profiling')
 PIPELINEWISE_DEFAULT_HOME = os.path.join(USER_HOME, 'pipelinewise')
-PIPELINEWISE_HOME = os.path.abspath(os.environ.setdefault('PIPELINEWISE_HOME', PIPELINEWISE_DEFAULT_HOME))
+PIPELINEWISE_HOME = os.path.abspath(
+    os.environ.setdefault('PIPELINEWISE_HOME', PIPELINEWISE_DEFAULT_HOME)
+)
 VENV_DIR = os.path.join(PIPELINEWISE_HOME, '.virtualenvs')
 COMMANDS = [
     'init',
@@ -61,7 +63,9 @@ def __init_logger(log_file=None, debug=False):
     return logger
 
 
-def __init_profiler(profiler_arg: bool, logger: logging.Logger) -> Tuple[Optional[Profile], Optional[str]]:
+def __init_profiler(
+    profiler_arg: bool, logger: logging.Logger
+) -> Tuple[Optional[Profile], Optional[str]]:
     """
     Initialise profiling environment by creating a cprofile.Profiler instance, a folder where pstats can be dumped
     Args:
@@ -82,9 +86,10 @@ def __init_profiler(profiler_arg: bool, logger: logging.Logger) -> Tuple[Optiona
 
         logger.debug('Profiler created.')
 
-        profiling_dir = os.path.join(PROFILING_DIR,
-                                     f'{datetime.utcnow().strftime("%Y%m%d_%H%M%S_%f")}_{generate_random_string(10)}'
-                                     )
+        profiling_dir = os.path.join(
+            PROFILING_DIR,
+            f'{datetime.utcnow().strftime("%Y%m%d_%H%M%S_%f")}_{generate_random_string(10)}',
+        )
 
         try:
             os.makedirs(profiling_dir)
@@ -103,10 +108,12 @@ def __init_profiler(profiler_arg: bool, logger: logging.Logger) -> Tuple[Optiona
     return None, None
 
 
-def __disable_profiler(profiler: Optional[Profile],
-                       profiling_dir: Optional[str],
-                       pstat_filename: Optional[str],
-                       logger: logging.Logger):
+def __disable_profiler(
+    profiler: Optional[Profile],
+    profiling_dir: Optional[str],
+    pstat_filename: Optional[str],
+    logger: logging.Logger,
+):
     """
     Disable given profiler and dump pipelinewise stats into a pStat file
     Args:
@@ -145,32 +152,42 @@ def main():
     parser.add_argument('--target', type=str, default='*', help='"Name of the target')
     parser.add_argument('--tap', type=str, default='*', help='Name of the tap')
     parser.add_argument('--tables', type=str, help='List of tables to sync')
-    parser.add_argument('--dir', type=str, default='*', help='Path to directory with config')
+    parser.add_argument(
+        '--dir', type=str, default='*', help='Path to directory with config'
+    )
     parser.add_argument('--name', type=str, default='*', help='Name of the project')
     parser.add_argument('--secret', type=str, help='Path to vault password file')
     parser.add_argument('--string', type=str)
-    parser.add_argument('--version',
-                        action='version',
-                        help='Displays the installed versions',
-                        version='PipelineWise {} - Command Line Interface'.format(__version__))
+    parser.add_argument(
+        '--version',
+        action='version',
+        help='Displays the installed versions',
+        version='PipelineWise {} - Command Line Interface'.format(__version__),
+    )
     parser.add_argument('--log', type=str, default='*', help='File to log into')
-    parser.add_argument('--extra_log',
-                        default=False,
-                        required=False,
-                        help='Copy singer and fastsync logging into PipelineWise logger',
-                        action='store_true')
-    parser.add_argument('--debug',
-                        default=False,
-                        required=False,
-                        help='Forces the debug mode with logging on stdout and log level debug',
-                        action='store_true')
-    parser.add_argument('--profiler', '-p',
-                        default=False,
-                        required=False,
-                        help='Enables code profiling mode using Python builtin profiler cProfile. '
-                             'The stats will be dumped into a folder in .pipelinewise/profiling',
-                        action='store_true'
-                        )
+    parser.add_argument(
+        '--extra_log',
+        default=False,
+        required=False,
+        help='Copy singer and fastsync logging into PipelineWise logger',
+        action='store_true',
+    )
+    parser.add_argument(
+        '--debug',
+        default=False,
+        required=False,
+        help='Forces the debug mode with logging on stdout and log level debug',
+        action='store_true',
+    )
+    parser.add_argument(
+        '--profiler',
+        '-p',
+        default=False,
+        required=False,
+        help='Enables code profiling mode using Python builtin profiler cProfile. '
+        'The stats will be dumped into a folder in .pipelinewise/profiling',
+        action='store_true',
+    )
 
     args = parser.parse_args()
 
@@ -201,7 +218,9 @@ def main():
     # import_config : this is for backward compatibility; use 'import' instead from CLI
     if args.command == 'import' or args.command == 'import_config':
         if args.dir == '*':
-            print('You must specify a directory path with config YAML files using the argument --dir')
+            print(
+                'You must specify a directory path with config YAML files using the argument --dir'
+            )
             sys.exit(1)
 
         # Every command argument is mapped to a python function with the same name, but 'import' is a
@@ -209,12 +228,16 @@ def main():
         args.command = 'import_project'
 
     if args.command == 'validate' and args.dir == '*':
-        print('You must specify a directory path with config YAML files using the argument --dir')
+        print(
+            'You must specify a directory path with config YAML files using the argument --dir'
+        )
         sys.exit(1)
 
     if args.command == 'encrypt_string':
         if not args.secret:
-            print('You must specify a path to a file with vault secret using the argument --secret')
+            print(
+                'You must specify a path to a file with vault secret using the argument --secret'
+            )
             sys.exit(1)
         if not args.string:
             print('You must specify a string to encrypt using the argument --string')
@@ -229,7 +252,9 @@ def main():
     try:
         getattr(ppw_instance, args.command)()
     finally:
-        __disable_profiler(profiler, profiling_dir, f'pipelinewise_{args.command}', logger)
+        __disable_profiler(
+            profiler, profiling_dir, f'pipelinewise_{args.command}', logger
+        )
 
 
 if __name__ == '__main__':

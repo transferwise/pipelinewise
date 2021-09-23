@@ -4,7 +4,9 @@ Pipelinewise common utils between cli and fastsync
 from typing import Optional
 
 
-def safe_column_name(name: Optional[str], quote_character: Optional[str]=None) -> Optional[str]:
+def safe_column_name(
+    name: Optional[str], quote_character: Optional[str] = None
+) -> Optional[str]:
     """
     Makes column name safe by capitalizing and wrapping it in double quotes
     Args:

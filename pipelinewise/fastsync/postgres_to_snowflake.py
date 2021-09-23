@@ -24,7 +24,7 @@ REQUIRED_CONFIG_KEYS = {
         'user',
         'password',
         'dbname',
-        'tap_id'    # tap_id is required to generate unique replication slot names
+        'tap_id',  # tap_id is required to generate unique replication slot names
     ],
     'target': [
         'account',
@@ -34,8 +34,8 @@ REQUIRED_CONFIG_KEYS = {
         'warehouse',
         's3_bucket',
         'stage',
-        'file_format'
-    ]
+        'file_format',
+    ],
 }
 
 LOCK = multiprocessing.Lock()
@@ -74,7 +74,7 @@ def tap_type_to_target_type(pg_type):
         # ARRAY is uppercase, because postgres stores it in this format in information_schema.columns.data_type
         'ARRAY': 'VARIANT',
         'json': 'VARIANT',
-        'jsonb': 'VARIANT'
+        'jsonb': 'VARIANT',
     }.get(pg_type, 'VARCHAR')
 
 
@@ -96,14 +96,18 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
         postgres.open_connection()
 
         # Get bookmark - LSN position or Incremental Key value
-        bookmark = utils.get_bookmark_for_table(table, args.properties, postgres, dbname=dbname)
+        bookmark = utils.get_bookmark_for_table(
+            table, args.properties, postgres, dbname=dbname
+        )
 
         # Exporting table data, get table definitions and close connection to avoid timeouts
-        postgres.copy_table(table,
-                            filepath,
-                            split_large_files=args.target.get('split_large_files'),
-                            split_file_chunk_size_mb=args.target.get('split_file_chunk_size_mb'),
-                            split_file_max_chunks=args.target.get('split_file_max_chunks'))
+        postgres.copy_table(
+            table,
+            filepath,
+            split_large_files=args.target.get('split_large_files'),
+            split_file_chunk_size_mb=args.target.get('split_file_chunk_size_mb'),
+            split_file_max_chunks=args.target.get('split_file_max_chunks'),
+        )
         file_parts = glob.glob(f'{filepath}*')
         size_bytes = sum([os.path.getsize(file_part) for file_part in file_parts])
         snowflake_types = postgres.map_column_types_to_target(table)
@@ -118,14 +122,22 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
             os.remove(file_part)
 
         # Create a pattern that match all file parts by removing multipart suffix
-        s3_key_pattern = re.sub(r'\.part\d*$', '', s3_keys[0]) if len(s3_keys) > 0 else 'NO_FILES_TO_LOAD'
+        s3_key_pattern = (
+            re.sub(r'\.part\d*$', '', s3_keys[0])
+            if len(s3_keys) > 0
+            else 'NO_FILES_TO_LOAD'
+        )
 
         # Creating temp table in Snowflake
         snowflake.create_schema(target_schema)
-        snowflake.create_table(target_schema, table, snowflake_columns, primary_key, is_temporary=True)
+        snowflake.create_table(
+            target_schema, table, snowflake_columns, primary_key, is_temporary=True
+        )
 
         # Load into Snowflake table
-        snowflake.copy_to_table(s3_key_pattern, target_schema, table, size_bytes, is_temporary=True)
+        snowflake.copy_to_table(
+            s3_key_pattern, target_schema, table, size_bytes, is_temporary=True
+        )
 
         for s3_key in s3_keys:
             if archive_load_files:
@@ -170,7 +182,8 @@ def main_impl():
     table_sync_excs = []
 
     # Log start info
-    LOGGER.info("""
+    LOGGER.info(
+        """
         -------------------------------------------------------
         STARTING SYNC
         -------------------------------------------------------
@@ -178,7 +191,11 @@ def main_impl():
             Total tables selected to sync  : %s
             Pool size                      : %s
         -------------------------------------------------------
-        """, args.tables, len(args.tables), pool_size)
+        """,
+        args.tables,
+        len(args.tables),
+        pool_size,
+    )
 
     # if internal arg drop_pg_slot is set to True, then we drop the slot before starting resync
     if args.drop_pg_slot:
@@ -187,11 +204,16 @@ def main_impl():
     # Start loading tables in parallel in spawning processes
     with multiprocessing.Pool(pool_size) as proc:
         table_sync_excs = list(
-            filter(lambda x: not isinstance(x, bool), proc.map(partial(sync_table, args=args), args.tables)))
+            filter(
+                lambda x: not isinstance(x, bool),
+                proc.map(partial(sync_table, args=args), args.tables),
+            )
+        )
 
     # Log summary
     end_time = datetime.now()
-    LOGGER.info("""
+    LOGGER.info(
+        """
         -------------------------------------------------------
         SYNC FINISHED - SUMMARY
         -------------------------------------------------------
@@ -202,8 +224,13 @@ def main_impl():
             Pool size                      : %s
             Runtime                        : %s
         -------------------------------------------------------
-        """, len(args.tables), len(args.tables) - len(table_sync_excs), str(table_sync_excs),
-                pool_size, end_time - start_time)
+        """,
+        len(args.tables),
+        len(args.tables) - len(table_sync_excs),
+        str(table_sync_excs),
+        pool_size,
+        end_time - start_time,
+    )
 
     if len(table_sync_excs) > 0:
         sys.exit(1)

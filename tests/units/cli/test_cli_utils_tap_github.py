@@ -31,7 +31,9 @@ class TestUtils(TestCase):
         actual_yaml = cli.utils.load_yaml(TAP_GITHUB_YAML)
         self.assertIsNone(cli.utils.validate(actual_yaml, schema))
 
-    def test_should_pass_if_organization_and_repos_include_missing_but_repository_exists(self):
+    def test_should_pass_if_organization_and_repos_include_missing_but_repository_exists(
+        self,
+    ):
         """
         Test should pass if organization and repos include missing but repository exists
         """
@@ -43,7 +45,9 @@ class TestUtils(TestCase):
 
         self.assertIsNone(cli.utils.validate(actual_yaml, schema))
 
-    def test_should_pass_if_organization_and_repository_missing_but_repos_include_exists(self):
+    def test_should_pass_if_organization_and_repository_missing_but_repos_include_exists(
+        self,
+    ):
         """
         Test should pass if organization and repository missing but repos_include exists
         """

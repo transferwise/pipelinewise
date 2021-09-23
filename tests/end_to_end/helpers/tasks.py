@@ -5,7 +5,9 @@ import subprocess
 
 def run_command(command):
     """Run shell command and return returncode, stdout and stderr"""
-    with subprocess.Popen(shlex.split(command), stdout=subprocess.PIPE, stderr=subprocess.PIPE) as proc:
+    with subprocess.Popen(
+        shlex.split(command), stdout=subprocess.PIPE, stderr=subprocess.PIPE
+    ) as proc:
         proc_result = proc.communicate()
         return_code = proc.returncode
         stdout = proc_result[0].decode('utf-8')
@@ -16,12 +18,12 @@ def run_command(command):
 
 def find_run_tap_log_file(stdout, sync_engine=None):
     """Pipelinewise creates log file per running tap instances in a dynamically created directory:
-        ~/.pipelinewise/<TARGET_ID>/<TAP_ID>/log
+    ~/.pipelinewise/<TARGET_ID>/<TAP_ID>/log
 
-        Every log file matches the pattern:
-        <TARGET_ID>-<TAP_ID>-<DATE>_<TIME>.<SYNC_ENGINE>.log.<STATUS>
+    Every log file matches the pattern:
+    <TARGET_ID>-<TAP_ID>-<DATE>_<TIME>.<SYNC_ENGINE>.log.<STATUS>
 
-        The generated full path is logged to STDOUT when tap starting"""
+    The generated full path is logged to STDOUT when tap starting"""
     if sync_engine:
         pattern = re.compile(r'Writing output into (.+\.{}\.log)'.format(sync_engine))
     else:
