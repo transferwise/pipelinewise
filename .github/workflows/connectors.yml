@@ -27,4 +27,4 @@ jobs:
 
       - name: Check all connectors are installable
         run: |
-          make pipelinewise all_connectors -e pw_acceptlicenses=y
+          make all_connectors -e pw_acceptlicenses=y
