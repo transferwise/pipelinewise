@@ -232,7 +232,7 @@ endif
 	$(call print_execute_time,Connectors)
 
 
-all_connectors: .check_license_env_var default_connectors extra_connectors
+all_connectors: default_connectors extra_connectors
 	@echo "Install all connectors..."
 	$(call print_execute_time,All connectors)
 
