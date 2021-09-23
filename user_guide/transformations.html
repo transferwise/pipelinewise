@@ -139,6 +139,7 @@ doing traditional ETL. ELT ingests data first into DWH in the original format an
 <li><p><strong>MASK-DATE</strong>: Replaces the months and day parts of date columns to be always 1st of Jan.</p></li>
 <li><p><strong>MASK-NUMBER</strong>: Transforms any numeric column to zero.</p></li>
 <li><p><strong>MASK-HIDDEN</strong>: Transforms any string column value to ‘hidden’.</p></li>
+<li><p><strong>MASK-STRING-SKIP-ENDS-n</strong>: Transforms string columns to masked version skipping first and last n characters, e.g. MASK-STRING-SKIP-ENDS-3</p></li>
 </ul>
 </section>
 <section id="transformation-validation">
