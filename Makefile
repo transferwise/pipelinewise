@@ -12,7 +12,7 @@ start_time:=$(shell date +%s)
 
 PIP_ARGS="[test]"
 
-pw_connectors=
+pw_connector=
 
 define DEFAULT_CONNECTORS
 tap-jira

@@ -115,7 +115,7 @@ jobs:
               ./tests/db/tap_mongodb.sh
               ./tests/db/target_postgres.sh
 
-              ./install.sh --acceptlicenses --connectors=target-snowflake,target-postgres,target-bigquery,tap-mysql,tap-postgres,tap-mongodb,transform-field,tap-s3-csv
+              make pipelinewise connectors -e pw_acceptlicenses=y -e pw_connector=target-snowflake,target-postgres,target-bigquery,tap-mysql,tap-postgres,tap-mongodb,transform-field,tap-s3-csv
               . .virtualenvs/pipelinewise/bin/activate
               export PIPELINEWISE_HOME=$PWD
               pytest tests/end_to_end -vx
