@@ -312,6 +312,11 @@ class TestFastSyncTargetPostgres(TestCase):
                     'tap_stream_name': 'public-my_table',
                     'type': 'HASH-SKIP-FIRST-5',
                 },
+                {
+                    'field_id': 'col_7',
+                    'tap_stream_name': 'public-my_table',
+                    'type': 'MASK-STRING-SKIP-ENDS-3',
+                },
             ]
         }
 
@@ -328,7 +333,11 @@ class TestFastSyncTargetPostgres(TestCase):
                 '"col_4" = 0, '
                 '"col_5" = ENCODE(DIGEST("col_5", \'sha256\'), \'hex\'), '
                 '"col_6" = CONCAT(SUBSTRING("col_6", 1, 5), '
-                'ENCODE(DIGEST(SUBSTRING("col_6", 5 + 1), \'sha256\'), \'hex\'));'
+                'ENCODE(DIGEST(SUBSTRING("col_6", 5 + 1), \'sha256\'), \'hex\')), '
+                '"col_7" = CASE WHEN LENGTH("col_7") > 2 * 3 THEN '
+                'CONCAT(SUBSTRING("col_7", 1, 3), REPEAT(\'*\', LENGTH("col_7")-(2 * 3)), '
+                'SUBSTRING("col_7", LENGTH("col_7")-3+1, 3)) '
+                'ELSE REPEAT(\'*\', LENGTH("col_7")) END;'
             ],
         )
 
@@ -383,6 +392,16 @@ class TestFastSyncTargetPostgres(TestCase):
                         {'column': 'col_2', 'regex_match': r'[0-9]{3}\.[0-9]{3}'},
                     ],
                 },
+                {
+                    'field_id': 'col_7',
+                    'tap_stream_name': 'public-my_table',
+                    'type': 'MASK-STRING-SKIP-ENDS-3',
+                    'when': [
+                        {'column': 'col_1', 'equals': 30},
+                        {'column': 'col_2', 'regex_match': r'[0-9]{3}\.[0-9]{3}'},
+                        {'column': 'col_4', 'equals': None},
+                    ],
+                },
             ]
         }
 
@@ -400,6 +419,12 @@ class TestFastSyncTargetPostgres(TestCase):
                 '"col_6" = CONCAT(SUBSTRING("col_6", 1, 5), '
                 'ENCODE(DIGEST(SUBSTRING("col_6", 5 + 1), \'sha256\'), \'hex\')) WHERE ("col_1" = 30) AND '
                 '("col_2" ~ \'[0-9]{3}\.[0-9]{3}\');',  # pylint: disable=W1401  # noqa: W605
+                'UPDATE "my_schema"."my_table_temp" SET '
+                '"col_7" = CASE WHEN LENGTH("col_7") > 2 * 3 THEN '
+                'CONCAT(SUBSTRING("col_7", 1, 3), REPEAT(\'*\', LENGTH("col_7")-(2 * 3)), '
+                'SUBSTRING("col_7", LENGTH("col_7")-3+1, 3)) '
+                'ELSE REPEAT(\'*\', LENGTH("col_7")) END WHERE ("col_1" = 30) AND '
+                '("col_2" ~ \'[0-9]{3}\.[0-9]{3}\') AND ("col_4" IS NULL);',  # pylint: disable=W1401  # noqa: W605
                 'UPDATE "my_schema"."my_table_temp" SET "col_1" = NULL, '
                 '"col_4" = 0, "col_5" = ENCODE(DIGEST("col_5", \'sha256\'), \'hex\');',
             ],

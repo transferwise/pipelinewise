@@ -4529,3 +4529,33 @@ values ('A', '2020-01-01 08:53:56.112248-07'),
        ('H', '1000-03-03 10:30:00 BC'),
        ('I', '50000-03-03 10:30:00')
        ;
+
+DROP TABLE IF EXISTS public.customers CASCADE;
+
+CREATE TABLE customers (
+    id serial primary key,
+    name varchar(100) NOT NULL,
+    phone varchar(10),
+    email text
+);
+
+INSERT INTO customers (name, phone, email) VALUES ('Martelle Cristoforetti', '2071506307', 'mcristoforetti0@accuweather.com'),
+	('Joelynn Cawthorne', '9764917766', 'jcawthorne1@bizjournals.com'),
+	('Gerrie Gillie', '7907324372', 'ggillie2@acquirethisname.com'),
+	('Sheilakathryn Muge', '7195638381', 'smuge3@umn.edu'),
+	('Fedora Mellanby', '4842466494', 'fmellanby4@fema.gov'),
+	('Dall Goodbourn', '4977729268', 'dgoodbourn5@dailymail.co.uk'),
+	('Helaina Van Halen', '5148995067', 'hvan6@hp.com'),
+	('Noelle Knight', NULL, 'nknight7@google.co.uk'),
+	('Anetta Doodney', '4669478802', 'adoodney8@1688.com'),
+	('Almira Clinch', '2235449869', 'aclinch9@netvibes.com'),
+	('Aidan Bachnic', '8479230171', 'abachnica@msu.edu'),
+	('Biddy Shirt', '8109841957', 'bshirtb@nps.gov'),
+	('Robinson Matuszinski', '7587994157', 'rmatuszinskic@ed.gov'),
+	('Pall Porcher', '2719539572', 'pporcherd@thetimes.co.uk'),
+	('Briggs Fyall', '5431890133', 'bfyalle@a8.net'),
+	('Shara Eversfield', '1796055914', 'seversfieldf@prlog.org'),
+	('Abbot Scowcraft', '1658501516', 'ascowcraftg@shutterfly.com'),
+	('Ransell Fardo', '9584912534', 'rfardoh@de.vu'),
+	('Leonard Buche', '9391842560', 'lbuchei@netscape.com'),
+	('Xylia Adnet', '6784481146', 'xadnetj@auda.org.au');
