@@ -40,6 +40,8 @@ The following transformations can be added optionally into the :ref:`yaml_config
 
 * **MASK-HIDDEN**: Transforms any string column value to 'hidden'.
 
+* **MASK-STRING-SKIP-ENDS-n**: Transforms string columns to masked version skipping first and last n characters, e.g. MASK-STRING-SKIP-ENDS-3
+
 
 .. _transformation_validation:
 

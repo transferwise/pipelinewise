@@ -75,6 +75,16 @@ schemas:
       - table_name: "table_with_reserved_words"
         replication_method: "FULL_TABLE"
 
+      ### Table with INCREMENTAL replication
+      - table_name: "customers"
+        replication_method: "INCREMENTAL"
+        replication_key: "id"
+        transformations:
+          - column: "phone"
+            type: "MASK-STRING-SKIP-ENDS-2"
+
+          - column: "email"
+            type: "MASK-STRING-SKIP-ENDS-6"
 
   ### SOURCE SCHEMA 2: public2
   - source_schema: "public2"
