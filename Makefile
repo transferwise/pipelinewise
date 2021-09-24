@@ -78,10 +78,9 @@ define check_license
 	@echo -e "$(YELLOW)"
 	@$(VENV_DIR)/$(1)/bin/python3 -m pip install pip-licenses
 	@echo -e "$(RESET_COLOR)"
-	$(eval DOLLAR_SIGN:=$$)
-	$(eval PKG_NAME:=`$(VENV_DIR)/$(1)/bin/pip-licenses|grep "$(1)[[:space:]]"| awk '{print $$(DOLLAR_SIGN)1}'`)
-	$(eval PKG_VERSION:=`$(VENV_DIR)/$(1)/bin/pip-licenses | grep "$(1)[[:space:]]" | awk '{print $$(DOLLAR_SIGN)2}'`)
-	$(eval PKG_LICENSE:=`$(VENV_DIR)/$(1)/bin/pip-licenses --from mixed | grep "$(1)[[:space:]]" | awk '{for (i=1; i<=NF-2; i++) $$(DOLLAR_SIGN)i = $$(DOLLAR_SIGN)(i+2); NF-=2; print}'`)
+	$(eval PKG_NAME:=`$(VENV_DIR)/$(1)/bin/pip-licenses|grep "$(1)[[:space:]]"| awk '{print $$$$1}'`)
+	$(eval PKG_VERSION:=`$(VENV_DIR)/$(1)/bin/pip-licenses | grep "$(1)[[:space:]]" | awk '{print $$$$2}'`)
+	$(eval PKG_LICENSE:=`$(VENV_DIR)/$(1)/bin/pip-licenses --from mixed | grep "$(1)[[:space:]]" | awk '{for (i=1; i<=NF-2; i++) $$$$i = $$$$(i+2); NF-=2; print}'`)
 
 	$(eval MAIN_LICENSE:="Apache Software License")
 
@@ -288,7 +287,7 @@ endif
 
 .check_gettext:
 	@echo -n "Checking gettext..."
-	@if ! ENVSUBST_LOC="$(type -p "envsubst")" || [[ -z ENVSUBST_LOC ]]; then\
+	@if ! ENVSUBST_LOC="$$(type -p "envsubst")" || [[ -z ENVSUBST_LOC ]]; then\
 		echo -e "$(FAIL_MSG)" &&\
 		echo "envsubst not found but it is required to run this script. Try to install gettext or gettext-base package" && exit 1;\
 	fi
