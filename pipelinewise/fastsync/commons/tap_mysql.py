@@ -13,10 +13,12 @@ LOGGER = logging.getLogger(__name__)
 
 DEFAULT_CHARSET = 'utf8'
 DEFAULT_EXPORT_BATCH_ROWS = 50000
-DEFAULT_SESSION_SQLS = ['SET @@session.time_zone="+0:00"',
-                        'SET @@session.wait_timeout=28800',
-                        'SET @@session.net_read_timeout=3600',
-                        'SET @@session.innodb_lock_wait_timeout=3600']
+DEFAULT_SESSION_SQLS = [
+    'SET @@session.time_zone="+0:00"',
+    'SET @@session.wait_timeout=28800',
+    'SET @@session.net_read_timeout=3600',
+    'SET @@session.innodb_lock_wait_timeout=3600',
+]
 
 
 class FastSyncTapMySql:
@@ -26,10 +28,15 @@ class FastSyncTapMySql:
 
     def __init__(self, connection_config, tap_type_to_target_type, target_quote=None):
         self.connection_config = connection_config
-        self.connection_config['charset'] = connection_config.get('charset', DEFAULT_CHARSET)
-        self.connection_config['export_batch_rows'] = connection_config.get('export_batch_rows',
-                                                                            DEFAULT_EXPORT_BATCH_ROWS)
-        self.connection_config['session_sqls'] = connection_config.get('session_sqls', DEFAULT_SESSION_SQLS)
+        self.connection_config['charset'] = connection_config.get(
+            'charset', DEFAULT_CHARSET
+        )
+        self.connection_config['export_batch_rows'] = connection_config.get(
+            'export_batch_rows', DEFAULT_EXPORT_BATCH_ROWS
+        )
+        self.connection_config['session_sqls'] = connection_config.get(
+            'session_sqls', DEFAULT_SESSION_SQLS
+        )
         self.tap_type_to_target_type = tap_type_to_target_type
         self.target_quote = target_quote
         self.conn = None
@@ -45,24 +52,46 @@ class FastSyncTapMySql:
             #
             # If bulk_sync_{host|port|user|password} values are not defined in the config then it's
             # using the normal credentials to connect
-            host=self.connection_config.get('bulk_sync_host', self.connection_config['host']),
-            port=int(self.connection_config.get('bulk_sync_port', self.connection_config['port'])),
-            user=self.connection_config.get('bulk_sync_user', self.connection_config['user']),
-            password=self.connection_config.get('bulk_sync_password', self.connection_config['password']),
+            host=self.connection_config.get(
+                'bulk_sync_host', self.connection_config['host']
+            ),
+            port=int(
+                self.connection_config.get(
+                    'bulk_sync_port', self.connection_config['port']
+                )
+            ),
+            user=self.connection_config.get(
+                'bulk_sync_user', self.connection_config['user']
+            ),
+            password=self.connection_config.get(
+                'bulk_sync_password', self.connection_config['password']
+            ),
             charset=self.connection_config['charset'],
-            cursorclass=pymysql.cursors.DictCursor)
+            cursorclass=pymysql.cursors.DictCursor,
+        )
         self.conn_unbuffered = pymysql.connect(
             # Fastsync is using bulk_sync_{host|port|user|password} values from the config by default
             # to avoid making heavy load on the primary source database when syncing large tables
             #
             # If bulk_sync_{host|port|user|password} values are not defined in the config then it's
             # using the normal credentials to connect
-            host=self.connection_config.get('bulk_sync_host', self.connection_config['host']),
-            port=int(self.connection_config.get('bulk_sync_port', self.connection_config['port'])),
-            user=self.connection_config.get('bulk_sync_user', self.connection_config['user']),
-            password=self.connection_config.get('bulk_sync_password', self.connection_config['password']),
+            host=self.connection_config.get(
+                'bulk_sync_host', self.connection_config['host']
+            ),
+            port=int(
+                self.connection_config.get(
+                    'bulk_sync_port', self.connection_config['port']
+                )
+            ),
+            user=self.connection_config.get(
+                'bulk_sync_user', self.connection_config['user']
+            ),
+            password=self.connection_config.get(
+                'bulk_sync_password', self.connection_config['password']
+            ),
             charset=self.connection_config['charset'],
-            cursorclass=pymysql.cursors.SSCursor)
+            cursorclass=pymysql.cursors.SSCursor,
+        )
 
         # Set session variables by running a list of SQLs which is defined
         # in the optional session_sqls connection parameters
@@ -84,7 +113,9 @@ class FastSyncTapMySql:
                     warnings.append(f'Could not set session variable: {sql}')
 
         if warnings:
-            LOGGER.warning('Encountered non-fatal errors when configuring session that could impact performance:')
+            LOGGER.warning(
+                'Encountered non-fatal errors when configuring session that could impact performance:'
+            )
         for warning in warnings:
             LOGGER.warning(warning)
 
@@ -121,16 +152,22 @@ class FastSyncTapMySql:
 
                 return []
         except (InterfaceError, OperationalError) as exc:
-            LOGGER.exception('Exception happened during running a query. Number of retries: %s. %s', n_retry, exc)
+            LOGGER.exception(
+                'Exception happened during running a query. Number of retries: %s. %s',
+                n_retry,
+                exc,
+            )
             if n_retry > 0:
                 LOGGER.info('Reopening the connections.')
                 self.close_connections(silent=True)
                 self.open_connections()
                 LOGGER.info('Retrying to run a query.')
-                return self.query(query,
-                                  params=params,
-                                  return_as_cursor=return_as_cursor,
-                                  n_retry=n_retry - 1)
+                return self.query(
+                    query,
+                    params=params,
+                    return_as_cursor=return_as_cursor,
+                    n_retry=n_retry - 1,
+                )
 
             raise exc
 
@@ -147,7 +184,7 @@ class FastSyncTapMySql:
         return {
             'log_file': binlog_pos.get('File'),
             'log_pos': binlog_pos.get('Position'),
-            'version': binlog_pos.get('version', 1)
+            'version': binlog_pos.get('version', 1),
         }
 
     # pylint: disable=invalid-name
@@ -155,9 +192,13 @@ class FastSyncTapMySql:
         """
         Get the actual incremental key position in the table
         """
-        result = self.query('SELECT MAX({}) AS key_value FROM {}'.format(replication_key, table))
+        result = self.query(
+            'SELECT MAX({}) AS key_value FROM {}'.format(replication_key, table)
+        )
         if len(result) == 0:
-            raise Exception('Cannot get replication key value for table: {}'.format(table))
+            raise Exception(
+                'Cannot get replication key value for table: {}'.format(table)
+            )
 
         mysql_key_value = result[0].get('key_value')
         key_value = mysql_key_value
@@ -175,7 +216,7 @@ class FastSyncTapMySql:
         return {
             'replication_key': replication_key,
             'replication_key_value': key_value,
-            'version': 1
+            'version': 1,
         }
 
     def get_primary_keys(self, table_name):
@@ -183,11 +224,15 @@ class FastSyncTapMySql:
         Get the primary key of a table
         """
         table_dict = utils.tablename_to_dict(table_name)
-        sql = "SHOW KEYS FROM `{}`.`{}` WHERE Key_name = 'PRIMARY'".format(table_dict['schema_name'],
-                                                                           table_dict['table_name'])
+        sql = "SHOW KEYS FROM `{}`.`{}` WHERE Key_name = 'PRIMARY'".format(
+            table_dict['schema_name'], table_dict['table_name']
+        )
         pk_specs = self.query(sql)
         if len(pk_specs) > 0:
-            return [safe_column_name(k.get('Column_name'), self.target_quote) for k in pk_specs]
+            return [
+                safe_column_name(k.get('Column_name'), self.target_quote)
+                for k in pk_specs
+            ]
 
         return None
 
@@ -251,7 +296,7 @@ class FastSyncTapMySql:
                         AND table_name = '{table_name}') x
                 ORDER BY
                         ordinal_position
-            """
+            """  # noqa: E501
         return self.query(sql)
 
     def map_column_types_to_target(self, table_name):
@@ -260,26 +305,32 @@ class FastSyncTapMySql:
         """
         mysql_columns = self.get_table_columns(table_name)
         mapped_columns = [
-            '{} {}'.format(safe_column_name(pc.get('column_name'), self.target_quote),
-                           self.tap_type_to_target_type(pc.get('data_type'), pc.get('column_type')))
-            for pc in mysql_columns]
+            '{} {}'.format(
+                safe_column_name(pc.get('column_name'), self.target_quote),
+                self.tap_type_to_target_type(
+                    pc.get('data_type'), pc.get('column_type')
+                ),
+            )
+            for pc in mysql_columns
+        ]
 
         return {
             'columns': mapped_columns,
-            'primary_key': self.get_primary_keys(table_name)
+            'primary_key': self.get_primary_keys(table_name),
         }
 
     # pylint: disable=too-many-locals
-    def copy_table(self,
-                   table_name,
-                   path,
-                   max_num=None,
-                   date_type='date',
-                   split_large_files=False,
-                   split_file_chunk_size_mb=1000,
-                   split_file_max_chunks=20,
-                   compress=True,
-                   ):
+    def copy_table(
+        self,
+        table_name,
+        path,
+        max_num=None,
+        date_type='date',
+        split_large_files=False,
+        split_file_chunk_size_mb=1000,
+        split_file_max_chunks=20,
+        compress=True,
+    ):
         """
         Export data from table to a zipped csv
         Args:
@@ -303,24 +354,30 @@ class FastSyncTapMySql:
         ,CONVERT_TZ( NOW(),@@session.time_zone,'+00:00') AS _SDC_BATCHED_AT
         ,null AS _SDC_DELETED_AT
         FROM `{}`.`{}`
-        """.format(','.join(column_safe_sql_values),
-                   table_dict['schema_name'],
-                   table_dict['table_name'])
+        """.format(
+            ','.join(column_safe_sql_values),
+            table_dict['schema_name'],
+            table_dict['table_name'],
+        )
         export_batch_rows = self.connection_config['export_batch_rows']
         exported_rows = 0
         with self.conn_unbuffered as cur:
             cur.execute(sql)
-            gzip_splitter = split_gzip.open(path,
-                                            mode='wt',
-                                            chunk_size_mb=split_file_chunk_size_mb,
-                                            max_chunks=split_file_max_chunks if split_large_files else 0,
-                                            compress=compress)
+            gzip_splitter = split_gzip.open(
+                path,
+                mode='wt',
+                chunk_size_mb=split_file_chunk_size_mb,
+                max_chunks=split_file_max_chunks if split_large_files else 0,
+                compress=compress,
+            )
 
             with gzip_splitter as split_gzip_files:
-                writer = csv.writer(split_gzip_files,
-                                    delimiter=',',
-                                    quotechar='"',
-                                    quoting=csv.QUOTE_MINIMAL)
+                writer = csv.writer(
+                    split_gzip_files,
+                    delimiter=',',
+                    quotechar='"',
+                    quoting=csv.QUOTE_MINIMAL,
+                )
 
                 while True:
                     rows = cur.fetchmany(export_batch_rows)
@@ -335,9 +392,14 @@ class FastSyncTapMySql:
                         # Then we believe this to be just an interim batch and not the final one so report on progress
 
                         LOGGER.info(
-                            'Exporting batch from %s to %s rows from %s...', (exported_rows - export_batch_rows),
-                            exported_rows, table_name)
+                            'Exporting batch from %s to %s rows from %s...',
+                            (exported_rows - export_batch_rows),
+                            exported_rows,
+                            table_name,
+                        )
                     # Write rows to file in one go
                     writer.writerows(rows)
 
-                LOGGER.info('Exported total of %s rows from %s...', exported_rows, table_name)
+                LOGGER.info(
+                    'Exported total of %s rows from %s...', exported_rows, table_name
+                )

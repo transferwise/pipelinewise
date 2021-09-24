@@ -52,7 +52,12 @@ class FastSyncTapPostgres:
         return re.sub('[^a-z0-9_]', '_', slot_name)
 
     @classmethod
-    def __get_slot_name(cls, connection, dbname: str, tap_id: str,) -> str:
+    def __get_slot_name(
+        cls,
+        connection,
+        dbname: str,
+        tap_id: str,
+    ) -> str:
         """
         Finds the right slot name to use and returns it
 
@@ -74,7 +79,9 @@ class FastSyncTapPostgres:
         try:
             # Backward compatibility: try to locate existing v15 slot first. PPW <= 0.15.0
             with connection.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
-                cur.execute(f"SELECT * FROM pg_replication_slots WHERE slot_name = '{slot_name_v15}';")
+                cur.execute(
+                    f"SELECT * FROM pg_replication_slots WHERE slot_name = '{slot_name_v15}';"
+                )
                 v15_slots_count = cur.rowcount
 
         except psycopg2.Error:
@@ -102,13 +109,17 @@ class FastSyncTapPostgres:
         LOGGER.debug('Connection to Primary server created.')
 
         try:
-            slot_name = cls.__get_slot_name(connection, connection_config['dbname'], connection_config['tap_id'])
+            slot_name = cls.__get_slot_name(
+                connection, connection_config['dbname'], connection_config['tap_id']
+            )
 
             LOGGER.info('Dropping the slot "%s"', slot_name)
             # drop the replication host
             with connection.cursor() as cur:
-                cur.execute(f'SELECT pg_drop_replication_slot(slot_name) '
-                            f"FROM pg_replication_slots WHERE slot_name = '{slot_name}';")
+                cur.execute(
+                    f'SELECT pg_drop_replication_slot(slot_name) '
+                    f"FROM pg_replication_slots WHERE slot_name = '{slot_name}';"
+                )
                 LOGGER.info('Number of dropped slots: %s', cur.rowcount)
 
         finally:
@@ -135,7 +146,8 @@ class FastSyncTapPostgres:
                 connection_config['port'],
                 connection_config['user'],
                 connection_config['password'],
-                connection_config['dbname'])
+                connection_config['dbname'],
+            )
         else:
             LOGGER.info('Connecting to replica')
             conn_string = template.format(
@@ -147,8 +159,11 @@ class FastSyncTapPostgres:
                 connection_config.get('replica_host', connection_config['host']),
                 connection_config.get('replica_port', connection_config['port']),
                 connection_config.get('replica_user', connection_config['user']),
-                connection_config.get('replica_password', connection_config['password']),
-                connection_config['dbname'])
+                connection_config.get(
+                    'replica_password', connection_config['password']
+                ),
+                connection_config['dbname'],
+            )
 
         if 'ssl' in connection_config and connection_config['ssl'] == 'true':
             conn_string += " sslmode='require'"
@@ -166,7 +181,9 @@ class FastSyncTapPostgres:
         """
         Open connection
         """
-        self.conn = self.get_connection(self.connection_config, prioritize_primary=False)
+        self.conn = self.get_connection(
+            self.connection_config, prioritize_primary=False
+        )
         self.curr = self.conn.cursor()
 
     def close_connection(self):
@@ -221,12 +238,16 @@ class FastSyncTapPostgres:
         replication slot and full-resync the new taps.
         """
         try:
-            slot_name = self.__get_slot_name(self.primary_host_conn,
-                                             self.connection_config['dbname'],
-                                             self.connection_config['tap_id'])
+            slot_name = self.__get_slot_name(
+                self.primary_host_conn,
+                self.connection_config['dbname'],
+                self.connection_config['tap_id'],
+            )
 
             # Create the replication host
-            self.primary_host_query(f"SELECT * FROM pg_create_logical_replication_slot('{slot_name}', 'wal2json')")
+            self.primary_host_query(
+                f"SELECT * FROM pg_create_logical_replication_slot('{slot_name}', 'wal2json')"
+            )
         except Exception as exc:
             # ERROR: replication slot already exists SQL state: 42710
             if hasattr(exc, 'pgcode') and exc.pgcode == '42710':
@@ -241,12 +262,15 @@ class FastSyncTapPostgres:
         """
         # Create replication slot dedicated connection
         # Always use Primary server for creating replication_slot
-        self.primary_host_conn = self.get_connection(self.connection_config, prioritize_primary=True)
+        self.primary_host_conn = self.get_connection(
+            self.connection_config, prioritize_primary=True
+        )
         self.primary_host_curr = self.primary_host_conn.cursor()
 
         # Make sure PostgreSQL version is 9.4 or higher
         result = self.primary_host_query(
-            "SELECT setting::int AS version FROM pg_settings WHERE name='server_version_num'")
+            "SELECT setting::int AS version FROM pg_settings WHERE name='server_version_num'"
+        )
         version = result[0].get('version')
 
         # Do not allow minor versions with PostgreSQL BUG #15114
@@ -275,9 +299,13 @@ class FastSyncTapPostgres:
             if version >= 100000:
                 result = self.query('SELECT pg_last_wal_replay_lsn() AS current_lsn')
             elif version >= 90400:
-                result = self.query('SELECT pg_last_xlog_replay_location() AS current_lsn')
+                result = self.query(
+                    'SELECT pg_last_xlog_replay_location() AS current_lsn'
+                )
             else:
-                raise Exception('Logical replication not supported before PostgreSQL 9.4')
+                raise Exception(
+                    'Logical replication not supported before PostgreSQL 9.4'
+                )
         else:
             # Get current lsn from primary host
             if version >= 100000:
@@ -285,16 +313,15 @@ class FastSyncTapPostgres:
             elif version >= 90400:
                 result = self.query('SELECT pg_current_xlog_location() AS current_lsn')
             else:
-                raise Exception('Logical replication not supported before PostgreSQL 9.4')
+                raise Exception(
+                    'Logical replication not supported before PostgreSQL 9.4'
+                )
 
         current_lsn = result[0].get('current_lsn')
         file, index = current_lsn.split('/')
         lsn = (int(file, 16) << 32) + int(index, 16)
 
-        return {
-            'lsn': lsn,
-            'version': 1
-        }
+        return {'lsn': lsn, 'version': 1}
 
     # pylint: disable=invalid-name
     def fetch_current_incremental_key_pos(self, table, replication_key):
@@ -302,9 +329,13 @@ class FastSyncTapPostgres:
         Get the actual incremental key position in the table
         """
         schema_name, table_name = table.split('.')
-        result = self.query(f'SELECT MAX({replication_key}) AS key_value FROM {schema_name}."{table_name}"')
+        result = self.query(
+            f'SELECT MAX({replication_key}) AS key_value FROM {schema_name}."{table_name}"'
+        )
         if len(result) == 0:
-            raise Exception('Cannot get replication key value for table: {}'.format(table))
+            raise Exception(
+                'Cannot get replication key value for table: {}'.format(table)
+            )
 
         postgres_key_value = result[0].get('key_value')
         key_value = postgres_key_value
@@ -322,7 +353,7 @@ class FastSyncTapPostgres:
         return {
             'replication_key': replication_key,
             'replication_key_value': key_value,
-            'version': 1
+            'version': 1,
         }
 
     def get_primary_keys(self, table):
@@ -339,7 +370,9 @@ class FastSyncTapPostgres:
                         pg_class.relnamespace = pg_namespace.oid AND
                         pg_attribute.attrelid = pg_class.oid AND
                         pg_attribute.attnum = any(pg_index.indkey)
-                    AND indisprimary""".format(schema_name, table_name)
+                    AND indisprimary""".format(
+            schema_name, table_name
+        )
         pk_specs = self.query(sql)
         if len(pk_specs) > 0:
             return [safe_column_name(k[0], self.target_quote) for k in pk_specs]
@@ -355,7 +388,7 @@ class FastSyncTapPostgres:
         if max_num:
             decimals = len(max_num.split('.')[1]) if '.' in max_num else 0
             decimal_format = f"""
-              'CASE WHEN "' || column_name || '" IS NULL THEN NULL ELSE GREATEST(LEAST({max_num}, ROUND("' || column_name || '"::numeric , {decimals})), -{max_num}) END'
+              'CASE WHEN "' || column_name || '" IS NULL THEN NULL ELSE GREATEST(LEAST({max_num}, ROUND("' || column_name || '"::numeric , {decimals})), -{max_num}) END'  # noqa E501
             """
             integer_format = """
               '"' || column_name || '"'
@@ -380,7 +413,10 @@ class FastSyncTapPostgres:
                 data_type,
                 CASE
                     WHEN data_type = 'ARRAY' THEN 'array_to_json("' || column_name || '") AS ' || column_name
-                    WHEN data_type = 'date' THEN column_name || '::{date_type} AS ' || column_name
+                    WHEN data_type = 'date' THEN
+                       'CASE WHEN "' ||column_name|| E'" < \\'0001-01-01\\' '
+                            'OR "' ||column_name|| E'" > \\'9999-12-31\\' THEN \\'9999-12-31\\' '
+                            'ELSE "' ||column_name|| '"::{date_type} END AS "' ||column_name|| '"'
                     WHEN udt_name = 'time' THEN 'replace("' || column_name || E'"::varchar,\\\'24:00:00\\\',\\\'00:00:00\\\') AS ' || column_name
                     WHEN udt_name = 'timetz' THEN 'replace(("' || column_name || E'" at time zone \'\'UTC\'\')::time::varchar,\\\'24:00:00\\\',\\\'00:00:00\\\') AS ' || column_name
                     WHEN udt_name in ('timestamp', 'timestamptz') THEN
@@ -397,7 +433,7 @@ class FastSyncTapPostgres:
                     AND table_name = '{table_name}'
                 ORDER BY ordinal_position
                 ) AS x
-            """
+            """  # noqa: E501
         return self.query(sql)
 
     def map_column_types_to_target(self, table_name):
@@ -412,25 +448,28 @@ class FastSyncTapPostgres:
             # most targets would want to map length 1 to boolean and the rest to number
             if isinstance(column_type, list):
                 column_type = column_type[1 if pc[3] > 1 else 0]
-            mapping = '{} {}'.format(safe_column_name(pc[0], self.target_quote), column_type)
+            mapping = '{} {}'.format(
+                safe_column_name(pc[0], self.target_quote), column_type
+            )
             mapped_columns.append(mapping)
 
         return {
             'columns': mapped_columns,
-            'primary_key': self.get_primary_keys(table_name)
+            'primary_key': self.get_primary_keys(table_name),
         }
 
     # pylint: disable=too-many-arguments
-    def copy_table(self,
-                   table_name,
-                   path,
-                   max_num=None,
-                   date_type='date',
-                   split_large_files=False,
-                   split_file_chunk_size_mb=1000,
-                   split_file_max_chunks=20,
-                   compress=True
-                   ):
+    def copy_table(
+        self,
+        table_name,
+        path,
+        max_num=None,
+        date_type='date',
+        split_large_files=False,
+        split_file_chunk_size_mb=1000,
+        split_file_max_chunks=20,
+        compress=True,
+    ):
         """
         Export data from table to a zipped csv
         Args:
@@ -455,14 +494,18 @@ class FastSyncTapPostgres:
         ,now() AT TIME ZONE 'UTC'
         ,null
         FROM {}."{}") TO STDOUT with CSV DELIMITER ','
-        """.format(','.join(column_safe_sql_values), schema_name, table_name)
+        """.format(
+            ','.join(column_safe_sql_values), schema_name, table_name
+        )
         LOGGER.info('Exporting data: %s', sql)
 
-        gzip_splitter = split_gzip.open(path,
-                                        mode='wb',
-                                        chunk_size_mb=split_file_chunk_size_mb,
-                                        max_chunks=split_file_max_chunks if split_large_files else 0,
-                                        compress=compress)
+        gzip_splitter = split_gzip.open(
+            path,
+            mode='wb',
+            chunk_size_mb=split_file_chunk_size_mb,
+            max_chunks=split_file_max_chunks if split_large_files else 0,
+            compress=compress,
+        )
 
         with gzip_splitter as split_gzip_files:
             self.curr.copy_expert(sql, split_gzip_files, size=131072)

@@ -19,6 +19,7 @@ class NotSelectedTableException(Exception):
     """
     Exception to raise when a table is not selected for resync
     """
+
     def __init__(self, table_name, selected_tables):
         self.message = f'Cannot Resync unselected table "{table_name}"! Selected tables are: {selected_tables}'
         super().__init__(self, self.message)
@@ -70,7 +71,7 @@ def tablename_to_dict(table, separator='.'):
         'catalog_name': catalog_name,
         'schema_name': schema_name,
         'table_name': table_name,
-        'temp_table_name': '{}_temp'.format(table_name)
+        'temp_table_name': '{}_temp'.format(table_name),
     }
 
 
@@ -84,8 +85,14 @@ def get_tables_from_properties(properties: Dict) -> set:
         metadata = stream.get('metadata', [])
         table_name = stream.get('table_name', stream['stream'])
 
-        table_meta = next((i for i in metadata if isinstance(i, dict) and len(i.get('breadcrumb', [])) == 0),
-                          {}).get('metadata')
+        table_meta = next(
+            (
+                i
+                for i in metadata
+                if isinstance(i, dict) and len(i.get('breadcrumb', [])) == 0
+            ),
+            {},
+        ).get('metadata')
         selected = table_meta.get('selected', False)
         schema_name = table_meta.get('schema-name')
         db_name = table_meta.get('database-name')
@@ -100,11 +107,7 @@ def get_tables_from_properties(properties: Dict) -> set:
     return tables
 
 
-def get_bookmark_for_table(
-        table,
-        properties,
-        db_engine,
-        dbname=None):
+def get_bookmark_for_table(table, properties, db_engine, dbname=None):
     """Get actual bookmark for a specific table used for LOG_BASED or INCREMENTAL
     replications
     """
@@ -116,24 +119,37 @@ def get_bookmark_for_table(
         table_name = stream.get('table_name', stream['stream'])
 
         # Get table specific metadata i.e. replication method, replication key, etc.
-        table_meta = next((i for i in metadata if isinstance(i, dict) and len(i.get('breadcrumb', [])) == 0),
-                          {}).get('metadata')
+        table_meta = next(
+            (
+                i
+                for i in metadata
+                if isinstance(i, dict) and len(i.get('breadcrumb', [])) == 0
+            ),
+            {},
+        ).get('metadata')
         db_name = table_meta.get('database-name')
         schema_name = table_meta.get('schema-name')
         replication_method = table_meta.get('replication-method')
         replication_key = table_meta.get('replication-key')
 
-        fully_qualified_table_name = '{}.{}'.format(schema_name or db_name, table_name) \
-            if schema_name is not None or db_name is not None else table_name
+        fully_qualified_table_name = (
+            '{}.{}'.format(schema_name or db_name, table_name)
+            if schema_name is not None or db_name is not None
+            else table_name
+        )
 
-        if (dbname is None or db_name == dbname) and fully_qualified_table_name == table:
+        if (
+            dbname is None or db_name == dbname
+        ) and fully_qualified_table_name == table:
             # Log based replication: get mysql binlog position
             if replication_method == 'LOG_BASED':
                 bookmark = db_engine.fetch_current_log_pos()
 
             # Key based incremental replication: Get max replication key from source
             elif replication_method == 'INCREMENTAL':
-                bookmark = db_engine.fetch_current_incremental_key_pos(fully_qualified_table_name, replication_key)
+                bookmark = db_engine.fetch_current_incremental_key_pos(
+                    fully_qualified_table_name, replication_key
+                )
 
             break
 
@@ -155,7 +171,9 @@ def get_target_schema(target_config, table):
                                             }
     """
     target_schema = None
-    config_default_target_schema = target_config.get('default_target_schema', '').strip()
+    config_default_target_schema = target_config.get(
+        'default_target_schema', ''
+    ).strip()
     config_schema_mapping = target_config.get('schema_mapping', {})
 
     table_dict = tablename_to_dict(table)
@@ -168,7 +186,8 @@ def get_target_schema(target_config, table):
     if not target_schema:
         raise Exception(
             "Target schema name not defined in config. Neither 'default_target_schema' (string) nor 'schema_mapping' "
-            '(object) defines target schema for {} stream. '.format(table))
+            '(object) defines target schema for {} stream. '.format(table)
+        )
 
     return target_schema
 
@@ -202,13 +221,17 @@ def get_grantees(target_config, table):
                                                         }
     """
     grantees = []
-    config_default_target_schema_select_permissions = target_config.get('default_target_schema_select_permissions', [])
+    config_default_target_schema_select_permissions = target_config.get(
+        'default_target_schema_select_permissions', []
+    )
     config_schema_mapping = target_config.get('schema_mapping', {})
 
     table_dict = tablename_to_dict(table)
     table_schema = table_dict['schema_name']
     if config_schema_mapping and table_schema in config_schema_mapping:
-        grantees = config_schema_mapping[table_schema].get('target_schema_select_permissions', [])
+        grantees = config_schema_mapping[table_schema].get(
+            'target_schema_select_permissions', []
+        )
     elif config_default_target_schema_select_permissions:
         grantees = config_default_target_schema_select_permissions
 
@@ -248,9 +271,13 @@ def grant_privilege(schema, grantees, grant_method, to_group=False):
 def save_state_file(path, table, bookmark, dbname=None):
     table_dict = tablename_to_dict(table)
     if dbname:
-        stream_id = '{}-{}-{}'.format(dbname, table_dict.get('schema_name'), table_dict.get('table_name'))
+        stream_id = '{}-{}-{}'.format(
+            dbname, table_dict.get('schema_name'), table_dict.get('table_name')
+        )
     elif table_dict['schema_name']:
-        stream_id = '{}-{}'.format(table_dict['schema_name'], table_dict.get('table_name'))
+        stream_id = '{}-{}'.format(
+            table_dict['schema_name'], table_dict.get('table_name')
+        )
     else:
         stream_id = table_dict['table_name']
 
@@ -273,7 +300,6 @@ def save_state_file(path, table, bookmark, dbname=None):
 
     # Save the new state file
     save_dict_to_json(path, state)
-
 
 
 def parse_args(required_config_keys: Dict) -> argparse.Namespace:
@@ -299,8 +325,14 @@ def parse_args(required_config_keys: Dict) -> argparse.Namespace:
     parser.add_argument('--target', help='Target Config file', required=True)
     parser.add_argument('--transform', help='Transformations Config file')
     parser.add_argument('--tables', help='Sync only specific tables')
-    parser.add_argument('--temp_dir', help='Temporary directory required for CSV exports')
-    parser.add_argument('--drop_pg_slot', help='Drop pg replication slot before starting resync', action='store_true')
+    parser.add_argument(
+        '--temp_dir', help='Temporary directory required for CSV exports'
+    )
+    parser.add_argument(
+        '--drop_pg_slot',
+        help='Drop pg replication slot before starting resync',
+        action='store_true',
+    )
 
     args: argparse.Namespace = parser.parse_args()
 
@@ -348,15 +380,20 @@ def retry_pattern():
     import backoff
     from botocore.exceptions import ClientError
 
-    return backoff.on_exception(backoff.expo,
-                                ClientError,
-                                max_tries=5,
-                                on_backoff=log_backoff_attempt,
-                                factor=10)
+    return backoff.on_exception(
+        backoff.expo,
+        ClientError,
+        max_tries=5,
+        on_backoff=log_backoff_attempt,
+        factor=10,
+    )
 
 
 def log_backoff_attempt(details):
-    LOGGER.error('Error detected communicating with Amazon, triggering backoff: %s try', details.get('tries'))
+    LOGGER.error(
+        'Error detected communicating with Amazon, triggering backoff: %s try',
+        details.get('tries'),
+    )
 
 
 def get_pool_size(tap: Dict) -> int:
@@ -377,11 +414,9 @@ def get_pool_size(tap: Dict) -> int:
     return min(fastsync_parallelism, cpu_cores)
 
 
-def gen_export_filename(tap_id: str,
-                        table: str,
-                        suffix: str = None,
-                        postfix: str = None,
-                        ext: str = None) -> str:
+def gen_export_filename(
+    tap_id: str, table: str, suffix: str = None, postfix: str = None, ext: str = None
+) -> str:
     """
     Generates a unique filename used for exported fastsync data that avoids file name collision
 
@@ -407,8 +442,6 @@ def gen_export_filename(tap_id: str,
     if not ext:
         ext = 'csv.gz'
 
-    return 'pipelinewise_{}_{}_{}_fastsync_{}.{}'.format(tap_id,
-                                                         table,
-                                                         suffix,
-                                                         postfix,
-                                                         ext)
+    return 'pipelinewise_{}_{}_{}_fastsync_{}.{}'.format(
+        tap_id, table, suffix, postfix, ext
+    )

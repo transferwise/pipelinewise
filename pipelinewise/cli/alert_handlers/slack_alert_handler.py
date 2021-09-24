@@ -11,7 +11,7 @@ ALERT_LEVEL_SLACK_COLORS = {
     BaseAlertHandler.LOG: '36C5F0',
     BaseAlertHandler.INFO: 'good',
     BaseAlertHandler.WARNING: 'warning',
-    BaseAlertHandler.ERROR: 'danger'
+    BaseAlertHandler.ERROR: 'danger',
 }
 
 
@@ -20,6 +20,7 @@ class SlackAlertHandler(BaseAlertHandler):
     """
     Slack Alert Handler class
     """
+
     def __init__(self, config: dict) -> None:
         if config is not None:
             if 'token' not in config:
@@ -27,7 +28,9 @@ class SlackAlertHandler(BaseAlertHandler):
             self.token = config['token']
 
             if 'channel' not in config:
-                raise InvalidAlertHandlerException('Missing channel in Slack connection')
+                raise InvalidAlertHandlerException(
+                    'Missing channel in Slack connection'
+                )
             self.channel = config['channel']
 
         else:
@@ -35,7 +38,9 @@ class SlackAlertHandler(BaseAlertHandler):
 
         self.client = WebClient(self.token)
 
-    def send(self, message: str, level: str = BaseAlertHandler.ERROR, exc: Exception = None) -> None:
+    def send(
+        self, message: str, level: str = BaseAlertHandler.ERROR, exc: Exception = None
+    ) -> None:
         """
         Send alert
 
@@ -47,9 +52,15 @@ class SlackAlertHandler(BaseAlertHandler):
         Returns:
             Initialised alert handler object
         """
-        self.client.chat_postMessage(channel=self.channel,
-                                     text=f'```{exc}```' if exc else None,
-                                     attachments=[{
-                                         'color': ALERT_LEVEL_SLACK_COLORS.get(level, BaseAlertHandler.ERROR),
-                                         'title': message
-                                     }])
+        self.client.chat_postMessage(
+            channel=self.channel,
+            text=f'```{exc}```' if exc else None,
+            attachments=[
+                {
+                    'color': ALERT_LEVEL_SLACK_COLORS.get(
+                        level, BaseAlertHandler.ERROR
+                    ),
+                    'title': message,
+                }
+            ],
+        )

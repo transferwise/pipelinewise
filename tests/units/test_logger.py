@@ -5,6 +5,7 @@ from pipelinewise.logger import Logger
 
 from tests.units.cli.cli_args import CliArgs
 
+
 # pylint: disable=no-self-use
 class TestLogging:
     """
@@ -20,14 +21,18 @@ class TestLogging:
         """Debug option should be disabled by default, LOGGING_CONF_FILE"""
         args = CliArgs()
         Logger(debug=args.debug)
-        path = os.path.join(Path(__file__).parent, '..', '..', 'pipelinewise', 'logging.conf')
+        path = os.path.join(
+            Path(__file__).parent, '..', '..', 'pipelinewise', 'logging.conf'
+        )
         assert os.environ['LOGGING_CONF_FILE'] == os.path.abspath(path)
 
     def test_logging_debug(self):
         """Providing debug option should set LOGGING_CONF_FILE env var"""
         args = CliArgs(debug=True)
         Logger(debug=args.debug)
-        path = os.path.join(Path(__file__).parent, '..', '..', 'pipelinewise', 'logging_debug.conf')
+        path = os.path.join(
+            Path(__file__).parent, '..', '..', 'pipelinewise', 'logging_debug.conf'
+        )
         assert os.environ['LOGGING_CONF_FILE'] == os.path.abspath(path)
 
     def test_custom_logging_conf(self):

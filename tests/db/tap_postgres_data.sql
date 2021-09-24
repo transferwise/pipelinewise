@@ -20,39 +20,40 @@ CREATE TABLE edgydata(
     cjson json,
     cjsonb jsonb,
     cvarchar varchar,
+    "date" date,
     PRIMARY KEY (cid)
 );
 
-insert into edgydata (ctimentz, ctimetz, cjson, cjsonb, cvarchar) values
-    (null, null, null, null, null),
-    ('23:00:15', '23:00:15+00', null, null, null),
-    ('12:00:15', '12:00:15+00:00', null, null, null),
-    ('12:00:15', '12:00:15+0300', null, null, null),
-    ('12:00:15', '12:00:15-0300', null, null, null),
-    ('24:00:00', '24:00:00', null, null, null),
-    ('24:00:00', '24:00:00+0000', null, null, null),
-    ('24:00:00', '24:00:00-0100', null, null, null),
-    ('00:00:00', '00:00:00', null, null, null),
-    (null, null, null, null,'Lorem ipsum dolor sit amet'),
-    (null, null, null, null,'Chinese: 和毛泽东 <<重上井冈山>>. 严永欣, 一九八八年.'),
-    (null, null, null, null,'Thai: แผ่นดินฮั่นเสื่อมโทรมแสนสังเวช'),
-    (null, null, null, null,E'Special Characters: ["/\\,!@£$%^&*()]'),
-    (null, null, '[]', '[]', '[]' ),
-    (null, null, '{}', '{}', '{}'),
-    (null, null, '[{}, {}]', '[{}, {}]',  '[{}, {}]'),
+insert into edgydata (ctimentz, ctimetz, cjson, cjsonb, cvarchar, "date") values
+    (null, null, null, null, null, DATE '20107-05-28'),
+    ('23:00:15', '23:00:15+00', null, null, null, DATE '2011-09-10'),
+    ('12:00:15', '12:00:15+00:00', null, null, null, DATE '2019-12-10'),
+    ('12:00:15', '12:00:15+0300', null, null, null, DATE '0001-09-10'),
+    ('12:00:15', '12:00:15-0300', null, null, null, DATE '1990-09-30'),
+    ('24:00:00', '24:00:00', null, null, null, null),
+    ('24:00:00', '24:00:00+0000', null, null, null, DATE '333333-09-30'),
+    ('24:00:00', '24:00:00-0100', null, null, null, DATE '1990-09-30'),
+    ('00:00:00', '00:00:00', null, null, null, DATE '2021-01-30'),
+    (null, null, null, null,'Lorem ipsum dolor sit amet', DATE '2021-01-30'),
+    (null, null, null, null,'Chinese: 和毛泽东 <<重上井冈山>>. 严永欣, 一九八八年.', DATE '2021-01-30'),
+    (null, null, null, null,'Thai: แผ่นดินฮั่นเสื่อมโทรมแสนสังเวช', DATE '2021-01-30'),
+    (null, null, null, null,E'Special Characters: ["/\\,!@£$%^&*()]', DATE '2021-01-30'),
+    (null, null, '[]', '[]', '[]' , DATE '2021-01-30'),
+    (null, null, '{}', '{}', '{}', DATE '2021-01-30'),
+    (null, null, '[{}, {}]', '[{}, {}]',  '[{}, {}]', DATE '2021-01-30'),
     (null, null, '[{"key": "ValueOne", "actions": []}, {"key": "ValueTwo", "actions": []}]',
         '[{"key": "ValueOne", "actions": []}, {"key": "ValueTwo", "actions": []}]',
-        '[{"key": "ValueOne", "actions": []}, {"key": "ValueTwo", "actions": []}]'),
-    (null, null, E'{"key": "Value\'s One"}', E'{"key": "Value\'s One"}', E'{"key": "Value\'s One"}'),
+        '[{"key": "ValueOne", "actions": []}, {"key": "ValueTwo", "actions": []}]', DATE '2021-01-30'),
+    (null, null, E'{"key": "Value\'s One"}', E'{"key": "Value\'s One"}', E'{"key": "Value\'s One"}', DATE '2021-01-30'),
     (null, null, E'[{"key": "Value\'s One", "actions": []},{"key": "Value\U00000027s Two", "actions": []}]',
         E'[{"key": "Value\'s One", "actions": []},{"key": "Value\U00000027s Two", "actions": []}]',
-        E'[{"key": "Value\'s One", "actions": []},{"key": "Value\U00000027s Two", "actions": []}]'),
-    (null, null, null, null,'	'),
+        E'[{"key": "Value\'s One", "actions": []},{"key": "Value\U00000027s Two", "actions": []}]', DATE '2021-01-30'),
+    (null, null, null, null,'	', DATE '2021-01-30'),
     (null, null, null, null,'Enter	The
-Ninja'),
+Ninja', DATE '2021-01-30'),
     (null, null, null, null,'Liewe
-Maatjies'),
-    (null, null, null, null,'Liewe	Maatjies')
+Maatjies', DATE '2021-01-30'),
+    (null, null, null, null,'Liewe	Maatjies', DATE '2021-01-30')
 ;
 
 COMMIT;
@@ -4528,3 +4529,33 @@ values ('A', '2020-01-01 08:53:56.112248-07'),
        ('H', '1000-03-03 10:30:00 BC'),
        ('I', '50000-03-03 10:30:00')
        ;
+
+DROP TABLE IF EXISTS public.customers CASCADE;
+
+CREATE TABLE customers (
+    id serial primary key,
+    name varchar(100) NOT NULL,
+    phone varchar(10),
+    email text
+);
+
+INSERT INTO customers (name, phone, email) VALUES ('Martelle Cristoforetti', '2071506307', 'mcristoforetti0@accuweather.com'),
+	('Joelynn Cawthorne', '9764917766', 'jcawthorne1@bizjournals.com'),
+	('Gerrie Gillie', '7907324372', 'ggillie2@acquirethisname.com'),
+	('Sheilakathryn Muge', '7195638381', 'smuge3@umn.edu'),
+	('Fedora Mellanby', '4842466494', 'fmellanby4@fema.gov'),
+	('Dall Goodbourn', '4977729268', 'dgoodbourn5@dailymail.co.uk'),
+	('Helaina Van Halen', '5148995067', 'hvan6@hp.com'),
+	('Noelle Knight', NULL, 'nknight7@google.co.uk'),
+	('Anetta Doodney', '4669478802', 'adoodney8@1688.com'),
+	('Almira Clinch', '2235449869', 'aclinch9@netvibes.com'),
+	('Aidan Bachnic', '8479230171', 'abachnica@msu.edu'),
+	('Biddy Shirt', '8109841957', 'bshirtb@nps.gov'),
+	('Robinson Matuszinski', '7587994157', 'rmatuszinskic@ed.gov'),
+	('Pall Porcher', '2719539572', 'pporcherd@thetimes.co.uk'),
+	('Briggs Fyall', '5431890133', 'bfyalle@a8.net'),
+	('Shara Eversfield', '1796055914', 'seversfieldf@prlog.org'),
+	('Abbot Scowcraft', '1658501516', 'ascowcraftg@shutterfly.com'),
+	('Ransell Fardo', '9584912534', 'rfardoh@de.vu'),
+	('Leonard Buche', '9391842560', 'lbuchei@netscape.com'),
+	('Xylia Adnet', '6784481146', 'xadnetj@auda.org.au');
