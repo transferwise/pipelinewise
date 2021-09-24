@@ -15,32 +15,32 @@ PIP_ARGS="[test]"
 pw_connector=
 
 define DEFAULT_CONNECTORS
-tap-jira
-tap-kafka
-tap-mysql
-tap-postgres
-tap-s3-csv
-tap-salesforce
-tap-snowflake
-tap-zendesk
-tap-mongodb
-tap-github
-tap-slack
-tap-mixpanel
-tap-twilio
-target-s3-csv
-target-snowflake
-target-redshift
-target-postgres
-target-bigquery
+tap-jira\
+tap-kafka\
+tap-mysql\
+tap-postgres\
+tap-s3-csv\
+tap-salesforce\
+tap-snowflake\
+tap-zendesk\
+tap-mongodb\
+tap-github\
+tap-slack\
+tap-mixpanel\
+tap-twilio\
+target-s3-csv\
+target-snowflake\
+target-redshift\
+target-postgres\
+target-bigquery\
 transform-field
 endef
 
 define EXTRA_CONNECTORS
-tap-adwords
-tap-oracle
-tap-zuora
-tap-google-analytics
+tap-adwords\
+tap-oracle\
+tap-zuora\
+tap-google-analytics\
 tap-shopify
 endef
 
@@ -162,7 +162,7 @@ define print_list_of_connectors
 	echo "   $1"
 endef
 
-help: .pw_logo
+help: .check_gettext .pw_logo
 	@echo
 	@echo "  Targets"
 	@echo "  ======="
@@ -173,7 +173,7 @@ help: .pw_logo
 	@echo "     extra_connectors                                           Install only extra connectors"
 	@echo "     connectors -e pw_connector=connector1,connector2,...       Install specific connector(s)"
 	@echo
-	@echo "     list_components                                            Show a list of installed components"
+	@echo "     list_installed_components                                  Show a list of installed components"
 	@echo "     list_default_connectors                                    Show a list of available default connectors"
 	@echo "     list_extra_connectors                                      Show a list of available extra connectors"
 	@echo
@@ -246,7 +246,7 @@ extra_connectors: .check_license_env_var
 	$(call print_execute_time,Extra connectors)
 
 
-list_components:
+list_installed_components:
 	$(call print_installed_connectors)
 
 list_default_connectors:
@@ -295,5 +295,3 @@ endif
 
 .set_pip_args:
 	$(eval PIP_ARGS:="")
-
-
