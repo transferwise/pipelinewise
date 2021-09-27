@@ -170,6 +170,7 @@ help: .check_gettext .pw_logo
 	@echo "     pipelinewise_no_test_extras                                Install the main Pipelinewise component without test extras"
 	@echo
 	@echo "     all_connectors                                             Install all connectors"
+	@echo "     default_connectors                                         Install default connectors"
 	@echo "     extra_connectors                                           Install only extra connectors"
 	@echo "     connectors -e pw_connector=connector1,connector2,...       Install specific connector(s)"
 	@echo
