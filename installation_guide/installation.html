@@ -188,12 +188,12 @@ Tap ID    Tap Type      Target ID     Target Type      Enabled    Status    Last
 PipelineWise CLI and every supported singer connectors into separated virtual environments:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ git clone https://github.com/transferwise/pipelinewise.git
 $ <span class="nb">cd</span> ./pipelinewise
-$ ./install.sh --connectors<span class="o">=</span>all
+$ make pipelinewise all_connectors
 </pre></div>
 </div>
 <p>Press <code class="docutils literal notranslate"><span class="pre">Y</span></code> to accept the license agreement of the required singer components. To automate
 the installation and accept every license agreement run <code class="docutils literal notranslate"><span class="pre">./install</span> <span class="pre">--acceptlicenses</span></code>.</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ ./install.sh --connectors<span class="o">=</span>all
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ make pipelinewise all_connectors
 
 <span class="o">(</span>...installation usually takes <span class="m">5</span>-10 minutes...<span class="o">)</span>
 
@@ -214,7 +214,7 @@ To start CLI:
 <p>You can install PipelineWise only with required connectors by using the <code class="docutils literal notranslate"><span class="pre">--connectors=</span></code> argument. For example if you
 need to replicate data only from MySQL and PostgreSQL into a Snowflake database you can install PipelineWise by
 running:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ ./install.sh --connectors<span class="o">=</span>tap-mysql,tap-postgres,target-snowflake
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ make pipelinewise connectors -e <span class="nv">pw_connector</span><span class="o">=</span>tap-mysql,tap-postgres,target-snowflake
 </pre></div>
 </div>
 <div class="admonition warning">
