@@ -16,7 +16,7 @@ RUN apt-get -qq update \
     # Install Oracle Instant Client for tap-oracle if its in the connectors list
     && bash -c "if grep -q \"tap-oracle\" <<< \"$connectors\"; then wget https://download.oracle.com/otn_software/linux/instantclient/193000/oracle-instantclient19.3-basiclite-19.3.0.0.0-1.x86_64.rpm -O /app/oracle-instantclient.rpm && alien -i /app/oracle-instantclient.rpm --scripts && rm -rf /app/oracle-instantclient.rpm ; fi" \
     && cd /app \
-    && ./install.sh --connectors=$connectors --acceptlicenses --nousage --notestextras \
+    && make pipelinewise_no_test_extras connectors -e pw_connector=$connectors -e pw_acceptlicenses=y \
     && ln -s /root/.pipelinewise /app/.pipelinewise
 
 ENTRYPOINT ["/app/entrypoint.sh"]

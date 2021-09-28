@@ -98,14 +98,14 @@ PipelineWise CLI and every supported singer connectors into separated virtual en
 
     $ git clone https://github.com/transferwise/pipelinewise.git
     $ cd ./pipelinewise
-    $ ./install.sh --connectors=all
+    $ make pipelinewise all_connectors
 
 Press ``Y`` to accept the license agreement of the required singer components. To automate
 the installation and accept every license agreement run ``./install --acceptlicenses``.
 
 .. code-block:: bash
 
-    $ ./install.sh --connectors=all
+    $ make pipelinewise all_connectors
 
     (...installation usually takes 5-10 minutes...)
 
@@ -131,7 +131,7 @@ running:
 
 .. code-block:: bash
 
-    $ ./install.sh --connectors=tap-mysql,tap-postgres,target-snowflake
+    $ make pipelinewise connectors -e pw_connector=tap-mysql,tap-postgres,target-snowflake
 
 .. warning::
 

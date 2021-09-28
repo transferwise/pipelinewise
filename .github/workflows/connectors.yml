@@ -27,4 +27,4 @@ jobs:
 
       - name: Check all connectors are installable
         run: |
-          ./install.sh --acceptlicenses --connectors=all
+          make all_connectors -e pw_acceptlicenses=y

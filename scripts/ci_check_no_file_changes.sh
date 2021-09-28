@@ -42,7 +42,7 @@ REGEXES=()
 for CHECK in "$@"
 do
   if [[ ${CHECK} == "python" ]]; then
-    REGEX="(^tests\/|^pipelinewise\/|^singer-connectors\/|^setup\.py)"
+    REGEX="(^tests\/|^pipelinewise\/|^singer-connectors\/|^setup\.py|^Makefile)"
     echo "Searching for changes in python files"
   elif [[ ${CHECK} == "doc" ]]; then
     REGEX="(^docs\/|.circleci/publish_docs.sh)"
