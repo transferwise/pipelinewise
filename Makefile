@@ -184,7 +184,7 @@ help: .check_gettext .pw_logo
 	@echo "   Options"
 	@echo "   ======="
 	@echo "      -e pw_connector=connector1,connector2,...                 Define a list of connectors for installing or cleaning"
-	@echo "      -e pw_acceptlicenses=y/Y/Yes/YES                           Forcing to accept the licenses automatically"
+	@echo "      -e pw_acceptlicenses=y/Y/Yes/YES                          Forcing to accept the licenses automatically"
 	@echo
 	@echo "   To start CLI"
 	@echo "   ============"
