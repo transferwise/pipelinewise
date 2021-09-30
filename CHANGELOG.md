@@ -1,3 +1,26 @@
+0.36.0 (2021-09-30)
+-------------------
+
+*New*
+- Add new transformation type: **MASK-STRING-SKIP-ENDS**
+- Bump `pipelinewise-target-snowflake` from `1.13.1` to `1.14.0` ([Changelog](https://github.com/transferwise/pipelinewise-target-snowflake/blob/master/CHANGELOG.md#1140-2021-09-30))
+    - Support `date` property format
+    - Don't log record on failure to avoind exposing data   
+
+*Changes*
+- Use Makefile for installation
+- Enforce PEP8
+
+*Fixes*
+- Dates out of range (with year > 9999) in FastSync from PG. 
+- Bump `pipelinewise-tap-postgres` from `1.8.0` to `1.8.1` ([Changelog](https://github.com/transferwise/pipelinewise-tap-postgres/blob/master/CHANGELOG.md#181-2021-09-23))
+    -  LOG_BASED: Handle dates with year > 9999.
+    -  INCREMENTAL & FULL_TABLE: Avoid processing timestamps arrays as timestamp
+
+- `Decimal` not JSON serializable in FastSync MongoDB
+- Don't use non-existent FastSync for MongoDB-Redshift pipelines.
+
+
 0.35.2 (2021-08-17)
 -------------------
 - Bump `pipelinewise-tap-github` from `1.0.1` to `1.0.2`
