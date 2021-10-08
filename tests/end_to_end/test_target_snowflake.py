@@ -3,13 +3,14 @@ import gzip
 import os
 import tempfile
 import uuid
-from datetime import datetime
-from random import randint
-
 import bson
 import pytest
+
+from datetime import datetime
+from random import randint
 from bson import Timestamp
-from pipelinewise.fastsync import mysql_to_snowflake
+
+from pipelinewise.fastsync.commons.type_mapping import MYSQL_TO_SNOWFLAKE_MAPPER
 
 from .helpers import tasks
 from .helpers import assertions
@@ -84,7 +85,7 @@ class TestTargetSnowflake:
         assertions.assert_all_columns_exist(
             self.run_query_tap_mysql,
             self.e2e.run_query_target_snowflake,
-            mysql_to_snowflake.tap_type_to_target_type,
+            MYSQL_TO_SNOWFLAKE_MAPPER,
         )
 
         # 2. Make changes in MariaDB source database
@@ -131,7 +132,7 @@ class TestTargetSnowflake:
         assertions.assert_all_columns_exist(
             self.run_query_tap_mysql,
             self.e2e.run_query_target_snowflake,
-            mysql_to_snowflake.tap_type_to_target_type,
+            MYSQL_TO_SNOWFLAKE_MAPPER,
             {'blob_col'},
         )
 
@@ -171,7 +172,7 @@ class TestTargetSnowflake:
         assertions.assert_all_columns_exist(
             self.run_query_tap_mysql,
             self.run_query_target_snowflake,
-            mysql_to_snowflake.tap_type_to_target_type,
+            MYSQL_TO_SNOWFLAKE_MAPPER,
         )
 
     # pylint: disable=invalid-name
@@ -189,7 +190,7 @@ class TestTargetSnowflake:
         assertions.assert_all_columns_exist(
             self.run_query_tap_mysql,
             self.run_query_target_snowflake,
-            mysql_to_snowflake.tap_type_to_target_type,
+            MYSQL_TO_SNOWFLAKE_MAPPER,
         )
 
     # pylint: disable=invalid-name
@@ -207,7 +208,7 @@ class TestTargetSnowflake:
         assertions.assert_all_columns_exist(
             self.run_query_tap_mysql,
             self.run_query_target_snowflake,
-            mysql_to_snowflake.tap_type_to_target_type,
+            MYSQL_TO_SNOWFLAKE_MAPPER,
         )
 
     # pylint: disable=invalid-name

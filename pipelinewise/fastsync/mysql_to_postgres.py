@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 import os
 import sys
-from functools import partial
-from argparse import Namespace
 import multiprocessing
-from typing import Union
 
+from typing import Union
+from argparse import Namespace
+from functools import partial
 from datetime import datetime
+
 from ..logger import Logger
 from .commons import utils
+from .commons.type_mapping import MYSQL_TO_POSTGRES_MAPPER
 from .commons.tap_mysql import FastSyncTapMySql
 from .commons.target_postgres import FastSyncTargetPostgres
 
@@ -22,57 +24,9 @@ REQUIRED_CONFIG_KEYS = {
 LOCK = multiprocessing.Lock()
 
 
-def tap_type_to_target_type(mysql_type, mysql_column_type):
-    """Data type mapping from MySQL to Postgres"""
-    return {
-        'char': 'CHARACTER VARYING',
-        'varchar': 'CHARACTER VARYING',
-        'binary': 'CHARACTER VARYING',
-        'varbinary': 'CHARACTER VARYING',
-        'blob': 'CHARACTER VARYING',
-        'tinyblob': 'CHARACTER VARYING',
-        'mediumblob': 'CHARACTER VARYING',
-        'longblob': 'CHARACTER VARYING',
-        'geometry': 'JSONB',
-        'point': 'JSONB',
-        'linestring': 'JSONB',
-        'polygon': 'JSONB',
-        'multipoint': 'JSONB',
-        'multilinestring': 'JSONB',
-        'multipolygon': 'JSONB',
-        'geometrycollection': 'JSONB',
-        'text': 'CHARACTER VARYING',
-        'tinytext': 'CHARACTER VARYING',
-        'mediumtext': 'CHARACTER VARYING',
-        'longtext': 'CHARACTER VARYING',
-        'enum': 'CHARACTER VARYING',
-        'int': 'INTEGER NULL',
-        'tinyint': 'BOOLEAN'
-        if mysql_column_type and mysql_column_type.startswith('tinyint(1)')
-        else 'SMALLINT NULL',
-        'smallint': 'SMALLINT NULL',
-        'mediumint': 'INTEGER NULL',
-        'bigint': 'BIGINT NULL',
-        'bit': 'BOOLEAN',
-        'decimal': 'DOUBLE PRECISION',
-        'double': 'DOUBLE PRECISION',
-        'float': 'DOUBLE PRECISION',
-        'bool': 'BOOLEAN',
-        'boolean': 'BOOLEAN',
-        'date': 'TIMESTAMP WITHOUT TIME ZONE',
-        'datetime': 'TIMESTAMP WITHOUT TIME ZONE',
-        'timestamp': 'TIMESTAMP WITHOUT TIME ZONE',
-        'time': 'TIME WITHOUT TIME ZONE',
-        'json': 'JSONB',
-    }.get(
-        mysql_type,
-        'CHARACTER VARYING',
-    )
-
-
 def sync_table(table: str, args: Namespace) -> Union[bool, str]:
     """Sync one table"""
-    mysql = FastSyncTapMySql(args.tap, tap_type_to_target_type)
+    mysql = FastSyncTapMySql(args.tap, MYSQL_TO_POSTGRES_MAPPER)
     postgres = FastSyncTargetPostgres(args.target, args.transform)
 
     try:

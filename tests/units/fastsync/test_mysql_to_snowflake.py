@@ -1,11 +1,7 @@
 import unittest
 from . import assertions
 
-from pipelinewise.fastsync.mysql_to_snowflake import (
-    tap_type_to_target_type,
-    sync_table,
-    main_impl,
-)
+from pipelinewise.fastsync.mysql_to_snowflake import sync_table, main_impl
 
 PACKAGE_IN_SCOPE = 'pipelinewise.fastsync.mysql_to_snowflake'
 TAP = 'FastSyncTapMySql'
@@ -13,31 +9,10 @@ TARGET = 'FastSyncTargetSnowflake'
 
 
 # pylint: disable=missing-function-docstring,invalid-name,no-self-use
-class S3CsvToPostgres(unittest.TestCase):
+class MysqlToSnowflake(unittest.TestCase):
     """
     Unit tests for fastsync mysql to snowflake
     """
-
-    def test_tap_type_to_target_type_with_defined_tap_type_returns_equivalent_target_type(
-        self,
-    ):
-        self.assertEqual('BINARY', tap_type_to_target_type('binary', None))
-        self.assertEqual('VARIANT', tap_type_to_target_type('geometry', None))
-        self.assertEqual('VARIANT', tap_type_to_target_type('point', None))
-        self.assertEqual('VARIANT', tap_type_to_target_type('linestring', None))
-        self.assertEqual('VARIANT', tap_type_to_target_type('polygon', None))
-        self.assertEqual('VARIANT', tap_type_to_target_type('multipoint', None))
-        self.assertEqual('VARIANT', tap_type_to_target_type('multilinestring', None))
-        self.assertEqual('VARIANT', tap_type_to_target_type('multipolygon', None))
-        self.assertEqual('VARIANT', tap_type_to_target_type('geometrycollection', None))
-
-    def test_tap_type_to_target_type_with_undefined_tap_type_returns_CHARACTER_VARYING(
-        self,
-    ):
-        self.assertEqual(
-            'VARCHAR', tap_type_to_target_type('random-type', 'random-type')
-        )
-
     @staticmethod
     def test_sync_table_runs_successfully_returns_true():
         assertions.assert_sync_table_returns_true_on_success(

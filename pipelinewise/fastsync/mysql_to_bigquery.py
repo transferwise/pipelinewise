@@ -4,13 +4,15 @@ import os
 import sys
 import glob
 import time
+import multiprocessing
+
 from functools import partial
 from argparse import Namespace
-import multiprocessing
 from typing import Union
-
 from datetime import datetime
+
 from .commons import utils
+from .commons.type_mapping import MYSQL_TO_BIGQUERY_MAPPER
 from .commons.tap_mysql import FastSyncTapMySql
 from .commons.target_bigquery import FastSyncTargetBigquery
 
@@ -28,45 +30,10 @@ REQUIRED_CONFIG_KEYS = {
 LOCK = multiprocessing.Lock()
 
 
-def tap_type_to_target_type(mysql_type, mysql_column_type):
-    """Data type mapping from MySQL to Bigquery"""
-    return {
-        'char': 'STRING',
-        'varchar': 'STRING',
-        'binary': 'STRING',
-        'varbinary': 'STRING',
-        'blob': 'STRING',
-        'tinyblob': 'STRING',
-        'mediumblob': 'STRING',
-        'longblob': 'STRING',
-        'geometry': 'STRING',
-        'text': 'STRING',
-        'tinytext': 'STRING',
-        'mediumtext': 'STRING',
-        'longtext': 'STRING',
-        'enum': 'STRING',
-        'int': 'INT64',
-        'tinyint': 'BOOL' if mysql_column_type == 'tinyint(1)' else 'INT64',
-        'smallint': 'INT64',
-        'mediumint': 'INT64',
-        'bigint': 'INT64',
-        'bit': 'BOOL',
-        'decimal': 'NUMERIC',
-        'double': 'NUMERIC',
-        'float': 'NUMERIC',
-        'bool': 'BOOL',
-        'boolean': 'BOOL',
-        'date': 'TIMESTAMP',
-        'datetime': 'TIMESTAMP',
-        'timestamp': 'TIMESTAMP',
-        'time': 'TIME',
-    }.get(mysql_type, 'STRING')
-
-
 # pylint: disable=too-many-locals
 def sync_table(table: str, args: Namespace) -> Union[bool, str]:
     """Sync one table"""
-    mysql = FastSyncTapMySql(args.tap, tap_type_to_target_type, target_quote='`')
+    mysql = FastSyncTapMySql(args.tap, MYSQL_TO_BIGQUERY_MAPPER, target_quote='`')
     bigquery = FastSyncTargetBigquery(args.target, args.transform)
 
     try:
