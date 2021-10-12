@@ -27,19 +27,16 @@ rm -rf /var/lib/apt/lists/* \
 # alien -i oracle-instantclient.rpm --scripts
 # rm -f oracle-instantclient.rpm
 
-
-# Change to dev-project folder
-cd dev-project
-
 # Install PipelineWise in the container
 
 # Build test databasese
-../tests/db/tap_mysql_db.sh
-../tests/db/tap_postgres_db.sh
 
-./mongo/init_rs.sh
-../tests/db/tap_mongodb.sh
-../tests/db/target_postgres.sh
+tests/db/tap_mysql_db.sh
+tests/db/tap_postgres_db.sh
+
+dev-project/mongo/init_rs.sh
+tests/db/tap_mongodb.sh
+tests/db/target_postgres.sh
 
 # Install PipelineWise and connectors in the container
 make pipelinewise connectors -e pw_acceptlicenses=y -e pw_connector=target-snowflake,target-postgres,target-bigquery,tap-mysql,tap-postgres,tap-mongodb,transform-field,tap-s3-csv

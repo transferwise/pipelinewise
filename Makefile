@@ -76,7 +76,7 @@ endef
 define check_license
 	@echo "Checking license..."
 	@echo -e "$(YELLOW)"
-	@$(VENV_DIR)/$(1)/bin/python3 -m pip install pip-licenses
+	@$(VENV_DIR)/$(1)/bin/python3 -m pip install pip-licenses==3.5.3
 	@echo -e "$(RESET_COLOR)"
 	$(eval PKG_NAME:=`$(VENV_DIR)/$(1)/bin/pip-licenses|grep "$(1)[[:space:]]"| awk '{print $$$$1}'`)
 	$(eval PKG_VERSION:=`$(VENV_DIR)/$(1)/bin/pip-licenses | grep "$(1)[[:space:]]" | awk '{print $$$$2}'`)
