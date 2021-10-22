@@ -36,7 +36,7 @@ setup(name='pipelinewise',
           'tzlocal>=2.0,<4.1',
           'slackclient>=2.7,<2.10',
           'psutil==5.8.0',
-          'ujson==4.1.*'
+          'ujson>=4.1,<4.3'
       ],
       extras_require={
           'test': [
