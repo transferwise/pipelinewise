@@ -46,6 +46,7 @@ jobs:
 
   integration_tests:
     runs-on: ubuntu-20.04
+    environment: ci_tests
     concurrency:
       group: ${{ github.head_ref }}
       cancel-in-progress: true
@@ -64,14 +65,16 @@ jobs:
 
       - name: Setup test containers
 #        if: steps.check.outcome == 'failure'
-        run: docker-compose -f dev-project/docker-compose.yml up
+        run: docker-compose -f dev-project/docker-compose.yml up -d
+
+      - name: List containers
+        run: docker ps -a
 
       - name: Run target pg integration tests
 #        if: steps.check.outcome == 'failure'
         run: docker exec -it pytest tests/end_to_end/test_target_postgres.py -vx
 
 #       Todo: enable this
-#
 #      - name: Run integration tests
 #        if: steps.check.outcome == 'failure'
 #        run: |
