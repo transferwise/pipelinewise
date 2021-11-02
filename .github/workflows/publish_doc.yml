@@ -30,4 +30,5 @@ jobs:
           GH_EMAIL: ap-github@wise.com              # can be anything
           GH_TOKEN:  ${{ secrets.GITHUB_TOKEN }}     # Comes from GH itself, available at runtime, not stored in secrets
         run: |
-          ./scripts/publish_docs.sh
+          ls
+          ~/scripts/publish_docs.sh
