@@ -70,12 +70,9 @@ jobs:
       - name: List containers
         run: docker ps -a
 
-      - name: Inspect container
-        run: docker exec -it pipelinewise_dev echo $PIPELINEWISE_READY
-#
-#      - name: Wait for containers to be ready
-#        run: while [ "`docker inspect -f {{.State.Running}} pipelinewise_dev`" != "true" ]; do sleep 2; done
-#
+      - name: Wait for PPW Status
+        run: while [ ! docker exec pipelinewise_dev ./dev-project/.virtualenvs/pipelinewise/bin/pipelinewise status ]; do sleep 2; done
+
 #      - name: Run target pg integration tests
 ##        if: steps.check.outcome == 'failure'
 #        run: docker exec -it pipelinewise_dev pytest tests/end_to_end/test_target_postgres.py -vx
