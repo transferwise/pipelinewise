@@ -14,18 +14,20 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v2
 
-      - name: Publish doc
-        working-directory: ~/gh_doc_automation
-        shell: bash
+      - name: Check if doc has changed
+        id: check
+        env:
+          GITHUB_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        continue-on-error: true
+        run: ./scripts/ci_check_no_file_changes.sh doc
 
+      - name: Publish doc
+        if: steps.check.outcome == 'failure'
+        working-directory: ~/gh_doc_automation
         env:
           GH_NAME: ap-github                        # can be anything
           GH_EMAIL: ap-github@wise.com              # can be anything
           GH_TOKEN:  ${{ secrets.GITHUB_TOKEN }}     # Comes from GH itself, available at runtime, not stored in secrets
         run: |
-          ./scripts/ci_check_no_file_changes.sh doc && rc=$? || rc=$?
-
-          if [[ $rc -eq 1 ]]
-          then
-            scripts/publish_docs.sh
-          fi
+          ./scripts/publish_docs.sh
