@@ -52,6 +52,8 @@ sed -i '/motd/d' ~/.bashrc  # Delete any existing old DO_AT_LOGIN line from bash
 DO_AT_LOGIN="cd $PIPELINEWISE_HOME && source $PIPELINEWISE_HOME/.virtualenvs/pipelinewise/bin/activate && CURRENT_YEAR=\$(date +'%Y') envsubst < $PIPELINEWISE_HOME/../motd"
 echo $DO_AT_LOGIN >> ~/.bashrc
 
+export PIPELINEWISE_READY=1
+
 echo
 echo "=========================================================================="
 echo "PipelineWise Dev environment is ready in Docker container(s)."
