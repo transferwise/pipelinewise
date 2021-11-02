@@ -11,7 +11,7 @@ set -e
 # from the top level of the package and not in the subdirectory...
 # Shouldn't ever be an issue the way we've got this setup, and you'll
 # want to change it a bit to make it work with your project structure.
-if [[ ! -f .circleci/config.yml ]]; then
+if [[ ! -f .circleci/config.yml || ! -f .github/config.yml ]]; then
     echo "This must be run from the gh_doc_automation project directory"
     exit 1
 fi
@@ -92,7 +92,8 @@ rm -r html/
 # Add everything, get ready for commit. But only do it if we're on
 # master. If you want to deploy on different branches, you can change
 # this.
-if [[ "$CIRCLE_BRANCH" =~ ^master$|^[0-9]+\.[0-9]+\.X$ ]]; then
+echo "Current branch: $GITHUB_BRANCH"
+if [[ "$GITHUB_BRANCH" =~ ^refs/heads/master$|^[0-9]+\.[0-9]+\.X$ ]]; then
     git add --all
     # Make sure "|| echo" is at the end to avoid error codes when no changes to commit
     git commit -m "[ci skip] publishing updated documentation..." || echo 
@@ -106,5 +107,5 @@ if [[ "$CIRCLE_BRANCH" =~ ^master$|^[0-9]+\.[0-9]+\.X$ ]]; then
     # NOW we should be able to push it
     git push origin gh-pages
 else
-    echo "Not on master, so won't push doc"
+    echo "Not on master branch, so won't push doc"
 fi
