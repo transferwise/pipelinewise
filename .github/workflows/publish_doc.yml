@@ -15,6 +15,7 @@ jobs:
         uses: actions/checkout@v2
 
       - name: Check if doc has changed
+        working-directory: ~/gh_doc_automation
         id: check
         env:
           GITHUB_REPO: ${{ github.repository }}
@@ -24,7 +25,7 @@ jobs:
 
       - name: Publish doc
         if: steps.check.outcome == 'failure'
-#        working-directory: ~/gh_doc_automation
+        working-directory: ~/gh_doc_automation
         env:
           GH_NAME: ap-github                        # can be anything
           GH_EMAIL: ap-github@wise.com              # can be anything
