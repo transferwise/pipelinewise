@@ -71,10 +71,10 @@ jobs:
         run: docker ps -a
 
       - name: Inspect container
-        run: docker inspect -f {{.State.Health.Status}} pipelinewise
+        run: docker inspect -f '{{.State.Status}}' pipelinewise
 
       - name: Wait for containers to be ready
-        run: while [ "`docker inspect -f {{.State.Health.Status}} pipelinewise`" != "healthy" ]; do sleep 2; done
+        run: while [ "`docker inspect -f {{.State.Status}} pipelinewise`" != "healthy" ]; do sleep 2; done
 
       - name: Run target pg integration tests
 #        if: steps.check.outcome == 'failure'
