@@ -11,7 +11,7 @@ set -e
 # from the top level of the package and not in the subdirectory...
 # Shouldn't ever be an issue the way we've got this setup, and you'll
 # want to change it a bit to make it work with your project structure.
-if [[ ! -f .circleci/config.yml || ! -f .github/config.yml ]]; then
+if [[ ! -f .circleci/config.yml ]]; then
     echo "This must be run from the gh_doc_automation project directory"
     exit 1
 fi
