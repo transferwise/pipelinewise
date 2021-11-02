@@ -71,7 +71,7 @@ jobs:
         run: docker ps -a
 
       - name: Wait for PPW Status
-        run: while [ ! docker exec pipelinewise_dev ./dev-project/.virtualenvs/pipelinewise/bin/pipelinewise status ]; do sleep 2; done
+        run: while [ ! "docker exec pipelinewise_dev ./dev-project/.virtualenvs/pipelinewise/bin/pipelinewise status" ]; do echo 'Sleeping for 5s'; sleep 5; done
 
 #      - name: Run target pg integration tests
 ##        if: steps.check.outcome == 'failure'
