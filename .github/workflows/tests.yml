@@ -46,6 +46,9 @@ jobs:
 
   integration_tests:
     runs-on: ubuntu-20.04
+    concurrency:
+      group: ${{ github.head_ref }}
+      cancel-in-progress: true
 
     steps:
       - name: Checking out repo
