@@ -92,8 +92,8 @@ rm -r html/
 # Add everything, get ready for commit. But only do it if we're on
 # master. If you want to deploy on different branches, you can change
 # this.
-echo "Current branch: $GITHUB_BRANCH"
-if [[ "$GITHUB_BRANCH" =~ ^refs/heads/master$|^[0-9]+\.[0-9]+\.X$ ]]; then
+echo "Current branch ref: $GITHUB_REF"
+if [[ "$GITHUB_REF" =~ ^refs/heads/master$|^[0-9]+\.[0-9]+\.X$ ]]; then
     git add --all
     # Make sure "|| echo" is at the end to avoid error codes when no changes to commit
     git commit -m "[ci skip] publishing updated documentation..." || echo 
