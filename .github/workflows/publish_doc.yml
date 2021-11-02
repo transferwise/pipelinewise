@@ -13,6 +13,11 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
+        with:
+          path: gh_doc_automation
+
+      - name: check structure
+        run: ls -l
 
       - name: Check if doc has changed
         working-directory: ~/gh_doc_automation
