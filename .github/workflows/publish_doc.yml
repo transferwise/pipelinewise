@@ -9,6 +9,7 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     environment: github-pages
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
@@ -25,7 +26,7 @@ jobs:
           GITHUB_REPO: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         continue-on-error: true
-        run: gh_doc_automation/scripts/ci_check_no_file_changes.sh doc
+        run: ./scripts/ci_check_no_file_changes.sh doc
 
       - name: Publish doc
         if: steps.check.outcome == 'failure'
@@ -34,4 +35,4 @@ jobs:
           GH_NAME: ap-github                        # can be anything
           GH_EMAIL: ap-github@wise.com              # can be anything
           GH_TOKEN:  ${{ secrets.GITHUB_TOKEN }}     # Comes from GH itself, available at runtime, not stored in secrets
-        run: gh_doc_automation/scripts/publish_docs.sh
+        run: ./scripts/publish_docs.sh
