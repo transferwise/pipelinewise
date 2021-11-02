@@ -51,11 +51,13 @@ mv docs/_build/html ./
 git stash
 
 # Checkout our gh-pages branch, remove everything but .git
+echo "Checking out gh-pages branch ..."
 git checkout gh-pages
 git pull origin gh-pages
 
 # Make sure to set the credentials! You'll need these environment vars
-# set in the "Environment Variables" section in Circle CI
+# set in the "Environment Variables" section in CI
+echo "Configuring git creds ..."
 git config user.email "$GH_EMAIL" > /dev/null 2>&1
 git config user.name "$GH_NAME" > /dev/null 2>&1
 
