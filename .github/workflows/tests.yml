@@ -59,22 +59,9 @@ jobs:
         continue-on-error: true
         run: ./scripts/ci_check_no_file_changes.sh python
 
-#      - name: Set up Python ${{ matrix.python-version }}
-#        if: steps.check.outcome == 'failure'
-#        uses: actions/setup-python@v2
-#        with:
-#          python-version: ${{ matrix.python-version }}
-
       - name: Setup test containers
 #        if: steps.check.outcome == 'failure'
         run: docker-compose -f dev-project/docker-compose.yml up
-
-      - name: Install Pipelinewise and connectors
-#        if: steps.check.outcome == 'failure'
-        run: |
-          docker exec -it pipelinewise make pipelinewise connectors \
-          -e pw_acceptlicenses=y \
-          -e pw_connector=target-snowflake,target-postgres,target-bigquery,tap-mysql,tap-postgres,tap-mongodb,transform-field,tap-s3-csv
 
       - name: Run target pg integration tests
 #        if: steps.check.outcome == 'failure'
