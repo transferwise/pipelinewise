@@ -122,28 +122,6 @@ jobs:
             fi
           no_output_timeout: 30m
 
-  # For documentation deployment. You'll need the following environment vars
-  # in your Circle CI settings, otherwise this will not work.
-  #
-  # GH_NAME (your git username)
-  # GH_EMAIL (your git email)
-  # GH_TOKEN (the personal Git token with pushes enabled)
-  deploy-doc:
-    docker:
-      - image: cimg/python:3.7
-    working_directory: ~/gh_doc_automation
-    steps:
-      - checkout
-      - run:
-          name: "Publish doc if it has changed"
-          command: |
-            ./scripts/ci_check_no_file_changes.sh doc && rc=$? || rc=$?
-
-            if [[ $rc -eq 1 ]]
-            then
-              .circleci/publish_docs.sh
-            fi
-
   upload_docker_image:
     <<: *docker_k8s_deployer
     steps:
@@ -221,7 +199,3 @@ workflows:
             branches:
               only:
                 - master
-
-  deploy_doc:
-    jobs:
-      - deploy-doc
