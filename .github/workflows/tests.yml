@@ -70,12 +70,18 @@ jobs:
       - name: List containers
         run: docker ps -a
 
+      - name: Inspect container
+        run: docker inspect -f {{.State.Health.Status}} pipelinewise
+
+      - name: Wait for containers to be ready
+        run: while [ "`docker inspect -f {{.State.Health.Status}} pipelinewise`" != "healthy" ]; do sleep 2; done
+
       - name: Run target pg integration tests
 #        if: steps.check.outcome == 'failure'
-        run: docker exec -it pytest tests/end_to_end/test_target_postgres.py -vx
+        run: docker exec -it pipelinewise pytest tests/end_to_end/test_target_postgres.py -vx
 
 #       Todo: enable this
 #      - name: Run integration tests
 #        if: steps.check.outcome == 'failure'
 #        run: |
-#          docker exec -it pytest tests/end_to_end -vx
+#          docker exec -it pipelinewise pytest tests/end_to_end -vx
