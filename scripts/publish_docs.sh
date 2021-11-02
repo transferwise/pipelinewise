@@ -11,7 +11,7 @@ set -e
 # from the top level of the package and not in the subdirectory...
 # Shouldn't ever be an issue the way we've got this setup, and you'll
 # want to change it a bit to make it work with your project structure.
-if [[ ! -f .circleci/config.yml ]]; then
+if [[ ! -d .github/workflows ]]; then
     echo "This must be run from the gh_doc_automation project directory"
     exit 1
 fi
@@ -101,7 +101,7 @@ if [[ "$GITHUB_REF" =~ ^refs/heads/master$|^[0-9]+\.[0-9]+\.X$ ]]; then
     git commit -m "[ci skip] publishing updated documentation..." || echo 
 
     # We have to re-add the origin with the GH_TOKEN credentials. You
-    # will need this SSH key in your environment variables on Circle.
+    # will need this SSH key in your environment variables on CI.
     # Make sure you change the <project>.git pattern at the end!
     git remote rm origin
     git remote add origin https://"$GH_NAME":"$GH_TOKEN"@github.com/transferwise/pipelinewise.git
