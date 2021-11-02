@@ -17,7 +17,7 @@ jobs:
           path: gh_doc_automation
 
       - name: check structure
-        run: ls -l
+        run: ls -l gh_doc_automation
 
       - name: Check if doc has changed
         working-directory: ~/gh_doc_automation
@@ -26,7 +26,7 @@ jobs:
           GITHUB_REPO: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         continue-on-error: true
-        run: ./scripts/ci_check_no_file_changes.sh doc
+        run: ./gh_doc_automation/scripts/ci_check_no_file_changes.sh doc
 
       - name: Publish doc
         if: steps.check.outcome == 'failure'
@@ -35,4 +35,4 @@ jobs:
           GH_NAME: ap-github                        # can be anything
           GH_EMAIL: ap-github@wise.com              # can be anything
           GH_TOKEN:  ${{ secrets.GITHUB_TOKEN }}     # Comes from GH itself, available at runtime, not stored in secrets
-        run: ./scripts/publish_docs.sh
+        run: ./gh_doc_automation/scripts/publish_docs.sh
