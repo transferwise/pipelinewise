@@ -44,9 +44,11 @@ do
   if [[ ${CHECK} == "python" ]]; then
     REGEX="(^tests\/|^pipelinewise\/|^singer-connectors\/|^setup\.py|^Makefile)"
     echo "Searching for changes in python files"
+
   elif [[ ${CHECK} == "doc" ]]; then
-    REGEX="(^docs\/|publish_docs.sh)"
+    REGEX="(^docs\/|^scripts/publish_docs.sh)"
     echo "Searching for changes in documentation files"
+
   else
     echo "Invalid check: \"${CHECK}\". Falling back to exiting with FAILURE code"
     exit 1
