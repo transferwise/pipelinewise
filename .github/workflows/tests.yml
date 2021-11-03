@@ -78,4 +78,20 @@ jobs:
 
       - name: Run target end-to-end tests
 #        if: steps.check.outcome == 'failure'
+        env:
+          TARGET_SNOWFLAKE_ACCOUNT: ${{ secrets.TARGET_SNOWFLAKE_ACCOUNT }}
+          TARGET_SNOWFLAKE_AWS_ACCESS_KEY: ${{ secrets.TARGET_SNOWFLAKE_AWS_ACCESS_KEY }}
+          TARGET_SNOWFLAKE_AWS_SECRET_ACCESS_KEY: ${{ secrets.TARGET_SNOWFLAKE_AWS_SECRET_ACCESS_KEY }}
+          TARGET_SNOWFLAKE_DBNAME: ${{ secrets.TARGET_SNOWFLAKE_DBNAME }}
+          TARGET_SNOWFLAKE_FILE_FORMAT: ${{ secrets.TARGET_SNOWFLAKE_FILE_FORMAT }}
+          TARGET_SNOWFLAKE_PASSWORD: ${{ secrets.TARGET_SNOWFLAKE_PASSWORD }}
+          TARGET_SNOWFLAKE_S3_BUCKET: ${{ secrets.TARGET_SNOWFLAKE_S3_BUCKET }}
+          TARGET_SNOWFLAKE_S3_KEY_PREFIX: ${{ secrets.TARGET_SNOWFLAKE_S3_KEY_PREFIX }}
+          TARGET_SNOWFLAKE_SCHEMA: ${{ secrets.TARGET_SNOWFLAKE_SCHEMA }}
+          TARGET_SNOWFLAKE_STAGE: ${{ secrets.TARGET_SNOWFLAKE_STAGE }}
+          TARGET_SNOWFLAKE_USER: ${{ secrets.TARGET_SNOWFLAKE_USER }}
+          TARGET_SNOWFLAKE_WAREHOUSE: ${{ secrets.TARGET_SNOWFLAKE_WAREHOUSE }}
+          TAP_S3_CSV_AWS_KEY: ${{ secrets.TAP_S3_CSV_AWS_KEY }}
+          TAP_S3_CSV_AWS_SECRET_ACCESS_KEY: ${{ secrets.TAP_S3_CSV_AWS_SECRET_ACCESS_KEY }}
+          TAP_S3_CSV_BUCKET: ${{ secrets.TAP_S3_CSV_BUCKET }}
         run: docker exec -t pipelinewise_dev pytest tests/end_to_end -vx
