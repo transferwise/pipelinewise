@@ -44,7 +44,7 @@ jobs:
         run: |
           pytest --cov=pipelinewise --cov-fail-under=72 -v tests/units
 
-  integration_tests:
+  e2e_tests:
     runs-on: ubuntu-20.04
     environment: ci_tests
 #    concurrency:
