@@ -76,19 +76,16 @@ jobs:
         run: |
           until docker logs pipelinewise_dev | grep "PipelineWise Dev environment is ready"
           do
-            echo 'Sleeping for 30s';
-            sleep 30;
-            echo "--------------------------------"
-            docker logs pipelinewise_dev -n 5
-            echo "--------------------------------"
+            echo 'Sleeping for 1min';
+            sleep 60;
           done
 
       - name: Run target pg integration tests
 #        if: steps.check.outcome == 'failure'
-        run: docker exec -it pipelinewise_dev pytest tests/end_to_end/test_target_postgres.py -vx
+        run: docker exec -t pipelinewise_dev pytest tests/end_to_end/test_target_postgres.py -vx
 
 #       Todo: enable this
 #      - name: Run integration tests
 #        if: steps.check.outcome == 'failure'
 #        run: |
-#          docker exec -it pipelinewise_dev pytest tests/end_to_end -vx
+#          docker exec -t pipelinewise_dev pytest tests/end_to_end -vx
