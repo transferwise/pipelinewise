@@ -67,11 +67,7 @@ jobs:
 #        if: steps.check.outcome == 'failure'
         run: docker-compose -f dev-project/docker-compose.yml up -d
 
-      - name: List containers
-#        if: steps.check.outcome == 'failure'
-        run: docker ps -a
-
-      - name: Wait for containers to be ready
+      - name: Wait for test containers to be ready
 #        if: steps.check.outcome == 'failure'
         run: |
           until docker logs pipelinewise_dev | grep "PipelineWise Dev environment is ready"
@@ -80,12 +76,6 @@ jobs:
             sleep 60;
           done
 
-      - name: Run target pg integration tests
+      - name: Run target end-to-end tests
 #        if: steps.check.outcome == 'failure'
-        run: docker exec -t pipelinewise_dev pytest tests/end_to_end/test_target_postgres.py -vx
-
-#       Todo: enable this
-#      - name: Run integration tests
-#        if: steps.check.outcome == 'failure'
-#        run: |
-#          docker exec -t pipelinewise_dev pytest tests/end_to_end -vx
+        run: docker exec -t pipelinewise_dev pytest tests/end_to_end -vx
