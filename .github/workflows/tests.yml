@@ -94,4 +94,9 @@ jobs:
           TAP_S3_CSV_AWS_KEY: ${{ secrets.TAP_S3_CSV_AWS_KEY }}
           TAP_S3_CSV_AWS_SECRET_ACCESS_KEY: ${{ secrets.TAP_S3_CSV_AWS_SECRET_ACCESS_KEY }}
           TAP_S3_CSV_BUCKET: ${{ secrets.TAP_S3_CSV_BUCKET }}
-        run: docker exec -t pipelinewise_dev pytest tests/end_to_end -vx
+        run: |
+          docker exec -t \
+          -e TAP_S3_CSV_AWS_KEY=$TAP_S3_CSV_AWS_KEY \
+          -e TAP_S3_CSV_AWS_SECRET_ACCESS_KEY=$TAP_S3_CSV_AWS_SECRET_ACCESS_KEY \
+          -e TAP_S3_CSV_BUCKET=$TAP_S3_CSV_BUCKET \
+          pipelinewise_dev pytest tests/end_to_end -vx
