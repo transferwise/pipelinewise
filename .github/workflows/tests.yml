@@ -74,10 +74,13 @@ jobs:
       - name: Wait for containers to be ready
 #        if: steps.check.outcome == 'failure'
         run: |
-          while [ 'docker logs pipelinewise_dev | grep "PipelineWise Dev environment is ready"' ]; do
+          until docker logs pipelinewise_dev | grep "PipelineWise Dev environment is ready"
+          do
             echo 'Sleeping for 30s';
             sleep 30;
-            docker logs pipelinewise_dev -n 10
+            echo "--------------------------------"
+            docker logs pipelinewise_dev -n 5
+            echo "--------------------------------"
           done
 
       - name: Run target pg integration tests
