@@ -75,8 +75,9 @@ jobs:
 #        if: steps.check.outcome == 'failure'
         run: |
           while [ 'docker logs pipelinewise_dev | grep "PipelineWise Dev environment is ready"' ]; do
-            echo 'Sleeping for 5s';
-            sleep 5;
+            echo 'Sleeping for 30s';
+            sleep 30;
+            docker logs pipelinewise_dev -n 10
           done
 
       - name: Run target pg integration tests
