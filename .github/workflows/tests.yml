@@ -68,14 +68,20 @@ jobs:
         run: docker-compose -f dev-project/docker-compose.yml up -d
 
       - name: List containers
+#        if: steps.check.outcome == 'failure'
         run: docker ps -a
 
-      - name: Wait for PPW Status
-        run: while [ ! "docker exec pipelinewise_dev ./dev-project/.virtualenvs/pipelinewise/bin/pipelinewise status" ]; do echo 'Sleeping for 5s'; sleep 5; done
+      - name: Wait for containers to be ready
+#        if: steps.check.outcome == 'failure'
+        run: |
+          while [ 'docker logs pipelinewise_dev | grep "PipelineWise Dev environment is ready"' ]; do
+            echo 'Sleeping for 5s';
+            sleep 5;
+          done
 
-#      - name: Run target pg integration tests
-##        if: steps.check.outcome == 'failure'
-#        run: docker exec -it pipelinewise_dev pytest tests/end_to_end/test_target_postgres.py -vx
+      - name: Run target pg integration tests
+#        if: steps.check.outcome == 'failure'
+        run: docker exec -it pipelinewise_dev pytest tests/end_to_end/test_target_postgres.py -vx
 
 #       Todo: enable this
 #      - name: Run integration tests
