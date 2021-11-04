@@ -38,6 +38,9 @@ services:
       TAP_MONGODB_DB: ${TAP_MONGODB_DB}
       TAP_MONGODB_ROOT_USER: ${TAP_MONGODB_ROOT_USER}
       TAP_MONGODB_ROOT_PASSWORD: ${TAP_MONGODB_ROOT_PASSWORD}
+
+      PATH: /opt/pipelinewise/dev-project/.virtualenvs/pipelinewise/bin:${PATH}
+
     volumes:
       - ../:/opt/pipelinewise
       # don't create container specific .virtualenvs files on host
