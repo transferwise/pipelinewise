@@ -11,6 +11,9 @@ on:
 jobs:
   unit_test:
     runs-on: ubuntu-20.04
+    concurrency:
+      group: ${{ github.head_ref }}
+      cancel-in-progress: true
     strategy:
       matrix:
         python-version: [3.6, 3.7, 3.8]
@@ -47,9 +50,9 @@ jobs:
   e2e_tests:
     runs-on: ubuntu-20.04
     environment: ci_tests
-#    concurrency:
-#      group: ${{ github.head_ref }}
-#      cancel-in-progress: true
+    concurrency:
+      group: ${{ github.head_ref }}
+      cancel-in-progress: true
 
     steps:
       - name: Checking out repo
@@ -64,11 +67,11 @@ jobs:
         run: ./scripts/ci_check_no_file_changes.sh python
 
       - name: Setup test containers
-#        if: steps.check.outcome == 'failure'
+        if: steps.check.outcome == 'failure'
         run: docker-compose -f dev-project/docker-compose.yml up -d
 
       - name: Wait for test containers to be ready
-#        if: steps.check.outcome == 'failure'
+        if: steps.check.outcome == 'failure'
         run: |
           until docker logs pipelinewise_dev | grep "PipelineWise Dev environment is ready"
           do
@@ -77,7 +80,7 @@ jobs:
           done
 
       - name: Run target end-to-end tests
-#        if: steps.check.outcome == 'failure'
+        if: steps.check.outcome == 'failure'
         env:
           TARGET_SNOWFLAKE_ACCOUNT: ${{ secrets.TARGET_SNOWFLAKE_ACCOUNT }}
           TARGET_SNOWFLAKE_AWS_ACCESS_KEY: ${{ secrets.TARGET_SNOWFLAKE_AWS_ACCESS_KEY }}
