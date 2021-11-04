@@ -11,9 +11,6 @@ on:
 jobs:
   unit_test:
     runs-on: ubuntu-20.04
-    concurrency:
-      group: ${{ github.head_ref }}
-      cancel-in-progress: true
     strategy:
       matrix:
         python-version: [3.6, 3.7, 3.8]
