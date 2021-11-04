@@ -1750,13 +1750,8 @@ TAP RUN SUMMARY
                 bookmarks = state_data.get('bookmarks')
                 list_of_tables = tables.split(',')
                 if bookmarks:
-                    cleanedup_bookmarks = {
-                        bookmark_name: bookmarks[bookmark_name]
-                        for bookmark_name in bookmarks
-                        if not any(table_name in bookmark_name for table_name in list_of_tables)
-                    }
-
-                    state_data['bookmarks'] = cleanedup_bookmarks
+                    for table_name in list_of_tables:
+                        bookmarks.pop(table_name, None)
 
                 state_file.seek(0)
                 json.dump(state_data, state_file)

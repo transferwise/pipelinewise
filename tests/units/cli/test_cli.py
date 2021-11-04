@@ -72,9 +72,9 @@ class TestCli:
         sample_state_data = {
             'currently_syncing': None,
             'bookmarks': {
-                'tap_id-table1': {'foo': 'bar'},
-                'tap_id-table2': {'foo': 'bar'},
-                'tap_id-table3': {'foo': 'bar'}
+                'table1': {'foo': 'bar'},
+                'table2': {'foo': 'bar'},
+                'table3': {'foo': 'bar'}
             }
         }
         with open(test_state_file, 'w', encoding='UTF-8') as state_file:
@@ -643,7 +643,7 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
             expected_state_data = {
                 'currently_syncing': None,
                 'bookmarks': {
-                    'tap_id-table2': {'foo': 'bar'},
+                    'table2': {'foo': 'bar'},
                 }
             }
             with open(test_state_file, encoding='UTF-8') as state_file:
