@@ -62,7 +62,8 @@ class TestCli:
 
         # Making a test tap bin file
         os.makedirs(f'{temp_path}pipelinewise/bin')
-        open(f'{temp_path}pipelinewise/bin/mysql-to-snowflake', 'a').close()
+        with open(f'{temp_path}pipelinewise/bin/mysql-to-snowflake', 'a', encoding='UTF-8'):
+            pass
 
         return pipelinewise
 
@@ -76,7 +77,7 @@ class TestCli:
                 'tap_id-table3': {'foo': 'bar'}
             }
         }
-        with open(test_state_file, 'w') as state_file:
+        with open(test_state_file, 'w', encoding='UTF-8') as state_file:
             json.dump(sample_state_data, state_file)
 
     @staticmethod
@@ -615,15 +616,19 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
         assert pytest_wrapped_e.value.code == 1
 
     def test_command_sync_tables_cleanup_state_if_file_not_exists_and_no_tables_argument(self):
+        """Testing sync_tables cleanup state if file not exists and there is no tables argument"""
         pipelinewise = self._init_for_sync_tables_states_cleanup()
         self._assert_calling_sync_tables(pipelinewise)
 
     def test_command_sync_tables_cleanup_state_if_file_not_exists_and_tables_argument(self):
+        """Testing sync_tables cleanup state if file not exists and there is tables argument"""
         pipelinewise = self._init_for_sync_tables_states_cleanup(tables_arg='table1,table3')
         self._assert_calling_sync_tables(pipelinewise)
 
     def test_command_sync_tables_cleanup_state_if_file_exists_and_no_table_argument(self):
+        """Testing sync_tables cleanup state if file exists and there is no table argument"""
         def _assert_state_file_is_deleted(*args, **kwargs):
+            # pylint: disable=unused-argument
             assert os.path.isfile(test_state_file) is False
 
         pipelinewise = self._init_for_sync_tables_states_cleanup()
@@ -632,14 +637,16 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
         self._assert_calling_sync_tables(pipelinewise, _assert_state_file_is_deleted)
 
     def test_command_sync_tables_cleanup_state_if_file_exists_and_table_argument(self):
+        """Testing sync_tables cleanup state if file exists and there is table argument"""
         def _assert_state_file_is_cleaned(*args, **kwargs):
+            # pylint: disable=unused-argument
             expected_state_data = {
                 'currently_syncing': None,
                 'bookmarks': {
                     'tap_id-table2': {'foo': 'bar'},
                 }
             }
-            with open(test_state_file) as state_file:
+            with open(test_state_file, encoding='UTF-8') as state_file:
                 state_data = json.load(state_file)
             assert state_data == expected_state_data
 
@@ -649,9 +656,11 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
         self._assert_calling_sync_tables(pipelinewise, _assert_state_file_is_cleaned)
 
     def test_command_sync_tables_cleanup_state_if_file_empty_and_table_argument(self):
+        """Testing sync_tables cleanup state if file empty and there is table argument"""
         pipelinewise = self._init_for_sync_tables_states_cleanup(tables_arg='table1,table3')
         test_state_file = pipelinewise.tap['files']['state']
-        open(test_state_file, 'a').close()
+        with open(test_state_file, 'a', encoding='UTF-8'):
+            pass
         self._assert_calling_sync_tables(pipelinewise)
 
     # pylint: disable=protected-access
@@ -884,5 +893,3 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
             )
 
             assert run_command_mock.call_count == 4
-
-

@@ -1743,9 +1743,9 @@ TAP RUN SUMMARY
                 pass
 
     @staticmethod
-    def _clean_tables_from_bookmarks_in_state_file(state_file: str, tables: str) -> None:
+    def _clean_tables_from_bookmarks_in_state_file(state_file_to_clean: str, tables: str) -> None:
         try:
-            with open(state_file, 'r+') as state_file:
+            with open(state_file_to_clean, 'r+', encoding='UTF-8') as state_file:
                 state_data = json.load(state_file)
                 bookmarks = state_data.get('bookmarks')
                 list_of_tables = tables.split(',')
