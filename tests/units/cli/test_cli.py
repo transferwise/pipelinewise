@@ -69,11 +69,11 @@ class TestCli:
     @staticmethod
     def _make_sample_state_file(test_state_file: str) -> None:
         sample_state_data = {
-            "currently_syncing": None,
-            "bookmarks": {
-                "tap_id-table1": {"foo": "bar"},
-                "tap_id-table2": {"foo": "bar"},
-                "tap_id-table3": {"foo": "bar"}
+            'currently_syncing': None,
+            'bookmarks': {
+                'tap_id-table1': {'foo': 'bar'},
+                'tap_id-table2': {'foo': 'bar'},
+                'tap_id-table3': {'foo': 'bar'}
             }
         }
         with open(test_state_file, 'w') as state_file:
@@ -634,9 +634,9 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
     def test_command_sync_tables_cleanup_state_if_file_exists_and_table_argument(self):
         def _assert_state_file_is_cleaned(*args, **kwargs):
             expected_state_data = {
-                "currently_syncing": None,
-                "bookmarks": {
-                    "tap_id-table2": {"foo": "bar"},
+                'currently_syncing': None,
+                'bookmarks': {
+                    'tap_id-table2': {'foo': 'bar'},
                 }
             }
             with open(test_state_file) as state_file:
