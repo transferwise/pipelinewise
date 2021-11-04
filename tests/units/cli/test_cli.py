@@ -1,3 +1,4 @@
+import json
 import os
 import re
 import time
@@ -9,6 +10,7 @@ import pytest
 
 from pathlib import Path
 from unittest.mock import patch
+from typing import Callable, Optional
 
 from tests.units.cli.cli_args import CliArgs
 from pipelinewise import cli
@@ -39,6 +41,8 @@ class TestCli:
         self.pipelinewise = PipelineWise(
             self.args, CONFIG_DIR, VIRTUALENVS_DIR, PROFILING_DIR
         )
+        if os.path.exists('/tmp/pwtest'):
+            shutil.rmtree('/tmp/pwtest')
 
     def teardown_method(self):
         """Delete test directories"""
@@ -47,6 +51,41 @@ class TestCli:
             shutil.rmtree(os.path.join(CONFIG_DIR, 'target_one/tap_one/log'))
         except Exception:
             pass
+
+    @staticmethod
+    def _init_for_sync_tables_states_cleanup(tables_arg: str = None) -> PipelineWise:
+        temp_path = '/tmp/pwtest/'
+        args = CliArgs(target='target_one', tap='tap_one', tables=tables_arg)
+        pipelinewise = PipelineWise(args, CONFIG_DIR, VIRTUALENVS_DIR)
+        pipelinewise.tap['files']['state'] = f'{temp_path}state.json'
+        pipelinewise.venv_dir = temp_path
+
+        # Making a test tap bin file
+        os.makedirs(f'{temp_path}pipelinewise/bin')
+        open(f'{temp_path}pipelinewise/bin/mysql-to-snowflake', 'a').close()
+
+        return pipelinewise
+
+    @staticmethod
+    def _make_sample_state_file(test_state_file: str) -> None:
+        sample_state_data = {
+            "currently_syncing": None,
+            "bookmarks": {
+                "tap_id-table1": {"foo": "bar"},
+                "tap_id-table2": {"foo": "bar"},
+                "tap_id-table3": {"foo": "bar"}
+            }
+        }
+        with open(test_state_file, 'w') as state_file:
+            json.dump(sample_state_data, state_file)
+
+    @staticmethod
+    def _assert_calling_sync_tables(pipelinewise: PipelineWise, side_effect_method: Optional[Callable] = None) -> None:
+        with patch('pipelinewise.cli.pipelinewise.PipelineWise.run_tap_fastsync') as mocked_fastsync:
+            if side_effect_method:
+                mocked_fastsync.side_effect = side_effect_method
+            pipelinewise.sync_tables()
+        mocked_fastsync.assert_called_once()
 
     def test_target_dir(self):
         """Singer target connector config path must be relative to the project config dir"""
@@ -575,6 +614,46 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
         assert pytest_wrapped_e.type == SystemExit
         assert pytest_wrapped_e.value.code == 1
 
+    def test_command_sync_tables_cleanup_state_if_file_not_exists_and_no_tables_argument(self):
+        pipelinewise = self._init_for_sync_tables_states_cleanup()
+        self._assert_calling_sync_tables(pipelinewise)
+
+    def test_command_sync_tables_cleanup_state_if_file_not_exists_and_tables_argument(self):
+        pipelinewise = self._init_for_sync_tables_states_cleanup(tables_arg='table1,table3')
+        self._assert_calling_sync_tables(pipelinewise)
+
+    def test_command_sync_tables_cleanup_state_if_file_exists_and_no_table_argument(self):
+        def _assert_state_file_is_deleted(*args, **kwargs):
+            assert os.path.isfile(test_state_file) is False
+
+        pipelinewise = self._init_for_sync_tables_states_cleanup()
+        test_state_file = pipelinewise.tap['files']['state']
+        self._make_sample_state_file(test_state_file)
+        self._assert_calling_sync_tables(pipelinewise, _assert_state_file_is_deleted)
+
+    def test_command_sync_tables_cleanup_state_if_file_exists_and_table_argument(self):
+        def _assert_state_file_is_cleaned(*args, **kwargs):
+            expected_state_data = {
+                "currently_syncing": None,
+                "bookmarks": {
+                    "tap_id-table2": {"foo": "bar"},
+                }
+            }
+            with open(test_state_file) as state_file:
+                state_data = json.load(state_file)
+            assert state_data == expected_state_data
+
+        pipelinewise = self._init_for_sync_tables_states_cleanup(tables_arg='table1,table3')
+        test_state_file = pipelinewise.tap['files']['state']
+        self._make_sample_state_file(test_state_file)
+        self._assert_calling_sync_tables(pipelinewise, _assert_state_file_is_cleaned)
+
+    def test_command_sync_tables_cleanup_state_if_file_empty_and_table_argument(self):
+        pipelinewise = self._init_for_sync_tables_states_cleanup(tables_arg='table1,table3')
+        test_state_file = pipelinewise.tap['files']['state']
+        open(test_state_file, 'a').close()
+        self._assert_calling_sync_tables(pipelinewise)
+
     # pylint: disable=protected-access
     def test_exit_gracefully(self):
         """Gracefully shoudl run tap command"""
@@ -805,3 +884,5 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
             )
 
             assert run_command_mock.call_count == 4
+
+

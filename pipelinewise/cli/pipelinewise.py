@@ -1381,6 +1381,8 @@ class PipelineWise:
             )
             sys.exit(1)
 
+        self._cleanup_tap_state_file()
+
         # Generate and run the command to run the tap directly
         tap_config = self.tap['files']['config']
         tap_inheritable_config = self.tap['files']['inheritable_config']
@@ -1728,6 +1730,42 @@ TAP RUN SUMMARY
                 break
 
         return errors
+
+    def _cleanup_tap_state_file(self) -> None:
+        tables = self.args.tables
+        state_file = self.tap['files']['state']
+        if tables:
+            self._clean_tables_from_bookmarks_in_state_file(state_file, tables)
+        else:
+            try:
+                os.remove(state_file)
+            except FileNotFoundError:
+                pass
+
+    @staticmethod
+    def _clean_tables_from_bookmarks_in_state_file(state_file: str, tables: str) -> None:
+        try:
+            with open(state_file, 'r+') as state_file:
+                state_data = json.load(state_file)
+                bookmarks = state_data.get('bookmarks')
+                list_of_tables = tables.split(',')
+                if bookmarks:
+                    cleanedup_bookmarks = {
+                        bookmark_name: bookmarks[bookmark_name]
+                        for bookmark_name in bookmarks
+                        if not any(table_name in bookmark_name for table_name in list_of_tables)
+                    }
+
+                    state_data['bookmarks'] = cleanedup_bookmarks
+
+                state_file.seek(0)
+                json.dump(state_data, state_file)
+                state_file.truncate()
+
+        except FileNotFoundError:
+            pass
+        except json.JSONDecodeError:
+            pass
 
     def __validate_transformations(
         self, transformation_file: str, catalog: Dict, tap_id: str, target_id: str
