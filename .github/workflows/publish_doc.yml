@@ -5,6 +5,10 @@ on:
   pull_request:
     branches: [master]
 
+concurrency:
+  group: doc-${{ github.head_ref }}
+  cancel-in-progress: true
+
 jobs:
   publish:
     runs-on: ubuntu-latest
