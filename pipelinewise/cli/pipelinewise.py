@@ -1737,10 +1737,7 @@ TAP RUN SUMMARY
         if tables:
             self._clean_tables_from_bookmarks_in_state_file(state_file, tables)
         else:
-            try:
-                os.remove(state_file)
-            except FileNotFoundError:
-                pass
+            utils.silentremove(state_file)
 
     @staticmethod
     def _clean_tables_from_bookmarks_in_state_file(state_file_to_clean: str, tables: str) -> None:
