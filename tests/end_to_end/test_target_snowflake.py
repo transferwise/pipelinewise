@@ -239,7 +239,7 @@ class TestTargetSnowflake:
         assertions.assert_date_column_naive_in_target(
             self.run_query_target_snowflake,
             'updated_at',
-            'ppw_e2e_tap_postgres."TABLE_WITH_SPACE AND UPPERCASE"',
+            f'ppw_e2e_tap_postgres{self.snowflake_schema_postfix}."TABLE_WITH_SPACE AND UPPERCASE"',
         )
 
         result = self.run_query_target_snowflake(
