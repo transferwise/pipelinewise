@@ -251,6 +251,10 @@ class E2EEnv:
                     },
                 },
             },
+        },
+        'SCHEMA_POSFIX': {
+            'value': os.environ.get('SCHEMA_POSFIX', 'TEST')
+
         }
 
         # Add is_configured keys for every connector
@@ -277,9 +281,6 @@ class E2EEnv:
         self.env['TARGET_BIGQUERY'][
             'is_configured'
         ] = self._is_env_connector_configured('TARGET_BIGQUERY')
-
-        # Add schema postfix
-        self.env['SCHEMA_POSTFIX'] = os.environ.get('SCHEMA_POSTFIX', 'TEST')
 
     def _get_conn_env_var(self, connector, key):
         """Get the value of a specific variable in the self.env dict"""
