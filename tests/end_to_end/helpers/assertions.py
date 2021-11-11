@@ -119,6 +119,8 @@ def assert_cols_in_table(
     )
     sql = sql_get_columns_for_table_fn(table_schema, table_name)
     result = query_runner_fn(sql)
+    print(f'---> sql = {sql}')
+    print(f'---> result = {result}')
     cols = [res[0] for res in result]
     try:
         assert all(col in cols for col in columns)
