@@ -252,8 +252,8 @@ class E2EEnv:
                 },
             },
         },
-        'SCHEMA_POSFIX': {
-            'value': os.environ.get('SCHEMA_POSFIX', 'TEST')
+        'SCHEMA_POSTFIX': {
+            'value': os.environ.get('SCHEMA_POSTFIX', 'TEST')
 
         }
 
