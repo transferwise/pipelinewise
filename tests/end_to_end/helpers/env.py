@@ -196,7 +196,7 @@ class E2EEnv:
                         'optional': True,
                     },
                     'SCHEMA_POSTFIX': {
-                        'value': os.environ.get('TARGET_SNOWFLAKE_SCHEMA_POSTFIX'),
+                        'value': os.environ.get('TARGET_SNOWFLAKE_SCHEMA_POSTFIX', 'TEST'),
                         'optional': True,
                     }
                 },
