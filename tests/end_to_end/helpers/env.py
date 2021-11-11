@@ -251,11 +251,12 @@ class E2EEnv:
                     },
                 },
             },
-        },
-        'SCHEMA_POSTFIX': {
-            'value': os.environ.get('SCHEMA_POSTFIX', 'TEST')
+           'SCHEMA_POSTFIX': {
+               'value': os.environ.get('SCHEMA_POSTFIX', 'TEST')
 
+           },
         }
+
 
         # Add is_configured keys for every connector
         # Useful to skip certain test cases dynamically when specific tap
