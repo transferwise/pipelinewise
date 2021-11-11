@@ -243,17 +243,17 @@ class TestTargetSnowflake:
         )
 
         result = self.run_query_target_snowflake(
-            'SELECT updated_at FROM '
-            'ppw_e2e_tap_postgres."TABLE_WITH_SPACE AND UPPERCASE" '
-            'where cvarchar=\'H\';'
+            f'SELECT updated_at FROM '
+            f'ppw_e2e_tap_postgres{self.snowflake_schema_postfix}."TABLE_WITH_SPACE AND UPPERCASE" '
+            f'where cvarchar=\'H\';'
         )[0][0]
 
         assert result == datetime(9999, 12, 31, 23, 59, 59, 998993)
 
         result = self.run_query_target_snowflake(
-            'SELECT updated_at FROM '
-            'ppw_e2e_tap_postgres."TABLE_WITH_SPACE AND UPPERCASE" '
-            'where cvarchar=\'I\';'
+            f'SELECT updated_at FROM '
+            f'ppw_e2e_tap_postgres{self.snowflake_schema_postfix}."TABLE_WITH_SPACE AND UPPERCASE" '
+            f'where cvarchar=\'I\';'
         )[0][0]
 
         assert result == datetime(9999, 12, 31, 23, 59, 59, 998993)
@@ -300,23 +300,25 @@ class TestTargetSnowflake:
         )
 
         result = self.run_query_target_snowflake(
-            'SELECT updated_at FROM ppw_e2e_tap_postgres."TABLE_WITH_SPACE AND UPPERCASE" where cvarchar=\'X\';'
+            f'SELECT updated_at FROM '
+            f'ppw_e2e_tap_postgres{self.snowflake_schema_postfix}."TABLE_WITH_SPACE AND UPPERCASE"'
+            f' where cvarchar=\'X\';'
         )[0][0]
 
         assert result == datetime(2019, 12, 31, 22, 53, 56, 800000)
 
         result = self.run_query_target_snowflake(
-            'SELECT updated_at FROM '
-            'ppw_e2e_tap_postgres."TABLE_WITH_SPACE AND UPPERCASE" '
-            'where cvarchar=\'faaaar future\';'
+            f'SELECT updated_at FROM '
+            f'ppw_e2e_tap_postgres{self.snowflake_schema_postfix}."TABLE_WITH_SPACE AND UPPERCASE" '
+            f'where cvarchar=\'faaaar future\';'
         )[0][0]
 
         assert result == datetime(9999, 12, 31, 23, 59, 59, 998993)
 
         result = self.run_query_target_snowflake(
-            'SELECT updated_at FROM '
-            'ppw_e2e_tap_postgres."TABLE_WITH_SPACE AND UPPERCASE" '
-            'where cvarchar=\'BC\';'
+            f'SELECT updated_at FROM '
+            f'ppw_e2e_tap_postgres{self.snowflake_schema_postfix}."TABLE_WITH_SPACE AND UPPERCASE" '
+            f'where cvarchar=\'BC\';'
         )[0][0]
 
         assert result == datetime(9999, 12, 31, 23, 59, 59, 998993)
@@ -426,13 +428,13 @@ class TestTargetSnowflake:
             """Helper inner function to test if every table and column exists in target snowflake"""
             assertions.assert_cols_in_table(
                 self.run_query_target_snowflake,
-                'ppw_e2e_tap_s3_csv',
+                f'ppw_e2e_tap_s3_csv{self.snowflake_schema_postfix}',
                 'countries',
                 ['CITY', 'COUNTRY', 'CURRENCY', 'ID', 'LANGUAGE'],
             )
             assertions.assert_cols_in_table(
                 self.run_query_target_snowflake,
-                'ppw_e2e_tap_s3_csv',
+                f'ppw_e2e_tap_s3_csv{self.snowflake_schema_postfix}',
                 'people',
                 [
                     'BIRTH_DATE',
