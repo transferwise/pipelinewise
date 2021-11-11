@@ -123,6 +123,7 @@ def assert_cols_in_table(
     try:
         assert all(col in cols for col in columns)
     except AssertionError as ex:
+        print(f'---->> {cols}')
         ex.args += (
             'Error',
             columns,
