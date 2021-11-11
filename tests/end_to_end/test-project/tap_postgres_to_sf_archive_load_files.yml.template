@@ -39,7 +39,7 @@ schemas:
 
   ### SOURCE SCHEMA 1: public
   - source_schema: "public"
-    target_schema: "ppw_e2e_tap_postgres_${SCHEMA_POSTFIX}"
+    target_schema: "ppw_e2e_tap_postgres"
 
     tables:
 
@@ -54,7 +54,7 @@ schemas:
 
   ### SOURCE SCHEMA 2: public2
   - source_schema: "public2"
-    target_schema: "ppw_e2e_tap_postgres_public2_${SCHEMA_POSTFIX}"
+    target_schema: "ppw_e2e_tap_postgres_public2"
 
     tables:
       ### Table with FULL_TABLE replication

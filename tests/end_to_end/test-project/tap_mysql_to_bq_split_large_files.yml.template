@@ -39,7 +39,7 @@ split_file_max_chunks: 5
 # ------------------------------------------------------------------------------
 schemas:
   - source_schema: "mysql_source_db"
-    target_schema: "ppw_e2e_tap_mysql_${SCHEMA_POSTFIX}"
+    target_schema: "ppw_e2e_tap_mysql"
 
     tables:
       - table_name: "address"
