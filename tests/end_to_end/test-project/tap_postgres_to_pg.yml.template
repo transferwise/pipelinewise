@@ -40,7 +40,7 @@ schemas:
 
   ### SOURCE SCHEMA 1: public
   - source_schema: "public"
-    target_schema: "ppw_e2e_tap_postgres"
+    target_schema: "ppw_e2e_tap_postgres_${SCHEMA_POSTFIX}"
 
     tables:
 
@@ -91,7 +91,7 @@ schemas:
 
   ### SOURCE SCHEMA 2: public2
   - source_schema: "public2"
-    target_schema: "ppw_e2e_tap_postgres_public2"
+    target_schema: "ppw_e2e_tap_postgres_public2_${SCHEMA_POSTFIX}"
 
     tables:
       ### Table with FULL_TABLE replication
@@ -105,7 +105,7 @@ schemas:
 
   ### SOURCE SCHEMA 3: logical 1
   - source_schema: "logical1"
-    target_schema: "ppw_e2e_tap_postgres_logical1"
+    target_schema: "ppw_e2e_tap_postgres_logical1_${SCHEMA_POSTFIX}"
 
     tables:
       - table_name: "logical1_table1"
@@ -115,6 +115,6 @@ schemas:
 
   ### SOURCE SCHEMA 4: logical2
   #- source_schema: "logical2"
-  #  target_schema: "ppw_e2e_tap_postgres_logical2"
+  #  target_schema: "ppw_e2e_tap_postgres_logical2_${SCHEMA_POSTFIX}"
   #  tables:
   #    - table_name: "logical2_table1"

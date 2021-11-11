@@ -32,7 +32,7 @@ primary_key_required: False               # Optional: in case you want to load t
                                           #            be de-duplicated and could cause
                                           #            duplicates. Always try selecting
                                           #            a reasonable key from the CSV file
-default_target_schema: "ppw_e2e_tap_s3_csv"
+default_target_schema: "ppw_e2e_tap_s3_csv_${SCHEMA_POSTFIX}"
 
 
 # ------------------------------------------------------------------------------
@@ -40,7 +40,7 @@ default_target_schema: "ppw_e2e_tap_s3_csv"
 # ------------------------------------------------------------------------------
 schemas:
   - source_schema: "s3_feeds" # This is mandatory, but can be anything in this tap type
-    target_schema: "ppw_e2e_tap_s3_csv" # Target schema in the destination Data Warehouse
+    target_schema: "ppw_e2e_tap_s3_csv_${SCHEMA_POSTFIX}" # Target schema in the destination Data Warehouse
     
     # List of CSV files to destination tables
     tables:
