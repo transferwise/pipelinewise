@@ -49,7 +49,7 @@ class TestTargetSnowflake:
     def teardown_method(self):
         """Delete test directories and database objects"""
 
-    '''
+
     @pytest.mark.dependency(name='import_config')
     def test_import_project(self):
         """Import the YAML project with taps and target and do discovery mode
@@ -463,7 +463,7 @@ class TestTargetSnowflake:
             TAP_S3_CSV_ID, TARGET_ID, ['fastsync', 'singer']
         )
         assert_columns_exist()
-    '''
+
     @pytest.mark.dependency(depends=['import_config'])
     def test_replicate_mongodb_to_sf(self):
         """Replicate mongodb to Snowflake"""
@@ -481,7 +481,7 @@ class TestTargetSnowflake:
                     '_SDC_BATCHED_AT',
                     '_SDC_DELETED_AT',
                 ],
-                schema_postfix=self.snowflake_schema_postfix,
+                schema_postfix='',
             )
 
         def assert_row_counts_equal(target_schema, table, count_in_source):
