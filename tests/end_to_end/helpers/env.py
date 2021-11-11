@@ -255,7 +255,6 @@ class E2EEnv:
                     },
                 },
             },
-
         }
 
         # Add is_configured keys for every connector
@@ -315,7 +314,6 @@ class E2EEnv:
             raise Exception('env_connector must be string or list')
 
         for env_conn in env_conns:
-            print(f"--->>{env_conn}")
             for key, value in self.env[env_conn]['vars'].items():
                 # If value not defined and is not optional
                 if not value['value'] and not value.get('optional'):
@@ -332,9 +330,7 @@ class E2EEnv:
         """Find env connectors by template filename patterns
         Returns list of self.env connector keys"""
         env_connectors = []
-        print(f'===>> {self.env.items()}')
         for connector, props in self.env.items():
-
             for pattern in props['template_patterns']:
                 if pattern in template_name:
                     env_connectors.append(connector)

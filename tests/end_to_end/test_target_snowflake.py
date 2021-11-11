@@ -146,16 +146,16 @@ class TestTargetSnowflake:
 
         # Checking if conditional MASK-NUMBER transformation is working
         result = self.run_query_target_snowflake(
-            'SELECT count(1) FROM ppw_e2e_tap_mysql.address '
-            'where zip_code_zip_code_id != 0 and street_number REGEXP \'[801]\';'
+            f'SELECT count(1) FROM ppw_e2e_tap_mysql_{self.snowflake_schema_postfix}.address '
+            f'where zip_code_zip_code_id != 0 and street_number REGEXP \'[801]\';'
         )[0][0]
 
         assert result == 0
 
         # Checking if conditional SET-NULL transformation is working
         result = self.run_query_target_snowflake(
-            'SELECT count(1) FROM ppw_e2e_tap_mysql.edgydata '
-            'where "GROUP" is not null and "CASE" = \'B\';'
+            f'SELECT count(1) FROM ppw_e2e_tap_mysql_{self.snowflake_schema_postfix}.edgydata '
+            f'where "GROUP" is not null and "CASE" = \'B\';'
         )[0][0]
 
         assert result == 0
