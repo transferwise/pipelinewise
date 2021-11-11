@@ -128,7 +128,7 @@ class TestTargetSnowflake:
             tap_mariadb_id, TARGET_ID, ['fastsync', 'singer']
         )
         assertions.assert_row_counts_equal(
-            self.run_query_tap_mysql, self.run_query_target_snowflake
+            self.run_query_tap_mysql, self.run_query_target_snowflake, schema_postfix=self.snowflake_schema_postfix
         )
         assertions.assert_all_columns_exist(
             self.run_query_tap_mysql,
@@ -168,12 +168,13 @@ class TestTargetSnowflake:
             tap_mariadb_id, TARGET_ID, profiling=True
         )
         assertions.assert_row_counts_equal(
-            self.run_query_tap_mysql, self.run_query_target_snowflake
+            self.run_query_tap_mysql, self.run_query_target_snowflake, schema_postfix=self.snowflake_schema_postfix
         )
         assertions.assert_all_columns_exist(
             self.run_query_tap_mysql,
             self.run_query_target_snowflake,
             mysql_to_snowflake.tap_type_to_target_type,
+            schema_postfix=self.snowflake_schema_postfix
         )
 
     # pylint: disable=invalid-name
@@ -186,12 +187,13 @@ class TestTargetSnowflake:
             tap_mariadb_id, TARGET_ID, profiling=True
         )
         assertions.assert_row_counts_equal(
-            self.run_query_tap_mysql, self.run_query_target_snowflake
+            self.run_query_tap_mysql, self.run_query_target_snowflake, schema_postfix=self.snowflake_schema_postfix
         )
         assertions.assert_all_columns_exist(
             self.run_query_tap_mysql,
             self.run_query_target_snowflake,
             mysql_to_snowflake.tap_type_to_target_type,
+            schema_postfix=self.snowflake_schema_postfix
         )
 
     # pylint: disable=invalid-name
@@ -204,12 +206,13 @@ class TestTargetSnowflake:
             tap_postgres_id, TARGET_ID, profiling=True
         )
         assertions.assert_row_counts_equal(
-            self.run_query_tap_mysql, self.run_query_target_snowflake
+            self.run_query_tap_mysql, self.run_query_target_snowflake, schema_postfix=self.snowflake_schema_postfix
         )
         assertions.assert_all_columns_exist(
             self.run_query_tap_mysql,
             self.run_query_target_snowflake,
             mysql_to_snowflake.tap_type_to_target_type,
+            schema_postfix=self.snowflake_schema_postfix
         )
 
     # pylint: disable=invalid-name
@@ -227,10 +230,10 @@ class TestTargetSnowflake:
             TAP_POSTGRES_ID, TARGET_ID, ['fastsync', 'singer']
         )
         assertions.assert_row_counts_equal(
-            self.run_query_tap_postgres, self.run_query_target_snowflake
+            self.run_query_tap_postgres, self.run_query_target_snowflake, schema_postfix=self.snowflake_schema_postfix
         )
         assertions.assert_all_columns_exist(
-            self.run_query_tap_postgres, self.run_query_target_snowflake
+            self.run_query_tap_postgres, self.run_query_target_snowflake, schema_postfix=self.snowflake_schema_postfix
         )
         assertions.assert_date_column_naive_in_target(
             self.run_query_target_snowflake,
@@ -284,10 +287,10 @@ class TestTargetSnowflake:
             TAP_POSTGRES_ID, TARGET_ID, ['fastsync', 'singer'], profiling=True
         )
         assertions.assert_row_counts_equal(
-            self.run_query_tap_postgres, self.run_query_target_snowflake
+            self.run_query_tap_postgres, self.run_query_target_snowflake, schema_postfix=self.snowflake_schema_postfix
         )
         assertions.assert_all_columns_exist(
-            self.run_query_tap_postgres, self.run_query_target_snowflake
+            self.run_query_tap_postgres, self.run_query_target_snowflake, schema_postfix=self.snowflake_schema_postfix
         )
         assertions.assert_date_column_naive_in_target(
             self.run_query_target_snowflake,
