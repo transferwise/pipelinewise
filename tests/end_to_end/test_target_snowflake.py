@@ -431,6 +431,7 @@ class TestTargetSnowflake:
                 f'ppw_e2e_tap_s3_csv{self.snowflake_schema_postfix}',
                 'countries',
                 ['CITY', 'COUNTRY', 'CURRENCY', 'ID', 'LANGUAGE'],
+                schema_postfix=self.snowflake_schema_postfix
             )
             assertions.assert_cols_in_table(
                 self.run_query_target_snowflake,
@@ -447,6 +448,7 @@ class TestTargetSnowflake:
                     'IS_PENSIONEER',
                     'LAST_NAME',
                 ],
+                schema_postfix=self.snowflake_schema_postfix
             )
 
         # 1. Run tap first time - both fastsync and a singer should be triggered
