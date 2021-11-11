@@ -44,6 +44,7 @@ class TestTargetSnowflake:
         self.run_query_tap_postgres = self.e2e.run_query_tap_postgres
         self.run_query_target_snowflake = self.e2e.run_query_target_snowflake
         self.mongodb_con = self.e2e.get_tap_mongodb_connection()
+        self.self.snowflake_schema_postfix = 'TEST'
 
     def teardown_method(self):
         """Delete test directories and database objects"""
@@ -461,7 +462,7 @@ class TestTargetSnowflake:
             """Helper inner function to test if every table and column exists in the target"""
             assertions.assert_cols_in_table(
                 self.run_query_target_snowflake,
-                'ppw_e2e_tap_mongodb',
+                f'ppw_e2e_tap_mongodb_{self.snowflake_schema_postfix}',
                 table,
                 [
                     '_ID',
@@ -492,10 +493,10 @@ class TestTargetSnowflake:
         my_coll_count = self.mongodb_con['my_collection'].count_documents({})
         all_datatypes_count = self.mongodb_con['all_datatypes'].count_documents({})
 
-        assert_row_counts_equal('ppw_e2e_tap_mongodb', 'listings', listing_count)
-        assert_row_counts_equal('ppw_e2e_tap_mongodb', 'my_collection', my_coll_count)
+        assert_row_counts_equal(f'ppw_e2e_tap_mongodb_{self.snowflake_schema_postfix}', 'listings', listing_count)
+        assert_row_counts_equal(f'ppw_e2e_tap_mongodb__{self.snowflake_schema_postfix}', 'my_collection', my_coll_count)
         assert_row_counts_equal(
-            'ppw_e2e_tap_mongodb', 'all_datatypes', all_datatypes_count
+            f'ppw_e2e_tap_mongodb_{self.snowflake_schema_postfix}', 'all_datatypes', all_datatypes_count
         )
 
         result_insert = self.mongodb_con.my_collection.insert_many(
@@ -542,8 +543,8 @@ class TestTargetSnowflake:
         assert (
             result_update.modified_count
             == self.run_query_target_snowflake(
-                'select count(_id) from ppw_e2e_tap_mongodb.my_collection where document:id = 0'
+                f'select count(_id) from ppw_e2e_tap_mongodb_{self.snowflake_schema_postfix}.my_collection where document:id = 0'
             )[0][0]
         )
 
-        assert_row_counts_equal('ppw_e2e_tap_mongodb', 'my_collection', my_coll_count)
+        assert_row_counts_equal(f'ppw_e2e_tap_mongodb_{self.snowflake_schema_postfix}', 'my_collection', my_coll_count)
