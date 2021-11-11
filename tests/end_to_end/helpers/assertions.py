@@ -297,13 +297,11 @@ def assert_all_columns_exist(
 
         # Some sources and targets can't be compared directly (e.g. BigQuery doesn't accept spaces in table names)
         # we fix that by renaming the source tables to names that the target would accept
-        print(f'---- funcs = {funcs}')
-        print(f'---- table to check 1= {table_to_check}')
         if 'target_sql_safe_name_fn' in funcs:
             table_to_check = funcs['target_sql_safe_name_fn'](table_to_check)
-        print(f'---- table to check 2= {table_to_check}')
+
         source_cols = table_cols[1].lower().split(';')
-        print(f'---> target_table_cols {target_table_cols}')
+
         try:
             target_cols = (
                 next(t[1] for t in target_table_cols if t[0].lower() == table_to_check)
@@ -311,7 +309,6 @@ def assert_all_columns_exist(
                 .split(';')
             )
         except StopIteration as ex:
-            print(f'---> exception = {ex}')
             ex.args += ('Error', f'{table_to_check} table not found in target')
             raise
 

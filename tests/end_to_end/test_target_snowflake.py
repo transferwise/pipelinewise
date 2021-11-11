@@ -86,6 +86,7 @@ class TestTargetSnowflake:
             self.run_query_tap_mysql,
             self.e2e.run_query_target_snowflake,
             mysql_to_snowflake.tap_type_to_target_type,
+            schema_postfix=self.snowflake_schema_postfix
         )
 
         # 2. Make changes in MariaDB source database
