@@ -138,8 +138,8 @@ class TestTargetSnowflake:
 
         # Checking if mask-date transformation is working
         result = self.run_query_target_snowflake(
-            'SELECT count(1) FROM ppw_e2e_tap_mysql.address '
-            'where MONTH(date_created) != 1 or DAY(date_created)::int != 1;'
+            f'SELECT count(1) FROM ppw_e2e_tap_mysql_{self.snowflake_schema_postfix}.address '
+            f'where MONTH(date_created) != 1 or DAY(date_created)::int != 1;'
         )[0][0]
 
         assert result == 0
