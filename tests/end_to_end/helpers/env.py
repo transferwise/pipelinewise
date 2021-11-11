@@ -251,8 +251,8 @@ class E2EEnv:
                     },
                 },
             },
-           'SCHEMA_POSTFIX': {
-               'template_patterns': ['schema_postfix']
+            'SCHEMA_POSTFIX': {
+               'template_patterns': ['schema_postfix'],
                'value': os.environ.get('SCHEMA_POSTFIX', 'TEST')
 
            },
