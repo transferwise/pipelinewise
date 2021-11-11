@@ -331,6 +331,7 @@ class E2EEnv:
         Returns list of self.env connector keys"""
         env_connectors = []
         for connector, props in self.env.items():
+            print(f'===>> {props["template_patterns"]}')
             for pattern in props['template_patterns']:
                 if pattern in template_name:
                     env_connectors.append(connector)
