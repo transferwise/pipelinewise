@@ -251,7 +251,8 @@ class E2EEnv:
                     },
                 },
             },
-        }
+        },
+
 
         # Add is_configured keys for every connector
         # Useful to skip certain test cases dynamically when specific tap
@@ -277,6 +278,9 @@ class E2EEnv:
         self.env['TARGET_BIGQUERY'][
             'is_configured'
         ] = self._is_env_connector_configured('TARGET_BIGQUERY')
+
+        # Add schema postfix
+        self.env['SCHEMA_POSTFIX'] = os.environ.get('TARGET_REDSHIFT_S3_ACL', 'TEST')
 
     def _get_conn_env_var(self, connector, key):
         """Get the value of a specific variable in the self.env dict"""
