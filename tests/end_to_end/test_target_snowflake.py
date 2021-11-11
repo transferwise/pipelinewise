@@ -135,6 +135,7 @@ class TestTargetSnowflake:
             self.e2e.run_query_target_snowflake,
             mysql_to_snowflake.tap_type_to_target_type,
             {'blob_col'},
+            schema_postfix=self.snowflake_schema_postfix
         )
 
         # Checking if mask-date transformation is working
