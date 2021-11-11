@@ -195,6 +195,10 @@ class E2EEnv:
                         ),
                         'optional': True,
                     },
+                    'SCHEMA_POSTFIX': {
+                        'value': os.environ.get('TARGET_SNOWFLAKE_SCHEMA_POSTFIX'),
+                        'optional': True,
+                    }
                 },
             },
             # ------------------------------------------------------------------
@@ -251,13 +255,8 @@ class E2EEnv:
                     },
                 },
             },
-            'SCHEMA_POSTFIX': {
-               'template_patterns': ['schema_postfix'],
-               'value': os.environ.get('SCHEMA_POSTFIX', 'TEST')
 
-           },
         }
-
 
         # Add is_configured keys for every connector
         # Useful to skip certain test cases dynamically when specific tap
