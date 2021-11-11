@@ -102,7 +102,7 @@ def assert_state_file_valid(target_name, tap_name, log_path=None):
 
 
 def assert_cols_in_table(
-    query_runner_fn: callable, table_schema: str, table_name: str, columns: List[str], schema_postfix: str = None
+    query_runner_fn: callable, table_schema: str, table_name: str, columns: List[str], schema_postfix: str = ''
 ):
     """Fetches the given table's columns from information_schema and
     tests if every given column is in the result
@@ -137,7 +137,7 @@ def _run_sql(query_runner_fn: callable, sql_query: str) -> List:
 
 
 def _map_tap_to_target_functions(
-    tap_query_runner_fn: callable, target_query_runner_fn: callable, schema_postfix: str = None
+    tap_query_runner_fn: callable, target_query_runner_fn: callable, schema_postfix: str = ''
 ) -> dict:
     """Takes two query runner methods and creates a map with the compatible database
     specific functions that required to run assertions.
@@ -196,7 +196,7 @@ def _map_tap_to_target_functions(
 
 
 def assert_row_counts_equal(
-    tap_query_runner_fn: callable, target_query_runner_fn: callable, schema_postfix: str = None
+    tap_query_runner_fn: callable, target_query_runner_fn: callable, schema_postfix: str = ''
 ) -> None:
     """Takes two query runner methods, counts the row numbers in every table in both the
     source and target databases and tests if the row counts are matching.
@@ -249,7 +249,7 @@ def assert_all_columns_exist(
     target_query_runner_fn: callable,
     column_type_mapper_fn: callable = None,
     ignore_cols: Union[Set, List] = None,
-    schema_postfix: str = None,
+    schema_postfix: str = '',
 ) -> None:
     """Takes two query runner methods, gets the columns list for every table in both the
     source and target database and tests if every column in source exists in the target database.

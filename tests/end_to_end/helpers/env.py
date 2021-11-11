@@ -426,7 +426,6 @@ class E2EEnv:
 
     def run_query_target_postgres(self, query: object) -> object:
         """Run and SQL query in target postgres database"""
-        print(f'----> {query}')
         return db.run_query_postgres(
             query,
             host=self._get_conn_env_var('TARGET_POSTGRES', 'HOST'),
