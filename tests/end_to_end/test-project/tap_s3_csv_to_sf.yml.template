@@ -41,7 +41,7 @@ default_target_schema: "ppw_e2e_tap_s3_csv"
 # ------------------------------------------------------------------------------
 schemas:
   - source_schema: "s3_feeds" # This is mandatory, but can be anything in this tap type
-    target_schema: "ppw_e2e_tap_s3_csv_${TARGET_SNOWFLAKE_SCHEMA_POSTFIX}" # Target schema in the destination Data Warehouse
+    target_schema: "ppw_e2e_tap_s3_csv${TARGET_SNOWFLAKE_SCHEMA_POSTFIX}" # Target schema in the destination Data Warehouse
     
     # List of CSV files to destination tables
     tables:
