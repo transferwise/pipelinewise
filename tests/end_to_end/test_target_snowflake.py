@@ -44,10 +44,11 @@ class TestTargetSnowflake:
         self.run_query_tap_postgres = self.e2e.run_query_tap_postgres
         self.run_query_target_snowflake = self.e2e.run_query_target_snowflake
         self.mongodb_con = self.e2e.get_tap_mongodb_connection()
-        self.snowflake_schema_postfix = '_TEST'
+        self.snowflake_schema_postfix = self.e2e.sf_schema_postfix
 
     def teardown_method(self):
         """Delete test directories and database objects"""
+        self.e2e.setup_target_snowflake()
 
     @pytest.mark.dependency(name='import_config')
     def test_import_project(self):
