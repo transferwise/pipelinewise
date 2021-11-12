@@ -4,6 +4,7 @@ import glob
 import boto3
 import shutil
 import subprocess
+import uuid
 
 from dotenv import load_dotenv
 from . import db
@@ -25,6 +26,7 @@ class E2EEnv:
 
         # Generate test project YAMLs from templates
         self._init_test_project_dir(project_dir)
+        self.sf_schema_postfix = f'_{str(uuid.uuid4())[:8]}'
 
     def _load_env(self):
         """Connector properties
@@ -196,7 +198,7 @@ class E2EEnv:
                         'optional': True,
                     },
                     'SCHEMA_POSTFIX': {
-                        'value': os.environ.get('TARGET_SNOWFLAKE_SCHEMA_POSTFIX', '_TEST'),
+                        'value': os.environ.get('TARGET_SNOWFLAKE_SCHEMA_POSTFIX', self.sf_schema_postfix),
                         'optional': True,
                     }
                 },
