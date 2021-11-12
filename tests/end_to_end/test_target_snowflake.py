@@ -559,4 +559,4 @@ class TestTargetSnowflake:
             )[0][0]
         )
 
-        assert_row_counts_equal(f'ppw_e2e_tap_mongodb_{self.snowflake_schema_postfix}', 'my_collection', my_coll_count)
+        assert_row_counts_equal(f'ppw_e2e_tap_mongodb{self.snowflake_schema_postfix}', 'my_collection', my_coll_count)
