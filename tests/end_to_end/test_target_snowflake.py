@@ -472,7 +472,7 @@ class TestTargetSnowflake:
             """Helper inner function to test if every table and column exists in the target"""
             assertions.assert_cols_in_table(
                 self.run_query_target_snowflake,
-                'ppw_e2e_tap_mongodb',
+                f'ppw_e2e_tap_mongodb{self.snowflake_schema_postfix}',
                 table,
                 [
                     '_ID',
@@ -481,7 +481,7 @@ class TestTargetSnowflake:
                     '_SDC_BATCHED_AT',
                     '_SDC_DELETED_AT',
                 ],
-                schema_postfix='',
+                schema_postfix=self.snowflake_schema_postfix,
             )
 
         def assert_row_counts_equal(target_schema, table, count_in_source):

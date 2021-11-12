@@ -465,8 +465,6 @@ class E2EEnv:
 
     def run_query_target_snowflake(self, query):
         """Run and SQL query in target snowflake database"""
-        print(f'-=-=-=> {self._get_conn_env_var("TARGET_SNOWFLAKE", "DBNAME")}')
-        print(f'---->>> {query}')
         return db.run_query_snowflake(
             query,
             account=self._get_conn_env_var('TARGET_SNOWFLAKE', 'ACCOUNT'),
