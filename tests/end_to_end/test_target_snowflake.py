@@ -48,7 +48,7 @@ class TestTargetSnowflake:
 
     def teardown_method(self):
         """Delete test directories and database objects"""
-        self.e2e.setup_target_snowflake()
+        # self.e2e.setup_target_snowflake()
 
     @pytest.mark.dependency(name='import_config')
     def test_import_project(self):
