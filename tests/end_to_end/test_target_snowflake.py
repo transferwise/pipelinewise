@@ -79,6 +79,7 @@ class TestTargetSnowflake:
         assertions.assert_run_tap_success(
             tap_mariadb_id, TARGET_ID, ['fastsync', 'singer']
         )
+        print(f'--->> {self.snowflake_schema_postfix}')
         assertions.assert_row_counts_equal(
             self.run_query_tap_mysql, self.run_query_target_snowflake, self.snowflake_schema_postfix
         )
