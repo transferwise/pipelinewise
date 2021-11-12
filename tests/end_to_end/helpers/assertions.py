@@ -119,6 +119,7 @@ def assert_cols_in_table(
     )
     sql = sql_get_columns_for_table_fn(table_schema, table_name)
     result = query_runner_fn(sql)
+    print(f'====> {query_runner_fn}')
     print(f'---> func = {funcs}')
     print(f'---> fn = {sql_get_columns_for_table_fn}')
     print(f'---> sql = {sql}')
