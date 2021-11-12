@@ -235,6 +235,8 @@ def assert_row_counts_equal(
 
     # Run the generated SQLs
     row_counts_in_source = _run_sql(tap_query_runner_fn, source_sql_row_count)
+    print(f' +++> funcs = {funcs}')
+    print(f'===>> target_dynamic_sql_row_count  = {target_dynamic_sql_row_count }')
     print(f'===>> target_schema = {target_schemas}')
     print(f'===>> target_sql_row_count = {target_sql_row_count}')
     row_counts_in_target = _run_sql(target_query_runner_fn, target_sql_row_count)
