@@ -22,12 +22,13 @@ class E2EEnv:
     on the supported databases"""
 
     def __init__(self, project_dir):
+        self.sf_schema_postfix = f'_{str(uuid.uuid4())[:8]}'
+
         self._load_env()
 
         # Generate test project YAMLs from templates
         self._init_test_project_dir(project_dir)
-        self.sf_schema_postfix = f'_{str(uuid.uuid4())[:8]}'
-
+        
     def _load_env(self):
         """Connector properties
 

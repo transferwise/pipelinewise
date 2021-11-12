@@ -49,7 +49,6 @@ class TestTargetSnowflake:
     def teardown_method(self):
         """Delete test directories and database objects"""
 
-
     @pytest.mark.dependency(name='import_config')
     def test_import_project(self):
         """Import the YAML project with taps and target and do discovery mode
@@ -436,7 +435,7 @@ class TestTargetSnowflake:
             )
             assertions.assert_cols_in_table(
                 self.run_query_target_snowflake,
-                f'ppw_e2e_tap_s3_csv',
+                'ppw_e2e_tap_s3_csv',
                 'people',
                 [
                     'BIRTH_DATE',
