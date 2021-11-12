@@ -23,6 +23,7 @@ class E2EEnv:
 
     def __init__(self, project_dir):
         self.sf_schema_postfix = f'_{str(uuid.uuid4())[:8]}'
+        self.sf_schema_postfix = '_TEST'
 
         self._load_env()
 
@@ -199,7 +200,7 @@ class E2EEnv:
                         'optional': True,
                     },
                     'SCHEMA_POSTFIX': {
-                        'value': os.environ.get('TARGET_SNOWFLAKE_SCHEMA_POSTFIX', '_TEST'),
+                        'value': os.environ.get('TARGET_SNOWFLAKE_SCHEMA_POSTFIX', self.sf_schema_postfix),
                         'optional': True,
                     }
                 },
@@ -596,25 +597,25 @@ class E2EEnv:
     def setup_target_snowflake(self):
         """Clean snowflake target database and prepare for test run"""
         self.run_query_target_snowflake(
-            'DROP SCHEMA IF EXISTS ppw_e2e_tap_postgres CASCADE'
+            f'DROP SCHEMA IF EXISTS ppw_e2e_tap_postgres{self.sf_schema_postfix} CASCADE'
         )
         self.run_query_target_snowflake(
-            'DROP SCHEMA IF EXISTS ppw_e2e_tap_postgres_public2 CASCADE'
+            f'DROP SCHEMA IF EXISTS ppw_e2e_tap_postgres_public2{self.sf_schema_postfix} CASCADE'
         )
         self.run_query_target_snowflake(
-            'DROP SCHEMA IF EXISTS ppw_e2e_tap_postgres_logical1 CASCADE'
+            f'DROP SCHEMA IF EXISTS ppw_e2e_tap_postgres_logical1{self.sf_schema_postfix} CASCADE'
         )
         self.run_query_target_snowflake(
-            'DROP SCHEMA IF EXISTS ppw_e2e_tap_postgres_logical2 CASCADE'
+            f'DROP SCHEMA IF EXISTS ppw_e2e_tap_postgres_logical2{self.sf_schema_postfix} CASCADE'
         )
         self.run_query_target_snowflake(
-            'DROP SCHEMA IF EXISTS ppw_e2e_tap_mysql CASCADE'
+            f'DROP SCHEMA IF EXISTS ppw_e2e_tap_mysql{self.sf_schema_postfix} CASCADE'
         )
         self.run_query_target_snowflake(
-            'DROP SCHEMA IF EXISTS ppw_e2e_tap_s3_csv CASCADE'
+            f'DROP SCHEMA IF EXISTS ppw_e2e_tap_s3_csv{self.sf_schema_postfix} CASCADE'
         )
         self.run_query_target_snowflake(
-            'DROP SCHEMA IF EXISTS ppw_e2e_tap_mongodb CASCADE'
+            f'DROP SCHEMA IF EXISTS ppw_e2e_tap_mongodb{self.sf_schema_postfix} CASCADE'
         )
 
         # Clean config directory
