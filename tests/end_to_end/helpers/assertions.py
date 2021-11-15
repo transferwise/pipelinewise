@@ -102,7 +102,7 @@ def assert_state_file_valid(target_name, tap_name, log_path=None):
 
 
 def assert_cols_in_table(
-    query_runner_fn: callable, table_schema: str, table_name: str, columns: List[str]
+    query_runner_fn: callable, table_schema: str, table_name: str, columns: List[str], schema_postfix: str = ''
 ):
     """Fetches the given table's columns from information_schema and
     tests if every given column is in the result
@@ -111,8 +111,9 @@ def assert_cols_in_table(
     :param table_schema: search table in this schema
     :param table_name: table with the columns
     :param columns: list of columns to check if there are in the table's columns
+    :param schema_postfix: schema postfix for snowflake target
     """
-    funcs = _map_tap_to_target_functions(None, query_runner_fn)
+    funcs = _map_tap_to_target_functions(None, query_runner_fn, schema_postfix)
     sql_get_columns_for_table_fn = funcs.get(
         'target_sql_get_table_cols_fn', db.sql_get_columns_for_table
     )
@@ -136,7 +137,7 @@ def _run_sql(query_runner_fn: callable, sql_query: str) -> List:
 
 
 def _map_tap_to_target_functions(
-    tap_query_runner_fn: callable, target_query_runner_fn: callable
+    tap_query_runner_fn: callable, target_query_runner_fn: callable, schema_postfix: str = ''
 ) -> dict:
     """Takes two query runner methods and creates a map with the compatible database
     specific functions that required to run assertions.
@@ -149,14 +150,15 @@ def _map_tap_to_target_functions(
         # tap-mysql specific attributes and functions
         'run_query_tap_mysql': {
             'source_schemas': ['mysql_source_db'],
-            'target_schemas': ['ppw_e2e_tap_mysql'],
+            'target_schemas': [f'ppw_e2e_tap_mysql{schema_postfix}'],
             'source_sql_get_cols_fn': db.sql_get_columns_mysql,
             'source_sql_dynamic_row_count_fn': db.sql_dynamic_row_count_mysql,
         },
         # tap-postgres specific attributes and functions
         'run_query_tap_postgres': {
             'source_schemas': ['public', 'public2'],
-            'target_schemas': ['ppw_e2e_tap_postgres', 'ppw_e2e_tap_postgres_public2'],
+            'target_schemas': [f'ppw_e2e_tap_postgres{schema_postfix}',
+                               f'ppw_e2e_tap_postgres_public2{schema_postfix}'],
             'source_sql_get_cols_fn': db.sql_get_columns_postgres,
             'source_sql_dynamic_row_count_fn': db.sql_dynamic_row_count_postgres,
         },
@@ -194,15 +196,16 @@ def _map_tap_to_target_functions(
 
 
 def assert_row_counts_equal(
-    tap_query_runner_fn: callable, target_query_runner_fn: callable
+    tap_query_runner_fn: callable, target_query_runner_fn: callable, schema_postfix: str = ''
 ) -> None:
     """Takes two query runner methods, counts the row numbers in every table in both the
     source and target databases and tests if the row counts are matching.
 
     :param tap_query_runner_fn: method to run queries in the first connection
-    :param target_query_runner_fn: method to run queries in the second connection"""
+    :param target_query_runner_fn: method to run queries in the second connection
+    :param schema_postfix: schema postfix for snowflake target"""
     # Generate a map of source and target specific functions
-    funcs = _map_tap_to_target_functions(tap_query_runner_fn, target_query_runner_fn)
+    funcs = _map_tap_to_target_functions(tap_query_runner_fn, target_query_runner_fn, schema_postfix)
 
     # Get source and target schemas
     source_schemas = funcs['source_schemas']
@@ -246,6 +249,7 @@ def assert_all_columns_exist(
     target_query_runner_fn: callable,
     column_type_mapper_fn: callable = None,
     ignore_cols: Union[Set, List] = None,
+    schema_postfix: str = '',
 ) -> None:
     """Takes two query runner methods, gets the columns list for every table in both the
     source and target database and tests if every column in source exists in the target database.
@@ -255,9 +259,10 @@ def assert_all_columns_exist(
     :param tap_query_runner_fn: method to run queries in the first connection
     :param target_query_runner_fn: method to run queries in the second connection
     :param column_type_mapper_fn: method to convert source to target column types
-    :param ignore_cols: List or set of columns to ignore if we know target table won't have them"""
+    :param ignore_cols: List or set of columns to ignore if we know target table won't have them
+    :param schema_postfix: Schema postfix for Snowflake targets"""
     # Generate a map of source and target specific functions
-    funcs = _map_tap_to_target_functions(tap_query_runner_fn, target_query_runner_fn)
+    funcs = _map_tap_to_target_functions(tap_query_runner_fn, target_query_runner_fn, schema_postfix)
 
     # Get source and target schemas
     source_schemas = funcs['source_schemas']

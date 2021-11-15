@@ -37,7 +37,7 @@ schemas:
 
   ### SOURCE SCHEMA 1: public
   - source_schema: "public"
-    target_schema: "ppw_e2e_tap_postgres"
+    target_schema: "ppw_e2e_tap_postgres${TARGET_SNOWFLAKE_SCHEMA_POSTFIX}"
 
     tables:
 
