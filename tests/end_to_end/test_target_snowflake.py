@@ -36,7 +36,7 @@ class TestTargetSnowflake:
     def setup_method(self):
         """Initialise test project by generating YAML files from
         templates for all the configured connectors"""
-        self.project_dir = os.path.join(DIR, 'test-project')
+
 
         # Init query runner methods
         self.run_query_tap_mysql = self.e2e.run_query_tap_mysql
@@ -46,6 +46,7 @@ class TestTargetSnowflake:
         self.snowflake_schema_postfix = self.e2e.sf_schema_postfix
 
     def setup_class(self):
+        self.project_dir = os.path.join(DIR, 'test-project')
         self.e2e = E2EEnv(self.project_dir)
 
     def teardown_method(self):
