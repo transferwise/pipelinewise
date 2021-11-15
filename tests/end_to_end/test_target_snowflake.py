@@ -46,10 +46,13 @@ class TestTargetSnowflake:
         self.snowflake_schema_postfix = self.e2e.sf_schema_postfix
 
     def setup_class(self):
+        """Initialise test suite"""
         self.project_dir = os.path.join(DIR, 'test-project')
         self.e2e = E2EEnv(self.project_dir)
 
     def teardown_class(self):
+        """Teardown test suite"""
+        # Cleanup the Snowflake test schemas
         self.e2e.setup_target_snowflake()
 
     def teardown_method(self):
