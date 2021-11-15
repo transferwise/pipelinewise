@@ -23,7 +23,7 @@ class E2EEnv:
 
     def __init__(self, project_dir):
         self.sf_schema_postfix = f'_{str(uuid.uuid4())[:8]}'
-        self.sf_schema_postfix = '_TEST'
+        self.sf_schema_postfix = '_e2etest'
 
         self._load_env()
 
