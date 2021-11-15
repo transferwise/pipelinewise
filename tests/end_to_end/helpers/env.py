@@ -24,8 +24,6 @@ class E2EEnv:
 
     def __init__(self, project_dir):
         self.sf_schema_postfix = f'_{str(uuid.uuid4())[:8]}'
-        self.sf_schema_postfix = random.choice(['test1', 'test2', 'test3'])
-
         self._load_env()
 
         # Generate test project YAMLs from templates
