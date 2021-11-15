@@ -39,13 +39,14 @@ class TestTargetSnowflake:
         self.project_dir = os.path.join(DIR, 'test-project')
 
         # Init query runner methods
-        self.e2e = E2EEnv(self.project_dir)
         self.run_query_tap_mysql = self.e2e.run_query_tap_mysql
         self.run_query_tap_postgres = self.e2e.run_query_tap_postgres
         self.run_query_target_snowflake = self.e2e.run_query_target_snowflake
         self.mongodb_con = self.e2e.get_tap_mongodb_connection()
         self.snowflake_schema_postfix = self.e2e.sf_schema_postfix
-        print(f'======>>> POSTFIX {self.snowflake_schema_postfix}')
+
+    def setup_class(self):
+        self.e2e = E2EEnv(self.project_dir)
 
     def teardown_method(self):
         """Delete test directories and database objects"""
