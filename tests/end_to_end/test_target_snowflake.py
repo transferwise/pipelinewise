@@ -37,7 +37,6 @@ class TestTargetSnowflake:
         """Initialise test project by generating YAML files from
         templates for all the configured connectors"""
 
-
         # Init query runner methods
         self.run_query_tap_mysql = self.e2e.run_query_tap_mysql
         self.run_query_tap_postgres = self.e2e.run_query_tap_postgres
