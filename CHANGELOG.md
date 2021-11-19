@@ -13,7 +13,7 @@
 - Bump `pytest` from `6.2.4` to `6.2.5`
 
 *Changes*
-- Moving last bits away from CircleCI.
+- Fully migrate CI to Github Actions.
 - Update `ujson` requirement from `==4.1.*` to `>=4.1,<4.3`
 - Update `tzlocal` requirement from `<2.2,>=2.0` to `>=2.0,<4.1`
 
