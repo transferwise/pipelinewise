@@ -1,3 +1,27 @@
+0.37.0 (2021-11-19)
+-------------------
+
+*New*
+- Added cleanup method for state file.
+- Bump `pytest-cov` from `2.12.1` to `3.0.0` ([Changelog](https://github.com/pytest-dev/pytest-cov/blob/master/CHANGELOG.rst#300-2021-10-04))
+- Bump `joblib` from `1.0.0` to `1.1.0`
+- Bump `flake8` from `3.9.2` to `4.0.1` 
+- Bump `jinja2` from `3.0.1` to `3.0.2`
+- Bump `python-dotenv` from `0.19.0` to `0.19.1`
+- Bump `target-snowflake` from `1.14.0` to `1.14.1`
+- Bump `ansible` from `4.4.0` to `4.7.0`
+- Bump `pytest` from `6.2.4` to `6.2.5`
+
+*Changes*
+- Fully migrate CI to Github Actions.
+- Update `ujson` requirement from `==4.1.*` to `>=4.1,<4.3`
+- Update `tzlocal` requirement from `<2.2,>=2.0` to `>=2.0,<4.1`
+
+*Fixes*
+- Make process in docker-compose file.
+- proc.info parsing in a case cmdline is None!
+
+
 0.36.0 (2021-09-30)
 -------------------
 
