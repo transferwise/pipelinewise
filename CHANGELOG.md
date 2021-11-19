@@ -19,7 +19,7 @@
 
 *Fixes*
 - Make process in docker-compose file.
-- proc.info parcing in a case cmdline is None!
+- proc.info parsing in a case cmdline is None!
 
 
 0.36.0 (2021-09-30)
