@@ -36,14 +36,23 @@ class TestTargetSnowflake:
     def setup_method(self):
         """Initialise test project by generating YAML files from
         templates for all the configured connectors"""
-        self.project_dir = os.path.join(DIR, 'test-project')
 
         # Init query runner methods
-        self.e2e = E2EEnv(self.project_dir)
         self.run_query_tap_mysql = self.e2e.run_query_tap_mysql
         self.run_query_tap_postgres = self.e2e.run_query_tap_postgres
         self.run_query_target_snowflake = self.e2e.run_query_target_snowflake
         self.mongodb_con = self.e2e.get_tap_mongodb_connection()
+        self.snowflake_schema_postfix = self.e2e.sf_schema_postfix
+
+    def setup_class(self):
+        """Initialise test suite"""
+        self.project_dir = os.path.join(DIR, 'test-project')
+        self.e2e = E2EEnv(self.project_dir)
+
+    def teardown_class(self):
+        """Teardown test suite"""
+        # Cleanup the Snowflake test schemas
+        self.e2e.setup_target_snowflake()
 
     def teardown_method(self):
         """Delete test directories and database objects"""
@@ -79,12 +88,13 @@ class TestTargetSnowflake:
             tap_mariadb_id, TARGET_ID, ['fastsync', 'singer']
         )
         assertions.assert_row_counts_equal(
-            self.run_query_tap_mysql, self.run_query_target_snowflake
+            self.run_query_tap_mysql, self.run_query_target_snowflake, self.snowflake_schema_postfix
         )
         assertions.assert_all_columns_exist(
             self.run_query_tap_mysql,
             self.e2e.run_query_target_snowflake,
             mysql_to_snowflake.tap_type_to_target_type,
+            schema_postfix=self.snowflake_schema_postfix
         )
 
         # 2. Make changes in MariaDB source database
@@ -126,35 +136,36 @@ class TestTargetSnowflake:
             tap_mariadb_id, TARGET_ID, ['fastsync', 'singer']
         )
         assertions.assert_row_counts_equal(
-            self.run_query_tap_mysql, self.run_query_target_snowflake
+            self.run_query_tap_mysql, self.run_query_target_snowflake, schema_postfix=self.snowflake_schema_postfix
         )
         assertions.assert_all_columns_exist(
             self.run_query_tap_mysql,
             self.e2e.run_query_target_snowflake,
             mysql_to_snowflake.tap_type_to_target_type,
             {'blob_col'},
+            schema_postfix=self.snowflake_schema_postfix
         )
 
         # Checking if mask-date transformation is working
         result = self.run_query_target_snowflake(
-            'SELECT count(1) FROM ppw_e2e_tap_mysql.address '
-            'where MONTH(date_created) != 1 or DAY(date_created)::int != 1;'
+            f'SELECT count(1) FROM ppw_e2e_tap_mysql{self.snowflake_schema_postfix}.address '
+            f'where MONTH(date_created) != 1 or DAY(date_created)::int != 1;'
         )[0][0]
 
         assert result == 0
 
         # Checking if conditional MASK-NUMBER transformation is working
         result = self.run_query_target_snowflake(
-            'SELECT count(1) FROM ppw_e2e_tap_mysql.address '
-            'where zip_code_zip_code_id != 0 and street_number REGEXP \'[801]\';'
+            f'SELECT count(1) FROM ppw_e2e_tap_mysql{self.snowflake_schema_postfix}.address '
+            f'where zip_code_zip_code_id != 0 and street_number REGEXP \'[801]\';'
         )[0][0]
 
         assert result == 0
 
         # Checking if conditional SET-NULL transformation is working
         result = self.run_query_target_snowflake(
-            'SELECT count(1) FROM ppw_e2e_tap_mysql.edgydata '
-            'where "GROUP" is not null and "CASE" = \'B\';'
+            f'SELECT count(1) FROM ppw_e2e_tap_mysql{self.snowflake_schema_postfix}.edgydata '
+            f'where "GROUP" is not null and "CASE" = \'B\';'
         )[0][0]
 
         assert result == 0
@@ -166,12 +177,13 @@ class TestTargetSnowflake:
             tap_mariadb_id, TARGET_ID, profiling=True
         )
         assertions.assert_row_counts_equal(
-            self.run_query_tap_mysql, self.run_query_target_snowflake
+            self.run_query_tap_mysql, self.run_query_target_snowflake, schema_postfix=self.snowflake_schema_postfix
         )
         assertions.assert_all_columns_exist(
             self.run_query_tap_mysql,
             self.run_query_target_snowflake,
             mysql_to_snowflake.tap_type_to_target_type,
+            schema_postfix=self.snowflake_schema_postfix
         )
 
     # pylint: disable=invalid-name
@@ -184,12 +196,13 @@ class TestTargetSnowflake:
             tap_mariadb_id, TARGET_ID, profiling=True
         )
         assertions.assert_row_counts_equal(
-            self.run_query_tap_mysql, self.run_query_target_snowflake
+            self.run_query_tap_mysql, self.run_query_target_snowflake, schema_postfix=self.snowflake_schema_postfix
         )
         assertions.assert_all_columns_exist(
             self.run_query_tap_mysql,
             self.run_query_target_snowflake,
             mysql_to_snowflake.tap_type_to_target_type,
+            schema_postfix=self.snowflake_schema_postfix
         )
 
     # pylint: disable=invalid-name
@@ -202,12 +215,13 @@ class TestTargetSnowflake:
             tap_postgres_id, TARGET_ID, profiling=True
         )
         assertions.assert_row_counts_equal(
-            self.run_query_tap_mysql, self.run_query_target_snowflake
+            self.run_query_tap_mysql, self.run_query_target_snowflake, schema_postfix=self.snowflake_schema_postfix
         )
         assertions.assert_all_columns_exist(
             self.run_query_tap_mysql,
             self.run_query_target_snowflake,
             mysql_to_snowflake.tap_type_to_target_type,
+            schema_postfix=self.snowflake_schema_postfix
         )
 
     # pylint: disable=invalid-name
@@ -225,29 +239,29 @@ class TestTargetSnowflake:
             TAP_POSTGRES_ID, TARGET_ID, ['fastsync', 'singer']
         )
         assertions.assert_row_counts_equal(
-            self.run_query_tap_postgres, self.run_query_target_snowflake
+            self.run_query_tap_postgres, self.run_query_target_snowflake, schema_postfix=self.snowflake_schema_postfix
         )
         assertions.assert_all_columns_exist(
-            self.run_query_tap_postgres, self.run_query_target_snowflake
+            self.run_query_tap_postgres, self.run_query_target_snowflake, schema_postfix=self.snowflake_schema_postfix
         )
         assertions.assert_date_column_naive_in_target(
             self.run_query_target_snowflake,
             'updated_at',
-            'ppw_e2e_tap_postgres."TABLE_WITH_SPACE AND UPPERCASE"',
+            f'ppw_e2e_tap_postgres{self.snowflake_schema_postfix}."TABLE_WITH_SPACE AND UPPERCASE"',
         )
 
         result = self.run_query_target_snowflake(
-            'SELECT updated_at FROM '
-            'ppw_e2e_tap_postgres."TABLE_WITH_SPACE AND UPPERCASE" '
-            'where cvarchar=\'H\';'
+            f'SELECT updated_at FROM '
+            f'ppw_e2e_tap_postgres{self.snowflake_schema_postfix}."TABLE_WITH_SPACE AND UPPERCASE" '
+            f'where cvarchar=\'H\';'
         )[0][0]
 
         assert result == datetime(9999, 12, 31, 23, 59, 59, 998993)
 
         result = self.run_query_target_snowflake(
-            'SELECT updated_at FROM '
-            'ppw_e2e_tap_postgres."TABLE_WITH_SPACE AND UPPERCASE" '
-            'where cvarchar=\'I\';'
+            f'SELECT updated_at FROM '
+            f'ppw_e2e_tap_postgres{self.snowflake_schema_postfix}."TABLE_WITH_SPACE AND UPPERCASE" '
+            f'where cvarchar=\'I\';'
         )[0][0]
 
         assert result == datetime(9999, 12, 31, 23, 59, 59, 998993)
@@ -282,35 +296,37 @@ class TestTargetSnowflake:
             TAP_POSTGRES_ID, TARGET_ID, ['fastsync', 'singer'], profiling=True
         )
         assertions.assert_row_counts_equal(
-            self.run_query_tap_postgres, self.run_query_target_snowflake
+            self.run_query_tap_postgres, self.run_query_target_snowflake, schema_postfix=self.snowflake_schema_postfix
         )
         assertions.assert_all_columns_exist(
-            self.run_query_tap_postgres, self.run_query_target_snowflake
+            self.run_query_tap_postgres, self.run_query_target_snowflake, schema_postfix=self.snowflake_schema_postfix
         )
         assertions.assert_date_column_naive_in_target(
             self.run_query_target_snowflake,
             'updated_at',
-            'ppw_e2e_tap_postgres."TABLE_WITH_SPACE AND UPPERCASE"',
+            f'ppw_e2e_tap_postgres{self.snowflake_schema_postfix}."TABLE_WITH_SPACE AND UPPERCASE"',
         )
 
         result = self.run_query_target_snowflake(
-            'SELECT updated_at FROM ppw_e2e_tap_postgres."TABLE_WITH_SPACE AND UPPERCASE" where cvarchar=\'X\';'
+            f'SELECT updated_at FROM '
+            f'ppw_e2e_tap_postgres{self.snowflake_schema_postfix}."TABLE_WITH_SPACE AND UPPERCASE"'
+            f' where cvarchar=\'X\';'
         )[0][0]
 
         assert result == datetime(2019, 12, 31, 22, 53, 56, 800000)
 
         result = self.run_query_target_snowflake(
-            'SELECT updated_at FROM '
-            'ppw_e2e_tap_postgres."TABLE_WITH_SPACE AND UPPERCASE" '
-            'where cvarchar=\'faaaar future\';'
+            f'SELECT updated_at FROM '
+            f'ppw_e2e_tap_postgres{self.snowflake_schema_postfix}."TABLE_WITH_SPACE AND UPPERCASE" '
+            f'where cvarchar=\'faaaar future\';'
         )[0][0]
 
         assert result == datetime(9999, 12, 31, 23, 59, 59, 998993)
 
         result = self.run_query_target_snowflake(
-            'SELECT updated_at FROM '
-            'ppw_e2e_tap_postgres."TABLE_WITH_SPACE AND UPPERCASE" '
-            'where cvarchar=\'BC\';'
+            f'SELECT updated_at FROM '
+            f'ppw_e2e_tap_postgres{self.snowflake_schema_postfix}."TABLE_WITH_SPACE AND UPPERCASE" '
+            f'where cvarchar=\'BC\';'
         )[0][0]
 
         assert result == datetime(9999, 12, 31, 23, 59, 59, 998993)
@@ -423,6 +439,7 @@ class TestTargetSnowflake:
                 'ppw_e2e_tap_s3_csv',
                 'countries',
                 ['CITY', 'COUNTRY', 'CURRENCY', 'ID', 'LANGUAGE'],
+                schema_postfix=self.snowflake_schema_postfix
             )
             assertions.assert_cols_in_table(
                 self.run_query_target_snowflake,
@@ -439,6 +456,7 @@ class TestTargetSnowflake:
                     'IS_PENSIONEER',
                     'LAST_NAME',
                 ],
+                schema_postfix=self.snowflake_schema_postfix
             )
 
         # 1. Run tap first time - both fastsync and a singer should be triggered
@@ -461,7 +479,7 @@ class TestTargetSnowflake:
             """Helper inner function to test if every table and column exists in the target"""
             assertions.assert_cols_in_table(
                 self.run_query_target_snowflake,
-                'ppw_e2e_tap_mongodb',
+                f'ppw_e2e_tap_mongodb{self.snowflake_schema_postfix}',
                 table,
                 [
                     '_ID',
@@ -470,6 +488,7 @@ class TestTargetSnowflake:
                     '_SDC_BATCHED_AT',
                     '_SDC_DELETED_AT',
                 ],
+                schema_postfix=self.snowflake_schema_postfix,
             )
 
         def assert_row_counts_equal(target_schema, table, count_in_source):
@@ -492,10 +511,10 @@ class TestTargetSnowflake:
         my_coll_count = self.mongodb_con['my_collection'].count_documents({})
         all_datatypes_count = self.mongodb_con['all_datatypes'].count_documents({})
 
-        assert_row_counts_equal('ppw_e2e_tap_mongodb', 'listings', listing_count)
-        assert_row_counts_equal('ppw_e2e_tap_mongodb', 'my_collection', my_coll_count)
+        assert_row_counts_equal(f'ppw_e2e_tap_mongodb{self.snowflake_schema_postfix}', 'listings', listing_count)
+        assert_row_counts_equal(f'ppw_e2e_tap_mongodb{self.snowflake_schema_postfix}', 'my_collection', my_coll_count)
         assert_row_counts_equal(
-            'ppw_e2e_tap_mongodb', 'all_datatypes', all_datatypes_count
+            f'ppw_e2e_tap_mongodb{self.snowflake_schema_postfix}', 'all_datatypes', all_datatypes_count
         )
 
         result_insert = self.mongodb_con.my_collection.insert_many(
@@ -542,8 +561,9 @@ class TestTargetSnowflake:
         assert (
             result_update.modified_count
             == self.run_query_target_snowflake(
-                'select count(_id) from ppw_e2e_tap_mongodb.my_collection where document:id = 0'
+                f'select count(_id) from ppw_e2e_tap_mongodb{self.snowflake_schema_postfix}.my_collection'
+                f' where document:id = 0'
             )[0][0]
         )
 
-        assert_row_counts_equal('ppw_e2e_tap_mongodb', 'my_collection', my_coll_count)
+        assert_row_counts_equal(f'ppw_e2e_tap_mongodb{self.snowflake_schema_postfix}', 'my_collection', my_coll_count)
