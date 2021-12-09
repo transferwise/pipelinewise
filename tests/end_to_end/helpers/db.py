@@ -79,7 +79,7 @@ def run_query_bigquery(query, project):
     client = bigquery.Client(project=project)
     query_job = client.query(query)
     query_job.result()
-    return [r.values() for r in query_job]
+    return [r.values() for r in query_job.result()]
 
 
 def run_query_redshift(query, host, port, user, password, database):
