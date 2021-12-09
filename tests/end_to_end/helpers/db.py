@@ -78,7 +78,6 @@ def run_query_bigquery(query, project):
     """Run and SQL query in a BigQuery database"""
     client = bigquery.Client(project=project)
     query_job = client.query(query)
-    query_job.result()
     return [r.values() for r in query_job.result()]
 
 
