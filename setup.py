@@ -6,7 +6,7 @@ with open('README.md') as f:
     LONG_DESCRIPTION = f.read()
 
 setup(name='pipelinewise',
-      version='0.36.0',
+      version='0.37.0',
       description='PipelineWise',
       long_description=LONG_DESCRIPTION,
       long_description_content_type='text/markdown',
@@ -22,28 +22,28 @@ setup(name='pipelinewise',
           'PyYAML==6.0',
           'ansible==4.7.0',
           'Jinja2==3.0.2',
-          'joblib==1.0.0',
+          'joblib==1.1.0',
           'PyMySQL==0.7.11',
           'psycopg2-binary==2.8.6',
           'snowflake-connector-python[pandas]==2.4.6',
-          'google-cloud-bigquery==1.24.0',
+          'google-cloud-bigquery==2.31.0',
           'pipelinewise-singer-python==1.*',
           'singer-encodings==0.0.*',
           'messytables==0.15.*',
           'python-pidfile==3.0.0',
           'pre-commit==2.15.0',
           'pymongo>=3.10,<3.13',
-          'tzlocal>=2.0,<2.2',
+          'tzlocal>=2.0,<4.1',
           'slackclient>=2.7,<2.10',
           'psutil==5.8.0',
-          'ujson==4.1.*'
+          'ujson>=4.1,<4.3'
       ],
       extras_require={
           'test': [
-              'flake8==3.9.2',
+              'flake8==4.0.1',
               'pytest==6.2.5',
               'pytest-dependency==0.4.0',
-              'pytest-cov==2.12.1',
+              'pytest-cov==3.0.0',
               'python-dotenv==0.19.1',
               'pylint==2.10.2',
               'unify==0.5'

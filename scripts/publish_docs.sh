@@ -11,7 +11,7 @@ set -e
 # from the top level of the package and not in the subdirectory...
 # Shouldn't ever be an issue the way we've got this setup, and you'll
 # want to change it a bit to make it work with your project structure.
-if [[ ! -f .circleci/config.yml ]]; then
+if [[ ! -d .github/workflows ]]; then
     echo "This must be run from the gh_doc_automation project directory"
     exit 1
 fi
@@ -51,11 +51,13 @@ mv docs/_build/html ./
 git stash
 
 # Checkout our gh-pages branch, remove everything but .git
+echo "Checking out gh-pages branch ..."
 git checkout gh-pages
 git pull origin gh-pages
 
 # Make sure to set the credentials! You'll need these environment vars
-# set in the "Environment Variables" section in Circle CI
+# set in the "Environment Variables" section in CI
+echo "Configuring git creds ..."
 git config user.email "$GH_EMAIL" > /dev/null 2>&1
 git config user.name "$GH_NAME" > /dev/null 2>&1
 
@@ -92,13 +94,14 @@ rm -r html/
 # Add everything, get ready for commit. But only do it if we're on
 # master. If you want to deploy on different branches, you can change
 # this.
-if [[ "$CIRCLE_BRANCH" =~ ^master$|^[0-9]+\.[0-9]+\.X$ ]]; then
+echo "Current branch ref: $GITHUB_REF"
+if [[ "$GITHUB_REF" =~ ^refs/heads/master$|^[0-9]+\.[0-9]+\.X$ ]]; then
     git add --all
     # Make sure "|| echo" is at the end to avoid error codes when no changes to commit
     git commit -m "[ci skip] publishing updated documentation..." || echo 
 
     # We have to re-add the origin with the GH_TOKEN credentials. You
-    # will need this SSH key in your environment variables on Circle.
+    # will need this SSH key in your environment variables on CI.
     # Make sure you change the <project>.git pattern at the end!
     git remote rm origin
     git remote add origin https://"$GH_NAME":"$GH_TOKEN"@github.com/transferwise/pipelinewise.git
@@ -106,5 +109,5 @@ if [[ "$CIRCLE_BRANCH" =~ ^master$|^[0-9]+\.[0-9]+\.X$ ]]; then
     # NOW we should be able to push it
     git push origin gh-pages
 else
-    echo "Not on master, so won't push doc"
+    echo "Not on master branch, so won't push doc"
 fi
