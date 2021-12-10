@@ -1,3 +1,8 @@
+0.37.2 (2021-12-10)
+-------------------
+- Bump `pipelinewise-tap-github` from `1.0.2` to `1.0.3`
+
+
 0.37.1 (2021-12-10)
 -------------------
 - Make a postfix for Snowflake schemas in end-to-end tests.
