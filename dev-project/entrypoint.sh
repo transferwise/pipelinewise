@@ -27,9 +27,7 @@ rm -rf /var/lib/apt/lists/* \
 # alien -i oracle-instantclient.rpm --scripts
 # rm -f oracle-instantclient.rpm
 
-# Install PipelineWise in the container
-
-# Build test databasese
+# Build test databases
 
 tests/db/tap_mysql_db.sh
 tests/db/tap_postgres_db.sh

@@ -9,6 +9,10 @@ on:
 
   workflow_dispatch:
 
+concurrency:
+  group: singer-connectors-${{ github.head_ref }}
+  cancel-in-progress: true
+
 jobs:
   check:
     runs-on: ubuntu-20.04
