@@ -1,3 +1,9 @@
+0.37.1 (2021-12-10)
+-------------------
+- Make a postfix for Snowflake schemas in end-to-end tests.
+- Bump `google-cloud-bigquery` from `1.24.0` to `2.31.0` ([Changelog](https://github.com/googleapis/python-bigquery/blob/main/CHANGELOG.md#2310-2021-11-24))
+
+
 0.37.0 (2021-11-19)
 -------------------
 
