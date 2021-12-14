@@ -32,7 +32,7 @@ class DuplicateConfigException(Exception):
 
 
 class InvalidConfigException(Exception):
-    """Raised if an invalid tap/target config is found"""
+    """Raised if an invalid config is found"""
 
     def __init__(self, message):
         super().__init__(message)
