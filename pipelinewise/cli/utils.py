@@ -12,7 +12,6 @@ import string
 import sys
 import tempfile
 import warnings
-
 import jsonschema
 import yaml
 
@@ -28,6 +27,7 @@ from ansible.parsing.yaml.loader import AnsibleLoader
 from ansible.parsing.yaml.objects import AnsibleMapping, AnsibleVaultEncryptedUnicode
 
 from . import tap_properties
+from .errors import InvalidConfigException
 
 LOGGER = logging.getLogger(__name__)
 
@@ -291,8 +291,7 @@ def validate(instance, schema):
         schema_safe_inst = json.loads(json.dumps(instance, cls=AnsibleJSONEncoder))
         jsonschema.validate(instance=schema_safe_inst, schema=schema)
     except jsonschema.exceptions.ValidationError:
-        LOGGER.critical('json object doesn\'t match schema %s', schema)
-        sys.exit(1)
+        raise InvalidConfigException(f'json object doesn\'t match schema {schema}')
 
 
 def delete_empty_keys(dic):
