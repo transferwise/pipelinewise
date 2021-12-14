@@ -714,7 +714,7 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
         args = CliArgs(dir=test_validate_command_dir)
         pipelinewise = PipelineWise(args, CONFIG_DIR, VIRTUALENVS_DIR)
 
-        with pytest.raises(Exception):
+        with pytest.raises(InvalidConfigException):
             pipelinewise.validate()
 
     def test_validate_command_4(self):
