@@ -1511,7 +1511,7 @@ class PipelineWise:
             if tap_yml['target'] not in targets:
                 raise InvalidConfigException(
                     f"Can't find the target with the ID '{tap_yml['target']}' referenced in '{yaml_file}'."
-                    f"Available target IDs: {list(targets.keys())}",
+                    f'Available target IDs: {list(targets.keys())}',
                     )
 
             tap_ids.add(tap_yml['id'])

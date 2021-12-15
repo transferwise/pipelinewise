@@ -20,6 +20,7 @@ class StreamBufferTooLargeException(Exception):
 class InvalidTransformationException(Exception):
     """Raised if invalid transformation config is found"""
 
+
 class DuplicateConfigException(Exception):
     """Raised if a duplicate tap/target config is found"""
 
