@@ -1536,13 +1536,14 @@ class PipelineWise:
                             f'Please omit "field_paths" from the transformation config of tap "{tap_yml["id"]}"'
                         )
 
-                    for condition in transformation.get('when', []):
-                        if condition.get('field_path') is not None:
-                            raise InvalidTransformationException(
-                                'This tap-target combo has FastSync component and is configuring a transformation '
-                                'conditions on json properties which are not supported by FastSync!\n'
-                                f'Please omit "field_path" from the transformation config of tap "{tap_yml["id"]}"'
-                            )
+                    if transformation['when'] is not None:
+                        for condition in transformation['when']:
+                            if condition.get('field_path') is not None:
+                                raise InvalidTransformationException(
+                                    'This tap-target combo has FastSync component and is configuring a transformation '
+                                    'conditions on json properties which are not supported by FastSync!\n'
+                                    f'Please omit "field_path" from the transformation config of tap "{tap_yml["id"]}"'
+                                )
 
             self.logger.info('Finished validating %s', yaml_file)
 
