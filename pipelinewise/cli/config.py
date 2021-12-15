@@ -265,10 +265,10 @@ class Config:
         tap_config = self.generate_tap_connection_config(tap, extra_config_keys)
 
         # Generate tap selection
-        tap_selection = {'selection': self.generate_selection(tap)}
+        tap_selection = {'selection': self.generate_selection(tap, tap_config['dbname'])}
 
         # Generate tap transformation
-        tap_transformation = {'transformations': self.generate_transformations(tap)}
+        tap_transformation = {'transformations': self.generate_transformations(tap, tap_config['dbname'])}
 
         # Generate tap inheritable_config dict
         tap_inheritable_config = self.generate_inheritable_config(tap)
@@ -304,11 +304,12 @@ class Config:
         return {**tap.get('db_conn'), **extra_config_keys}
 
     @classmethod
-    def generate_selection(cls, tap: Dict) -> List[Dict]:
+    def generate_selection(cls, tap: Dict, dbname: str) -> List[Dict]:
         """
         Generate the selection data which is the list of selected streams and their replication method
         Args:
             tap: the tap config dictionary
+            dbname: tap db name
 
         Returns: List of dictionaries of selected streams
         """
@@ -325,7 +326,7 @@ class Config:
                     utils.delete_empty_keys(
                         {
                             'tap_stream_id': utils.get_tap_stream_id(
-                                tap, tap['db_conn']['dbname'], schema_name, table_name
+                                tap, dbname, schema_name, table_name
                             ),
                             'replication_method': replication_method,
                             # Add replication_key only if replication_method is INCREMENTAL
@@ -338,10 +339,11 @@ class Config:
         return selection
 
     @classmethod
-    def generate_transformations(cls, tap: Dict) -> List[Dict]:
+    def generate_transformations(cls, tap: Dict, dbname: str) -> List[Dict]:
         """
         Generate the transformations data from the given tap config
         Args:
+            dbname: tap db name
             tap: the tap config dictionary
 
         Returns: List of transformations
@@ -356,7 +358,7 @@ class Config:
                     transformations.append(
                         {
                             'tap_stream_name': utils.get_tap_stream_name(
-                                tap, tap['db_conn']['dbname'], schema_name, table_name),
+                                tap, dbname, schema_name, table_name),
                             'field_id': trans['column'],
                             # Make column name safe by wrapping it in quotes, it's useful when a field_id is a reserved
                             # word to be used by target snowflake in fastsync
