@@ -290,8 +290,8 @@ def validate(instance, schema):
         # Serialise vault encrypted objects to string
         schema_safe_inst = json.loads(json.dumps(instance, cls=AnsibleJSONEncoder))
         jsonschema.validate(instance=schema_safe_inst, schema=schema)
-    except jsonschema.exceptions.ValidationError:
-        raise InvalidConfigException(f'json object doesn\'t match schema {schema}')
+    except jsonschema.exceptions.ValidationError as ex:
+        raise InvalidConfigException(f'json object doesn\'t match schema {schema}') from ex
 
 
 def delete_empty_keys(dic):

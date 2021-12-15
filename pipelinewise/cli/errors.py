@@ -20,19 +20,9 @@ class StreamBufferTooLargeException(Exception):
 class InvalidTransformationException(Exception):
     """Raised if invalid transformation config is found"""
 
-    def __init__(self, message):
-        super().__init__(message)
-
-
 class DuplicateConfigException(Exception):
     """Raised if a duplicate tap/target config is found"""
-
-    def __init__(self, message):
-        super().__init__(message)
 
 
 class InvalidConfigException(Exception):
     """Raised if an invalid config is found"""
-
-    def __init__(self, message):
-        super().__init__(message)
