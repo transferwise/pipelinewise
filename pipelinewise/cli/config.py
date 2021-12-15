@@ -326,7 +326,7 @@ class Config:
                             ),
                             'replication_method': replication_method,
                             # Add replication_key only if replication_method is INCREMENTAL
-                            'replication_key': table['replication_key']
+                            'replication_key': table.get('replication_key')
                             if replication_method == 'INCREMENTAL' else None,
                         }
                     )
