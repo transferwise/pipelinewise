@@ -247,9 +247,6 @@ class Config:
         """
         Generating JSON config files for a singer tap connector:
             1. config.json             :(Singer spec):  Tap connection details
-            2. properties.json         :(Singer spec):  Tap schema properties (generated)
-            3. state.json              :(Singer spec):  Bookmark for incremental and log_based
-                                                        replications
 
             4. selection.json          :(Pipelinewise): List of streams/tables to replicate
             5. inheritable_config.json :(Pipelinewise): Extra config keys for the linked
@@ -325,7 +322,7 @@ class Config:
                     utils.delete_empty_keys(
                         {
                             'tap_stream_id': utils.get_tap_stream_id(
-                                tap, tap['db_conn']['dbname'], schema_name, table_name
+                                tap, tap['db_conn'].get('dbname'), schema_name, table_name
                             ),
                             'replication_method': replication_method,
                             # Add replication_key only if replication_method is INCREMENTAL
@@ -356,7 +353,7 @@ class Config:
                     transformations.append(
                         {
                             'tap_stream_name': utils.get_tap_stream_name(
-                                tap, tap['db_conn']['dbname'], schema_name, table_name),
+                                tap, tap['db_conn'].get('dbname'), schema_name, table_name),
                             'field_id': trans['column'],
                             # Make column name safe by wrapping it in quotes, it's useful when a field_id is a reserved
                             # word to be used by target snowflake in fastsync
