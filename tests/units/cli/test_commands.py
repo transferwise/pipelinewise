@@ -22,7 +22,7 @@ class TestCommands:
     @pytest.fixture(autouse=True)
     def mock_json_validation(self, mocker):  # noqa: F811
         """we are using some config files which does not exist, so we patch the method that verifies the json files"""
-        mocker.patch('pipelinewise.cli.commands.is_invalid_json', return_value=False)
+        mocker.patch('pipelinewise.cli.commands.is_invalid_json_file', return_value=False)
 
     def test_exists_and_executable(self):
         """Tests the function that detect if a file exists and executable"""
