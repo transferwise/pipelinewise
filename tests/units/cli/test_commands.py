@@ -845,7 +845,6 @@ class TestConfigValidation:
 
             self._assert_target_config(config=test_json_file)
 
-
     def test_target_config_valid_if_json_property_is_none(self):
         """Test TargetConfig is valid if config is None"""
         self._assert_target_config(config=None)
