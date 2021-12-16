@@ -1,6 +1,12 @@
+import json
 import os
 import sys
 import pytest
+import threading
+import time
+
+from pytest_mock import mocker  # noqa: F401 pylint: disable=unused-import
+from tempfile import TemporaryDirectory
 
 from pipelinewise.cli import commands
 from pipelinewise.cli.errors import StreamBufferTooLargeException
@@ -11,6 +17,12 @@ class TestCommands:
     """
     Unit tests for PipelineWise CLI commands functions
     """
+
+    # pylint: disable=redefined-outer-name
+    @pytest.fixture(autouse=True)
+    def mock_json_validation(self, mocker):  # noqa: F811
+        """we are using some config files which does not exist, so we patch the method that verifies the json files"""
+        mocker.patch('pipelinewise.cli.commands.is_invalid_json', return_value=False)
 
     def test_exists_and_executable(self):
         """Tests the function that detect if a file exists and executable"""
@@ -23,11 +35,15 @@ class TestCommands:
         # Should be false if file not exists
         assert commands.exists_and_executable('invalid_executable') is False
         # Should be false if file exists but not executable
-        assert commands.exists_and_executable(__file__) is False
+        with TemporaryDirectory() as temp_dir:
+            with open(f'{temp_dir}/test.tmp', 'w', encoding='utf-8') as tmp_file:
+                tmp_file.write('foo')
+            assert commands.exists_and_executable(f'{temp_dir}/test.tmp') is False
 
     def test_build_tap_command(self):
         """Tests the function that generates tap executable command"""
         # State file should not be included if state file path not passed
+
         tap = commands.TapParams(
             id='my_tap_mysql',
             type='tap_mysql',
@@ -662,3 +678,190 @@ class TestCommands:
             )
         assert os.path.isfile('test.log.failed')
         os.remove('test.log.failed')
+
+
+class TestConfigValidation:
+    """Unit tests for json properties validation"""
+    def setup_class(self):
+        """SetUp Class"""
+        commands.PARAMS_VALIDATION_RETRY_PERIOD_SEC = 0.1
+        commands.PARAMS_VALIDATION_RETRY_TIMES = 3
+        self.sec_to_repair_json_file = 0.15  #: pylint: disable=attribute-defined-outside-init
+
+    class AsyncWriteJsonFile(threading.Thread):
+        """Helper class to asynchronous write on a file"""
+        def __init__(self, file_name, content, waiting_time):
+            threading.Thread.__init__(self)
+            self.file_name = file_name
+            self.content = content
+            self.waiting_time = waiting_time
+
+        def run(self):
+            time.sleep(self.waiting_time)
+            with open(self.file_name, 'w', encoding='utf-8') as json_file:
+                json_file.write(self.content)
+
+    @staticmethod
+    def _assert_tap_config(config, properties, state):
+        commands.TapParams(
+            id='foo',
+            type='bar',
+            bin='foo_bin',
+            python_bin='foo/python',
+            config=config,
+            properties=properties,
+            state=state,
+        )
+
+    @staticmethod
+    def _assert_target_config(config):
+        commands.TargetParams(
+            id='foo',
+            type='bar',
+            bin='foo_bin',
+            python_bin='foo/python',
+            config=config,
+        )
+
+    def test_tap_config_json_validation(self):
+        """Test it retries if any json file is invalid"""
+        with TemporaryDirectory() as temp_dir:
+
+            test_json_file = f'{temp_dir}/test_file.json'
+            valid_json_file = f'{temp_dir}/valid_file.json'
+            with open(valid_json_file, 'w', encoding='utf-8') as valid_file:
+                json.dump({'foo': 'bar'}, valid_file)
+
+            for case_number in range(3):
+                with open(test_json_file, 'w', encoding='utf-8') as invalid_file:
+                    invalid_file.write('foo')
+
+                # Starts with an invalid file and since the main method is retrying we fix the file after some seconds
+                fixed_file = self.AsyncWriteJsonFile(test_json_file, '{"foo": "bar"}', self.sec_to_repair_json_file)
+                fixed_file.start()
+                fixed_file.join()
+
+                self._assert_tap_config(config=test_json_file if case_number == 0 else valid_json_file,
+                                        properties=test_json_file if case_number == 1 else valid_json_file,
+                                        state=test_json_file if case_number == 2 else valid_json_file)
+
+    def test_tap_config_jason_valid_if_state_file_does_not_exist(self):
+        """Test it is valid if state file does not exists at all"""
+        with TemporaryDirectory() as temp_dir:
+            valid_json_file = f'{temp_dir}/valid_file.json'
+            not_exists_state_file = f'{temp_dir}/not_exists.json'
+            with open(valid_json_file, 'w', encoding='utf-8') as valid_file:
+                json.dump({'foo': 'bar'}, valid_file)
+
+            self._assert_tap_config(config=valid_json_file, properties=valid_json_file, state=not_exists_state_file)
+
+    # pylint: disable=invalid-name
+    def test_tap_config_json_valid_if_state_file_is_empty_and_raise_exception_on_invalid_content(self):
+        """Test it is valid if state file is empty and raise exception if invalid content"""
+        invalid_file_contents = [' ', 'foo', '{"foo": 1']
+
+        with TemporaryDirectory() as temp_dir:
+            invalid_json_file = f'{temp_dir}/invalid_file.json'
+            valid_json_file = f'{temp_dir}/valid_file.json'
+            empty_file = f'{temp_dir}/empty_stat.json'
+
+            with open(valid_json_file, 'w', encoding='utf-8') as valid_file:
+                json.dump({'foo': 'bar'}, valid_file)
+
+            # 1. asserting if raises exception on invalid contents
+            for invalid_content in invalid_file_contents:
+                with open(invalid_json_file, 'w', encoding='utf-8') as invalid_file:
+                    invalid_file.write(invalid_content)
+
+                with pytest.raises(commands.RunCommandException) as command_exception:
+                    self._assert_tap_config(
+                        config=valid_json_file,
+                        properties=valid_json_file,
+                        state=invalid_json_file,
+                    )
+                assert str(command_exception.value) == f'Invalid json file for state: {invalid_json_file}'
+
+            # 2. asserting if it is valid with empty file
+            with open(empty_file, 'w', encoding='utf-8') as state_file:
+                state_file.write('')
+            self._assert_tap_config(
+                config=valid_json_file,
+                properties=valid_json_file,
+                state=empty_file
+            )
+
+    def test_tap_config_valid_if_json_property_is_none(self):
+        """Test TapConfig is valid if a json property is None"""
+        with TemporaryDirectory() as temp_dir:
+            valid_json_file = f'{temp_dir}/valid_file.json'
+            with open(valid_json_file, 'w', encoding='utf-8') as valid_file:
+                json.dump({'foo': 'bar'}, valid_file)
+
+            for case_number in range(3):
+                self._assert_tap_config(
+                    config=None if case_number == 0 else valid_json_file,
+                    properties=None if case_number == 1 else valid_json_file,
+                    state=None if case_number == 2 else valid_json_file
+                )
+
+    def test_tap_config_raise_exception_if_not_valid_json_after_retries(self):
+        """Test it raises and exception if invalid json files yet after many retries"""
+        invalid_file_contents = ['', ' ', 'foo', '{"foo": 1']
+
+        with TemporaryDirectory() as temp_dir:
+            invalid_json_file = f'{temp_dir}/invalid_file.json'
+            valid_json_file = f'{temp_dir}/valid_file.json'
+
+            with open(valid_json_file, 'w', encoding='utf-8') as valid_file:
+                json.dump({'foo': 'bar'}, valid_file)
+
+            for invalid_content in invalid_file_contents:
+                with open(invalid_json_file, 'w', encoding='utf-8') as invalid_file:
+                    invalid_file.write(invalid_content)
+
+                for case_number in range(2):
+                    with pytest.raises(commands.RunCommandException) as command_exception:
+                        self._assert_tap_config(
+                            config=invalid_json_file if case_number == 0 else valid_json_file,
+                            properties=invalid_json_file if case_number == 1 else valid_json_file,
+                            state=valid_json_file,
+                        )
+
+                assert str(command_exception.value) ==\
+                       f'Invalid json file for {"config" if case_number == 0 else "properties"}: {invalid_json_file}'
+
+    def test_target_config_json_validation(self):
+        """Test it retries if any json file is invalid"""
+        with TemporaryDirectory() as temp_dir:
+            test_json_file = f'{temp_dir}/test_file.json'
+
+            with open(test_json_file, 'w', encoding='utf-8') as invalid_file:
+                invalid_file.write('foo')
+
+            # It starts with an invalid file and since the main method is retrying we fix the file after some seconds
+            fixed_file = self.AsyncWriteJsonFile(test_json_file, '{"foo": "bar"}', self.sec_to_repair_json_file)
+            fixed_file.start()
+            fixed_file.join()
+
+            self._assert_target_config(config=test_json_file)
+
+
+    def test_target_config_valid_if_json_property_is_none(self):
+        """Test TargetConfig is valid if config is None"""
+        self._assert_target_config(config=None)
+
+    def test_target_config_raise_exception_if_not_valid_json_after_retries(self):
+        """Test if it raises and exception if invalid json files yet after many retries"""
+        invalid_file_contents = ['', 'foo', '{"foo": 1']
+
+        with TemporaryDirectory() as temp_dir:
+            invalid_json_file = f'{temp_dir}/invalid_file.json'
+
+            for invalid_content in invalid_file_contents:
+                with open(invalid_json_file, 'w', encoding='utf-8') as invalid_file:
+                    invalid_file.write(invalid_content)
+
+                with pytest.raises(commands.RunCommandException) as command_exception:
+                    self._assert_target_config(config=invalid_json_file)
+
+                assert str(command_exception.value) == f'Invalid json file for config: {invalid_json_file}'

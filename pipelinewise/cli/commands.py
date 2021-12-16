@@ -4,6 +4,9 @@ PipelineWise CLI - Commands
 import os
 import shlex
 import logging
+import json
+import time
+
 from subprocess import PIPE, STDOUT, Popen
 from collections import namedtuple
 
@@ -15,6 +18,9 @@ DEFAULT_STREAM_BUFFER_SIZE = 0  # Disabled by default
 DEFAULT_STREAM_BUFFER_BIN = 'mbuffer'
 MIN_STREAM_BUFFER_SIZE = 10
 MAX_STREAM_BUFFER_SIZE = 2500
+
+PARAMS_VALIDATION_RETRY_PERIOD_SEC = 2
+PARAMS_VALIDATION_RETRY_TIMES = 3
 
 STATUS_RUNNING = 'running'
 STATUS_FAILED = 'failed'
@@ -29,13 +35,84 @@ TransformParams = namedtuple(
 )
 
 
+def is_invalid_json_file(json_file_path, file_property):
+    """
+    checking if input file is a valid json or not, in some cases it is allowed to have an empty file, or it is allowed
+    file not exists!
+    """
+    try:
+        with open(json_file_path, 'r', encoding='utf-8') as json_file:
+            json.load(json_file)
+        return False
+    except FileNotFoundError:
+        return file_property['file_must_exists']
+    except json.decoder.JSONDecodeError:
+        if file_property['allowed_empty'] and os.stat(json_file_path).st_size == 0:
+            return False
+        return True
+
+
+def do_json_conf_validation(json_file, file_property):
+    """
+    Validating a json format config property and retry if it is invalid
+    """
+    invalid_json = False
+    for _ in range(PARAMS_VALIDATION_RETRY_TIMES):
+        if is_invalid_json_file(json_file_path=json_file, file_property=file_property):
+            invalid_json = True
+            time.sleep(PARAMS_VALIDATION_RETRY_PERIOD_SEC)
+        else:
+            invalid_json = False
+            break
+    return invalid_json
+
+
+# pylint: disable=function-redefined)
+class TapParams(TapParams):
+    """
+    for overriding TaptParam init and validating json properties
+    """
+    # pylint: disable=unused-argument
+    def __init__(self, *args, **kwargs):
+        super().__init__()
+        list_of_params_in_json_file = {
+            'config': {'file_must_exists': True, 'allowed_empty': False},
+            'properties': {'file_must_exists': True, 'allowed_empty': False},
+            'state': {'file_must_exists': False, 'allowed_empty': True}
+        }
+        for param, file_property in list_of_params_in_json_file.items():
+            invalid_json = do_json_conf_validation(
+                json_file=kwargs[param],
+                file_property=file_property
+               ) if kwargs.get(param) else False
+
+            if invalid_json:
+                raise RunCommandException(
+                    f'Invalid json file for {param}: {kwargs[param]}')
+
+
+# pylint: disable=function-redefined)
+class TargetParams(TargetParams):
+    """
+    for overriding TargetParam init and validating json properties
+    """
+    # pylint: disable=unused-argument
+    def __init__(self, *args, **kwargs):
+        super().__init__()
+        invalid_json = do_json_conf_validation(
+            json_file=kwargs.get('config'),
+            file_property={'file_must_exists': True, 'allowed_empty': False}) if kwargs.get('config') else False
+
+        if invalid_json:
+            raise RunCommandException(f'Invalid json file for config: {kwargs["config"]}')
+
+
+# pylint: disable=unnecessary-pass
 class RunCommandException(Exception):
     """
     Custom exception to raise when run command fails
     """
-
-    def __init__(self, *args, **kwargs):
-        Exception.__init__(self, *args, **kwargs)
+    pass
 
 
 def exists_and_executable(bin_path: str) -> bool:
@@ -51,13 +128,14 @@ def exists_and_executable(bin_path: str) -> bool:
         boolean: True if file exists and executable, otherwise False
 
     """
+
     if not os.access(bin_path, os.X_OK):
+
         try:
             paths = f"{os.environ['PATH']}".split(':')
             (p for p in paths if os.access(f'{p}/{bin_path}', os.X_OK)).__next__()
         except StopIteration:
             return False
-
     return True
 
 

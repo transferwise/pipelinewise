@@ -45,6 +45,7 @@ setup(name='pipelinewise',
               'pytest-dependency==0.4.0',
               'pytest-cov==3.0.0',
               'python-dotenv==0.19.1',
+              'pytest-mock==3.6.1',
               'pylint==2.10.2',
               'unify==0.5'
           ]
