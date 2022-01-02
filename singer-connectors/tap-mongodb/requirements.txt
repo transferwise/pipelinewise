@@ -1,1 +1,2 @@
-pipelinewise-tap-mongodb==1.2.0
+# We need unreleased support for "srv" property in order to sync with Atlas
+git+https://github.com/transferwise/pipelinewise-tap-mongodb.git
