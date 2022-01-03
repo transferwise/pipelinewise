@@ -6,6 +6,7 @@ RUN apt-get -qq update \
     && apt-get -qqy --no-install-recommends install \
         apt-utils \
         alien \
+        gnupg \
         libaio1 \
         mbuffer \
         wget \
@@ -13,11 +14,13 @@ RUN apt-get -qq update \
     && rm -rf /var/lib/apt/lists/* \
     && pip install -U --no-cache-dir pip
 
-# In order to use fastsync with MongoDB Atlas we need version 100+ of mongodump
-RUN cd /tmp && \
-    wget https://fastdl.mongodb.org/tools/db/mongodb-database-tools-debian10-x86_64-100.5.1.deb && \
-    dpkg -i mongodb-database-tools-debian10-x86_64-100.5.1.deb && \
-    rm mongodb-database-tools-debian10-x86_64-100.5.1.deb
+# Add Mongodb ppa
+RUN wget -qO - https://www.mongodb.org/static/pgp/server-4.4.asc | apt-key add - \
+    && echo "deb [ arch=amd64 ] https://repo.mongodb.org/apt/ubuntu bionic/mongodb-org/4.4 multiverse" | tee /etc/apt/sources.list.d/mongodb.list \
+    && apt-get -qq update \
+    && apt-get -qqy --no-install-recommends install \
+        mongodb-database-tools \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY singer-connectors/ /app/singer-connectors/
 COPY Makefile /app

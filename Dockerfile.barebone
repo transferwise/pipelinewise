@@ -4,6 +4,7 @@ RUN apt-get -qq update \
     && apt-get -qqy --no-install-recommends install \
         apt-utils \
         alien \
+        gnupg \
         libaio1 \
         wget \
     && rm -rf /var/lib/apt/lists/* \
