@@ -10,7 +10,6 @@ RUN apt-get -qq update \
         libaio1 \
         mbuffer \
         wget \
-        git \
     && rm -rf /var/lib/apt/lists/* \
     && pip install -U --no-cache-dir pip
 
