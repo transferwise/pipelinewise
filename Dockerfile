@@ -1,6 +1,6 @@
 FROM python:3.7-slim-buster
 
-ARG connectors=default
+ARG connectors=all
 
 RUN apt-get -qq update \
     && apt-get -qqy --no-install-recommends install \
