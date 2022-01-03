@@ -440,8 +440,6 @@ class FastSyncTapMongoDB:
             export_dir,
         ]
 
-        LOGGER.info("Running: %s", cmd)
-
         return_code = subprocess.call(cmd)
 
         LOGGER.debug('Export command return code %s', return_code)
