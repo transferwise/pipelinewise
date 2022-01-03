@@ -5,7 +5,6 @@ import gzip
 import ujson
 import logging
 import os
-import ssl
 import subprocess
 import uuid
 import bson
