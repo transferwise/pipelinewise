@@ -225,7 +225,7 @@ class FastSyncTapMongoDB:
         Open connection
         """
 
-        self.database = MongoClient(self.connection_config["connection_string"])[
+        self.database = MongoClient(self.connection_config['connection_string'])[
             self.connection_config['database']
         ]
 
