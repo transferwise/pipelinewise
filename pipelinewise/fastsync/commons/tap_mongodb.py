@@ -177,15 +177,11 @@ def get_connection_string(config: Dict):
         connection_query['replicaSet'] = config['replica_set']
 
     if use_ssl:
-        connection_query['tls'] = 'true'
+        connection_query['ssl'] = 'true'
 
     # NB: "sslAllowInvalidCertificates" must ONLY be supplied if `SSL` is true.
     if not verify_mode and use_ssl:
         connection_query['tlsAllowInvalidCertificates'] = 'true'
-
-    # looks like mongo dump and pymongo differ in ssl params
-    # if config.get('ssl', None) is not None:
-    #     conn += f'&ssl={config["ssl"]}'
 
     query_string = parse.urlencode(connection_query)
 
