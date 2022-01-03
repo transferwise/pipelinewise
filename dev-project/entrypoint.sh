@@ -4,7 +4,7 @@ set -e
 
 # Add Mongodb ppa
 apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv 4B7C549A058F8B6B
-echo "deb [ arch=amd64 ] https://repo.mongodb.org/apt/ubuntu bionic/mongodb-org/4.2 multiverse" | tee /etc/apt/sources.list.d/mongodb.list
+echo "deb [ arch=amd64 ] https://repo.mongodb.org/apt/ubuntu bionic/mongodb-org/4.4 multiverse" | tee /etc/apt/sources.list.d/mongodb.list
 
 # Install OS dependencies
 apt-get update
@@ -14,7 +14,7 @@ apt-get install -y --no-install-recommends \
   libaio1 \
   mariadb-client \
   mbuffer \
-  mongo-tools \
+  mongodb-database-tools \
   mongodb-org-shell=4.2.7 \
   postgresql-client
 
