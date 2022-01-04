@@ -149,7 +149,7 @@ Example YAML for ``tap-mongodb``:
 Example connection to MongoDB Atlas
 """""""""""""""""""""""""""""""""""
 
-.. code_block:: bash
+.. code-block:: bash
 
 	db_conn:
 		srv: "true"
