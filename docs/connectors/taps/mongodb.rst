@@ -149,11 +149,11 @@ Example YAML for ``tap-mongodb``:
 Example connection to MongoDB Atlas
 """""""""""""""""""""""""""""""""""
 
-.. code_block:: yaml
+.. code_block:: bash
 	db_conn:
 		srv: "true"
 		host: "xxxxxxxxx.xxxxx.mongodb.net"
-		auth_database: "admin"         # the Mongodb database name to authenticate on
-		dbname: "db-name"           				# Mongodb database name to sync from
-		user: "user-name"							# User with read roles
-		password: "password"                            # Plain string or vault encrypted
+		auth_database: "admin"			# the Mongodb database name to authenticate on
+		dbname: "db-name"				# Mongodb database name to sync from
+		user: "user-name"				# User with read roles
+		password: "password"			# Plain string or vault encrypted
