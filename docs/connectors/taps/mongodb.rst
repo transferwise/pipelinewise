@@ -150,6 +150,7 @@ Example connection to MongoDB Atlas
 """""""""""""""""""""""""""""""""""
 
 .. code_block:: bash
+
 	db_conn:
 		srv: "true"
 		host: "xxxxxxxxx.xxxxx.mongodb.net"
