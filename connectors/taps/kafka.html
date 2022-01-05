@@ -155,85 +155,85 @@ and sends singer compatible messages in small batches to standard output.</p>
 A sample YAML for Kafka replication can be generated into a project directory by
 following the steps in the <a class="reference internal" href="../../installation_guide/creating_pipelines.html#generating-pipelines"><span class="std std-ref">Generating Sample Pipelines</span></a> section.</p>
 <p>Example YAML for <code class="docutils literal notranslate"><span class="pre">tap-kafka</span></code>:</p>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nn">---</span>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nn">---</span><span class="w"></span>
 
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="c1"># General Properties</span>
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="nt">id</span><span class="p">:</span> <span class="s">&quot;kafka&quot;</span>                            <span class="c1"># Unique identifier of the tap</span>
-<span class="nt">name</span><span class="p">:</span> <span class="s">&quot;Kafka</span><span class="nv"> </span><span class="s">Topic</span><span class="nv"> </span><span class="s">with</span><span class="nv"> </span><span class="s">sample</span><span class="nv"> </span><span class="s">data&quot;</span>   <span class="c1"># Name of the tap</span>
-<span class="nt">type</span><span class="p">:</span> <span class="s">&quot;tap-kafka&quot;</span>                      <span class="c1"># !! THIS SHOULD NOT CHANGE !!</span>
-<span class="nt">owner</span><span class="p">:</span> <span class="s">&quot;somebody@foo.com&quot;</span>              <span class="c1"># Data owner to contact</span>
-<span class="c1">#send_alert: False                     # Optional: Disable all configured alerts on this tap</span>
-
-
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="c1"># Source (Tap) - Kafka connection details</span>
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="nt">db_conn</span><span class="p">:</span>
-  <span class="nt">group_id</span><span class="p">:</span> <span class="s">&quot;myGroupId&quot;</span>
-  <span class="nt">bootstrap_servers</span><span class="p">:</span> <span class="s">&quot;kafka1.foo.com:9092,kafka2.foo.com:9092,kafka3.foo.com:9092&quot;</span>
-  <span class="nt">topic</span><span class="p">:</span> <span class="s">&quot;myKafkaTopic&quot;</span>
+<span class="c1"># ------------------------------------------------------------------------------</span><span class="w"></span>
+<span class="c1"># General Properties</span><span class="w"></span>
+<span class="c1"># ------------------------------------------------------------------------------</span><span class="w"></span>
+<span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;kafka&quot;</span><span class="w">                            </span><span class="c1"># Unique identifier of the tap</span><span class="w"></span>
+<span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Kafka</span><span class="nv"> </span><span class="s">Topic</span><span class="nv"> </span><span class="s">with</span><span class="nv"> </span><span class="s">sample</span><span class="nv"> </span><span class="s">data&quot;</span><span class="w">   </span><span class="c1"># Name of the tap</span><span class="w"></span>
+<span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;tap-kafka&quot;</span><span class="w">                      </span><span class="c1"># !! THIS SHOULD NOT CHANGE !!</span><span class="w"></span>
+<span class="nt">owner</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;somebody@foo.com&quot;</span><span class="w">              </span><span class="c1"># Data owner to contact</span><span class="w"></span>
+<span class="c1">#send_alert: False                     # Optional: Disable all configured alerts on this tap</span><span class="w"></span>
 
 
-  <span class="c1"># --------------------------------------------------------------------------</span>
-  <span class="c1"># Optionally you can define primary key(s) from the kafka JSON messages.</span>
-  <span class="c1"># If primary keys defined then extra column(s) will be added to the output</span>
-  <span class="c1"># singer stream with the extracted values by /slashed/paths ala XPath selectors.</span>
-  <span class="c1"># --------------------------------------------------------------------------</span>
-  <span class="nt">primary_keys</span><span class="p">:</span>
-     <span class="nt">transfer_id</span><span class="p">:</span> <span class="s">&quot;/transferMetadata/transferId&quot;</span>
-
-  <span class="c1"># --------------------------------------------------------------------------</span>
-  <span class="c1"># Kafka Consumer optional parameters</span>
-  <span class="c1"># --------------------------------------------------------------------------</span>
-  <span class="c1">#max_runtime_ms: 300000                   # The maximum time for the tap to collect new messages from Kafka topic.</span>
-  <span class="c1">#consumer_timeout_ms: 10000               # KafkaConsumer setting. Number of milliseconds to block during message iteration before raising StopIteration</span>
-  <span class="c1">#session_timeout_ms: 30000                # KafkaConsumer setting. The timeout used to detect failures when using Kafka’s group management facilities.</span>
-  <span class="c1">#heartbeat_interval_ms: 10000             # KafkaConsumer setting. The expected time in milliseconds between heartbeats to the consumer coordinator when using Kafka’s group management facilities.</span>
-  <span class="c1">#max_poll_interval_ms: 300000             # KafkaConsumer setting. The maximum delay between invocations of poll() when using consumer group management.</span>
-  <span class="c1">#max_poll_records: 500                    # KafkaConsumer setting. The maximum number of records returned in a single call to poll().</span>
-
-  <span class="c1">#commit_interval_ms: 5000                 # Number of milliseconds between two commits. This is different than the kafka auto commit feature. Tap-kafka sends commit messages automatically but only when the data consumed successfully and persisted to local store.</span>
-  <span class="c1">#local_store_dir: ./tap-kafka-local-store # Path to the local store with consumed kafka messages</span>
-  <span class="c1">#local_store_batch_size_rows: 1000        # Number of messages to write to disk in one go. This can avoid high I/O issues when messages written to local store disk too frequently.</span>
+<span class="c1"># ------------------------------------------------------------------------------</span><span class="w"></span>
+<span class="c1"># Source (Tap) - Kafka connection details</span><span class="w"></span>
+<span class="c1"># ------------------------------------------------------------------------------</span><span class="w"></span>
+<span class="nt">db_conn</span><span class="p">:</span><span class="w"></span>
+<span class="w">  </span><span class="nt">group_id</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;myGroupId&quot;</span><span class="w"></span>
+<span class="w">  </span><span class="nt">bootstrap_servers</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;kafka1.foo.com:9092,kafka2.foo.com:9092,kafka3.foo.com:9092&quot;</span><span class="w"></span>
+<span class="w">  </span><span class="nt">topic</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;myKafkaTopic&quot;</span><span class="w"></span>
 
 
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="c1"># Destination (Target) - Target properties</span>
-<span class="c1"># Connection details should be in the relevant target YAML file</span>
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="nt">target</span><span class="p">:</span> <span class="s">&quot;snowflake&quot;</span>                       <span class="c1"># ID of the target connector where the data will be loaded</span>
-<span class="nt">batch_size_rows</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">20000</span>                    <span class="c1"># Batch size for the stream to optimise load performance</span>
-<span class="nt">stream_buffer_size</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">0</span>                     <span class="c1"># In-memory buffer size (MB) between taps and targets for asynchronous data pipes</span>
-<span class="nt">default_target_schema</span><span class="p">:</span> <span class="s">&quot;kafka&quot;</span>            <span class="c1"># Target schema where the data will be loaded</span>
-<span class="nt">default_target_schema_select_permission</span><span class="p">:</span>  <span class="c1"># Optional: Grant SELECT on schema and tables that created</span>
-  <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">grp_stats</span>
-<span class="c1">#batch_wait_limit_seconds: 3600           # Optional: Maximum time to wait for `batch_size_rows`. Available only for snowflake target.</span>
+<span class="w">  </span><span class="c1"># --------------------------------------------------------------------------</span><span class="w"></span>
+<span class="w">  </span><span class="c1"># Optionally you can define primary key(s) from the kafka JSON messages.</span><span class="w"></span>
+<span class="w">  </span><span class="c1"># If primary keys defined then extra column(s) will be added to the output</span><span class="w"></span>
+<span class="w">  </span><span class="c1"># singer stream with the extracted values by /slashed/paths ala XPath selectors.</span><span class="w"></span>
+<span class="w">  </span><span class="c1"># --------------------------------------------------------------------------</span><span class="w"></span>
+<span class="w">  </span><span class="nt">primary_keys</span><span class="p">:</span><span class="w"></span>
+<span class="w">     </span><span class="nt">transfer_id</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/transferMetadata/transferId&quot;</span><span class="w"></span>
 
-<span class="c1"># Options only for Snowflake target</span>
-<span class="c1">#archive_load_files: False                      # Optional: when enabled, the files loaded to Snowflake will also be stored in `archive_load_files_s3_bucket`</span>
-<span class="c1">#archive_load_files_s3_prefix: &quot;archive&quot;        # Optional: When `archive_load_files` is enabled, the archived files will be placed in the archive S3 bucket under this prefix.</span>
-<span class="c1">#archive_load_files_s3_bucket: &quot;&lt;BUCKET_NAME&gt;&quot;  # Optional: When `archive_load_files` is enabled, the archived files will be placed in this bucket. (Default: the value of `s3_bucket` in target snowflake YAML)</span>
+<span class="w">  </span><span class="c1"># --------------------------------------------------------------------------</span><span class="w"></span>
+<span class="w">  </span><span class="c1"># Kafka Consumer optional parameters</span><span class="w"></span>
+<span class="w">  </span><span class="c1"># --------------------------------------------------------------------------</span><span class="w"></span>
+<span class="w">  </span><span class="c1">#max_runtime_ms: 300000                   # The maximum time for the tap to collect new messages from Kafka topic.</span><span class="w"></span>
+<span class="w">  </span><span class="c1">#consumer_timeout_ms: 10000               # KafkaConsumer setting. Number of milliseconds to block during message iteration before raising StopIteration</span><span class="w"></span>
+<span class="w">  </span><span class="c1">#session_timeout_ms: 30000                # KafkaConsumer setting. The timeout used to detect failures when using Kafka’s group management facilities.</span><span class="w"></span>
+<span class="w">  </span><span class="c1">#heartbeat_interval_ms: 10000             # KafkaConsumer setting. The expected time in milliseconds between heartbeats to the consumer coordinator when using Kafka’s group management facilities.</span><span class="w"></span>
+<span class="w">  </span><span class="c1">#max_poll_interval_ms: 300000             # KafkaConsumer setting. The maximum delay between invocations of poll() when using consumer group management.</span><span class="w"></span>
+<span class="w">  </span><span class="c1">#max_poll_records: 500                    # KafkaConsumer setting. The maximum number of records returned in a single call to poll().</span><span class="w"></span>
+
+<span class="w">  </span><span class="c1">#commit_interval_ms: 5000                 # Number of milliseconds between two commits. This is different than the kafka auto commit feature. Tap-kafka sends commit messages automatically but only when the data consumed successfully and persisted to local store.</span><span class="w"></span>
+<span class="w">  </span><span class="c1">#local_store_dir: ./tap-kafka-local-store # Path to the local store with consumed kafka messages</span><span class="w"></span>
+<span class="w">  </span><span class="c1">#local_store_batch_size_rows: 1000        # Number of messages to write to disk in one go. This can avoid high I/O issues when messages written to local store disk too frequently.</span><span class="w"></span>
 
 
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="c1"># Source to target Schema mapping</span>
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="nt">schemas</span><span class="p">:</span>
-  <span class="p p-Indicator">-</span> <span class="nt">source_schema</span><span class="p">:</span> <span class="s">&quot;kafka&quot;</span>             <span class="c1"># This is mandatory, but can be anything in this tap type</span>
-    <span class="nt">target_schema</span><span class="p">:</span> <span class="s">&quot;kafka&quot;</span>             <span class="c1"># Target schema in the destination Data Warehouse</span>
+<span class="c1"># ------------------------------------------------------------------------------</span><span class="w"></span>
+<span class="c1"># Destination (Target) - Target properties</span><span class="w"></span>
+<span class="c1"># Connection details should be in the relevant target YAML file</span><span class="w"></span>
+<span class="c1"># ------------------------------------------------------------------------------</span><span class="w"></span>
+<span class="nt">target</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;snowflake&quot;</span><span class="w">                       </span><span class="c1"># ID of the target connector where the data will be loaded</span><span class="w"></span>
+<span class="nt">batch_size_rows</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">20000</span><span class="w">                    </span><span class="c1"># Batch size for the stream to optimise load performance</span><span class="w"></span>
+<span class="nt">stream_buffer_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span><span class="w">                     </span><span class="c1"># In-memory buffer size (MB) between taps and targets for asynchronous data pipes</span><span class="w"></span>
+<span class="nt">default_target_schema</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;kafka&quot;</span><span class="w">            </span><span class="c1"># Target schema where the data will be loaded</span><span class="w"></span>
+<span class="nt">default_target_schema_select_permission</span><span class="p">:</span><span class="w">  </span><span class="c1"># Optional: Grant SELECT on schema and tables that created</span><span class="w"></span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">grp_stats</span><span class="w"></span>
+<span class="c1">#batch_wait_limit_seconds: 3600           # Optional: Maximum time to wait for `batch_size_rows`. Available only for snowflake target.</span><span class="w"></span>
 
-    <span class="c1"># Kafka topic to replicate into destination Data Warehouse</span>
-    <span class="c1"># You can load data only from one kafka topic in one YAML file.</span>
-    <span class="c1"># If you want load from multiple kafka topics, create another tap YAML similar to this file</span>
-    <span class="nt">tables</span><span class="p">:</span>
-      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;my_kafka_topic&quot;</span>   <span class="c1"># target table name needs to match to the topic name in snake case format</span>
+<span class="c1"># Options only for Snowflake target</span><span class="w"></span>
+<span class="c1">#archive_load_files: False                      # Optional: when enabled, the files loaded to Snowflake will also be stored in `archive_load_files_s3_bucket`</span><span class="w"></span>
+<span class="c1">#archive_load_files_s3_prefix: &quot;archive&quot;        # Optional: When `archive_load_files` is enabled, the archived files will be placed in the archive S3 bucket under this prefix.</span><span class="w"></span>
+<span class="c1">#archive_load_files_s3_bucket: &quot;&lt;BUCKET_NAME&gt;&quot;  # Optional: When `archive_load_files` is enabled, the archived files will be placed in this bucket. (Default: the value of `s3_bucket` in target snowflake YAML)</span><span class="w"></span>
 
-        <span class="c1"># OPTIONAL: Load time transformations</span>
-        <span class="c1">#transformations:</span>
-        <span class="c1">#  - column: &quot;last_name&quot;            # Column to transform</span>
-        <span class="c1">#    type: &quot;SET-NULL&quot;               # Transformation type</span>
+
+<span class="c1"># ------------------------------------------------------------------------------</span><span class="w"></span>
+<span class="c1"># Source to target Schema mapping</span><span class="w"></span>
+<span class="c1"># ------------------------------------------------------------------------------</span><span class="w"></span>
+<span class="nt">schemas</span><span class="p">:</span><span class="w"></span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">source_schema</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;kafka&quot;</span><span class="w">             </span><span class="c1"># This is mandatory, but can be anything in this tap type</span><span class="w"></span>
+<span class="w">    </span><span class="nt">target_schema</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;kafka&quot;</span><span class="w">             </span><span class="c1"># Target schema in the destination Data Warehouse</span><span class="w"></span>
+
+<span class="w">    </span><span class="c1"># Kafka topic to replicate into destination Data Warehouse</span><span class="w"></span>
+<span class="w">    </span><span class="c1"># You can load data only from one kafka topic in one YAML file.</span><span class="w"></span>
+<span class="w">    </span><span class="c1"># If you want load from multiple kafka topics, create another tap YAML similar to this file</span><span class="w"></span>
+<span class="w">    </span><span class="nt">tables</span><span class="p">:</span><span class="w"></span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;my_kafka_topic&quot;</span><span class="w">   </span><span class="c1"># target table name needs to match to the topic name in snake case format</span><span class="w"></span>
+
+<span class="w">        </span><span class="c1"># OPTIONAL: Load time transformations</span><span class="w"></span>
+<span class="w">        </span><span class="c1">#transformations:</span><span class="w"></span>
+<span class="w">        </span><span class="c1">#  - column: &quot;last_name&quot;            # Column to transform</span><span class="w"></span>
+<span class="w">        </span><span class="c1">#    type: &quot;SET-NULL&quot;               # Transformation type</span><span class="w"></span>
 </pre></div>
 </div>
 </section>
@@ -250,7 +250,7 @@ following the steps in the <a class="reference internal" href="../../installatio
   <hr/>
 
   <div role="contentinfo">
-    <p>&#169; Copyright 2021, Wise Ltd..</p>
+    <p>&#169; Copyright 2022, Wise Ltd..</p>
   </div>
 
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a

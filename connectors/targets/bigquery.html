@@ -145,24 +145,24 @@ all the supported <a class="reference internal" href="../taps.html#taps-list"><s
 A sample YAML for Bigquery target can be generated into a project directory by
 following the steps in the <a class="reference internal" href="../../installation_guide/creating_pipelines.html#generating-pipelines"><span class="std std-ref">Generating Sample Pipelines</span></a> section.</p>
 <p>Example YAML for target-bigquery:</p>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nn">---</span>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nn">---</span><span class="w"></span>
 
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="c1"># General Properties</span>
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="nt">id</span><span class="p">:</span> <span class="s">&quot;bigquery&quot;</span>                        <span class="c1"># Unique identifier of the target</span>
-<span class="nt">name</span><span class="p">:</span> <span class="s">&quot;Bigquery&quot;</span>                      <span class="c1"># Name of the target</span>
-<span class="nt">type</span><span class="p">:</span> <span class="s">&quot;target-bigquery&quot;</span>               <span class="c1"># !! THIS SHOULD NOT CHANGE !!</span>
+<span class="c1"># ------------------------------------------------------------------------------</span><span class="w"></span>
+<span class="c1"># General Properties</span><span class="w"></span>
+<span class="c1"># ------------------------------------------------------------------------------</span><span class="w"></span>
+<span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;bigquery&quot;</span><span class="w">                        </span><span class="c1"># Unique identifier of the target</span><span class="w"></span>
+<span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Bigquery&quot;</span><span class="w">                      </span><span class="c1"># Name of the target</span><span class="w"></span>
+<span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;target-bigquery&quot;</span><span class="w">               </span><span class="c1"># !! THIS SHOULD NOT CHANGE !!</span><span class="w"></span>
 
 
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="c1"># Target - Data Warehouse connection details</span>
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="nt">db_conn</span><span class="p">:</span>
-  <span class="nt">project_id</span><span class="p">:</span> <span class="s">&quot;&lt;PROJECT_NAME&gt;&quot;</span>                 <span class="c1"># Bigquery project name</span>
-  <span class="nt">dataset_id</span><span class="p">:</span> <span class="s">&quot;&lt;DATASET_NAME&gt;&quot;</span>                 <span class="c1"># Bigquery dataset name</span>
-  <span class="c1"># Optional: Location/region of your dataset</span>
-  <span class="nt">location</span><span class="p">:</span> <span class="s">&quot;&lt;LOCATION_NAME&gt;&quot;</span>                  <span class="c1"># Bigquery location of the dataset</span>
+<span class="c1"># ------------------------------------------------------------------------------</span><span class="w"></span>
+<span class="c1"># Target - Data Warehouse connection details</span><span class="w"></span>
+<span class="c1"># ------------------------------------------------------------------------------</span><span class="w"></span>
+<span class="nt">db_conn</span><span class="p">:</span><span class="w"></span>
+<span class="w">  </span><span class="nt">project_id</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;PROJECT_NAME&gt;&quot;</span><span class="w">                 </span><span class="c1"># Bigquery project name</span><span class="w"></span>
+<span class="w">  </span><span class="nt">dataset_id</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;DATASET_NAME&gt;&quot;</span><span class="w">                 </span><span class="c1"># Bigquery dataset name</span><span class="w"></span>
+<span class="w">  </span><span class="c1"># Optional: Location/region of your dataset</span><span class="w"></span>
+<span class="w">  </span><span class="nt">location</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;LOCATION_NAME&gt;&quot;</span><span class="w">                  </span><span class="c1"># Bigquery location of the dataset</span><span class="w"></span>
 </pre></div>
 </div>
 </section>
@@ -179,7 +179,7 @@ following the steps in the <a class="reference internal" href="../../installatio
   <hr/>
 
   <div role="contentinfo">
-    <p>&#169; Copyright 2021, Wise Ltd..</p>
+    <p>&#169; Copyright 2022, Wise Ltd..</p>
   </div>
 
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a

@@ -82,7 +82,10 @@
 <li class="toctree-l2"><a class="reference internal" href="snowflake.html">Tap Snowflake</a></li>
 <li class="toctree-l2 current"><a class="current reference internal" href="#">Tap MongoDB</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#mongodb-setup-requirements">MongoDB setup requirements</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#configuring-what-to-replicate">Configuring what to replicate</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#configuring-what-to-replicate">Configuring what to replicate</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#example-connection-to-mongodb-atlas">Example connection to MongoDB Atlas</a></li>
+</ul>
+</li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="salesforce.html">Tap Salesforce</a></li>
@@ -211,6 +214,7 @@ following the steps in the <a class="reference internal" href="../../installatio
     db_conn:
             host: <span class="s2">&quot;mongodb_host1,mongodb_host2,mongodb_host3&quot;</span>       <span class="c1"># Mongodb host(s)</span>
             port: <span class="m">27017</span>                                                     <span class="c1"># Mongodb port</span>
+            srv: <span class="s2">&quot;false&quot;</span>                                                                            <span class="c1"># For MongoDB Atlas `srv` should be &quot;true&quot; and `port` will be ignored</span>
             user: <span class="s2">&quot;PipelineWiseUser&quot;</span>                                        <span class="c1"># Mongodb user</span>
             password: <span class="s2">&quot;mY_VerY_StRonG_PaSSwoRd&quot;</span>                 <span class="c1"># Mongodb plain string or vault encrypted</span>
             auth_database: <span class="s2">&quot;admin&quot;</span>                                                  <span class="c1"># Mongodb database to authenticate on</span>
@@ -259,6 +263,18 @@ following the steps in the <a class="reference internal" href="../../installatio
                     - table_name: <span class="s2">&quot;my_other_collection&quot;</span>
 </pre></div>
 </div>
+<section id="example-connection-to-mongodb-atlas">
+<h3>Example connection to MongoDB Atlas<a class="headerlink" href="#example-connection-to-mongodb-atlas" title="Permalink to this headline"></a></h3>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>db_conn:
+        srv: <span class="s2">&quot;true&quot;</span>
+        host: <span class="s2">&quot;xxxxxxxxx.xxxxx.mongodb.net&quot;</span>
+        auth_database: <span class="s2">&quot;admin&quot;</span>                  <span class="c1"># the Mongodb database name to authenticate on</span>
+        dbname: <span class="s2">&quot;db-name&quot;</span>                               <span class="c1"># Mongodb database name to sync from</span>
+        user: <span class="s2">&quot;user-name&quot;</span>                               <span class="c1"># User with read roles</span>
+        password: <span class="s2">&quot;password&quot;</span>                    <span class="c1"># Plain string or vault encrypted</span>
+</pre></div>
+</div>
+</section>
 </section>
 </section>
 
@@ -273,7 +289,7 @@ following the steps in the <a class="reference internal" href="../../installatio
   <hr/>
 
   <div role="contentinfo">
-    <p>&#169; Copyright 2021, Wise Ltd..</p>
+    <p>&#169; Copyright 2022, Wise Ltd..</p>
   </div>
 
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a

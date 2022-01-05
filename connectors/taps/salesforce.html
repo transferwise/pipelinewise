@@ -148,84 +148,84 @@
 A sample YAML for Salesforce replication can be generated into a project directory by
 following the steps in the <a class="reference internal" href="../../installation_guide/creating_pipelines.html#generating-pipelines"><span class="std std-ref">Generating Sample Pipelines</span></a> section.</p>
 <p>Example YAML for tap-salesforce:</p>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nn">---</span>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nn">---</span><span class="w"></span>
 
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="c1"># General Properties</span>
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="nt">id</span><span class="p">:</span> <span class="s">&quot;salesforce&quot;</span>                       <span class="c1"># Unique identifier of the tap</span>
-<span class="nt">name</span><span class="p">:</span> <span class="s">&quot;Sample</span><span class="nv"> </span><span class="s">data</span><span class="nv"> </span><span class="s">on</span><span class="nv"> </span><span class="s">Salesforce&quot;</span>      <span class="c1"># Name of the tap</span>
-<span class="nt">type</span><span class="p">:</span> <span class="s">&quot;tap-salesforce&quot;</span>                 <span class="c1"># !! THIS SHOULD NOT CHANGE !!</span>
-<span class="nt">owner</span><span class="p">:</span> <span class="s">&quot;somebody@foo.com&quot;</span>              <span class="c1"># Data owner to contact</span>
-<span class="c1">#send_alert: False                     # Optional: Disable all configured alerts on this tap</span>
-
-
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="c1"># Source (Tap) - Salesforce connection details</span>
-<span class="c1">#</span>
-<span class="c1"># The client_id and client_secret keys are your OAuth Salesforce App secrets.</span>
-<span class="c1"># The refresh_token is a secret created during the OAuth flow. For more info on</span>
-<span class="c1"># the Salesforce OAuth flow, visit the Salesforce documentation at</span>
-<span class="c1"># https://developer.salesforce.com/docs/atlas.en-us.api_rest.meta/api_rest/intro_understanding_web_server_oauth_flow.htm</span>
-<span class="c1">#</span>
-<span class="c1"># api_type to use extracting data from Snowflake. This can be BULK or REST.</span>
-<span class="c1"># Further details about API types at https://www.stitchdata.com/docs/integrations/saas/salesforce#bulk-vs-rest-api</span>
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="nt">db_conn</span><span class="p">:</span>
-  <span class="nt">client_id</span><span class="p">:</span> <span class="s">&quot;&lt;ACCESS_TOKEN&gt;&quot;</span>             <span class="c1"># Salesforce Client ID</span>
-  <span class="nt">client_secret</span><span class="p">:</span> <span class="s">&quot;&lt;CLIENT_SECRET&gt;&quot;</span>        <span class="c1"># Salesforce Client Secret</span>
-  <span class="nt">refresh_token</span><span class="p">:</span> <span class="s">&quot;&lt;REFRESH_TOKEN&quot;</span>         <span class="c1"># Salesforce Refresh Token</span>
-  <span class="nt">start_date</span><span class="p">:</span> <span class="s">&quot;2019-01-01T00:00:00Z&quot;</span>      <span class="c1"># Bound on SOQL queries when searching for records</span>
-  <span class="nt">api_type</span><span class="p">:</span> <span class="s">&quot;BULK&quot;</span>                        <span class="c1"># Salesforce API Type: BULK or REST</span>
+<span class="c1"># ------------------------------------------------------------------------------</span><span class="w"></span>
+<span class="c1"># General Properties</span><span class="w"></span>
+<span class="c1"># ------------------------------------------------------------------------------</span><span class="w"></span>
+<span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;salesforce&quot;</span><span class="w">                       </span><span class="c1"># Unique identifier of the tap</span><span class="w"></span>
+<span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Sample</span><span class="nv"> </span><span class="s">data</span><span class="nv"> </span><span class="s">on</span><span class="nv"> </span><span class="s">Salesforce&quot;</span><span class="w">      </span><span class="c1"># Name of the tap</span><span class="w"></span>
+<span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;tap-salesforce&quot;</span><span class="w">                 </span><span class="c1"># !! THIS SHOULD NOT CHANGE !!</span><span class="w"></span>
+<span class="nt">owner</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;somebody@foo.com&quot;</span><span class="w">              </span><span class="c1"># Data owner to contact</span><span class="w"></span>
+<span class="c1">#send_alert: False                     # Optional: Disable all configured alerts on this tap</span><span class="w"></span>
 
 
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="c1"># Destination (Target) - Target properties</span>
-<span class="c1"># Connection details should be in the relevant target YAML file</span>
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="nt">target</span><span class="p">:</span> <span class="s">&quot;snowflake&quot;</span>                       <span class="c1"># ID of the target connector where the data will be loaded</span>
-<span class="nt">batch_size_rows</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">20000</span>                    <span class="c1"># Batch size for the stream to optimise load performance</span>
-<span class="nt">stream_buffer_size</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">0</span>                     <span class="c1"># In-memory buffer size (MB) between taps and targets for asynchronous data pipes</span>
-<span class="nt">default_target_schema</span><span class="p">:</span> <span class="s">&quot;salesforce&quot;</span>       <span class="c1"># Target schema where the data will be loaded</span>
-<span class="nt">default_target_schema_select_permission</span><span class="p">:</span>  <span class="c1"># Optional: Grant SELECT on schema and tables that created</span>
-  <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">grp_power</span>
-<span class="c1">#batch_wait_limit_seconds: 3600           # Optional: Maximum time to wait for `batch_size_rows`. Available only for snowflake target.</span>
+<span class="c1"># ------------------------------------------------------------------------------</span><span class="w"></span>
+<span class="c1"># Source (Tap) - Salesforce connection details</span><span class="w"></span>
+<span class="c1">#</span><span class="w"></span>
+<span class="c1"># The client_id and client_secret keys are your OAuth Salesforce App secrets.</span><span class="w"></span>
+<span class="c1"># The refresh_token is a secret created during the OAuth flow. For more info on</span><span class="w"></span>
+<span class="c1"># the Salesforce OAuth flow, visit the Salesforce documentation at</span><span class="w"></span>
+<span class="c1"># https://developer.salesforce.com/docs/atlas.en-us.api_rest.meta/api_rest/intro_understanding_web_server_oauth_flow.htm</span><span class="w"></span>
+<span class="c1">#</span><span class="w"></span>
+<span class="c1"># api_type to use extracting data from Snowflake. This can be BULK or REST.</span><span class="w"></span>
+<span class="c1"># Further details about API types at https://www.stitchdata.com/docs/integrations/saas/salesforce#bulk-vs-rest-api</span><span class="w"></span>
+<span class="c1"># ------------------------------------------------------------------------------</span><span class="w"></span>
+<span class="nt">db_conn</span><span class="p">:</span><span class="w"></span>
+<span class="w">  </span><span class="nt">client_id</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;ACCESS_TOKEN&gt;&quot;</span><span class="w">             </span><span class="c1"># Salesforce Client ID</span><span class="w"></span>
+<span class="w">  </span><span class="nt">client_secret</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;CLIENT_SECRET&gt;&quot;</span><span class="w">        </span><span class="c1"># Salesforce Client Secret</span><span class="w"></span>
+<span class="w">  </span><span class="nt">refresh_token</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;REFRESH_TOKEN&quot;</span><span class="w">         </span><span class="c1"># Salesforce Refresh Token</span><span class="w"></span>
+<span class="w">  </span><span class="nt">start_date</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;2019-01-01T00:00:00Z&quot;</span><span class="w">      </span><span class="c1"># Bound on SOQL queries when searching for records</span><span class="w"></span>
+<span class="w">  </span><span class="nt">api_type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;BULK&quot;</span><span class="w">                        </span><span class="c1"># Salesforce API Type: BULK or REST</span><span class="w"></span>
 
-<span class="c1"># Options only for Snowflake target</span>
-<span class="c1">#archive_load_files: False                      # Optional: when enabled, the files loaded to Snowflake will also be stored in `archive_load_files_s3_bucket`</span>
-<span class="c1">#archive_load_files_s3_prefix: &quot;archive&quot;        # Optional: When `archive_load_files` is enabled, the archived files will be placed in the archive S3 bucket under this prefix.</span>
-<span class="c1">#archive_load_files_s3_bucket: &quot;&lt;BUCKET_NAME&gt;&quot;  # Optional: When `archive_load_files` is enabled, the archived files will be placed in this bucket. (Default: the value of `s3_bucket` in target snowflake YAML)</span>
+
+<span class="c1"># ------------------------------------------------------------------------------</span><span class="w"></span>
+<span class="c1"># Destination (Target) - Target properties</span><span class="w"></span>
+<span class="c1"># Connection details should be in the relevant target YAML file</span><span class="w"></span>
+<span class="c1"># ------------------------------------------------------------------------------</span><span class="w"></span>
+<span class="nt">target</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;snowflake&quot;</span><span class="w">                       </span><span class="c1"># ID of the target connector where the data will be loaded</span><span class="w"></span>
+<span class="nt">batch_size_rows</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">20000</span><span class="w">                    </span><span class="c1"># Batch size for the stream to optimise load performance</span><span class="w"></span>
+<span class="nt">stream_buffer_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span><span class="w">                     </span><span class="c1"># In-memory buffer size (MB) between taps and targets for asynchronous data pipes</span><span class="w"></span>
+<span class="nt">default_target_schema</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;salesforce&quot;</span><span class="w">       </span><span class="c1"># Target schema where the data will be loaded</span><span class="w"></span>
+<span class="nt">default_target_schema_select_permission</span><span class="p">:</span><span class="w">  </span><span class="c1"># Optional: Grant SELECT on schema and tables that created</span><span class="w"></span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">grp_power</span><span class="w"></span>
+<span class="c1">#batch_wait_limit_seconds: 3600           # Optional: Maximum time to wait for `batch_size_rows`. Available only for snowflake target.</span><span class="w"></span>
+
+<span class="c1"># Options only for Snowflake target</span><span class="w"></span>
+<span class="c1">#archive_load_files: False                      # Optional: when enabled, the files loaded to Snowflake will also be stored in `archive_load_files_s3_bucket`</span><span class="w"></span>
+<span class="c1">#archive_load_files_s3_prefix: &quot;archive&quot;        # Optional: When `archive_load_files` is enabled, the archived files will be placed in the archive S3 bucket under this prefix.</span><span class="w"></span>
+<span class="c1">#archive_load_files_s3_bucket: &quot;&lt;BUCKET_NAME&gt;&quot;  # Optional: When `archive_load_files` is enabled, the archived files will be placed in this bucket. (Default: the value of `s3_bucket` in target snowflake YAML)</span><span class="w"></span>
 
 
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="c1"># Source to target Schema mapping</span>
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="nt">schemas</span><span class="p">:</span>
-  <span class="p p-Indicator">-</span> <span class="nt">source_schema</span><span class="p">:</span> <span class="s">&quot;salesforce&quot;</span>           <span class="c1"># This is mandatory, but can be anything in this tap type</span>
-    <span class="nt">target_schema</span><span class="p">:</span> <span class="s">&quot;salesforce&quot;</span>           <span class="c1"># Target schema in the destination Data Warehouse</span>
+<span class="c1"># ------------------------------------------------------------------------------</span><span class="w"></span>
+<span class="c1"># Source to target Schema mapping</span><span class="w"></span>
+<span class="c1"># ------------------------------------------------------------------------------</span><span class="w"></span>
+<span class="nt">schemas</span><span class="p">:</span><span class="w"></span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">source_schema</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;salesforce&quot;</span><span class="w">           </span><span class="c1"># This is mandatory, but can be anything in this tap type</span><span class="w"></span>
+<span class="w">    </span><span class="nt">target_schema</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;salesforce&quot;</span><span class="w">           </span><span class="c1"># Target schema in the destination Data Warehouse</span><span class="w"></span>
 
-    <span class="c1"># List of Salesforce tables to replicate into destination Data Warehouse</span>
-    <span class="c1"># Tap-Salesforce will use the best incremental strategies automatically to replicate data</span>
-    <span class="c1">#</span>
-    <span class="c1"># Tap-Salesforce currently supports the replication of the majority of Salesforce objects,</span>
-    <span class="c1"># with the exception of those listed in the Unsupported Objects row of this table at</span>
-    <span class="c1"># https://www.stitchdata.com/docs/integrations/saas/salesforce#bulk-vs-rest-api</span>
-    <span class="c1">#</span>
-    <span class="c1">#</span>
-    <span class="c1"># This section will only cover a few of the most popular tables Salesforce integration offers.</span>
-    <span class="c1"># See the Salesforce Object Reference guide for info on objects not listed here, including the</span>
-    <span class="c1"># fields available in each object at https://resources.docs.salesforce.com/sfdc/pdf/object_reference.pdf</span>
-    <span class="nt">tables</span><span class="p">:</span>
-      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;Account&quot;</span>
-      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;Contact&quot;</span>
-      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;Lead&quot;</span>
-      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;Opportunity&quot;</span>
-      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;User&quot;</span>
+<span class="w">    </span><span class="c1"># List of Salesforce tables to replicate into destination Data Warehouse</span><span class="w"></span>
+<span class="w">    </span><span class="c1"># Tap-Salesforce will use the best incremental strategies automatically to replicate data</span><span class="w"></span>
+<span class="w">    </span><span class="c1">#</span><span class="w"></span>
+<span class="w">    </span><span class="c1"># Tap-Salesforce currently supports the replication of the majority of Salesforce objects,</span><span class="w"></span>
+<span class="w">    </span><span class="c1"># with the exception of those listed in the Unsupported Objects row of this table at</span><span class="w"></span>
+<span class="w">    </span><span class="c1"># https://www.stitchdata.com/docs/integrations/saas/salesforce#bulk-vs-rest-api</span><span class="w"></span>
+<span class="w">    </span><span class="c1">#</span><span class="w"></span>
+<span class="w">    </span><span class="c1">#</span><span class="w"></span>
+<span class="w">    </span><span class="c1"># This section will only cover a few of the most popular tables Salesforce integration offers.</span><span class="w"></span>
+<span class="w">    </span><span class="c1"># See the Salesforce Object Reference guide for info on objects not listed here, including the</span><span class="w"></span>
+<span class="w">    </span><span class="c1"># fields available in each object at https://resources.docs.salesforce.com/sfdc/pdf/object_reference.pdf</span><span class="w"></span>
+<span class="w">    </span><span class="nt">tables</span><span class="p">:</span><span class="w"></span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Account&quot;</span><span class="w"></span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Contact&quot;</span><span class="w"></span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Lead&quot;</span><span class="w"></span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Opportunity&quot;</span><span class="w"></span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;User&quot;</span><span class="w"></span>
 
-        <span class="c1"># OPTIONAL: Load time transformations</span>
-        <span class="c1">#transformations:</span>
-        <span class="c1">#  - column: &quot;last_name&quot;            # Column to transform</span>
-        <span class="c1">#    type: &quot;SET-NULL&quot;               # Transformation type</span>
+<span class="w">        </span><span class="c1"># OPTIONAL: Load time transformations</span><span class="w"></span>
+<span class="w">        </span><span class="c1">#transformations:</span><span class="w"></span>
+<span class="w">        </span><span class="c1">#  - column: &quot;last_name&quot;            # Column to transform</span><span class="w"></span>
+<span class="w">        </span><span class="c1">#    type: &quot;SET-NULL&quot;               # Transformation type</span><span class="w"></span>
 </pre></div>
 </div>
 </section>
@@ -242,7 +242,7 @@ following the steps in the <a class="reference internal" href="../../installatio
   <hr/>
 
   <div role="contentinfo">
-    <p>&#169; Copyright 2021, Wise Ltd..</p>
+    <p>&#169; Copyright 2022, Wise Ltd..</p>
   </div>
 
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a

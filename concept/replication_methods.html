@@ -164,12 +164,12 @@ column that exists in a source table.</p>
 <li><p>Repeat.</p></li>
 </ol>
 <p>Let’s use a SQL query as an example:</p>
-<div class="highlight-sql notranslate"><div class="highlight"><pre><span></span><span class="k">SELECT</span> <span class="n">replication_key_column</span><span class="p">,</span>
-      <span class="n">column_you_selected_1</span><span class="p">,</span>
-      <span class="n">column_you_selected_2</span><span class="p">,</span>
-      <span class="p">[...]</span>
-  <span class="k">FROM</span> <span class="k">schema</span><span class="p">.</span><span class="k">table</span>
-<span class="k">WHERE</span> <span class="n">replication_key_column</span> <span class="o">&gt;=</span> <span class="s1">&#39;last_saved_maximum_value&#39;</span>
+<div class="highlight-sql notranslate"><div class="highlight"><pre><span></span><span class="k">SELECT</span><span class="w"> </span><span class="n">replication_key_column</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="n">column_you_selected_1</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="n">column_you_selected_2</span><span class="p">,</span><span class="w"></span>
+<span class="w">      </span><span class="p">[...]</span><span class="w"></span>
+<span class="w">  </span><span class="k">FROM</span><span class="w"> </span><span class="k">schema</span><span class="p">.</span><span class="k">table</span><span class="w"></span>
+<span class="k">WHERE</span><span class="w"> </span><span class="n">replication_key_column</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="s1">&#39;last_saved_maximum_value&#39;</span><span class="w"></span>
 </pre></div>
 </div>
 <p>If <a class="reference internal" href="#log-based"><span class="std std-ref">Log Based</span></a> Replication isn’t feasible or available for a data source, Key-based Incremental Replication
@@ -215,7 +215,7 @@ Check <a class="reference internal" href="#fast-sync"><span class="std std-ref">
   <hr/>
 
   <div role="contentinfo">
-    <p>&#169; Copyright 2021, Wise Ltd..</p>
+    <p>&#169; Copyright 2022, Wise Ltd..</p>
   </div>
 
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a

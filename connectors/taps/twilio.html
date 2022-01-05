@@ -140,92 +140,92 @@
 A sample YAML for Twilio replication can be generated into a project directory by
 following the steps in the <a class="reference internal" href="../../installation_guide/creating_pipelines.html#generating-pipelines"><span class="std std-ref">Generating Sample Pipelines</span></a> section.</p>
 <p>Example YAML for tap-twilio:</p>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nn">---</span>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nn">---</span><span class="w"></span>
 
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="c1"># General Properties</span>
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="nt">id</span><span class="p">:</span> <span class="s">&quot;twilio&quot;</span>                           <span class="c1"># Unique identifier of the tap</span>
-<span class="nt">name</span><span class="p">:</span> <span class="s">&quot;Twilio&quot;</span>                         <span class="c1"># Name of the tap</span>
-<span class="nt">type</span><span class="p">:</span> <span class="s">&quot;tap-twilio&quot;</span>                     <span class="c1"># !! THIS SHOULD NOT CHANGE !!</span>
-<span class="nt">owner</span><span class="p">:</span> <span class="s">&quot;somebody@foo.com&quot;</span>              <span class="c1"># Data owner to contact</span>
-<span class="c1">#send_alert: False                     # Optional: Disable all configured alerts on this tap</span>
-
-
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="c1"># Source (Tap) - Twilio connection details</span>
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="nt">db_conn</span><span class="p">:</span>
-  <span class="nt">account_sid</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">&lt;TWILIO_ACCOUNT_SID&gt;</span>         <span class="c1"># Twilio Account SID</span>
-  <span class="nt">auth_token</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">&lt;TWILIO_AUTH_TOKEN&gt;</span>           <span class="c1"># Twilio Auth token</span>
-  <span class="nt">start_date</span><span class="p">:</span> <span class="s">&quot;2021-02-01T00:00:00Z&quot;</span>        <span class="c1"># The default value to use if no bookmark exists for an endpoint. ISO-8601 datetime formatted string</span>
-  <span class="nt">user_agent</span><span class="p">:</span> <span class="s">&quot;someone@transferwise.com&quot;</span>    <span class="c1"># Optional: Process and email for API logging purposes.</span>
+<span class="c1"># ------------------------------------------------------------------------------</span><span class="w"></span>
+<span class="c1"># General Properties</span><span class="w"></span>
+<span class="c1"># ------------------------------------------------------------------------------</span><span class="w"></span>
+<span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;twilio&quot;</span><span class="w">                           </span><span class="c1"># Unique identifier of the tap</span><span class="w"></span>
+<span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Twilio&quot;</span><span class="w">                         </span><span class="c1"># Name of the tap</span><span class="w"></span>
+<span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;tap-twilio&quot;</span><span class="w">                     </span><span class="c1"># !! THIS SHOULD NOT CHANGE !!</span><span class="w"></span>
+<span class="nt">owner</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;somebody@foo.com&quot;</span><span class="w">              </span><span class="c1"># Data owner to contact</span><span class="w"></span>
+<span class="c1">#send_alert: False                     # Optional: Disable all configured alerts on this tap</span><span class="w"></span>
 
 
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="c1"># Destination (Target) - Target properties</span>
-<span class="c1"># Connection details should be in the relevant target YAML file</span>
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="nt">target</span><span class="p">:</span> <span class="s">&quot;snowflake&quot;</span>                        <span class="c1"># ID of the target connector where the data will be loaded</span>
-<span class="nt">batch_size_rows</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">20000</span>                     <span class="c1"># Batch size for the stream to optimise load performance</span>
-<span class="nt">stream_buffer_size</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">0</span>                      <span class="c1"># In-memory buffer size (MB) between taps and targets for asynchronous data pipes</span>
-<span class="nt">default_target_schema</span><span class="p">:</span> <span class="s">&quot;twilio&quot;</span>            <span class="c1"># Target schema where the data will be loaded</span>
-<span class="c1">#default_target_schema_select_permission:  # Optional: Grant SELECT on schema and tables that created</span>
-<span class="c1">#  - grp_power</span>
-<span class="c1">#batch_wait_limit_seconds: 3600            # Optional: Maximum time to wait for `batch_size_rows`. Available only for snowflake target.</span>
-
-<span class="c1"># Options only for Snowflake target</span>
-<span class="c1">#archive_load_files: False                      # Optional: when enabled, the files loaded to Snowflake will also be stored in `archive_load_files_s3_bucket`</span>
-<span class="c1">#archive_load_files_s3_prefix: &quot;archive&quot;        # Optional: When `archive_load_files` is enabled, the archived files will be placed in the archive S3 bucket under this prefix.</span>
-<span class="c1">#archive_load_files_s3_bucket: &quot;&lt;BUCKET_NAME&gt;&quot;  # Optional: When `archive_load_files` is enabled, the archived files will be placed in this bucket. (Default: the value of `s3_bucket` in target snowflake YAML)</span>
+<span class="c1"># ------------------------------------------------------------------------------</span><span class="w"></span>
+<span class="c1"># Source (Tap) - Twilio connection details</span><span class="w"></span>
+<span class="c1"># ------------------------------------------------------------------------------</span><span class="w"></span>
+<span class="nt">db_conn</span><span class="p">:</span><span class="w"></span>
+<span class="w">  </span><span class="nt">account_sid</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">&lt;TWILIO_ACCOUNT_SID&gt;</span><span class="w">         </span><span class="c1"># Twilio Account SID</span><span class="w"></span>
+<span class="w">  </span><span class="nt">auth_token</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">&lt;TWILIO_AUTH_TOKEN&gt;</span><span class="w">           </span><span class="c1"># Twilio Auth token</span><span class="w"></span>
+<span class="w">  </span><span class="nt">start_date</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;2021-02-01T00:00:00Z&quot;</span><span class="w">        </span><span class="c1"># The default value to use if no bookmark exists for an endpoint. ISO-8601 datetime formatted string</span><span class="w"></span>
+<span class="w">  </span><span class="nt">user_agent</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;someone@transferwise.com&quot;</span><span class="w">    </span><span class="c1"># Optional: Process and email for API logging purposes.</span><span class="w"></span>
 
 
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="c1"># Source to target Schema mapping</span>
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="nt">schemas</span><span class="p">:</span>
+<span class="c1"># ------------------------------------------------------------------------------</span><span class="w"></span>
+<span class="c1"># Destination (Target) - Target properties</span><span class="w"></span>
+<span class="c1"># Connection details should be in the relevant target YAML file</span><span class="w"></span>
+<span class="c1"># ------------------------------------------------------------------------------</span><span class="w"></span>
+<span class="nt">target</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;snowflake&quot;</span><span class="w">                        </span><span class="c1"># ID of the target connector where the data will be loaded</span><span class="w"></span>
+<span class="nt">batch_size_rows</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">20000</span><span class="w">                     </span><span class="c1"># Batch size for the stream to optimise load performance</span><span class="w"></span>
+<span class="nt">stream_buffer_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span><span class="w">                      </span><span class="c1"># In-memory buffer size (MB) between taps and targets for asynchronous data pipes</span><span class="w"></span>
+<span class="nt">default_target_schema</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;twilio&quot;</span><span class="w">            </span><span class="c1"># Target schema where the data will be loaded</span><span class="w"></span>
+<span class="c1">#default_target_schema_select_permission:  # Optional: Grant SELECT on schema and tables that created</span><span class="w"></span>
+<span class="c1">#  - grp_power</span><span class="w"></span>
+<span class="c1">#batch_wait_limit_seconds: 3600            # Optional: Maximum time to wait for `batch_size_rows`. Available only for snowflake target.</span><span class="w"></span>
 
-  <span class="p p-Indicator">-</span> <span class="nt">source_schema</span><span class="p">:</span> <span class="s">&quot;twilio&quot;</span>             <span class="c1"># This is mandatory, but can be anything in this tap type</span>
-    <span class="nt">target_schema</span><span class="p">:</span> <span class="s">&quot;twilio&quot;</span>             <span class="c1"># Target schema in the destination Data Warehouse</span>
-    <span class="nt">target_schema_select_permissions</span><span class="p">:</span>   <span class="c1"># Optional: Grant SELECT on schema and tables that created</span>
-      <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">grp_stats</span>
-
-    <span class="c1"># List of Twilio tables to load into destination Data Warehouse</span>
-    <span class="c1"># Tap-Twilio will use the best incremental strategies automatically to replicate data</span>
-    <span class="nt">tables</span><span class="p">:</span>
-      <span class="c1"># Incrementally loaded tables</span>
-      <span class="c1"># TaskRouter resources</span>
-      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;workspaces&quot;</span>
-      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;activities&quot;</span>
-      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;events&quot;</span>
-      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;tasks&quot;</span>
-      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;task_channels&quot;</span>
-      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;task_queues&quot;</span>
-      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;workers&quot;</span>
-      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;workflows&quot;</span>
-      <span class="c1"># Programmable Chat resources</span>
-      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;services&quot;</span>
-      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;roles&quot;</span>
-      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;chat_channels&quot;</span>
-      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;users&quot;</span>
+<span class="c1"># Options only for Snowflake target</span><span class="w"></span>
+<span class="c1">#archive_load_files: False                      # Optional: when enabled, the files loaded to Snowflake will also be stored in `archive_load_files_s3_bucket`</span><span class="w"></span>
+<span class="c1">#archive_load_files_s3_prefix: &quot;archive&quot;        # Optional: When `archive_load_files` is enabled, the archived files will be placed in the archive S3 bucket under this prefix.</span><span class="w"></span>
+<span class="c1">#archive_load_files_s3_bucket: &quot;&lt;BUCKET_NAME&gt;&quot;  # Optional: When `archive_load_files` is enabled, the archived files will be placed in this bucket. (Default: the value of `s3_bucket` in target snowflake YAML)</span><span class="w"></span>
 
 
-      <span class="c1"># Tables that cannot load incrementally and will use FULL_TABLE method</span>
-      <span class="c1"># TaskRouter resources</span>
-      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;cumulative_statistics&quot;</span>
-      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;channels&quot;</span>
+<span class="c1"># ------------------------------------------------------------------------------</span><span class="w"></span>
+<span class="c1"># Source to target Schema mapping</span><span class="w"></span>
+<span class="c1"># ------------------------------------------------------------------------------</span><span class="w"></span>
+<span class="nt">schemas</span><span class="p">:</span><span class="w"></span>
 
-      <span class="c1"># Programmable Chat resources</span>
-      <span class="c1"># These 2 resources are using FULL_TABLE method and can pull huge amount of data from the twilio api at every sync.</span>
-      <span class="c1"># Please use it with caution.</span>
-      <span class="c1">#- table_name: &quot;members&quot;</span>
-      <span class="c1">#- table_name: &quot;chat_messages&quot;</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">source_schema</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;twilio&quot;</span><span class="w">             </span><span class="c1"># This is mandatory, but can be anything in this tap type</span><span class="w"></span>
+<span class="w">    </span><span class="nt">target_schema</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;twilio&quot;</span><span class="w">             </span><span class="c1"># Target schema in the destination Data Warehouse</span><span class="w"></span>
+<span class="w">    </span><span class="nt">target_schema_select_permissions</span><span class="p">:</span><span class="w">   </span><span class="c1"># Optional: Grant SELECT on schema and tables that created</span><span class="w"></span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">grp_stats</span><span class="w"></span>
+
+<span class="w">    </span><span class="c1"># List of Twilio tables to load into destination Data Warehouse</span><span class="w"></span>
+<span class="w">    </span><span class="c1"># Tap-Twilio will use the best incremental strategies automatically to replicate data</span><span class="w"></span>
+<span class="w">    </span><span class="nt">tables</span><span class="p">:</span><span class="w"></span>
+<span class="w">      </span><span class="c1"># Incrementally loaded tables</span><span class="w"></span>
+<span class="w">      </span><span class="c1"># TaskRouter resources</span><span class="w"></span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;workspaces&quot;</span><span class="w"></span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;activities&quot;</span><span class="w"></span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;events&quot;</span><span class="w"></span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;tasks&quot;</span><span class="w"></span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;task_channels&quot;</span><span class="w"></span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;task_queues&quot;</span><span class="w"></span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;workers&quot;</span><span class="w"></span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;workflows&quot;</span><span class="w"></span>
+<span class="w">      </span><span class="c1"># Programmable Chat resources</span><span class="w"></span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;services&quot;</span><span class="w"></span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;roles&quot;</span><span class="w"></span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;chat_channels&quot;</span><span class="w"></span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;users&quot;</span><span class="w"></span>
 
 
-        <span class="c1"># OPTIONAL: Load time transformations - you can add it to any table</span>
-        <span class="c1">#transformations:</span>
-        <span class="c1">#  - column: &quot;some_column_to_transform&quot; # Column to transform</span>
-        <span class="c1">#    type: &quot;SET-NULL&quot;                   # Transformation type</span>
+<span class="w">      </span><span class="c1"># Tables that cannot load incrementally and will use FULL_TABLE method</span><span class="w"></span>
+<span class="w">      </span><span class="c1"># TaskRouter resources</span><span class="w"></span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;cumulative_statistics&quot;</span><span class="w"></span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;channels&quot;</span><span class="w"></span>
+
+<span class="w">      </span><span class="c1"># Programmable Chat resources</span><span class="w"></span>
+<span class="w">      </span><span class="c1"># These 2 resources are using FULL_TABLE method and can pull huge amount of data from the twilio api at every sync.</span><span class="w"></span>
+<span class="w">      </span><span class="c1"># Please use it with caution.</span><span class="w"></span>
+<span class="w">      </span><span class="c1">#- table_name: &quot;members&quot;</span><span class="w"></span>
+<span class="w">      </span><span class="c1">#- table_name: &quot;chat_messages&quot;</span><span class="w"></span>
+
+
+<span class="w">        </span><span class="c1"># OPTIONAL: Load time transformations - you can add it to any table</span><span class="w"></span>
+<span class="w">        </span><span class="c1">#transformations:</span><span class="w"></span>
+<span class="w">        </span><span class="c1">#  - column: &quot;some_column_to_transform&quot; # Column to transform</span><span class="w"></span>
+<span class="w">        </span><span class="c1">#    type: &quot;SET-NULL&quot;                   # Transformation type</span><span class="w"></span>
 </pre></div>
 </div>
 </section>
@@ -242,7 +242,7 @@ following the steps in the <a class="reference internal" href="../../installatio
   <hr/>
 
   <div role="contentinfo">
-    <p>&#169; Copyright 2021, Wise Ltd..</p>
+    <p>&#169; Copyright 2022, Wise Ltd..</p>
   </div>
 
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a

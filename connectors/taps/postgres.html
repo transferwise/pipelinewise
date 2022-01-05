@@ -217,96 +217,96 @@ database.</p>
 A sample YAML for Postgres replication can be generated into a project directory by
 following the steps in the <a class="reference internal" href="../../installation_guide/creating_pipelines.html#generating-pipelines"><span class="std std-ref">Generating Sample Pipelines</span></a> section.</p>
 <p>Example YAML for <code class="docutils literal notranslate"><span class="pre">tap-postgres</span></code>:</p>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nn">---</span>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nn">---</span><span class="w"></span>
 
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="c1"># General Properties</span>
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="nt">id</span><span class="p">:</span> <span class="s">&quot;postgres_sample&quot;</span>                  <span class="c1"># Unique identifier of the tap</span>
-<span class="nt">name</span><span class="p">:</span> <span class="s">&quot;Sample</span><span class="nv"> </span><span class="s">Postgres</span><span class="nv"> </span><span class="s">Database&quot;</span>       <span class="c1"># Name of the tap</span>
-<span class="nt">type</span><span class="p">:</span> <span class="s">&quot;tap-postgres&quot;</span>                   <span class="c1"># !! THIS SHOULD NOT CHANGE !!</span>
-<span class="nt">owner</span><span class="p">:</span> <span class="s">&quot;somebody@foo.com&quot;</span>              <span class="c1"># Data owner to contact</span>
-<span class="c1">#send_alert: False                     # Optional: Disable all configured alerts on this tap</span>
-
-
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="c1"># Source (Tap) - PostgreSQL connection details</span>
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="nt">db_conn</span><span class="p">:</span>
-  <span class="nt">host</span><span class="p">:</span> <span class="s">&quot;&lt;HOST&gt;&quot;</span>                       <span class="c1"># PostgreSQL host</span>
-  <span class="nt">port</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">5432</span>                           <span class="c1"># PostgreSQL port</span>
-  <span class="nt">user</span><span class="p">:</span> <span class="s">&quot;&lt;USER&gt;&quot;</span>                       <span class="c1"># PostfreSQL user</span>
-  <span class="nt">password</span><span class="p">:</span> <span class="s">&quot;&lt;PASSWORD&gt;&quot;</span>               <span class="c1"># Plain string or vault encrypted</span>
-  <span class="nt">dbname</span><span class="p">:</span> <span class="s">&quot;&lt;DB_NAME&gt;&quot;</span>                  <span class="c1"># PostgreSQL database name</span>
-  <span class="c1">#filter_schemas: &quot;schema1,schema2&quot;   # Optional: Scan only the required schemas</span>
-                                       <span class="c1">#           to improve the performance of</span>
-                                       <span class="c1">#           data extraction</span>
-  <span class="c1">#max_run_seconds                     # Optional: Stop running the tap after certain</span>
-                                       <span class="c1">#           number of seconds</span>
-                                       <span class="c1">#           Default: 43200</span>
-  <span class="c1">#logical_poll_total_seconds:         # Optional: Stop running the tap when no data</span>
-                                       <span class="c1">#           received from wal after certain number of seconds</span>
-                                       <span class="c1">#           Default: 10800</span>
-  <span class="c1">#break_at_end_lsn:                   # Optional: Stop running the tap if the newly received lsn</span>
-                                       <span class="c1">#           is after the max lsn that was detected when the tap started</span>
-                                       <span class="c1">#           Default: true</span>
-  <span class="c1">#ssl: &quot;true&quot;                         # Optional: Using SSL via postgres sslmode &#39;require&#39; option.</span>
-                                       <span class="c1">#           If the server does not accept SSL connections or the client</span>
-                                       <span class="c1">#           certificate is not recognized the connection will fail</span>
-  <span class="nt">fastsync_parallelism</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">&lt;int&gt;</span>          <span class="c1"># Optional: size of multiprocessing pool used by FastSync</span>
-                                       <span class="c1">#           Min: 1</span>
-                                       <span class="c1">#           Default: number of CPU cores</span>
-
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="c1"># Destination (Target) - Target properties</span>
-<span class="c1"># Connection details should be in the relevant target YAML file</span>
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="nt">target</span><span class="p">:</span> <span class="s">&quot;snowflake&quot;</span>                    <span class="c1"># ID of the target connector where the data will be loaded</span>
-<span class="nt">batch_size_rows</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">20000</span>                 <span class="c1"># Batch size for the stream to optimise load performance</span>
-<span class="nt">stream_buffer_size</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">0</span>                  <span class="c1"># In-memory buffer size (MB) between taps and targets for asynchronous data pipes</span>
-<span class="c1">#batch_wait_limit_seconds: 3600        # Optional: Maximum time to wait for `batch_size_rows`. Available only for snowflake target.</span>
-
-<span class="c1"># Options only for Snowflake target</span>
-<span class="c1">#split_large_files: False                       # Optional: split large files to multiple pieces and create multipart zip files. (Default: False)</span>
-<span class="c1">#split_file_chunk_size_mb: 1000                 # Optional: File chunk sizes if `split_large_files` enabled. (Default: 1000)</span>
-<span class="c1">#split_file_max_chunks: 20                      # Optional: Max number of chunks if `split_large_files` enabled. (Default: 20)</span>
-<span class="c1">#archive_load_files: False                      # Optional: when enabled, the files loaded to Snowflake will also be stored in `archive_load_files_s3_bucket`</span>
-<span class="c1">#archive_load_files_s3_prefix: &quot;archive&quot;        # Optional: When `archive_load_files` is enabled, the archived files will be placed in the archive S3 bucket under this prefix.</span>
-<span class="c1">#archive_load_files_s3_bucket: &quot;&lt;BUCKET_NAME&gt;&quot;  # Optional: When `archive_load_files` is enabled, the archived files will be placed in this bucket. (Default: the value of `s3_bucket` in target snowflake YAML)</span>
+<span class="c1"># ------------------------------------------------------------------------------</span><span class="w"></span>
+<span class="c1"># General Properties</span><span class="w"></span>
+<span class="c1"># ------------------------------------------------------------------------------</span><span class="w"></span>
+<span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;postgres_sample&quot;</span><span class="w">                  </span><span class="c1"># Unique identifier of the tap</span><span class="w"></span>
+<span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Sample</span><span class="nv"> </span><span class="s">Postgres</span><span class="nv"> </span><span class="s">Database&quot;</span><span class="w">       </span><span class="c1"># Name of the tap</span><span class="w"></span>
+<span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;tap-postgres&quot;</span><span class="w">                   </span><span class="c1"># !! THIS SHOULD NOT CHANGE !!</span><span class="w"></span>
+<span class="nt">owner</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;somebody@foo.com&quot;</span><span class="w">              </span><span class="c1"># Data owner to contact</span><span class="w"></span>
+<span class="c1">#send_alert: False                     # Optional: Disable all configured alerts on this tap</span><span class="w"></span>
 
 
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="c1"># Source to target Schema mapping</span>
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="nt">schemas</span><span class="p">:</span>
+<span class="c1"># ------------------------------------------------------------------------------</span><span class="w"></span>
+<span class="c1"># Source (Tap) - PostgreSQL connection details</span><span class="w"></span>
+<span class="c1"># ------------------------------------------------------------------------------</span><span class="w"></span>
+<span class="nt">db_conn</span><span class="p">:</span><span class="w"></span>
+<span class="w">  </span><span class="nt">host</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;HOST&gt;&quot;</span><span class="w">                       </span><span class="c1"># PostgreSQL host</span><span class="w"></span>
+<span class="w">  </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5432</span><span class="w">                           </span><span class="c1"># PostgreSQL port</span><span class="w"></span>
+<span class="w">  </span><span class="nt">user</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;USER&gt;&quot;</span><span class="w">                       </span><span class="c1"># PostfreSQL user</span><span class="w"></span>
+<span class="w">  </span><span class="nt">password</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;PASSWORD&gt;&quot;</span><span class="w">               </span><span class="c1"># Plain string or vault encrypted</span><span class="w"></span>
+<span class="w">  </span><span class="nt">dbname</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;DB_NAME&gt;&quot;</span><span class="w">                  </span><span class="c1"># PostgreSQL database name</span><span class="w"></span>
+<span class="w">  </span><span class="c1">#filter_schemas: &quot;schema1,schema2&quot;   # Optional: Scan only the required schemas</span><span class="w"></span>
+<span class="w">                                       </span><span class="c1">#           to improve the performance of</span><span class="w"></span>
+<span class="w">                                       </span><span class="c1">#           data extraction</span><span class="w"></span>
+<span class="w">  </span><span class="c1">#max_run_seconds                     # Optional: Stop running the tap after certain</span><span class="w"></span>
+<span class="w">                                       </span><span class="c1">#           number of seconds</span><span class="w"></span>
+<span class="w">                                       </span><span class="c1">#           Default: 43200</span><span class="w"></span>
+<span class="w">  </span><span class="c1">#logical_poll_total_seconds:         # Optional: Stop running the tap when no data</span><span class="w"></span>
+<span class="w">                                       </span><span class="c1">#           received from wal after certain number of seconds</span><span class="w"></span>
+<span class="w">                                       </span><span class="c1">#           Default: 10800</span><span class="w"></span>
+<span class="w">  </span><span class="c1">#break_at_end_lsn:                   # Optional: Stop running the tap if the newly received lsn</span><span class="w"></span>
+<span class="w">                                       </span><span class="c1">#           is after the max lsn that was detected when the tap started</span><span class="w"></span>
+<span class="w">                                       </span><span class="c1">#           Default: true</span><span class="w"></span>
+<span class="w">  </span><span class="c1">#ssl: &quot;true&quot;                         # Optional: Using SSL via postgres sslmode &#39;require&#39; option.</span><span class="w"></span>
+<span class="w">                                       </span><span class="c1">#           If the server does not accept SSL connections or the client</span><span class="w"></span>
+<span class="w">                                       </span><span class="c1">#           certificate is not recognized the connection will fail</span><span class="w"></span>
+<span class="w">  </span><span class="nt">fastsync_parallelism</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">&lt;int&gt;</span><span class="w">          </span><span class="c1"># Optional: size of multiprocessing pool used by FastSync</span><span class="w"></span>
+<span class="w">                                       </span><span class="c1">#           Min: 1</span><span class="w"></span>
+<span class="w">                                       </span><span class="c1">#           Default: number of CPU cores</span><span class="w"></span>
 
-  <span class="p p-Indicator">-</span> <span class="nt">source_schema</span><span class="p">:</span> <span class="s">&quot;public&quot;</span>            <span class="c1"># Source schema in postgres with tables</span>
-    <span class="nt">target_schema</span><span class="p">:</span> <span class="s">&quot;repl_pg_public&quot;</span>    <span class="c1"># Target schema in the destination Data Warehouse</span>
-    <span class="nt">target_schema_select_permissions</span><span class="p">:</span>  <span class="c1"># Optional: Grant SELECT on schema and tables that created</span>
-      <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">grp_stats</span>
+<span class="c1"># ------------------------------------------------------------------------------</span><span class="w"></span>
+<span class="c1"># Destination (Target) - Target properties</span><span class="w"></span>
+<span class="c1"># Connection details should be in the relevant target YAML file</span><span class="w"></span>
+<span class="c1"># ------------------------------------------------------------------------------</span><span class="w"></span>
+<span class="nt">target</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;snowflake&quot;</span><span class="w">                    </span><span class="c1"># ID of the target connector where the data will be loaded</span><span class="w"></span>
+<span class="nt">batch_size_rows</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">20000</span><span class="w">                 </span><span class="c1"># Batch size for the stream to optimise load performance</span><span class="w"></span>
+<span class="nt">stream_buffer_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span><span class="w">                  </span><span class="c1"># In-memory buffer size (MB) between taps and targets for asynchronous data pipes</span><span class="w"></span>
+<span class="c1">#batch_wait_limit_seconds: 3600        # Optional: Maximum time to wait for `batch_size_rows`. Available only for snowflake target.</span><span class="w"></span>
 
-    <span class="c1"># List of tables to replicate from Postgres to destination Data Warehouse</span>
-    <span class="c1">#</span>
-    <span class="c1"># Please check the Replication Strategies section in the documentation to understand the differences.</span>
-    <span class="c1"># For LOG_BASED replication method you might need to adjust the source mysql/ mariadb configuration.</span>
-    <span class="nt">tables</span><span class="p">:</span>
-      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;table_one&quot;</span>
-        <span class="nt">replication_method</span><span class="p">:</span> <span class="s">&quot;INCREMENTAL&quot;</span>   <span class="c1"># One of INCREMENTAL, LOG_BASED and FULL_TABLE</span>
-        <span class="nt">replication_key</span><span class="p">:</span> <span class="s">&quot;last_update&quot;</span>      <span class="c1"># Important: Incremental load always needs replication key</span>
+<span class="c1"># Options only for Snowflake target</span><span class="w"></span>
+<span class="c1">#split_large_files: False                       # Optional: split large files to multiple pieces and create multipart zip files. (Default: False)</span><span class="w"></span>
+<span class="c1">#split_file_chunk_size_mb: 1000                 # Optional: File chunk sizes if `split_large_files` enabled. (Default: 1000)</span><span class="w"></span>
+<span class="c1">#split_file_max_chunks: 20                      # Optional: Max number of chunks if `split_large_files` enabled. (Default: 20)</span><span class="w"></span>
+<span class="c1">#archive_load_files: False                      # Optional: when enabled, the files loaded to Snowflake will also be stored in `archive_load_files_s3_bucket`</span><span class="w"></span>
+<span class="c1">#archive_load_files_s3_prefix: &quot;archive&quot;        # Optional: When `archive_load_files` is enabled, the archived files will be placed in the archive S3 bucket under this prefix.</span><span class="w"></span>
+<span class="c1">#archive_load_files_s3_bucket: &quot;&lt;BUCKET_NAME&gt;&quot;  # Optional: When `archive_load_files` is enabled, the archived files will be placed in this bucket. (Default: the value of `s3_bucket` in target snowflake YAML)</span><span class="w"></span>
 
-        <span class="c1"># OPTIONAL: Load time transformations</span>
-        <span class="c1">#transformations:</span>
-        <span class="c1">#  - column: &quot;last_name&quot;            # Column to transform</span>
-        <span class="c1">#    type: &quot;SET-NULL&quot;               # Transformation type</span>
 
-      <span class="c1"># You can add as many tables as you need...</span>
-      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;table_two&quot;</span>
-        <span class="nt">replication_method</span><span class="p">:</span> <span class="s">&quot;LOG_BASED&quot;</span>     <span class="c1"># Important! Log based must be enabled in MySQL</span>
+<span class="c1"># ------------------------------------------------------------------------------</span><span class="w"></span>
+<span class="c1"># Source to target Schema mapping</span><span class="w"></span>
+<span class="c1"># ------------------------------------------------------------------------------</span><span class="w"></span>
+<span class="nt">schemas</span><span class="p">:</span><span class="w"></span>
 
-  <span class="c1"># You can add as many schemas as you need...</span>
-  <span class="c1"># Uncomment this if you want replicate tables from multiple schemas</span>
-  <span class="c1">#- source_schema: &quot;another_schema_in_postgres&quot;</span>
-  <span class="c1">#  target_schema: &quot;another</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">source_schema</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;public&quot;</span><span class="w">            </span><span class="c1"># Source schema in postgres with tables</span><span class="w"></span>
+<span class="w">    </span><span class="nt">target_schema</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;repl_pg_public&quot;</span><span class="w">    </span><span class="c1"># Target schema in the destination Data Warehouse</span><span class="w"></span>
+<span class="w">    </span><span class="nt">target_schema_select_permissions</span><span class="p">:</span><span class="w">  </span><span class="c1"># Optional: Grant SELECT on schema and tables that created</span><span class="w"></span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">grp_stats</span><span class="w"></span>
+
+<span class="w">    </span><span class="c1"># List of tables to replicate from Postgres to destination Data Warehouse</span><span class="w"></span>
+<span class="w">    </span><span class="c1">#</span><span class="w"></span>
+<span class="w">    </span><span class="c1"># Please check the Replication Strategies section in the documentation to understand the differences.</span><span class="w"></span>
+<span class="w">    </span><span class="c1"># For LOG_BASED replication method you might need to adjust the source mysql/ mariadb configuration.</span><span class="w"></span>
+<span class="w">    </span><span class="nt">tables</span><span class="p">:</span><span class="w"></span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;table_one&quot;</span><span class="w"></span>
+<span class="w">        </span><span class="nt">replication_method</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;INCREMENTAL&quot;</span><span class="w">   </span><span class="c1"># One of INCREMENTAL, LOG_BASED and FULL_TABLE</span><span class="w"></span>
+<span class="w">        </span><span class="nt">replication_key</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;last_update&quot;</span><span class="w">      </span><span class="c1"># Important: Incremental load always needs replication key</span><span class="w"></span>
+
+<span class="w">        </span><span class="c1"># OPTIONAL: Load time transformations</span><span class="w"></span>
+<span class="w">        </span><span class="c1">#transformations:</span><span class="w"></span>
+<span class="w">        </span><span class="c1">#  - column: &quot;last_name&quot;            # Column to transform</span><span class="w"></span>
+<span class="w">        </span><span class="c1">#    type: &quot;SET-NULL&quot;               # Transformation type</span><span class="w"></span>
+
+<span class="w">      </span><span class="c1"># You can add as many tables as you need...</span><span class="w"></span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;table_two&quot;</span><span class="w"></span>
+<span class="w">        </span><span class="nt">replication_method</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;LOG_BASED&quot;</span><span class="w">     </span><span class="c1"># Important! Log based must be enabled in MySQL</span><span class="w"></span>
+
+<span class="w">  </span><span class="c1"># You can add as many schemas as you need...</span><span class="w"></span>
+<span class="w">  </span><span class="c1"># Uncomment this if you want replicate tables from multiple schemas</span><span class="w"></span>
+<span class="w">  </span><span class="c1">#- source_schema: &quot;another_schema_in_postgres&quot;</span><span class="w"></span>
+<span class="w">  </span><span class="c1">#  target_schema: &quot;another</span><span class="w"></span>
 </pre></div>
 </div>
 </section>
@@ -323,7 +323,7 @@ following the steps in the <a class="reference internal" href="../../installatio
   <hr/>
 
   <div role="contentinfo">
-    <p>&#169; Copyright 2021, Wise Ltd..</p>
+    <p>&#169; Copyright 2022, Wise Ltd..</p>
   </div>
 
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a

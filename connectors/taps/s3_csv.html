@@ -164,92 +164,92 @@ PipelineWise will resort to use the IAM role attached to the host.</p></li>
 A sample YAML for S3 CSV replication can be generated into a project directory by
 following the steps in the <a class="reference internal" href="../../installation_guide/creating_pipelines.html#generating-pipelines"><span class="std std-ref">Generating Sample Pipelines</span></a> section.</p>
 <p>Example YAML for <code class="docutils literal notranslate"><span class="pre">tap-s3-csv</span></code>:</p>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nn">---</span>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nn">---</span><span class="w"></span>
 
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="c1"># General Properties</span>
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="nt">id</span><span class="p">:</span> <span class="s">&quot;csv_on_s3&quot;</span>                        <span class="c1"># Unique identifier of the tap</span>
-<span class="nt">name</span><span class="p">:</span> <span class="s">&quot;Sample</span><span class="nv"> </span><span class="s">CSV</span><span class="nv"> </span><span class="s">files</span><span class="nv"> </span><span class="s">on</span><span class="nv"> </span><span class="s">S3&quot;</span>          <span class="c1"># Name of the tap</span>
-<span class="nt">type</span><span class="p">:</span> <span class="s">&quot;tap-s3-csv&quot;</span>                     <span class="c1"># !! THIS SHOULD NOT CHANGE !!</span>
-<span class="nt">owner</span><span class="p">:</span> <span class="s">&quot;somebody@foo.com&quot;</span>              <span class="c1"># Data owner to contact</span>
-<span class="c1">#send_alert: False                     # Optional: Disable all configured alerts on this tap</span>
-
-
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="c1"># Source (Tap) - S3 connection details</span>
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="nt">db_conn</span><span class="p">:</span>
-
-  <span class="c1"># Profile based authentication</span>
-  <span class="nt">aws_profile</span><span class="p">:</span> <span class="s">&quot;&lt;AWS_PROFILE&gt;&quot;</span>                  <span class="c1"># AWS profile name, if not provided, the AWS_PROFILE environment</span>
-                                                <span class="c1"># variable or the &#39;default&#39; profile will be used, if not</span>
-                                                <span class="c1"># available, then IAM role attached to the host will be used.</span>
-
-  <span class="c1"># Credentials based authentication</span>
-  <span class="c1">#aws_access_key_id: &quot;&lt;ACCESS_KEY&gt;&quot;            # Plain string or vault encrypted. Required for non-profile based auth. If not provided, AWS_ACCESS_KEY_ID environment variable will be used.</span>
-  <span class="c1">#aws_secret_access_key: &quot;&lt;SECRET_ACCESS_KEY&quot;  # Plain string or vault encrypted. Required for non-profile based auth. If not provided, AWS_SECRET_ACCESS_KEY environment variable will be used.</span>
-  <span class="c1">#aws_session_token: &quot;&lt;AWS_SESSION_TOKEN&gt;&quot;     # Optional: Plain string or vault encrypted. If not provided, AWS_SESSION_TOKEN environment variable will be used.</span>
-
-  <span class="c1">#aws_endpoint_url: &quot;&lt;FULL_ENDPOINT_URL&gt;&quot;      # Optional: for non AWS S3, for example https://nyc3.digitaloceanspaces.com</span>
-
-  <span class="nt">bucket</span><span class="p">:</span> <span class="s">&quot;my-bucket&quot;</span>                           <span class="c1"># S3 Bucket name</span>
-  <span class="nt">start_date</span><span class="p">:</span> <span class="s">&quot;2000-01-01&quot;</span>                      <span class="c1"># File before this data will be excluded</span>
-  <span class="nt">fastsync_parallelism</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">&lt;int&gt;</span>                   <span class="c1"># Optional: size of multiprocessing pool used by FastSync</span>
-                                                <span class="c1">#           Min: 1</span>
-                                                <span class="c1">#           Default: number of CPU cores</span>
-
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="c1"># Destination (Target) - Target properties</span>
-<span class="c1"># Connection details should be in the relevant target YAML file</span>
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="nt">target</span><span class="p">:</span> <span class="s">&quot;snowflake&quot;</span>                       <span class="c1"># ID of the target connector where the data will be loaded</span>
-<span class="nt">batch_size_rows</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">20000</span>                    <span class="c1"># Batch size for the stream to optimise load performance</span>
-<span class="nt">stream_buffer_size</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">0</span>                     <span class="c1"># In-memory buffer size (MB) between taps and targets for asynchronous data pipes</span>
-<span class="nt">default_target_schema</span><span class="p">:</span> <span class="s">&quot;s3_feeds&quot;</span>         <span class="c1"># Target schema where the data will be loaded</span>
-<span class="nt">default_target_schema_select_permission</span><span class="p">:</span>  <span class="c1"># Optional: Grant SELECT on schema and tables that created</span>
-  <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">grp_power</span>
-<span class="c1"># primary_key_required: False             # Optional: in case you want to load tables without key</span>
-                                          <span class="c1">#            properties, uncomment this. Please note</span>
-                                          <span class="c1">#            that files without primary keys will not</span>
-                                          <span class="c1">#            be de-duplicated and could cause</span>
-                                          <span class="c1">#            duplicates. Always try selecting</span>
-                                          <span class="c1">#            a reasonable key from the CSV file</span>
-<span class="c1">#batch_wait_limit_seconds: 3600           # Optional: Maximum time to wait for `batch_size_rows`. Available only for snowflake target.</span>
-
-<span class="c1"># Options only for Snowflake target</span>
-<span class="c1">#archive_load_files: False                      # Optional: when enabled, the files loaded to Snowflake will also be stored in `archive_load_files_s3_bucket`</span>
-<span class="c1">#archive_load_files_s3_prefix: &quot;archive&quot;        # Optional: When `archive_load_files` is enabled, the archived files will be placed in the archive S3 bucket under this prefix.</span>
-<span class="c1">#archive_load_files_s3_bucket: &quot;&lt;BUCKET_NAME&gt;&quot;  # Optional: When `archive_load_files` is enabled, the archived files will be placed in this bucket. (Default: the value of `s3_bucket` in target snowflake YAML)</span>
+<span class="c1"># ------------------------------------------------------------------------------</span><span class="w"></span>
+<span class="c1"># General Properties</span><span class="w"></span>
+<span class="c1"># ------------------------------------------------------------------------------</span><span class="w"></span>
+<span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;csv_on_s3&quot;</span><span class="w">                        </span><span class="c1"># Unique identifier of the tap</span><span class="w"></span>
+<span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Sample</span><span class="nv"> </span><span class="s">CSV</span><span class="nv"> </span><span class="s">files</span><span class="nv"> </span><span class="s">on</span><span class="nv"> </span><span class="s">S3&quot;</span><span class="w">          </span><span class="c1"># Name of the tap</span><span class="w"></span>
+<span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;tap-s3-csv&quot;</span><span class="w">                     </span><span class="c1"># !! THIS SHOULD NOT CHANGE !!</span><span class="w"></span>
+<span class="nt">owner</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;somebody@foo.com&quot;</span><span class="w">              </span><span class="c1"># Data owner to contact</span><span class="w"></span>
+<span class="c1">#send_alert: False                     # Optional: Disable all configured alerts on this tap</span><span class="w"></span>
 
 
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="c1"># Source to target Schema mapping</span>
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="nt">schemas</span><span class="p">:</span>
-  <span class="p p-Indicator">-</span> <span class="nt">source_schema</span><span class="p">:</span> <span class="s">&quot;s3_feeds&quot;</span> <span class="c1"># This is mandatory, but can be anything in this tap type</span>
-    <span class="nt">target_schema</span><span class="p">:</span> <span class="s">&quot;s3_feeds&quot;</span> <span class="c1"># Target schema in the destination Data Warehouse</span>
+<span class="c1"># ------------------------------------------------------------------------------</span><span class="w"></span>
+<span class="c1"># Source (Tap) - S3 connection details</span><span class="w"></span>
+<span class="c1"># ------------------------------------------------------------------------------</span><span class="w"></span>
+<span class="nt">db_conn</span><span class="p">:</span><span class="w"></span>
 
-    <span class="c1"># List of CSV files to destination tables</span>
-    <span class="nt">tables</span><span class="p">:</span>
+<span class="w">  </span><span class="c1"># Profile based authentication</span><span class="w"></span>
+<span class="w">  </span><span class="nt">aws_profile</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;AWS_PROFILE&gt;&quot;</span><span class="w">                  </span><span class="c1"># AWS profile name, if not provided, the AWS_PROFILE environment</span><span class="w"></span>
+<span class="w">                                                </span><span class="c1"># variable or the &#39;default&#39; profile will be used, if not</span><span class="w"></span>
+<span class="w">                                                </span><span class="c1"># available, then IAM role attached to the host will be used.</span><span class="w"></span>
 
-      <span class="c1"># Every file in S3 bucket that matches the search pattern will be loaded into this table</span>
-      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;feed_file_one&quot;</span>
-        <span class="nt">s3_csv_mapping</span><span class="p">:</span>
-          <span class="nt">search_pattern</span><span class="p">:</span> <span class="s">&quot;^feed_file_one_.*.csv$&quot;</span> <span class="c1"># Required.</span>
-          <span class="nt">search_prefix</span><span class="p">:</span> <span class="s">&quot;&quot;</span>                        <span class="c1"># Optional</span>
-          <span class="nt">key_properties</span><span class="p">:</span> <span class="p p-Indicator">[</span><span class="s">&quot;id&quot;</span><span class="p p-Indicator">]</span>                   <span class="c1"># Optional</span>
-          <span class="nt">delimiter</span><span class="p">:</span> <span class="s">&quot;,&quot;</span>                           <span class="c1"># Optional. Default: &#39;,&#39;</span>
+<span class="w">  </span><span class="c1"># Credentials based authentication</span><span class="w"></span>
+<span class="w">  </span><span class="c1">#aws_access_key_id: &quot;&lt;ACCESS_KEY&gt;&quot;            # Plain string or vault encrypted. Required for non-profile based auth. If not provided, AWS_ACCESS_KEY_ID environment variable will be used.</span><span class="w"></span>
+<span class="w">  </span><span class="c1">#aws_secret_access_key: &quot;&lt;SECRET_ACCESS_KEY&quot;  # Plain string or vault encrypted. Required for non-profile based auth. If not provided, AWS_SECRET_ACCESS_KEY environment variable will be used.</span><span class="w"></span>
+<span class="w">  </span><span class="c1">#aws_session_token: &quot;&lt;AWS_SESSION_TOKEN&gt;&quot;     # Optional: Plain string or vault encrypted. If not provided, AWS_SESSION_TOKEN environment variable will be used.</span><span class="w"></span>
 
-        <span class="c1"># OPTIONAL: Load time transformations</span>
-        <span class="c1">#transformations:</span>
-        <span class="c1">#  - column: &quot;last_name&quot;            # Column to transform</span>
-        <span class="c1">#    type: &quot;SET-NULL&quot;               # Transformation type</span>
+<span class="w">  </span><span class="c1">#aws_endpoint_url: &quot;&lt;FULL_ENDPOINT_URL&gt;&quot;      # Optional: for non AWS S3, for example https://nyc3.digitaloceanspaces.com</span><span class="w"></span>
 
-      <span class="c1"># You can add as many tables as you need...</span>
-      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;feed_file_two&quot;</span>
-        <span class="nt">s3_csv_mapping</span><span class="p">:</span>
-          <span class="nt">search_pattern</span><span class="p">:</span> <span class="s">&quot;^feed_file_tow_.csv$&quot;</span>
+<span class="w">  </span><span class="nt">bucket</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;my-bucket&quot;</span><span class="w">                           </span><span class="c1"># S3 Bucket name</span><span class="w"></span>
+<span class="w">  </span><span class="nt">start_date</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;2000-01-01&quot;</span><span class="w">                      </span><span class="c1"># File before this data will be excluded</span><span class="w"></span>
+<span class="w">  </span><span class="nt">fastsync_parallelism</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">&lt;int&gt;</span><span class="w">                   </span><span class="c1"># Optional: size of multiprocessing pool used by FastSync</span><span class="w"></span>
+<span class="w">                                                </span><span class="c1">#           Min: 1</span><span class="w"></span>
+<span class="w">                                                </span><span class="c1">#           Default: number of CPU cores</span><span class="w"></span>
+
+<span class="c1"># ------------------------------------------------------------------------------</span><span class="w"></span>
+<span class="c1"># Destination (Target) - Target properties</span><span class="w"></span>
+<span class="c1"># Connection details should be in the relevant target YAML file</span><span class="w"></span>
+<span class="c1"># ------------------------------------------------------------------------------</span><span class="w"></span>
+<span class="nt">target</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;snowflake&quot;</span><span class="w">                       </span><span class="c1"># ID of the target connector where the data will be loaded</span><span class="w"></span>
+<span class="nt">batch_size_rows</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">20000</span><span class="w">                    </span><span class="c1"># Batch size for the stream to optimise load performance</span><span class="w"></span>
+<span class="nt">stream_buffer_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span><span class="w">                     </span><span class="c1"># In-memory buffer size (MB) between taps and targets for asynchronous data pipes</span><span class="w"></span>
+<span class="nt">default_target_schema</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;s3_feeds&quot;</span><span class="w">         </span><span class="c1"># Target schema where the data will be loaded</span><span class="w"></span>
+<span class="nt">default_target_schema_select_permission</span><span class="p">:</span><span class="w">  </span><span class="c1"># Optional: Grant SELECT on schema and tables that created</span><span class="w"></span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">grp_power</span><span class="w"></span>
+<span class="c1"># primary_key_required: False             # Optional: in case you want to load tables without key</span><span class="w"></span>
+<span class="w">                                          </span><span class="c1">#            properties, uncomment this. Please note</span><span class="w"></span>
+<span class="w">                                          </span><span class="c1">#            that files without primary keys will not</span><span class="w"></span>
+<span class="w">                                          </span><span class="c1">#            be de-duplicated and could cause</span><span class="w"></span>
+<span class="w">                                          </span><span class="c1">#            duplicates. Always try selecting</span><span class="w"></span>
+<span class="w">                                          </span><span class="c1">#            a reasonable key from the CSV file</span><span class="w"></span>
+<span class="c1">#batch_wait_limit_seconds: 3600           # Optional: Maximum time to wait for `batch_size_rows`. Available only for snowflake target.</span><span class="w"></span>
+
+<span class="c1"># Options only for Snowflake target</span><span class="w"></span>
+<span class="c1">#archive_load_files: False                      # Optional: when enabled, the files loaded to Snowflake will also be stored in `archive_load_files_s3_bucket`</span><span class="w"></span>
+<span class="c1">#archive_load_files_s3_prefix: &quot;archive&quot;        # Optional: When `archive_load_files` is enabled, the archived files will be placed in the archive S3 bucket under this prefix.</span><span class="w"></span>
+<span class="c1">#archive_load_files_s3_bucket: &quot;&lt;BUCKET_NAME&gt;&quot;  # Optional: When `archive_load_files` is enabled, the archived files will be placed in this bucket. (Default: the value of `s3_bucket` in target snowflake YAML)</span><span class="w"></span>
+
+
+<span class="c1"># ------------------------------------------------------------------------------</span><span class="w"></span>
+<span class="c1"># Source to target Schema mapping</span><span class="w"></span>
+<span class="c1"># ------------------------------------------------------------------------------</span><span class="w"></span>
+<span class="nt">schemas</span><span class="p">:</span><span class="w"></span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">source_schema</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;s3_feeds&quot;</span><span class="w"> </span><span class="c1"># This is mandatory, but can be anything in this tap type</span><span class="w"></span>
+<span class="w">    </span><span class="nt">target_schema</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;s3_feeds&quot;</span><span class="w"> </span><span class="c1"># Target schema in the destination Data Warehouse</span><span class="w"></span>
+
+<span class="w">    </span><span class="c1"># List of CSV files to destination tables</span><span class="w"></span>
+<span class="w">    </span><span class="nt">tables</span><span class="p">:</span><span class="w"></span>
+
+<span class="w">      </span><span class="c1"># Every file in S3 bucket that matches the search pattern will be loaded into this table</span><span class="w"></span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;feed_file_one&quot;</span><span class="w"></span>
+<span class="w">        </span><span class="nt">s3_csv_mapping</span><span class="p">:</span><span class="w"></span>
+<span class="w">          </span><span class="nt">search_pattern</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;^feed_file_one_.*.csv$&quot;</span><span class="w"> </span><span class="c1"># Required.</span><span class="w"></span>
+<span class="w">          </span><span class="nt">search_prefix</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&quot;</span><span class="w">                        </span><span class="c1"># Optional</span><span class="w"></span>
+<span class="w">          </span><span class="nt">key_properties</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;id&quot;</span><span class="p p-Indicator">]</span><span class="w">                   </span><span class="c1"># Optional</span><span class="w"></span>
+<span class="w">          </span><span class="nt">delimiter</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;,&quot;</span><span class="w">                           </span><span class="c1"># Optional. Default: &#39;,&#39;</span><span class="w"></span>
+
+<span class="w">        </span><span class="c1"># OPTIONAL: Load time transformations</span><span class="w"></span>
+<span class="w">        </span><span class="c1">#transformations:</span><span class="w"></span>
+<span class="w">        </span><span class="c1">#  - column: &quot;last_name&quot;            # Column to transform</span><span class="w"></span>
+<span class="w">        </span><span class="c1">#    type: &quot;SET-NULL&quot;               # Transformation type</span><span class="w"></span>
+
+<span class="w">      </span><span class="c1"># You can add as many tables as you need...</span><span class="w"></span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;feed_file_two&quot;</span><span class="w"></span>
+<span class="w">        </span><span class="nt">s3_csv_mapping</span><span class="p">:</span><span class="w"></span>
+<span class="w">          </span><span class="nt">search_pattern</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;^feed_file_tow_.csv$&quot;</span><span class="w"></span>
 </pre></div>
 </div>
 </section>
@@ -266,7 +266,7 @@ following the steps in the <a class="reference internal" href="../../installatio
   <hr/>
 
   <div role="contentinfo">
-    <p>&#169; Copyright 2021, Wise Ltd..</p>
+    <p>&#169; Copyright 2022, Wise Ltd..</p>
   </div>
 
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a

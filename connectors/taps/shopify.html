@@ -191,75 +191,75 @@ API password to extract data from your Shopify Shop:</p>
 A sample YAML for Jira replication can be generated into a project directory by
 following the steps in the <a class="reference internal" href="../../installation_guide/creating_pipelines.html#generating-pipelines"><span class="std std-ref">Generating Sample Pipelines</span></a> section.</p>
 <p>Example YAML for <code class="docutils literal notranslate"><span class="pre">tap-shopify</span></code>:</p>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nn">---</span>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nn">---</span><span class="w"></span>
 
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="c1"># General Properties</span>
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="nt">id</span><span class="p">:</span> <span class="s">&quot;shopify&quot;</span>                           <span class="c1"># Unique identifier of the tap</span>
-<span class="nt">name</span><span class="p">:</span> <span class="s">&quot;Shopify&quot;</span>                         <span class="c1"># Name of the tap</span>
-<span class="nt">type</span><span class="p">:</span> <span class="s">&quot;tap-shopify&quot;</span>                     <span class="c1"># !! THIS SHOULD NOT CHANGE !!</span>
-<span class="nt">owner</span><span class="p">:</span> <span class="s">&quot;somebody@foo.com&quot;</span>               <span class="c1"># Data owner to contact</span>
-<span class="c1">#send_alert: False                      # Optional: Disable all configured alerts on this tap</span>
-
-
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="c1"># Source (Tap) - Shopify connection details</span>
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="nt">db_conn</span><span class="p">:</span>
-  <span class="nt">shop</span><span class="p">:</span> <span class="s">&quot;&lt;STORE</span><span class="nv"> </span><span class="s">SUBDOMAIN&gt;&quot;</span>               <span class="c1"># Shopify Store Subdomain</span>
-  <span class="nt">api_key</span><span class="p">:</span> <span class="s">&quot;&lt;PRIVATE</span><span class="nv"> </span><span class="s">API</span><span class="nv"> </span><span class="s">KEY</span><span class="nv"> </span><span class="s">PASSWORD&gt;&quot;</span>   <span class="c1"># Shopify Private App API Password</span>
-  <span class="nt">start_date</span><span class="p">:</span> <span class="s">&quot;2019-01-01&quot;</span>                <span class="c1"># Sync data from this date onwards</span>
+<span class="c1"># ------------------------------------------------------------------------------</span><span class="w"></span>
+<span class="c1"># General Properties</span><span class="w"></span>
+<span class="c1"># ------------------------------------------------------------------------------</span><span class="w"></span>
+<span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;shopify&quot;</span><span class="w">                           </span><span class="c1"># Unique identifier of the tap</span><span class="w"></span>
+<span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Shopify&quot;</span><span class="w">                         </span><span class="c1"># Name of the tap</span><span class="w"></span>
+<span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;tap-shopify&quot;</span><span class="w">                     </span><span class="c1"># !! THIS SHOULD NOT CHANGE !!</span><span class="w"></span>
+<span class="nt">owner</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;somebody@foo.com&quot;</span><span class="w">               </span><span class="c1"># Data owner to contact</span><span class="w"></span>
+<span class="c1">#send_alert: False                      # Optional: Disable all configured alerts on this tap</span><span class="w"></span>
 
 
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="c1"># Destination (Target) - Target properties</span>
-<span class="c1"># Connection details should be in the relevant target YAML file</span>
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="nt">target</span><span class="p">:</span> <span class="s">&quot;snowflake&quot;</span>                       <span class="c1"># ID of the target connector where the data will be loaded</span>
-<span class="nt">batch_size_rows</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">20000</span>                    <span class="c1"># Batch size for the stream to optimise load performance</span>
-<span class="nt">stream_buffer_size</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">0</span>                     <span class="c1"># In-memory buffer size (MB) between taps and targets for asynchronous data pipes</span>
-<span class="nt">default_target_schema</span><span class="p">:</span> <span class="s">&quot;shopify&quot;</span>          <span class="c1"># Target schema where the data will be loaded</span>
-<span class="c1">#batch_wait_limit_seconds: 3600           # Optional: Maximum time to wait for `batch_size_rows`. Available only for snowflake target.</span>
-
-<span class="c1"># Options only for Snowflake target</span>
-<span class="c1">#archive_load_files: False                      # Optional: when enabled, the files loaded to Snowflake will also be stored in `archive_load_files_s3_bucket`</span>
-<span class="c1">#archive_load_files_s3_prefix: &quot;archive&quot;        # Optional: When `archive_load_files` is enabled, the archived files will be placed in the archive S3 bucket under this prefix.</span>
-<span class="c1">#archive_load_files_s3_bucket: &quot;&lt;BUCKET_NAME&gt;&quot;  # Optional: When `archive_load_files` is enabled, the archived files will be placed in this bucket. (Default: the value of `s3_bucket` in target snowflake YAML)</span>
+<span class="c1"># ------------------------------------------------------------------------------</span><span class="w"></span>
+<span class="c1"># Source (Tap) - Shopify connection details</span><span class="w"></span>
+<span class="c1"># ------------------------------------------------------------------------------</span><span class="w"></span>
+<span class="nt">db_conn</span><span class="p">:</span><span class="w"></span>
+<span class="w">  </span><span class="nt">shop</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;STORE</span><span class="nv"> </span><span class="s">SUBDOMAIN&gt;&quot;</span><span class="w">               </span><span class="c1"># Shopify Store Subdomain</span><span class="w"></span>
+<span class="w">  </span><span class="nt">api_key</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;PRIVATE</span><span class="nv"> </span><span class="s">API</span><span class="nv"> </span><span class="s">KEY</span><span class="nv"> </span><span class="s">PASSWORD&gt;&quot;</span><span class="w">   </span><span class="c1"># Shopify Private App API Password</span><span class="w"></span>
+<span class="w">  </span><span class="nt">start_date</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;2019-01-01&quot;</span><span class="w">                </span><span class="c1"># Sync data from this date onwards</span><span class="w"></span>
 
 
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="c1"># Source to target Schema mapping</span>
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="nt">schemas</span><span class="p">:</span>
+<span class="c1"># ------------------------------------------------------------------------------</span><span class="w"></span>
+<span class="c1"># Destination (Target) - Target properties</span><span class="w"></span>
+<span class="c1"># Connection details should be in the relevant target YAML file</span><span class="w"></span>
+<span class="c1"># ------------------------------------------------------------------------------</span><span class="w"></span>
+<span class="nt">target</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;snowflake&quot;</span><span class="w">                       </span><span class="c1"># ID of the target connector where the data will be loaded</span><span class="w"></span>
+<span class="nt">batch_size_rows</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">20000</span><span class="w">                    </span><span class="c1"># Batch size for the stream to optimise load performance</span><span class="w"></span>
+<span class="nt">stream_buffer_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span><span class="w">                     </span><span class="c1"># In-memory buffer size (MB) between taps and targets for asynchronous data pipes</span><span class="w"></span>
+<span class="nt">default_target_schema</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;shopify&quot;</span><span class="w">          </span><span class="c1"># Target schema where the data will be loaded</span><span class="w"></span>
+<span class="c1">#batch_wait_limit_seconds: 3600           # Optional: Maximum time to wait for `batch_size_rows`. Available only for snowflake target.</span><span class="w"></span>
 
-  <span class="p p-Indicator">-</span> <span class="nt">source_schema</span><span class="p">:</span> <span class="s">&quot;shopify&quot;</span>             <span class="c1"># This is mandatory, but can be anything in this tap type</span>
-    <span class="nt">target_schema</span><span class="p">:</span> <span class="s">&quot;shopify&quot;</span>             <span class="c1"># Target schema in the destination Data Warehouse</span>
-    <span class="c1">#target_schema_select_permissions:    # Optional: Grant SELECT on schema and tables that created</span>
-    <span class="c1">#  - grp_stats</span>
-
-    <span class="c1"># List of Github tables to load into destination Data Warehouse</span>
-    <span class="c1"># Tap-Github will use the best incremental strategies automatically to replicate data</span>
-    <span class="nt">tables</span><span class="p">:</span>
-      <span class="c1"># Supported tables</span>
-      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;orders&quot;</span>
-      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;customers&quot;</span>
-      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;products&quot;</span>
-      <span class="p p-Indicator">-</span> <span class="nt">table_name</span><span class="p">:</span> <span class="s">&quot;transactions&quot;</span>
+<span class="c1"># Options only for Snowflake target</span><span class="w"></span>
+<span class="c1">#archive_load_files: False                      # Optional: when enabled, the files loaded to Snowflake will also be stored in `archive_load_files_s3_bucket`</span><span class="w"></span>
+<span class="c1">#archive_load_files_s3_prefix: &quot;archive&quot;        # Optional: When `archive_load_files` is enabled, the archived files will be placed in the archive S3 bucket under this prefix.</span><span class="w"></span>
+<span class="c1">#archive_load_files_s3_bucket: &quot;&lt;BUCKET_NAME&gt;&quot;  # Optional: When `archive_load_files` is enabled, the archived files will be placed in this bucket. (Default: the value of `s3_bucket` in target snowflake YAML)</span><span class="w"></span>
 
 
-      <span class="c1"># Additional supported tables</span>
-      <span class="c1">#- table_name: &quot;custom_collections&quot;</span>
-      <span class="c1">#- table_name: &quot;abandoned_checkouts&quot;</span>
-      <span class="c1">#- table_name: &quot;metafields&quot;</span>
-      <span class="c1">#- table_name: &quot;order_refunds&quot;</span>
-      <span class="c1">#- table_name: &quot;collects&quot;</span>
+<span class="c1"># ------------------------------------------------------------------------------</span><span class="w"></span>
+<span class="c1"># Source to target Schema mapping</span><span class="w"></span>
+<span class="c1"># ------------------------------------------------------------------------------</span><span class="w"></span>
+<span class="nt">schemas</span><span class="p">:</span><span class="w"></span>
+
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">source_schema</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;shopify&quot;</span><span class="w">             </span><span class="c1"># This is mandatory, but can be anything in this tap type</span><span class="w"></span>
+<span class="w">    </span><span class="nt">target_schema</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;shopify&quot;</span><span class="w">             </span><span class="c1"># Target schema in the destination Data Warehouse</span><span class="w"></span>
+<span class="w">    </span><span class="c1">#target_schema_select_permissions:    # Optional: Grant SELECT on schema and tables that created</span><span class="w"></span>
+<span class="w">    </span><span class="c1">#  - grp_stats</span><span class="w"></span>
+
+<span class="w">    </span><span class="c1"># List of Github tables to load into destination Data Warehouse</span><span class="w"></span>
+<span class="w">    </span><span class="c1"># Tap-Github will use the best incremental strategies automatically to replicate data</span><span class="w"></span>
+<span class="w">    </span><span class="nt">tables</span><span class="p">:</span><span class="w"></span>
+<span class="w">      </span><span class="c1"># Supported tables</span><span class="w"></span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;orders&quot;</span><span class="w"></span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;customers&quot;</span><span class="w"></span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;products&quot;</span><span class="w"></span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;transactions&quot;</span><span class="w"></span>
 
 
-        <span class="c1"># OPTIONAL: Load time transformations - you can add it to any table</span>
-        <span class="c1">#transformations:</span>
-        <span class="c1">#  - column: &quot;some_column_to_transform&quot; # Column to transform</span>
-        <span class="c1">#    type: &quot;SET-NULL&quot;                   # Transformation type</span>
+<span class="w">      </span><span class="c1"># Additional supported tables</span><span class="w"></span>
+<span class="w">      </span><span class="c1">#- table_name: &quot;custom_collections&quot;</span><span class="w"></span>
+<span class="w">      </span><span class="c1">#- table_name: &quot;abandoned_checkouts&quot;</span><span class="w"></span>
+<span class="w">      </span><span class="c1">#- table_name: &quot;metafields&quot;</span><span class="w"></span>
+<span class="w">      </span><span class="c1">#- table_name: &quot;order_refunds&quot;</span><span class="w"></span>
+<span class="w">      </span><span class="c1">#- table_name: &quot;collects&quot;</span><span class="w"></span>
+
+
+<span class="w">        </span><span class="c1"># OPTIONAL: Load time transformations - you can add it to any table</span><span class="w"></span>
+<span class="w">        </span><span class="c1">#transformations:</span><span class="w"></span>
+<span class="w">        </span><span class="c1">#  - column: &quot;some_column_to_transform&quot; # Column to transform</span><span class="w"></span>
+<span class="w">        </span><span class="c1">#    type: &quot;SET-NULL&quot;                   # Transformation type</span><span class="w"></span>
 </pre></div>
 </div>
 </section>
@@ -276,7 +276,7 @@ following the steps in the <a class="reference internal" href="../../installatio
   <hr/>
 
   <div role="contentinfo">
-    <p>&#169; Copyright 2021, Wise Ltd..</p>
+    <p>&#169; Copyright 2022, Wise Ltd..</p>
   </div>
 
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
