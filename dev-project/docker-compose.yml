@@ -8,6 +8,7 @@ services:
     entrypoint: /opt/pipelinewise/dev-project/entrypoint.sh
     environment:
       PIPELINEWISE_HOME: /opt/pipelinewise/dev-project
+
       TAP_MYSQL_HOST: db_mysql_source
       TAP_MYSQL_PORT: ${TAP_MYSQL_PORT}
       TAP_MYSQL_PORT_ON_HOST: ${TAP_MYSQL_PORT_ON_HOST}
@@ -15,6 +16,14 @@ services:
       TAP_MYSQL_USER: ${TAP_MYSQL_USER}
       TAP_MYSQL_PASSWORD: ${TAP_MYSQL_PASSWORD}
       TAP_MYSQL_DB: ${TAP_MYSQL_DB}
+
+      TAP_MYSQL_REPLICA_HOST: db_mysql_source_replica
+      TAP_MYSQL_REPLICA_PORT: ${TAP_MYSQL_REPLICA_PORT}
+      TAP_MYSQL_REPLICA_PORT_ON_HOST: ${TAP_MYSQL_REPLICA_PORT_ON_HOST}
+      TAP_MYSQL_REPLICA_ROOT_PASSWORD: ${TAP_MYSQL_REPLICA_ROOT_PASSWORD}
+      TAP_MYSQL_REPLICA_USER: ${TAP_MYSQL_REPLICA_USER}
+      TAP_MYSQL_REPLICA_PASSWORD: ${TAP_MYSQL_REPLICA_PASSWORD}
+      TAP_MYSQL_REPLICA_DB: ${TAP_MYSQL_REPLICA_DB}
 
       TAP_POSTGRES_HOST: db_postgres_source
       TAP_POSTGRES_PORT: ${TAP_POSTGRES_PORT}
@@ -80,12 +89,26 @@ services:
     container_name: pipelinewise_dev_mysql_source
     ports:
       - ${TAP_MYSQL_PORT_ON_HOST}:${TAP_MYSQL_PORT}
-    command: --default-authentication-plugin=mysql_native_password --log-bin=mysql-bin --binlog-format=ROW
+    command: --default-authentication-plugin=mysql_native_password --server-id=1 --log-bin=mysql-bin --binlog-format=ROW --binlog-do-db=${TAP_MYSQL_DB} --binlog-do-db=${TAP_MYSQL_REPLICA_DB}
     environment:
       MYSQL_ROOT_PASSWORD: ${TAP_MYSQL_ROOT_PASSWORD}
       MYSQL_USER: ${TAP_MYSQL_USER}
       MYSQL_PASSWORD: ${TAP_MYSQL_PASSWORD}
       MYSQL_DATABASE: ${TAP_MYSQL_DB}
+    networks:
+      - pipelinewise_network
+
+  db_mysql_source_replica:
+    image: mariadb:10.2.26
+    container_name: pipelinewise_dev_mysql_source_replica
+    ports:
+      - ${TAP_MYSQL_REPLICA_PORT_ON_HOST}:${TAP_MYSQL_REPLICA_PORT}
+    command: --default-authentication-plugin=mysql_native_password --server-id=2 --log-bin=mysql-bin --relay-log=mysql-relay-log --replicate-do-db=${TAP_MYSQL_REPLICA_DB}
+    environment:
+      MYSQL_ROOT_PASSWORD: ${TAP_MYSQL_REPLICA_ROOT_PASSWORD}
+      MYSQL_USER: ${TAP_MYSQL_REPLICA_USER}
+      MYSQL_PASSWORD: ${TAP_MYSQL_REPLICA_PASSWORD}
+      MYSQL_DATABASE: ${TAP_MYSQL_REPLICA_DB}
     networks:
       - pipelinewise_network
 
