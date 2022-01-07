@@ -179,7 +179,7 @@ class TestFastSyncTapMongoDB(TestCase):
                     'mongodump',
                     '--uri',
                     '"mongodb://my_user:secret@foo.com:3306/my_db'
-                    '?authSource=admin&readPreference=secondaryPreferred&ssl=true"',
+                    '?readPreference=secondaryPreferred&authSource=admin&ssl=true"',
                     '--forceTableScan',
                     '--gzip',
                     '-c',
@@ -239,7 +239,7 @@ class TestFastSyncTapMongoDB(TestCase):
                                 'mongodump',
                                 '--uri',
                                 '"mongodb://my_user:secret@foo.com:3306/my_db'
-                                '?authSource=admin&readPreference=secondaryPreferred&ssl=true"',
+                                '?readPreference=secondaryPreferred&authSource=admin&ssl=true"',
                                 '--forceTableScan',
                                 '--gzip',
                                 '-c',

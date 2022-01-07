@@ -1,11 +1,18 @@
 FROM python:3.8-slim-buster
 
+RUN apt-get -qq update \
+    && apt-get -qqy --no-install-recommends install \
+        apt-utils \
+        alien \
+        gnupg \
+        libaio1 \
+        wget \
+    && rm -rf /var/lib/apt/lists/* \
+    && pip install -U --no-cache-dir pip
+
 COPY . /app
 
-RUN apt-get -qq update \
-    && apt-get -qqy --no-install-recommends install apt-utils alien libaio1 wget \
-    && rm -rf /var/lib/apt/lists/* \
-    && pip install -U --no-cache-dir pip \
+RUN echo "setup pipelinewise" \
     && cd /app \
     && make pipelinewise_no_test_extras -e pw_acceptlicenses=y \
     && ln -s /root/.pipelinewise /app/.pipelinewise
