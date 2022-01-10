@@ -226,7 +226,6 @@ class TestTargetSnowflake:
             schema_postfix=self.snowflake_schema_postfix
         )
 
-
     # pylint: disable=invalid-name
     @pytest.mark.dependency(depends=['import_config'])
     def test_resync_pg_to_sf_with_split_large_files(
