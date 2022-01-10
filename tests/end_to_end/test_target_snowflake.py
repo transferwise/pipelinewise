@@ -28,7 +28,7 @@ TAP_S3_CSV_ID = 's3_csv_to_sf'
 TARGET_ID = 'snowflake'
 
 
-# pylint: disable=attribute-defined-outside-init
+# pylint: disable=attribute-defined-outside-init,too-many-instance-attributes
 class TestTargetSnowflake:
     """
     End to end tests for Target Snowflake

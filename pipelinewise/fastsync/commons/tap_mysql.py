@@ -44,7 +44,7 @@ class FastSyncTapMySql:
         self.conn_unbuffered = None
         self.is_replica = False
 
-    def get_connection_parameters(self, config: dict) -> Tuple[dict, bool]:
+    def get_connection_parameters(self) -> Tuple[dict, bool]:
         """
         Method to get connection parameters
         Connection is either to the primary or a replica if its credentials are given
@@ -57,21 +57,21 @@ class FastSyncTapMySql:
 
         is_replica = False
 
-        if "replica_host" in config:
+        if 'replica_host' in self.connection_config:
             is_replica = True
 
-        host = config.get('replica_host', config['host'])
-        port = int(config.get('replica_port', config['port']))
-        user = config.get('replica_user', config['user'])
-        password = config.get('replica_password', config['password'])
-        charset = config['charset']
+        host = self.connection_config.get('replica_host', self.connection_config['host'])
+        port = int(self.connection_config.get('replica_port', self.connection_config['port']))
+        user = self.connection_config.get('replica_user', self.connection_config['user'])
+        password = self.connection_config.get('replica_password', self.connection_config['password'])
+        charset = self.connection_config['charset']
 
         return ({
-            "host": host,
-            "port": port,
-            "user": user,
-            "password": password,
-            "charset": charset,
+            'host': host,
+            'port': port,
+            'user': user,
+            'password': password,
+            'charset': charset,
         }, is_replica)
 
     def open_connections(self):
@@ -85,7 +85,7 @@ class FastSyncTapMySql:
         # If replica_{host|port|user|password} values are not defined in the config then it's
         # using the normal credentials to connect
 
-        conn_params, is_replica = self.get_connection_parameters(self.connection_config)
+        conn_params, is_replica = self.get_connection_parameters()
 
         self.is_replica = is_replica
 
