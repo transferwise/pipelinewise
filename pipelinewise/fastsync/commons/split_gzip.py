@@ -127,7 +127,7 @@ class SplitGzipFile(io.BufferedIOBase):
                 self.chunk_file = gzip.open(self.chunk_filename, self.mode)
             else:
                 if 'b' in self.mode:
-                    self.chunk_file = builtins.open(
+                    self.chunk_file = builtins.open(  # pylint: disable=unspecified-encoding
                         self.chunk_filename, self.mode
                     )
                 else:
