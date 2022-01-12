@@ -51,11 +51,6 @@ class TestTargetSnowflake:
         self.project_dir = os.path.join(DIR, 'test-project')
         self.e2e = E2EEnv(self.project_dir)
 
-    def teardown_class(self):
-        """Teardown test suite"""
-        # Cleanup the Snowflake test schemas
-        self.e2e.setup_target_snowflake()
-
     def teardown_method(self):
         """Delete test directories and database objects"""
 
