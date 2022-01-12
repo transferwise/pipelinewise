@@ -49,6 +49,7 @@ class TestTargetSnowflake:
         self.project_dir = os.path.join(DIR, 'test-project')
         self.e2e = E2EEnv(self.project_dir)
 
+    @pytest.mark.dependency(depends=['import_config'])
     def teardown_class(self):
         """Teardown test suite"""
         # Cleanup the Snowflake test schemas
