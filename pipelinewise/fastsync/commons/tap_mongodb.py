@@ -5,12 +5,12 @@ import gzip
 import ujson
 import logging
 import os
-import ssl
 import subprocess
 import uuid
 import bson
 import pytz
 import tzlocal
+from urllib import parse
 
 from typing import Tuple, Optional, Dict, Callable, Any
 from pymongo import MongoClient
@@ -153,6 +153,50 @@ def transform_value(value: Any, path) -> Any:
     return value
 
 
+def get_connection_string(config: Dict):
+    """
+    Generates a MongoClientConnectionString based on configuration
+    Args:
+        config: DB config
+
+    Returns: A MongoClient connection string
+    """
+    srv = config.get('srv') == 'true'
+
+    # Default SSL verify mode to true, give option to disable
+    verify_mode = config.get('verify_mode', 'true') == 'true'
+    use_ssl = config.get('ssl') == 'true'
+
+    connection_query = {
+        'readPreference': 'secondaryPreferred',
+        'authSource': config['auth_database'],
+    }
+
+    if config.get('replica_set'):
+        connection_query['replicaSet'] = config['replica_set']
+
+    if use_ssl:
+        connection_query['ssl'] = 'true'
+
+    # NB: "sslAllowInvalidCertificates" must ONLY be supplied if `SSL` is true.
+    if not verify_mode and use_ssl:
+        connection_query['tlsAllowInvalidCertificates'] = 'true'
+
+    query_string = parse.urlencode(connection_query)
+
+    connection_string = '{protocol}://{user}:{password}@{host}{port}/{database}?{query_string}'.format(
+        protocol='mongodb+srv' if srv else 'mongodb',
+        user=config['user'],
+        password=config['password'],
+        host=config['host'],
+        port='' if srv else ':{port}'.format(port=int(config['port'])),
+        database=config['database'],
+        query_string=query_string
+    )
+
+    return connection_string
+
+
 class FastSyncTapMongoDB:
     """
     Common functions for fastsync from a MongoDB database
@@ -170,6 +214,8 @@ class FastSyncTapMongoDB:
             'write_batch_rows', DEFAULT_WRITE_BATCH_ROWS
         )
 
+        self.connection_config['connection_string'] = get_connection_string(self.connection_config)
+
         self.tap_type_to_target_type = tap_type_to_target_type
         self.database: Optional[Database] = None
 
@@ -177,26 +223,8 @@ class FastSyncTapMongoDB:
         """
         Open connection
         """
-        # Default SSL verify mode to true, give option to disable
-        verify_mode = self.connection_config.get('verify_mode', 'true') == 'true'
-        use_ssl = self.connection_config.get('ssl') == 'true'
 
-        connection_params = dict(
-            host=self.connection_config['host'],
-            port=int(self.connection_config['port']),
-            username=self.connection_config['user'],
-            password=self.connection_config['password'],
-            authSource=self.connection_config['auth_database'],
-            ssl=use_ssl,
-            replicaSet=self.connection_config.get('replica_set', None),
-            readPreference='secondaryPreferred',
-        )
-
-        # NB: "ssl_cert_reqs" must ONLY be supplied if `SSL` is true.
-        if not verify_mode and use_ssl:
-            connection_params['ssl_cert_reqs'] = ssl.CERT_NONE
-
-        self.database = MongoClient(**connection_params)[
+        self.database = MongoClient(self.connection_config['connection_string'])[
             self.connection_config['database']
         ]
 
@@ -395,32 +423,19 @@ class FastSyncTapMongoDB:
         """
         LOGGER.info('Starting export of table "%s"', collection_name)
 
-        url = (
-            f'mongodb://{self.connection_config["user"]}:{self.connection_config["password"]}'
-            f'@{self.connection_config["host"]}:{self.connection_config["port"]}/'
-            f'{self.connection_config["database"]}?authSource={self.connection_config["auth_database"]}'
-            f'&readPreference=secondaryPreferred'
-        )
+        cmd = [
+            'mongodump',
+            '--uri',
+            f'"{self.connection_config["connection_string"]}"',
+            '--forceTableScan',
+            '--gzip',
+            '-c',
+            collection_name,
+            '-o',
+            export_dir,
+        ]
 
-        if self.connection_config.get('replica_set', None) is not None:
-            url += f'&replicaSet={self.connection_config["replica_set"]}'
-
-        if self.connection_config.get('ssl', None) is not None:
-            url += f'&ssl={self.connection_config["ssl"]}'
-
-        return_code = subprocess.call(
-            [
-                'mongodump',
-                '--uri',
-                f'"{url}"',
-                '--forceTableScan',
-                '--gzip',
-                '-c',
-                collection_name,
-                '-o',
-                export_dir,
-            ]
-        )
+        return_code = subprocess.call(cmd)
 
         LOGGER.debug('Export command return code %s', return_code)
 
