@@ -26,51 +26,48 @@ STATUS_RUNNING = 'running'
 STATUS_FAILED = 'failed'
 STATUS_SUCCESS = 'success'
 
-TapParams = namedtuple(
+OriginalTapParams = namedtuple(
     'TapParams', ['id', 'type', 'bin', 'python_bin', 'config', 'properties', 'state']
 )
-TargetParams = namedtuple('TargetParams', ['id', 'type', 'bin', 'python_bin', 'config'])
+OriginalTargetParams = namedtuple('TargetParams', ['id', 'type', 'bin', 'python_bin', 'config'])
 TransformParams = namedtuple(
     'TransformParams', ['bin', 'python_bin', 'config', 'tap_id', 'target_id']
 )
 
 
-def is_invalid_json_file(json_file_path, file_property):
-    """
-    checking if input file is a valid json or not, in some cases it is allowed to have an empty file, or it is allowed
-    file not exists!
+def _verify_json_file(json_file_path, file_must_exists, allowed_empty):
+    """Checking if input file is a valid json or not, in some cases it is allowed to have an empty file,
+     or it is allowed file not exists!
     """
     try:
         with open(json_file_path, 'r', encoding='utf-8') as json_file:
             json.load(json_file)
-        return False
     except FileNotFoundError:
-        return file_property['file_must_exists']
+        return not file_must_exists
     except json.decoder.JSONDecodeError:
-        if file_property['allowed_empty'] and os.stat(json_file_path).st_size == 0:
+        if not allowed_empty or os.stat(json_file_path).st_size != 0:
             return False
-        return True
+    return True
 
 
 def do_json_conf_validation(json_file, file_property):
     """
     Validating a json format config property and retry if it is invalid
     """
-    invalid_json = False
     for _ in range(PARAMS_VALIDATION_RETRY_TIMES):
-        if is_invalid_json_file(json_file_path=json_file, file_property=file_property):
-            invalid_json = True
-            time.sleep(PARAMS_VALIDATION_RETRY_PERIOD_SEC)
-        else:
-            invalid_json = False
-            break
-    return invalid_json
+        if _verify_json_file(json_file_path=json_file,
+                             file_must_exists=file_property['file_must_exists'],
+                             allowed_empty=file_property['allowed_empty']):
+            return True
+
+        time.sleep(PARAMS_VALIDATION_RETRY_PERIOD_SEC)
+    return False
 
 
 # pylint: disable=function-redefined)
-class TapParams(TapParams):
+class TapParams(OriginalTapParams):
     """
-    for overriding TaptParam init and validating json properties
+    for overriding TapParam init and validating json properties
     """
     # pylint: disable=unused-argument
     def __init__(self, *args, **kwargs):
@@ -81,30 +78,30 @@ class TapParams(TapParams):
             'state': {'file_must_exists': False, 'allowed_empty': True}
         }
         for param, file_property in list_of_params_in_json_file.items():
-            invalid_json = do_json_conf_validation(
-                json_file=kwargs[param],
+            valid_json = do_json_conf_validation(
+                json_file=getattr(self, param, None),
                 file_property=file_property
-               ) if kwargs.get(param) else False
+               ) if getattr(self, param, None) else True
 
-            if invalid_json:
+            if not valid_json:
                 raise RunCommandException(
-                    f'Invalid json file for {param}: {kwargs[param]}')
+                    f'Invalid json file for {param}: {getattr(self, param, None)}')
 
 
 # pylint: disable=function-redefined)
-class TargetParams(TargetParams):
+class TargetParams(OriginalTargetParams):
     """
     for overriding TargetParam init and validating json properties
     """
     # pylint: disable=unused-argument
     def __init__(self, *args, **kwargs):
         super().__init__()
-        invalid_json = do_json_conf_validation(
-            json_file=kwargs.get('config'),
-            file_property={'file_must_exists': True, 'allowed_empty': False}) if kwargs.get('config') else False
+        valid_json = do_json_conf_validation(
+            json_file=getattr(self, 'config', None),
+            file_property={'file_must_exists': True, 'allowed_empty': False}) if getattr(self, 'config', None) else True
 
-        if invalid_json:
-            raise RunCommandException(f'Invalid json file for config: {kwargs["config"]}')
+        if not valid_json:
+            raise RunCommandException(f'Invalid json file for config: {getattr(self, "config", None)}')
 
 
 # pylint: disable=unnecessary-pass

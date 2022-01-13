@@ -22,7 +22,7 @@ class TestCommands:
     @pytest.fixture(autouse=True)
     def mock_json_validation(self, mocker):  # noqa: F811
         """we are using some config files which does not exist, so we patch the method that verifies the json files"""
-        mocker.patch('pipelinewise.cli.commands.is_invalid_json_file', return_value=False)
+        mocker.patch('pipelinewise.cli.commands._verify_json_file', return_value=True)
 
     def test_exists_and_executable(self):
         """Tests the function that detect if a file exists and executable"""
@@ -723,27 +723,35 @@ class TestConfigValidation:
             config=config,
         )
 
-    def test_tap_config_json_validation(self):
-        """Test it retries if any json file is invalid"""
+    def _assert_retry_validation_of_json_file(self, json_files_situation):
         with TemporaryDirectory() as temp_dir:
-
-            test_json_file = f'{temp_dir}/test_file.json'
+            invalid_json_file = f'{temp_dir}/invalid_file.json'
             valid_json_file = f'{temp_dir}/valid_file.json'
             with open(valid_json_file, 'w', encoding='utf-8') as valid_file:
                 json.dump({'foo': 'bar'}, valid_file)
 
-            for case_number in range(3):
-                with open(test_json_file, 'w', encoding='utf-8') as invalid_file:
-                    invalid_file.write('foo')
+            with open(invalid_json_file, 'w', encoding='utf-8') as invalid_file:
+                invalid_file.write('foo')
 
-                # Starts with an invalid file and since the main method is retrying we fix the file after some seconds
-                fixed_file = self.AsyncWriteJsonFile(test_json_file, '{"foo": "bar"}', self.sec_to_repair_json_file)
-                fixed_file.start()
-                fixed_file.join()
+            # Starts with an invalid file and since the main method is retrying we fix the file after some seconds
+            fixed_file = self.AsyncWriteJsonFile(invalid_json_file, '{"foo": "bar"}', self.sec_to_repair_json_file)
+            fixed_file.start()
+            fixed_file.join()
 
-                self._assert_tap_config(config=test_json_file if case_number == 0 else valid_json_file,
-                                        properties=test_json_file if case_number == 1 else valid_json_file,
-                                        state=test_json_file if case_number == 2 else valid_json_file)
+            self._assert_tap_config(config=locals()[f'{json_files_situation["config"]}_json_file'],
+                                    properties=locals()[f'{json_files_situation["properties"]}_json_file'],
+                                    state=locals()[f'{json_files_situation["state"]}_json_file']
+                                    )
+
+    def test_tap_config_json_validation(self):
+        """Test it retries if any json file is invalid"""
+        test_cases = (
+            {'config': 'invalid', 'properties': 'valid', 'state': 'valid'},
+            {'config': 'valid', 'properties': 'invalid', 'state': 'valid'},
+            {'config': 'valid', 'properties': 'valid', 'state': 'invalid'},
+        )
+        for json_files_situation in test_cases:
+            self._assert_retry_validation_of_json_file(json_files_situation)
 
     def test_tap_config_jason_valid_if_state_file_does_not_exist(self):
         """Test it is valid if state file does not exists at all"""
