@@ -805,11 +805,16 @@ class TestConfigValidation:
             with open(valid_json_file, 'w', encoding='utf-8') as valid_file:
                 json.dump({'foo': 'bar'}, valid_file)
 
-            for case_number in range(3):
+            test_cases = (
+                (None, valid_json_file, valid_json_file),
+                (valid_json_file, None, valid_json_file),
+                (valid_json_file, valid_json_file, None)
+            )
+            for config, property, state in test_cases:
                 self._assert_tap_config(
-                    config=None if case_number == 0 else valid_json_file,
-                    properties=None if case_number == 1 else valid_json_file,
-                    state=None if case_number == 2 else valid_json_file
+                    config=config,
+                    properties=property,
+                    state=state
                 )
 
     def test_tap_config_raise_exception_if_not_valid_json_after_retries(self):
