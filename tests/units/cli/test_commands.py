@@ -810,10 +810,10 @@ class TestConfigValidation:
                 (valid_json_file, None, valid_json_file),
                 (valid_json_file, valid_json_file, None)
             )
-            for config, property, state in test_cases:
+            for config, properties, state in test_cases:
                 self._assert_tap_config(
                     config=config,
-                    properties=property,
+                    properties=properties,
                     state=state
                 )
 
