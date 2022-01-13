@@ -64,6 +64,15 @@ jobs:
         continue-on-error: true
         run: ./scripts/ci_check_no_file_changes.sh python
 
+      - name: Setup gcloud
+        if: steps.check.outcome == 'failure'
+        uses: google-github-actions/setup-gcloud@v0.2.0
+        with:
+          service_account_key: ${{ secrets.GCP_PIPELINEWISE_SA }}
+          project_id: thread-styleme
+          export_default_credentials: true
+          credentials_file_path: "./application_default_credentials.json"
+
       - name: Setup test containers
         if: steps.check.outcome == 'failure'
         run: docker-compose -f dev-project/docker-compose.yml up -d
@@ -95,6 +104,7 @@ jobs:
           TAP_S3_CSV_AWS_KEY: ${{ secrets.TAP_S3_CSV_AWS_KEY }}
           TAP_S3_CSV_AWS_SECRET_ACCESS_KEY: ${{ secrets.TAP_S3_CSV_AWS_SECRET_ACCESS_KEY }}
           TAP_S3_CSV_BUCKET: ${{ secrets.TAP_S3_CSV_BUCKET }}
+          TARGET_BIGQUERY_PROJECT: ${{ secrets.TARGET_BIGQUERY_PROJECT }}
         run: |
           docker exec -t \
           -e TAP_S3_CSV_AWS_KEY=$TAP_S3_CSV_AWS_KEY \
@@ -112,4 +122,6 @@ jobs:
           -e TARGET_SNOWFLAKE_STAGE=$TARGET_SNOWFLAKE_STAGE \
           -e TARGET_SNOWFLAKE_USER=$TARGET_SNOWFLAKE_USER \
           -e TARGET_SNOWFLAKE_WAREHOUSE=$TARGET_SNOWFLAKE_WAREHOUSE \
+          -e TARGET_BIGQUERY_PROJECT=$TARGET_BIGQUERY_PROJECT \
+          -e GOOGLE_APPLICATION_CREDENTIALS="/opt/pipelinewise/application_default_credentials.json" \
           pipelinewise_dev pytest tests/end_to_end -vx

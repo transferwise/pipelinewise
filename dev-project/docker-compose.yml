@@ -48,6 +48,8 @@ services:
       TAP_MONGODB_ROOT_USER: ${TAP_MONGODB_ROOT_USER}
       TAP_MONGODB_ROOT_PASSWORD: ${TAP_MONGODB_ROOT_PASSWORD}
 
+      TARGET_BIGQUERY_PROJECT: ${TARGET_BIGQUERY_PROJECT}
+
       PATH: /opt/pipelinewise/dev-project/.virtualenvs/pipelinewise/bin:${PATH}
 
     volumes:
