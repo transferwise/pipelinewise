@@ -1,3 +1,11 @@
+0.38.0 (2022-01-14)
+-------------------
+- MySQL tap now connects to replica instance during fastsync if credentials are provided
+- Added fastsync support for MongoDB Atlas
+- Docker base image to Python 3.8
+- Bump `pyyaml` from `5.4.1` to `6.0`
+
+
 0.37.2 (2021-12-10)
 -------------------
 - Bump `pipelinewise-tap-github` from `1.0.2` to `1.0.3`
