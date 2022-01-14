@@ -2,7 +2,7 @@ version: '3'
 services:
   ### Primary container with PipelineWise CLI
   pipelinewise:
-    image: python:3.7.4-buster
+    image: python:3.8-buster
     container_name: pipelinewise_dev
     working_dir: /opt/pipelinewise
     entrypoint: /opt/pipelinewise/dev-project/entrypoint.sh

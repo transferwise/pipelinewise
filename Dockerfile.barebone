@@ -1,4 +1,4 @@
-FROM python:3.7-slim-buster
+FROM python:3.8-slim-buster
 
 RUN apt-get -qq update \
     && apt-get -qqy --no-install-recommends install \
