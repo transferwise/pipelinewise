@@ -91,6 +91,11 @@ class E2EEnv:
                     'PASSWORD': {'value': os.environ.get('TAP_MYSQL_PASSWORD')},
                     'DB': {'value': os.environ.get('TAP_MYSQL_DB')},
                     'DB_2': {'value': os.environ.get('TAP_MYSQL_REPLICA_DB')},
+                    'REPLICA_HOST': {'value': os.environ.get('TAP_MYSQL_REPLICA_HOST')},
+                    'REPLICA_PORT': {'value': os.environ.get('TAP_MYSQL_REPLICA_PORT')},
+                    'REPLICA_USER': {'value': os.environ.get('TAP_MYSQL_REPLICA_USER')},
+                    'REPLICA_PASSWORD': {'value': os.environ.get('TAP_MYSQL_REPLICA_PASSWORD')},
+                    'REPLICA_DB': {'value': os.environ.get('TAP_MYSQL_REPLICA_DB')},
                 },
             },
             # ------------------------------------------------------------------
