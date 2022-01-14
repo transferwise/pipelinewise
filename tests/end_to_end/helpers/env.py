@@ -629,7 +629,7 @@ class E2EEnv:
             f'DROP SCHEMA IF EXISTS ppw_e2e_tap_mysql{self.sf_schema_postfix} CASCADE'
         )
         self.run_query_target_postgres(
-            'DROP SCHEMA IF EXISTS ppw_e2e_tap_mysql_2 CASCADE'
+            f'DROP SCHEMA IF EXISTS ppw_e2e_tap_mysql_2{self.sf_schema_postfix} CASCADE'
         )
         self.run_query_target_snowflake(
             f'DROP SCHEMA IF EXISTS ppw_e2e_tap_s3_csv{self.sf_schema_postfix} CASCADE'
