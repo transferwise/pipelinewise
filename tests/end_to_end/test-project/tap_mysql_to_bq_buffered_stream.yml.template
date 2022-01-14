@@ -101,3 +101,13 @@ schemas:
       - table_name: "all_datatypes"
         replication_method: "LOG_BASED"
 
+      ### Table with INCREMENTAL replication
+      - table_name: "customers"
+        replication_method: "INCREMENTAL"
+        replication_key: "id"
+        transformations:
+          - column: "phone"
+            type: "MASK-STRING-SKIP-ENDS-2"
+
+          - column: "email"
+            type: "MASK-STRING-SKIP-ENDS-6"

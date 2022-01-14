@@ -5,6 +5,7 @@ import boto3
 import shutil
 import subprocess
 import uuid
+from pathlib import Path
 
 from dotenv import load_dotenv
 from . import db
@@ -627,3 +628,9 @@ class E2EEnv:
         self.delete_dataset_target_bigquery('ppw_e2e_tap_mysql')
         self.delete_dataset_target_bigquery('ppw_e2e_tap_s3_csv')
         self.delete_dataset_target_bigquery('ppw_e2e_tap_mongodb')
+
+    @staticmethod
+    def remove_all_state_files():
+        """Clean up state files to ensure tests behave the same every time"""
+        for state_file in Path(CONFIG_DIR).glob('**/state.json'):
+            state_file.unlink()
