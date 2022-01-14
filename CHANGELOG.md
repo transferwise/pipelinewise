@@ -4,7 +4,9 @@
 - Added fastsync support for MongoDB Atlas
 - Docker base image to Python 3.8
 - Bump `pyyaml` from `5.4.1` to `6.0`
-
+- Bump `pipelinewise-target-snowflake` from `1.14.1` to `1.15.0`
+- Bump `pipelinewise-tap-s3-csv` from `1.2.2` to `1.2.3`
+- Bump `pipelinewise-tap-postgres` from `1.8.1` to `1.8.2`
 
 0.37.2 (2021-12-10)
 -------------------
