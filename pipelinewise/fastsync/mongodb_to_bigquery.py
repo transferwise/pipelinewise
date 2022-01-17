@@ -31,7 +31,7 @@ REQUIRED_CONFIG_KEYS = {
 LOCK = multiprocessing.Lock()
 
 
-def tap_type_to_target_type(mongo_type):
+def tap_type_to_target_type(mongo_type, *_):
     """Data type mapping from MongoDB to Bigquery"""
     return {
         'string': 'STRING',

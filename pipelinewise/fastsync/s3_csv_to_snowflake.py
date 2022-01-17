@@ -32,7 +32,7 @@ REQUIRED_CONFIG_KEYS = {
 LOCK = multiprocessing.Lock()
 
 
-def tap_type_to_target_type(csv_type):
+def tap_type_to_target_type(csv_type, *_):
     """Data type mapping from S3 csv to Snowflake"""
 
     return {

@@ -27,7 +27,7 @@ LONG_VARCHAR_LENGTH = 65535
 LOCK = multiprocessing.Lock()
 
 
-def tap_type_to_target_type(pg_type):
+def tap_type_to_target_type(pg_type, *_):
     """Data type mapping from MySQL to Redshift"""
     return {
         'char': 'CHARACTER VARYING({})'.format(DEFAULT_VARCHAR_LENGTH),
