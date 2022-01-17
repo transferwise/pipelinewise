@@ -154,6 +154,13 @@ def _map_tap_to_target_functions(
             'source_sql_get_cols_fn': db.sql_get_columns_mysql,
             'source_sql_dynamic_row_count_fn': db.sql_dynamic_row_count_mysql,
         },
+        # tap-mysql specific attributes and functions
+        'run_query_tap_mysql_2': {
+            'source_schemas': ['mysql_source_db_2'],
+            'target_schemas': [f'ppw_e2e_tap_mysql_2{schema_postfix}'],
+            'source_sql_get_cols_fn': db.sql_get_columns_mysql,
+            'source_sql_dynamic_row_count_fn': db.sql_dynamic_row_count_mysql,
+        },
         # tap-postgres specific attributes and functions
         'run_query_tap_postgres': {
             'source_schemas': ['public', 'public2'],
