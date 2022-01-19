@@ -1,1 +1,1 @@
-pipelinewise-target-bigquery==1.1.1
+pipelinewise-target-bigquery==1.2.0
