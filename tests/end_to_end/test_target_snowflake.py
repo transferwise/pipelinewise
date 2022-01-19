@@ -19,6 +19,7 @@ DIR = os.path.dirname(__file__)
 TAP_MARIADB_ID = 'mariadb_to_sf'
 TAP_MARIADB_SPLIT_LARGE_FILES_ID = 'mariadb_to_sf_split_large_files'
 TAP_MARIADB_BUFFERED_STREAM_ID = 'mariadb_to_sf_buffered_stream'
+TAP_MARIADB_REPLICA_ID = 'mariadb_replica_to_sf'
 TAP_POSTGRES_ID = 'postgres_to_sf'
 TAP_POSTGRES_SPLIT_LARGE_FILES_ID = 'postgres_to_sf_split_large_files'
 TAP_POSTGRES_ARCHIVE_LOAD_FILES_ID = 'postgres_to_sf_archive_load_files'
@@ -27,7 +28,7 @@ TAP_S3_CSV_ID = 's3_csv_to_sf'
 TARGET_ID = 'snowflake'
 
 
-# pylint: disable=attribute-defined-outside-init
+# pylint: disable=attribute-defined-outside-init,too-many-instance-attributes
 class TestTargetSnowflake:
     """
     End to end tests for Target Snowflake
@@ -39,6 +40,7 @@ class TestTargetSnowflake:
 
         # Init query runner methods
         self.run_query_tap_mysql = self.e2e.run_query_tap_mysql
+        self.run_query_tap_mysql_2 = self.e2e.run_query_tap_mysql_2
         self.run_query_tap_postgres = self.e2e.run_query_tap_postgres
         self.run_query_target_snowflake = self.e2e.run_query_target_snowflake
         self.mongodb_con = self.e2e.get_tap_mongodb_connection()
@@ -213,6 +215,25 @@ class TestTargetSnowflake:
         assertions.assert_all_columns_exist(
             self.run_query_tap_mysql,
             self.run_query_target_snowflake,
+            mysql_to_snowflake.tap_type_to_target_type,
+            schema_postfix=self.snowflake_schema_postfix
+        )
+
+    @pytest.mark.dependency(depends=['import_config'])
+    def test_replicate_mariadb_replica_to_sf(self):
+        """Replicate data from MariaDB to Snowflake"""
+        # 1. Run tap first time - both fastsync and a singer should be triggered
+        assertions.assert_run_tap_success(
+            TAP_MARIADB_REPLICA_ID, TARGET_ID, ['fastsync', 'singer']
+        )
+        assertions.assert_row_counts_equal(
+            self.run_query_tap_mysql_2,
+            self.run_query_target_snowflake,
+            self.snowflake_schema_postfix
+        )
+        assertions.assert_all_columns_exist(
+            self.run_query_tap_mysql_2,
+            self.e2e.run_query_target_snowflake,
             mysql_to_snowflake.tap_type_to_target_type,
             schema_postfix=self.snowflake_schema_postfix
         )

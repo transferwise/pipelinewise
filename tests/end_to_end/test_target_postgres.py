@@ -16,6 +16,7 @@ from .helpers.env import E2EEnv
 DIR = os.path.dirname(__file__)
 TAP_MARIADB_ID = 'mariadb_to_pg'
 TAP_MARIADB_BUFFERED_STREAM_ID = 'mariadb_to_pg_buffered_stream'
+TAP_MARIADB_REPLICA_ID = 'mariadb_replica_to_pg'
 TAP_MONGODB_ID = 'mongo_to_pg'
 TAP_POSTGRES_ID = 'postgres_to_pg'
 TAP_S3_CSV_ID = 's3_csv_to_pg'
@@ -36,6 +37,7 @@ class TestTargetPostgres:
         # Init query runner methods
         self.e2e = E2EEnv(self.project_dir)
         self.run_query_tap_mysql = self.e2e.run_query_tap_mysql
+        self.run_query_tap_mysql_2 = self.e2e.run_query_tap_mysql_2
         self.run_query_tap_postgres = self.e2e.run_query_tap_postgres
         self.run_query_target_postgres = self.e2e.run_query_target_postgres
         self.mongodb_con = self.e2e.get_tap_mongodb_connection()
@@ -206,6 +208,22 @@ class TestTargetPostgres:
         """Replicate data from MariaDB to Postgres DWH with custom buffer size
         Same tests cases as test_replicate_mariadb_to_pg but using another tap with custom stream buffer size"""
         self.test_resync_mariadb_to_pg(tap_mariadb_id=TAP_MARIADB_BUFFERED_STREAM_ID)
+
+    @pytest.mark.dependency(depends=['import_config'])
+    def test_replicate_mariadb_replica_to_pg(self):
+        """Replicate data from MariaDB to Postgres DWH"""
+        # 1. Run tap first time - both fastsync and a singer should be triggered
+        assertions.assert_run_tap_success(
+            TAP_MARIADB_REPLICA_ID, TARGET_ID, ['fastsync', 'singer'], profiling=True
+        )
+        assertions.assert_row_counts_equal(
+            self.run_query_tap_mysql_2, self.run_query_target_postgres
+        )
+        assertions.assert_all_columns_exist(
+            self.run_query_tap_mysql_2,
+            self.run_query_target_postgres,
+            mysql_to_postgres.tap_type_to_target_type,
+        )
 
     @pytest.mark.dependency(depends=['import_config'])
     def test_replicate_pg_to_pg(self):
