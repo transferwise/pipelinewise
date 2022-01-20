@@ -1,1 +1,1 @@
-pipelinewise-tap-postgres==1.8.2
+git+https://github.com/thread/pipelinewise-tap-postgres.git@master

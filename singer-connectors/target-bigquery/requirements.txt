@@ -1,1 +1,1 @@
-pipelinewise-target-bigquery==1.2.0
+git+https://github.com/thread/pipelinewise-target-bigquery.git@master
