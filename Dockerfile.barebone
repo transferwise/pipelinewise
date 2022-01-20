@@ -7,6 +7,7 @@ RUN apt-get -qq update \
         gnupg \
         libaio1 \
         wget \
+        git \
     && rm -rf /var/lib/apt/lists/* \
     && pip install -U --no-cache-dir pip
 
