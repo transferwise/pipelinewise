@@ -1,3 +1,9 @@
+0.38.1 (2022-02-25)
+-------------------
+- Bump `pipelinewise-tap-kafka` from `4.0.1` to `5.0.0`
+- Bump `pipelinewise-target-bigquery` from `1.1.1` to `1.2.0`
+- Prevent usage of extended transformation feature when FastSync exists
+
 0.38.0 (2022-01-14)
 -------------------
 - MySQL tap now connects to replica instance during fastsync if credentials are provided
