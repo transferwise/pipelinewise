@@ -753,7 +753,7 @@ class TestConfigValidation:
         for json_files_situation in test_cases:
             self._assert_retry_validation_of_json_file(json_files_situation)
 
-    def test_tap_config_jason_valid_if_state_file_does_not_exist(self):
+    def test_tap_config_json_valid_if_state_file_does_not_exist(self):
         """Test it is valid if state file does not exists at all"""
         with TemporaryDirectory() as temp_dir:
             valid_json_file = f'{temp_dir}/valid_file.json'
