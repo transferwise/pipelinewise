@@ -92,7 +92,7 @@ in the :ref:`yaml_configuration`:
               - column: "property_name"
                 equals: 'passwordHash'
 
-                # Tip: Use 'regex_match' instead of 'equal' if you need
+                # Tip: Use 'regex_match' instead of 'equals' if you need
                 # more complex matching criteria. For example:
                 # regex_match: 'password|salt|passwordHash'
 
@@ -103,6 +103,22 @@ in the :ref:`yaml_configuration`:
                 equals: 'com.transferwise.fx.user.User'
               - column: "property_name"
                 equals: 'passwordHash'
+
+          - column: "column_3"
+            type: "HASH"
+            when:
+              - column: "json_column"
+                field_path: 'metadata/property_name'
+                equals: 'passwordHash'
+
+      - table_name: "users"
+        replication_method: "LOG_BASED"
+        transformations:
+          - column: "json_column"
+            field_paths:
+              - "user/info/phone"
+              - "user/info/addresses/0"
+            type: "SET-NULL"
     ...
     ...
 

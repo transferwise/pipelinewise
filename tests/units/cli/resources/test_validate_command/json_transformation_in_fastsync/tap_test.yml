@@ -1,0 +1,46 @@
+---
+
+# ------------------------------------------------------------------------------
+# General Properties
+# ------------------------------------------------------------------------------
+id: "pg_sample"                     # Unique identifier of the tap
+name: "Sample PG Database"          # Name of the tap
+type: "tap-postgres"                # !! THIS SHOULD NOT CHANGE !!
+owner: "somebody@foo.com"           # Data owner to contact
+
+
+# ------------------------------------------------------------------------------
+# Source (Tap) - / Postgres connection details
+# ------------------------------------------------------------------------------
+db_conn:
+  host: "<HOST>"                       # Postgres host
+  port: 3306                           # Postgres port
+  user: "<USER>"                       # Postgres user
+  password: "<PASSWORD>"               # Plain string or vault encrypted
+  dbname: "<DB_NAME>"                  # Postgres database name
+
+
+# ------------------------------------------------------------------------------
+# Destination (Target) - Target properties
+# Connection details should be in the relevant target YAML file
+# ------------------------------------------------------------------------------
+target: "sf_target"               # ID of the target connector where the data will be loaded
+batch_size_rows: 20000         # Batch size for the stream to optimise load performance
+
+
+# ------------------------------------------------------------------------------
+# Source to target Schema mapping
+# ------------------------------------------------------------------------------
+schemas:
+
+  - source_schema: "my_db"             # Source schema (aka. database) in / Postgres with tables
+    target_schema: "repl_my_db"        # Target schema in the destination Data Warehouse
+
+    tables:
+      - table_name: "table_two"
+        replication_method: "LOG_BASED"
+        transformations:
+          - column: json_col
+            type: "SET-NULL"
+            field_paths:
+              - 'array_field/2'
