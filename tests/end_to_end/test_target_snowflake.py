@@ -59,6 +59,18 @@ class TestTargetSnowflake:
     def teardown_method(self):
         """Delete test directories and database objects"""
 
+    @pytest.mark.dependency(name='validate')
+    def test_validate(self):
+        """Validate the YAML project with taps and target """
+
+        # validate project
+        return_code, stdout, stderr = tasks.run_command(f'pipelinewise validate --dir {self.project_dir}')
+
+        print('--------------- stdout ----------', stdout)
+        print('--------------- stderr ----------', stderr)
+        assert return_code == 0
+
+    @pytest.mark.dependency(depends=['validate'])
     @pytest.mark.dependency(name='import_config')
     def test_import_project(self):
         """Import the YAML project with taps and target and do discovery mode

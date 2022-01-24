@@ -24,6 +24,7 @@ from .commands import TapParams, TargetParams, TransformParams
 from .config import Config
 from .alert_sender import AlertSender
 from .alert_handlers.base_alert_handler import BaseAlertHandler
+from .errors import InvalidTransformationException, DuplicateConfigException, InvalidConfigException
 
 FASTSYNC_PAIRS = {
     ConnectorType.TAP_MYSQL: {
@@ -1467,6 +1468,7 @@ class PipelineWise:
         yaml_dir = self.args.dir
         self.logger.info('Searching YAML config files in %s', yaml_dir)
         tap_yamls, target_yamls = utils.get_tap_target_names(yaml_dir)
+
         self.logger.info('Detected taps: %s', tap_yamls)
         self.logger.info('Detected targets: %s', target_yamls)
 
@@ -1475,47 +1477,74 @@ class PipelineWise:
 
         vault_secret = self.args.secret
 
-        target_ids = set()
-        # pylint: disable=E1136,E1137  # False positive when loading vault encrypted YAML
+        # dictionary of targets ID and type
+        targets = {}
+
         # Validate target json schemas and that no duplicate IDs exist
         for yaml_file in target_yamls:
-            self.logger.info('Started validating %s', yaml_file)
-            loaded_yaml = utils.load_yaml(
-                os.path.join(yaml_dir, yaml_file), vault_secret
-            )
-            utils.validate(loaded_yaml, target_schema)
+            self.logger.info('Started validating target file: %s', yaml_file)
 
-            if loaded_yaml['id'] in target_ids:
-                self.logger.error('Duplicate target found "%s"', loaded_yaml['id'])
-                sys.exit(1)
+            # pylint: disable=E1136  # False positive when loading vault encrypted YAML
+            target_yml = utils.load_yaml(os.path.join(yaml_dir, yaml_file), vault_secret)
+            utils.validate(target_yml, target_schema)
 
-            target_ids.add(loaded_yaml['id'])
-            self.logger.info('Finished validating %s', yaml_file)
+            if target_yml['id'] in targets:
+                raise DuplicateConfigException(f'Duplicate target found "{target_yml["id"]}"')
+
+            targets[target_yml['id']] = target_yml['type']
+
+            self.logger.info('Finished validating target file: %s', yaml_file)
 
         tap_ids = set()
-        # pylint: disable=E1136,E1137  # False positive when loading vault encrypted YAML
+
         # Validate tap json schemas, check that every tap has valid 'target' and that no duplicate IDs exist
         for yaml_file in tap_yamls:
-            self.logger.info('Started validating %s', yaml_file)
-            loaded_yaml = utils.load_yaml(
-                os.path.join(yaml_dir, yaml_file), vault_secret
-            )
-            utils.validate(loaded_yaml, tap_schema)
+            self.logger.info('Started validating %s ...', yaml_file)
 
-            if loaded_yaml['id'] in tap_ids:
-                self.logger.error('Duplicate tap found "%s"', loaded_yaml['id'])
-                sys.exit(1)
+            # pylint: disable=E1136  # False positive when loading vault encrypted YAML
+            tap_yml = utils.load_yaml(os.path.join(yaml_dir, yaml_file), vault_secret)
+            utils.validate(tap_yml, tap_schema)
 
-            if loaded_yaml['target'] not in target_ids:
-                self.logger.error(
-                    "Can'f find the target with the ID '%s' referenced in '%s'. Available target IDs: %s",
-                    loaded_yaml['target'],
-                    yaml_file,
-                    target_ids,
-                )
-                sys.exit(1)
+            if tap_yml['id'] in tap_ids:
+                raise DuplicateConfigException(f'Duplicate tap found "{tap_yml["id"]}"')
 
-            tap_ids.add(loaded_yaml['id'])
+            if tap_yml['target'] not in targets:
+                raise InvalidConfigException(
+                    f"Can't find the target with the ID '{tap_yml['target']}' referenced in '{yaml_file}'."
+                    f'Available target IDs: {list(targets.keys())}',
+                    )
+
+            tap_ids.add(tap_yml['id'])
+
+            # If there is a fastsync component for this tap-target combo and transformations on json properties are
+            # configured then fail the validation.
+            # The reason being that at the time of writing this, transformations in Fastsync are done on the
+            # target side using mostly SQL UPDATE, and transformations on properties in json fields are not
+            # implemented due to the need of converting XPATH syntax to SQL which has been deemed as not worth it
+            if self.__does_fastsync_component_exist(targets[tap_yml['target']], tap_yml['type']):
+                self.logger.debug('FastSync component found for tap %s', tap_yml['id'])
+
+                # Load the transformations
+                transformations = Config.generate_transformations(tap_yml)
+
+                # check if transformations are using "field_paths" or "field_path" config, fail if so
+                for transformation in transformations:
+                    if transformation.get('field_paths') is not None:
+                        raise InvalidTransformationException(
+                            'This tap-target combo has FastSync component and is configuring a transformation on json '
+                            'properties which are not supported by FastSync!\n'
+                            f'Please omit "field_paths" from the transformation config of tap "{tap_yml["id"]}"'
+                        )
+
+                    if transformation['when'] is not None:
+                        for condition in transformation['when']:
+                            if condition.get('field_path') is not None:
+                                raise InvalidTransformationException(
+                                    'This tap-target combo has FastSync component and is configuring a transformation '
+                                    'conditions on json properties which are not supported by FastSync!\n'
+                                    f'Please omit "field_path" from the transformation config of tap "{tap_yml["id"]}"'
+                                )
+
             self.logger.info('Finished validating %s', yaml_file)
 
         self.logger.info('Validation successful')
@@ -1801,3 +1830,16 @@ TAP RUN SUMMARY
 
             if returncode != 0:
                 return stderr
+
+    @classmethod
+    def __does_fastsync_component_exist(cls, target_type: str, tap_type: str) -> bool:
+        """
+        Checks if the given tap-target combo have FastSync
+        Args:
+            target_type: type of the target
+            tap_type: type of tap
+
+        Returns:
+            Boolean, True if FastSync exists, False otherwise.
+        """
+        return ConnectorType(target_type) in FASTSYNC_PAIRS.get(ConnectorType(tap_type), {})

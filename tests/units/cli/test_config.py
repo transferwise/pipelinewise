@@ -4,6 +4,7 @@ import pytest
 
 from pipelinewise import cli
 from pipelinewise.cli.config import Config
+from pipelinewise.cli.errors import InvalidConfigException
 
 PIPELINEWISE_TEST_HOME = '/tmp/.pipelinewise'
 
@@ -155,11 +156,8 @@ class TestConfig:
         )
         vault_secret = '{}/resources/vault-secret.txt'.format(os.path.dirname(__file__))
         print(yaml_config_dir)
-        with pytest.raises(SystemExit) as pytest_wrapped_e:
+        with pytest.raises(InvalidConfigException):
             Config.from_yamls(PIPELINEWISE_TEST_HOME, yaml_config_dir, vault_secret)
-
-        assert pytest_wrapped_e.type == SystemExit
-        assert pytest_wrapped_e.value.code == 1
 
     def test_from_invalid_yamls(self):
         """Test creating Config object using invalid YAML configuration directory"""

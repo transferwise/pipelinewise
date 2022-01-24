@@ -3,6 +3,7 @@ import pytest
 
 from unittest import TestCase
 from pipelinewise import cli
+from pipelinewise.cli.errors import InvalidConfigException
 
 TAP_GITHUB_YAML = '{}/resources/tap-github.yml'.format(os.path.dirname(__file__))
 
@@ -16,11 +17,8 @@ class TestUtils(TestCase):
 
     def assert_json_is_invalid(self, schema, invalid_yaml):
         """Simple assertion to check if validate function exits with error"""
-        with pytest.raises(SystemExit) as pytest_wrapped_e:
+        with pytest.raises(InvalidConfigException):
             cli.utils.validate(invalid_yaml, schema)
-
-        self.assertEqual(pytest_wrapped_e.type, SystemExit)
-        self.assertEqual(pytest_wrapped_e.value.code, 1)
 
     def test_should_pass_with_valid_json_schema(self):
         """
