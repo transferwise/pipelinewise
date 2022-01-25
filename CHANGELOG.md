@@ -3,6 +3,8 @@
 - Bump `pipelinewise-tap-kafka` from `4.0.1` to `5.0.0`
 - Bump `pipelinewise-target-bigquery` from `1.1.1` to `1.2.0`
 - Prevent usage of extended transformation feature when FastSync exists
+- Fixed fastsync from postgres to bigquery
+- Fixed an issue when `SplitGzipFile` doesn't work with binary mode
 
 0.38.0 (2022-01-14)
 -------------------
