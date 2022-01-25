@@ -17,6 +17,7 @@ from pipelinewise import cli
 from pipelinewise.cli.constants import ConnectorType
 from pipelinewise.cli.config import Config
 from pipelinewise.cli.pipelinewise import PipelineWise
+from pipelinewise.cli.errors import DuplicateConfigException, InvalidConfigException, InvalidTransformationException
 
 RESOURCES_DIR = '{}/resources'.format(os.path.dirname(__file__))
 CONFIG_DIR = '{}/sample_json_config'.format(RESOURCES_DIR)
@@ -519,7 +520,7 @@ class TestCli:
         ):
             assert os.path.isfile(os.path.join(TEST_PROJECT_DIR, sample_yaml))
 
-        # Re-creating project should reaise exception of directory not empty
+        # Re-creating project should raise exception of directory not empty
         with pytest.raises(SystemExit) as pytest_wrapped_e:
             pipelinewise.init()
         assert pytest_wrapped_e.type == SystemExit
@@ -693,7 +694,7 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
         args = CliArgs(dir=test_validate_command_dir)
         pipelinewise = PipelineWise(args, CONFIG_DIR, VIRTUALENVS_DIR)
 
-        with pytest.raises(SystemExit):
+        with pytest.raises(InvalidConfigException):
             pipelinewise.validate()
 
     def test_validate_command_2(self):
@@ -713,7 +714,7 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
         args = CliArgs(dir=test_validate_command_dir)
         pipelinewise = PipelineWise(args, CONFIG_DIR, VIRTUALENVS_DIR)
 
-        with pytest.raises(SystemExit):
+        with pytest.raises(InvalidConfigException):
             pipelinewise.validate()
 
     def test_validate_command_4(self):
@@ -724,7 +725,21 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
         args = CliArgs(dir=test_validate_command_dir)
         pipelinewise = PipelineWise(args, CONFIG_DIR, VIRTUALENVS_DIR)
 
-        with pytest.raises(SystemExit):
+        with pytest.raises(DuplicateConfigException):
+            pipelinewise.validate()
+
+    def test_validate_command_5(self):
+        """
+        Test validate command should fail because of transformation on json properties for a tap-target combo that
+        has Fastsync
+        """
+        test_validate_command_dir = \
+            f'{os.path.dirname(__file__)}/resources/test_validate_command/json_transformation_in_fastsync'
+
+        args = CliArgs(dir=test_validate_command_dir)
+        pipelinewise = PipelineWise(args, CONFIG_DIR, VIRTUALENVS_DIR)
+
+        with pytest.raises(InvalidTransformationException):
             pipelinewise.validate()
 
     # pylint: disable=protected-access
