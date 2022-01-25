@@ -11,6 +11,7 @@ RUN apt-get -qq update \
         mbuffer \
         wget \
         git \
+        fuse \
     && rm -rf /var/lib/apt/lists/* \
     && pip install -U --no-cache-dir pip
 
@@ -21,6 +22,12 @@ RUN wget -qO - https://www.mongodb.org/static/pgp/server-4.4.asc | apt-key add -
     && apt-get -qqy --no-install-recommends install \
         mongodb-database-tools \
     && rm -rf /var/lib/apt/lists/*
+
+# Install GCSFuse
+ENV GCSFUSE_VERSION 0.39.2
+RUN wget https://github.com/GoogleCloudPlatform/gcsfuse/releases/download/v${GCSFUSE_VERSION}/gcsfuse_${GCSFUSE_VERSION}_amd64.deb \
+    && dpkg --install gcsfuse_${GCSFUSE_VERSION}_amd64.deb \
+    && rm -Rf gcsfuse_${GCSFUSE_VERSION}_amd64.deb
 
 COPY singer-connectors/ /app/singer-connectors/
 COPY Makefile /app
