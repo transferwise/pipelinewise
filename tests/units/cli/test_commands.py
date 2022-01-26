@@ -5,8 +5,8 @@ import pytest
 import threading
 import time
 
-from pytest_mock import mocker  # noqa: F401 pylint: disable=unused-import
 from tempfile import TemporaryDirectory
+from unittest import mock
 
 from pipelinewise.cli import commands
 from pipelinewise.cli.errors import StreamBufferTooLargeException
@@ -17,12 +17,6 @@ class TestCommands:
     """
     Unit tests for PipelineWise CLI commands functions
     """
-
-    # pylint: disable=redefined-outer-name
-    @pytest.fixture(autouse=True)
-    def mock_json_validation(self, mocker):  # noqa: F811
-        """we are using some config files which does not exist, so we patch the method that verifies the json files"""
-        mocker.patch('pipelinewise.cli.commands._verify_json_file', return_value=True)
 
     def test_exists_and_executable(self):
         """Tests the function that detect if a file exists and executable"""
@@ -40,8 +34,11 @@ class TestCommands:
                 tmp_file.write('foo')
             assert commands.exists_and_executable(f'{temp_dir}/test.tmp') is False
 
+    @mock.patch('pipelinewise.cli.commands._verify_json_file', mock.MagicMock(return_value=True))
     def test_build_tap_command(self):
         """Tests the function that generates tap executable command"""
+
+        # we are using some config files which does not exist, so we patch the method that verifies the json files
         # State file should not be included if state file path not passed
 
         tap = commands.TapParams(
@@ -141,8 +138,11 @@ class TestCommands:
             f'--config .ppw/config.json --catalog .ppw/properties.json --state {state_mock}'
         )
 
+    @mock.patch('pipelinewise.cli.commands._verify_json_file', mock.MagicMock(return_value=True))
     def test_build_target_command(self):
         """Tests the function that generates target executable command"""
+
+        # we are using some config files which does not exist, so we patch the method that verifies the json files
         # Should return a input piped command with an executable target command
 
         target = commands.TargetParams(
@@ -269,9 +269,13 @@ class TestCommands:
             == 'mbuffer -m 100M -q -l stream_buffer.log.running'
         )
 
+    @mock.patch('pipelinewise.cli.commands._verify_json_file', mock.MagicMock(return_value=True))
     def test_build_singer_command(self):
         """Tests the function that generates the full singer singer command
         that connects the required components with linux pipes"""
+
+        # we are using some config files which does not exist, so we patch the method that verifies the json files
+
         transform_config = '{}/resources/transform-config.json'.format(
             os.path.dirname(__file__)
         )
@@ -502,8 +506,12 @@ class TestCommands:
             '--config .ppw/config.json'
         )
 
+    @mock.patch('pipelinewise.cli.commands._verify_json_file', mock.MagicMock(return_value=True))
     def test_build_fastsync_command(self):
         """Tests the function that generates the fastsync command"""
+
+        # we are using some config files which does not exist, so we patch the method that verifies the json files
+
         transform_config = '{}/resources/transform-config.json'.format(
             os.path.dirname(__file__)
         )
