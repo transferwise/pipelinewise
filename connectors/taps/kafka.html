@@ -79,7 +79,6 @@
 <li class="toctree-l2"><a class="reference internal" href="oracle.html">Tap Oracle</a></li>
 <li class="toctree-l2"><a class="reference internal" href="s3_csv.html">Tap S3 CSV</a></li>
 <li class="toctree-l2 current"><a class="current reference internal" href="#">Tap Kafka</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#consuming-kafka-messages">Consuming Kafka messages</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#configuring-what-to-replicate">Configuring what to replicate</a></li>
 </ul>
 </li>
@@ -143,12 +142,7 @@
 <li><p><code class="docutils literal notranslate"><span class="pre">MESSAGE</span></code>: The original and full kafka message</p></li>
 <li><p><cite>Dynamic primary key columns</cite>: (Optional) Fields extracted from the Kafka JSON messages by JSONPath selector(s).</p></li>
 </ul>
-<section id="consuming-kafka-messages">
-<h2>Consuming Kafka messages<a class="headerlink" href="#consuming-kafka-messages" title="Permalink to this headline"></a></h2>
-<p>Tap Kafka saves consumed messages into a local disk storage and sends commit messages to Kafka after every
-consumed message. A batching mechanism keeps maintaining of deleting and flushing messages from the local storage
-and sends singer compatible messages in small batches to standard output.</p>
-</section>
+<p>Supported message formats: JSON and Protobuf (experimental).</p>
 <section id="configuring-what-to-replicate">
 <h2>Configuring what to replicate<a class="headerlink" href="#configuring-what-to-replicate" title="Permalink to this headline"></a></h2>
 <p>PipelineWise configures every tap with a common structured YAML file format.
@@ -184,19 +178,34 @@ following the steps in the <a class="reference internal" href="../../installatio
 <span class="w">  </span><span class="nt">primary_keys</span><span class="p">:</span><span class="w"></span>
 <span class="w">     </span><span class="nt">transfer_id</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/transferMetadata/transferId&quot;</span><span class="w"></span>
 
+<span class="w">  </span><span class="c1">#initial_start_time:                      # (Default: latest) Start time reference of the message consumption if</span><span class="w"></span>
+<span class="w">                                            </span><span class="c1"># no bookmarked position in state.json. One of: latest, earliest or an</span><span class="w"></span>
+<span class="w">                                            </span><span class="c1"># ISO-8601 formatted timestamp string.</span><span class="w"></span>
+
 <span class="w">  </span><span class="c1"># --------------------------------------------------------------------------</span><span class="w"></span>
-<span class="w">  </span><span class="c1"># Kafka Consumer optional parameters</span><span class="w"></span>
+<span class="w">  </span><span class="c1"># Kafka Consumer optional parameters. Commented values are default values.</span><span class="w"></span>
 <span class="w">  </span><span class="c1"># --------------------------------------------------------------------------</span><span class="w"></span>
 <span class="w">  </span><span class="c1">#max_runtime_ms: 300000                   # The maximum time for the tap to collect new messages from Kafka topic.</span><span class="w"></span>
 <span class="w">  </span><span class="c1">#consumer_timeout_ms: 10000               # KafkaConsumer setting. Number of milliseconds to block during message iteration before raising StopIteration</span><span class="w"></span>
 <span class="w">  </span><span class="c1">#session_timeout_ms: 30000                # KafkaConsumer setting. The timeout used to detect failures when using Kafka’s group management facilities.</span><span class="w"></span>
 <span class="w">  </span><span class="c1">#heartbeat_interval_ms: 10000             # KafkaConsumer setting. The expected time in milliseconds between heartbeats to the consumer coordinator when using Kafka’s group management facilities.</span><span class="w"></span>
 <span class="w">  </span><span class="c1">#max_poll_interval_ms: 300000             # KafkaConsumer setting. The maximum delay between invocations of poll() when using consumer group management.</span><span class="w"></span>
-<span class="w">  </span><span class="c1">#max_poll_records: 500                    # KafkaConsumer setting. The maximum number of records returned in a single call to poll().</span><span class="w"></span>
 
 <span class="w">  </span><span class="c1">#commit_interval_ms: 5000                 # Number of milliseconds between two commits. This is different than the kafka auto commit feature. Tap-kafka sends commit messages automatically but only when the data consumed successfully and persisted to local store.</span><span class="w"></span>
-<span class="w">  </span><span class="c1">#local_store_dir: ./tap-kafka-local-store # Path to the local store with consumed kafka messages</span><span class="w"></span>
-<span class="w">  </span><span class="c1">#local_store_batch_size_rows: 1000        # Number of messages to write to disk in one go. This can avoid high I/O issues when messages written to local store disk too frequently.</span><span class="w"></span>
+
+<span class="w">  </span><span class="c1"># --------------------------------------------------------------------------</span><span class="w"></span>
+<span class="w">  </span><span class="c1"># Protobuf support - Experimental</span><span class="w"></span>
+<span class="w">  </span><span class="c1"># --------------------------------------------------------------------------</span><span class="w"></span>
+<span class="w">  </span><span class="c1">#message_format: protobuf                 # (Default: json) Supported message formats are json and protobuf.</span><span class="w"></span>
+<span class="w">  </span><span class="c1">#proto_schema: |                          # Protobuf message format in .proto syntax. Required if the message_format is protobuf.</span><span class="w"></span>
+<span class="w">  </span><span class="c1">#     syntax = &quot;proto3&quot;;</span><span class="w"></span>
+<span class="w">  </span><span class="c1">#</span><span class="w"></span>
+<span class="w">  </span><span class="c1">#     message ProtoMessage {</span><span class="w"></span>
+<span class="w">  </span><span class="c1">#       string query = 1;</span><span class="w"></span>
+<span class="w">  </span><span class="c1">#       int32 page_number = 2;</span><span class="w"></span>
+<span class="w">  </span><span class="c1">#       int32 result_per_page = 3;</span><span class="w"></span>
+<span class="w">  </span><span class="c1">#     }</span><span class="w"></span>
+<span class="w">  </span><span class="c1">#proto_classess_dir:                      # (Default: current working dir) Directory where to store runtime compiled proto classes</span><span class="w"></span>
 
 
 <span class="c1"># ------------------------------------------------------------------------------</span><span class="w"></span>
