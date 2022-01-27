@@ -1,3 +1,7 @@
+0.40.0 (2022-02-27)
+-------------------
+- Bump `pipelinewise-tap-kafka` from `5.0.1` to `5.1.0`
+
 0.39.1 (2022-02-26)
 -------------------
 - Bump `pipelinewise-tap-kafka` from `5.0.0` to `5.0.1`
