@@ -27,19 +27,34 @@ db_conn:
   primary_keys:
      transfer_id: "/transferMetadata/transferId"
 
+  #initial_start_time:                      # (Default: latest) Start time reference of the message consumption if
+                                            # no bookmarked position in state.json. One of: latest, earliest or an
+                                            # ISO-8601 formatted timestamp string.
+
   # --------------------------------------------------------------------------
-  # Kafka Consumer optional parameters
+  # Kafka Consumer optional parameters. Commented values are default values.
   # --------------------------------------------------------------------------
   #max_runtime_ms: 300000                   # The maximum time for the tap to collect new messages from Kafka topic.
   #consumer_timeout_ms: 10000               # KafkaConsumer setting. Number of milliseconds to block during message iteration before raising StopIteration
   #session_timeout_ms: 30000                # KafkaConsumer setting. The timeout used to detect failures when using Kafka’s group management facilities.
   #heartbeat_interval_ms: 10000             # KafkaConsumer setting. The expected time in milliseconds between heartbeats to the consumer coordinator when using Kafka’s group management facilities.
   #max_poll_interval_ms: 300000             # KafkaConsumer setting. The maximum delay between invocations of poll() when using consumer group management.
-  #max_poll_records: 500                    # KafkaConsumer setting. The maximum number of records returned in a single call to poll().
 
   #commit_interval_ms: 5000                 # Number of milliseconds between two commits. This is different than the kafka auto commit feature. Tap-kafka sends commit messages automatically but only when the data consumed successfully and persisted to local store.
-  #local_store_dir: ./tap-kafka-local-store # Path to the local store with consumed kafka messages
-  #local_store_batch_size_rows: 1000        # Number of messages to write to disk in one go. This can avoid high I/O issues when messages written to local store disk too frequently.
+
+  # --------------------------------------------------------------------------
+  # Protobuf support - Experimental
+  # --------------------------------------------------------------------------
+  #message_format: protobuf                 # (Default: json) Supported message formats are json and protobuf.
+  #proto_schema: |                          # Protobuf message format in .proto syntax. Required if the message_format is protobuf.
+  #     syntax = "proto3";
+  #
+  #     message ProtoMessage {
+  #       string query = 1;
+  #       int32 page_number = 2;
+  #       int32 result_per_page = 3;
+  #     }
+  #proto_classess_dir:                      # (Default: current working dir) Directory where to store runtime compiled proto classes
 
 # ------------------------------------------------------------------------------
 # Destination (Target) - Target properties
