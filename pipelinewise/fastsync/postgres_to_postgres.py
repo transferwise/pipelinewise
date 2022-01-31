@@ -30,7 +30,7 @@ REQUIRED_CONFIG_KEYS = {
 LOCK = multiprocessing.Lock()
 
 
-def tap_type_to_target_type(pg_type):
+def tap_type_to_target_type(pg_type, *_):
     """Data type mapping from Postgres to Postgres"""
     return {
         'char': 'CHARACTER VARYING',

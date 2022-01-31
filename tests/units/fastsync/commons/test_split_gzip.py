@@ -1,3 +1,4 @@
+import builtins
 import gzip
 import itertools
 import glob
@@ -111,7 +112,7 @@ class TestSplitGzipFile(TestCase):
         """
         Write gzip without splitting it and reading it
         """
-        # max_chunk = 0 should create a file with no splitting
+        # max_chunk = 0 should create a file with no splitting and binary mode
         with split_gzip.SplitGzipFile(self.filename, 'wb', max_chunks=0) as f_write:
             f_write.write(DATA_WITH_100_BYTES * 50)
 
@@ -119,6 +120,38 @@ class TestSplitGzipFile(TestCase):
             file_content = f_read.read()
 
         self.assertEqual(file_content, DATA_WITH_100_BYTES * 50)
+
+        # max_chunk = 0 should create a file with no splitting and text mode
+        with split_gzip.SplitGzipFile(self.filename, 'wt', max_chunks=0) as f_write:
+            f_write.write(str(DATA_WITH_100_BYTES * 50))
+
+        with gzip.open(self.filename, 'rt') as f_read:
+            file_content = f_read.read()
+
+        self.assertEqual(file_content, str(DATA_WITH_100_BYTES * 50))
+
+    def test_write_with_no_split_no_compress(self):
+        """
+        Write gzip without splitting it and reading it
+        """
+        # max_chunk = 0 should create a file with no splitting and binary mode
+        with split_gzip.SplitGzipFile(
+                self.filename, 'wb', max_chunks=0, compress=False) as f_write:
+            f_write.write(DATA_WITH_100_BYTES * 50)
+
+        with builtins.open(self.filename, 'rb') as f_read:
+            file_content = f_read.read()
+
+        self.assertEqual(file_content, DATA_WITH_100_BYTES * 50)
+
+        # max_chunk = 0 should create a file with no splitting and text mode
+        with split_gzip.SplitGzipFile(self.filename, 'wt', max_chunks=0) as f_write:
+            f_write.write(str(DATA_WITH_100_BYTES * 50))
+
+        with gzip.open(self.filename, 'rt') as f_read:
+            file_content = f_read.read()
+
+        self.assertEqual(file_content, str(DATA_WITH_100_BYTES * 50))
 
     def test_write_with_single_chunk(self):
         """
