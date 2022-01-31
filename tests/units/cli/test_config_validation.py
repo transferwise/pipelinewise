@@ -29,7 +29,7 @@ class TestConfigValidation(TestCase):
         self.temp_dir.cleanup()
 
     class AsyncWriteJsonFile(threading.Thread):
-        """Helper class to asynchronous write on a file"""
+        """Helper class for asynchronous writing on a file"""
         def __init__(self, file_name, content, waiting_time):
             threading.Thread.__init__(self)
             self.file_name = file_name
@@ -75,15 +75,39 @@ class TestConfigValidation(TestCase):
 
         self._assert_tap_config(config=config, properties=properties, state=state)
 
-    def test_tap_config_json_validation_retry(self):
-        """Test it retries if any json file is invalid"""
-        test_cases = [(self.invalid_json_file, self.valid_json_file, self.valid_json_file),
-                      (self.valid_json_file, self.invalid_json_file, self.valid_json_file),
-                      (self.valid_json_file, self.valid_json_file, self.invalid_json_file)
-                      ]
+    def _assert_raise_exception_on_invalid_file_content(self, test_case_invalid, invalid_file_contents):
+        for invalid_content in invalid_file_contents:
+            with open(self.invalid_json_file, 'w', encoding='utf-8') as invalid_file:
+                invalid_file.write(invalid_content)
 
-        for config, properties, state in test_cases:
-            self._assert_retry_validation_of_json_file(config, properties, state)
+            with self.assertRaises(commands.RunCommandException) as command_exception:
+                self._assert_tap_config(
+                    config=self.invalid_json_file if test_case_invalid == 'config' else self.valid_json_file,
+                    properties=self.invalid_json_file if test_case_invalid == 'properties' else self.valid_json_file,
+                    state=self.invalid_json_file if test_case_invalid == 'state' else self.valid_json_file,
+                )
+            self.assertEqual(f'Invalid json file for {test_case_invalid}: {self.invalid_json_file}',
+                             str(command_exception.exception))
+
+    # -----------------  TEST CASES FOR TAP --------------------------
+
+    def test_tap_config_json_validation_retry_with_invalid_config_and_then_fix(self):
+        """Test it retries to validate the file if config file is invalid and then during the process it is fixed"""
+        self._assert_retry_validation_of_json_file(config=self.invalid_json_file,
+                                                   properties=self.valid_json_file,
+                                                   state=self.valid_json_file)
+
+    def test_tap_config_json_validation_retry_with_invalid_properties_and_then_fix(self):
+        """Test it retries to validate the file if properties file is invalid and then during the process it is fixed"""
+        self._assert_retry_validation_of_json_file(config=self.valid_json_file,
+                                                   properties=self.invalid_json_file,
+                                                   state=self.valid_json_file)
+
+    def test_tap_config_json_validation_retry_with_invalid_state_and_then_fix(self):
+        """Test it retries to validate the file if state file is invalid and then during the process it is fixed"""
+        self._assert_retry_validation_of_json_file(config=self.valid_json_file,
+                                                   properties=self.valid_json_file,
+                                                   state=self.invalid_json_file)
 
     def test_tap_config_json_valid_if_state_file_does_not_exist(self):
         """Test it is valid if state file does not exists at all"""
@@ -100,62 +124,46 @@ class TestConfigValidation(TestCase):
             state=self.empty_file
         )
 
+    def test_tap_config_raises_exception_if_config_is_none(self):
+        """Test it raises an exception if not any file is defined for config"""
+        with self.assertRaises(commands.RunCommandException) as command_exception:
+            self._assert_tap_config(config=None, properties=self.valid_json_file, state=self.valid_json_file)
+
+        self.assertEqual('Invalid json file for config: None', str(command_exception.exception))
+
+    def test_tap_config_valid_if_properties_is_none(self):
+        """Test TapConfig is valid if not a file defined for properties"""
+        self._assert_tap_config(config=self.valid_json_file, properties=None, state=self.valid_json_file)
+
+    def test_tap_config_valid_if_state_is_none(self):
+        """Test TapConfig is valid if not a file defined for state"""
+        self._assert_tap_config(config=self.valid_json_file, properties=self.valid_json_file, state=None)
+
+    def test_tap_config_raise_exception_if_invalid_config_yet_after_retries(self):
+        """Test it raises an exception if invalid json file for config yet after many retries"""
+        self._assert_raise_exception_on_invalid_file_content(
+            test_case_invalid='config',
+            invalid_file_contents=('', ' ', 'foo', '{"foo": 1')
+        )
+
+    def test_tap_config_raise_exception_if_invalid_properties_yet_after_retries(self):
+        """Test it raises an exception if invalid json file for properties yet after many retries"""
+        self._assert_raise_exception_on_invalid_file_content(
+            test_case_invalid='properties',
+            invalid_file_contents=('', ' ', 'foo', '{"foo": 1')
+        )
+
     def test_tap_config_json_raise_exception_on_invalid_content_for_state_file(self):
         """Test if exception is raised exception on invalid content"""
-        invalid_file_contents = (' ', 'foo', '{"foo": 1')
-
-        for invalid_content in invalid_file_contents:
-            with open(self.invalid_json_file, 'w', encoding='utf-8') as invalid_file:
-                invalid_file.write(invalid_content)
-
-            with self.assertRaises(commands.RunCommandException) as command_exception:
-                self._assert_tap_config(
-                    config=self.valid_json_file,
-                    properties=self.valid_json_file,
-                    state=self.invalid_json_file,
-                )
-            assert str(command_exception.exception) == f'Invalid json file for state: {self.invalid_json_file}'
-
-    def test_tap_config_valid_if_json_property_is_none(self):
-        """Test TapConfig is valid if a json property is None"""
-        test_cases = (
-            (None, self.valid_json_file, self.valid_json_file),
-            (self.valid_json_file, None, self.valid_json_file),
-            (self.valid_json_file, self.valid_json_file, None)
+        self._assert_raise_exception_on_invalid_file_content(
+            test_case_invalid='state',
+            invalid_file_contents=(' ', 'foo', '{"foo": 1')
         )
-        for config, properties, state in test_cases:
-            self._assert_tap_config(
-                config=config,
-                properties=properties,
-                state=state
-            )
 
-    def test_tap_config_raise_exception_if_not_valid_json_after_retries(self):
-        """Test it raises and exception if invalid json files yet after many retries"""
-        invalid_file_contents = ['', ' ', 'foo', '{"foo": 1']
-
-        for invalid_content in invalid_file_contents:
-            with open(self.invalid_json_file, 'w', encoding='utf-8') as invalid_file:
-                invalid_file.write(invalid_content)
-
-            test_cases = (
-                (self.invalid_json_file, self.valid_json_file),
-                (self.valid_json_file,  self.invalid_json_file)
-            )
-            for config, properties in test_cases:
-                with self.assertRaises(commands.RunCommandException) as command_exception:
-                    self._assert_tap_config(
-                        config=config,
-                        properties=properties,
-                        state=self.valid_json_file,
-                    )
-
-                    assert str(command_exception.exception) ==\
-                           f'Invalid json file for {"config" if config == self.invalid_json_file else "properties"}:' \
-                           f' {self.invalid_json_file}'
+    # -----------------  TEST CASES FOR TARGET --------------------------
 
     def test_target_config_json_validation_retires(self):
-        """Test it retries if any json file is invalid"""
+        """Test it retries if config json file is invalid"""
         invalid_file_to_be_fixed_later = self.invalid_json_file
 
         # It starts with an invalid file and since the main method is retrying we fix the file after some seconds
@@ -167,9 +175,11 @@ class TestConfigValidation(TestCase):
 
         self._assert_target_config(config=invalid_file_to_be_fixed_later)
 
-    def test_target_config_valid_if_json_property_is_none(self):
-        """Test TargetConfig is valid if config is None"""
-        self._assert_target_config(config=None)
+    def test_target_config_raises_exception_if_json_property_is_none(self):
+        """Test it raises an exception if not any file is defined for config"""
+        with self.assertRaises(commands.RunCommandException) as command_exception:
+            self._assert_target_config(config=None)
+        self.assertEqual('Invalid json file for config: None', str(command_exception.exception))
 
     def test_target_config_raises_exception_if_not_valid_json_after_retries(self):
         """Test if it raises and exception if invalid json files yet after many retries"""
@@ -182,4 +192,5 @@ class TestConfigValidation(TestCase):
             with self.assertRaises(commands.RunCommandException) as command_exception:
                 self._assert_target_config(config=self.invalid_json_file)
 
-            assert str(command_exception.exception) == f'Invalid json file for config: {self.invalid_json_file}'
+            self.assertEqual(f'Invalid json file for config: {self.invalid_json_file}',
+                             str(command_exception.exception))

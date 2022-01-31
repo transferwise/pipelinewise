@@ -72,11 +72,16 @@ class TapParams(OriginalTapParams):
     # pylint: disable=unused-argument
     def __init__(self, *args, **kwargs):
         super().__init__()
+        if not getattr(self, 'config', None):
+            raise RunCommandException(
+                f'Invalid json file for config: {getattr(self, "config", None)}')
+
         list_of_params_in_json_file = {
             'config': {'file_must_exists': True, 'allowed_empty': False},
             'properties': {'file_must_exists': True, 'allowed_empty': False},
             'state': {'file_must_exists': False, 'allowed_empty': True}
         }
+
         for param, file_property in list_of_params_in_json_file.items():
             valid_json = do_json_conf_validation(
                 json_file=getattr(self, param, None),
@@ -96,9 +101,11 @@ class TargetParams(OriginalTargetParams):
     # pylint: disable=unused-argument
     def __init__(self, *args, **kwargs):
         super().__init__()
+        json_file = getattr(self, 'config', None)
+
         valid_json = do_json_conf_validation(
             json_file=getattr(self, 'config', None),
-            file_property={'file_must_exists': True, 'allowed_empty': False}) if getattr(self, 'config', None) else True
+            file_property={'file_must_exists': True, 'allowed_empty': False}) if json_file else False
 
         if not valid_json:
             raise RunCommandException(f'Invalid json file for config: {getattr(self, "config", None)}')
