@@ -34,6 +34,7 @@ jobs:
       uses: docker/build-push-action@v2
       with:
         file: ./Dockerfile
+        context: .
         push: true
         tags: |
           transferwiseworkspace/pipelinewise:${{ steps.genTag.outputs.replaced }}
@@ -44,12 +45,27 @@ jobs:
       uses: docker/build-push-action@v2
       with:
         file: ./Dockerfile.barebone
+        context: .
         push: true
         tags: |
           transferwiseworkspace/pipelinewise-barebone:${{ steps.genTag.outputs.replaced }}
           transferwiseworkspace/pipelinewise-barebone:latest
+          
+    - name: Build and push main image with only default connectors
+      id: docker_build_default
+      uses: docker/build-push-action@v2
+      with:
+        file: ./Dockerfile
+        context: .
+        build_args: |
+          "connectors=default"
+        push: true
+        tags: |
+          transferwiseworkspace/pipelinewise-default:${{ steps.genTag.outputs.replaced }}
+          transferwiseworkspace/pipelinewise-default:latest
 
     - name: Image digests
       run: |
         echo ${{ steps.docker_build_main.outputs.digest }}
         echo ${{ steps.docker_build_barebone.outputs.digest }}
+        echo ${{ steps.docker_build_default.outputs.digest }}
