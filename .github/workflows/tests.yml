@@ -69,7 +69,6 @@ jobs:
         uses: google-github-actions/setup-gcloud@v0.2.0
         with:
           service_account_key: ${{ secrets.GCP_PIPELINEWISE_SA }}
-          project_id: thread-styleme
           export_default_credentials: true
           credentials_file_path: "./application_default_credentials.json"
 
