@@ -131,6 +131,9 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
             target_schema, table, snowflake_columns, primary_key, is_temporary=True
         )
 
+        # Update table primary keys to nullable
+        snowflake.update_primary_keys_nullable(target_schema, table, primary_key, is_temporary=True)
+
         # Load into Snowflake table
         snowflake.copy_to_table(
             s3_key_pattern, target_schema, table, size_bytes, is_temporary=True

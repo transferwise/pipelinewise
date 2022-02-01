@@ -312,6 +312,32 @@ class FastSyncTargetSnowflake:
             ),
         )
 
+    def update_primary_keys_nullable(self,
+        target_schema: str,
+        table_name: str,
+        primary_key: List[str],
+        is_temporary: bool = False):
+
+        if primary_key is None:
+            return
+
+        table_dict = utils.tablename_to_dict(table_name)
+        target_table = (
+            table_dict.get('table_name')
+            if not is_temporary
+            else table_dict.get('temp_table_name')
+        )
+
+        for pk_column in primary_key:
+            sql = (
+                f'ALTER TABLE {target_schema}."{target_table.upper()}" '
+                f'ALTER COLUMN {pk_column} DROP NOT NULL'
+            )
+
+            self.query(
+                sql, query_tag_props={'schema': target_schema, 'table': target_table}
+            )
+
     # grant_... functions are common functions called by utils.py: grant_privilege function
     # "to_group" is not used here but exists for compatibility reasons with other database types
     # "to_group" is for databases that can grant to users and groups separately like Amazon Redshift
