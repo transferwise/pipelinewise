@@ -30,7 +30,7 @@ class TestConfigValidation(TestCase):
 
     class AsyncWriteJsonFile(threading.Thread):
         """Helper class for asynchronous writing on a file"""
-        def __init__(self, file_name, content, waiting_time):
+        def __init__(self, file_name: str, content: str, waiting_time: int):
             threading.Thread.__init__(self)
             self.file_name = file_name
             self.content = content
@@ -42,7 +42,7 @@ class TestConfigValidation(TestCase):
                 json_file.write(self.content)
 
     @staticmethod
-    def _assert_tap_config(config, properties, state):
+    def _assert_tap_config(config: str, properties: str, state: str) -> None:
         commands.TapParams(
             id='foo',
             type='bar',
@@ -54,7 +54,7 @@ class TestConfigValidation(TestCase):
         )
 
     @staticmethod
-    def _assert_target_config(config):
+    def _assert_target_config(config: str) -> None:
         commands.TargetParams(
             id='foo',
             type='bar',
@@ -63,7 +63,7 @@ class TestConfigValidation(TestCase):
             config=config,
         )
 
-    def _assert_retry_validation_of_json_file(self, config, properties, state):
+    def _assert_retry_validation_of_json_file(self, config: str, properties: str, state: str) -> None:
         invalid_file_to_be_fixed_later = self.invalid_json_file
 
         # Starts with an invalid file and since the main method is retrying we fix the file after some seconds
@@ -75,7 +75,7 @@ class TestConfigValidation(TestCase):
 
         self._assert_tap_config(config=config, properties=properties, state=state)
 
-    def _assert_raise_exception_on_invalid_file_content(self, test_case_invalid, invalid_file_contents):
+    def _assert_raise_exception_on_invalid_file_content(self, test_case_invalid: str, invalid_file_contents: tuple):
         for invalid_content in invalid_file_contents:
             with open(self.invalid_json_file, 'w', encoding='utf-8') as invalid_file:
                 invalid_file.write(invalid_content)

@@ -35,7 +35,7 @@ TransformParams = namedtuple(
 )
 
 
-def _verify_json_file(json_file_path, file_must_exists, allowed_empty):
+def _verify_json_file(json_file_path: str, file_must_exists: bool, allowed_empty: bool) -> bool:
     """Checking if input file is a valid json or not, in some cases it is allowed to have an empty file,
      or it is allowed file not exists!
     """
@@ -50,7 +50,7 @@ def _verify_json_file(json_file_path, file_must_exists, allowed_empty):
     return True
 
 
-def do_json_conf_validation(json_file, file_property):
+def do_json_conf_validation(json_file: str, file_property: dict) -> bool:
     """
     Validating a json format config property and retry if it is invalid
     """
