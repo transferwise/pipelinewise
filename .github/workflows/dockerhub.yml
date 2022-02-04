@@ -36,8 +36,8 @@ jobs:
         file: ./Dockerfile
         push: true
         tags: |
-          transferwiseworkspace/pipelinewise:${{ steps.genTag.outputs.replaced }}
-          transferwiseworkspace/pipelinewise:latest
+          thread/pipelinewise:${{ steps.genTag.outputs.replaced }}
+          thread/pipelinewise:latest
 
     - name: Build and push barebone image
       id: docker_build_barebone
@@ -46,8 +46,8 @@ jobs:
         file: ./Dockerfile.barebone
         push: true
         tags: |
-          transferwiseworkspace/pipelinewise-barebone:${{ steps.genTag.outputs.replaced }}
-          transferwiseworkspace/pipelinewise-barebone:latest
+          thread/pipelinewise-barebone:${{ steps.genTag.outputs.replaced }}
+          thread/pipelinewise-barebone:latest
 
     - name: Image digests
       run: |
