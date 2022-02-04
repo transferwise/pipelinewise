@@ -38,6 +38,8 @@ jobs:
         tags: |
           thread/pipelinewise:${{ steps.genTag.outputs.replaced }}
           thread/pipelinewise:latest
+        build-args: |
+          connectors=tap-postgres,target-bigquery,transform-field
 
     - name: Build and push barebone image
       id: docker_build_barebone
