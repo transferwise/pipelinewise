@@ -10,6 +10,7 @@ import json
 import copy
 import psutil
 import pidfile
+import smart_open
 
 from datetime import datetime
 from time import time
@@ -1038,7 +1039,7 @@ class PipelineWise:
                 nonlocal start, state
 
                 if start is None or time() - start >= 2:
-                    with open(tap.state, 'w', encoding='utf-8') as state_file:
+                    with smart_open.open(tap.state, 'w', encoding='utf-8') as state_file:
                         state_file.write(line)
 
                     # Update start time to be the current time.
@@ -1068,7 +1069,7 @@ class PipelineWise:
 
         # update the state file one last time to make sure it always has the last state message.
         if state is not None:
-            with open(tap.state, 'w', encoding='utf-8') as statefile:
+            with smart_open.open(tap.state, 'w', encoding='utf-8') as statefile:
                 statefile.write(state)
 
     def run_tap_fastsync(
@@ -1310,7 +1311,7 @@ class PipelineWise:
         """
         pidfile_path = self.tap['files']['pidfile']
         try:
-            with open(pidfile_path, encoding='utf-8') as pidf:
+            with smart_open.open(pidfile_path, encoding='utf-8') as pidf:
                 pid = int(pidf.read())
                 parent = psutil.Process(pid)
 
@@ -1704,7 +1705,7 @@ TAP RUN SUMMARY
 
             # Append the summary to the right log file
             if log_file_to_write_summary:
-                with open(log_file_to_write_summary, 'a', encoding='utf-8') as logfile:
+                with smart_open.open(log_file_to_write_summary, 'a', encoding='utf-8') as logfile:
                     logfile.write(summary)
 
     # pylint: disable=unused-variable
@@ -1771,7 +1772,7 @@ TAP RUN SUMMARY
     @staticmethod
     def _clean_tables_from_bookmarks_in_state_file(state_file_to_clean: str, tables: str) -> None:
         try:
-            with open(state_file_to_clean, 'r+', encoding='UTF-8') as state_file:
+            with smart_open.open(state_file_to_clean, 'r+', encoding='UTF-8') as state_file:
                 state_data = json.load(state_file)
                 bookmarks = state_data.get('bookmarks')
                 list_of_tables = tables.split(',')

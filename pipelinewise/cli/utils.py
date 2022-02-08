@@ -14,6 +14,7 @@ import tempfile
 import warnings
 import jsonschema
 import yaml
+import smart_open
 
 from io import StringIO
 from datetime import date, datetime
@@ -74,7 +75,7 @@ def is_json_file(path):
     """
     try:
         if os.path.isfile(path):
-            with open(path, encoding='utf-8') as jsonfile:
+            with smart_open.open(path, encoding='utf-8') as jsonfile:
                 if json.load(jsonfile):
                     return True
         return False
@@ -89,7 +90,7 @@ def load_json(path):
     try:
         LOGGER.debug('Parsing file at %s', path)
         if os.path.isfile(path):
-            with open(path, encoding='utf-8') as jsonfile:
+            with smart_open.open(path, encoding='utf-8') as jsonfile:
                 return json.load(jsonfile)
         else:
             LOGGER.debug('No file at %s', path)
@@ -115,7 +116,7 @@ def save_json(data, path):
     """
     try:
         LOGGER.debug('Saving JSON %s', path)
-        with open(path, 'w', encoding='utf-8') as jsonfile:
+        with smart_open.open(path, 'w', encoding='utf-8') as jsonfile:
             return json.dump(
                 data, jsonfile, cls=AnsibleJSONEncoder, indent=4, sort_keys=True
             )
@@ -140,7 +141,7 @@ def is_yaml_file(path):
     """
     try:
         if os.path.isfile(path):
-            with open(path, encoding='utf-8') as yamlfile:
+            with smart_open.open(path, encoding='utf-8') as yamlfile:
                 if yaml.safe_load(yamlfile):
                     return True
         return False
@@ -188,7 +189,7 @@ def load_yaml(yaml_file, vault_secret=None):
 
     data = None
     if os.path.isfile(yaml_file):
-        with open(yaml_file, 'r', encoding='utf-8') as stream:
+        with smart_open.open(yaml_file, 'r', encoding='utf-8') as stream:
             # Render environment variables using jinja templates
             contents = stream.read()
             template = Template(contents)
@@ -526,7 +527,7 @@ def find_errors_in_log_file(file, max_errors=10, error_pattern=None):
 
     errors = []
     if file and os.path.isfile(file):
-        with open(file, encoding='utf-8') as file_object:
+        with smart_open.open(file, encoding='utf-8') as file_object:
             for line in file_object:
                 if len(re.findall(error_pattern, line)) > 0:
                     errors.append(line)

@@ -6,6 +6,7 @@ import shlex
 import logging
 import json
 import time
+import smart_open
 
 from subprocess import PIPE, STDOUT, Popen
 from collections import namedtuple
@@ -40,7 +41,7 @@ def _verify_json_file(json_file_path: str, file_must_exists: bool, allowed_empty
      or it is allowed file not exists!
     """
     try:
-        with open(json_file_path, 'r', encoding='utf-8') as json_file:
+        with smart_open.open(json_file_path, 'r', encoding='utf-8') as json_file:
             json.load(json_file)
     except FileNotFoundError:
         return not file_must_exists
@@ -450,7 +451,7 @@ def run_command(command: str, log_file: str = None, line_callback: callable = No
 
         # Start command
         with Popen(shlex.split(piped_command), stdout=PIPE, stderr=STDOUT) as proc:
-            with open(log_file_running, 'a+', encoding='utf-8') as logfile:
+            with smart_open.open(log_file_running, 'a+', encoding='utf-8') as logfile:
                 stdout = ''
                 while True:
                     line = proc.stdout.readline()
