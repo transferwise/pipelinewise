@@ -38,6 +38,7 @@ setup(name='pipelinewise',
           'psutil==5.8.0',
           'ujson>=4.1,<4.3',
           'dnspython==2.1.*',
+          'smart_open==5.2.*',
       ],
       extras_require={
           'test': [
