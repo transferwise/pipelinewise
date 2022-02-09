@@ -61,7 +61,7 @@ class TapParams:
     """
     TapParams validates json properties.
     """
-    id: str  # pylint: disable=invalid-name
+    tap_id: str
     type: str
     bin: str
     python_bin: str
@@ -96,7 +96,7 @@ class TargetParams:
     """
     TargetParams validates json properties.
     """
-    id: str  # pylint: disable=invalid-name
+    target_id: str
     type: str
     bin: str
     python_bin: str
@@ -183,7 +183,7 @@ def build_tap_command(
     tap_command = f'{tap.bin} --config {tap.config} {catalog_argument} {tap.properties} {state_arg}'
 
     if profiling_mode:
-        dump_file = os.path.join(profiling_dir, f'tap_{tap.id}.pstat')
+        dump_file = os.path.join(profiling_dir, f'tap_{tap.tap_id}.pstat')
         tap_command = f'{tap.python_bin} -m cProfile -o {dump_file} {tap_command}'
 
     return tap_command
@@ -207,7 +207,7 @@ def build_target_command(
     target_command = f'{target.bin} --config {target.config}'
 
     if profiling_mode:
-        dump_file = os.path.join(profiling_dir, f'target_{target.id}.pstat')
+        dump_file = os.path.join(profiling_dir, f'target_{target.target_id}.pstat')
         target_command = (
             f'{target.python_bin} -m cProfile -o {dump_file} {target_command}'
         )
@@ -411,7 +411,7 @@ def build_fastsync_command(
     command = f'{fastsync_bin} {command_args}'
 
     if profiling_mode:
-        dump_file = os.path.join(profiling_dir, f'fastsync_{tap.id}_{target.id}.pstat')
+        dump_file = os.path.join(profiling_dir, f'fastsync_{tap.tap_id}_{target.target_id}.pstat')
         command = f'{ppw_python_bin} -m cProfile -o {dump_file} {command}'
 
     LOGGER.debug('FastSync command: %s', command)
