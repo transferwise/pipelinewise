@@ -1202,7 +1202,7 @@ class PipelineWise:
         try:
             with pidfile.PIDFile(self.tap['files']['pidfile']):
                 target_params = TargetParams(
-                    id=target_id,
+                    target_id=target_id,
                     type=target_type,
                     bin=self.target_bin,
                     python_bin=self.target_python_bin,
@@ -1226,7 +1226,7 @@ class PipelineWise:
                         log_dir, f'{target_id}-{tap_id}-{current_time}.fastsync.log'
                     )
                     tap_params = TapParams(
-                        id=tap_id,
+                        tap_id=tap_id,
                         type=tap_type,
                         bin=self.tap_bin,
                         python_bin=self.tap_python_bin,
@@ -1252,7 +1252,7 @@ class PipelineWise:
                         log_dir, f'{target_id}-{tap_id}-{current_time}.singer.log'
                     )
                     tap_params = TapParams(
-                        id=tap_id,
+                        tap_id=tap_id,
                         type=tap_type,
                         bin=self.tap_bin,
                         python_bin=self.tap_python_bin,
@@ -1415,7 +1415,7 @@ class PipelineWise:
 
                 # Create parameters as NamedTuples
                 tap_params = TapParams(
-                    id=tap_id,
+                    tap_id=tap_id,
                     type=tap_type,
                     bin=self.tap_bin,
                     python_bin=self.tap_python_bin,
@@ -1425,7 +1425,7 @@ class PipelineWise:
                 )
 
                 target_params = TargetParams(
-                    id=target_id,
+                    target_id=target_id,
                     type=target_type,
                     bin=self.target_bin,
                     python_bin=self.target_python_bin,
