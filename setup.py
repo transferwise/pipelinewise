@@ -16,6 +16,7 @@ setup(name='pipelinewise',
           'License :: OSI Approved :: Apache Software License',
           'Programming Language :: Python :: 3 :: Only'
       ],
+      python_requires='>=3.7,<3.10',
       install_requires=[
           'argparse==1.4.0',
           'tabulate==0.8.9',
