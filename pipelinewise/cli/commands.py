@@ -7,8 +7,8 @@ import logging
 import json
 import time
 
+from dataclasses import dataclass
 from subprocess import PIPE, STDOUT, Popen
-from collections import namedtuple
 
 from . import utils
 from .errors import StreamBufferTooLargeException
@@ -25,14 +25,6 @@ PARAMS_VALIDATION_RETRY_TIMES = 3
 STATUS_RUNNING = 'running'
 STATUS_FAILED = 'failed'
 STATUS_SUCCESS = 'success'
-
-OriginalTapParams = namedtuple(
-    'TapParams', ['id', 'type', 'bin', 'python_bin', 'config', 'properties', 'state']
-)
-OriginalTargetParams = namedtuple('TargetParams', ['id', 'type', 'bin', 'python_bin', 'config'])
-TransformParams = namedtuple(
-    'TransformParams', ['bin', 'python_bin', 'config', 'tap_id', 'target_id']
-)
 
 
 def _verify_json_file(json_file_path: str, file_must_exists: bool, allowed_empty: bool) -> bool:
@@ -64,17 +56,23 @@ def do_json_conf_validation(json_file: str, file_property: dict) -> bool:
     return False
 
 
-# pylint: disable=function-redefined)
-class TapParams(OriginalTapParams):
+@dataclass
+class TapParams:
     """
-    for overriding TapParam init and validating json properties
+    TapParams validates json properties.
     """
-    # pylint: disable=unused-argument
-    def __init__(self, *args, **kwargs):
-        super().__init__()
-        if not getattr(self, 'config', None):
+    tap_id: str
+    type: str
+    bin: str
+    python_bin: str
+    config: str
+    properties: str
+    state: str
+
+    def __post_init__(self):
+        if not self.config:
             raise RunCommandException(
-                f'Invalid json file for config: {getattr(self, "config", None)}')
+                f'Invalid json file for config: {self.config}')
 
         list_of_params_in_json_file = {
             'config': {'file_must_exists': True, 'allowed_empty': False},
@@ -93,22 +91,36 @@ class TapParams(OriginalTapParams):
                     f'Invalid json file for {param}: {getattr(self, param, None)}')
 
 
-# pylint: disable=function-redefined)
-class TargetParams(OriginalTargetParams):
+@dataclass
+class TargetParams:
     """
-    for overriding TargetParam init and validating json properties
+    TargetParams validates json properties.
     """
-    # pylint: disable=unused-argument
-    def __init__(self, *args, **kwargs):
-        super().__init__()
-        json_file = getattr(self, 'config', None)
+    target_id: str
+    type: str
+    bin: str
+    python_bin: str
+    config: str
+
+    def __post_init__(self):
+        json_file = self.config
 
         valid_json = do_json_conf_validation(
-            json_file=getattr(self, 'config', None),
+            json_file=json_file,
             file_property={'file_must_exists': True, 'allowed_empty': False}) if json_file else False
 
         if not valid_json:
-            raise RunCommandException(f'Invalid json file for config: {getattr(self, "config", None)}')
+            raise RunCommandException(f'Invalid json file for config: {self.config}')
+
+
+@dataclass
+class TransformParams:
+    """TransformParams."""
+    bin: str
+    python_bin: str
+    config: str
+    tap_id: str
+    target_id: str
 
 
 # pylint: disable=unnecessary-pass
@@ -171,7 +183,7 @@ def build_tap_command(
     tap_command = f'{tap.bin} --config {tap.config} {catalog_argument} {tap.properties} {state_arg}'
 
     if profiling_mode:
-        dump_file = os.path.join(profiling_dir, f'tap_{tap.id}.pstat')
+        dump_file = os.path.join(profiling_dir, f'tap_{tap.tap_id}.pstat')
         tap_command = f'{tap.python_bin} -m cProfile -o {dump_file} {tap_command}'
 
     return tap_command
@@ -195,7 +207,7 @@ def build_target_command(
     target_command = f'{target.bin} --config {target.config}'
 
     if profiling_mode:
-        dump_file = os.path.join(profiling_dir, f'target_{target.id}.pstat')
+        dump_file = os.path.join(profiling_dir, f'target_{target.target_id}.pstat')
         target_command = (
             f'{target.python_bin} -m cProfile -o {dump_file} {target_command}'
         )
@@ -399,7 +411,7 @@ def build_fastsync_command(
     command = f'{fastsync_bin} {command_args}'
 
     if profiling_mode:
-        dump_file = os.path.join(profiling_dir, f'fastsync_{tap.id}_{target.id}.pstat')
+        dump_file = os.path.join(profiling_dir, f'fastsync_{tap.tap_id}_{target.target_id}.pstat')
         command = f'{ppw_python_bin} -m cProfile -o {dump_file} {command}'
 
     LOGGER.debug('FastSync command: %s', command)
