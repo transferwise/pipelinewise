@@ -1,12 +1,19 @@
-0.40.0 (2022-02-27)
+0.41.0 (2022-02-10)
+-------------------
+
+- Dropped support for python 3.6
+- Bump ujson from 4.3.0 to 5.1.0
+- Bump pipelinewise-tap-s3-csv to 2.0.0
+
+0.40.0 (2022-01-27)
 -------------------
 - Bump `pipelinewise-tap-kafka` from `5.0.1` to `5.1.0`
 
-0.39.1 (2022-02-26)
+0.39.1 (2022-01-26)
 -------------------
 - Bump `pipelinewise-tap-kafka` from `5.0.0` to `5.0.1`
 
-0.39.0 (2022-02-25)
+0.39.0 (2022-01-25)
 -------------------
 - Bump `pipelinewise-tap-kafka` from `4.0.1` to `5.0.0`
 - Bump `pipelinewise-target-bigquery` from `1.1.1` to `1.2.0`
