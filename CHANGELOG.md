@@ -2,8 +2,8 @@
 -------------------
 
 - Dropped support for python 3.6
-- Bump ujson from 4.3.0 to 5.1.0
-- Bump pipelinewise-tap-s3-csv to 2.0.0
+- Bump `ujson` from `4.3.0` to `5.1.0`
+- Bump `pipelinewise-tap-s3-csv` to `2.0.0`
 - Fix for config json files
 - Fix: e2e tests fail when SF credentials are not present
 
