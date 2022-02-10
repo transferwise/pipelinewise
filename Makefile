@@ -8,7 +8,7 @@ RESET_COLOR = \x1b[0m
 PIPELINEWISE_HOME = $(shell pwd)
 VENV_DIR = ${PIPELINEWISE_HOME}/.virtualenvs
 
-python ?= "python"
+python ?= "python3"
 
 start_time:=$(shell date +%s)
 
