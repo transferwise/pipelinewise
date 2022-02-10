@@ -20,7 +20,7 @@ from ..logger import Logger
 __version__ = get_distribution('pipelinewise').version
 USER_HOME = os.path.expanduser('~')
 DEFAULT_CONFIG_DIR = os.path.join(USER_HOME, '.pipelinewise')
-CONFIG_DIR = os.environ.get('PIPELINEWISE_CONFIG', DEFAULT_CONFIG_DIR)
+CONFIG_DIR = os.environ.get('PIPELINEWISE_CONFIG_DIRECTORY', DEFAULT_CONFIG_DIR)
 PROFILING_DIR = os.path.join(CONFIG_DIR, 'profiling')
 PIPELINEWISE_DEFAULT_HOME = os.path.join(USER_HOME, 'pipelinewise')
 PIPELINEWISE_HOME = os.path.abspath(
