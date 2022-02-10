@@ -8,6 +8,8 @@ RESET_COLOR = \x1b[0m
 PIPELINEWISE_HOME = $(shell pwd)
 VENV_DIR = ${PIPELINEWISE_HOME}/.virtualenvs
 
+python ?= "python"
+
 start_time:=$(shell date +%s)
 
 PIP_ARGS="[test]"
@@ -113,7 +115,7 @@ endef
 define make_virtualenv
 	@echo -n "Making Virtual Environment for $(1) in $(VENV_DIR)..."
 	@echo -e -n "$(YELLOW)"
-	@test -d $(VENV_DIR)/$(1) || python3 -m venv $(VENV_DIR)/$(1)
+	@test -d $(VENV_DIR)/$(1) || $(python) -m venv $(VENV_DIR)/$(1)
 	@source $(VENV_DIR)/$(1)/bin/activate
 	@echo -e "$(OK_MSG)"
 	@echo -e -n "$(YELLOW)"
