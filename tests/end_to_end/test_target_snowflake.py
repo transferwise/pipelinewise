@@ -33,7 +33,6 @@ class TestTargetSnowflake:
     """
     End to end tests for Target Snowflake
     """
-
     def setup_method(self):
         """Initialise test project by generating YAML files from
         templates for all the configured connectors"""
@@ -59,6 +58,18 @@ class TestTargetSnowflake:
     def teardown_method(self):
         """Delete test directories and database objects"""
 
+    @pytest.fixture(autouse=True)
+    def skip_if_no_sf_credentials(self):
+        """
+        Test fixture to be used by all tests to check if SF is configured to decide whether to run the test or not.
+        """
+        # Skip every test if required env vars not provided
+        print('skip_if_no_sf_credentials executed')
+        if self.e2e.env['TARGET_SNOWFLAKE']['is_configured']:
+            yield
+        else:
+            pytest.skip('Target Snowflake environment variables are not provided')
+
     @pytest.mark.dependency(name='validate')
     def test_validate(self):
         """Validate the YAML project with taps and target """
@@ -75,10 +86,6 @@ class TestTargetSnowflake:
     def test_import_project(self):
         """Import the YAML project with taps and target and do discovery mode
         to write the JSON files for singer connectors"""
-
-        # Skip every target_postgres related test if required env vars not provided
-        if not self.e2e.env['TARGET_SNOWFLAKE']['is_configured']:
-            pytest.skip('Target Snowflake environment variables are not provided')
 
         # Setup and clean source and target databases
         self.e2e.setup_tap_mysql()
@@ -368,9 +375,6 @@ class TestTargetSnowflake:
     @pytest.mark.dependency(depends=['import_config'])
     def test_replicate_pg_to_sf_with_archive_load_files(self):
         """Fastsync tables from Postgres to Snowflake with archive load files enabled"""
-        if not self.e2e.env['TARGET_SNOWFLAKE']['is_configured']:
-            pytest.skip('Target Snowflake environment variables are not provided')
-
         archive_s3_prefix = 'archive_folder'  # Custom s3 prefix defined in TAP_POSTGRES_ARCHIVE_LOAD_FILES_ID
 
         s3_bucket = os.environ.get('TARGET_SNOWFLAKE_S3_BUCKET')
