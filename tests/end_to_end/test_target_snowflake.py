@@ -60,7 +60,9 @@ class TestTargetSnowflake:
 
     @pytest.fixture(autouse=True)
     def skip_if_no_sf_credentials(self):
-
+        """
+        Test fixture to be used by all tests to check if SF is configured to decide whether to run the test or not.
+        """
         # Skip every test if required env vars not provided
         print('skip_if_no_sf_credentials executed')
         if self.e2e.env['TARGET_SNOWFLAKE']['is_configured']:
