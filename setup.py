@@ -6,7 +6,8 @@ with open('README.md') as f:
     LONG_DESCRIPTION = f.read()
 
 setup(name='pipelinewise',
-      version='0.40.0',
+      python_requires='>=3.7',
+      version='0.41.0',
       description='PipelineWise',
       long_description=LONG_DESCRIPTION,
       long_description_content_type='text/markdown',
@@ -36,7 +37,7 @@ setup(name='pipelinewise',
           'tzlocal>=2.0,<4.1',
           'slackclient>=2.7,<2.10',
           'psutil==5.8.0',
-          'ujson>=4.1,<4.3',
+          'ujson==5.1.0',
           'dnspython==2.1.*',
       ],
       extras_require={
