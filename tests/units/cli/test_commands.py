@@ -40,7 +40,7 @@ class TestCommands:
         # State file should not be included if state file path not passed
 
         tap = commands.TapParams(
-            id='my_tap_mysql',
+            tap_id='my_tap_mysql',
             type='tap_mysql',
             bin='/bin/tap_mysql.py',
             python_bin='/bin/python3',
@@ -72,7 +72,7 @@ class TestCommands:
 
         # State file should not be included if state file passed but file not exists
         tap = commands.TapParams(
-            id='my_tap_mysql',
+            tap_id='my_tap_mysql',
             type='tap_mysql',
             bin='/bin/tap_mysql.py',
             python_bin='/bin/python3',
@@ -106,7 +106,7 @@ class TestCommands:
         state_mock = __file__
 
         tap = commands.TapParams(
-            id='my_tap_mysql',
+            tap_id='my_tap_mysql',
             type='tap_mysql',
             bin='/bin/tap_mysql.py',
             python_bin='/bin/python3',
@@ -144,7 +144,7 @@ class TestCommands:
         # Should return a input piped command with an executable target command
 
         target = commands.TargetParams(
-            id='my_target',
+            target_id='my_target',
             type='target-snowflake',
             bin='/bin/target_postgres.py',
             python_bin='/bin/python',
@@ -284,7 +284,7 @@ class TestCommands:
 
         # Should generate a command with tap state and transformation
         tap_params = commands.TapParams(
-            id='my_tap',
+            tap_id='my_tap',
             type='tap-mysql',
             bin='/bin/tap_mysql.py',
             python_bin='/bin/python',
@@ -294,7 +294,7 @@ class TestCommands:
         )
 
         target_params = commands.TargetParams(
-            id='my_target',
+            target_id='my_target',
             type='target-postgres',
             bin='/bin/target_postgres.py',
             python_bin='/bin/python',
@@ -379,7 +379,7 @@ class TestCommands:
 
         # Should generate a command without state and with transformation
         tap_params = commands.TapParams(
-            id='my_tap',
+            tap_id='my_tap',
             type='tap-mysql',
             bin='/bin/tap_mysql.py',
             python_bin='/bin/python',
@@ -420,7 +420,7 @@ class TestCommands:
 
         # Should generate a command with state and without transformation
         tap_params = commands.TapParams(
-            id='my_tap',
+            tap_id='my_tap',
             type='tap-mysql',
             bin='/bin/tap_mysql.py',
             python_bin='/bin/python',
@@ -468,7 +468,7 @@ class TestCommands:
 
         # Should generate a command without state and transformation
         tap_params = commands.TapParams(
-            id='my_tap',
+            tap_id='my_tap',
             type='tap-mysql',
             bin='/bin/tap_mysql.py',
             python_bin='/bin/python',
@@ -520,7 +520,7 @@ class TestCommands:
         # Should generate a fastsync command with transformation
 
         tap_params = commands.TapParams(
-            id='my_tap',
+            tap_id='my_tap',
             type='tap-mysql',
             bin='/bin/tap_mysql.py',
             python_bin='/tap-mysql/bin/python',
@@ -530,7 +530,7 @@ class TestCommands:
         )
 
         target_params = commands.TargetParams(
-            id='my_target',
+            target_id='my_target',
             type='target-postgres',
             bin='/bin/target_postgres.py',
             python_bin='/target-postgres/bin/python',
