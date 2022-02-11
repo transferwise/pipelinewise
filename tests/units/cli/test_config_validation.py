@@ -44,7 +44,7 @@ class TestConfigValidation(TestCase):
     @staticmethod
     def _assert_tap_config(config: str, properties: str, state: str) -> None:
         commands.TapParams(
-            id='foo',
+            tap_id='foo',
             type='bar',
             bin='foo_bin',
             python_bin='foo/python',
@@ -56,7 +56,7 @@ class TestConfigValidation(TestCase):
     @staticmethod
     def _assert_target_config(config: str) -> None:
         commands.TargetParams(
-            id='foo',
+            target_id='foo',
             type='bar',
             bin='foo_bin',
             python_bin='foo/python',
