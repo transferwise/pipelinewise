@@ -26,6 +26,7 @@ PIPELINEWISE_DEFAULT_HOME = os.path.join(USER_HOME, 'pipelinewise')
 PIPELINEWISE_HOME = os.path.abspath(
     os.environ.setdefault('PIPELINEWISE_HOME', PIPELINEWISE_DEFAULT_HOME)
 )
+TEMP_DIR = os.environ.get('PIPELINEWISE_TEMP_DIR')
 VENV_DIR = os.path.join(PIPELINEWISE_HOME, '.virtualenvs')
 COMMANDS = [
     'init',
@@ -248,7 +249,9 @@ def main():
 
     profiler, profiling_dir = __init_profiler(args.profiler, logger)
 
-    ppw_instance = PipelineWise(args, CONFIG_DIR, VENV_DIR, profiling_dir)
+    ppw_instance = PipelineWise(
+        args, CONFIG_DIR, VENV_DIR, temp_dir=TEMP_DIR, profiling_dir=profiling_dir
+    )
 
     try:
         getattr(ppw_instance, args.command)()

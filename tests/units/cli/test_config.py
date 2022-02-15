@@ -7,6 +7,7 @@ from pipelinewise.cli.config import Config
 from pipelinewise.cli.errors import InvalidConfigException
 
 PIPELINEWISE_TEST_HOME = '/tmp/.pipelinewise'
+PIPELINEWISE_TEST_TEMP_DIR = '/tmp/.pipelinewise/tmp'
 
 
 # Todo: Inherit from unittest.TestCase
@@ -208,10 +209,10 @@ class TestConfig:
 
     def test_getters(self):
         """Test Config getter functions"""
-        config = Config(PIPELINEWISE_TEST_HOME)
+        config = Config(PIPELINEWISE_TEST_HOME, PIPELINEWISE_TEST_TEMP_DIR)
 
         # Target and tap directory should be g
-        assert config.get_temp_dir() == '{}/tmp'.format(PIPELINEWISE_TEST_HOME)
+        assert config.temp_dir == PIPELINEWISE_TEST_TEMP_DIR
         assert config.get_target_dir('test-target-id') == '{}/test-target-id'.format(
             PIPELINEWISE_TEST_HOME
         )
@@ -239,7 +240,8 @@ class TestConfig:
         vault_secret = '{}/resources/vault-secret.txt'.format(os.path.dirname(__file__))
 
         json_config_dir = './pipelinewise-test-config'
-        config = Config.from_yamls(json_config_dir, yaml_config_dir, vault_secret)
+        temp_dir = json_config_dir + '/tmp'
+        config = Config.from_yamls(json_config_dir, temp_dir, yaml_config_dir, vault_secret)
 
         # Save the config as singer compatible JSON files
         config.save()

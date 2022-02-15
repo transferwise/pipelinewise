@@ -64,7 +64,7 @@ class PipelineWise:
     STATUS_FAILED = 'FAILED'
     TRANSFORM_FIELD_CONNECTOR_NAME = 'transform-field'
 
-    def __init__(self, args, config_dir, venv_dir, profiling_dir=None):
+    def __init__(self, args, config_dir, venv_dir, temp_dir=None, profiling_dir=None):
 
         self.profiling_mode = args.profiler
         self.profiling_dir = profiling_dir
@@ -73,6 +73,11 @@ class PipelineWise:
         self.logger = logging.getLogger(__name__)
         self.config_dir = config_dir
         self.venv_dir = venv_dir
+        if temp_dir is None:
+            self.temp_dir = os.path.join(self.config_dir, 'tmp')
+        else:
+            self.temp_dir = temp_dir
+        self.temp_dir = temp_dir
         self.extra_log = args.extra_log
         self.pipelinewise_bin = os.path.join(
             self.venv_dir, 'cli', 'bin', 'pipelinewise'
@@ -141,7 +146,7 @@ class PipelineWise:
 
             # Save the new dict as JSON into a temp file
             tempfile_path = utils.create_temp_file(
-                dir=self.get_temp_dir(), prefix='target_config_', suffix='.json'
+                dir=self.temp_dir, prefix='target_config_', suffix='.json'
             )[1]
             utils.save_json(dict_a, tempfile_path)
 
@@ -324,12 +329,12 @@ class PipelineWise:
             if create_fallback:
                 # Save to files: filtered and fallback properties
                 temp_properties_path = utils.create_temp_file(
-                    dir=self.get_temp_dir(), prefix='properties_', suffix='.json'
+                    dir=self.temp_dir, prefix='properties_', suffix='.json'
                 )[1]
                 utils.save_json(properties, temp_properties_path)
 
                 temp_fallback_properties_path = utils.create_temp_file(
-                    dir=self.get_temp_dir(), prefix='properties_', suffix='.json'
+                    dir=self.temp_dir, prefix='properties_', suffix='.json'
                 )[1]
                 utils.save_json(fallback_properties, temp_fallback_properties_path)
 
@@ -342,7 +347,7 @@ class PipelineWise:
 
             # Fallback not required: Save only the filtered properties JSON
             temp_properties_path = utils.create_temp_file(
-                dir=self.get_temp_dir(), prefix='properties_', suffix='.json'
+                dir=self.temp_dir, prefix='properties_', suffix='.json'
             )[1]
             utils.save_json(properties, temp_properties_path)
 
@@ -362,12 +367,6 @@ class PipelineWise:
             self.config = config
         else:
             self.config = {}
-
-    def get_temp_dir(self):
-        """
-        Returns the tap specific temp directory
-        """
-        return os.path.join(self.config_dir, 'tmp')
 
     def get_tap_dir(self, target_id, tap_id):
         """
@@ -1083,7 +1082,7 @@ class PipelineWise:
             target=target,
             transform=transform,
             venv_dir=self.venv_dir,
-            temp_dir=self.get_temp_dir(),
+            temp_dir=self.temp_dir,
             tables=self.args.tables,
             profiling_mode=self.profiling_mode,
             profiling_dir=self.profiling_dir,
@@ -1806,7 +1805,7 @@ TAP RUN SUMMARY
             # create a temp file with the content being the given catalog object
             # we need this file to execute the validation cli command
             temp_catalog_file = utils.create_temp_file(
-                dir=self.get_temp_dir(), prefix='properties_', suffix='.json'
+                dir=self.temp_dir, prefix='properties_', suffix='.json'
             )[1]
 
             utils.save_json(catalog, temp_catalog_file)
