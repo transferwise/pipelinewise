@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import Mock, patch, ANY, mock_open
+from unittest.mock import Mock, call, patch, ANY
 from google.cloud import bigquery
 from pipelinewise.fastsync.commons.target_bigquery import FastSyncTargetBigquery
 
@@ -345,3 +345,317 @@ class TestFastSyncTargetBigquery:
         client().delete_table.assert_called_with(
             'dummy-project.test_schema.table_with_space_and_uppercase_temp'
         )
+
+    @patch('pipelinewise.fastsync.commons.target_bigquery.bigquery.Client')
+    def test_obfuscate_columns_case1(self, client):
+        """
+        Test obfuscation where given transformations are emtpy
+        Test should pass with no executed queries
+        """
+        target_schema = 'my_schema'
+        table_name = 'public.my_table'
+
+        self.bigquery.transformation_config = {}
+
+        self.bigquery.obfuscate_columns(target_schema, table_name)
+        client().query.assert_not_called()
+
+    @patch('pipelinewise.fastsync.commons.target_bigquery.bigquery.Client')
+    def test_obfuscate_columns_case2(self, client):
+        """
+        Test obfuscation where given transformations has an unsupported transformation type
+        Test should fail
+        """
+        target_schema = 'my_schema'
+        table_name = 'public.my_table'
+
+        self.bigquery.transformation_config = {
+            'transformations': [
+                {
+                    'field_id': 'col_7',
+                    'tap_stream_name': 'public-my_table',
+                    'type': 'RANDOM',
+                }
+            ]
+        }
+
+        with pytest.raises(ValueError):
+            self.bigquery.obfuscate_columns(target_schema, table_name)
+
+        client().query.assert_not_called()
+
+    @patch('pipelinewise.fastsync.commons.target_bigquery.bigquery.Client')
+    def test_obfuscate_columns_case3(self, client):
+        """
+        Test obfuscation where given transformations have no conditions
+        Test should pass
+        """
+        target_schema = 'my_schema'
+        table_name = 'public.my_table'
+
+        self.bigquery.transformation_config = {
+            'transformations': [
+                {
+                    'field_id': 'col_1',
+                    'tap_stream_name': 'public-my_table',
+                    'type': 'SET-NULL',
+                },
+                {
+                    'field_id': 'col_2',
+                    'tap_stream_name': 'public-my_table',
+                    'type': 'MASK-HIDDEN',
+                },
+                {
+                    'field_id': 'col_3',
+                    'tap_stream_name': 'public-my_table',
+                    'type': 'MASK-DATE',
+                },
+                {
+                    'field_id': 'col_4',
+                    'tap_stream_name': 'public-my_table',
+                    'safe_field_id': '"COL_4"',
+                    'type': 'MASK-NUMBER',
+                },
+                {
+                    'field_id': 'col_5',
+                    'tap_stream_name': 'public-my_table',
+                    'type': 'HASH',
+                },
+                {
+                    'field_id': 'col_6',
+                    'tap_stream_name': 'public-my_table',
+                    'type': 'HASH-SKIP-FIRST-5',
+                },
+                {
+                    'field_id': 'col_7',
+                    'tap_stream_name': 'public-my_table',
+                    'type': 'MASK-STRING-SKIP-ENDS-3',
+                },
+            ]
+        }
+
+        self.bigquery.obfuscate_columns(target_schema, table_name)
+
+        client().query.assert_called_with(
+            "UPDATE `my_schema`.`my_table_temp` SET `col_1` = NULL, `col_2` = 'hidden', "
+            '`col_3` = TIMESTAMP(DATETIME(DATE(EXTRACT(YEAR FROM `col_3`), 1, '
+            '1),TIME(`col_3`))), `col_4` = 0, `col_5` = TO_BASE64(SHA256(`col_5`)), '
+            '`col_6` = CONCAT(SUBSTRING(`col_6`, 1, 5), '
+            'TO_BASE64(SHA256(SUBSTRING(`col_6`, 5 + 1)))), `col_7` = CASE WHEN '
+            "LENGTH(`col_7`) > 2 * 3 THEN CONCAT(SUBSTRING(`col_7`, 1, 3), REPEAT('*', "
+            'LENGTH(`col_7`)-(2 * 3)), SUBSTRING(`col_7`, LENGTH(`col_7`)-3+1, 3)) ELSE '
+            "REPEAT('*', LENGTH(`col_7`)) END WHERE true;",
+            job_config=ANY,
+        )
+
+    @patch('pipelinewise.fastsync.commons.target_bigquery.bigquery.Client')
+    def test_obfuscate_columns_case4(self, client):
+        """
+        Test obfuscation where given transformations have conditions
+        Test should pass
+        """
+        target_schema = 'my_schema'
+        table_name = 'public.my_table'
+
+        self.bigquery.transformation_config = {
+            'transformations': [
+                {
+                    'field_id': 'col_1',
+                    'tap_stream_name': 'public-my_table',
+                    'type': 'SET-NULL',
+                },
+                {
+                    'field_id': 'col_2',
+                    'tap_stream_name': 'public-my_table',
+                    'type': 'MASK-HIDDEN',
+                    'when': [
+                        {'column': 'col_4', 'safe_column': '"COL_4"', 'equals': None},
+                        {
+                            'column': 'col_1',
+                        },
+                    ],
+                },
+                {
+                    'field_id': 'col_3',
+                    'tap_stream_name': 'public-my_table',
+                    'type': 'MASK-DATE',
+                    'when': [{'column': 'col_5', 'equals': 'some_value'}],
+                },
+                {
+                    'field_id': 'col_4',
+                    'tap_stream_name': 'public-my_table',
+                    'type': 'MASK-NUMBER',
+                },
+                {
+                    'field_id': 'col_5',
+                    'tap_stream_name': 'public-my_table',
+                    'type': 'HASH',
+                },
+                {
+                    'field_id': 'col_6',
+                    'tap_stream_name': 'public-my_table',
+                    'type': 'HASH-SKIP-FIRST-5',
+                    'when': [
+                        {'column': 'col_1', 'equals': 30},
+                        {'column': 'col_2', 'regex_match': r'[0-9]{3}\.[0-9]{3}'},
+                    ],
+                },
+                {
+                    'field_id': 'col_7',
+                    'tap_stream_name': 'public-my_table',
+                    'type': 'MASK-STRING-SKIP-ENDS-3',
+                    'when': [
+                        {'column': 'col_1', 'equals': 30},
+                        {'column': 'col_2', 'regex_match': r'[0-9]{3}\.[0-9]{3}'},
+                        {'column': 'col_4', 'equals': None},
+                    ],
+                },
+            ]
+        }
+
+        self.bigquery.obfuscate_columns(target_schema, table_name)
+
+        expected_sql = [
+            "UPDATE `my_schema`.`my_table_temp` SET `col_2` = 'hidden' WHERE (`col_4` IS NULL);",
+            "UPDATE `my_schema`.`my_table_temp` SET `col_3` = TIMESTAMP(DATETIME(DATE(EXTRACT(YEAR FROM `col_3`), 1, 1),TIME(`col_3`))) WHERE (`col_5` = 'some_value');",
+            "UPDATE `my_schema`.`my_table_temp` SET `col_6` = CONCAT(SUBSTRING(`col_6`, 1, 5), TO_BASE64(SHA256(SUBSTRING(`col_6`, 5 + 1)))) WHERE (`col_1` = 30) AND REGEXP_CONTAINS(`col_2`, '[0-9]{3}\\.[0-9]{3}');",
+            "UPDATE `my_schema`.`my_table_temp` SET `col_7` = CASE WHEN LENGTH(`col_7`) > 2 * 3 THEN CONCAT(SUBSTRING(`col_7`, 1, 3), REPEAT('*', LENGTH(`col_7`)-(2 * 3)), SUBSTRING(`col_7`, LENGTH(`col_7`)-3+1, 3)) ELSE REPEAT('*', LENGTH(`col_7`)) END WHERE (`col_1` = 30) AND REGEXP_CONTAINS(`col_2`, '[0-9]{3}\\.[0-9]{3}') AND (`col_4` IS NULL);",
+            "UPDATE `my_schema`.`my_table_temp` SET `col_1` = NULL, `col_4` = 0, `col_5` = TO_BASE64(SHA256(`col_5`)) WHERE true;",
+        ]
+
+        expected_calls = []
+        for sql in expected_sql:
+            expected_calls.append(call(sql, job_config=ANY))
+            expected_calls.append(call().result())
+
+        client().query.assert_has_calls(expected_calls)
+
+    # pylint: disable=invalid-name
+    def test_default_archive_destination(self):
+        """
+        Validate parameters passed to gcs copy_blob method when custom GCS bucket and folder are not defined
+        """
+        mock_source_bucket = Mock()
+        mock_source_bucket.name = 'some_bucket'
+
+        mock_buckets = {mock_source_bucket.name: mock_source_bucket}
+
+        mock_blob = Mock()
+        mock_blob.bucket = mock_source_bucket
+        mock_blob.name = 'some_bucket/snowflake-import/ppw_20210615115603_fastsync.csv.gz'
+
+        mock_gcs_client = Mock()
+        mock_gcs_client.get_bucket.side_effect = lambda x: mock_buckets.get(x)
+
+        self.bigquery.gcs = mock_gcs_client
+
+        self.bigquery.connection_config['gcs_bucket'] = mock_source_bucket.name
+
+        archive_blob = self.bigquery.copy_to_archive(
+            mock_blob,
+            'some-tap',
+            'some_schema.some_table',
+        )
+
+        mock_source_bucket.copy_blob.assert_called_with(
+            mock_blob,
+            mock_source_bucket,
+            new_name='archive/some-tap/some_table/ppw_20210615115603_fastsync.csv.gz',
+        )
+        archive_blob.metadata.update.assert_called_with(
+            {
+                'tap': 'some-tap',
+                'schema': 'some_schema',
+                'table': 'some_table',
+                'archived-by': 'pipelinewise_fastsync',
+            }
+        )
+
+    # pylint: disable=invalid-name
+    def test_custom_archive_destination(self):
+        """
+        Validate parameters passed to s3 copy_object method when using custom s3 bucket and folder
+        """
+        mock_source_bucket = Mock()
+        mock_source_bucket.name = 'some_bucket'
+        mock_archive_bucket = Mock()
+        mock_archive_bucket.name = 'archive_bucket'
+
+        mock_buckets = {
+            mock_source_bucket.name: mock_source_bucket,
+            mock_archive_bucket.name: mock_archive_bucket,
+        }
+
+        mock_blob = Mock()
+        mock_blob.bucket = mock_source_bucket
+        mock_blob.name = 'some_bucket/snowflake-import/ppw_20210615115603_fastsync.csv.gz'
+
+        mock_gcs_client = Mock()
+        mock_gcs_client.get_bucket.side_effect = lambda x: mock_buckets.get(x)
+
+        self.bigquery.gcs = mock_gcs_client
+
+        self.bigquery.connection_config['gcs_bucket'] = 'some_bucket'
+        self.bigquery.connection_config['archive_load_files_gcs_bucket'] = 'archive_bucket'
+        self.bigquery.connection_config['archive_load_files_gcs_prefix'] = 'archive_folder'
+
+        archive_blob = self.bigquery.copy_to_archive(
+            mock_blob,
+            'some-tap',
+            'some_schema.some_table',
+        )
+
+        mock_source_bucket.copy_blob.assert_called_with(
+            mock_blob,
+            mock_archive_bucket,
+            new_name='archive_folder/some-tap/some_table/ppw_20210615115603_fastsync.csv.gz',
+        )
+        archive_blob.metadata.update.assert_called_with(
+            {
+                'tap': 'some-tap',
+                'schema': 'some_schema',
+                'table': 'some_table',
+                'archived-by': 'pipelinewise_fastsync',
+            }
+        )
+
+    # pylint: disable=invalid-name
+    def test_copied_archive_metadata(self):
+        """
+        Validate parameters passed to s3 copy_object method when custom s3 bucket and folder are not defined
+        """
+        mock_source_bucket = Mock()
+        mock_source_bucket.name = 'some_bucket'
+
+        mock_buckets = {mock_source_bucket.name: mock_source_bucket}
+
+        mock_blob = Mock()
+        mock_blob.bucket = mock_source_bucket
+        mock_blob.name = 'some_bucket/snowflake-import/ppw_20210615115603_fastsync.csv.gz'
+        mock_blob.metadata = {'copied-old-key': 'copied-old-value'}
+
+        mock_gcs_client = Mock()
+        mock_gcs_client.get_bucket.side_effect = lambda x: mock_buckets.get(x)
+
+        self.bigquery.gcs = mock_gcs_client
+
+        self.bigquery.connection_config['s3_bucket'] = 'some_bucket'
+
+        archive_blob = self.bigquery.copy_to_archive(
+            mock_blob,
+            'some-tap',
+            'some_schema.some_table',
+        )
+
+        mock_source_bucket.copy_blob.assert_called_with(
+            mock_blob,
+            mock_source_bucket,
+            new_name='archive/some-tap/some_table/ppw_20210615115603_fastsync.csv.gz',
+        )
+        assert archive_blob.metadata == {
+            'copied-old-key': 'copied-old-value',
+            'tap': 'some-tap',
+            'schema': 'some_schema',
+            'table': 'some_table',
+            'archived-by': 'pipelinewise_fastsync',
+        }
