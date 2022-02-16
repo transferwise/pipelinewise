@@ -15,7 +15,7 @@ from . import utils
 class Config:
     """PipelineWise Configuration Class"""
 
-    def __init__(self, config_dir):
+    def __init__(self, config_dir, temp_dir=None):
         """
         Class Constructor
 
@@ -24,12 +24,15 @@ class Config:
         self.logger = logging.getLogger(__name__)
         self.config_dir = config_dir
         self.config_path = os.path.join(self.config_dir, 'config.json')
+        self.temp_dir = temp_dir
+        if self.temp_dir is None:
+            self.temp_dir = os.path.join(self.config_dir, 'tmp')
         self.global_config = {}
         self.targets = {}
 
     @classmethod
     # pylint: disable=too-many-locals
-    def from_yamls(cls, config_dir, yaml_dir='.', vault_secret=None):
+    def from_yamls(cls, config_dir, yaml_dir='.', vault_secret=None, temp_dir=None):
         """
         Class Constructor
 
@@ -38,7 +41,7 @@ class Config:
         Pipelinewise can import and generate singer configurations files
         from human friendly easy to understand YAML files.
         """
-        config = cls(config_dir)
+        config = cls(config_dir, temp_dir=temp_dir)
         targets = {}
         taps = {}
 
@@ -124,12 +127,6 @@ class Config:
 
         return config
 
-    def get_temp_dir(self):
-        """
-        Returns the tap specific temp directory
-        """
-        return os.path.join(self.config_dir, 'tmp')
-
     def get_target_dir(self, target_id):
         """
         Returns the absolute path of a target configuration directory
@@ -177,7 +174,7 @@ class Config:
             # Save every tap JSON files
             for tap in target['taps']:
                 extra_config_keys = utils.get_tap_extra_config_keys(
-                    tap, self.get_temp_dir()
+                    tap, self.temp_dir
                 )
                 self.save_tap_jsons(target, tap, extra_config_keys)
 
@@ -404,7 +401,7 @@ class Config:
         # Generate tap inheritable_config dict
         tap_inheritable_config = utils.delete_empty_keys(
             {
-                'temp_dir': self.get_temp_dir(),
+                'temp_dir': self.temp_dir,
                 'tap_id': tap.get('id'),
                 'query_tag': json.dumps(
                     {
