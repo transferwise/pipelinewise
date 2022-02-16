@@ -3,7 +3,6 @@ import os
 import re
 import time
 import shutil
-import signal
 import psutil
 import pidfile
 import pytest
@@ -575,6 +574,8 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
         """Test stop tap command"""
         args = CliArgs(target='target_one', tap='tap_one')
         pipelinewise = PipelineWise(args, CONFIG_DIR, VIRTUALENVS_DIR)
+        pipelinewise.tap_run_log_file = 'test-tap-run-dummy.log'
+        Path('{}.running'.format(pipelinewise.tap_run_log_file)).touch()
 
         # Tap is not running, pid file not exist, should exit with error
         with pytest.raises(SystemExit) as pytest_wrapped_e:
@@ -602,6 +603,12 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
         for proc in psutil.process_iter(['cmdline']):
             full_command = ' '.join(proc.info['cmdline']) if proc.info['cmdline'] else ''
             assert re.match('scheduler|pipelinewise|tap|target', full_command) is None
+
+        # Graceful exit should rename log file from running status to terminated
+        assert os.path.isfile('{}.terminated'.format(pipelinewise.tap_run_log_file))
+
+        # Delete test log file
+        os.remove('{}.terminated'.format(pipelinewise.tap_run_log_file))
 
     def test_command_sync_tables(self):
         """Test run tap command"""
@@ -663,28 +670,6 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
         with open(test_state_file, 'a', encoding='UTF-8'):
             pass
         self._assert_calling_sync_tables(pipelinewise)
-
-    # pylint: disable=protected-access
-    def test_exit_gracefully(self):
-        """Gracefully shoudl run tap command"""
-        args = CliArgs(target='target_one', tap='tap_one')
-        pipelinewise = PipelineWise(args, CONFIG_DIR, VIRTUALENVS_DIR)
-
-        # Create a test log file, simulating a running tap
-        pipelinewise.tap_run_log_file = 'test-tap-run-dummy.log'
-        Path('{}.running'.format(pipelinewise.tap_run_log_file)).touch()
-
-        # Graceful exit should return 1 by default
-        with pytest.raises(SystemExit) as pytest_wrapped_e:
-            pipelinewise._exit_gracefully(signal.SIGINT, frame=None)
-        assert pytest_wrapped_e.type == SystemExit
-        assert pytest_wrapped_e.value.code == 1
-
-        # Graceful exit should rename log file from running status to terminated
-        assert os.path.isfile('{}.terminated'.format(pipelinewise.tap_run_log_file))
-
-        # Delete test log file
-        os.remove('{}.terminated'.format(pipelinewise.tap_run_log_file))
 
     def test_validate_command_1(self):
         """Test validate command should fail because of missing replication key for incremental"""

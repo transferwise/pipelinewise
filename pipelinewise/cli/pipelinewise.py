@@ -1300,7 +1300,8 @@ class PipelineWise:
         utils.silentremove(tap_properties_singer)
         self._print_tap_run_summary(self.STATUS_SUCCESS, start_time, datetime.now())
 
-    def stop_tap(self, _, _):
+    # pylint: disable=unused-argument
+    def stop_tap(self, sig=None, frame=None):
         """
         Stop running tap
 
@@ -1331,7 +1332,7 @@ class PipelineWise:
                 if os.path.isfile(tap_run_log_file_running):
                     os.rename(tap_run_log_file_running, tap_run_log_file_terminated)
 
-            sys.exit(0)
+            sys.exit(1)
 
         except ProcessLookupError:
             self.logger.error(
