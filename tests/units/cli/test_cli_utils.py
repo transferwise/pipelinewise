@@ -1,8 +1,9 @@
 import os
 import re
+import pytest
 
 from pipelinewise import cli
-import pytest
+from pipelinewise.cli.errors import InvalidConfigException
 
 VIRTUALENVS_DIR = './virtualenvs-dummy'
 
@@ -14,10 +15,8 @@ class TestUtils:
     """
     def assert_json_is_invalid(self, schema, invalid_target):
         """Simple assertion to check if validate function exits with error"""
-        with pytest.raises(SystemExit) as pytest_wrapped_e:
+        with pytest.raises(InvalidConfigException):
             cli.utils.validate(invalid_target, schema)
-        assert pytest_wrapped_e.type == SystemExit
-        assert pytest_wrapped_e.value.code == 1
 
     def test_json_detectors(self):
         """Testing JSON detector functions"""

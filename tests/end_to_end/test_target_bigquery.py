@@ -7,7 +7,7 @@ from random import randint
 import bson
 import pytest
 from bson import Timestamp
-from pipelinewise.fastsync import mysql_to_bigquery
+from pipelinewise.fastsync import mysql_to_bigquery, postgres_to_bigquery
 
 from .helpers import tasks
 from .helpers import assertions
@@ -41,10 +41,25 @@ class TestTargetBigquery:
         self.run_query_tap_postgres = self.e2e.run_query_tap_postgres
         self.run_query_target_bigquery = self.e2e.run_query_target_bigquery
         self.mongodb_con = self.e2e.get_tap_mongodb_connection()
+        self.e2e.remove_all_state_files()
+        if self.e2e.env['TARGET_BIGQUERY']['is_configured']:
+            self.e2e.setup_target_bigquery()
 
     def teardown_method(self):
         """Delete test directories and database objects"""
 
+    @pytest.mark.dependency(name='validate')
+    def test_validate(self):
+        """Validate the YAML project with taps and target """
+
+        # validate project
+        return_code, stdout, stderr = tasks.run_command(f'pipelinewise validate --dir {self.project_dir}')
+
+        print('--------------- stdout ----------', stdout)
+        print('--------------- stderr ----------', stderr)
+        assert return_code == 0
+
+    @pytest.mark.dependency(depends=['validate'])
     @pytest.mark.dependency(name='import_config')
     def test_import_project(self):
         """Import the YAML project with taps and target and do discovery mode
@@ -191,24 +206,6 @@ class TestTargetBigquery:
 
     # pylint: disable=invalid-name
     @pytest.mark.dependency(depends=['import_config'])
-    def test_resync_pg_to_bq_with_split_large_files(
-        self, tap_postgres_id=TAP_POSTGRES_SPLIT_LARGE_FILES_ID
-    ):
-        """Resync tables from Postgres to Bigquery using splitting large files option"""
-        assertions.assert_resync_tables_success(
-            tap_postgres_id, TARGET_ID, profiling=True
-        )
-        assertions.assert_row_counts_equal(
-            self.run_query_tap_mysql, self.run_query_target_bigquery
-        )
-        assertions.assert_all_columns_exist(
-            self.run_query_tap_mysql,
-            self.run_query_target_bigquery,
-            mysql_to_bigquery.tap_type_to_target_type,
-        )
-
-    # pylint: disable=invalid-name
-    @pytest.mark.dependency(depends=['import_config'])
     def test_replicate_mariadb_to_bq_with_custom_buffer_size(self):
         """Replicate data from MariaDB to Bigquery with custom buffer size
         Same tests cases as test_replicate_mariadb_to_bq but using another tap with custom stream buffer size"""
@@ -234,7 +231,7 @@ class TestTargetBigquery:
             'where cvarchar=\'H\';'
         )[0][0]
 
-        assert result == datetime(9999, 12, 31, 23, 59, 59, 999008, tzinfo=timezone.utc)
+        assert result == datetime(9999, 12, 31, 23, 59, 59, 999000, tzinfo=timezone.utc)
 
         result = self.run_query_target_bigquery(
             'SELECT updated_at FROM '
@@ -242,7 +239,7 @@ class TestTargetBigquery:
             'where cvarchar=\'I\';'
         )[0][0]
 
-        assert result == datetime(9999, 12, 31, 23, 59, 59, 999008, tzinfo=timezone.utc)
+        assert result == datetime(9999, 12, 31, 23, 59, 59, 999000, tzinfo=timezone.utc)
 
         # 2. Make changes in PG source database
         #  LOG_BASED
@@ -292,7 +289,7 @@ class TestTargetBigquery:
             'where cvarchar=\'faaaar future\';'
         )[0][0]
 
-        assert result == datetime(9999, 12, 31, 23, 59, 59, 999008, tzinfo=timezone.utc)
+        assert result == datetime(9999, 12, 31, 23, 59, 59, 999000, tzinfo=timezone.utc)
 
         result = self.run_query_target_bigquery(
             'SELECT updated_at FROM '
@@ -300,7 +297,25 @@ class TestTargetBigquery:
             'where cvarchar=\'BC\';'
         )[0][0]
 
-        assert result == datetime(9999, 12, 31, 23, 59, 59, 999008, tzinfo=timezone.utc)
+        assert result == datetime(9999, 12, 31, 23, 59, 59, 999000, tzinfo=timezone.utc)
+
+    # pylint: disable=invalid-name
+    @pytest.mark.dependency(depends=['import_config'])
+    def test_resync_pg_to_bq_with_split_large_files(
+        self, tap_postgres_id=TAP_POSTGRES_SPLIT_LARGE_FILES_ID
+    ):
+        """Resync tables from Postgres to Bigquery using splitting large files option"""
+        assertions.assert_resync_tables_success(
+            tap_postgres_id, TARGET_ID, profiling=True
+        )
+        assertions.assert_row_counts_equal(
+            self.run_query_tap_postgres, self.run_query_target_bigquery
+        )
+        assertions.assert_all_columns_exist(
+            self.run_query_tap_postgres,
+            self.run_query_target_bigquery,
+            postgres_to_bigquery.tap_type_to_target_type,
+        )
 
     @pytest.mark.dependency(depends=['import_config'])
     def test_replicate_s3_to_bq(self):

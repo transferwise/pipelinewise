@@ -1,7 +1,7 @@
 from unittest import TestCase
 from unittest.mock import patch
-import pymysql
 
+import pymysql
 from pipelinewise.fastsync.commons import tap_mysql
 from pipelinewise.fastsync.commons.tap_mysql import FastSyncTapMySql
 
@@ -57,6 +57,52 @@ class TestFastSyncTapMySql(TestCase):
         # Test if session variables applied on both connections
         assert self.mysql.executed_queries == tap_mysql.DEFAULT_SESSION_SQLS
         assert self.mysql.executed_queries_unbuffered == self.mysql.executed_queries
+
+    def test_get_connection_to_primary(self):
+        """
+        Check that get connection uses the right credentials to connect to primary
+        """
+        creds = {
+            'host': 'my_primary_host',
+            'port': 3306,
+            'user': 'my_primary_user',
+            'password': 'my_primary_user',
+        }
+
+        conn_params, is_replica = FastSyncTapMySql(
+            connection_config=creds,
+            tap_type_to_target_type='testing'
+        ).get_connection_parameters()
+        self.assertFalse(is_replica)
+        self.assertEqual(conn_params['host'], creds['host'])
+        self.assertEqual(conn_params['port'], creds['port'])
+        self.assertEqual(conn_params['user'], creds['user'])
+        self.assertEqual(conn_params['password'], creds['password'])
+
+    def test_get_connection_to_replica(self):
+        """
+        Check that get connection uses the right credentials to connect to secondary if present
+        """
+        creds = {
+            'host': 'my_primary_host',
+            'replica_host': 'my_replica_host',
+            'port': 3306,
+            'replica_port': 4406,
+            'user': 'my_primary_user',
+            'replica_user': 'my_replica_user',
+            'password': 'my_primary_user',
+            'replica_password': 'my_replica_user',
+        }
+
+        conn_params, is_replica = FastSyncTapMySql(
+            connection_config=creds,
+            tap_type_to_target_type='testing'
+        ).get_connection_parameters()
+        self.assertTrue(is_replica)
+        self.assertEqual(conn_params['host'], creds['replica_host'])
+        self.assertEqual(conn_params['port'], creds['replica_port'])
+        self.assertEqual(conn_params['user'], creds['replica_user'])
+        self.assertEqual(conn_params['password'], creds['replica_password'])
 
     def test_open_connections_with_session_sqls(self):
         """Custom session parameters should be applied if defined"""

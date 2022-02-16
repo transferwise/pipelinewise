@@ -1,3 +1,39 @@
+0.41.0 (2022-02-10)
+-------------------
+
+- Dropped support for python 3.6
+- Bump `ujson` from `4.3.0` to `5.1.0`
+- Bump `pipelinewise-tap-s3-csv` to `2.0.0`
+- Fix for config json files
+- Fix: e2e tests fail when SF credentials are not present
+
+0.40.0 (2022-01-27)
+-------------------
+- Bump `pipelinewise-tap-kafka` from `5.0.1` to `5.1.0`
+
+0.39.1 (2022-01-26)
+-------------------
+- Bump `pipelinewise-tap-kafka` from `5.0.0` to `5.0.1`
+
+0.39.0 (2022-01-25)
+-------------------
+- Bump `pipelinewise-tap-kafka` from `4.0.1` to `5.0.0`
+- Bump `pipelinewise-target-bigquery` from `1.1.1` to `1.2.0`
+- Bump `pipelinewise-transform-field` from `2.2.0` to `2.3.0`
+- Prevent usage of extended transformation feature when FastSync exists
+- Fixed fastsync from postgres to bigquery
+- Fixed an issue when `SplitGzipFile` doesn't work with binary mode
+
+0.38.0 (2022-01-14)
+-------------------
+- MySQL tap now connects to replica instance during fastsync if credentials are provided
+- Added fastsync support for MongoDB Atlas
+- Docker base image to Python 3.8
+- Bump `pyyaml` from `5.4.1` to `6.0`
+- Bump `pipelinewise-target-snowflake` from `1.14.1` to `1.15.0`
+- Bump `pipelinewise-tap-s3-csv` from `1.2.2` to `1.2.3`
+- Bump `pipelinewise-tap-postgres` from `1.8.1` to `1.8.2`
+
 0.37.2 (2021-12-10)
 -------------------
 - Bump `pipelinewise-tap-github` from `1.0.2` to `1.0.3`

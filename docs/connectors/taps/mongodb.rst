@@ -97,6 +97,7 @@ Example YAML for ``tap-mongodb``:
 	db_conn:
 		host: "mongodb_host1,mongodb_host2,mongodb_host3" 	# Mongodb host(s)
 		port: 27017                           				# Mongodb port
+		srv: "false"										# For MongoDB Atlas `srv` should be "true" and `port` will be ignored
 		user: "PipelineWiseUser"                  			# Mongodb user
 		password: "mY_VerY_StRonG_PaSSwoRd"                 # Mongodb plain string or vault encrypted
 		auth_database: "admin"            					# Mongodb database to authenticate on
@@ -143,3 +144,17 @@ Example YAML for ``tap-mongodb``:
 
 		  	# default replication method is LOG_BASED
 		  	- table_name: "my_other_collection"
+
+
+Example connection to MongoDB Atlas
+"""""""""""""""""""""""""""""""""""
+
+.. code-block:: bash
+
+	db_conn:
+		srv: "true"
+		host: "xxxxxxxxx.xxxxx.mongodb.net"
+		auth_database: "admin"			# the Mongodb database name to authenticate on
+		dbname: "db-name"				# Mongodb database name to sync from
+		user: "user-name"				# User with read roles
+		password: "password"			# Plain string or vault encrypted

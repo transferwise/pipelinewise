@@ -2,6 +2,10 @@ import os
 import sys
 import pytest
 
+
+from tempfile import TemporaryDirectory
+from unittest import mock
+
 from pipelinewise.cli import commands
 from pipelinewise.cli.errors import StreamBufferTooLargeException
 
@@ -23,13 +27,20 @@ class TestCommands:
         # Should be false if file not exists
         assert commands.exists_and_executable('invalid_executable') is False
         # Should be false if file exists but not executable
-        assert commands.exists_and_executable(__file__) is False
+        with TemporaryDirectory() as temp_dir:
+            with open(f'{temp_dir}/test.tmp', 'w', encoding='utf-8') as tmp_file:
+                tmp_file.write('foo')
+            assert commands.exists_and_executable(f'{temp_dir}/test.tmp') is False
 
+    @mock.patch('pipelinewise.cli.commands._verify_json_file', mock.MagicMock(return_value=True))
     def test_build_tap_command(self):
         """Tests the function that generates tap executable command"""
+
+        # we are using some config files which does not exist, so we patch the method that verifies the json files
         # State file should not be included if state file path not passed
+
         tap = commands.TapParams(
-            id='my_tap_mysql',
+            tap_id='my_tap_mysql',
             type='tap_mysql',
             bin='/bin/tap_mysql.py',
             python_bin='/bin/python3',
@@ -61,7 +72,7 @@ class TestCommands:
 
         # State file should not be included if state file passed but file not exists
         tap = commands.TapParams(
-            id='my_tap_mysql',
+            tap_id='my_tap_mysql',
             type='tap_mysql',
             bin='/bin/tap_mysql.py',
             python_bin='/bin/python3',
@@ -95,7 +106,7 @@ class TestCommands:
         state_mock = __file__
 
         tap = commands.TapParams(
-            id='my_tap_mysql',
+            tap_id='my_tap_mysql',
             type='tap_mysql',
             bin='/bin/tap_mysql.py',
             python_bin='/bin/python3',
@@ -125,12 +136,15 @@ class TestCommands:
             f'--config .ppw/config.json --catalog .ppw/properties.json --state {state_mock}'
         )
 
+    @mock.patch('pipelinewise.cli.commands._verify_json_file', mock.MagicMock(return_value=True))
     def test_build_target_command(self):
         """Tests the function that generates target executable command"""
+
+        # we are using some config files which does not exist, so we patch the method that verifies the json files
         # Should return a input piped command with an executable target command
 
         target = commands.TargetParams(
-            id='my_target',
+            target_id='my_target',
             type='target-snowflake',
             bin='/bin/target_postgres.py',
             python_bin='/bin/python',
@@ -253,9 +267,13 @@ class TestCommands:
             == 'mbuffer -m 100M -q -l stream_buffer.log.running'
         )
 
+    @mock.patch('pipelinewise.cli.commands._verify_json_file', mock.MagicMock(return_value=True))
     def test_build_singer_command(self):
         """Tests the function that generates the full singer singer command
         that connects the required components with linux pipes"""
+
+        # we are using some config files which does not exist, so we patch the method that verifies the json files
+
         transform_config = '{}/resources/transform-config.json'.format(
             os.path.dirname(__file__)
         )
@@ -266,7 +284,7 @@ class TestCommands:
 
         # Should generate a command with tap state and transformation
         tap_params = commands.TapParams(
-            id='my_tap',
+            tap_id='my_tap',
             type='tap-mysql',
             bin='/bin/tap_mysql.py',
             python_bin='/bin/python',
@@ -276,7 +294,7 @@ class TestCommands:
         )
 
         target_params = commands.TargetParams(
-            id='my_target',
+            target_id='my_target',
             type='target-postgres',
             bin='/bin/target_postgres.py',
             python_bin='/bin/python',
@@ -361,7 +379,7 @@ class TestCommands:
 
         # Should generate a command without state and with transformation
         tap_params = commands.TapParams(
-            id='my_tap',
+            tap_id='my_tap',
             type='tap-mysql',
             bin='/bin/tap_mysql.py',
             python_bin='/bin/python',
@@ -402,7 +420,7 @@ class TestCommands:
 
         # Should generate a command with state and without transformation
         tap_params = commands.TapParams(
-            id='my_tap',
+            tap_id='my_tap',
             type='tap-mysql',
             bin='/bin/tap_mysql.py',
             python_bin='/bin/python',
@@ -450,7 +468,7 @@ class TestCommands:
 
         # Should generate a command without state and transformation
         tap_params = commands.TapParams(
-            id='my_tap',
+            tap_id='my_tap',
             type='tap-mysql',
             bin='/bin/tap_mysql.py',
             python_bin='/bin/python',
@@ -486,8 +504,12 @@ class TestCommands:
             '--config .ppw/config.json'
         )
 
+    @mock.patch('pipelinewise.cli.commands._verify_json_file', mock.MagicMock(return_value=True))
     def test_build_fastsync_command(self):
         """Tests the function that generates the fastsync command"""
+
+        # we are using some config files which does not exist, so we patch the method that verifies the json files
+
         transform_config = '{}/resources/transform-config.json'.format(
             os.path.dirname(__file__)
         )
@@ -498,7 +520,7 @@ class TestCommands:
         # Should generate a fastsync command with transformation
 
         tap_params = commands.TapParams(
-            id='my_tap',
+            tap_id='my_tap',
             type='tap-mysql',
             bin='/bin/tap_mysql.py',
             python_bin='/tap-mysql/bin/python',
@@ -508,7 +530,7 @@ class TestCommands:
         )
 
         target_params = commands.TargetParams(
-            id='my_target',
+            target_id='my_target',
             type='target-postgres',
             bin='/bin/target_postgres.py',
             python_bin='/target-postgres/bin/python',

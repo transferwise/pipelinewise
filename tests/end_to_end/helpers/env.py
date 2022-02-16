@@ -5,6 +5,7 @@ import boto3
 import shutil
 import subprocess
 import uuid
+from pathlib import Path
 
 from dotenv import load_dotenv
 from . import db
@@ -90,6 +91,12 @@ class E2EEnv:
                     'USER': {'value': os.environ.get('TAP_MYSQL_USER')},
                     'PASSWORD': {'value': os.environ.get('TAP_MYSQL_PASSWORD')},
                     'DB': {'value': os.environ.get('TAP_MYSQL_DB')},
+                    'DB_2': {'value': os.environ.get('TAP_MYSQL_REPLICA_DB')},
+                    'REPLICA_HOST': {'value': os.environ.get('TAP_MYSQL_REPLICA_HOST')},
+                    'REPLICA_PORT': {'value': os.environ.get('TAP_MYSQL_REPLICA_PORT')},
+                    'REPLICA_USER': {'value': os.environ.get('TAP_MYSQL_REPLICA_USER')},
+                    'REPLICA_PASSWORD': {'value': os.environ.get('TAP_MYSQL_REPLICA_PASSWORD')},
+                    'REPLICA_DB': {'value': os.environ.get('TAP_MYSQL_REPLICA_DB')},
                 },
             },
             # ------------------------------------------------------------------
@@ -465,6 +472,17 @@ class E2EEnv:
             database=self._get_conn_env_var('TAP_MYSQL', 'DB'),
         )
 
+    def run_query_tap_mysql_2(self, query):
+        """Run and SQL query in tap mysql database"""
+        return db.run_query_mysql(
+            query,
+            host=self._get_conn_env_var('TAP_MYSQL', 'HOST'),
+            port=int(self._get_conn_env_var('TAP_MYSQL', 'PORT')),
+            user=self._get_conn_env_var('TAP_MYSQL', 'USER'),
+            password=self._get_conn_env_var('TAP_MYSQL', 'PASSWORD'),
+            database=self._get_conn_env_var('TAP_MYSQL', 'DB_2'),
+        )
+
     def run_query_target_snowflake(self, query):
         """Run and SQL query in target snowflake database"""
         return db.run_query_snowflake(
@@ -552,6 +570,9 @@ class E2EEnv:
             'DROP SCHEMA IF EXISTS ppw_e2e_tap_mysql CASCADE'
         )
         self.run_query_target_postgres(
+            'DROP SCHEMA IF EXISTS ppw_e2e_tap_mysql_2 CASCADE'
+        )
+        self.run_query_target_postgres(
             'DROP SCHEMA IF EXISTS ppw_e2e_tap_s3_csv CASCADE'
         )
         self.run_query_target_postgres(
@@ -593,27 +614,32 @@ class E2EEnv:
 
     def setup_target_snowflake(self):
         """Clean snowflake target database and prepare for test run"""
-        self.run_query_target_snowflake(
-            f'DROP SCHEMA IF EXISTS ppw_e2e_tap_postgres{self.sf_schema_postfix} CASCADE'
-        )
-        self.run_query_target_snowflake(
-            f'DROP SCHEMA IF EXISTS ppw_e2e_tap_postgres_public2{self.sf_schema_postfix} CASCADE'
-        )
-        self.run_query_target_snowflake(
-            f'DROP SCHEMA IF EXISTS ppw_e2e_tap_postgres_logical1{self.sf_schema_postfix} CASCADE'
-        )
-        self.run_query_target_snowflake(
-            f'DROP SCHEMA IF EXISTS ppw_e2e_tap_postgres_logical2{self.sf_schema_postfix} CASCADE'
-        )
-        self.run_query_target_snowflake(
-            f'DROP SCHEMA IF EXISTS ppw_e2e_tap_mysql{self.sf_schema_postfix} CASCADE'
-        )
-        self.run_query_target_snowflake(
-            f'DROP SCHEMA IF EXISTS ppw_e2e_tap_s3_csv{self.sf_schema_postfix} CASCADE'
-        )
-        self.run_query_target_snowflake(
-            f'DROP SCHEMA IF EXISTS ppw_e2e_tap_mongodb{self.sf_schema_postfix} CASCADE'
-        )
+
+        if self.env['TARGET_SNOWFLAKE']['is_configured']:
+            self.run_query_target_snowflake(
+                f'DROP SCHEMA IF EXISTS ppw_e2e_tap_postgres{self.sf_schema_postfix} CASCADE'
+            )
+            self.run_query_target_snowflake(
+                f'DROP SCHEMA IF EXISTS ppw_e2e_tap_postgres_public2{self.sf_schema_postfix} CASCADE'
+            )
+            self.run_query_target_snowflake(
+                f'DROP SCHEMA IF EXISTS ppw_e2e_tap_postgres_logical1{self.sf_schema_postfix} CASCADE'
+            )
+            self.run_query_target_snowflake(
+                f'DROP SCHEMA IF EXISTS ppw_e2e_tap_postgres_logical2{self.sf_schema_postfix} CASCADE'
+            )
+            self.run_query_target_snowflake(
+                f'DROP SCHEMA IF EXISTS ppw_e2e_tap_mysql{self.sf_schema_postfix} CASCADE'
+            )
+            self.run_query_target_postgres(
+                f'DROP SCHEMA IF EXISTS ppw_e2e_tap_mysql_2{self.sf_schema_postfix} CASCADE'
+            )
+            self.run_query_target_snowflake(
+                f'DROP SCHEMA IF EXISTS ppw_e2e_tap_s3_csv{self.sf_schema_postfix} CASCADE'
+            )
+            self.run_query_target_snowflake(
+                f'DROP SCHEMA IF EXISTS ppw_e2e_tap_mongodb{self.sf_schema_postfix} CASCADE'
+            )
 
         # Clean config directory
         shutil.rmtree(os.path.join(CONFIG_DIR, 'snowflake'), ignore_errors=True)
@@ -627,3 +653,9 @@ class E2EEnv:
         self.delete_dataset_target_bigquery('ppw_e2e_tap_mysql')
         self.delete_dataset_target_bigquery('ppw_e2e_tap_s3_csv')
         self.delete_dataset_target_bigquery('ppw_e2e_tap_mongodb')
+
+    @staticmethod
+    def remove_all_state_files():
+        """Clean up state files to ensure tests behave the same every time"""
+        for state_file in Path(CONFIG_DIR).glob('**/state.json'):
+            state_file.unlink()

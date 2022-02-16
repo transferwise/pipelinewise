@@ -38,13 +38,19 @@
           "type": "object",
           "properties": {
             "column": {
-              "type": "string"
+              "type": "string",
+              "minLength": 1
+            },
+            "field_path": {
+              "type": "string",
+              "minLength": 1
             },
             "equals": {
               "type": ["null", "integer", "string", "boolean", "number"]
             }
           },
-          "required": ["column", "equals"]
+          "required": ["column", "equals"],
+          "additionalProperties": false
         },
         {
           "type": "object",
@@ -54,6 +60,10 @@
             },
             "regex_match": {
               "type": "string"
+            },
+            "field_path": {
+              "type": "string",
+              "minLength": 1
             }
           },
           "required": ["column", "regex_match"]
@@ -122,9 +132,19 @@
     },
     "transformation": {
       "type": "object",
+      "additionalProperties": false,
       "properties": {
         "column": {
-          "type": "string"
+          "type": "string",
+          "minLength": 1
+        },
+        "field_paths": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1
         },
         "type": {
           "type": "string",
@@ -169,6 +189,7 @@
     },
     "s3_csv_mapping": {
       "type": "object",
+      "additionalProperties": false,
       "properties": {
         "search_prefix": {
           "type": "string"

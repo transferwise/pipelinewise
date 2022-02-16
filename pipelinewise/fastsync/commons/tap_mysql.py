@@ -2,12 +2,13 @@ import csv
 import datetime
 import decimal
 import logging
-import pymysql
+from typing import Tuple
 
+import pymysql
 from pymysql import InterfaceError, OperationalError
 
-from . import utils, split_gzip
 from ...utils import safe_column_name
+from . import split_gzip, utils
 
 LOGGER = logging.getLogger(__name__)
 
@@ -26,7 +27,7 @@ class FastSyncTapMySql:
     Common functions for fastsync from a MySQL database
     """
 
-    def __init__(self, connection_config, tap_type_to_target_type, target_quote=None):
+    def __init__(self, connection_config: dict, tap_type_to_target_type, target_quote=None):
         self.connection_config = connection_config
         self.connection_config['charset'] = connection_config.get(
             'charset', DEFAULT_CHARSET
@@ -41,55 +42,59 @@ class FastSyncTapMySql:
         self.target_quote = target_quote
         self.conn = None
         self.conn_unbuffered = None
+        self.is_replica = False
+
+    def get_connection_parameters(self) -> Tuple[dict, bool]:
+        """
+        Method to get connection parameters
+        Connection is either to the primary or a replica if its credentials are given
+
+        Args:
+            connection_config: dictionary containing the db connection details
+        Returns:
+            dict with credentials
+        """
+
+        is_replica = False
+
+        if 'replica_host' in self.connection_config:
+            is_replica = True
+
+        host = self.connection_config.get('replica_host', self.connection_config['host'])
+        port = int(self.connection_config.get('replica_port', self.connection_config['port']))
+        user = self.connection_config.get('replica_user', self.connection_config['user'])
+        password = self.connection_config.get('replica_password', self.connection_config['password'])
+        charset = self.connection_config['charset']
+
+        return ({
+            'host': host,
+            'port': port,
+            'user': user,
+            'password': password,
+            'charset': charset,
+        }, is_replica)
 
     def open_connections(self):
         """
         Open connection
         """
+
+        # Fastsync is using replica_{host|port|user|password} values from the config by default
+        # to avoid making heavy load on the primary source database when syncing large tables
+        #
+        # If replica_{host|port|user|password} values are not defined in the config then it's
+        # using the normal credentials to connect
+
+        conn_params, is_replica = self.get_connection_parameters()
+
+        self.is_replica = is_replica
+
         self.conn = pymysql.connect(
-            # Fastsync is using bulk_sync_{host|port|user|password} values from the config by default
-            # to avoid making heavy load on the primary source database when syncing large tables
-            #
-            # If bulk_sync_{host|port|user|password} values are not defined in the config then it's
-            # using the normal credentials to connect
-            host=self.connection_config.get(
-                'bulk_sync_host', self.connection_config['host']
-            ),
-            port=int(
-                self.connection_config.get(
-                    'bulk_sync_port', self.connection_config['port']
-                )
-            ),
-            user=self.connection_config.get(
-                'bulk_sync_user', self.connection_config['user']
-            ),
-            password=self.connection_config.get(
-                'bulk_sync_password', self.connection_config['password']
-            ),
-            charset=self.connection_config['charset'],
+            **conn_params,
             cursorclass=pymysql.cursors.DictCursor,
         )
         self.conn_unbuffered = pymysql.connect(
-            # Fastsync is using bulk_sync_{host|port|user|password} values from the config by default
-            # to avoid making heavy load on the primary source database when syncing large tables
-            #
-            # If bulk_sync_{host|port|user|password} values are not defined in the config then it's
-            # using the normal credentials to connect
-            host=self.connection_config.get(
-                'bulk_sync_host', self.connection_config['host']
-            ),
-            port=int(
-                self.connection_config.get(
-                    'bulk_sync_port', self.connection_config['port']
-                )
-            ),
-            user=self.connection_config.get(
-                'bulk_sync_user', self.connection_config['user']
-            ),
-            password=self.connection_config.get(
-                'bulk_sync_password', self.connection_config['password']
-            ),
-            charset=self.connection_config['charset'],
+            **conn_params,
             cursorclass=pymysql.cursors.SSCursor,
         )
 
@@ -175,16 +180,28 @@ class FastSyncTapMySql:
         """
         Get the actual binlog position in MySQL
         """
-        result = self.query('SHOW MASTER STATUS')
-        if len(result) == 0:
-            raise Exception('MySQL binary logging is not enabled.')
+        if self.is_replica:
+            result = self.query('SHOW SLAVE STATUS')
+            if len(result) == 0:
+                raise Exception('MySQL binary logging is not enabled.')
+            binlog_pos = result[0]
+            log_file = binlog_pos.get('Master_Log_File')
+            log_pos = binlog_pos.get('Read_Master_Log_Pos')
+            version = binlog_pos.get('version', 1)
 
-        binlog_pos = result[0]
+        else:
+            result = self.query('SHOW MASTER STATUS')
+            if len(result) == 0:
+                raise Exception('MySQL binary logging is not enabled.')
+            binlog_pos = result[0]
+            log_file = binlog_pos.get('File')
+            log_pos = binlog_pos.get('Position')
+            version = binlog_pos.get('version', 1)
 
         return {
-            'log_file': binlog_pos.get('File'),
-            'log_pos': binlog_pos.get('Position'),
-            'version': binlog_pos.get('version', 1),
+            'log_file': log_file,
+            'log_pos': log_pos,
+            'version': version,
         }
 
     # pylint: disable=invalid-name
