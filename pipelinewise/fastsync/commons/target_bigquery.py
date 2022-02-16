@@ -133,7 +133,8 @@ class FastSyncTargetBigquery:
 
         # Combine existing metadata with archive related headers
         archive_blob = archive_bucket.get_blob(archive_blob_name)
-        archive_blob.metadata = (blob.metadata or {}).update(
+        new_metadata = blob.metadata or {}
+        new_metadata.update(
             {
                 'tap': tap_id,
                 'schema': archive_schema,
@@ -141,6 +142,7 @@ class FastSyncTargetBigquery:
                 'archived-by': 'pipelinewise_fastsync',
             }
         )
+        archive_blob.metadata = new_metadata
 
     def create_schema(self, schema_name):
         temp_schema = self.connection_config.get('temp_schema', schema_name)
