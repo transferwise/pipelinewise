@@ -102,7 +102,7 @@ class FastSyncTargetBigquery:
 
         return blob
 
-    def copy_to_archive(self, blob: storage.Blob, tap_id: str, table: str) -> None:
+    def copy_to_archive(self, blob: storage.Blob, tap_id: str, table: str) -> storage.Blob:
         """Copy load file to archive folder with metadata added"""
         table_dict = utils.tablename_to_dict(table)
         archive_table = table_dict.get('table_name')
@@ -116,12 +116,12 @@ class FastSyncTargetBigquery:
             'archive_load_files_gcs_prefix', 'archive'
         )
 
-        source_bucket = self.gcs.get_bucket(self.connection_config.get('gcs_bucket'))
+        source_bucket = blob.bucket
 
         # Get archive GCS bucket from config, defaulting to same bucket used for Snowflake imports if not specified
         archive_bucket = self.gcs.get_bucket(
             self.connection_config.get(
-                'archive_load_files_gcs_bucket', source_bucket
+                'archive_load_files_gcs_bucket', source_bucket.name
             )
         )
 
@@ -133,7 +133,7 @@ class FastSyncTargetBigquery:
 
         # Combine existing metadata with archive related headers
         archive_blob = archive_bucket.get_blob(archive_blob_name)
-        new_metadata = blob.metadata or {}
+        new_metadata = {} if blob.metadata is None else blob.metadata
         new_metadata.update(
             {
                 'tap': tap_id,
@@ -143,6 +143,7 @@ class FastSyncTargetBigquery:
             }
         )
         archive_blob.metadata = new_metadata
+        return archive_blob
 
     def create_schema(self, schema_name):
         temp_schema = self.connection_config.get('temp_schema', schema_name)
@@ -248,7 +249,7 @@ class FastSyncTargetBigquery:
         job_config.allow_quoted_newlines = allow_quoted_newlines
         job_config.skip_leading_rows = 1 if skip_csv_header else 0
 
-        uris = [f'gs://{blob.bucket}/{blob.name}' for blob in blobs]
+        uris = [f'gs://{blob.bucket.name}/{blob.name}' for blob in blobs]
         job = client.load_table_from_uri(
             source_uris=uris, destination=table_ref, job_config=job_config
         )
