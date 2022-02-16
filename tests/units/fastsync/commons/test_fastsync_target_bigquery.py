@@ -177,57 +177,61 @@ class TestFastSyncTargetBigquery:
     ):
         """Validate if COPY command generated correctly"""
         # COPY table with standard table and column names
-        client().load_table_from_file.return_value = bigquery_job
+        client().load_table_from_uri.return_value = bigquery_job
         load_job_config.return_value = bigquery_job_config
-        mocked_open = mock_open()
-        with patch('pipelinewise.fastsync.commons.target_bigquery.open', mocked_open):
-            self.bigquery.copy_to_table(
-                filepath='/path/to/dummy-file.csv.gz',
-                target_schema='test_schema',
-                table_name='test_table',
-                size_bytes=1000,
-                is_temporary=False,
-                skip_csv_header=False,
-            )
-        mocked_open.assert_called_with('/path/to/dummy-file.csv.gz', 'rb')
+
+        mock_bucket = Mock()
+        mock_bucket.name = 'some-bucket'
+        mock_blob = Mock()
+        mock_blob.bucket = mock_bucket
+        mock_blob.name = '/path/to/dummy-file.csv.gz'
+
+        self.bigquery.copy_to_table(
+            blobs=[mock_blob],
+            target_schema='test_schema',
+            table_name='test_table',
+            size_bytes=1000,
+            is_temporary=False,
+            skip_csv_header=False,
+        )
         assert bigquery_job_config.source_format == bigquery.SourceFormat.CSV
         assert bigquery_job_config.write_disposition == 'WRITE_TRUNCATE'
         assert bigquery_job_config.allow_quoted_newlines is True
         assert bigquery_job_config.skip_leading_rows == 0
         client().dataset.assert_called_with('test_schema')
         client().dataset().table.assert_called_with('test_table')
-        assert client().load_table_from_file.call_count == 1
+        client().load_table_from_uri.assert_called_once()
+        client().load_table_from_uri.reset_mock()
 
         # COPY table with reserved word in table and column names in temp table
-        with patch('pipelinewise.fastsync.commons.target_bigquery.open', mocked_open):
-            self.bigquery.copy_to_table(
-                filepath='/path/to/full-file.csv.gz',
-                target_schema='test_schema',
-                table_name='full',
-                size_bytes=1000,
-                is_temporary=True,
-                skip_csv_header=False,
-            )
-        mocked_open.assert_called_with('/path/to/full-file.csv.gz', 'rb')
+        self.bigquery.copy_to_table(
+            blobs=[mock_blob],
+            target_schema='test_schema',
+            table_name='full',
+            size_bytes=1000,
+            is_temporary=True,
+            skip_csv_header=True,
+            write_truncate=False,
+            allow_quoted_newlines=False,
+        )
         assert bigquery_job_config.source_format == bigquery.SourceFormat.CSV
-        assert bigquery_job_config.write_disposition == 'WRITE_TRUNCATE'
-        assert bigquery_job_config.allow_quoted_newlines is True
-        assert bigquery_job_config.skip_leading_rows == 0
+        assert bigquery_job_config.write_disposition == 'WRITE_APPEND'
+        assert bigquery_job_config.allow_quoted_newlines is False
+        assert bigquery_job_config.skip_leading_rows == 1
         client().dataset.assert_called_with('test_schema')
         client().dataset().table.assert_called_with('full_temp')
-        assert client().load_table_from_file.call_count == 2
+        client().load_table_from_uri.assert_called_once()
+        client().load_table_from_uri.reset_mock()
 
-        # COPY table with space and uppercase in table name and s3 key
-        with patch('pipelinewise.fastsync.commons.target_bigquery.open', mocked_open):
-            self.bigquery.copy_to_table(
-                filepath='/path/to/file with space.csv.gz',
-                target_schema='test_schema',
-                table_name='table with SPACE and UPPERCASE',
-                size_bytes=1000,
-                is_temporary=True,
-                skip_csv_header=False,
-            )
-        mocked_open.assert_called_with('/path/to/file with space.csv.gz', 'rb')
+        # COPY table with space and uppercase in table name
+        self.bigquery.copy_to_table(
+            blobs=[mock_blob],
+            target_schema='test_schema',
+            table_name='table with SPACE and UPPERCASE',
+            size_bytes=1000,
+            is_temporary=True,
+            skip_csv_header=False,
+        )
         assert bigquery_job_config.source_format == bigquery.SourceFormat.CSV
         assert bigquery_job_config.write_disposition == 'WRITE_TRUNCATE'
         assert bigquery_job_config.allow_quoted_newlines is True
@@ -236,7 +240,8 @@ class TestFastSyncTargetBigquery:
         client().dataset().table.assert_called_with(
             'table_with_space_and_uppercase_temp'
         )
-        assert client().load_table_from_file.call_count == 3
+        client().load_table_from_uri.assert_called_once()
+        client().load_table_from_uri.reset_mock()
 
     @patch('pipelinewise.fastsync.commons.target_bigquery.bigquery.Client')
     def test_grant_select_on_table(self, client, bigquery_job):
