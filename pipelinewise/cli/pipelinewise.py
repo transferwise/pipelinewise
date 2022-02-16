@@ -101,7 +101,7 @@ class PipelineWise:
 
         # Catch SIGINT and SIGTERM to exit gracefully
         for sig in [signal.SIGINT, signal.SIGTERM]:
-            signal.signal(sig, self._exit_gracefully)
+            signal.signal(sig, self.stop_tap)
 
     def send_alert(
         self, message: str, level: str = BaseAlertHandler.ERROR, exc: Exception = None
@@ -1300,14 +1300,14 @@ class PipelineWise:
         utils.silentremove(tap_properties_singer)
         self._print_tap_run_summary(self.STATUS_SUCCESS, start_time, datetime.now())
 
-    def stop_tap(self):
+    def stop_tap(self, _, _):
         """
         Stop running tap
 
         The command finds the tap specific pidfile that was created by run_tap command and sends
-        a SIGINT to the process. The SIGINT signal triggers _exit_gracefully function automatically and
-        the tap stops running.
+        a SIGTERM to the process.
         """
+        self.logger.info('Trying to stop tap gracefully...')
         pidfile_path = self.tap['files']['pidfile']
         try:
             with open(pidfile_path, encoding='utf-8') as pidf:
@@ -1316,12 +1316,23 @@ class PipelineWise:
 
                 # Terminate child processes
                 for child in parent.children(recursive=True):
-                    self.logger.info('Sending SIGINT to child pid %s...', child.pid)
-                    child.send_signal(signal.SIGINT)
+                    self.logger.info('Sending SIGTERM to child pid %s...', child.pid)
+                    child.send_signal(signal.SIGTERM)
 
                 # Terminate main process
-                self.logger.info('Sending SIGINT to main pid %s...', parent.pid)
-                parent.send_signal(signal.SIGINT)
+                # self.logger.info('Sending SIGTERM to main pid %s...', parent.pid)
+                # parent.send_signal(signal.SIGTERM)
+
+            # Rename log files from running to terminated status
+            if self.tap_run_log_file:
+                tap_run_log_file_running = f'{self.tap_run_log_file}.running'
+                tap_run_log_file_terminated = f'{self.tap_run_log_file}.terminated'
+
+                if os.path.isfile(tap_run_log_file_running):
+                    os.rename(tap_run_log_file_running, tap_run_log_file_terminated)
+
+            sys.exit(0)
+
         except ProcessLookupError:
             self.logger.error(
                 'Pid %s not found. Is the tap running on this machine? '
@@ -1329,6 +1340,7 @@ class PipelineWise:
                 pid,
             )
             sys.exit(1)
+
         except FileNotFoundError:
             self.logger.error(
                 'No pidfile found at %s. Tap does not seem to be running.', pidfile_path
@@ -1662,20 +1674,6 @@ class PipelineWise:
                 and 'token' not in stream_bookmark
             )
         )
-
-    # pylint: disable=unused-argument
-    def _exit_gracefully(self, sig, frame, exit_code=1):
-        self.logger.info('Stopping gracefully...')
-
-        # Rename log files from running to terminated status
-        if self.tap_run_log_file:
-            tap_run_log_file_running = f'{self.tap_run_log_file}.running'
-            tap_run_log_file_terminated = f'{self.tap_run_log_file}.terminated'
-
-            if os.path.isfile(tap_run_log_file_running):
-                os.rename(tap_run_log_file_running, tap_run_log_file_terminated)
-
-        sys.exit(exit_code)
 
     def _print_tap_run_summary(self, status, start_time, end_time):
         summary = f"""
