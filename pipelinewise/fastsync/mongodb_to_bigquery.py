@@ -48,6 +48,8 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
     """Sync one table"""
     mongodb = FastSyncTapMongoDB(args.tap, tap_type_to_target_type)
     bigquery = FastSyncTargetBigquery(args.target, args.transform)
+    tap_id = args.target.get('tap_id')
+    archive_load_files = args.target.get('archive_load_files', False)
 
     try:
         dbname = args.tap.get('dbname')
@@ -72,20 +74,25 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
         bigquery_columns = bigquery_types.get('columns', [])
         mongodb.close_connection()
 
+        # Uploading to GCS
+        gcs_blob = bigquery.upload_to_gcs(filepath)
+        os.remove(filepath)
+
         # Creating temp table in Bigquery
         bigquery.create_schema(target_schema)
         bigquery.create_table(target_schema, table, bigquery_columns, is_temporary=True)
 
         # Load into Bigquery table
         bigquery.copy_to_table(
-            filepath,
-            target_schema,
-            table,
-            size_bytes,
-            is_temporary=True,
-            skip_csv_header=True,
+            [gcs_blob], target_schema, table, size_bytes, is_temporary=True,
         )
-        os.remove(filepath)
+
+        if archive_load_files:
+            # Copy load file to archive
+            bigquery.copy_to_archive(gcs_blob, tap_id, table)
+
+        # Delete all file parts from s3
+        gcs_blob.delete()
 
         # Obfuscate columns
         bigquery.obfuscate_columns(target_schema, table)
