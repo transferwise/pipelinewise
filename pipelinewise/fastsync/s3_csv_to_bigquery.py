@@ -54,7 +54,7 @@ def sync_table(table_name: str, args: Namespace) -> Union[bool, str]:
 
         target_schema = utils.get_target_schema(args.target, table_name)
 
-        s3_csv.copy_table(table_name, filepath)
+        s3_csv.copy_table(table_name, filepath, compress=False)
         size_bytes = os.path.getsize(filepath)
 
         # Uploading to GCS

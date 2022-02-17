@@ -20,6 +20,7 @@ from messytables import (
 from singer.utils import strptime_with_tz
 from singer_encodings import csv as singer_encodings_csv
 
+from . import split_gzip
 from .utils import retry_pattern
 from ...utils import safe_column_name
 
@@ -73,7 +74,7 @@ class FastSyncTapS3Csv:
             )
         )
 
-    def copy_table(self, table_name: str, file_path: str) -> None:
+    def copy_table(self, table_name: str, file_path: str, compress=True) -> None:
         """
         Copies data from all csv files that match the search_pattern and into the csv file in file_path
         :param table_name: Name of the table
@@ -119,10 +120,16 @@ class FastSyncTapS3Csv:
         self.tables_last_modified[table_name] = max_last_modified
 
         # write to the given compressed csv file
-        with gzip.open(file_path, 'wt') as gzfile:
-
+        gzip_splitter = split_gzip.open(
+            file_path,
+            mode='wt',
+            chunk_size_mb=split_gzip.DEFAULT_CHUNK_SIZE_MB,
+            max_chunks=0,
+            compress=compress,
+        )
+        with gzip_splitter as split_gzip_files:
             writer = csv.DictWriter(
-                gzfile,
+                split_gzip_files,
                 fieldnames=sorted(list(headers)),
                 # we need to sort the headers so that copying into snowflake works
                 delimiter=',',
