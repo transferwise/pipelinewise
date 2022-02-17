@@ -74,7 +74,7 @@ class FastSyncTapS3Csv:
             )
         )
 
-    def copy_table(self, table_name: str, file_path: str, compress=True) -> None:
+    def copy_table(self, table_name: str, file_path: str, compress=True, include_header=True) -> None:
         """
         Copies data from all csv files that match the search_pattern and into the csv file in file_path
         :param table_name: Name of the table
@@ -136,8 +136,9 @@ class FastSyncTapS3Csv:
                 quotechar='"',
                 quoting=csv.QUOTE_MINIMAL,
             )
-            # write the header
-            writer.writeheader()
+            if include_header:
+                # write the header
+                writer.writeheader()
             # write all records at once
             writer.writerows(records)
 
