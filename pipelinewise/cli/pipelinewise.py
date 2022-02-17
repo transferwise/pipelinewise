@@ -1320,10 +1320,6 @@ class PipelineWise:
                     self.logger.info('Sending SIGTERM to child pid %s...', child.pid)
                     child.send_signal(signal.SIGTERM)
 
-                # Terminate main process
-                # self.logger.info('Sending SIGTERM to main pid %s...', parent.pid)
-                # parent.send_signal(signal.SIGTERM)
-
             # Rename log files from running to terminated status
             if self.tap_run_log_file:
                 tap_run_log_file_running = f'{self.tap_run_log_file}.running'
