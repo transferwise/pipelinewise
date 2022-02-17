@@ -62,6 +62,7 @@ def fixture_gcs_client():
     with patch('pipelinewise.fastsync.commons.target_bigquery.storage.Client') as mock:
         yield mock
 
+
 # pylint: disable=unused-argument
 @pytest.fixture(name='target_bigquery')
 def fixture_target_bigquery(gcs_client):
@@ -536,10 +537,10 @@ class TestFastSyncTargetBigquery:
         # pylint: disable=line-too-long
         expected_sql = [
             "UPDATE `my_schema`.`my_table_temp` SET `col_2` = 'hidden' WHERE (`col_4` IS NULL);",
-            "UPDATE `my_schema`.`my_table_temp` SET `col_3` = TIMESTAMP(DATETIME(DATE(EXTRACT(YEAR FROM `col_3`), 1, 1),TIME(`col_3`))) WHERE (`col_5` = 'some_value');",
-            "UPDATE `my_schema`.`my_table_temp` SET `col_6` = CONCAT(SUBSTRING(`col_6`, 1, 5), TO_BASE64(SHA256(SUBSTRING(`col_6`, 5 + 1)))) WHERE (`col_1` = 30) AND REGEXP_CONTAINS(`col_2`, '[0-9]{3}\\.[0-9]{3}');",
-            "UPDATE `my_schema`.`my_table_temp` SET `col_7` = CASE WHEN LENGTH(`col_7`) > 2 * 3 THEN CONCAT(SUBSTRING(`col_7`, 1, 3), REPEAT('*', LENGTH(`col_7`)-(2 * 3)), SUBSTRING(`col_7`, LENGTH(`col_7`)-3+1, 3)) ELSE REPEAT('*', LENGTH(`col_7`)) END WHERE (`col_1` = 30) AND REGEXP_CONTAINS(`col_2`, '[0-9]{3}\\.[0-9]{3}') AND (`col_4` IS NULL);",
-            'UPDATE `my_schema`.`my_table_temp` SET `col_1` = NULL, `col_4` = 0, `col_5` = TO_BASE64(SHA256(`col_5`)) WHERE true;',
+            "UPDATE `my_schema`.`my_table_temp` SET `col_3` = TIMESTAMP(DATETIME(DATE(EXTRACT(YEAR FROM `col_3`), 1, 1),TIME(`col_3`))) WHERE (`col_5` = 'some_value');",  # noqa: E501
+            "UPDATE `my_schema`.`my_table_temp` SET `col_6` = CONCAT(SUBSTRING(`col_6`, 1, 5), TO_BASE64(SHA256(SUBSTRING(`col_6`, 5 + 1)))) WHERE (`col_1` = 30) AND REGEXP_CONTAINS(`col_2`, '[0-9]{3}\\.[0-9]{3}');",  # noqa: E501
+            "UPDATE `my_schema`.`my_table_temp` SET `col_7` = CASE WHEN LENGTH(`col_7`) > 2 * 3 THEN CONCAT(SUBSTRING(`col_7`, 1, 3), REPEAT('*', LENGTH(`col_7`)-(2 * 3)), SUBSTRING(`col_7`, LENGTH(`col_7`)-3+1, 3)) ELSE REPEAT('*', LENGTH(`col_7`)) END WHERE (`col_1` = 30) AND REGEXP_CONTAINS(`col_2`, '[0-9]{3}\\.[0-9]{3}') AND (`col_4` IS NULL);",  # noqa: E501
+            'UPDATE `my_schema`.`my_table_temp` SET `col_1` = NULL, `col_4` = 0, `col_5` = TO_BASE64(SHA256(`col_5`)) WHERE true;',  # noqa: E501
         ]
 
         expected_calls = []
@@ -657,7 +658,7 @@ class TestFastSyncTargetBigquery:
         mock_blob.metadata = {'copied-old-key': 'copied-old-value'}
 
         mock_gcs_client = Mock()
-        mock_gcs_client.get_bucket.side_effect =mock_buckets.get
+        mock_gcs_client.get_bucket.side_effect = mock_buckets.get
 
         target_bigquery.gcs = mock_gcs_client
 
