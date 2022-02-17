@@ -1,9 +1,11 @@
+import os
 import logging
 import json
 import re
 from typing import List, Dict
 
 from google.cloud import bigquery
+from google.cloud import storage
 from google.api_core import exceptions
 
 from .transform_utils import TransformationHelper, SQLFlavor
@@ -37,6 +39,9 @@ class FastSyncTargetBigquery:
     def __init__(self, connection_config, transformation_config=None):
         self.connection_config = connection_config
         self.transformation_config = transformation_config
+        self.gcs = storage.Client(
+            project=self.connection_config['project_id'],
+        )
 
     def open_connection(self):
         project_id = self.connection_config['project_id']
@@ -77,6 +82,69 @@ class FastSyncTargetBigquery:
         query_job.result()
 
         return query_job
+
+    def upload_to_gcs(self, file: str) -> storage.Blob:
+        bucket_name = self.connection_config['gcs_bucket']
+        key_prefix = self.connection_config.get('gcs_key_prefix', '')
+        key = '{}{}'.format(key_prefix, os.path.basename(file))
+
+        LOGGER.info(
+            'Uploading to GCS bucket: %s, local file: %s, GCS key: %s',
+            bucket_name,
+            file,
+            key,
+        )
+
+        # Upload to GCS
+        bucket = self.gcs.get_bucket(bucket_name)
+        blob = bucket.blob(key)
+        blob.upload_from_filename(file)
+
+        return blob
+
+    def copy_to_archive(self, blob: storage.Blob, tap_id: str, table: str) -> storage.Blob:
+        """Copy load file to archive folder with metadata added"""
+        table_dict = utils.tablename_to_dict(table)
+        archive_table = table_dict.get('table_name')
+        archive_schema = table_dict.get('schema_name', '')
+
+        # Retain same filename
+        archive_file_basename = os.path.basename(blob.name)
+
+        # Get archive GCS prefix from config, defaulting to 'archive' if not specified
+        archive_prefix = self.connection_config.get(
+            'archive_load_files_gcs_prefix', 'archive'
+        )
+
+        source_bucket = blob.bucket
+
+        # Get archive GCS bucket from config, defaulting to same bucket used for Snowflake imports if not specified
+        archive_bucket = self.gcs.get_bucket(
+            self.connection_config.get(
+                'archive_load_files_gcs_bucket', source_bucket.name
+            )
+        )
+
+        archive_blob_name = f'{archive_prefix}/{tap_id}/{archive_table}/{archive_file_basename}'
+        source_blob_name = f'{blob.bucket}/{blob.name}'
+        LOGGER.info('Archiving %s to %s', source_blob_name, archive_blob_name)
+
+        source_bucket.copy_blob(blob, archive_bucket, new_name=archive_blob_name)
+
+        # Combine existing metadata with archive related headers
+        archive_blob = archive_bucket.get_blob(archive_blob_name)
+        new_metadata = {} if blob.metadata is None else blob.metadata
+        new_metadata.update(
+            {
+                'tap': tap_id,
+                'schema': archive_schema,
+                'table': archive_table,
+                'archived-by': 'pipelinewise_fastsync',
+            }
+        )
+        archive_blob.metadata = new_metadata
+        archive_blob.patch()
+        return archive_blob
 
     def create_schema(self, schema_name):
         temp_schema = self.connection_config.get('temp_schema', schema_name)
@@ -147,19 +215,19 @@ class FastSyncTargetBigquery:
 
         self.query(sql)
 
-    # pylint: disable=R0913,R0914
+    # pylint: disable=too-many-locals
     def copy_to_table(
         self,
-        filepath,
-        target_schema,
-        table_name,
-        size_bytes,
-        is_temporary,
-        skip_csv_header=False,
-        allow_quoted_newlines=True,
-        write_truncate=True,
+        blobs: List[storage.Blob],
+        target_schema: str,
+        table_name: str,
+        size_bytes: int,
+        is_temporary: bool,
+        skip_csv_header: bool = False,
+        allow_quoted_newlines: bool = True,
+        write_truncate: bool = True,
     ):
-        LOGGER.info('BIGQUERY - Loading %s into Bigquery...', filepath)
+        LOGGER.info('BIGQUERY - Loading into Bigquery...')
         table_dict = utils.tablename_to_dict(table_name)
         target_table = safe_name(
             table_dict.get(
@@ -172,6 +240,7 @@ class FastSyncTargetBigquery:
         dataset_ref = client.dataset(target_schema)
         table_ref = dataset_ref.table(target_table)
         table_schema = client.get_table(table_ref).schema
+
         job_config = bigquery.LoadJobConfig()
         job_config.source_format = bigquery.SourceFormat.CSV
         job_config.schema = table_schema
@@ -180,10 +249,11 @@ class FastSyncTargetBigquery:
         )
         job_config.allow_quoted_newlines = allow_quoted_newlines
         job_config.skip_leading_rows = 1 if skip_csv_header else 0
-        with open(filepath, 'rb') as exported_data:
-            job = client.load_table_from_file(
-                exported_data, table_ref, job_config=job_config
-            )
+
+        uris = [f'gs://{blob.bucket.name}/{blob.name}' for blob in blobs]
+        job = client.load_table_from_uri(
+            source_uris=uris, destination=table_ref, job_config=job_config
+        )
         try:
             job.result()
         except exceptions.BadRequest as exc:

@@ -104,6 +104,8 @@ jobs:
           TAP_S3_CSV_AWS_SECRET_ACCESS_KEY: ${{ secrets.TAP_S3_CSV_AWS_SECRET_ACCESS_KEY }}
           TAP_S3_CSV_BUCKET: ${{ secrets.TAP_S3_CSV_BUCKET }}
           TARGET_BIGQUERY_PROJECT: ${{ secrets.TARGET_BIGQUERY_PROJECT }}
+          TARGET_BIGQUERY_GCS_BUCKET: ${{ secrets.TARGET_BIGQUERY_GCS_BUCKET }}
+          TARGET_BIGQUERY_GCS_KEY_PREFIX: ${{ secrets.TARGET_BIGQUERY_GCS_KEY_PREFIX }}
         run: |
           docker exec -t \
           -e TAP_S3_CSV_AWS_KEY=$TAP_S3_CSV_AWS_KEY \
@@ -122,5 +124,7 @@ jobs:
           -e TARGET_SNOWFLAKE_USER=$TARGET_SNOWFLAKE_USER \
           -e TARGET_SNOWFLAKE_WAREHOUSE=$TARGET_SNOWFLAKE_WAREHOUSE \
           -e TARGET_BIGQUERY_PROJECT=$TARGET_BIGQUERY_PROJECT \
+          -e TARGET_BIGQUERY_GCS_BUCKET=$TARGET_BIGQUERY_GCS_BUCKET \
+          -e TARGET_BIGQUERY_GCS_KEY_PREFIX=$TARGET_BIGQUERY_GCS_KEY_PREFIX \
           -e GOOGLE_APPLICATION_CREDENTIALS="/opt/pipelinewise/application_default_credentials.json" \
           pipelinewise_dev pytest tests/end_to_end -vx

@@ -244,6 +244,7 @@ class FastSyncTapMongoDB:
         split_file_chunk_size_mb=1000,
         split_file_max_chunks=20,
         compress=True,
+        include_header=True,
     ):
         """
         Export data from table to a zipped csv
@@ -286,8 +287,8 @@ class FastSyncTapMongoDB:
                     quotechar='"',
                     quoting=csv.QUOTE_MINIMAL,
                 )
-
-                writer.writeheader()
+                if include_header:
+                    writer.writeheader()
                 rows = []
 
                 LOGGER.info('Starting data processing...')

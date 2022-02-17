@@ -220,6 +220,8 @@ class E2EEnv:
                 'template_patterns': ['target_bigquery', 'to_bq'],
                 'vars': {
                     'PROJECT': {'value': os.environ.get('TARGET_BIGQUERY_PROJECT')},
+                    'GCS_BUCKET': {'value': os.environ.get('TARGET_BIGQUERY_GCS_BUCKET')},
+                    'GCS_KEY_PREFIX': {'value': os.environ.get('TARGET_BIGQUERY_GCS_KEY_PREFIX')},
                 },
             },
             # ------------------------------------------------------------------
