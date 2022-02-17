@@ -55,8 +55,8 @@ class TestFastSyncTapMySql(TestCase):
             self.mysql.open_connections()
 
         # Test if session variables applied on both connections
-        assert self.mysql.executed_queries == tap_mysql.DEFAULT_SESSION_SQLS
-        assert self.mysql.executed_queries_unbuffered == self.mysql.executed_queries
+        self.assertListEqual(self.mysql.executed_queries, tap_mysql.DEFAULT_SESSION_SQLS)
+        self.assertListEqual(self.mysql.executed_queries_unbuffered, self.mysql.executed_queries)
 
     def test_get_connection_to_primary(self):
         """
@@ -121,8 +121,8 @@ class TestFastSyncTapMySql(TestCase):
             self.mysql.open_connections()
 
         # Test if session variables applied on both connections
-        assert self.mysql.executed_queries == session_sqls
-        assert self.mysql.executed_queries_unbuffered == self.mysql.executed_queries
+        self.assertListEqual(self.mysql.executed_queries, session_sqls)
+        self.assertListEqual(self.mysql.executed_queries_unbuffered, self.mysql.executed_queries)
 
     def test_open_connections_with_invalid_session_sqls(self):
         """Invalid SQLs in session_sqls should be ignored"""
@@ -142,11 +142,11 @@ class TestFastSyncTapMySql(TestCase):
             self.mysql.open_connections()
 
         # Test if session variables applied on both connections
-        assert self.mysql.executed_queries == [
+        self.assertListEqual(self.mysql.executed_queries, [
             'SET SESSION max_statement_time=0',
             'SET SESSION wait_timeout=28800',
-        ]
-        self.assertEqual(self.mysql.executed_queries_unbuffered, self.mysql.executed_queries)
+        ])
+        self.assertListEqual(self.mysql.executed_queries_unbuffered, self.mysql.executed_queries)
 
     def test_fetch_current_log_pos_with_gtid_and_mysql_engine_fails(self):
         """
@@ -185,7 +185,7 @@ class TestFastSyncTapMySql(TestCase):
             result = self.mysql.fetch_current_log_pos()
 
             query_method_mock.assert_called_once_with('select @@gtid_slave_pos as current_gtid;')
-            self.assertEqual(result, {'gtid': expected_gtid})
+            self.assertDictEqual(result, {'gtid': expected_gtid})
 
     def test_fetch_current_log_pos_with_gtid_and_replica_mariadb_engine_gtid_not_found(self):
         """
@@ -234,7 +234,7 @@ class TestFastSyncTapMySql(TestCase):
                     call('select @@server_id as server_id;'),
                 ]
             )
-            self.assertEqual(result, {'gtid': expected_gtid})
+            self.assertDictEqual(result, {'gtid': expected_gtid})
 
     def test_fetch_current_log_pos_with_gtid_and_primary_mariadb_engine_no_gtid_found_expect_exception(self):
         """
@@ -308,7 +308,7 @@ class TestFastSyncTapMySql(TestCase):
 
             query_method_mock.assert_called_once_with('SHOW SLAVE STATUS')
 
-            self.assertEqual(result, {
+            self.assertDictEqual(result, {
                 'log_file': 'binlog_xyz',
                 'log_pos': 444,
                 'version': 1,
@@ -332,7 +332,7 @@ class TestFastSyncTapMySql(TestCase):
             ]
 
             result = self.mysql.fetch_current_log_pos()
-            self.assertEqual(result, {
+            self.assertDictEqual(result, {
                 'log_file': 'binlog_xyz',
                 'log_pos': 444,
                 'version': 1,
