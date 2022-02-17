@@ -2,10 +2,11 @@ import csv
 import datetime
 import decimal
 import logging
-from typing import Tuple
-
 import pymysql
-from pymysql import InterfaceError, OperationalError
+import pymysql.cursors
+
+from typing import Tuple, Dict, Callable
+from pymysql import InterfaceError, OperationalError, Connection
 
 from ...utils import safe_column_name
 from . import split_gzip, utils
@@ -14,6 +15,9 @@ LOGGER = logging.getLogger(__name__)
 
 DEFAULT_CHARSET = 'utf8'
 DEFAULT_EXPORT_BATCH_ROWS = 50000
+MARIADB_ENGINE = 'mariadb'
+MYSQL_ENGINE = 'mysql'
+DEFAULT_USE_GTID = False
 DEFAULT_SESSION_SQLS = [
     'SET @@session.time_zone="+0:00"',
     'SET @@session.wait_timeout=28800',
@@ -27,7 +31,7 @@ class FastSyncTapMySql:
     Common functions for fastsync from a MySQL database
     """
 
-    def __init__(self, connection_config: dict, tap_type_to_target_type, target_quote=None):
+    def __init__(self, connection_config: dict, tap_type_to_target_type: Callable, target_quote=None):
         self.connection_config = connection_config
         self.connection_config['charset'] = connection_config.get(
             'charset', DEFAULT_CHARSET
@@ -37,6 +41,12 @@ class FastSyncTapMySql:
         )
         self.connection_config['session_sqls'] = connection_config.get(
             'session_sqls', DEFAULT_SESSION_SQLS
+        )
+        self.connection_config['use_gtid'] = connection_config.get(
+            'use_gtid', DEFAULT_USE_GTID
+        )
+        self.connection_config['engine'] = connection_config.get(
+            'engine', MYSQL_ENGINE
         )
         self.tap_type_to_target_type = tap_type_to_target_type
         self.target_quote = target_quote
@@ -49,10 +59,8 @@ class FastSyncTapMySql:
         Method to get connection parameters
         Connection is either to the primary or a replica if its credentials are given
 
-        Args:
-            connection_config: dictionary containing the db connection details
         Returns:
-            dict with credentials
+            Tuple of Dict with credentials and flag of whether the connection is to replica or not.
         """
 
         is_replica = False
@@ -76,7 +84,8 @@ class FastSyncTapMySql:
 
     def open_connections(self):
         """
-        Open connection
+        Open connection to primary or replica depending on the config
+        This sets the instance attributes "conn" and "conn_unbuffered"
         """
 
         # Fastsync is using replica_{host|port|user|password} values from the config by default
@@ -89,11 +98,11 @@ class FastSyncTapMySql:
 
         self.is_replica = is_replica
 
-        self.conn = pymysql.connect(
+        self.conn: Connection = pymysql.connect(
             **conn_params,
             cursorclass=pymysql.cursors.DictCursor,
         )
-        self.conn_unbuffered = pymysql.connect(
+        self.conn_unbuffered: Connection = pymysql.connect(
             **conn_params,
             cursorclass=pymysql.cursors.SSCursor,
         )
@@ -146,7 +155,7 @@ class FastSyncTapMySql:
             conn = self.conn
 
         try:
-            with conn as cur:
+            with conn.cursor() as cur:
                 cur.execute(query, params)
 
                 if return_as_cursor:
@@ -176,11 +185,96 @@ class FastSyncTapMySql:
 
             raise exc
 
-    def fetch_current_log_pos(self):
+    def fetch_current_log_pos(self) -> Dict:
         """
         Get the actual binlog position in MySQL
+
+        Returns: log coordinates in a dictionary, could be GTID pos or binlog file and pos.
+        """
+        if self.connection_config['use_gtid']:
+            return self._get_current_gtid_pos()
+
+        return self._get_binlog_coordinates()
+
+    def _get_current_gtid_pos(self) -> Dict:
+        """
+        Get the current GTID position in server
+
+        Raises:
+            NotImplementedError: if engine is not mariadb
+            Exception: if GTID is not found on the server
+        Returns: Dict with GTID position
+        Examples:
+            {
+                "gtid": "0-1774983-23"
+            }
+        """
+        if self.connection_config['engine'] != MARIADB_ENGINE:
+            raise NotImplementedError(f'Getting current GTID pos on this server of type '
+                                      f'{self.connection_config["engine"]} is not yet implemented!')
+
+        if self.is_replica:
+            LOGGER.debug('Connecting to replica to get gtid...')
+
+            result = self.query('select @@gtid_slave_pos as current_gtid;')
+
+            if not result:
+                raise Exception('GTID is not enabled.')
+
+            gtid = result[0]['current_gtid']
+
+            LOGGER.info('Found Gtid %s', gtid)
+
+            return {
+                'gtid': gtid
+            }
+
+        LOGGER.debug('Connecting to primary to get gtid...')
+
+        result = self.query('select @@gtid_current_pos as current_gtid;')
+        if not result:
+            raise Exception('GTID is not enabled!')
+        gtids = result[0]['current_gtid']
+
+        server_result = self.query('select @@server_id as server_id;')
+        server_id = str(server_result[0]['server_id'])
+
+        LOGGER.info('Found GTID(s): %s in server %s', gtids, server_id)
+
+        for gtid in gtids.split(','):
+            gtid = gtid.strip()
+
+            if not gtid:
+                continue
+
+            gtid_parts = gtid.split('-')
+            if len(gtid_parts) != 3:
+                continue
+
+            if gtid_parts[1] == server_id:
+                LOGGER.info('Using GTID %s for state bookmark', gtid)
+                return {
+                    'gtid': gtid,
+                }
+
+        raise Exception(f'No suitable GTID was found for server {server_id}.')
+
+    def _get_binlog_coordinates(self) -> Dict:
+        """
+        Get the actual binlog file and position in server
+
+        Raises:
+            Exception: if binlog is not enabled
+        Returns: a dict with binlog coordinate and version
+        Examples:
+             {
+                "log_file": "binlog.00001",
+                "log_pos": 334,
+                "version": 1,
+             }
         """
         if self.is_replica:
+            LOGGER.debug('Connecting to replica to get binlog coordinates...')
             result = self.query('SHOW SLAVE STATUS')
             if len(result) == 0:
                 raise Exception('MySQL binary logging is not enabled.')
@@ -190,6 +284,7 @@ class FastSyncTapMySql:
             version = binlog_pos.get('version', 1)
 
         else:
+            LOGGER.debug('Connecting to primary to get binlog coordinates...')
             result = self.query('SHOW MASTER STATUS')
             if len(result) == 0:
                 raise Exception('MySQL binary logging is not enabled.')
@@ -212,7 +307,7 @@ class FastSyncTapMySql:
         result = self.query(
             'SELECT MAX({}) AS key_value FROM {}'.format(replication_key, table)
         )
-        if len(result) == 0:
+        if not result:
             raise Exception(
                 'Cannot get replication key value for table: {}'.format(table)
             )
@@ -378,7 +473,7 @@ class FastSyncTapMySql:
         )
         export_batch_rows = self.connection_config['export_batch_rows']
         exported_rows = 0
-        with self.conn_unbuffered as cur:
+        with self.conn_unbuffered.cursor() as cur:
             cur.execute(sql)
             gzip_splitter = split_gzip.open(
                 path,
