@@ -125,7 +125,7 @@ class FastSyncTargetBigquery:
             )
         )
 
-        archive_blob_name =f'{archive_prefix}/{tap_id}/{archive_table}/{archive_file_basename}'
+        archive_blob_name = f'{archive_prefix}/{tap_id}/{archive_table}/{archive_file_basename}'
         source_blob_name = f'{blob.bucket}/{blob.name}'
         LOGGER.info('Archiving %s to %s', source_blob_name, archive_blob_name)
 
