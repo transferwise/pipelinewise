@@ -25,6 +25,12 @@
     "db_conn": {
       "type": "object",
       "properties": {
+        "use_gtid": {
+          "type": "boolean"
+        },
+        "engine": {
+          "enum": ["mariadb", "mysql"]
+        },
         "fastsync_parallelism": {
           "type": "integer",
           "minimum": 1,
