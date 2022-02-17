@@ -18,7 +18,8 @@ db_conn:
   user: "${TAP_MYSQL_USER}"             # MySQL user
   password: "${TAP_MYSQL_PASSWORD}"     # Plain string or vault encrypted
   dbname: "${TAP_MYSQL_DB}"             # MySQL database name
-
+  use_gtid: true
+  engine: mariadb
 
 # ------------------------------------------------------------------------------
 # Destination (Target) - Target properties
