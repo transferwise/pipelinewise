@@ -591,6 +591,7 @@ class TestFastSyncTargetBigquery:
                 'archived-by': 'pipelinewise_fastsync',
             }
         )
+        archive_blob.patch.assert_called_once()
 
     # pylint: disable=invalid-name
     @staticmethod

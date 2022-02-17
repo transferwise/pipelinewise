@@ -143,6 +143,7 @@ class FastSyncTargetBigquery:
             }
         )
         archive_blob.metadata = new_metadata
+        archive_blob.patch()
         return archive_blob
 
     def create_schema(self, schema_name):
