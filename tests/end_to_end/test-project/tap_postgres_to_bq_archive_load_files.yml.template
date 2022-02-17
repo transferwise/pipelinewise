@@ -1,0 +1,62 @@
+---
+
+# ------------------------------------------------------------------------------
+# General Properties
+# ------------------------------------------------------------------------------
+id: "postgres_to_bq_archive_load_files"
+name: "PostgreSQL source test database"
+type: "tap-postgres"
+owner: "test-runner"
+
+
+# ------------------------------------------------------------------------------
+# Source (Tap) - PostgreSQL connection details
+# ------------------------------------------------------------------------------
+db_conn:
+  host: "${TAP_POSTGRES_HOST}"          # PostgreSQL host
+  logical_poll_total_seconds: 3         # Time out if no LOG_BASED changes received for 3 seconds
+  port: ${TAP_POSTGRES_PORT}            # PostgreSQL port
+  user: "${TAP_POSTGRES_USER}"          # PostgreSQL user
+  password: "${TAP_POSTGRES_PASSWORD}"  # Plain string or vault encrypted
+  dbname: "${TAP_POSTGRES_DB}"          # PostgreSQL database name
+
+
+# ------------------------------------------------------------------------------
+# Destination (Target) - Target properties
+# Connection details should be in the relevant target YAML file
+# ------------------------------------------------------------------------------
+target: "bigquery"                            # ID of the target connector where the data will be loaded
+batch_size_rows: 1000                         # Batch size for the stream to optimise load performance
+stream_buffer_size: 0                         # In-memory buffer size (MB) between taps and targets for asynchronous data pipes
+archive_load_files: True                      # Archive the load files in dedicated S3 folder
+archive_load_files_gcs_prefix: archive_folder # Archive folder
+
+
+# ------------------------------------------------------------------------------
+# Source to target Schema mapping
+# ------------------------------------------------------------------------------
+schemas:
+
+  ### SOURCE SCHEMA 1: public
+  - source_schema: "public"
+    target_schema: "ppw_e2e_tap_postgres${TARGET_SNOWFLAKE_SCHEMA_POSTFIX}"
+
+    tables:
+
+      ### Table with INCREMENTAL replication
+      - table_name: "city"
+        replication_method: "INCREMENTAL"
+        replication_key: "id"
+
+      ### Table with FULL_TABLE replication
+      - table_name: "country"
+        replication_method: "FULL_TABLE"
+
+  ### SOURCE SCHEMA 2: public2
+  - source_schema: "public2"
+    target_schema: "ppw_e2e_tap_postgres_public2${TARGET_SNOWFLAKE_SCHEMA_POSTFIX}"
+
+    tables:
+      ### Table with FULL_TABLE replication
+      - table_name: "wearehere"
+        replication_method: "FULL_TABLE"
