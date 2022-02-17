@@ -68,7 +68,7 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
         )
 
         # Exporting table data, get table definitions and close connection to avoid timeouts
-        mongodb.copy_table(table, filepath, args.temp_dir)
+        mongodb.copy_table(table, filepath, args.temp_dir, compress=False)
         size_bytes = os.path.getsize(filepath)
         bigquery_types = mongodb.map_column_types_to_target()
         bigquery_columns = bigquery_types.get('columns', [])
