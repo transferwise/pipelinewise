@@ -258,7 +258,7 @@ class TestFastSyncTapMySql(TestCase):
                 ]
             )
 
-    def test_fetch_current_log_pos_with_gtid_and_primary_mariadb_engine_no_gtid__with_server_id_found_expect_exception(
+    def test_fetch_current_log_pos_with_gtid_and_primary_mariadb_engine_no_gtid_with_server_id_found_expect_exception(
             self):
         """
         If using gtid is enabled and engine is primary mariadb which has a list of
@@ -272,7 +272,7 @@ class TestFastSyncTapMySql(TestCase):
         with patch.object(self.mysql, 'query') as query_method_mock:
 
             query_method_mock.side_effect = [
-                [{'current_gtid': f'0,43223,0-333-11,'}],
+                [{'current_gtid': '0,43223,0-333-11,'}],
                 [{'server_id': 192}],
             ]
 
