@@ -1,9 +1,9 @@
 from unittest import TestCase
-from unittest.mock import patch
+from unittest.mock import patch, call
 
 import pymysql
 from pipelinewise.fastsync.commons import tap_mysql
-from pipelinewise.fastsync.commons.tap_mysql import FastSyncTapMySql
+from pipelinewise.fastsync.commons.tap_mysql import FastSyncTapMySql, MARIADB_ENGINE
 
 
 class FastSyncTapMySqlMock(FastSyncTapMySql):
@@ -146,4 +146,196 @@ class TestFastSyncTapMySql(TestCase):
             'SET SESSION max_statement_time=0',
             'SET SESSION wait_timeout=28800',
         ]
-        assert self.mysql.executed_queries_unbuffered == self.mysql.executed_queries
+        self.assertEqual(self.mysql.executed_queries_unbuffered, self.mysql.executed_queries)
+
+    def test_fetch_current_log_pos_with_gtid_and_mysql_engine_fails(self):
+        """
+        If using gtid is enabled and engine is mysql, then expect NotImplementedError
+        """
+        self.connection_config['use_gtid'] = True
+
+        self.mysql = FastSyncTapMySql(self.connection_config, lambda x: x)
+
+        with patch('pymysql.connect') as mysql_connect_mock:
+            mysql_connect_mock.return_value = []
+
+            with self.assertRaises(NotImplementedError):
+                self.mysql.fetch_current_log_pos()
+
+            mysql_connect_mock.assert_not_called()
+
+    def test_fetch_current_log_pos_with_gtid_and_replica_mariadb_engine_succeeds(self):
+        """
+        If using gtid is enabled and engine is replica mariadb, then expect gtid result
+        """
+        self.connection_config['use_gtid'] = True
+        self.connection_config['engine'] = MARIADB_ENGINE
+
+        self.mysql = FastSyncTapMySql(self.connection_config, lambda x: x)
+        self.mysql.is_replica = True
+
+        with patch.object(self.mysql, 'query') as query_method_mock:
+
+            expected_gtid = '0-192-444'
+
+            query_method_mock.return_value = [
+                {'current_gtid': expected_gtid}
+            ]
+
+            result = self.mysql.fetch_current_log_pos()
+
+            query_method_mock.assert_called_once_with('select @@gtid_slave_pos as current_gtid;')
+            self.assertEqual(result, {'gtid': expected_gtid})
+
+    def test_fetch_current_log_pos_with_gtid_and_replica_mariadb_engine_gtid_not_found(self):
+        """
+        If using gtid is enabled and engine is replica mariadb, the gtid is not found, then expect Exception
+        """
+        self.connection_config['use_gtid'] = True
+        self.connection_config['engine'] = MARIADB_ENGINE
+
+        self.mysql = FastSyncTapMySql(self.connection_config, lambda x: x)
+        self.mysql.is_replica = True
+
+        with patch.object(self.mysql, 'query') as query_method_mock:
+
+            query_method_mock.return_value = []
+
+            with self.assertRaises(Exception) as ex:
+                self.mysql.fetch_current_log_pos()
+                self.assertEqual('GTID is not enabled!', str(ex))
+
+            query_method_mock.assert_called_once_with('select @@gtid_slave_pos as current_gtid;')
+
+    def test_fetch_current_log_pos_with_gtid_and_primary_mariadb_engine_succeeds(self):
+        """
+        If using gtid is enabled and engine is primary mariadb which has a list of
+        gtids with one that has the same server id, then expect gtid result
+        """
+        self.connection_config['use_gtid'] = True
+        self.connection_config['engine'] = MARIADB_ENGINE
+
+        self.mysql = FastSyncTapMySql(self.connection_config, lambda x: x)
+
+        with patch.object(self.mysql, 'query') as query_method_mock:
+
+            expected_gtid = '0-192-444'
+
+            query_method_mock.side_effect = [
+                [{'current_gtid': f'0,{expected_gtid},43223,0-333-11,'}],
+                [{'server_id': 192}],
+            ]
+
+            result = self.mysql.fetch_current_log_pos()
+
+            query_method_mock.assert_has_calls(
+                [
+                    call('select @@gtid_current_pos as current_gtid;'),
+                    call('select @@server_id as server_id;'),
+                ]
+            )
+            self.assertEqual(result, {'gtid': expected_gtid})
+
+    def test_fetch_current_log_pos_with_gtid_and_primary_mariadb_engine_no_gtid_found_expect_exception(self):
+        """
+        If using gtid is enabled and engine is primary mariadb which doesn't return gtid, then expect an exception
+        """
+        self.connection_config['use_gtid'] = True
+        self.connection_config['engine'] = MARIADB_ENGINE
+
+        self.mysql = FastSyncTapMySql(self.connection_config, lambda x: x)
+
+        with patch.object(self.mysql, 'query') as query_method_mock:
+            query_method_mock.side_effect = []
+
+            with self.assertRaises(Exception) as ex:
+                self.mysql.fetch_current_log_pos()
+                self.assertEqual('GTID is not enabled!', str(ex))
+
+            query_method_mock.assert_has_calls(
+                [
+                    call('select @@gtid_current_pos as current_gtid;'),
+                ]
+            )
+
+    def test_fetch_current_log_pos_with_gtid_and_primary_mariadb_engine_no_gtid__with_server_id_found_expect_exception(
+            self):
+        """
+        If using gtid is enabled and engine is primary mariadb which has a list of
+        gtids with none having the same server id, then expect an exception
+        """
+        self.connection_config['use_gtid'] = True
+        self.connection_config['engine'] = MARIADB_ENGINE
+
+        self.mysql = FastSyncTapMySql(self.connection_config, lambda x: x)
+
+        with patch.object(self.mysql, 'query') as query_method_mock:
+
+            query_method_mock.side_effect = [
+                [{'current_gtid': f'0,43223,0-333-11,'}],
+                [{'server_id': 192}],
+            ]
+
+            with self.assertRaises(Exception) as ex:
+                self.mysql.fetch_current_log_pos()
+                self.assertEqual('No suitable GTID was found for server 192', str(ex))
+
+            query_method_mock.assert_has_calls(
+                [
+                    call('select @@gtid_current_pos as current_gtid;'),
+                    call('select @@server_id as server_id;'),
+                ]
+            )
+
+    def test_fetch_current_log_pos_with_binlog_coordinate_and_replica_server(self):
+        """
+        fetch_current_log_pos without enabled usage of gtid will return binlog coordinates from replica server
+        """
+        self.connection_config['use_gtid'] = False
+
+        self.mysql = FastSyncTapMySql(self.connection_config, lambda x: x)
+        self.mysql.is_replica = True
+
+        with patch.object(self.mysql, 'query') as query_method_mock:
+            query_method_mock.return_value = [
+                {
+                    'Master_Log_File': 'binlog_xyz',
+                    'Read_Master_Log_Pos': 444,
+                }
+            ]
+
+            result = self.mysql.fetch_current_log_pos()
+
+            query_method_mock.assert_called_once_with('SHOW SLAVE STATUS')
+
+            self.assertEqual(result, {
+                'log_file': 'binlog_xyz',
+                'log_pos': 444,
+                'version': 1,
+            })
+
+    def test_fetch_current_log_pos_with_binlog_coordinate_and_primary_server(self):
+        """
+        fetch_current_log_pos without enabled usage of gtid will return binlog coordinates from primary server
+        """
+        self.connection_config['use_gtid'] = False
+
+        self.mysql = FastSyncTapMySql(self.connection_config, lambda x: x)
+        self.mysql.is_replica = False
+
+        with patch.object(self.mysql, 'query') as query_method_mock:
+            query_method_mock.return_value = [
+                {
+                    'File': 'binlog_xyz',
+                    'Position': 444,
+                }
+            ]
+
+            result = self.mysql.fetch_current_log_pos()
+            self.assertEqual(result, {
+                'log_file': 'binlog_xyz',
+                'log_pos': 444,
+                'version': 1,
+            })
+
+            query_method_mock.assert_called_once_with('SHOW MASTER STATUS')
