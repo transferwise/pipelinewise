@@ -455,6 +455,12 @@ class Config:
                 'archive_load_files_s3_prefix': tap.get(
                     'archive_load_files_s3_prefix', None
                 ),
+                'archive_load_files_gcs_bucket': tap.get(
+                    'archive_load_files_gcs_bucket', None
+                ),
+                'archive_load_files_gcs_prefix': tap.get(
+                    'archive_load_files_gcs_prefix', None
+                ),
             }
         )
 
