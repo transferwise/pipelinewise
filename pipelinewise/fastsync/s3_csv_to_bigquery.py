@@ -19,6 +19,7 @@ REQUIRED_CONFIG_KEYS = {
     'tap': ['bucket', 'start_date'],
     'target': [
         'project_id',
+        'gcs_bucket',
     ],
 }
 
