@@ -186,6 +186,11 @@
         },
         "gcs_key_prefix": {
           "type": "string"
+        },
+        "gcs_parallelism": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
         }
       },
       "required": [
