@@ -37,6 +37,7 @@ python3 -m venv ~/venv-doc
 . ~/venv-doc/bin/activate
 pip install --upgrade pip
 pip install sphinx sphinx-rtd-theme
+pip install -e .
 
 # CD into docs, make them. If you're not using Sphinx, you'll probably
 # have a different build script.
@@ -98,7 +99,7 @@ echo "Current branch ref: $GITHUB_REF"
 if [[ "$GITHUB_REF" =~ ^refs/heads/master$|^[0-9]+\.[0-9]+\.X$ ]]; then
     git add --all
     # Make sure "|| echo" is at the end to avoid error codes when no changes to commit
-    git commit -m "[ci skip] publishing updated documentation..." || echo 
+    git commit -m "[ci skip] publishing updated documentation..." || echo
 
     # We have to re-add the origin with the GH_TOKEN credentials. You
     # will need this SSH key in your environment variables on CI.
