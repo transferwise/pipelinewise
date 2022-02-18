@@ -180,10 +180,17 @@
         },
         "dataset_id": {
           "type": "string"
+        },
+        "gcs_bucket": {
+          "type": "string"
+        },
+        "gcs_key_prefix": {
+          "type": "string"
         }
       },
       "required": [
-        "project_id"
+        "project_id",
+        "gcs_bucket"
       ]
     }
   },
