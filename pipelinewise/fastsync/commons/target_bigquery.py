@@ -1,4 +1,4 @@
-import multiprocessing
+import multiprocessing.pool
 import os
 import logging
 import json
@@ -117,7 +117,7 @@ class FastSyncTargetBigquery:
             key,
         )
         gcs_parallelism = self.connection_config.get('gcs_parallelism', 1)
-        with multiprocessing.Pool(gcs_parallelism) as proc:
+        with multiprocessing.pool.ThreadPool(gcs_parallelism) as proc:
             gcs_blobs = proc.map(self.upload_to_gcs, files)
         return gcs_blobs
 
