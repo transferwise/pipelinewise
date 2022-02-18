@@ -25,7 +25,7 @@ REQUIRED_CONFIG_KEYS = {
         'auth_database',
         'dbname',
     ],
-    'target': ['project_id'],
+    'target': ['project_id', 'gcs_bucket'],
 }
 
 LOCK = multiprocessing.Lock()

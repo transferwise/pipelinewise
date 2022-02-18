@@ -22,6 +22,7 @@ REQUIRED_CONFIG_KEYS = {
     'tap': ['host', 'port', 'user', 'password'],
     'target': [
         'project_id',
+        'gcs_bucket',
     ],
 }
 

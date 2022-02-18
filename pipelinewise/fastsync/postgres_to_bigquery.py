@@ -20,7 +20,7 @@ LOGGER = logging.getLogger(__name__)
 
 REQUIRED_CONFIG_KEYS = {
     'tap': ['host', 'port', 'user', 'password'],
-    'target': ['project_id'],
+    'target': ['project_id', 'gcs_bucket'],
 }
 
 LOCK = multiprocessing.Lock()
