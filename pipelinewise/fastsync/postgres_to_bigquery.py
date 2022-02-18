@@ -20,7 +20,7 @@ LOGGER = logging.getLogger(__name__)
 
 REQUIRED_CONFIG_KEYS = {
     'tap': ['host', 'port', 'user', 'password'],
-    'target': ['project_id'],
+    'target': ['project_id', 'gcs_bucket'],
 }
 
 LOCK = multiprocessing.Lock()
@@ -106,9 +106,8 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
         postgres.close_connection()
 
         # Uploading to GCS
-        gcs_blobs = []
+        gcs_blobs = bigquery.multi_upload_to_gcs(file_parts)
         for file_part in file_parts:
-            gcs_blobs.append(bigquery.upload_to_gcs(file_part))
             os.remove(file_part)
 
         # Creating temp table in Bigquery

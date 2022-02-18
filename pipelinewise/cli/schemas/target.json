@@ -180,10 +180,22 @@
         },
         "dataset_id": {
           "type": "string"
+        },
+        "gcs_bucket": {
+          "type": "string"
+        },
+        "gcs_key_prefix": {
+          "type": "string"
+        },
+        "gcs_parallelism": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
         }
       },
       "required": [
-        "project_id"
+        "project_id",
+        "gcs_bucket"
       ]
     }
   },

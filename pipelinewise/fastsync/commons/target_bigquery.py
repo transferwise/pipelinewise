@@ -1,3 +1,4 @@
+import multiprocessing.pool
 import os
 import logging
 import json
@@ -101,6 +102,24 @@ class FastSyncTargetBigquery:
         blob.upload_from_filename(file)
 
         return blob
+
+    def multi_upload_to_gcs(self, files: List[str]) -> List[storage.Blob]:
+        bucket_name = self.connection_config['gcs_bucket']
+        key_prefix = self.connection_config.get('gcs_key_prefix', '')
+        key = '{}{}'.format(
+            key_prefix,
+            os.path.splitext(os.path.basename(files[0]))[0]
+        )
+        LOGGER.info(
+            'Uploading to GCS bucket: %s, %s local files, GCS key prefix: %s',
+            bucket_name,
+            len(files),
+            key,
+        )
+        gcs_parallelism = self.connection_config.get('gcs_parallelism', 1)
+        with multiprocessing.pool.ThreadPool(gcs_parallelism) as proc:
+            gcs_blobs = proc.map(self.upload_to_gcs, files)
+        return gcs_blobs
 
     def copy_to_archive(self, blob: storage.Blob, tap_id: str, table: str) -> storage.Blob:
         """Copy load file to archive folder with metadata added"""
