@@ -1321,16 +1321,6 @@ class PipelineWise:
                 child.terminate()
                 child.wait()
 
-            # Rename log files from running to terminated status
-            if self.tap_run_log_file:
-                tap_run_log_file_running = f'{self.tap_run_log_file}.running'
-                tap_run_log_file_terminated = f'{self.tap_run_log_file}.terminated'
-
-                if os.path.isfile(tap_run_log_file_running):
-                    os.rename(tap_run_log_file_running, tap_run_log_file_terminated)
-
-            sys.exit(1)
-
         except ProcessLookupError:
             self.logger.error(
                 'Pid %s not found. Is the tap running on this machine? '
@@ -1344,6 +1334,16 @@ class PipelineWise:
                 'No pidfile found at %s. Tap does not seem to be running.', pidfile_path
             )
             sys.exit(1)
+
+        # Rename log files from running to terminated status
+        if self.tap_run_log_file:
+            tap_run_log_file_running = f'{self.tap_run_log_file}.running'
+            tap_run_log_file_terminated = f'{self.tap_run_log_file}.terminated'
+
+            if os.path.isfile(tap_run_log_file_running):
+                os.rename(tap_run_log_file_running, tap_run_log_file_terminated)
+
+        sys.exit(1)
 
     # pylint: disable=too-many-locals
     def sync_tables(self):
