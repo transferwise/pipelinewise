@@ -1335,6 +1335,9 @@ class PipelineWise:
             )
             sys.exit(1)
 
+        # Remove pidfile.
+        os.remove(pidfile_path)
+
         # Rename log files from running to terminated status
         if self.tap_run_log_file:
             tap_run_log_file_running = f'{self.tap_run_log_file}.running'
