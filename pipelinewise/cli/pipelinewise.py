@@ -1304,14 +1304,18 @@ class PipelineWise:
         try:
             with open(pidfile_path, encoding='utf-8') as pidf:
                 pid = int(pidf.read())
+                pgid = os.getpgid(pid)
                 parent = psutil.Process(pid)
 
-                # Terminate the youngest child process which must be the bash call
-                # to the tap-target combination.
-                child = sorted(parent.children(), key=lambda x: x.create_time())[-1]
-                self.logger.info('Sending SIGTERM to child pid %s...', child.pid)
-                child.terminate()
-                child.wait()
+                # Terminate all the processes in the current process' process group.
+                for child in parent.children():
+                    if os.getpgid(child.pid) == pgid:
+                        self.logger.info('Sending SIGTERM to child pid %s...', child.pid)
+                        child.terminate()
+                        try:
+                            child.wait(timeout=5)
+                        except psutil.TimeoutExpired:
+                            child.kill()
 
         except ProcessLookupError:
             self.logger.error(
