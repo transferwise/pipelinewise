@@ -1315,8 +1315,9 @@ class PipelineWise:
                 pid = int(pidf.read())
                 parent = psutil.Process(pid)
 
-                # Terminate child processes
-                child = parent.children()[-1]
+                # Terminate the youngest child process which must be the bash call
+                # to the tap-target combination.
+                child = sorted(parent.children(), key=lambda x: x.create_time())[-1]
                 self.logger.info('Sending SIGTERM to child pid %s...', child.pid)
                 child.terminate()
                 child.wait()
