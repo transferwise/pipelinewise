@@ -55,7 +55,11 @@ class FastSyncTapMySql:
         self.is_replica = False
 
     @property
-    def is_mariadb(self):
+    def is_mariadb(self) -> bool:
+        """
+        Property method, to find if the engine is mariadb or not
+        Returns: bool
+        """
         return self.connection_config['engine'] == MARIADB_ENGINE
 
     def get_connection_parameters(self, prioritize_primary: bool = False) -> Tuple[dict, bool]:
@@ -224,81 +228,9 @@ class FastSyncTapMySql:
             }
         """
         if self.is_mariadb:
-            if self.is_replica:
-                LOGGER.info('Connecting to replica to get gtid...')
+            return self.__find_mariadb_gtid_pos()
 
-                result = self.query('select @@gtid_slave_pos as current_gtids;')
-
-                if not result:
-                    raise Exception('GTID is not enabled.')
-
-                gtids = result[0]['current_gtids']
-
-            else:
-                LOGGER.info('Connecting to primary to get gtid...')
-
-                result = self.query('select @@gtid_current_pos as current_gtids;')
-
-                if not result:
-                    raise Exception('Unable to replicate binlog stream because GTID mode is not enabled.')
-
-                gtids = result[0]['current_gtids']
-
-            server_id = str(self.__get_primary_server_id())
-
-            LOGGER.info('Found GTID(s): %s in server "%s"', gtids, server_id)
-
-            for gtid in gtids.split(','):
-                gtid = gtid.strip()
-
-                if not gtid:
-                    continue
-
-                gtid_parts = gtid.split('-')
-                if len(gtid_parts) != 3:
-                    continue
-
-                if gtid_parts[1] == server_id:
-                    LOGGER.info('Using GTID %s for state bookmark', gtid)
-                    return {
-                        'gtid': gtid,
-                    }
-
-        else:
-            result = self.query('select @@gtid_mode as gtid_mode;')
-
-            if result[0]['gtid_mode'] != 'ON':
-                raise Exception('Unable to replicate binlog stream because GTID mode is not enabled.')
-
-            result = self.query('select @@GLOBAL.gtid_executed as current_gtids;')
-
-            if not result:
-                raise Exception('No GTID was found with "@@GLOBAL.gtid_executed".')
-
-            gtids = result[0]['current_gtids']
-
-            server_uuid = self.__get_primary_server_uuid()
-
-            LOGGER.info('Found GTID(s): %s', gtids)
-
-            for gtid in gtids.split(','):
-                gtid = gtid.strip()
-
-                if not gtid:
-                    continue
-
-                gtid_parts = gtid.split(':')
-
-                if len(gtid_parts) != 2:
-                    continue
-
-                if gtid_parts[0] == server_uuid:
-                    LOGGER.info('Using GTID %s for state bookmark', gtid)
-                    return {
-                        'gtid': gtid,
-                    }
-
-        raise Exception(f'No suitable GTID was found.')
+        return self.__find_mysql_gtid_pos()
 
     def _get_binlog_coordinates(self) -> Dict:
         """
@@ -583,3 +515,93 @@ class FastSyncTapMySql:
         )
 
         return result[0]['server_id']
+
+    def __find_mariadb_gtid_pos(self) -> Dict[str, str]:
+        """
+        Finds the current GTID pos in mariadb
+        Returns: Dict with gtid key
+        Raises: Exception if GTID is not enabled or not found
+        """
+        if self.is_replica:
+            LOGGER.info('Connecting to replica to get gtid...')
+
+            result = self.query('select @@gtid_slave_pos as current_gtids;')
+
+            if not result:
+                raise Exception('GTID is not enabled.')
+
+            gtids = result[0]['current_gtids']
+
+        else:
+            LOGGER.info('Connecting to primary to get gtid...')
+
+            result = self.query('select @@gtid_current_pos as current_gtids;')
+
+            if not result:
+                raise Exception('Unable to replicate binlog stream because GTID mode is not enabled.')
+
+            gtids = result[0]['current_gtids']
+
+        server_id = str(self.__get_primary_server_id())
+
+        LOGGER.info('Found GTID(s): %s in server "%s"', gtids, server_id)
+
+        for gtid in gtids.split(','):
+            gtid = gtid.strip()
+
+            if not gtid:
+                continue
+
+            gtid_parts = gtid.split('-')
+            if len(gtid_parts) != 3:
+                continue
+
+            if gtid_parts[1] == server_id:
+                LOGGER.info('Using GTID %s for state bookmark', gtid)
+                return {
+                    'gtid': gtid,
+                }
+
+        raise Exception('No suitable GTID was found.')
+
+    def __find_mysql_gtid_pos(self) -> Dict[str, str]:
+        """
+        Finds the current GTID pos in mariadb
+        Returns: Dict with gtid key
+        Raises: Exception if GTID is not enabled or not found
+       """
+
+        result = self.query('select @@gtid_mode as gtid_mode;')
+
+        if result[0]['gtid_mode'] != 'ON':
+            raise Exception('Unable to replicate binlog stream because GTID mode is not enabled.')
+
+        result = self.query('select @@GLOBAL.gtid_executed as current_gtids;')
+
+        if not result:
+            raise Exception('No GTID was found with "@@GLOBAL.gtid_executed".')
+
+        gtids = result[0]['current_gtids']
+
+        server_uuid = self.__get_primary_server_uuid()
+
+        LOGGER.info('Found GTID(s): %s', gtids)
+
+        for gtid in gtids.split(','):
+            gtid = gtid.strip()
+
+            if not gtid:
+                continue
+
+            gtid_parts = gtid.split(':')
+
+            if len(gtid_parts) != 2:
+                continue
+
+            if gtid_parts[0] == server_uuid:
+                LOGGER.info('Using GTID %s for state bookmark', gtid)
+                return {
+                    'gtid': gtid,
+                }
+
+        raise Exception('No suitable GTID was found.')
