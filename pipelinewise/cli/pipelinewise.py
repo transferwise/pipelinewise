@@ -1274,30 +1274,21 @@ class PipelineWise:
 
         except pidfile.AlreadyRunningError:
             self.logger.error('Another instance of the tap is already running.')
-            utils.silentremove(cons_target_config)
-            utils.silentremove(tap_properties_fastsync)
-            utils.silentremove(tap_properties_singer)
             sys.exit(1)
         # Delete temp files if there is any
         except commands.RunCommandException as exc:
             self.logger.exception(exc)
-            utils.silentremove(cons_target_config)
-            utils.silentremove(tap_properties_fastsync)
-            utils.silentremove(tap_properties_singer)
             self._print_tap_run_summary(self.STATUS_FAILED, start_time, datetime.now())
             self.send_alert(message=f'{tap_id} tap failed', exc=exc)
             sys.exit(1)
         except Exception as exc:
-            utils.silentremove(cons_target_config)
-            utils.silentremove(tap_properties_fastsync)
-            utils.silentremove(tap_properties_singer)
             self._print_tap_run_summary(self.STATUS_FAILED, start_time, datetime.now())
             self.send_alert(message=f'{tap_id} tap failed', exc=exc)
             raise exc
-
-        utils.silentremove(cons_target_config)
-        utils.silentremove(tap_properties_fastsync)
-        utils.silentremove(tap_properties_singer)
+        finally:
+            utils.silentremove(cons_target_config)
+            utils.silentremove(tap_properties_fastsync)
+            utils.silentremove(tap_properties_singer)
         self._print_tap_run_summary(self.STATUS_SUCCESS, start_time, datetime.now())
 
     # pylint: disable=unused-argument
@@ -1460,20 +1451,17 @@ class PipelineWise:
 
         except pidfile.AlreadyRunningError:
             self.logger.error('Another instance of the tap is already running.')
-            utils.silentremove(cons_target_config)
             sys.exit(1)
         # Delete temp file if there is any
         except commands.RunCommandException as exc:
             self.logger.exception(exc)
-            utils.silentremove(cons_target_config)
             self.send_alert(message=f'Failed to sync tables in {tap_id} tap', exc=exc)
             sys.exit(1)
         except Exception as exc:
-            utils.silentremove(cons_target_config)
             self.send_alert(message=f'Failed to sync tables in {tap_id} tap', exc=exc)
             raise exc
-
-        utils.silentremove(cons_target_config)
+        finally:
+            utils.silentremove(cons_target_config)
 
     def validate(self):
         """
