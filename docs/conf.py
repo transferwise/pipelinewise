@@ -14,6 +14,7 @@
 # import sys
 # sys.path.insert(0, os.path.abspath('.'))
 import datetime
+import importlib.metadata
 
 
 def setup(app):
@@ -25,7 +26,7 @@ def setup(app):
 project = 'PipelineWise'
 copyright = f'{datetime.datetime.now().year}, Wise Ltd.'
 author = 'Wise'
-version = '0.35.2'
+version = importlib.metadata.version('pipelinewise')
 
 
 # -- General configuration ---------------------------------------------------
