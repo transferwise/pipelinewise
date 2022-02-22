@@ -94,8 +94,7 @@ following the steps in the :ref:`generating_pipelines` section.
 
 .. note::
 
-  This tap supports :ref:`log_based` replication method with GTID position, at the time
-  of writing this, only MariaDB GTID is implemented.
+  This tap supports :ref:`log_based` replication method with GTID position for both Mariadb and Mysql.
 
 
 Example YAML for ``tap-mysql``:
