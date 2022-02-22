@@ -54,10 +54,17 @@ class FastSyncTapMySql:
         self.conn_unbuffered = None
         self.is_replica = False
 
-    def get_connection_parameters(self) -> Tuple[dict, bool]:
+    @property
+    def is_mariadb(self):
+        return self.connection_config['engine'] == MARIADB_ENGINE
+
+    def get_connection_parameters(self, prioritize_primary: bool = False) -> Tuple[dict, bool]:
         """
         Method to get connection parameters
         Connection is either to the primary or a replica if its credentials are given
+
+        Args: prioritize_primary (bool): Flag to force getting the primary's connection details even if replica have
+        been provided
 
         Returns:
             Tuple of Dict with credentials and flag of whether the connection is to replica or not.
@@ -65,22 +72,29 @@ class FastSyncTapMySql:
 
         is_replica = False
 
-        if 'replica_host' in self.connection_config:
-            is_replica = True
+        if prioritize_primary:
+            host = self.connection_config['host']
+            port = int(self.connection_config['port'])
+            user = self.connection_config['user']
+            password = self.connection_config['password']
+        else:
+            if 'replica_host' in self.connection_config:
+                is_replica = True
 
-        host = self.connection_config.get('replica_host', self.connection_config['host'])
-        port = int(self.connection_config.get('replica_port', self.connection_config['port']))
-        user = self.connection_config.get('replica_user', self.connection_config['user'])
-        password = self.connection_config.get('replica_password', self.connection_config['password'])
+            host = self.connection_config.get('replica_host', self.connection_config['host'])
+            port = int(self.connection_config.get('replica_port', self.connection_config['port']))
+            user = self.connection_config.get('replica_user', self.connection_config['user'])
+            password = self.connection_config.get('replica_password', self.connection_config['password'])
+
         charset = self.connection_config['charset']
 
         return ({
-            'host': host,
-            'port': port,
-            'user': user,
-            'password': password,
-            'charset': charset,
-        }, is_replica)
+                    'host': host,
+                    'port': port,
+                    'user': user,
+                    'password': password,
+                    'charset': charset,
+                }, is_replica)
 
     def open_connections(self):
         """
@@ -209,55 +223,82 @@ class FastSyncTapMySql:
                 "gtid": "0-1774983-23"
             }
         """
-        if self.connection_config['engine'] != MARIADB_ENGINE:
-            raise NotImplementedError(f'Getting current GTID pos on this server of type '
-                                      f'{self.connection_config["engine"]} is not yet implemented!')
+        if self.is_mariadb:
+            if self.is_replica:
+                LOGGER.info('Connecting to replica to get gtid...')
 
-        if self.is_replica:
-            LOGGER.debug('Connecting to replica to get gtid...')
+                result = self.query('select @@gtid_slave_pos as current_gtids;')
 
-            result = self.query('select @@gtid_slave_pos as current_gtid;')
+                if not result:
+                    raise Exception('GTID is not enabled.')
+
+                gtids = result[0]['current_gtids']
+
+            else:
+                LOGGER.info('Connecting to primary to get gtid...')
+
+                result = self.query('select @@gtid_current_pos as current_gtids;')
+
+                if not result:
+                    raise Exception('Unable to replicate binlog stream because GTID mode is not enabled.')
+
+                gtids = result[0]['current_gtids']
+
+            server_id = str(self.__get_primary_server_id())
+
+            LOGGER.info('Found GTID(s): %s in server "%s"', gtids, server_id)
+
+            for gtid in gtids.split(','):
+                gtid = gtid.strip()
+
+                if not gtid:
+                    continue
+
+                gtid_parts = gtid.split('-')
+                if len(gtid_parts) != 3:
+                    continue
+
+                if gtid_parts[1] == server_id:
+                    LOGGER.info('Using GTID %s for state bookmark', gtid)
+                    return {
+                        'gtid': gtid,
+                    }
+
+        else:
+            result = self.query('select @@gtid_mode as gtid_mode;')
+
+            if result[0]['gtid_mode'] != 'ON':
+                raise Exception('Unable to replicate binlog stream because GTID mode is not enabled.')
+
+            result = self.query('select @@GLOBAL.gtid_executed as current_gtids;')
 
             if not result:
-                raise Exception('GTID is not enabled.')
+                raise Exception('No GTID was found with "@@GLOBAL.gtid_executed".')
 
-            gtid = result[0]['current_gtid']
+            gtids = result[0]['current_gtids']
 
-            LOGGER.info('Found Gtid %s', gtid)
+            server_uuid = self.__get_primary_server_uuid()
 
-            return {
-                'gtid': gtid
-            }
+            LOGGER.info('Found GTID(s): %s', gtids)
 
-        LOGGER.debug('Connecting to primary to get gtid...')
+            for gtid in gtids.split(','):
+                gtid = gtid.strip()
 
-        result = self.query('select @@gtid_current_pos as current_gtid;')
-        if not result:
-            raise Exception('GTID is not enabled!')
-        gtids = result[0]['current_gtid']
+                if not gtid:
+                    continue
 
-        server_result = self.query('select @@server_id as server_id;')
-        server_id = str(server_result[0]['server_id'])
+                gtid_parts = gtid.split(':')
 
-        LOGGER.info('Found GTID(s): %s in server %s', gtids, server_id)
+                if len(gtid_parts) != 2:
+                    continue
 
-        for gtid in gtids.split(','):
-            gtid = gtid.strip()
+                if gtid_parts[0] == server_uuid:
+                    LOGGER.info('Using GTID %s for state bookmark', gtid)
+                    return {
+                        'gtid': gtid,
+                    }
 
-            if not gtid:
-                continue
-
-            gtid_parts = gtid.split('-')
-            if len(gtid_parts) != 3:
-                continue
-
-            if gtid_parts[1] == server_id:
-                LOGGER.info('Using GTID %s for state bookmark', gtid)
-                return {
-                    'gtid': gtid,
-                }
-
-        raise Exception(f'No suitable GTID was found for server {server_id}.')
+        raise Exception(f'No suitable GTID was found.')
 
     def _get_binlog_coordinates(self) -> Dict:
         """
@@ -433,15 +474,15 @@ class FastSyncTapMySql:
 
     # pylint: disable=too-many-locals
     def copy_table(
-        self,
-        table_name,
-        path,
-        max_num=None,
-        date_type='date',
-        split_large_files=False,
-        split_file_chunk_size_mb=1000,
-        split_file_max_chunks=20,
-        compress=True,
+            self,
+            table_name,
+            path,
+            max_num=None,
+            date_type='date',
+            split_large_files=False,
+            split_file_chunk_size_mb=1000,
+            split_file_max_chunks=20,
+            compress=True,
     ):
         """
         Export data from table to a zipped csv
@@ -515,3 +556,30 @@ class FastSyncTapMySql:
                 LOGGER.info(
                     'Exported total of %s rows from %s...', exported_rows, table_name
                 )
+
+    def __get_primary_server_uuid(self) -> str:
+        """
+        Fetches the primary server's UUID
+
+        Returns: server uuid
+        """
+        result = self.query('select @@server_uuid as server_uuid;',
+                            pymysql.connect(**self.get_connection_parameters(prioritize_primary=True)[0],
+                                            cursorclass=pymysql.cursors.DictCursor) if self.is_replica else None
+                            )
+
+        return result[0]['server_uuid']
+
+    def __get_primary_server_id(self) -> int:
+        """
+        Fetches the primary server's ID
+
+        Returns: server uuid
+        """
+        result = self.query(
+            'select @@server_id as server_id;',
+            pymysql.connect(**self.get_connection_parameters(prioritize_primary=True)[0],
+                            cursorclass=pymysql.cursors.DictCursor) if self.is_replica else None
+        )
+
+        return result[0]['server_id']
