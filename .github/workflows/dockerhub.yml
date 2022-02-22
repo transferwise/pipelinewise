@@ -61,8 +61,8 @@ jobs:
           "connectors=default"
         push: true
         tags: |
-          transferwiseworkspace/pipelinewise-default:${{ steps.genTag.outputs.replaced }}
-          transferwiseworkspace/pipelinewise-default:latest
+          transferwiseworkspace/pipelinewise:${{ steps.genTag.outputs.replaced }}-default
+          transferwiseworkspace/pipelinewise:latest-default
 
     - name: Image digests
       run: |
