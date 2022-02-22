@@ -4,8 +4,11 @@ PipelineWise CLI - Commands
 import os
 import shlex
 import logging
+import json
+import time
+
+from dataclasses import dataclass
 from subprocess import PIPE, STDOUT, Popen
-from collections import namedtuple
 
 from . import utils
 from .errors import StreamBufferTooLargeException
@@ -16,26 +19,116 @@ DEFAULT_STREAM_BUFFER_BIN = 'mbuffer'
 MIN_STREAM_BUFFER_SIZE = 10
 MAX_STREAM_BUFFER_SIZE = 2500
 
+PARAMS_VALIDATION_RETRY_PERIOD_SEC = 2
+PARAMS_VALIDATION_RETRY_TIMES = 3
+
 STATUS_RUNNING = 'running'
 STATUS_FAILED = 'failed'
 STATUS_SUCCESS = 'success'
 
-TapParams = namedtuple(
-    'TapParams', ['id', 'type', 'bin', 'python_bin', 'config', 'properties', 'state']
-)
-TargetParams = namedtuple('TargetParams', ['id', 'type', 'bin', 'python_bin', 'config'])
-TransformParams = namedtuple(
-    'TransformParams', ['bin', 'python_bin', 'config', 'tap_id', 'target_id']
-)
+
+def _verify_json_file(json_file_path: str, file_must_exists: bool, allowed_empty: bool) -> bool:
+    """Checking if input file is a valid json or not, in some cases it is allowed to have an empty file,
+     or it is allowed file not exists!
+    """
+    try:
+        with open(json_file_path, 'r', encoding='utf-8') as json_file:
+            json.load(json_file)
+    except FileNotFoundError:
+        return not file_must_exists
+    except json.decoder.JSONDecodeError:
+        if not allowed_empty or os.stat(json_file_path).st_size != 0:
+            return False
+    return True
 
 
+def do_json_conf_validation(json_file: str, file_property: dict) -> bool:
+    """
+    Validating a json format config property and retry if it is invalid
+    """
+    for _ in range(PARAMS_VALIDATION_RETRY_TIMES):
+        if _verify_json_file(json_file_path=json_file,
+                             file_must_exists=file_property['file_must_exists'],
+                             allowed_empty=file_property['allowed_empty']):
+            return True
+
+        time.sleep(PARAMS_VALIDATION_RETRY_PERIOD_SEC)
+    return False
+
+
+@dataclass
+class TapParams:
+    """
+    TapParams validates json properties.
+    """
+    tap_id: str
+    type: str
+    bin: str
+    python_bin: str
+    config: str
+    properties: str
+    state: str
+
+    def __post_init__(self):
+        if not self.config:
+            raise RunCommandException(
+                f'Invalid json file for config: {self.config}')
+
+        list_of_params_in_json_file = {
+            'config': {'file_must_exists': True, 'allowed_empty': False},
+            'properties': {'file_must_exists': True, 'allowed_empty': False},
+            'state': {'file_must_exists': False, 'allowed_empty': True}
+        }
+
+        for param, file_property in list_of_params_in_json_file.items():
+            valid_json = do_json_conf_validation(
+                json_file=getattr(self, param, None),
+                file_property=file_property
+               ) if getattr(self, param, None) else True
+
+            if not valid_json:
+                raise RunCommandException(
+                    f'Invalid json file for {param}: {getattr(self, param, None)}')
+
+
+@dataclass
+class TargetParams:
+    """
+    TargetParams validates json properties.
+    """
+    target_id: str
+    type: str
+    bin: str
+    python_bin: str
+    config: str
+
+    def __post_init__(self):
+        json_file = self.config
+
+        valid_json = do_json_conf_validation(
+            json_file=json_file,
+            file_property={'file_must_exists': True, 'allowed_empty': False}) if json_file else False
+
+        if not valid_json:
+            raise RunCommandException(f'Invalid json file for config: {self.config}')
+
+
+@dataclass
+class TransformParams:
+    """TransformParams."""
+    bin: str
+    python_bin: str
+    config: str
+    tap_id: str
+    target_id: str
+
+
+# pylint: disable=unnecessary-pass
 class RunCommandException(Exception):
     """
     Custom exception to raise when run command fails
     """
-
-    def __init__(self, *args, **kwargs):
-        Exception.__init__(self, *args, **kwargs)
+    pass
 
 
 def exists_and_executable(bin_path: str) -> bool:
@@ -51,13 +144,14 @@ def exists_and_executable(bin_path: str) -> bool:
         boolean: True if file exists and executable, otherwise False
 
     """
+
     if not os.access(bin_path, os.X_OK):
+
         try:
             paths = f"{os.environ['PATH']}".split(':')
             (p for p in paths if os.access(f'{p}/{bin_path}', os.X_OK)).__next__()
         except StopIteration:
             return False
-
     return True
 
 
@@ -89,7 +183,7 @@ def build_tap_command(
     tap_command = f'{tap.bin} --config {tap.config} {catalog_argument} {tap.properties} {state_arg}'
 
     if profiling_mode:
-        dump_file = os.path.join(profiling_dir, f'tap_{tap.id}.pstat')
+        dump_file = os.path.join(profiling_dir, f'tap_{tap.tap_id}.pstat')
         tap_command = f'{tap.python_bin} -m cProfile -o {dump_file} {tap_command}'
 
     return tap_command
@@ -113,7 +207,7 @@ def build_target_command(
     target_command = f'{target.bin} --config {target.config}'
 
     if profiling_mode:
-        dump_file = os.path.join(profiling_dir, f'target_{target.id}.pstat')
+        dump_file = os.path.join(profiling_dir, f'target_{target.target_id}.pstat')
         target_command = (
             f'{target.python_bin} -m cProfile -o {dump_file} {target_command}'
         )
@@ -317,7 +411,7 @@ def build_fastsync_command(
     command = f'{fastsync_bin} {command_args}'
 
     if profiling_mode:
-        dump_file = os.path.join(profiling_dir, f'fastsync_{tap.id}_{target.id}.pstat')
+        dump_file = os.path.join(profiling_dir, f'fastsync_{tap.tap_id}_{target.target_id}.pstat')
         command = f'{ppw_python_bin} -m cProfile -o {dump_file} {command}'
 
     LOGGER.debug('FastSync command: %s', command)
