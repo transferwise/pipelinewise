@@ -37,6 +37,7 @@ python3 -m venv ~/venv-doc
 . ~/venv-doc/bin/activate
 pip install --upgrade pip
 pip install sphinx sphinx-rtd-theme
+pip install -e .
 
 # CD into docs, make them. If you're not using Sphinx, you'll probably
 # have a different build script.

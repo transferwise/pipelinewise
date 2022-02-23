@@ -146,7 +146,7 @@ class FastSyncTapMySql:
             conn = self.conn
 
         try:
-            with conn as cur:
+            with conn.cursor() as cur:
                 cur.execute(query, params)
 
                 if return_as_cursor:
@@ -277,10 +277,10 @@ class FastSyncTapMySql:
         table_name = table_dict.get('table_name')
 
         sql = f"""
-                SELECT column_name,
-                    data_type,
-                    column_type,
-                    safe_sql_value
+                SELECT column_name AS column_name,
+                    data_type AS data_type,
+                    column_type AS column_type,
+                    safe_sql_value AS safe_sql_value
                 FROM (SELECT column_name,
                             data_type,
                             column_type,
@@ -378,7 +378,7 @@ class FastSyncTapMySql:
         )
         export_batch_rows = self.connection_config['export_batch_rows']
         exported_rows = 0
-        with self.conn_unbuffered as cur:
+        with self.conn_unbuffered.cursor() as cur:
             cur.execute(sql)
             gzip_splitter = split_gzip.open(
                 path,
