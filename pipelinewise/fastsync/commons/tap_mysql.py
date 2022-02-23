@@ -219,7 +219,6 @@ class FastSyncTapMySql:
         Get the current GTID position in server
 
         Raises:
-            NotImplementedError: if engine is not mariadb
             Exception: if GTID is not found on the server
         Returns: Dict with GTID position
         Examples:
