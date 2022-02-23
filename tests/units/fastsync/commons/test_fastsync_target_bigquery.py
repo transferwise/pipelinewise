@@ -115,6 +115,7 @@ class TestFastSyncTargetBigquery:
             target_schema='test_schema',
             table_name='test_table',
             columns=['`id` INTEGER', '`txt` STRING'],
+            primary_key=[],
         )
         client().query.assert_called_with(
             'CREATE OR REPLACE TABLE test_schema.`test_table` ('
@@ -130,6 +131,7 @@ class TestFastSyncTargetBigquery:
             target_schema='test_schema',
             table_name='order',
             columns=['`id` INTEGER', '`txt` STRING', '`select` STRING'],
+            primary_key=[],
         )
         client().query.assert_called_with(
             'CREATE OR REPLACE TABLE test_schema.`order` ('
@@ -145,6 +147,7 @@ class TestFastSyncTargetBigquery:
             target_schema='test_schema',
             table_name='TABLE with SPACE',
             columns=['`ID` INTEGER', '`COLUMN WITH SPACE` STRING'],
+            primary_key=[],
         )
         client().query.assert_called_with(
             'CREATE OR REPLACE TABLE test_schema.`table_with_space` ('
@@ -160,6 +163,7 @@ class TestFastSyncTargetBigquery:
             target_schema='test_schema',
             table_name='test_table_no_pk',
             columns=['`ID` INTEGER', '`TXT` STRING'],
+            primary_key=[],
         )
         client().query.assert_called_with(
             'CREATE OR REPLACE TABLE test_schema.`test_table_no_pk` ('
@@ -167,6 +171,22 @@ class TestFastSyncTargetBigquery:
             '_sdc_extracted_at timestamp,'
             '_sdc_batched_at timestamp,'
             '_sdc_deleted_at timestamp)',
+            job_config=ANY,
+        )
+
+        # Create table with primary key
+        self.bigquery.create_table(
+            target_schema='test_schema',
+            table_name='test_table_no_pk',
+            columns=['`ID` INTEGER', '`TXT` STRING'],
+            primary_key=['`id`', '`txt`'],
+        )
+        client().query.assert_called_with(
+            'CREATE OR REPLACE TABLE test_schema.`test_table_no_pk` ('
+            '`id` integer,`txt` string,'
+            '_sdc_extracted_at timestamp,'
+            '_sdc_batched_at timestamp,'
+            '_sdc_deleted_at timestamp) CLUSTER BY `id`,`txt`',
             job_config=ANY,
         )
 

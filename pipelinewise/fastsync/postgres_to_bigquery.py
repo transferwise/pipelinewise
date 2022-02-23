@@ -94,11 +94,12 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
 
         bigquery_types = postgres.map_column_types_to_target(table)
         bigquery_columns = bigquery_types.get('columns', [])
+        primary_key = bigquery_types.get('primary_key', [])
         postgres.close_connection()
 
         # Creating temp table in Bigquery
         bigquery.create_schema(target_schema)
-        bigquery.create_table(target_schema, table, bigquery_columns, is_temporary=True)
+        bigquery.create_table(target_schema, table, bigquery_columns, primary_key, is_temporary=True)
 
         # Load into Bigquery table
         for num, file_part in enumerate(file_parts):
@@ -117,7 +118,7 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
         bigquery.obfuscate_columns(target_schema, table)
 
         # Create target table and swap with the temp table in Bigquery
-        bigquery.create_table(target_schema, table, bigquery_columns)
+        bigquery.create_table(target_schema, table, bigquery_columns, primary_key)
         bigquery.swap_tables(target_schema, table)
 
         # Save bookmark to singer state file
