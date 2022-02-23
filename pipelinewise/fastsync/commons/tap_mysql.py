@@ -345,10 +345,10 @@ class FastSyncTapMySql:
         table_name = table_dict.get('table_name')
 
         sql = f"""
-                SELECT column_name,
-                    data_type,
-                    column_type,
-                    safe_sql_value
+                SELECT column_name AS column_name,
+                    data_type AS data_type,
+                    column_type AS column_type,
+                    safe_sql_value AS safe_sql_value
                 FROM (SELECT column_name,
                             data_type,
                             column_type,
