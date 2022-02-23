@@ -3,7 +3,7 @@ import os
 import logging
 import json
 import re
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 from google.cloud import bigquery
 from google.cloud import storage
@@ -191,6 +191,7 @@ class FastSyncTargetBigquery:
         target_schema: str,
         table_name: str,
         columns: List[str],
+        primary_key: Optional[List[str]],
         is_temporary: bool = False,
         sort_columns=False,
     ):
@@ -231,6 +232,9 @@ class FastSyncTargetBigquery:
             f'CREATE OR REPLACE TABLE {target_schema}.{target_table} ('
             f'{",".join(columns)})'
         )
+        if primary_key:
+            primary_key = [c.lower() for c in primary_key]
+            sql = sql + f' CLUSTER BY {",".join(primary_key)}'
 
         self.query(sql)
 

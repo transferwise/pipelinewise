@@ -72,6 +72,7 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
         size_bytes = os.path.getsize(filepath)
         bigquery_types = mongodb.map_column_types_to_target()
         bigquery_columns = bigquery_types.get('columns', [])
+        primary_key = bigquery_types.get('primary_key', [])
         mongodb.close_connection()
 
         # Uploading to GCS
@@ -80,7 +81,7 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
 
         # Creating temp table in Bigquery
         bigquery.create_schema(target_schema)
-        bigquery.create_table(target_schema, table, bigquery_columns, is_temporary=True)
+        bigquery.create_table(target_schema, table, bigquery_columns, primary_key, is_temporary=True)
 
         # Load into Bigquery table
         bigquery.copy_to_table(
@@ -98,7 +99,7 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
         bigquery.obfuscate_columns(target_schema, table)
 
         # Create target table and swap with the temp table in Bigquery
-        bigquery.create_table(target_schema, table, bigquery_columns)
+        bigquery.create_table(target_schema, table, bigquery_columns, primary_key)
         bigquery.swap_tables(target_schema, table)
 
         # Save bookmark to singer state file
