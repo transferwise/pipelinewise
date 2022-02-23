@@ -495,10 +495,13 @@ class FastSyncTapMySql:
 
         Returns: server uuid
         """
-        result = self.query('select @@server_uuid as server_uuid;',
-                            pymysql.connect(**self.get_connection_parameters(prioritize_primary=True)[0],
-                                            cursorclass=pymysql.cursors.DictCursor) if self.is_replica else None
-                            )
+        conn = pymysql.connect(**self.get_connection_parameters(prioritize_primary=True)[0],
+                               cursorclass=pymysql.cursors.DictCursor) if self.is_replica else None
+
+        result = self.query('select @@server_uuid as server_uuid;', conn)
+
+        if conn:
+            conn.close()
 
         return result[0]['server_uuid']
 
@@ -508,11 +511,13 @@ class FastSyncTapMySql:
 
         Returns: server uuid
         """
-        result = self.query(
-            'select @@server_id as server_id;',
-            pymysql.connect(**self.get_connection_parameters(prioritize_primary=True)[0],
-                            cursorclass=pymysql.cursors.DictCursor) if self.is_replica else None
-        )
+        conn = pymysql.connect(**self.get_connection_parameters(prioritize_primary=True)[0],
+                               cursorclass=pymysql.cursors.DictCursor) if self.is_replica else None
+
+        result = self.query('select @@server_id as server_id;', conn)
+
+        if conn:
+            conn.close()
 
         return result[0]['server_id']
 
