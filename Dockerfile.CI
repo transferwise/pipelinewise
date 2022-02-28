@@ -1,0 +1,12 @@
+ARG PYTHON_VERSION
+
+FROM python:${PYTHON_VERSION}-bullseye
+
+WORKDIR /app
+
+COPY ./setup.py ./README.md ./
+
+RUN pip install -U pip setuptools wheel && \
+    pip install -Ue .[test]
+
+VOLUME /app
