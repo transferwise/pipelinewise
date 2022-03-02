@@ -268,8 +268,14 @@ def assert_all_columns_exist(
     :param column_type_mapper_fn: method to convert source to target column types
     :param ignore_cols: List or set of columns to ignore if we know target table won't have them
     :param schema_postfix: Schema postfix for Snowflake targets"""
+
+    if ignore_cols is None:
+        ignore_cols = []
+
     # Generate a map of source and target specific functions
-    funcs = _map_tap_to_target_functions(tap_query_runner_fn, target_query_runner_fn, schema_postfix)
+    funcs = _map_tap_to_target_functions(
+        tap_query_runner_fn, target_query_runner_fn, schema_postfix
+    )
 
     # Get source and target schemas
     source_schemas = funcs['source_schemas']
@@ -280,8 +286,8 @@ def assert_all_columns_exist(
     target_sql_get_cols = funcs['target_sql_get_cols_fn'](target_schemas)
 
     # Run the generated SQLs
-    source_table_cols = _run_sql(tap_query_runner_fn, source_sql_get_cols)
-    target_table_cols = _run_sql(target_query_runner_fn, target_sql_get_cols)
+    source_table_cols_raw = _run_sql(tap_query_runner_fn, source_sql_get_cols)
+    target_table_cols_raw = _run_sql(target_query_runner_fn, target_sql_get_cols)
 
     def _cols_list_to_dict(cols: List) -> dict:
         """
@@ -294,70 +300,67 @@ def assert_all_columns_exist(
         cols_dict = {}
         for col in cols:
             col_props = col.split(':')
-            cols_dict[col_props[0]] = {'type': col_props[1], 'type_extra': col_props[2]}
+            cols_dict[col_props[0]] = {
+                'type': col_props[1],
+                'type_extra': col_props[2],
+            }
 
         return cols_dict
 
-    # Compare the two dataset
-    for table_cols in source_table_cols:
-        table_to_check = table_cols[0].lower()
+    # *_table_cols is a list of lists
+    # each individual list is [table_name, table_columns_information]
+    source_table_columns_map = {
+        table[0].lower(): _cols_list_to_dict(table[1].lower().split(';'))
+        for table in source_table_cols_raw
+    }
+    target_table_columns_map = {
+        table[0].lower(): _cols_list_to_dict(table[1].lower().split(';'))
+        for table in target_table_cols_raw
+    }
+
+    for source_table_name, source_table_columns in source_table_columns_map.items():
 
         # Some sources and targets can't be compared directly (e.g. BigQuery doesn't accept spaces in table names)
         # we fix that by renaming the source tables to names that the target would accept
         if 'target_sql_safe_name_fn' in funcs:
-            table_to_check = funcs['target_sql_safe_name_fn'](table_to_check)
+            source_table_name = funcs['target_sql_safe_name_fn'](source_table_name)
 
-        source_cols = table_cols[1].lower().split(';')
+        if source_table_name not in target_table_columns_map:
+            raise Exception(f'table "{source_table_name}" not found in target')
 
-        try:
-            target_cols = (
-                next(t[1] for t in target_table_cols if t[0].lower() == table_to_check)
-                .lower()
-                .split(';')
-            )
-        except StopIteration as ex:
-            ex.args += ('Error', f'{table_to_check} table not found in target')
-            raise
+        target_table_columns = target_table_columns_map[source_table_name]
 
-        source_cols_dict = _cols_list_to_dict(source_cols)
-        target_cols_dict = _cols_list_to_dict(target_cols)
-        print(target_cols_dict)
-        for col_name, col_props in source_cols_dict.items():
-            # Check if column exists in the target table
-
-            if ignore_cols and col_name in ignore_cols:
+        for source_column_name, source_column_type_info in source_table_columns.items():
+            if source_column_name in ignore_cols:
                 continue
 
-            try:
-                assert col_name in target_cols_dict
-            except AssertionError as ex:
-                ex.args += (
-                    'Error',
-                    f'{col_name} column not found in target table {table_to_check}',
+            if source_column_name not in target_table_columns:
+                raise Exception(
+                    f'"{source_column_name}" column not found in target table "{source_table_name}"'
                 )
-                raise
 
-            # Check if column type is expected in the target table, if mapper function provided
-            if column_type_mapper_fn:
-                try:
-                    target_col = target_cols_dict[col_name]
-                    exp_col_type = (
-                        column_type_mapper_fn(
-                            col_props['type'], col_props['type_extra']
-                        )
-                        .replace(' NULL', '')
-                        .lower()
-                    )
-                    act_col_type = target_col['type'].lower()
-                    assert act_col_type == exp_col_type
-                except AssertionError as ex:
-                    ex.args += (
-                        'Error',
-                        f'{col_name} column type is not as expected. '
-                        f'Expected: {exp_col_type} '
-                        f'Actual: {act_col_type}',
-                    )
-                    raise
+            target_column_type_info = target_table_columns[source_column_name]
+
+            if column_type_mapper_fn is None:
+                continue
+
+            expected_target_column_type = (
+                column_type_mapper_fn(
+                    source_column_type_info['type'],
+                    source_column_type_info['type_extra'],
+                )
+                .replace(' NULL', '')
+                .lower()
+            )
+
+            actual_target_column_type = target_column_type_info['type'].lower()
+
+            if actual_target_column_type != expected_target_column_type:
+                raise Exception(
+                    f'{source_column_name} column type is not as expected. '
+                    f'Expected: {expected_target_column_type} '
+                    f'Actual: {actual_target_column_type}'
+                )
 
 
 def assert_date_column_naive_in_target(
