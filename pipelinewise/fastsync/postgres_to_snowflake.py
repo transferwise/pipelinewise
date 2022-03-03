@@ -48,7 +48,7 @@ def tap_type_to_target_type(pg_type, *_):
         'character': 'VARCHAR',
         'varchar': 'VARCHAR',
         'character varying': 'VARCHAR',
-        'text': 'TEXT',
+        'text': 'VARCHAR',
         'bit': 'BOOLEAN',
         'varbit': 'NUMBER',
         'bit varying': 'NUMBER',
