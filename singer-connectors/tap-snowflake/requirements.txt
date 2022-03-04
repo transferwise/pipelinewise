@@ -1,1 +1,1 @@
-pipelinewise-tap-snowflake==2.0.3
+pipelinewise-tap-snowflake==3.0.0
