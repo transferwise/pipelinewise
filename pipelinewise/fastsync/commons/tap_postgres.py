@@ -332,7 +332,7 @@ class FastSyncTapPostgres:
         result = self.query(
             f'SELECT MAX({replication_key}) AS key_value FROM {schema_name}."{table_name}"'
         )
-        if len(result) == 0:
+        if not result:
             raise Exception(
                 'Cannot get replication key value for table: {}'.format(table)
             )
@@ -349,6 +349,10 @@ class FastSyncTapPostgres:
 
         elif isinstance(postgres_key_value, decimal.Decimal):
             key_value = float(postgres_key_value)
+
+        if key_value is None:
+            LOGGER.warning('Not replication value found for table %s, returning empty bookmark', table)
+            return {}
 
         return {
             'replication_key': replication_key,
