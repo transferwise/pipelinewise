@@ -1,1 +1,1 @@
-git+https://github.com/transferwise/pipelinewise-tap-snowflake@master
+pipelinewise-tap-snowflake==3.0.0
