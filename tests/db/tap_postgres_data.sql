@@ -4559,3 +4559,11 @@ INSERT INTO customers (name, phone, email) VALUES ('Martelle Cristoforetti', '20
 	('Ransell Fardo', '9584912534', 'rfardoh@de.vu'),
 	('Leonard Buche', '9391842560', 'lbuchei@netscape.com'),
 	('Xylia Adnet', '6784481146', 'xadnetj@auda.org.au');
+
+-----
+DROP TABLE IF EXISTS public.empty_table CASCADE;
+
+CREATE TABLE public.empty_table (
+                           id serial primary key,
+                           cbool bool
+);
