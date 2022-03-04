@@ -351,7 +351,7 @@ class FastSyncTapPostgres:
             key_value = float(postgres_key_value)
 
         if key_value is None:
-            LOGGER.warning('Not replication value found for table %s, returning empty bookmark', table)
+            LOGGER.warning('No replication value found for table %s, returning empty bookmark', table)
             return {}
 
         return {
