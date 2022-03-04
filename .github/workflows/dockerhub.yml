@@ -34,6 +34,7 @@ jobs:
       uses: docker/build-push-action@v2
       with:
         file: ./Dockerfile
+        context: .
         push: true
         tags: |
           thread/pipelinewise:${{ steps.genTag.outputs.replaced }}
@@ -46,6 +47,7 @@ jobs:
       uses: docker/build-push-action@v2
       with:
         file: ./Dockerfile.barebone
+        context: .
         push: true
         tags: |
           thread/pipelinewise-barebone:${{ steps.genTag.outputs.replaced }}
@@ -55,3 +57,4 @@ jobs:
       run: |
         echo ${{ steps.docker_build_main.outputs.digest }}
         echo ${{ steps.docker_build_barebone.outputs.digest }}
+        echo ${{ steps.docker_build_default.outputs.digest }}
