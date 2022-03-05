@@ -40,7 +40,7 @@ jobs:
       - name: Check whether or not docker image for CI exists remotely
         id: docker-image-exists-remotely
         continue-on-error: true
-        run: docker manifest inspect transferwiseworkspace/pipelinewise:ci-py${{ matrix.python-version  }} > /dev/null
+        run: docker manifest inspect thread/pipelinewise:ci-py${{ matrix.python-version  }} > /dev/null
 
       - name: Check if requirements or Dockerfile.CI has changed
         id: dockerfile-setup-changed
@@ -54,34 +54,34 @@ jobs:
         run: |
           docker build \
           --build-arg PYTHON_VERSION=${{ matrix.python-version }} \
-          -t transferwiseworkspace/pipelinewise:ci-py${{ matrix.python-version  }} \
+          -t thread/pipelinewise:ci-py${{ matrix.python-version  }} \
           -f Dockerfile.CI .
 
       - name: Push docker image if rebuilt
         if: steps.docker-image-exists-remotely.outcome == 'failure' || steps.dockerfile-setup-changed.outcome == 'success'
         run: |
-          docker push transferwiseworkspace/pipelinewise:ci-py${{ matrix.python-version  }}
+          docker push thread/pipelinewise:ci-py${{ matrix.python-version  }}
 
       - name: Check code formatting
         if: steps.check.outcome == 'failure'
         run: |
           docker run --rm \
           -v $PWD:/app \
-          transferwiseworkspace/pipelinewise:ci-py${{ matrix.python-version  }} \
+          thread/pipelinewise:ci-py${{ matrix.python-version  }} \
           bash -c "find pipelinewise tests -type f -name '*.py' | xargs unify --check-only"
 
       - name: Pylinting
         if: steps.check.outcome == 'failure'
         run: |
           docker run --rm -v $PWD:/app \
-          transferwiseworkspace/pipelinewise:ci-py${{ matrix.python-version  }} \
+          thread/pipelinewise:ci-py${{ matrix.python-version  }} \
           bash -c "pylint pipelinewise tests"
 
       - name: Pep8
         if: steps.check.outcome == 'failure'
         run: |
           docker run --rm -v $PWD:/app \
-          transferwiseworkspace/pipelinewise:ci-py${{ matrix.python-version  }} \
+          thread/pipelinewise:ci-py${{ matrix.python-version  }} \
           bash -c "flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics"
 
       - name: Pep8 complexity
@@ -89,5 +89,5 @@ jobs:
         run: |
           docker run --rm \
           -v $PWD:/app \
-          transferwiseworkspace/pipelinewise:ci-py${{ matrix.python-version  }} \
+          thread/pipelinewise:ci-py${{ matrix.python-version  }} \
           bash -c "flake8 . --count --max-complexity=15 --max-line-length=120 --statistics"
