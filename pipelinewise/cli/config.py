@@ -417,6 +417,7 @@ class Config:
                 'parallelism': tap.get('parallelism', 0),
                 'parallelism_max': tap.get('parallelism_max', 4),
                 'hard_delete': tap.get('hard_delete', True),
+                'append_only': tap.get('append_only', False),
                 'flush_all_streams': tap.get('flush_all_streams', False),
                 'primary_key_required': tap.get('primary_key_required', True),
                 'default_target_schema': tap.get('default_target_schema'),

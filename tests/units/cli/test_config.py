@@ -336,6 +336,7 @@ class TestConfig:
             'data_flattening_max_level': 0,
             'flush_all_streams': False,
             'hard_delete': True,
+            'append_only': False,
             'parallelism': 0,
             'parallelism_max': 4,
             'primary_key_required': True,
