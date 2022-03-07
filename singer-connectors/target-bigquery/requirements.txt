@@ -1,1 +1,1 @@
-git+https://github.com/thread/pipelinewise-target-bigquery.git@79224f298d9f7db1424a92ddf4b10131d64a8091
+git+https://github.com/thread/pipelinewise-target-bigquery.git@86f0d0d6fbc2b9cf258e801445a50e504d4cbd21
