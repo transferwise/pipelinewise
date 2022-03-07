@@ -307,7 +307,9 @@ class TestFastSyncTapPostgres(TestCase):
         ]
 
     def test_fetch_current_incremental_key_pos_empty_result_expect_exception(self):
-
+        """
+        test fetch_current_incremental_key_pos where result is empty, it should raise an exception
+        """
         with patch.object(self.postgres, 'query') as query_mock:
             query_mock.return_value = None
 
@@ -317,7 +319,9 @@ class TestFastSyncTapPostgres(TestCase):
             self.assertEqual('Cannot get replication key value for table: schema.table1', str(cm.exception))
 
     def test_fetch_current_incremental_key_pos_empty_key_value_return_empty_state(self):
-
+        """
+        test fetch_current_incremental_key_pos where result has empty value is empty, it should return an empty state
+        """
         with patch.object(self.postgres, 'query') as query_mock:
             query_mock.return_value = [{}]
 
@@ -326,7 +330,9 @@ class TestFastSyncTapPostgres(TestCase):
             self.assertFalse(state)
 
     def test_fetch_current_incremental_key_pos_non_empty_key_value_return_state(self):
-
+        """
+        test fetch_current_incremental_key_pos where result exists, it should return a non empty state with key value
+        """
         with patch.object(self.postgres, 'query') as query_mock:
             query_mock.return_value = [{'key_value': 123}]
 
@@ -339,7 +345,10 @@ class TestFastSyncTapPostgres(TestCase):
             }, state)
 
     def test_fetch_current_incremental_key_pos_datetime_key_value_return_state(self):
-
+        """
+        test fetch_current_incremental_key_pos where result is datetime, it should return a state with iso formatted
+         datetime key value
+        """
         with patch.object(self.postgres, 'query') as query_mock:
             query_mock.return_value = [{'key_value': datetime.datetime(2020, 1, 24, 7, 12, 6)}]
 
@@ -352,7 +361,10 @@ class TestFastSyncTapPostgres(TestCase):
             }, state)
 
     def test_fetch_current_incremental_key_pos_date_key_value_return_state(self):
-
+        """
+        test fetch_current_incremental_key_pos where result is date, it should return a state with iso formatted
+         datetime key value
+        """
         with patch.object(self.postgres, 'query') as query_mock:
             query_mock.return_value = [{'key_value': datetime.date(2020, 1, 24)}]
 
@@ -365,7 +377,9 @@ class TestFastSyncTapPostgres(TestCase):
             }, state)
 
     def test_fetch_current_incremental_key_pos_decimal_key_value_return_state(self):
-
+        """
+        test fetch_current_incremental_key_pos where result is decimal, it should return a state with float key value
+        """
         with patch.object(self.postgres, 'query') as query_mock:
             query_mock.return_value = [{'key_value': Decimal(4.222222222)}]
 
