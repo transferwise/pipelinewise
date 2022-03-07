@@ -1,3 +1,6 @@
+import datetime
+
+from decimal import Decimal
 from unittest import TestCase
 from unittest.mock import MagicMock, Mock, PropertyMock, patch
 
@@ -302,3 +305,74 @@ class TestFastSyncTapPostgres(TestCase):
             'SELECT pg_drop_replication_slot(slot_name) FROM pg_replication_slots WHERE '
             "slot_name = 'pipelinewise_my_db_tap_test';",
         ]
+
+    def test_fetch_current_incremental_key_pos_empty_result_expect_exception(self):
+
+        with patch.object(self.postgres, 'query') as query_mock:
+            query_mock.return_value = None
+
+            with self.assertRaises(Exception) as cm:
+                self.postgres.fetch_current_incremental_key_pos('schema.table1', 'id')
+
+            self.assertEqual('Cannot get replication key value for table: schema.table1', str(cm.exception))
+
+    def test_fetch_current_incremental_key_pos_empty_key_value_return_empty_state(self):
+
+        with patch.object(self.postgres, 'query') as query_mock:
+            query_mock.return_value = [{}]
+
+            state = self.postgres.fetch_current_incremental_key_pos('schema.table1', 'id')
+
+            self.assertFalse(state)
+
+    def test_fetch_current_incremental_key_pos_non_empty_key_value_return_state(self):
+
+        with patch.object(self.postgres, 'query') as query_mock:
+            query_mock.return_value = [{'key_value': 123}]
+
+            state = self.postgres.fetch_current_incremental_key_pos('schema.table1', 'id')
+
+            self.assertDictEqual({
+                'replication_key': 'id',
+                'replication_key_value': 123,
+                'version': 1,
+            }, state)
+
+    def test_fetch_current_incremental_key_pos_datetime_key_value_return_state(self):
+
+        with patch.object(self.postgres, 'query') as query_mock:
+            query_mock.return_value = [{'key_value': datetime.datetime(2020, 1, 24, 7, 12, 6)}]
+
+            state = self.postgres.fetch_current_incremental_key_pos('schema.table1', 'id')
+
+            self.assertDictEqual({
+                'replication_key': 'id',
+                'replication_key_value': '2020-01-24T07:12:06',
+                'version': 1,
+            }, state)
+
+    def test_fetch_current_incremental_key_pos_date_key_value_return_state(self):
+
+        with patch.object(self.postgres, 'query') as query_mock:
+            query_mock.return_value = [{'key_value': datetime.date(2020, 1, 24)}]
+
+            state = self.postgres.fetch_current_incremental_key_pos('schema.table1', 'id')
+
+            self.assertDictEqual({
+                'replication_key': 'id',
+                'replication_key_value': '2020-01-24T00:00:00',
+                'version': 1,
+            }, state)
+
+    def test_fetch_current_incremental_key_pos_decimal_key_value_return_state(self):
+
+        with patch.object(self.postgres, 'query') as query_mock:
+            query_mock.return_value = [{'key_value': Decimal(4.222222222)}]
+
+            state = self.postgres.fetch_current_incremental_key_pos('schema.table1', 'id')
+
+            self.assertDictEqual({
+                'replication_key': 'id',
+                'replication_key_value': 4.222222222,
+                'version': 1,
+            }, state)
