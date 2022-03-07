@@ -231,6 +231,7 @@ class FastSyncTargetBigquery:
         sql = (
             f'CREATE OR REPLACE TABLE {target_schema}.{target_table} ('
             f'{",".join(columns)})'
+            f' PARTITION BY TIMESTAMP_TRUNC({utils.SDC_EXTRACTED_AT.lower()}, DAY)'
         )
         if primary_key:
             primary_key = [c.lower() for c in primary_key]
