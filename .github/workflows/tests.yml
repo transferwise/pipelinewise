@@ -46,7 +46,7 @@ jobs:
       - name: Run Unit tests
         if: steps.check.outcome == 'failure'
         run: |
-          pytest --cov=pipelinewise --cov-fail-under=72 -v tests/units
+          pytest --cov=pipelinewise --cov-fail-under=74 -v tests/units
 
   e2e_tests:
     runs-on: ubuntu-20.04
