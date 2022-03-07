@@ -1,4 +1,4 @@
-name: Tests
+name: End-to-End Tests
 
 on:
   push:
@@ -9,45 +9,10 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: tests-${{ github.head_ref }}
+  group: e2e_tests-${{ github.head_ref }}
   cancel-in-progress: true
 
 jobs:
-  unit_test:
-    runs-on: ubuntu-20.04
-    strategy:
-      matrix:
-        python-version: ["3.7", "3.8", "3.9"]
-
-    steps:
-      - name: Checking out repo
-        uses: actions/checkout@v2
-
-      - name: Check if python changes are present
-        id: check
-        env:
-          GITHUB_REPO: ${{ github.repository }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-        continue-on-error: true
-        run: ./scripts/ci_check_no_file_changes.sh python
-
-      - name: Set up Python ${{ matrix.python-version }}
-        if: steps.check.outcome == 'failure'
-        uses: actions/setup-python@v2
-        with:
-          python-version: ${{ matrix.python-version }}
-
-      - name: Install dependencies
-        if: steps.check.outcome == 'failure'
-        run: |
-          pip install -U pip setuptools wheel
-          pip install -Ue .[test]
-
-      - name: Run Unit tests
-        if: steps.check.outcome == 'failure'
-        run: |
-          pytest --cov=pipelinewise --cov-fail-under=74 -v tests/units
-
   e2e_tests:
     runs-on: ubuntu-20.04
     environment: ci_tests
