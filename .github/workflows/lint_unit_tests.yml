@@ -1,4 +1,4 @@
-name: Linter
+name: Lint and Unit Tests
 
 on:
   push:
@@ -9,11 +9,11 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: linter-${{ github.head_ref }}
+  group: lint_unit_tests-${{ github.head_ref }}
   cancel-in-progress: true
 
 jobs:
-  check:
+  build-docker-image:
     runs-on: ubuntu-20.04
     strategy:
       matrix:
@@ -62,6 +62,32 @@ jobs:
         run: |
           docker push transferwiseworkspace/pipelinewise:ci-py${{ matrix.python-version  }}
 
+  lint:
+    needs:
+      - build-docker-image
+    runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        python-version: ["3.7", "3.8", "3.9"]
+
+    steps:
+      - name: Checking out repo
+        uses: actions/checkout@v2
+
+      - name: Check if python changes are present
+        id: check
+        env:
+          GITHUB_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        continue-on-error: true
+        run: ./scripts/ci_check_no_file_changes.sh python
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
       - name: Check code formatting
         if: steps.check.outcome == 'failure'
         run: |
@@ -91,3 +117,37 @@ jobs:
           -v $PWD:/app \
           transferwiseworkspace/pipelinewise:ci-py${{ matrix.python-version  }} \
           bash -c "flake8 . --count --max-complexity=15 --max-line-length=120 --statistics"
+
+  unit-test:
+    needs:
+      - build-docker-image
+    runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        python-version: ["3.7", "3.8", "3.9"]
+
+    steps:
+      - name: Checking out repo
+        uses: actions/checkout@v2
+
+      - name: Check if python changes are present
+        id: check
+        env:
+          GITHUB_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        continue-on-error: true
+        run: ./scripts/ci_check_no_file_changes.sh python
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Run Unit tests
+        if: steps.check.outcome == 'failure'
+        run: |
+          docker run --rm \
+          -v $PWD:/app \
+          transferwiseworkspace/pipelinewise:ci-py${{ matrix.python-version  }} \
+          bash -c "pytest --cov=pipelinewise --cov-fail-under=72 -v tests/units"
