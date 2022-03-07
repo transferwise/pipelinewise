@@ -143,7 +143,8 @@ class TestFastSyncTargetBigquery:
             '`id` integer,`txt` string,'
             '_sdc_extracted_at timestamp,'
             '_sdc_batched_at timestamp,'
-            '_sdc_deleted_at timestamp)',
+            '_sdc_deleted_at timestamp)'
+            ' PARTITION BY TIMESTAMP_TRUNC(_sdc_extracted_at, DAY)',
             job_config=ANY,
         )
 
@@ -159,7 +160,8 @@ class TestFastSyncTargetBigquery:
             '`id` integer,`txt` string,`select` string,'
             '_sdc_extracted_at timestamp,'
             '_sdc_batched_at timestamp,'
-            '_sdc_deleted_at timestamp)',
+            '_sdc_deleted_at timestamp)'
+            ' PARTITION BY TIMESTAMP_TRUNC(_sdc_extracted_at, DAY)',
             job_config=ANY,
         )
 
@@ -175,7 +177,8 @@ class TestFastSyncTargetBigquery:
             '`id` integer,`column with space` string,'
             '_sdc_extracted_at timestamp,'
             '_sdc_batched_at timestamp,'
-            '_sdc_deleted_at timestamp)',
+            '_sdc_deleted_at timestamp)'
+            ' PARTITION BY TIMESTAMP_TRUNC(_sdc_extracted_at, DAY)',
             job_config=ANY,
         )
 
@@ -191,7 +194,8 @@ class TestFastSyncTargetBigquery:
             '`id` integer,`txt` string,'
             '_sdc_extracted_at timestamp,'
             '_sdc_batched_at timestamp,'
-            '_sdc_deleted_at timestamp)',
+            '_sdc_deleted_at timestamp)'
+            ' PARTITION BY TIMESTAMP_TRUNC(_sdc_extracted_at, DAY)',
             job_config=ANY,
         )
 
@@ -207,7 +211,9 @@ class TestFastSyncTargetBigquery:
             '`id` integer,`txt` string,'
             '_sdc_extracted_at timestamp,'
             '_sdc_batched_at timestamp,'
-            '_sdc_deleted_at timestamp) CLUSTER BY `id`,`txt`',
+            '_sdc_deleted_at timestamp)'
+            ' PARTITION BY TIMESTAMP_TRUNC(_sdc_extracted_at, DAY)'
+            ' CLUSTER BY `id`,`txt`',
             job_config=ANY,
         )
 
