@@ -313,10 +313,10 @@ class TestFastSyncTapPostgres(TestCase):
         with patch.object(self.postgres, 'query') as query_mock:
             query_mock.return_value = None
 
-            with self.assertRaises(Exception) as cm:
+            with self.assertRaises(Exception) as context:
                 self.postgres.fetch_current_incremental_key_pos('schema.table1', 'id')
 
-            self.assertEqual('Cannot get replication key value for table: schema.table1', str(cm.exception))
+            self.assertEqual('Cannot get replication key value for table: schema.table1', str(context.exception))
 
     def test_fetch_current_incremental_key_pos_empty_key_value_return_empty_state(self):
         """
