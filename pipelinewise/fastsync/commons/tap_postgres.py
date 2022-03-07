@@ -338,6 +338,11 @@ class FastSyncTapPostgres:
             )
 
         postgres_key_value = result[0].get('key_value')
+
+        if postgres_key_value is None:
+            LOGGER.warning('No replication value found for table %s, returning empty bookmark', table)
+            return {}
+
         key_value = postgres_key_value
 
         # Convert postgres data/datetime format to JSON friendly values
@@ -349,10 +354,6 @@ class FastSyncTapPostgres:
 
         elif isinstance(postgres_key_value, decimal.Decimal):
             key_value = float(postgres_key_value)
-
-        if key_value is None:
-            LOGGER.warning('No replication value found for table %s, returning empty bookmark', table)
-            return {}
 
         return {
             'replication_key': replication_key,
