@@ -531,11 +531,6 @@ class FastSyncTapMySql:
 
             result = self.query('select @@gtid_slave_pos as current_gtids;')
 
-            if not result:
-                raise Exception('GTID is not enabled.')
-
-            gtids = result[0]['current_gtids']
-
         else:
             LOGGER.info('Connecting to primary to get gtid...')
 
