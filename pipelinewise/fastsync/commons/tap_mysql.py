@@ -528,18 +528,16 @@ class FastSyncTapMySql:
         """
         if self.is_replica:
             LOGGER.info('Connecting to replica to get gtid...')
-
             result = self.query('select @@gtid_slave_pos as current_gtids;')
 
         else:
             LOGGER.info('Connecting to primary to get gtid...')
-
             result = self.query('select @@gtid_current_pos as current_gtids;')
 
-            if not result:
-                raise Exception('Unable to replicate binlog stream because GTID mode is not enabled.')
+        if not result:
+            raise Exception('GTID is not enabled.')
 
-            gtids = result[0]['current_gtids']
+        gtids = result[0]['current_gtids']
 
         server_id = str(self.__get_primary_server_id())
 
@@ -572,8 +570,8 @@ class FastSyncTapMySql:
 
         result = self.query('select @@gtid_mode as gtid_mode;')
 
-        if result[0]['gtid_mode'] != 'ON':
-            raise Exception('Unable to replicate binlog stream because GTID mode is not enabled.')
+        if not result or result[0].get('gtid_mode') != 'ON':
+            raise Exception('GTID mode is not enabled.')
 
         result = self.query('select @@GLOBAL.gtid_executed as current_gtids;')
 
