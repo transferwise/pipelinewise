@@ -332,12 +332,17 @@ class FastSyncTapPostgres:
         result = self.query(
             f'SELECT MAX({replication_key}) AS key_value FROM {schema_name}."{table_name}"'
         )
-        if len(result) == 0:
+        if not result:
             raise Exception(
                 'Cannot get replication key value for table: {}'.format(table)
             )
 
         postgres_key_value = result[0].get('key_value')
+
+        if postgres_key_value is None:
+            LOGGER.warning('No replication value found for table %s, returning empty bookmark', table)
+            return {}
+
         key_value = postgres_key_value
 
         # Convert postgres data/datetime format to JSON friendly values

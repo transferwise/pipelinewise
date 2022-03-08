@@ -90,7 +90,6 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
 
         # Exporting table data, get table definitions and close connection to avoid timeouts
         postgres.copy_table(table, filepath)
-        size_bytes = os.path.getsize(filepath)
         postgres_target_types = postgres.map_column_types_to_target(table)
         postgres_target_columns = postgres_target_types.get('columns', [])
         primary_key = postgres_target_types.get('primary_key')
@@ -106,14 +105,20 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
             is_temporary=True,
         )
 
-        # Load into Postgres table
-        postgres_target.copy_to_table(
-            filepath, target_schema, table, size_bytes, is_temporary=True
-        )
-        os.remove(filepath)
+        # if table is empty, then there is no exported file at filepath
+        if os.path.exists(filepath):
+            size_bytes = os.path.getsize(filepath)
 
-        # Obfuscate columns
-        postgres_target.obfuscate_columns(target_schema, table, is_temporary=True)
+            # Load into Postgres table
+            postgres_target.copy_to_table(
+                filepath, target_schema, table, size_bytes, is_temporary=True
+            )
+            os.remove(filepath)
+
+            # Obfuscate columns
+            postgres_target.obfuscate_columns(target_schema, table, is_temporary=True)
+        else:
+            LOGGER.warning('Not export file has been generated, this is likely due to table being empty')
 
         # Create target table and swap with the temp table in Postgres
         postgres_target.swap_tables(target_schema, table)

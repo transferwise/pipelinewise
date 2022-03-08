@@ -71,6 +71,11 @@ schemas:
         replication_method: "INCREMENTAL"
         replication_key: "id"
 
+      ### Table with reserved word
+      - table_name: "empty_table"
+        replication_method: "INCREMENTAL"
+        replication_key: "id"
+
       ### Table with space and mixed upper and lowercase characters
       - table_name: "table_with_space and UPPERCase"
         replication_method: "LOG_BASED"
@@ -103,19 +108,3 @@ schemas:
       - table_name: "public2_edgydata"
         replication_method: "INCREMENTAL"
         replication_key: "cid"
-
-  ### SOURCE SCHEMA 3: logical 1
-  #- source_schema: "logical1"
-  #  target_schema: "ppw_e2e_tap_postgres_logical1${TARGET_SNOWFLAKE_SCHEMA_POSTFIX}"
-  #
-  #  tables:
-  #    - table_name: "logical1_table1"
-  #      replication_method: "LOG_BASED"
-  #    - table_name: "logical1_table2"
-  #    - table_name: "logical1_edgydata"
-
-  ### SOURCE SCHEMA 4: logical2
-  #- source_schema: "logical2"
-  #  target_schema: "ppw_e2e_tap_postgres_logical2${TARGET_SNOWFLAKE_SCHEMA_POSTFIX}"
-  #  tables:
-  #    - table_name: "logical2_table1"
