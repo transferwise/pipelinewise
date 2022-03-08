@@ -195,9 +195,10 @@ class TestFastSyncTapMySql(TestCase):
 
             query_method_mock.return_value = []
 
-            with self.assertRaises(Exception) as ex:
+            with self.assertRaises(Exception) as context:
                 self.mysql.fetch_current_log_pos()
-                self.assertEqual('GTID is not enabled!', str(ex))
+
+            self.assertEqual('GTID is not enabled.', str(context.exception))
 
             query_method_mock.assert_called_once_with('select @@gtid_slave_pos as current_gtids;')
 
@@ -240,11 +241,14 @@ class TestFastSyncTapMySql(TestCase):
         self.mysql = FastSyncTapMySql(self.connection_config, lambda x: x)
 
         with patch.object(self.mysql, 'query') as query_method_mock:
-            query_method_mock.side_effect = []
+            query_method_mock.side_effect = [
+                []
+            ]
 
-            with self.assertRaises(Exception) as ex:
+            with self.assertRaises(Exception) as context:
                 self.mysql.fetch_current_log_pos()
-                self.assertEqual('GTID is not enabled!', str(ex))
+
+            self.assertEqual('GTID is not enabled.', str(context.exception))
 
             query_method_mock.assert_has_calls(
                 [
@@ -270,9 +274,10 @@ class TestFastSyncTapMySql(TestCase):
                 [{'server_id': 192}],
             ]
 
-            with self.assertRaises(Exception) as ex:
+            with self.assertRaises(Exception) as context:
                 self.mysql.fetch_current_log_pos()
-                self.assertEqual('No suitable GTID was found for server 192', str(ex))
+
+            self.assertEqual('No suitable GTID was found.', str(context.exception))
 
             query_method_mock.assert_has_calls(
                 [
@@ -345,15 +350,13 @@ class TestFastSyncTapMySql(TestCase):
 
         with patch.object(self.mysql, 'query') as query_method_mock:
             query_method_mock.side_effect = [
-                {
-                    'gtid_mode': 'OFF',
-                }
+                [{'gtid_mode': 'OFF'}]
             ]
 
-            with self.assertRaises(Exception) as ex:
+            with self.assertRaises(Exception) as context:
                 self.mysql.fetch_current_log_pos()
 
-                self.assertEqual('Unable to replicate binlog stream because GTID mode is not enabled.', str(ex))
+            self.assertEqual('GTID mode is not enabled.', str(context.exception))
 
             query_method_mock.assert_called_once_with('select @@gtid_mode as gtid_mode;')
 
