@@ -42,6 +42,8 @@ The following transformations can be added optionally into the :ref:`yaml_config
 
 * **MASK-STRING-SKIP-ENDS-n**: Transforms string columns to masked version skipping first and last n characters, e.g. MASK-STRING-SKIP-ENDS-3
 
+* **NULL-OR-REDACTED**: Transforms any column to '<redacted>', but maintains NULL values as NULL.
+
 
 .. _transformation_validation:
 
