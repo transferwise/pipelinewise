@@ -37,8 +37,10 @@ class ExternalTransformationType(Enum):
     """
     List of external supported transformation types
     """
+
     NULL_OR_REDACTED = 'NULL-OR-REDACTED'
     NULL_OR_REDACTED_SKIP_FIRST = 'NULL-OR-REDACTED-SKIP-FIRST'
+    INTERNAL = 'INTERNAL'
 
 
 @unique
@@ -85,15 +87,11 @@ class TransformationHelper:
             if trans_item.get('tap_stream_name').lower() == stream_name.lower():
 
                 transform_type = TransformationType(trans_item['type'])
-                if 'external_type' in trans_item:
-                    external_type = ExternalTransformationType(trans_item['external_type'])
-                else:
-                    external_type = None
 
-                if 'param' in trans_item:
-                    param = trans_item['param']
-                else:
-                    param = None
+                external_type = ExternalTransformationType(trans_item['external_type'])
+
+                param = trans_item['param']
+
 
                 # Make the field id safe in case it's a reserved word
                 column = cls.__safe_column(trans_item['field_id'], sql_flavor)
@@ -109,7 +107,7 @@ class TransformationHelper:
                     )
 
                 elif transform_type == TransformationType.HASH:
-                    if external_type is None:
+                    if external_type == ExternalTransformationType.INTERNAL:
                         trans_map.append(
                             {
                                 'trans': cls.__hash_to_sql(column, sql_flavor),

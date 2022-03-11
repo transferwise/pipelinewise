@@ -158,7 +158,8 @@
           "type": "string",
           "enum": [
             "NULL-OR-REDACTED",
-            "NULL-OR-REDACTED-SKIP-FIRST"
+            "NULL-OR-REDACTED-SKIP-FIRST",
+            "INTERNAL"
           ]
         },
         "param": {

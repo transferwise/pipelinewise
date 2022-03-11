@@ -314,7 +314,7 @@ class Config:
                     if 'external_type' in trans:
                         external_type = trans['external_type']
                     else:
-                        external_type = None
+                        external_type = 'INTERNAL'
                     if 'param' in trans:
                         param = trans['param']
                     else:
