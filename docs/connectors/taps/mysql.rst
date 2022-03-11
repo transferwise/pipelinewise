@@ -4,8 +4,6 @@
 Tap MySQL
 ---------
 
-This tap is compatible with Mysql and Mariadb servers to some extent.
-
 MySQL setup requirements
 ''''''''''''''''''''''''
 
