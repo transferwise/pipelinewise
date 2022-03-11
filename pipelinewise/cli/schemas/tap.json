@@ -38,19 +38,13 @@
           "type": "object",
           "properties": {
             "column": {
-              "type": "string",
-              "minLength": 1
-            },
-            "field_path": {
-              "type": "string",
-              "minLength": 1
+              "type": "string"
             },
             "equals": {
               "type": ["null", "integer", "string", "boolean", "number"]
             }
           },
-          "required": ["column", "equals"],
-          "additionalProperties": false
+          "required": ["column", "equals"]
         },
         {
           "type": "object",
@@ -60,10 +54,6 @@
             },
             "regex_match": {
               "type": "string"
-            },
-            "field_path": {
-              "type": "string",
-              "minLength": 1
             }
           },
           "required": ["column", "regex_match"]
@@ -132,19 +122,9 @@
     },
     "transformation": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "column": {
-          "type": "string",
-          "minLength": 1
-        },
-        "field_paths": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "minLength": 1
-          },
-          "minItems": 1
+          "type": "string"
         },
         "type": {
           "type": "string",
@@ -174,6 +154,16 @@
             "MASK-STRING-SKIP-ENDS-9"
           ]
         },
+        "external_type": {
+          "type": "string",
+          "enum": [
+            "NULL-OR-REDACTED",
+            "NULL-OR-REDACTED-SKIP-FIRST"
+          ]
+        },
+        "param": {
+          "type": "integer"
+        },
         "when": {
           "type": "array",
           "items": {
@@ -189,7 +179,6 @@
     },
     "s3_csv_mapping": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "search_prefix": {
           "type": "string"
@@ -383,7 +372,7 @@
     "split_file_max_chunks": {
       "type": "integer",
       "min": 1,
-      "max": 99999
+      "max": 100
     },
     "schemas": {
       "type": "array",
