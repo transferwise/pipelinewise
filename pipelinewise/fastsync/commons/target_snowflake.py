@@ -4,7 +4,7 @@ import json
 import boto3
 import snowflake.connector
 
-from typing import List, Dict
+from typing import List, Dict, Optional
 from snowflake.connector.encryption_util import SnowflakeEncryptionUtil
 from snowflake.connector.remote_storage_util import SnowflakeFileEncryptionMaterial
 
@@ -217,7 +217,7 @@ class FastSyncTargetSnowflake:
         target_schema: str,
         table_name: str,
         columns: List[str],
-        primary_key: List[str],
+        primary_key: Optional[List[str]],
         is_temporary: bool = False,
         sort_columns=False,
     ):
@@ -252,17 +252,50 @@ class FastSyncTargetSnowflake:
         if sort_columns:
             columns.sort()
 
+        full_table_name = self._get_full_qualified_table_name(target_schema, target_table)
+
         sql_columns = ','.join(columns)
         sql_primary_keys = ','.join(primary_key) if primary_key else None
         sql = (
-            f'CREATE OR REPLACE TABLE {target_schema}."{target_table.upper()}" ('
-            f'{sql_columns}'
+            f'CREATE OR REPLACE TABLE {full_table_name} ({sql_columns}'
             f'{f", PRIMARY KEY ({sql_primary_keys}))" if primary_key else ")"}'
         )
 
         self.query(
             sql, query_tag_props={'schema': target_schema, 'table': target_table}
         )
+
+        self._drop_pk_non_nullability(target_schema, target_table, primary_key)
+
+    def _drop_pk_non_nullability(self, target_schema: str, target_table: str, primary_keys: Optional[List[str]]):
+        """
+        Drop non-null constraints on PK columns in the given table
+
+        Args:
+            target_schema: schema name where table is
+            target_table: table name to alter
+            primary_keys: list of primary key columns of the table, column are uppercase and wrapped in double quotes
+        """
+        if not primary_keys:
+            return
+
+        full_table_name = self._get_full_qualified_table_name(target_schema, target_table)
+
+        for p_key in primary_keys:
+            sql = f'alter table {full_table_name} alter column {p_key.upper()} drop not null;'
+            self.query(sql, query_tag_props={'schema': target_schema, 'table': target_table})
+
+    @staticmethod
+    def _get_full_qualified_table_name(schema: str, table: str) -> str:
+        """
+        Constructs the full qualified table name as "SCHEMA_NAME"."TABLE_NAME"
+        Args:
+            schema: schema name in SF
+            table: table name in SF
+
+        Returns: str: full qualified name
+        """
+        return f'"{schema.upper()}"."{table.upper()}"'
 
     # pylint: disable=too-many-locals
     def copy_to_table(
