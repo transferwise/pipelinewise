@@ -1,1 +1,1 @@
-pipelinewise-target-snowflake==1.15.0
+-e git+https@github.com:transferwise/pipelinewise-target-snowflake.git@AP-1110#egg=pipelinewise-target-snowflake
