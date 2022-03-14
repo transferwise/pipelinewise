@@ -1,1 +1,1 @@
--e git+https@github.com:transferwise/pipelinewise-target-snowflake.git@AP-1110#egg=pipelinewise-target-snowflake
+-e git+https://github.com/transferwise/pipelinewise-target-snowflake.git@AP-1110#egg=pipelinewise-target-snowflake
