@@ -1,3 +1,7 @@
+0.42.1 (2022-03-17)
+-------------------
+- Bump `tap-kafka` to `6.0.0`
+
 0.42.0 (2022-03-17)
 -------------------
 - Allow non-default configuration directory
@@ -10,7 +14,6 @@
 - Bump `tap-snowflake` to `3.0.0`
 - Check singer connectors installable for Python 3.7 3.8 3.9
 - Support log_based using GTID for MySQL and Mariadb
-
 
 0.41.0 (2022-02-10)
 -------------------
