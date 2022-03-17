@@ -8,9 +8,6 @@
 - Replace `ansible` with `ansible-core`
 - Bump `tap-postgres` to `1.8.3`
 - Bump `tap-snowflake` to `3.0.0`
-- Update for compatibility with MySQL 8
-- Improve signal handling
-- Fix pg_to_sf e2e tests
 - Check singer connectors installable for Python 3.7 3.8 3.9
 - Support log_based using GTID for MySQL and Mariadb
 
