@@ -88,6 +88,7 @@ DEFAULT_CONNECTORS=(
     tap-github
     tap-slack
     tap-mixpanel
+    tap-twilio
     target-s3-csv
     target-snowflake
     target-redshift
@@ -113,6 +114,9 @@ CURRENT_CONNECTORS=(
     tap-google-analytics
     tap-github
     tap-slack
+    tap-mongodb
+    tap-jira
+    tap-twilio
     target-snowflake
     target-s3-csv
     target-postgres
