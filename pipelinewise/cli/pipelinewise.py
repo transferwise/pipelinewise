@@ -1154,12 +1154,6 @@ class PipelineWise:
             self.logger.info('Tap %s is not enabled.', self.tap['name'])
             sys.exit(1)
 
-        # Run only if not running
-        tap_status = self.detect_tap_status(target_id, tap_id)
-        if tap_status['currentStatus'] == 'running':
-            self.logger.info('Tap %s is currently running.', self.tap['name'])
-            sys.exit(1)
-
         # Generate and run the command to run the tap directly
         tap_config = self.tap['files']['config']
         tap_inheritable_config = self.tap['files']['inheritable_config']
@@ -1371,15 +1365,6 @@ class PipelineWise:
         # Run only if tap enabled
         if not self.tap.get('enabled', False):
             self.logger.info('Tap %s is not enabled.', self.tap['name'])
-            sys.exit(1)
-
-        # Run only if tap not running
-        tap_status = self.detect_tap_status(target_id, tap_id)
-        if tap_status['currentStatus'] == 'running':
-            self.logger.info(
-                'Tap %s is currently running and cannot sync. Stop the tap and try again.',
-                self.tap['name'],
-            )
             sys.exit(1)
 
         # Tap exists but configuration not completed
