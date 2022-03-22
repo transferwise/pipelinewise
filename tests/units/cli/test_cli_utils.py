@@ -413,6 +413,7 @@ class TestUtils:
         assert len(random_str) == 10
 
     def test_create_backup_of_the_file(self):
+        """test if create_backup_of_the_file method works correctly when original file exists"""
         with TemporaryDirectory() as temp_dir:
             file_content = 'foo'
             test_file = 'test.tmp'
@@ -428,6 +429,7 @@ class TestUtils:
             assert bak_content == file_content
 
     def test_create_backup_of_the_file_if_original_file_does_not_exist(self):
+        """test if create_backup_of_the_file method works correctly when original file not exists"""
         with TemporaryDirectory() as temp_dir:
             test_file = 'test.tmp'
 
