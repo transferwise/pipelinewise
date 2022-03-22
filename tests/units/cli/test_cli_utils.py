@@ -2,6 +2,8 @@ import os
 import re
 import pytest
 
+from tempfile import TemporaryDirectory
+
 from pipelinewise import cli
 from pipelinewise.cli.errors import InvalidConfigException
 
@@ -409,3 +411,29 @@ class TestUtils:
         """generate_random_string given a length greater than or eq to 8 expect result"""
         random_str = cli.utils.generate_random_string(10)
         assert len(random_str) == 10
+
+    def test_create_backup_of_the_file(self):
+        with TemporaryDirectory() as temp_dir:
+            file_content = 'foo'
+            test_file = 'test.tmp'
+            # Creating the original file
+            with open(f'{temp_dir}/{test_file}', 'w', encoding='utf-8') as tmp_file:
+                tmp_file.write(file_content)
+
+            cli.utils.create_backup_of_the_file(f'{temp_dir}/test.tmp')
+
+            with open(f'{temp_dir}/{test_file}.bak', 'r', encoding='utf-8') as bak_file:
+                bak_content = bak_file.read()
+
+            assert bak_content == file_content
+
+    def test_create_backup_of_the_file_if_original_file_does_not_exist(self):
+        with TemporaryDirectory() as temp_dir:
+            test_file = 'test.tmp'
+
+            cli.utils.create_backup_of_the_file(f'{temp_dir}/test.tmp')
+
+            with open(f'{temp_dir}/{test_file}.bak', 'r', encoding='utf-8') as bak_file:
+                bak_content = bak_file.read()
+
+            assert bak_content == 'ORIGINAL FILE DID NOT EXIST!'
