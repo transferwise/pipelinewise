@@ -1192,6 +1192,7 @@ class PipelineWise:
             create_fallback=True,
         )
 
+        utils.create_backup_of_the_file(tap_state)
         start_time = datetime.now()
         try:
             with pidfile.PIDFile(self.tap['files']['pidfile']):
