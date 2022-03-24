@@ -494,6 +494,7 @@ class TestCli:
         assert self.pipelinewise.send_alert('test-message') == {'sent': 0}
 
     def test_send_alert_to_tap_specific_slack_channel(self):
+        """Test if sends alert to the tap specific channel"""
         config_dir = f'{RESOURCES_DIR}/sample_json_config_for_specific_slack_channel'
 
         pipelinewise = PipelineWise(
