@@ -12,16 +12,15 @@ CONFIG_DIR = os.path.join(USER_HOME, ".pipelinewise")
 
 
 class TargetSnowflake(unittest.TestCase):
-    def setUp(self) -> None:
+    def setUp(self):
         super().setUp()
         self.e2e_env = self.get_e2e_env()
         self.check_snowflake_credentials_provided()
         self.check_validate_taps()
         self.check_import_config()
-        return None
 
-    def tearDown(self) -> None:
-        return super().tearDown()
+    def tearDown(self):
+        super().tearDown()
 
     def get_e2e_env(self) -> E2EEnv:
         test_projects_dir = Path(TEST_PROJECTS_DIR_PATH)
@@ -31,7 +30,7 @@ class TargetSnowflake(unittest.TestCase):
 
     def check_snowflake_credentials_provided(self):
         if self.e2e_env.env["TARGET_SNOWFLAKE"]["is_configured"] is False:
-            raise unittest.SkipTest("TARGET SNOWFLAKE credentials are not configured")
+            self.skipTest("TARGET SNOWFLAKE credentials are not configured")
 
     def check_validate_taps(self):
         return_code, stdout, stderr = tasks.run_command(
