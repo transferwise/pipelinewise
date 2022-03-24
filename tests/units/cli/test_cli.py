@@ -8,8 +8,9 @@ import pidfile
 import pytest
 
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import patch, call
 from typing import Callable, Optional
+from slack import WebClient
 
 from tests.units.cli.cli_args import CliArgs
 from pipelinewise import cli
@@ -482,8 +483,8 @@ class TestCli:
         """Test if alert"""
         with patch(
             'pipelinewise.cli.alert_sender.AlertSender.send_to_all_handlers'
-        ) as aler_sender_mock:
-            aler_sender_mock.return_value = {'sent': 1}
+        ) as alert_sender_mock:
+            alert_sender_mock.return_value = {'sent': 1}
             # Should send alert and should return stats if alerting enabled on the tap
             self.pipelinewise.tap = self.pipelinewise.get_tap('target_one', 'tap_one')
             assert self.pipelinewise.send_alert('test-message') == {'sent': 1}
@@ -491,6 +492,32 @@ class TestCli:
         # Should not send alert and should return none if alerting disabled on the tap
         self.pipelinewise.tap = self.pipelinewise.get_tap('target_one', 'tap_two')
         assert self.pipelinewise.send_alert('test-message') == {'sent': 0}
+
+    def test_send_alert_to_tap_specific_slack_channel(self):
+        config_dir = f'{RESOURCES_DIR}/sample_json_config_for_specific_slack_channel'
+
+        pipelinewise = PipelineWise(
+            self.args, config_dir, VIRTUALENVS_DIR, PROFILING_DIR
+        )
+        pipelinewise.tap = pipelinewise.get_tap('target_one', 'tap_one')
+        with patch.object(WebClient, 'chat_postMessage') as mocked_slack:
+            pipelinewise.send_alert('test-message')
+
+            # Assert if alert is sent to the the main channel and also to the tap channel
+            mocked_slack.assert_has_calls(
+                [
+                    call(
+                        channel=pipelinewise.alert_sender.alert_handlers['slack']['channel'],
+                        text=None,
+                        attachments=[{'color': 'danger', 'title': 'test-message'}]
+                    ),
+                    call(
+                        channel=pipelinewise.tap['slack_alert_channel'],
+                        text=None,
+                        attachments=[{'color': 'danger', 'title': 'test-message'}]
+                    )
+                ]
+            )
 
     def test_command_encrypt_string(self, capsys):
         """Test vault encryption command output"""

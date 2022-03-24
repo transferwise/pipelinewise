@@ -40,7 +40,7 @@ class VictoropsAlertHandler(BaseAlertHandler):
             raise InvalidAlertHandlerException('No valid VictorOps config supplied.')
 
     def send(
-        self, message: str, level: str = BaseAlertHandler.ERROR, exc: Exception = None
+        self, message: str, level: str = BaseAlertHandler.ERROR, exc: Exception = None, *args, **kwargs
     ) -> None:
         """
         Send alert

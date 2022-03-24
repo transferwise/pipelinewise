@@ -17,7 +17,7 @@ class BaseAlertHandler(ABC):
 
     @abstractmethod
     # pylint: disable=unnecessary-pass
-    def send(self, message: str, level: str = ERROR, exc: Exception = None) -> None:
+    def send(self, message: str, level: str = ERROR, exc: Exception = None, *args, **kwargs) -> None:
         """
         Send alert
 
