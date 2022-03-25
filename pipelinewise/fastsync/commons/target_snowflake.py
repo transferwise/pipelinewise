@@ -380,7 +380,9 @@ class FastSyncTargetSnowflake:
             tap_stream_name_by_table_name, transformations, SQLFlavor('snowflake')
         )
 
-        self.__apply_transformations(trans_map, target_schema, temp_table)
+        source_schema_name = table_dict["schema_name"]
+        source_table_name = table_dict["table_name"]
+        self.__apply_transformations(trans_map, target_schema, temp_table, source_schema_name, source_table_name)
 
         LOGGER.info('Obfuscation rules applied.')
 
@@ -408,7 +410,7 @@ class FastSyncTargetSnowflake:
         )
 
     def __apply_transformations(
-        self, transformations: List[Dict], target_schema: str, table_name: str
+        self, transformations: List[Dict], target_schema: str, table_name: str, source_schema_name: str, source_table_name: str
     ) -> None:
         """
         Generate and execute the SQL queries based on the given transformations.
@@ -418,6 +420,29 @@ class FastSyncTargetSnowflake:
             table_name: the table name on which we want to apply the transformations
         """
         full_qual_table_name = f'"{target_schema.upper()}"."{table_name.upper()}"'
+
+        privacy_query=f"""
+select column_name,privacy_properties:turing_strategy:sql::text as sql from "TURING"."BACKEND"."PRIVACY_PROPERTIES" where schema_name='{source_schema_name}' and table_name='{source_table_name}'
+"""
+        res=self.query(privacy_query,
+                       query_tag_props={'schema': "BACKEND",
+                                        'table': "PRIVACY_PROPERTIES"})
+        sql_parts = []
+        for row in res:
+            row = dict(row)
+            column_name = row['COLUMN_NAME']
+            sql = row['SQL']
+            if sql is not None:
+                sql = sql.replace("$column_name$", column_name)
+            sql_parts.append(f"{column_name} = ({sql})")
+
+        if sql_parts:
+            data_privacy_sql = f'UPDATE {full_qual_table_name} SET ' + ", ".join(sql_parts)
+            LOGGER.info('Running data privacy obfuscation query: %s', data_privacy_sql)
+            self.query(
+                data_privacy_sql,
+                query_tag_props={'schema': target_schema, 'table': table_name},
+            )
 
         if transformations:
             all_cols_update_sql = ''
