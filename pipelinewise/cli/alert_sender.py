@@ -118,7 +118,11 @@ class AlertSender:
 
         # Initialise and create an alert handler object from the the alert handler spec
         handler = self.__init_handler_class(alert_handler)
-        handler.send(message=message, level=level, exc=exc, tap_slack_channel=tap_slack_channel)
+
+        if alert_handler_type == 'slack':
+            handler.send(message=message, level=level, exc=exc, tap_slack_channel=tap_slack_channel)
+        else:
+            handler.send(message=message, level=level, exc=exc)
 
         # Alert sent successfully
         return True
