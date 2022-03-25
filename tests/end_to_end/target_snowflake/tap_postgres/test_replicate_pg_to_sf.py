@@ -4,9 +4,6 @@ from pipelinewise.fastsync import postgres_to_snowflake
 from tests.end_to_end.helpers import assertions
 from tests.end_to_end.target_snowflake.tap_postgres import TapPostgres
 
-TAP_ID = "postgres_to_sf"
-TARGET_ID = "snowflake"
-
 
 class TestReplicatePGToSF(TapPostgres):
     """
@@ -14,15 +11,20 @@ class TestReplicatePGToSF(TapPostgres):
     """
 
     def setUp(self):
+        self.TAP_ID = "postgres_to_sf"
+        self.TARGET_ID = "snowflake"
         super().setUp()
+        self.drop_schema_if_exists(f"{self.TAP_ID}{self.e2e_env.sf_schema_postfix}")
 
     def tearDown(self):
-        self.drop_schema_if_exists(f"{TAP_ID}{self.e2e_env.sf_schema_postfix}")
-        self.remove_dir(f"{TARGET_ID}/{TAP_ID}")
+        self.drop_schema_if_exists(f"{self.TAP_ID}{self.e2e_env.sf_schema_postfix}")
+        self.remove_dir_from_config_dir(f"{self.TARGET_ID}/{self.TAP_ID}")
         super().tearDown()
 
     def test_replicate_pg_to_sf(self):
-        assertions.assert_run_tap_success(TAP_ID, TARGET_ID, ["fastsync", "singer"])
+        assertions.assert_run_tap_success(
+            self.TAP_ID, self.TARGET_ID, ["fastsync", "singer"]
+        )
 
         assertions.assert_row_counts_equal(
             self.e2e_env.run_query_tap_postgres,
@@ -49,7 +51,7 @@ class TestReplicatePGToSF(TapPostgres):
             f"where cvarchar='H';"
         )[0][0]
 
-        assert result == datetime(9999, 12, 31, 23, 59, 59, 998993)
+        self.assertEqual(result, datetime(9999, 12, 31, 23, 59, 59, 998993))
 
         result = self.e2e_env.run_query_target_snowflake(
             f"SELECT updated_at FROM "
@@ -57,7 +59,7 @@ class TestReplicatePGToSF(TapPostgres):
             f"where cvarchar='I';"
         )[0][0]
 
-        assert result == datetime(9999, 12, 31, 23, 59, 59, 998993)
+        self.assertEqual(result, datetime(9999, 12, 31, 23, 59, 59, 998993))
 
         # 2. Make changes in PG source database
         #  LOG_BASED
@@ -94,7 +96,7 @@ class TestReplicatePGToSF(TapPostgres):
 
         # 3. Run tap second time - both fastsync and a singer should be triggered, there are some FULL_TABLE
         assertions.assert_run_tap_success(
-            TAP_ID, TARGET_ID, ["fastsync", "singer"], profiling=True
+            self.TAP_ID, self.TARGET_ID, ["fastsync", "singer"], profiling=True
         )
 
         assertions.assert_row_counts_equal(
@@ -122,7 +124,7 @@ class TestReplicatePGToSF(TapPostgres):
             f" where cvarchar='X';"
         )[0][0]
 
-        assert result == datetime(2019, 12, 31, 22, 53, 56, 800000)
+        self.assertEqual(result, datetime(2019, 12, 31, 22, 53, 56, 800000))
 
         result = self.e2e_env.run_query_target_snowflake(
             f"SELECT updated_at FROM "
@@ -130,7 +132,7 @@ class TestReplicatePGToSF(TapPostgres):
             f"where cvarchar='faaaar future';"
         )[0][0]
 
-        assert result == datetime(9999, 12, 31, 23, 59, 59, 998993)
+        self.assertEqual(result, datetime(9999, 12, 31, 23, 59, 59, 998993))
 
         result = self.e2e_env.run_query_target_snowflake(
             f"SELECT updated_at FROM "
@@ -138,4 +140,4 @@ class TestReplicatePGToSF(TapPostgres):
             f"where cvarchar='BC';"
         )[0][0]
 
-        assert result == datetime(9999, 12, 31, 23, 59, 59, 998993)
+        self.assertEqual(result, datetime(9999, 12, 31, 23, 59, 59, 998993))

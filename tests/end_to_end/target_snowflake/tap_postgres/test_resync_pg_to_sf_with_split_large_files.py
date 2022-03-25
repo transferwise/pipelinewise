@@ -2,9 +2,6 @@ from pipelinewise.fastsync import postgres_to_snowflake
 from tests.end_to_end.helpers import assertions
 from tests.end_to_end.target_snowflake.tap_postgres import TapPostgres
 
-TAP_ID = "postgres_to_sf_split_large_files"
-TARGET_ID = "snowflake"
-
 
 class TestResyncPGToSFWithSplitLargeFiles(TapPostgres):
     """
@@ -12,17 +9,20 @@ class TestResyncPGToSFWithSplitLargeFiles(TapPostgres):
     """
 
     def setUp(self):
+        self.TAP_ID = "postgres_to_sf_split_large_files"
+        self.TARGET_ID = "snowflake"
         super().setUp()
+        self.drop_schema_if_exists(f"{self.TAP_ID}{self.e2e_env.sf_schema_postfix}")
 
     def tearDown(self):
-        self.drop_schema_if_exists(f"{TAP_ID}{self.e2e_env.sf_schema_postfix}")
-        self.remove_dir(f"{TARGET_ID}/{TAP_ID}")
+        self.drop_schema_if_exists(f"{self.TAP_ID}{self.e2e_env.sf_schema_postfix}")
+        self.remove_dir_from_config_dir(f"{self.TARGET_ID}/{self.TAP_ID}")
         super().tearDown()
 
     def test_resync_pg_to_sf_with_split_large_files(self):
         assertions.assert_resync_tables_success(
-            tap=TAP_ID,
-            target=TARGET_ID,
+            tap=self.TAP_ID,
+            target=self.TARGET_ID,
         )
 
         assertions.assert_row_counts_equal(
