@@ -362,6 +362,10 @@
         "tap-twilio"
       ]
     },
+    "slack_alert_channel": {
+      "type": "string",
+      "pattern": "^#"
+    },
     "db_conn": {
       "$ref": "#/definitions/db_conn"
     },

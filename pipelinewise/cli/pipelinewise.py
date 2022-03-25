@@ -121,8 +121,9 @@ class PipelineWise:
 
         send_alert = self.tap.get('send_alert', True)
         if send_alert:
+            tap_slack_channel = self.tap.get('slack_alert_channel')
             stats = self.alert_sender.send_to_all_handlers(
-                message=message, level=level, exc=exc
+                message=message, level=level, exc=exc, tap_slack_channel=tap_slack_channel
             )
 
         return stats

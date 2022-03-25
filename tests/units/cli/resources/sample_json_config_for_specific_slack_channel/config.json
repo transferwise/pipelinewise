@@ -1,0 +1,27 @@
+{
+    "alert_handlers": {
+        "slack": {
+            "channel": "#test-channel",
+            "token": "foo"
+        }
+    },
+    "targets": [
+        {
+            "id": "target_one",
+            "name": "Target One",
+            "type": "target-s3-csv",
+            "status": "ready",
+            "taps": [
+                {
+                    "enabled": true,
+                    "id": "tap_one",
+                    "name": "Source Three",
+                    "owner": "somebody@transferwise.com",
+                    "type": "tap-mysql",
+                    "send_alert": true,
+                    "slack_alert_channel": "#test-channel-tap-one"
+                }
+            ]
+        }
+    ]
+}
