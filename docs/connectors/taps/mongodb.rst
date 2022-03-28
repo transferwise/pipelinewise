@@ -89,6 +89,7 @@ Example YAML for ``tap-mongodb``:
 	type: "tap-mongodb"
 	owner: "foo@bar.com"
 	#send_alert: False                     # Optional: Disable all configured alerts on this tap
+    #slack_alert_channel: "#tap-channel"   # Optional: Sending a copy of specific tap alerts to this slack channel
 
 
 	# ------------------------------------------------------------------------------
