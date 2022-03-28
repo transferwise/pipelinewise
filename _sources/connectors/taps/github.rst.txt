@@ -35,6 +35,7 @@ Example YAML for ``tap-github``:
     owner: "somebody@foo.com"              # Data owner to contact
     sync_period: "*/90 * * * *"            # Period in which the tap will run
     #send_alert: False                     # Optional: Disable all configured alerts on this tap
+    #slack_alert_channel: "#tap-channel"   # Optional: Sending a copy of specific tap alerts to this slack channel
 
 
     # ------------------------------------------------------------------------------

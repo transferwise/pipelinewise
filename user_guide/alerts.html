@@ -145,12 +145,19 @@ optional entry to any tap <a class="reference internal" href="yaml_config.html#y
 <p><code class="docutils literal notranslate"><span class="pre">channel</span></code>: Slack channel where the alerts will be sent</p>
 </li>
 </ol>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>---
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nn">---</span><span class="w"></span>
 
-alert_handlers:
-  slack:
-    token: <span class="s2">&quot;slack-token&quot;</span>
-    channel: <span class="s2">&quot;#slack-channel&quot;</span>
+<span class="nt">alert_handlers</span><span class="p">:</span><span class="w"></span>
+<span class="w">  </span><span class="nt">slack</span><span class="p">:</span><span class="w"></span>
+<span class="w">    </span><span class="nt">token</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;slack-token&quot;</span><span class="w"></span>
+<span class="w">    </span><span class="nt">channel</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;#slack-channel&quot;</span><span class="w"></span>
+</pre></div>
+</div>
+<p>To send a copy of alerts to the specific channel for a tap, beside the previous
+settings, you need to add below setting also in the tap config yaml file:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nn">---</span><span class="w"></span>
+
+<span class="nt">slack_alert_channel</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;#specific-channel-for-this-tap&quot;</span><span class="w"></span>
 </pre></div>
 </div>
 </section>

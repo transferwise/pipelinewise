@@ -30,6 +30,8 @@ Example YAML for ``tap-adwords``:
     type: "tap-adwords"                     # !! THIS SHOULD NOT CHANGE !!
     owner: "Foo"                            # Data owner to contact
     #send_alert: False                      # Optional: Disable all configured alerts on this tap
+    #slack_alert_channel: "#tap-channel"    # Optional: Sending a copy of specific tap alerts to this slack channel
+
 
     primary_key_required: False
     db_conn:
