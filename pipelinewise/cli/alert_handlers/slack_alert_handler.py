@@ -38,8 +38,9 @@ class SlackAlertHandler(BaseAlertHandler):
 
         self.client = WebClient(self.token)
 
+    # pylint: disable=arguments-differ
     def send(
-        self, message: str, level: str = BaseAlertHandler.ERROR, exc: Exception = None
+        self, message: str, level: str = BaseAlertHandler.ERROR, exc: Exception = None, tap_slack_channel: str = None
     ) -> None:
         """
         Send alert
@@ -48,19 +49,23 @@ class SlackAlertHandler(BaseAlertHandler):
             message: the alert message
             level: alert level
             exc: optional exception that triggered the alert
+            tap_slack_channel: optional specific tap slack channel
 
         Returns:
             Initialised alert handler object
         """
-        self.client.chat_postMessage(
-            channel=self.channel,
-            text=f'```{exc}```' if exc else None,
-            attachments=[
-                {
-                    'color': ALERT_LEVEL_SLACK_COLORS.get(
-                        level, BaseAlertHandler.ERROR
-                    ),
-                    'title': message,
-                }
-            ],
-        )
+        channels = [self.channel, tap_slack_channel] if tap_slack_channel else [self.channel]
+
+        for channel in channels:
+            self.client.chat_postMessage(
+                channel=channel,
+                text=f'```{exc}```' if exc else None,
+                attachments=[
+                    {
+                        'color': ALERT_LEVEL_SLACK_COLORS.get(
+                            level, BaseAlertHandler.ERROR
+                        ),
+                        'title': message,
+                    }
+                ],
+            )

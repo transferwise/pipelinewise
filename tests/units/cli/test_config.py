@@ -358,3 +358,64 @@ class TestConfig:
 
         # Delete the generated JSON config directory
         shutil.rmtree(json_config_dir)
+
+    def test_save_config_with_optional_slack_channel_for_alerts(self):
+        """Test config target and tap JSON save functionalities if there is a optional setting for slack channel"""
+
+        # Load a full configuration set from YAML files
+        yaml_config_dir = '{}/resources/test_yaml_config_with_slack_channel'.format(
+            os.path.dirname(__file__)
+        )
+        vault_secret = '{}/resources/vault-secret.txt'.format(os.path.dirname(__file__))
+
+        json_config_dir = './pipelinewise-test-config'
+        config = Config.from_yamls(json_config_dir, yaml_config_dir, vault_secret)
+
+        # Save the config as singer compatible JSON files
+        config.save()
+
+        # Check if every required JSON file created, both for target and tap
+        main_config_json = '{}/config.json'.format(json_config_dir)
+
+        # Check content of the generated JSON files
+        actual_config_json = cli.utils.load_json(main_config_json)
+
+        expected_taps_config = [
+            {
+                'id': 'mysql_sample_1',
+                'type': 'tap-mysql',
+                'name': 'Sample MySQL Database',
+                'owner': 'somebody@foo.com',
+                'stream_buffer_size': None,
+                'send_alert': True,
+                'enabled': True,
+                'slack_alert_channel': '#test-channel_1'
+            },
+            {
+                'id': 'mysql_sample_2',
+                'type': 'tap-mysql',
+                'name': 'Sample MySQL Database',
+                'owner': 'somebody@foo.com',
+                'stream_buffer_size': None,
+                'send_alert': True,
+                'enabled': True,
+                'slack_alert_channel': '#test-channel_2'
+            },
+            {
+                'id': 'mysql_sample_3',
+                'type': 'tap-mysql',
+                'name': 'Sample MySQL Database',
+                'owner': 'somebody@foo.com',
+                'stream_buffer_size': None,
+                'send_alert': True,
+                'enabled': True,
+            }
+        ]
+
+        assert len(actual_config_json['targets'][0]['taps']) == 3
+
+        for tap_config in expected_taps_config:
+            assert tap_config in actual_config_json['targets'][0]['taps']
+
+        # Delete the generated JSON config directory
+        shutil.rmtree(json_config_dir)
