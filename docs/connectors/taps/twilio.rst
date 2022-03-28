@@ -26,6 +26,7 @@ Example YAML for tap-twilio:
     type: "tap-twilio"                     # !! THIS SHOULD NOT CHANGE !!
     owner: "somebody@foo.com"              # Data owner to contact
     #send_alert: False                     # Optional: Disable all configured alerts on this tap
+    #slack_alert_channel: "#tap-channel"   # Optional: Sending a copy of specific tap alerts to this slack channel
 
 
     # ------------------------------------------------------------------------------
