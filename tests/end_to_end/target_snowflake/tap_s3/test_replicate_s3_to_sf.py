@@ -7,11 +7,9 @@ TARGET_ID = "snowflake"
 
 class TestReplicateS3ToSF(TapS3):
     def setUp(self):
-        super().setUp()
+        super().setUp(tap_id=TAP_ID, target_id=TARGET_ID)
 
     def tearDown(self):
-        self.drop_schema_if_exists(f"{TAP_ID}{self.e2e_env.sf_schema_postfix}")
-        self.remove_dir(f"{TARGET_ID}/{TAP_ID}")
         super().tearDown()
 
     def assert_columns_exist(self):
@@ -47,9 +45,13 @@ class TestReplicateS3ToSF(TapS3):
         """
 
         # 1. Run tap first time - both fastsync and a singer should be triggered
-        assertions.assert_run_tap_success(TAP_ID, TARGET_ID, ["fastsync", "singer"])
+        assertions.assert_run_tap_success(
+            self.tap_id, self.target_id, ["fastsync", "singer"]
+        )
         self.assert_columns_exist()
 
         # 2. Run tap second time - both fastsync and a singer should be triggered
-        assertions.assert_run_tap_success(TAP_ID, TARGET_ID, ["fastsync", "singer"])
+        assertions.assert_run_tap_success(
+            self.tap_id, self.target_id, ["fastsync", "singer"]
+        )
         self.assert_columns_exist()
