@@ -12,14 +12,26 @@ CONFIG_DIR = os.path.join(USER_HOME, ".pipelinewise")
 
 
 class TargetSnowflake(unittest.TestCase):
-    def setUp(self):
+    def setUp(self, tap_id: str, target_id: str, tap_type: str):
         super().setUp()
+
+        self.tap_id = tap_id
+        self.target_id = target_id
         self.e2e_env = self.get_e2e_env()
+
+        if self.e2e_env.env[tap_type]["is_configured"] is False:
+            self.skipTest(f"{tap_type} is not configured properly")
+
+        self.remove_dir_from_config_dir(f"{self.target_id}/{self.tap_id}")
+        self.drop_sf_schema_if_exists(f"{self.tap_id}{self.e2e_env.sf_schema_postfix}")
+
         self.check_snowflake_credentials_provided()
         self.check_validate_taps()
         self.check_import_config()
 
     def tearDown(self):
+        self.remove_dir_from_config_dir(f"{self.target_id}/{self.tap_id}")
+        self.drop_sf_schema_if_exists(f"{self.tap_id}{self.e2e_env.sf_schema_postfix}")
         super().tearDown()
 
     def get_e2e_env(self) -> E2EEnv:
@@ -44,10 +56,10 @@ class TargetSnowflake(unittest.TestCase):
         )
         assertions.assert_command_success(return_code, stdout, stderr)
 
-    def drop_schema_if_exists(self, schema: str):
+    def drop_sf_schema_if_exists(self, schema: str):
         self.e2e_env.run_query_target_snowflake(
             f"DROP SCHEMA IF EXISTS {schema} CASCADE"
         )
 
-    def remove_dir(self, dir_path: str):
+    def remove_dir_from_config_dir(self, dir_path: str):
         shutil.rmtree(os.path.join(CONFIG_DIR, dir_path), ignore_errors=True)
