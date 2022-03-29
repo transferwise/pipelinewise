@@ -4,6 +4,10 @@ import tempfile
 from tests.end_to_end.helpers import assertions
 from tests.end_to_end.target_snowflake.tap_postgres import TapPostgres
 
+TAP_ID = "postgres_to_sf_archive_load_files"
+TARGET_ID = "snowflake"
+ARCHIVE_S3_PREFIX = "archive_folder"
+
 
 class TestReplicatePGToSFWithArchiveLoadFiles(TapPostgres):
     """
@@ -11,23 +15,17 @@ class TestReplicatePGToSFWithArchiveLoadFiles(TapPostgres):
     """
 
     def setUp(self):
-        self.TAP_ID = "postgres_to_sf_archive_load_files"
-        self.TARGET_ID = "snowflake"
-        self.ARCHIVE_S3_PREFIX = "archive_folder"
-        super().setUp()
-        self.drop_schema_if_exists(f"{self.TAP_ID}{self.e2e_env.sf_schema_postfix}")
+        super().setUp(tap_id=TAP_ID, target_id=TARGET_ID)
         self.s3_bucket = self.e2e_env._get_conn_env_var("TARGET_SNOWFLAKE", "S3_BUCKET")
         self.s3_client = self.e2e_env.get_aws_session().client("s3")
 
     def tearDown(self):
-        self.drop_schema_if_exists(f"{self.TAP_ID}{self.e2e_env.sf_schema_postfix}")
-        self.remove_dir_from_config_dir(f"{self.TARGET_ID}/{self.TAP_ID}")
         super().tearDown()
 
     def delete_dangling_files_from_archive(self):
         files_in_s3_archive = self.s3_client.list_objects(
             Bucket=self.s3_bucket,
-            Prefix=f"{self.ARCHIVE_S3_PREFIX}/postgres_to_sf_archive_load_files/",
+            Prefix=f"{ARCHIVE_S3_PREFIX}/postgres_to_sf_archive_load_files/",
         ).get("Contents", [])
         for file_in_archive in files_in_s3_archive:
             self.s3_client.delete_object(
@@ -37,9 +35,7 @@ class TestReplicatePGToSFWithArchiveLoadFiles(TapPostgres):
     def get_files_from_s3_for_table(self, table: str):
         return self.s3_client.list_objects(
             Bucket=self.s3_bucket,
-            Prefix=(
-                f"{self.ARCHIVE_S3_PREFIX}/postgres_to_sf_archive_load_files/{table}"
-            ),
+            Prefix=(f"{ARCHIVE_S3_PREFIX}/postgres_to_sf_archive_load_files/{table}"),
         ).get("Contents")
 
     def test_replicate_pg_to_sf_with_archive_load_files(self):
@@ -47,7 +43,7 @@ class TestReplicatePGToSFWithArchiveLoadFiles(TapPostgres):
         self.delete_dangling_files_from_archive()
 
         assertions.assert_run_tap_success(
-            self.TAP_ID, self.TARGET_ID, ["fastsync", "singer"]
+            self.tap_id, self.target_id, ["fastsync", "singer"]
         )
 
         expected_archive_files_count = {

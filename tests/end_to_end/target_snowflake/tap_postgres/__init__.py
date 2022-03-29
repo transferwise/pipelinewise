@@ -2,10 +2,9 @@ from tests.end_to_end.target_snowflake import TargetSnowflake
 
 
 class TapPostgres(TargetSnowflake):
-    def setUp(self):
-        super().setUp()
-        if self.e2e_env.env["TAP_POSTGRES"]["is_configured"] is False:
-            self.skipTest("TAP POSTGRES credentials are not configured")
+    def setUp(self, tap_id: str, target_id: str):
+        super().setUp(tap_id=tap_id, target_id=target_id, tap_type="TAP_POSTGRES")
+        self.e2e_env.setup_tap_postgres()
 
     def tearDown(self):
         super().tearDown()

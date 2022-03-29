@@ -4,6 +4,9 @@ from pipelinewise.fastsync import postgres_to_snowflake
 from tests.end_to_end.helpers import assertions
 from tests.end_to_end.target_snowflake.tap_postgres import TapPostgres
 
+TAP_ID = "postgres_to_sf"
+TARGET_ID = "snowflake"
+
 
 class TestReplicatePGToSF(TapPostgres):
     """
@@ -11,19 +14,14 @@ class TestReplicatePGToSF(TapPostgres):
     """
 
     def setUp(self):
-        self.TAP_ID = "postgres_to_sf"
-        self.TARGET_ID = "snowflake"
-        super().setUp()
-        self.drop_schema_if_exists(f"{self.TAP_ID}{self.e2e_env.sf_schema_postfix}")
+        super().setUp(tap_id=TAP_ID, target_id=TARGET_ID)
 
     def tearDown(self):
-        self.drop_schema_if_exists(f"{self.TAP_ID}{self.e2e_env.sf_schema_postfix}")
-        self.remove_dir_from_config_dir(f"{self.TARGET_ID}/{self.TAP_ID}")
         super().tearDown()
 
     def test_replicate_pg_to_sf(self):
         assertions.assert_run_tap_success(
-            self.TAP_ID, self.TARGET_ID, ["fastsync", "singer"]
+            self.tap_id, self.target_id, ["fastsync", "singer"]
         )
 
         assertions.assert_row_counts_equal(
@@ -96,7 +94,7 @@ class TestReplicatePGToSF(TapPostgres):
 
         # 3. Run tap second time - both fastsync and a singer should be triggered, there are some FULL_TABLE
         assertions.assert_run_tap_success(
-            self.TAP_ID, self.TARGET_ID, ["fastsync", "singer"], profiling=True
+            self.tap_id, self.target_id, ["fastsync", "singer"], profiling=True
         )
 
         assertions.assert_row_counts_equal(
