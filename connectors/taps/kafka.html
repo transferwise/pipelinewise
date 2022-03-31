@@ -140,6 +140,7 @@
 <li><p><code class="docutils literal notranslate"><span class="pre">MESSAGE_OFFSET</span></code>: Offset extracted from the kafka metadata</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">MESSAGE_PARTITION</span></code>: Partition extracted from the kafka metadata</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">MESSAGE</span></code>: The original and full kafka message</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">MESSAGE_KEY</span></code>: (Optional) Key extracted from the Kafka message.</p></li>
 <li><p><cite>Dynamic primary key columns</cite>: (Optional) Fields extracted from the Kafka JSON messages by JSONPath selector(s).</p></li>
 </ul>
 <p>Supported message formats: JSON and Protobuf (experimental).</p>
@@ -170,7 +171,6 @@ following the steps in the <a class="reference internal" href="../../installatio
 <span class="w">  </span><span class="nt">bootstrap_servers</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;kafka1.foo.com:9092,kafka2.foo.com:9092,kafka3.foo.com:9092&quot;</span><span class="w"></span>
 <span class="w">  </span><span class="nt">topic</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;myKafkaTopic&quot;</span><span class="w"></span>
 
-
 <span class="w">  </span><span class="c1"># --------------------------------------------------------------------------</span><span class="w"></span>
 <span class="w">  </span><span class="c1"># Optionally you can define primary key(s) from the kafka JSON messages.</span><span class="w"></span>
 <span class="w">  </span><span class="c1"># If primary keys defined then extra column(s) will be added to the output</span><span class="w"></span>
@@ -178,6 +178,14 @@ following the steps in the <a class="reference internal" href="../../installatio
 <span class="w">  </span><span class="c1"># --------------------------------------------------------------------------</span><span class="w"></span>
 <span class="w">  </span><span class="nt">primary_keys</span><span class="p">:</span><span class="w"></span>
 <span class="w">     </span><span class="nt">transfer_id</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/transferMetadata/transferId&quot;</span><span class="w"></span>
+
+<span class="w">  </span><span class="c1"># --------------------------------------------------------------------------</span><span class="w"></span>
+<span class="w">  </span><span class="c1"># Additionally you can specify whether to use Kafka message key as a primary key.</span><span class="w"></span>
+<span class="w">  </span><span class="c1"># If custom primary keys were specified earlier, message key property is ignored</span><span class="w"></span>
+<span class="w">  </span><span class="c1"># and custom PKs are used instead.</span><span class="w"></span>
+<span class="w">  </span><span class="c1"># ! Message key should be a valid utf-8 encoded string.</span><span class="w"></span>
+<span class="w">  </span><span class="c1"># --------------------------------------------------------------------------</span><span class="w"></span>
+<span class="w">  </span><span class="nt">use_message_key</span><span class="p">:</span><span class="w">                          </span><span class="c1"># (Default: true)</span><span class="w"></span>
 
 <span class="w">  </span><span class="c1">#initial_start_time:                      # (Default: latest) Start time reference of the message consumption if</span><span class="w"></span>
 <span class="w">                                            </span><span class="c1"># no bookmarked position in state.json. One of: latest, earliest or an</span><span class="w"></span>
