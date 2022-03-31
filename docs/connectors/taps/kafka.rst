@@ -10,6 +10,7 @@ Messages from kafka topics are extracted into the following fields:
 * ``MESSAGE_OFFSET``: Offset extracted from the kafka metadata
 * ``MESSAGE_PARTITION``: Partition extracted from the kafka metadata
 * ``MESSAGE``: The original and full kafka message
+* ``MESSAGE_KEY``: (Optional) Key extracted from the Kafka message.
 * `Dynamic primary key columns`: (Optional) Fields extracted from the Kafka JSON messages by JSONPath selector(s).
 
 Supported message formats: JSON and Protobuf (experimental).
@@ -36,6 +37,7 @@ Example YAML for ``tap-kafka``:
     type: "tap-kafka"                      # !! THIS SHOULD NOT CHANGE !!
     owner: "somebody@foo.com"              # Data owner to contact
     #send_alert: False                     # Optional: Disable all configured alerts on this tap
+    #slack_alert_channel: "#tap-channel"   # Optional: Sending a copy of specific tap alerts to this slack channel
 
 
     # ------------------------------------------------------------------------------
@@ -46,7 +48,6 @@ Example YAML for ``tap-kafka``:
       bootstrap_servers: "kafka1.foo.com:9092,kafka2.foo.com:9092,kafka3.foo.com:9092"
       topic: "myKafkaTopic"
 
-
       # --------------------------------------------------------------------------
       # Optionally you can define primary key(s) from the kafka JSON messages.
       # If primary keys defined then extra column(s) will be added to the output
@@ -54,6 +55,14 @@ Example YAML for ``tap-kafka``:
       # --------------------------------------------------------------------------
       primary_keys:
          transfer_id: "/transferMetadata/transferId"
+      
+      # --------------------------------------------------------------------------
+      # Additionally you can specify whether to use Kafka message key as a primary key.
+      # If custom primary keys were specified earlier, message key property is ignored
+      # and custom PKs are used instead.
+      # ! Message key should be a valid utf-8 encoded string.
+      # --------------------------------------------------------------------------      
+      use_message_key:                          # (Default: true)  
 
       #initial_start_time:                      # (Default: latest) Start time reference of the message consumption if
                                                 # no bookmarked position in state.json. One of: latest, earliest or an
@@ -75,9 +84,9 @@ Example YAML for ``tap-kafka``:
       # --------------------------------------------------------------------------
       #message_format: protobuf                 # (Default: json) Supported message formats are json and protobuf.
       #proto_schema: |                          # Protobuf message format in .proto syntax. Required if the message_format is protobuf.
-      #     syntax = "proto3";
+      #     syntax = "proto3";                  
       #
-      #     message ProtoMessage {
+      #     message ProtoMessage {          
       #       string query = 1;
       #       int32 page_number = 2;
       #       int32 result_per_page = 3;

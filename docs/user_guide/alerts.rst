@@ -43,7 +43,7 @@ To send alerts to a Slack channel on failed tap runs:
 
    ``channel``: Slack channel where the alerts will be sent
 
-.. code-block:: bash
+.. code-block:: yaml
 
     ---
 
@@ -51,6 +51,16 @@ To send alerts to a Slack channel on failed tap runs:
       slack:
         token: "slack-token"
         channel: "#slack-channel"
+
+
+To send a copy of alerts to the specific channel for a tap, beside the previous
+settings, you need to add below setting also in the tap config yaml file:
+
+.. code-block:: yaml
+
+    ---
+
+    slack_alert_channel: "#specific-channel-for-this-tap"
 
 
 
