@@ -1,8 +1,8 @@
 from tests.end_to_end.helpers import assertions
 from tests.end_to_end.target_snowflake.tap_s3 import TapS3
 
-TAP_ID = "s3_csv_to_sf"
-TARGET_ID = "snowflake"
+TAP_ID = 's3_csv_to_sf'
+TARGET_ID = 'snowflake'
 
 
 class TestReplicateS3ToSF(TapS3):
@@ -21,25 +21,25 @@ class TestReplicateS3ToSF(TapS3):
 
         assertions.assert_cols_in_table(
             self.e2e_env.run_query_target_snowflake,
-            "ppw_e2e_tap_s3_csv",
-            "countries",
-            ["CITY", "COUNTRY", "CURRENCY", "ID", "LANGUAGE"],
+            'ppw_e2e_tap_s3_csv',
+            'countries',
+            ['CITY', 'COUNTRY', 'CURRENCY', 'ID', 'LANGUAGE'],
             schema_postfix=self.e2e_env.sf_schema_postfix,
         )
         assertions.assert_cols_in_table(
             self.e2e_env.run_query_target_snowflake,
-            "ppw_e2e_tap_s3_csv",
-            "people",
+            'ppw_e2e_tap_s3_csv',
+            'people',
             [
-                "BIRTH_DATE",
-                "EMAIL",
-                "FIRST_NAME",
-                "GENDER",
-                "GROUP",
-                "ID",
-                "IP_ADDRESS",
-                "IS_PENSIONEER",
-                "LAST_NAME",
+                'BIRTH_DATE',
+                'EMAIL',
+                'FIRST_NAME',
+                'GENDER',
+                'GROUP',
+                'ID',
+                'IP_ADDRESS',
+                'IS_PENSIONEER',
+                'LAST_NAME',
             ],
             schema_postfix=self.e2e_env.sf_schema_postfix,
         )
@@ -51,12 +51,12 @@ class TestReplicateS3ToSF(TapS3):
 
         # 1. Run tap first time - both fastsync and a singer should be triggered
         assertions.assert_run_tap_success(
-            self.tap_id, self.target_id, ["fastsync", "singer"]
+            self.tap_id, self.target_id, ['fastsync', 'singer']
         )
         self.assert_columns_exist()
 
         # 2. Run tap second time - both fastsync and a singer should be triggered
         assertions.assert_run_tap_success(
-            self.tap_id, self.target_id, ["fastsync", "singer"]
+            self.tap_id, self.target_id, ['fastsync', 'singer']
         )
         self.assert_columns_exist()
