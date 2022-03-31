@@ -2,8 +2,8 @@ from pipelinewise.fastsync import mysql_to_snowflake
 from tests.end_to_end.helpers import assertions
 from tests.end_to_end.target_snowflake.tap_mariadb import TapMariaDB
 
-TAP_ID = 'mariadb_to_sf'
-TARGET_ID = 'snowflake'
+TAP_ID = "mariadb_to_sf"
+TARGET_ID = "snowflake"
 
 
 class TestResyncMariaDBToSF(TapMariaDB):
@@ -11,13 +11,15 @@ class TestResyncMariaDBToSF(TapMariaDB):
     Resync tables from MariaDB to Snowflake
     """
 
+    # pylint: disable=arguments-differ
     def setUp(self):
         super().setUp(tap_id=TAP_ID, target_id=TARGET_ID)
 
-    def tearDown(self):
-        super().tearDown()
-
     def test_resync_mariadb_to_sf(self):
+        """
+        Resync tables from MariaDB to Snowflake
+        """
+
         assertions.assert_resync_tables_success(
             self.tap_id,
             self.target_id,
