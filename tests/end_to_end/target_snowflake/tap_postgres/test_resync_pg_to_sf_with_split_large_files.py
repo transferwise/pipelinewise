@@ -2,8 +2,8 @@ from pipelinewise.fastsync import postgres_to_snowflake
 from tests.end_to_end.helpers import assertions
 from tests.end_to_end.target_snowflake.tap_postgres import TapPostgres
 
-TAP_ID = "postgres_to_sf_split_large_files"
-TARGET_ID = "snowflake"
+TAP_ID = 'postgres_to_sf_split_large_files'
+TARGET_ID = 'snowflake'
 
 
 class TestResyncPGToSFWithSplitLargeFiles(TapPostgres):
