@@ -1,0 +1,40 @@
+--- tap_postgres_orig/__init__.py	2022-04-03 13:39:47.000000000 +0200
++++ tap_postgres/__init__.py	2022-04-03 13:50:52.000000000 +0200
+@@ -417,6 +414,8 @@
+     if args.discover:
+         do_discovery(conn_config)
+     elif args.properties or args.catalog:
++        do_discover_privacy_properties(conn_config)
++
+         state = args.state
+         state_file = args.state_file
+         do_sync(conn_config, args.catalog.to_dict() if args.catalog else args.properties,
+@@ -424,6 +423,28 @@
+     else:
+         LOGGER.info("No properties were selected")
+ 
++def do_discover_privacy_properties(conn_config):
++    with post_db.open_connection(conn_config) as conn:
++        discover_privacy_properties(conn)
++
++def discover_privacy_properties(conn):
++    global privacy_properties
++    privacy_properties = {}
++    with conn.cursor(cursor_factory=psycopg2.extras.DictCursor, name='stitch_cursor') as cur:
++        sql = """
++select schema_name, table_name, column_name, privacy_properties -> 'turing_strategy' -> 'python'  from privacy_properties
++"""
++        cur.execute(sql)
++
++        # Define recursive dictionary
++        from collections import defaultdict
++        tree = lambda: defaultdict(tree)
++        pp = tree()
++        for row in cur.fetchall():
++            schema_name, table_name, column_name, python_snippet= row
++            python_snippet = python_snippet.replace("$column_name$", column_name)
++            pp[schema_name][table_name][column_name] = python_snippet
++    privacy_properties = pp
+ 
+ def main():
+     """
