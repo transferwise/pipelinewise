@@ -35,6 +35,9 @@
           "type": "integer",
           "minimum": 1,
           "maximum": 1000
+        },
+        "use_message_key": {
+          "type": "boolean"
         }
       }
     },
