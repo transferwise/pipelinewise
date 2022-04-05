@@ -9,7 +9,7 @@
          state = args.state
          state_file = args.state_file
          do_sync(conn_config, args.catalog.to_dict() if args.catalog else args.properties,
-@@ -424,6 +423,28 @@
+@@ -424,6 +423,32 @@
      else:
          LOGGER.info("No properties were selected")
  
@@ -22,19 +22,23 @@
 +    privacy_properties = {}
 +    with conn.cursor(cursor_factory=psycopg2.extras.DictCursor, name='stitch_cursor') as cur:
 +        sql = """
-+select schema_name, table_name, column_name, privacy_properties -> 'turing_strategy' -> 'python'  from privacy_properties
++select schema_name, table_name, column_name, privacy_properties -> 'turing_strategy' -> 'python' from privacy_properties
 +"""
-+        cur.execute(sql)
++        try:
++            cur.execute(sql)
 +
-+        # Define recursive dictionary
-+        from collections import defaultdict
-+        tree = lambda: defaultdict(tree)
-+        pp = tree()
-+        for row in cur.fetchall():
-+            schema_name, table_name, column_name, python_snippet= row
-+            python_snippet = python_snippet.replace("$column_name$", column_name)
-+            pp[schema_name][table_name][column_name] = python_snippet
-+    privacy_properties = pp
++            # Define recursive dictionary
++            from collections import defaultdict
++            tree = lambda: defaultdict(tree)
++            pp = tree()
++            for row in cur.fetchall():
++                schema_name, table_name, column_name, python_snippet= row
++                python_snippet = python_snippet.replace("$column_name$", column_name)
++                pp[schema_name][table_name][column_name] = python_snippet
++            privacy_properties = pp
++            LOGGER.info("Privacy properties table found in this tap")
++        except psycopg2.errors.UndefinedTable:
++            LOGGER.info("No privacy properties table found in this tap")
  
  def main():
      """
