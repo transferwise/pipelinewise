@@ -1,6 +1,6 @@
 --- singer_orig/messages.py	2022-04-03 13:44:36.000000000 +0200
 +++ singer/messages.py	2022-04-03 14:10:12.000000000 +0200
-@@ -299,6 +300,20 @@
+@@ -299,6 +300,21 @@
  
  
  def write_message(message):
@@ -11,7 +11,8 @@
 +        if table_properties is not None:
 +            record = message.record
 +            for column in record:
-+                if python_code := table_properties.get(column):
++                python_code = table_properties.get(column)
++                if python_code:
 +                    result = {}
 +                    value = record[column]
 +                    exec(python_code)
