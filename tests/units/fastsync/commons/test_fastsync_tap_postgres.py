@@ -18,11 +18,6 @@ class TestFastSyncTapPostgres(TestCase):
         self.postgres.executed_queries_primary_host = []
         self.postgres.executed_queries = []
 
-        def primary_host_query_mock(query, _=None):
-            self.postgres.executed_queries_primary_host.append(query)
-
-        self.postgres.primary_host_query = primary_host_query_mock
-
     def test_generate_repl_slot_name(self):
         """Validate if the replication slot name generated correctly"""
         # Provide only database name
@@ -67,17 +62,20 @@ class TestFastSyncTapPostgres(TestCase):
         Validate if replication slot creation SQL commands generated correctly in case no v15 slots exists
         """
 
-        def execute_mock(query):
+        def execute_mock(query, _=None):
             print('Mocked execute called')
             self.postgres.executed_queries_primary_host.append(query)
 
         # mock cursor with execute method
         cursor_mock = MagicMock().return_value
         cursor_mock.__enter__.return_value.execute.side_effect = execute_mock
-        type(cursor_mock.__enter__.return_value).rowcount = PropertyMock(return_value=0)
+        # First query -> 0 rows, second query -> 1 row
+        type(cursor_mock.__enter__.return_value).rowcount = PropertyMock(side_effect=[0, 1])
+        cursor_mock.__enter__.return_value.fetchall.return_value = [{'lsn': '24368/44107178'}]
 
         # mock PG connection instance with ability to open cursor
-        pg_con = Mock()
+        pg_con = MagicMock()
+        pg_con.__enter__.return_value = pg_con
         pg_con.cursor.return_value = cursor_mock
 
         self.postgres.primary_host_conn = pg_con
@@ -93,17 +91,20 @@ class TestFastSyncTapPostgres(TestCase):
         Validate if replication slot creation SQL commands generated correctly in case a v15 slots exists
         """
 
-        def execute_mock(query):
+        def execute_mock(query, _=None):
             print('Mocked execute called')
             self.postgres.executed_queries_primary_host.append(query)
 
         # mock cursor with execute method
         cursor_mock = MagicMock().return_value
         cursor_mock.__enter__.return_value.execute.side_effect = execute_mock
-        type(cursor_mock.__enter__.return_value).rowcount = PropertyMock(return_value=1)
+        # First query -> 1 row, second query -> 1 row
+        type(cursor_mock.__enter__.return_value).rowcount = PropertyMock(side_effect=[1, 1])
+        cursor_mock.__enter__.return_value.fetchall.return_value = [{'lsn': '24368/44107178'}]
 
         # mock PG connection instance with ability to open cursor
-        pg_con = Mock()
+        pg_con = MagicMock()
+        pg_con.__enter__.return_value = pg_con
         pg_con.cursor.return_value = cursor_mock
 
         self.postgres.primary_host_conn = pg_con
