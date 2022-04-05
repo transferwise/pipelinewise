@@ -15,6 +15,12 @@ from ...utils import safe_column_name
 LOGGER = logging.getLogger(__name__)
 
 
+def parse_lsn(lsn: str) -> int:
+    """Parse string LSN format to integer"""
+    file, index = lsn.split('/')
+    return (int(file, 16) << 32) + int(index, 16)
+
+
 class FastSyncTapPostgres:
     """
     Common functions for fastsync from a Postgres database
@@ -317,9 +323,7 @@ class FastSyncTapPostgres:
                     'Logical replication not supported before PostgreSQL 9.4'
                 )
 
-        current_lsn = result[0].get('current_lsn')
-        file, index = current_lsn.split('/')
-        lsn = (int(file, 16) << 32) + int(index, 16)
+        lsn = parse_lsn(result[0].get('current_lsn'))
 
         return {'lsn': lsn, 'version': 1}
 
