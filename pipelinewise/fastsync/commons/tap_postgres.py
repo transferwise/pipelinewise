@@ -4,6 +4,7 @@ import logging
 import re
 import sys
 import psycopg2
+import psycopg2.errors
 import psycopg2.extras
 
 from typing import Dict
@@ -221,7 +222,7 @@ class FastSyncTapPostgres:
                 return []
 
     # pylint: disable=no-member
-    def create_replication_slot(self):
+    def create_replication_slot(self) -> int:
         """
         Create replication slot on the primary host
 
@@ -236,24 +237,21 @@ class FastSyncTapPostgres:
         format you won't be able to do LOG_BASED replication from the same postgres
         database by multiple taps. If that the case then you need to drop the old
         replication slot and full-resync the new taps.
-        """
-        try:
-            slot_name = self.__get_slot_name(
-                self.primary_host_conn,
-                self.connection_config['dbname'],
-                self.connection_config['tap_id'],
-            )
 
-            # Create the replication host
+        Returns the LSN at which the replication slot is consistent.
+        """
+        slot_name = self.__get_slot_name(
+            self.primary_host_conn,
+            self.connection_config['dbname'],
+            self.connection_config['tap_id'],
+        )
+
+        # Create the replication host
+        return parse_lsn(
             self.primary_host_query(
                 f"SELECT * FROM pg_create_logical_replication_slot('{slot_name}', 'wal2json')"
-            )
-        except Exception as exc:
-            # ERROR: replication slot already exists SQL state: 42710
-            if hasattr(exc, 'pgcode') and exc.pgcode == '42710':
-                pass
-            else:
-                raise exc
+            )[0]['lsn']
+        )
 
     # pylint: disable=too-many-branches,no-member,chained-comparison
     def fetch_current_log_pos(self):
@@ -287,8 +285,12 @@ class FastSyncTapPostgres:
         if version < 90400:
             raise Exception('Logical replication not supported before PostgreSQL 9.4')
 
-        # Create replication slot
-        self.create_replication_slot()
+        try:
+            # Create replication slot.
+            self.create_replication_slot()
+        except psycopg2.errors.DuplicateObject:
+            # Replication slot exists already so continue.
+            pass
 
         # Close replication slot dedicated connection
         self.primary_host_conn.close()
