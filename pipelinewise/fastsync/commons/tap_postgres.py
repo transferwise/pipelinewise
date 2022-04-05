@@ -529,8 +529,9 @@ class FastSyncTapPostgres:
             split_file_chunk_size_mb: File chunk sizes if `split_large_files` enabled. (Default: 1000)
             split_file_max_chunks: Max number of chunks if `split_large_files` enabled. (Default: 20)
         """
-        table_columns = self.get_table_columns(table_name, max_num, date_type)
-        column_safe_sql_values = [c.get('safe_sql_value') for c in table_columns]
+        column_safe_sql_values = [
+            c.get('safe_sql_value') for c in self.get_table_columns(table_name, max_num, date_type)
+        ]
 
         # If self.get_table_columns returns zero row then table not exist
         if len(column_safe_sql_values) == 0:
