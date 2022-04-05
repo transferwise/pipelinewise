@@ -4,6 +4,7 @@ import logging
 import re
 import sys
 import textwrap
+import time
 import psycopg2
 import psycopg2.errors
 import psycopg2.extras
@@ -342,18 +343,33 @@ class FastSyncTapPostgres:
             raise Exception('Logical replication not supported before PostgreSQL 9.4')
 
         try:
-            # Create replication slot.
-            self.create_replication_slot()
+            # Create replication slot and obtain the oldest LSN
+            # that it can deliver.
+            oldest_lsn = self.create_replication_slot()
         except psycopg2.errors.DuplicateObject:
-            # Replication slot exists already so continue.
-            pass
+            # Replication slot exists already so just get the
+            # oldest LSN which the slot can deliver.
+            oldest_lsn = self.get_confirmed_flush_lsn()
 
         # Close replication slot dedicated connection
         self.primary_host_conn.close()
 
-        lsn = self.get_current_lsn()
+        current_lsn = self.get_current_lsn()
 
-        return {'lsn': lsn, 'version': 1}
+        if self.connection_config.get('replica_host'):
+            # Ensure that the newest LSN availiable on the replica is newer than
+            # the oldest LSN which is deliverable by the replication slot.
+            time_waited = 0  # seconds
+            wait_period = 1  # seconds
+            max_time_waited = 60  # seconds
+            while oldest_lsn > current_lsn:
+                time.sleep(wait_period)
+                time_waited += wait_period
+                if time_waited > max_time_waited:
+                    raise RuntimeError('Replica database is lagging too far behind Primary.')
+                current_lsn = self.get_current_lsn()
+
+        return {'lsn': current_lsn, 'version': 1}
 
     # pylint: disable=invalid-name
     def fetch_current_incremental_key_pos(self, table, replication_key):
