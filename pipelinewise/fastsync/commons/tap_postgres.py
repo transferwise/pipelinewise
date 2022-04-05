@@ -3,6 +3,7 @@ import decimal
 import logging
 import re
 import sys
+import textwrap
 import psycopg2
 import psycopg2.errors
 import psycopg2.extras
@@ -286,6 +287,33 @@ class FastSyncTapPostgres:
                     'Logical replication not supported before PostgreSQL 9.4'
                 )
         return parse_lsn(result[0]['current_lsn'])
+
+    def get_confirmed_flush_lsn(self) -> int:
+        """
+        Get the last flushed LSN for the replication slot.
+
+        For Postgres <9.6 this defaults to the restart_lsn as confirmed_flush_lsn
+        is not availiable.
+        """
+        slot_name = self.__get_slot_name(
+            self.primary_host_conn,
+            self.connection_config['dbname'],
+            self.connection_config['tap_id'],
+        )
+
+        res = self.primary_host_query(
+            textwrap.dedent(
+                f"""SELECT *
+                    FROM pg_replication_slots
+                    WHERE slot_name = '{slot_name}'
+                    AND plugin = 'wal2json'
+                    AND slot_type = 'logical'"""
+            )
+        )[0]
+
+        # confirmed_flush_lsn was introduced in Postgres 9.6 so fallback to
+        # restart_lsn if needed.
+        return parse_lsn(res.get('confirmed_flush_lsn', res['restart_lsn']))
 
     # pylint: disable=too-many-branches,no-member,chained-comparison
     def fetch_current_log_pos(self):
