@@ -29,6 +29,7 @@ class FastSyncTapPostgres:
         self.curr = None
         self.primary_host_conn = None
         self.primary_host_curr = None
+        self.version = None
 
     @staticmethod
     def generate_replication_slot_name(dbname, tap_id=None, prefix='pipelinewise'):
@@ -253,6 +254,33 @@ class FastSyncTapPostgres:
             )[0]['lsn']
         )
 
+    def get_current_lsn(self) -> int:
+        """Obtain the most recent LSN availiable."""
+        # is replica_host set ?
+        if self.connection_config.get('replica_host'):
+            # Get latest applied lsn from replica_host
+            if self.version >= 100000:
+                result = self.query('SELECT pg_last_wal_replay_lsn() AS current_lsn')
+            elif self.version >= 90400:
+                result = self.query(
+                    'SELECT pg_last_xlog_replay_location() AS current_lsn'
+                )
+            else:
+                raise Exception(
+                    'Logical replication not supported before PostgreSQL 9.4'
+                )
+        else:
+            # Get current lsn from primary host
+            if self.version >= 100000:
+                result = self.query('SELECT pg_current_wal_lsn() AS current_lsn')
+            elif self.version >= 90400:
+                result = self.query('SELECT pg_current_xlog_location() AS current_lsn')
+            else:
+                raise Exception(
+                    'Logical replication not supported before PostgreSQL 9.4'
+                )
+        return parse_lsn(result[0]['current_lsn'])
+
     # pylint: disable=too-many-branches,no-member,chained-comparison
     def fetch_current_log_pos(self):
         """
@@ -269,20 +297,20 @@ class FastSyncTapPostgres:
         result = self.primary_host_query(
             "SELECT setting::int AS version FROM pg_settings WHERE name='server_version_num'"
         )
-        version = result[0].get('version')
+        self.version = result[0].get('version')
 
         # Do not allow minor versions with PostgreSQL BUG #15114
-        if (version >= 110000) and (version < 110002):
+        if (self.version >= 110000) and (self.version < 110002):
             raise Exception('PostgreSQL upgrade required to minor version 11.2')
-        if (version >= 100000) and (version < 100007):
+        if (self.version >= 100000) and (self.version < 100007):
             raise Exception('PostgreSQL upgrade required to minor version 10.7')
-        if (version >= 90600) and (version < 90612):
+        if (self.version >= 90600) and (self.version < 90612):
             raise Exception('PostgreSQL upgrade required to minor version 9.6.12')
-        if (version >= 90500) and (version < 90516):
+        if (self.version >= 90500) and (self.version < 90516):
             raise Exception('PostgreSQL upgrade required to minor version 9.5.16')
-        if (version >= 90400) and (version < 90421):
+        if (self.version >= 90400) and (self.version < 90421):
             raise Exception('PostgreSQL upgrade required to minor version 9.4.21')
-        if version < 90400:
+        if self.version < 90400:
             raise Exception('Logical replication not supported before PostgreSQL 9.4')
 
         try:
@@ -295,33 +323,7 @@ class FastSyncTapPostgres:
         # Close replication slot dedicated connection
         self.primary_host_conn.close()
 
-        # is replica_host set ?
-        if self.connection_config.get('replica_host'):
-            # Get latest applied lsn from replica_host
-            if version >= 100000:
-                result = self.query('SELECT pg_last_wal_replay_lsn() AS current_lsn')
-            elif version >= 90400:
-                result = self.query(
-                    'SELECT pg_last_xlog_replay_location() AS current_lsn'
-                )
-            else:
-                raise Exception(
-                    'Logical replication not supported before PostgreSQL 9.4'
-                )
-        else:
-            # Get current lsn from primary host
-            if version >= 100000:
-                result = self.query('SELECT pg_current_wal_lsn() AS current_lsn')
-            elif version >= 90400:
-                result = self.query('SELECT pg_current_xlog_location() AS current_lsn')
-            else:
-                raise Exception(
-                    'Logical replication not supported before PostgreSQL 9.4'
-                )
-
-        current_lsn = result[0].get('current_lsn')
-        file, index = current_lsn.split('/')
-        lsn = (int(file, 16) << 32) + int(index, 16)
+        lsn = self.get_current_lsn()
 
         return {'lsn': lsn, 'version': 1}
 
