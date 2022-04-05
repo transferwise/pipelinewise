@@ -34,9 +34,7 @@ class FastSyncTapPostgres:
         self.tap_type_to_target_type = tap_type_to_target_type
         self.target_quote = target_quote
         self.conn = None
-        self.curr = None
         self.primary_host_conn = None
-        self.primary_host_curr = None
         self.version = None
 
     @staticmethod
@@ -194,7 +192,6 @@ class FastSyncTapPostgres:
         self.conn = self.get_connection(
             self.connection_config, prioritize_primary=False
         )
-        self.curr = self.conn.cursor()
 
     def close_connection(self):
         """
@@ -326,7 +323,6 @@ class FastSyncTapPostgres:
         self.primary_host_conn = self.get_connection(
             self.connection_config, prioritize_primary=True
         )
-        self.primary_host_curr = self.primary_host_conn.cursor()
 
         # Make sure PostgreSQL version is 9.4 or higher
         result = self.primary_host_query(
@@ -562,4 +558,5 @@ class FastSyncTapPostgres:
         )
 
         with gzip_splitter as split_gzip_files:
-            self.curr.copy_expert(sql, split_gzip_files, size=131072)
+            with self.conn.cursor() as cur:
+                cur.copy_expert(sql, split_gzip_files, size=131072)
