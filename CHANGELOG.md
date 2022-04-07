@@ -1,3 +1,19 @@
+0.43.0 (2022-04-07)
+-------------------
+
+*Breaking changes*
+- Bump `tap-kafka` to `7.0.0`
+- Drop not null constraints on Snowflake tables PK columns.  
+
+*Added*
+- Send failure alerts to slack channel defined in tap, `slack_alert_channel`
+- Backup state file before tap starting
+
+*Fixes*
+- Patch tap-mysql to `1.5.1`
+- Don't use log files to check tap status before starting it. 
+- Change to e2e tests structure
+
 0.42.1 (2022-03-17)
 -------------------
 - Bump `tap-kafka` to `6.0.0`

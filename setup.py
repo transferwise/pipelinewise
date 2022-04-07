@@ -7,7 +7,7 @@ with open('README.md') as f:
 
 setup(name='pipelinewise',
       python_requires='>=3.7,<3.10',
-      version='0.42.1',
+      version='0.43.0',
       description='PipelineWise',
       long_description=LONG_DESCRIPTION,
       long_description_content_type='text/markdown',
@@ -15,7 +15,10 @@ setup(name='pipelinewise',
       url='https://github.com/transferwise/pipelinewise',
       classifiers=[
           'License :: OSI Approved :: Apache Software License',
-          'Programming Language :: Python :: 3 :: Only'
+          'Programming Language :: Python :: 3 :: Only',
+          'Programming Language :: Python :: 3.7',
+          'Programming Language :: Python :: 3.8',
+          'Programming Language :: Python :: 3.9',
       ],
       install_requires=[
           'argparse==1.4.0',
