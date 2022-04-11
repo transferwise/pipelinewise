@@ -424,10 +424,10 @@ class FastSyncTargetSnowflake:
         full_qual_table_name = f'"{target_schema.upper()}"."{table_name.upper()}"'
 
         privacy_query=f"""
-select column_name,privacy_properties:turing_strategy:sql::text as sql from "TURING"."BACKEND"."PRIVACY_PROPERTIES" where schema_name='{source_schema_name}' and table_name='{source_table_name}'
+select column_name,privacy_properties:turing_strategy:sql::text as sql from "TURING"."{target_schema.upper()}"."PRIVACY_PROPERTIES" where schema_name='{source_schema_name}' and table_name='{source_table_name}'
 """
         res=self.query(privacy_query,
-                       query_tag_props={'schema': "BACKEND",
+                       query_tag_props={'schema': target_schema.upper(),
                                         'table': "PRIVACY_PROPERTIES"})
         sql_parts = []
         for row in res:
