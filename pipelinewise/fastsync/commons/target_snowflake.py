@@ -6,7 +6,7 @@ import snowflake.connector
 
 from typing import List, Dict, Optional
 from snowflake.connector.encryption_util import SnowflakeEncryptionUtil
-from snowflake.connector.remote_storage_util import SnowflakeFileEncryptionMaterial
+from snowflake.connector.storage_client import SnowflakeFileEncryptionMaterial
 
 from . import utils
 from .transform_utils import TransformationHelper, SQLFlavor
