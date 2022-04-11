@@ -41,6 +41,7 @@ setup(name='pipelinewise',
           'psutil==5.8.0',
           'ujson==5.1.0',
           'dnspython==2.1.*',
+          'boto3==1.21.*',
       ],
       extras_require={
           'test': [
