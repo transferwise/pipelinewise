@@ -423,28 +423,37 @@ class FastSyncTargetSnowflake:
         """
         full_qual_table_name = f'"{target_schema.upper()}"."{table_name.upper()}"'
 
-        privacy_query=f"""
+        show_tables_query=f"""
+show tables in "TURING"."{target_schema.upper()}"
+"""
+        res=self.query(show_tables_query, query_tag_props={'schema': target_schema.upper()})
+        if 'PRIVACY_PROPERTIES' in map(lambda row: dict(row).get('name', '').upper(),res):
+
+            privacy_query=f"""
 select column_name,privacy_properties:turing_strategy:sql::text as sql from "TURING"."{target_schema.upper()}"."PRIVACY_PROPERTIES" where schema_name='{source_schema_name}' and table_name='{source_table_name}'
 """
-        res=self.query(privacy_query,
-                       query_tag_props={'schema': target_schema.upper(),
-                                        'table': "PRIVACY_PROPERTIES"})
-        sql_parts = []
-        for row in res:
-            row = dict(row)
-            column_name = row['COLUMN_NAME']
-            sql = row['SQL']
-            if sql is not None:
-                sql = sql.replace("$column_name$", column_name)
-            sql_parts.append(f"{column_name} = ({sql})")
+            res=self.query(privacy_query,
+                           query_tag_props={'schema': target_schema.upper(),
+                                            'table': "PRIVACY_PROPERTIES"})
+            sql_parts = []
+            for row in res:
+                row = dict(row)
+                column_name = row['COLUMN_NAME']
+                sql = row['SQL']
+                if sql is not None:
+                    sql = sql.replace("$column_name$", column_name)
+                sql_parts.append(f"{column_name} = ({sql})")
 
-        if sql_parts:
-            data_privacy_sql = f'UPDATE {full_qual_table_name} SET ' + ", ".join(sql_parts)
-            LOGGER.info('Running data privacy obfuscation query: %s', data_privacy_sql)
-            self.query(
-                data_privacy_sql,
-                query_tag_props={'schema': target_schema, 'table': table_name},
-            )
+            if sql_parts:
+                data_privacy_sql = f'UPDATE {full_qual_table_name} SET ' + ", ".join(sql_parts)
+                LOGGER.info('Running data privacy obfuscation query: %s', data_privacy_sql)
+                self.query(
+                    data_privacy_sql,
+                    query_tag_props={'schema': target_schema, 'table': table_name},
+                )
+
+        else:
+            LOGGER.info('No data privacy table found in schema: %s', target_schema.upper())
 
         if transformations:
             all_cols_update_sql = ''
