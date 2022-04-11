@@ -150,4 +150,4 @@ jobs:
           docker run --rm \
           -v $PWD:/app \
           transferwiseworkspace/pipelinewise:ci-py${{ matrix.python-version  }} \
-          bash -c "pytest --cov=pipelinewise --cov-fail-under=74 -v tests/units"
+          bash -c "pytest --cov=pipelinewise --cov-fail-under=75 -v tests/units"
