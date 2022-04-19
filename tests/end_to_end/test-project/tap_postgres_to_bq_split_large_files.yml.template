@@ -72,6 +72,11 @@ schemas:
         replication_method: "INCREMENTAL"
         replication_key: "id"
 
+      ### Empty table
+      - table_name: "empty_table"
+        replication_method: "INCREMENTAL"
+        replication_key: "id"
+
       ### Table with space and mixed upper and lowercase characters
       - table_name: "table_with_space and UPPERCase"
         replication_method: "LOG_BASED"
