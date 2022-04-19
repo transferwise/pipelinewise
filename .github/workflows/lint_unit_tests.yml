@@ -92,6 +92,7 @@ jobs:
         if: steps.check.outcome == 'failure'
         run: |
           docker run --rm \
+          --pull always \
           -v $PWD:/app \
           thread/pipelinewise:ci-py${{ matrix.python-version  }} \
           bash -c "find pipelinewise tests -type f -name '*.py' | xargs unify --check-only"
@@ -100,6 +101,7 @@ jobs:
         if: steps.check.outcome == 'failure'
         run: |
           docker run --rm -v $PWD:/app \
+          --pull always \
           thread/pipelinewise:ci-py${{ matrix.python-version  }} \
           bash -c "pylint pipelinewise tests"
 
@@ -107,6 +109,7 @@ jobs:
         if: steps.check.outcome == 'failure'
         run: |
           docker run --rm -v $PWD:/app \
+          --pull always \
           thread/pipelinewise:ci-py${{ matrix.python-version  }} \
           bash -c "flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics"
 
@@ -114,6 +117,7 @@ jobs:
         if: steps.check.outcome == 'failure'
         run: |
           docker run --rm \
+          --pull always \
           -v $PWD:/app \
           thread/pipelinewise:ci-py${{ matrix.python-version  }} \
           bash -c "flake8 . --count --max-complexity=15 --max-line-length=120 --statistics"
@@ -148,6 +152,7 @@ jobs:
         if: steps.check.outcome == 'failure'
         run: |
           docker run --rm \
+          --pull always \
           -v $PWD:/app \
-          thread/pipelinewise:ci-py${{ matrix.python-version  }}
+          thread/pipelinewise:ci-py${{ matrix.python-version  }} \
           bash -c "pytest --cov=pipelinewise --cov-fail-under=75 -v tests/units"
