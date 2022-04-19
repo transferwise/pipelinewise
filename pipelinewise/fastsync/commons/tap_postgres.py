@@ -301,7 +301,8 @@ class FastSyncTapPostgres:
 
         res = self.primary_host_query(
             textwrap.dedent(
-                f"""SELECT *
+                f"""\
+                    SELECT *
                     FROM pg_replication_slots
                     WHERE slot_name = '{slot_name}'
                     AND plugin = 'wal2json'
