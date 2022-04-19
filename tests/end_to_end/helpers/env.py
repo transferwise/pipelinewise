@@ -280,6 +280,9 @@ class E2EEnv:
         self.env['TAP_S3_CSV']['is_configured'] = self._is_env_connector_configured(
             'TAP_S3_CSV'
         )
+        self.env['TAP_MONGODB']['is_configured'] = self._is_env_connector_configured(
+            'TAP_MONGODB'
+        )
         self.env['TARGET_POSTGRES'][
             'is_configured'
         ] = self._is_env_connector_configured('TARGET_POSTGRES')

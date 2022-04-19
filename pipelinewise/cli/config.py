@@ -193,8 +193,7 @@ class Config:
             target = target_tuple[1]
             taps = []
             for tap in target.get('taps'):
-                taps.append(
-                    {
+                tap_setting = {
                         'id': tap.get('id'),
                         'name': tap.get('name'),
                         'type': tap.get('type'),
@@ -203,7 +202,9 @@ class Config:
                         'send_alert': tap.get('send_alert', True),
                         'enabled': True,
                     }
-                )
+                if tap.get('slack_alert_channel'):
+                    tap_setting['slack_alert_channel'] = tap['slack_alert_channel']
+                taps.append(tap_setting)
 
             targets.append(
                 {

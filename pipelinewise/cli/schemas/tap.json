@@ -25,10 +25,19 @@
     "db_conn": {
       "type": "object",
       "properties": {
+        "use_gtid": {
+          "type": "boolean"
+        },
+        "engine": {
+          "enum": ["mariadb", "mysql"]
+        },
         "fastsync_parallelism": {
           "type": "integer",
           "minimum": 1,
           "maximum": 1000
+        },
+        "use_message_key": {
+          "type": "boolean"
         }
       }
     },
@@ -355,6 +364,10 @@
         "tap-mixpanel",
         "tap-twilio"
       ]
+    },
+    "slack_alert_channel": {
+      "type": "string",
+      "pattern": "^#"
     },
     "db_conn": {
       "$ref": "#/definitions/db_conn"

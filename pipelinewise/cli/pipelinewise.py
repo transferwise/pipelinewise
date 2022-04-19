@@ -124,8 +124,9 @@ class PipelineWise:
 
         send_alert = self.tap.get('send_alert', True)
         if send_alert:
+            tap_slack_channel = self.tap.get('slack_alert_channel')
             stats = self.alert_sender.send_to_all_handlers(
-                message=message, level=level, exc=exc
+                message=message, level=level, exc=exc, tap_slack_channel=tap_slack_channel
             )
 
         return stats
@@ -1151,12 +1152,6 @@ class PipelineWise:
             self.logger.info('Tap %s is not enabled.', self.tap['name'])
             sys.exit(1)
 
-        # Run only if not running
-        tap_status = self.detect_tap_status(target_id, tap_id)
-        if tap_status['currentStatus'] == 'running':
-            self.logger.info('Tap %s is currently running.', self.tap['name'])
-            sys.exit(1)
-
         # Generate and run the command to run the tap directly
         tap_config = self.tap['files']['config']
         tap_inheritable_config = self.tap['files']['inheritable_config']
@@ -1195,6 +1190,7 @@ class PipelineWise:
             create_fallback=True,
         )
 
+        utils.create_backup_of_the_file(tap_state)
         start_time = datetime.now()
         try:
             with pidfile.PIDFile(self.tap['files']['pidfile']):
@@ -1368,15 +1364,6 @@ class PipelineWise:
         # Run only if tap enabled
         if not self.tap.get('enabled', False):
             self.logger.info('Tap %s is not enabled.', self.tap['name'])
-            sys.exit(1)
-
-        # Run only if tap not running
-        tap_status = self.detect_tap_status(target_id, tap_id)
-        if tap_status['currentStatus'] == 'running':
-            self.logger.info(
-                'Tap %s is currently running and cannot sync. Stop the tap and try again.',
-                self.tap['name'],
-            )
             sys.exit(1)
 
         # Tap exists but configuration not completed
@@ -1663,7 +1650,9 @@ class PipelineWise:
             or (
                 replication_method == self.LOG_BASED
                 and 'lsn' not in stream_bookmark
+                and 'log_file' not in stream_bookmark
                 and 'log_pos' not in stream_bookmark
+                and 'gtid' not in stream_bookmark
                 and 'token' not in stream_bookmark
             )
         )

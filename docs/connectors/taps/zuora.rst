@@ -29,6 +29,7 @@ Example YAML for tap-zuora:
     type: "tap-zuora"                 # !! THIS SHOULD NOT CHANGE !!
     owner: "somebody@foo.com"         # Data owner to contact
     #send_alert: False                # Optional: Disable all configured alerts on this tap
+    #slack_alert_channel: "#tap-channel"   # Optional: Sending a copy of specific tap alerts to this slack channel
 
 
     # ------------------------------------------------------------------------------

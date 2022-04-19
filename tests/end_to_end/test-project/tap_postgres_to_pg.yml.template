@@ -89,6 +89,11 @@ schemas:
           - column: "email"
             type: "MASK-STRING-SKIP-ENDS-6"
 
+      ### Empty table
+      - table_name: "empty_table"
+        replication_method: "INCREMENTAL"
+        replication_key: "id"
+
   ### SOURCE SCHEMA 2: public2
   - source_schema: "public2"
     target_schema: "ppw_e2e_tap_postgres_public2"

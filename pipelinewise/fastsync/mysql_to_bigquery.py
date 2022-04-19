@@ -105,9 +105,11 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
         mysql.close_connections()
 
         # Uploading to GCS
-        gcs_blobs = bigquery.multi_upload_to_gcs(file_parts)
-        for file_part in file_parts:
-            os.remove(file_part)
+        gcs_blobs = []
+        if len(file_parts) > 0:
+            gcs_blobs = bigquery.multi_upload_to_gcs(file_parts)
+            for file_part in file_parts:
+                os.remove(file_part)
 
         # Creating temp table in Bigquery
         bigquery.create_schema(target_schema)

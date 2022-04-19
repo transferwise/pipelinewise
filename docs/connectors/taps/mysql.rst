@@ -4,11 +4,8 @@
 Tap MySQL
 ---------
 
-
 MySQL setup requirements
 ''''''''''''''''''''''''
-
-*(Section based on Stitch documentation)*
 
 **Step 1: Check if you have all the required credentials for replicating data from MySQL**
 
@@ -92,6 +89,12 @@ following the steps in the :ref:`generating_pipelines` section.
   Read more info about this decision in `this github issue <https://github.com/singer-io/tap-mysql/issues/82>`_
   or browse the codebase `here <https://github.com/transferwise/pipelinewise-tap-mysql/blob/34cbd9b085146c08003bfa460f1550ce78c65e4c/tap_mysql/__init__.py#L73>`_.
 
+
+.. note::
+
+  This tap supports :ref:`log_based` replication method with GTID position for both Mariadb and Mysql.
+
+
 Example YAML for ``tap-mysql``:
 
 .. code-block:: yaml
@@ -106,6 +109,7 @@ Example YAML for ``tap-mysql``:
   type: "tap-mysql"                      # !! THIS SHOULD NOT CHANGE !!
   owner: "somebody@foo.com"              # Data owner to contact
   #send_alert: False                     # Optional: Disable all configured alerts on this tap
+  #slack_alert_channel: "#tap-channel"   # Optional: Sending a copy of specific tap alerts to this slack channel
 
 
   # ------------------------------------------------------------------------------
@@ -117,6 +121,8 @@ Example YAML for ``tap-mysql``:
     user: "<USER>"                       # MySQL/ MariaDB user
     password: "<PASSWORD>"               # Plain string or vault encrypted
     dbname: "<DB_NAME>"                  # MySQL/ MariaDB database name
+    use_gtid: <boolean>                  # Flag to enable using GTID as the state bookmark for log based tables
+    engine: "mariadb/mysql"              # Flavor of the server, used in conjunction with "use_gtid"
     #filter_dbs: "schema1,schema2"       # Optional: Scan only the required schemas
                                          #           to improve the performance of
                                          #           data extraction
