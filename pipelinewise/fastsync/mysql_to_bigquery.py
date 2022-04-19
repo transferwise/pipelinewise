@@ -116,20 +116,21 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
         bigquery.create_table(target_schema, table, bigquery_columns, primary_key, is_temporary=True)
 
         # Load into Bigquery table
-        bigquery.copy_to_table(
-            gcs_blobs, target_schema, table, size_bytes, is_temporary=True,
-        )
+        if len(gcs_blobs) > 0:
+            bigquery.copy_to_table(
+                gcs_blobs, target_schema, table, size_bytes, is_temporary=True,
+            )
 
-        for blob in gcs_blobs:
-            if archive_load_files:
-                # Copy load file to archive
-                bigquery.copy_to_archive(blob, tap_id, table)
+            for blob in gcs_blobs:
+                if archive_load_files:
+                    # Copy load file to archive
+                    bigquery.copy_to_archive(blob, tap_id, table)
 
-            # Delete all file parts from s3
-            blob.delete()
+                # Delete all file parts from s3
+                blob.delete()
 
-        # Obfuscate columns
-        bigquery.obfuscate_columns(target_schema, table)
+            # Obfuscate columns
+            bigquery.obfuscate_columns(target_schema, table)
 
         # Create target table and swap with the temp table in Bigquery
         bigquery.create_table(target_schema, table, bigquery_columns, primary_key)
