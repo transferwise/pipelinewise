@@ -356,13 +356,10 @@ class FastSyncTapPostgres:
         if self.connection_config.get('replica_host'):
             # Ensure that the newest LSN availiable on the replica is newer than
             # the oldest LSN which is deliverable by the replication slot.
-            time_waited = 0  # seconds
-            wait_period = 1  # seconds
             max_time_waited = 60  # seconds
+            now = time.time()
             while oldest_lsn > current_lsn:
-                time.sleep(wait_period)
-                time_waited += wait_period
-                if time_waited > max_time_waited:
+                if time.time() - now > max_time_waited:
                     raise RuntimeError('Replica database is lagging too far behind Primary.')
                 current_lsn = self.get_current_lsn()
 
