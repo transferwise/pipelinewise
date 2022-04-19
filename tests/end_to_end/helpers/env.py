@@ -15,6 +15,7 @@ CONFIG_DIR = os.path.join(USER_HOME, '.pipelinewise')
 DIR = os.path.dirname(os.path.realpath(__file__))
 
 
+# pylint: disable=too-many-public-methods
 class E2EEnv:
     """Utilities class to run End to End tests
 
@@ -22,14 +23,15 @@ class E2EEnv:
     to run SQL queries on the supported databases and to run common assertions
     on the supported databases"""
 
-    def __init__(self, project_dir):
-        self.sf_schema_postfix = f'_{str(uuid.uuid4())[:8]}'
-        self._load_env()
+    env = {}
+    sf_schema_postfix = f'_{str(uuid.uuid4())[:8]}'
 
+    def __init__(self, project_dir):
         # Generate test project YAMLs from templates
         self._init_test_project_dir(project_dir)
 
-    def _load_env(self):
+    @classmethod
+    def load_env(cls):
         """Connector properties
 
         vars: Load environment variables in priority order:
@@ -49,7 +51,7 @@ class E2EEnv:
         load_dotenv(
             dotenv_path=os.path.join(DIR, '..', '..', '..', 'dev-project', '.env')
         )
-        self.env = {
+        cls.env = {
             # ------------------------------------------------------------------
             # Tap Postgres is a REQUIRED test connector and test database with test data available
             # in the docker environment
@@ -205,7 +207,7 @@ class E2EEnv:
                         'optional': True,
                     },
                     'SCHEMA_POSTFIX': {
-                        'value': os.environ.get('TARGET_SNOWFLAKE_SCHEMA_POSTFIX', self.sf_schema_postfix),
+                        'value': os.environ.get('TARGET_SNOWFLAKE_SCHEMA_POSTFIX', cls.sf_schema_postfix),
                         'optional': True,
                     }
                 },
@@ -269,30 +271,30 @@ class E2EEnv:
         # Add is_configured keys for every connector
         # Useful to skip certain test cases dynamically when specific tap
         # or target database is not configured
-        self.env['TAP_POSTGRES']['is_configured'] = self._is_env_connector_configured(
+        cls.env['TAP_POSTGRES']['is_configured'] = cls._is_env_connector_configured(
             'TAP_POSTGRES'
         )
-        self.env['TAP_MYSQL']['is_configured'] = self._is_env_connector_configured(
+        cls.env['TAP_MYSQL']['is_configured'] = cls._is_env_connector_configured(
             'TAP_MYSQL'
         )
-        self.env['TAP_S3_CSV']['is_configured'] = self._is_env_connector_configured(
+        cls.env['TAP_S3_CSV']['is_configured'] = cls._is_env_connector_configured(
             'TAP_S3_CSV'
         )
-        self.env['TAP_MONGODB']['is_configured'] = self._is_env_connector_configured(
+        cls.env['TAP_MONGODB']['is_configured'] = cls._is_env_connector_configured(
             'TAP_MONGODB'
         )
-        self.env['TARGET_POSTGRES'][
+        cls.env['TARGET_POSTGRES'][
             'is_configured'
-        ] = self._is_env_connector_configured('TARGET_POSTGRES')
-        self.env['TARGET_REDSHIFT'][
+        ] = cls._is_env_connector_configured('TARGET_POSTGRES')
+        cls.env['TARGET_REDSHIFT'][
             'is_configured'
-        ] = self._is_env_connector_configured('TARGET_REDSHIFT')
-        self.env['TARGET_SNOWFLAKE'][
+        ] = cls._is_env_connector_configured('TARGET_REDSHIFT')
+        cls.env['TARGET_SNOWFLAKE'][
             'is_configured'
-        ] = self._is_env_connector_configured('TARGET_SNOWFLAKE')
-        self.env['TARGET_BIGQUERY'][
+        ] = cls._is_env_connector_configured('TARGET_SNOWFLAKE')
+        cls.env['TARGET_BIGQUERY'][
             'is_configured'
-        ] = self._is_env_connector_configured('TARGET_BIGQUERY')
+        ] = cls._is_env_connector_configured('TARGET_BIGQUERY')
 
     def _get_conn_env_var(self, connector, key):
         """Get the value of a specific variable in the self.env dict"""
@@ -315,7 +317,8 @@ class E2EEnv:
             aws_secret_access_key=aws_secret_access_key,
         )
 
-    def _is_env_connector_configured(self, env_connector):
+    @classmethod
+    def _is_env_connector_configured(cls, env_connector):
         """Detect if certain component(s) of env vars group is configured properly"""
         env_conns = []
         if isinstance(env_connector, str):
@@ -326,11 +329,11 @@ class E2EEnv:
             raise Exception('env_connector must be string or list')
 
         for env_conn in env_conns:
-            for key, value in self.env[env_conn]['vars'].items():
+            for key, value in cls.env[env_conn]['vars'].items():
                 # If value not defined and is not optional
                 if not value['value'] and not value.get('optional'):
                     # Value not defined but the entirely component is optional
-                    if self.env[env_conn].get('optional'):
+                    if cls.env[env_conn].get('optional'):
                         return False
                     # Value not defined but it's a required property
                     raise Exception(
@@ -662,3 +665,7 @@ class E2EEnv:
         """Clean up state files to ensure tests behave the same every time"""
         for state_file in Path(CONFIG_DIR).glob('**/state.json'):
             state_file.unlink()
+
+
+# Setup the class
+E2EEnv.load_env()

@@ -1,6 +1,10 @@
+import pytest
+
+from tests.end_to_end.helpers.env import E2EEnv
 from tests.end_to_end.target_snowflake import TargetSnowflake
 
 
+@pytest.mark.skipif(not E2EEnv.env['TAP_MYSQL']['is_configured'], reason='MySql not configured.')
 class TapMariaDB(TargetSnowflake):
     """
     Base class for E2E tests for tap mysql -> target snowflake
