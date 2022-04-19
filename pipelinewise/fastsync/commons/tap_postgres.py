@@ -3,7 +3,10 @@ import decimal
 import logging
 import re
 import sys
+import textwrap
+import time
 import psycopg2
+import psycopg2.errors
 import psycopg2.extras
 
 from typing import Dict
@@ -13,6 +16,12 @@ from . import utils, split_gzip
 from ...utils import safe_column_name
 
 LOGGER = logging.getLogger(__name__)
+
+
+def parse_lsn(lsn: str) -> int:
+    """Parse string LSN format to integer"""
+    file, index = lsn.split('/')
+    return (int(file, 16) << 32) + int(index, 16)
 
 
 class FastSyncTapPostgres:
@@ -25,9 +34,8 @@ class FastSyncTapPostgres:
         self.tap_type_to_target_type = tap_type_to_target_type
         self.target_quote = target_quote
         self.conn = None
-        self.curr = None
         self.primary_host_conn = None
-        self.primary_host_curr = None
+        self.version = None
 
     @staticmethod
     def generate_replication_slot_name(dbname, tap_id=None, prefix='pipelinewise'):
@@ -184,7 +192,6 @@ class FastSyncTapPostgres:
         self.conn = self.get_connection(
             self.connection_config, prioritize_primary=False
         )
-        self.curr = self.conn.cursor()
 
     def close_connection(self):
         """
@@ -221,7 +228,7 @@ class FastSyncTapPostgres:
                 return []
 
     # pylint: disable=no-member
-    def create_replication_slot(self):
+    def create_replication_slot(self) -> int:
         """
         Create replication slot on the primary host
 
@@ -236,24 +243,76 @@ class FastSyncTapPostgres:
         format you won't be able to do LOG_BASED replication from the same postgres
         database by multiple taps. If that the case then you need to drop the old
         replication slot and full-resync the new taps.
-        """
-        try:
-            slot_name = self.__get_slot_name(
-                self.primary_host_conn,
-                self.connection_config['dbname'],
-                self.connection_config['tap_id'],
-            )
 
-            # Create the replication host
+        Returns the LSN at which the replication slot is consistent.
+        """
+        slot_name = self.__get_slot_name(
+            self.primary_host_conn,
+            self.connection_config['dbname'],
+            self.connection_config['tap_id'],
+        )
+
+        # Create the replication host
+        return parse_lsn(
             self.primary_host_query(
                 f"SELECT * FROM pg_create_logical_replication_slot('{slot_name}', 'wal2json')"
-            )
-        except Exception as exc:
-            # ERROR: replication slot already exists SQL state: 42710
-            if hasattr(exc, 'pgcode') and exc.pgcode == '42710':
-                pass
+            )[0]['lsn']
+        )
+
+    def get_current_lsn(self) -> int:
+        """Obtain the most recent LSN availiable."""
+        # is replica_host set ?
+        if self.connection_config.get('replica_host'):
+            # Get latest applied lsn from replica_host
+            if self.version >= 100000:
+                result = self.query('SELECT pg_last_wal_replay_lsn() AS current_lsn')
+            elif self.version >= 90400:
+                result = self.query(
+                    'SELECT pg_last_xlog_replay_location() AS current_lsn'
+                )
             else:
-                raise exc
+                raise Exception(
+                    'Logical replication not supported before PostgreSQL 9.4'
+                )
+        else:
+            # Get current lsn from primary host
+            if self.version >= 100000:
+                result = self.query('SELECT pg_current_wal_lsn() AS current_lsn')
+            elif self.version >= 90400:
+                result = self.query('SELECT pg_current_xlog_location() AS current_lsn')
+            else:
+                raise Exception(
+                    'Logical replication not supported before PostgreSQL 9.4'
+                )
+        return parse_lsn(result[0]['current_lsn'])
+
+    def get_confirmed_flush_lsn(self) -> int:
+        """
+        Get the last flushed LSN for the replication slot.
+
+        For Postgres <9.6 this defaults to the restart_lsn as confirmed_flush_lsn
+        is not availiable.
+        """
+        slot_name = self.__get_slot_name(
+            self.primary_host_conn,
+            self.connection_config['dbname'],
+            self.connection_config['tap_id'],
+        )
+
+        res = self.primary_host_query(
+            textwrap.dedent(
+                f"""\
+                    SELECT *
+                    FROM pg_replication_slots
+                    WHERE slot_name = '{slot_name}'
+                    AND plugin = 'wal2json'
+                    AND slot_type = 'logical'"""
+            )
+        )[0]
+
+        # confirmed_flush_lsn was introduced in Postgres 9.6 so fallback to
+        # restart_lsn if needed.
+        return parse_lsn(res.get('confirmed_flush_lsn', res['restart_lsn']))
 
     # pylint: disable=too-many-branches,no-member,chained-comparison
     def fetch_current_log_pos(self):
@@ -265,63 +324,52 @@ class FastSyncTapPostgres:
         self.primary_host_conn = self.get_connection(
             self.connection_config, prioritize_primary=True
         )
-        self.primary_host_curr = self.primary_host_conn.cursor()
 
         # Make sure PostgreSQL version is 9.4 or higher
         result = self.primary_host_query(
             "SELECT setting::int AS version FROM pg_settings WHERE name='server_version_num'"
         )
-        version = result[0].get('version')
+        self.version = result[0].get('version')
 
         # Do not allow minor versions with PostgreSQL BUG #15114
-        if (version >= 110000) and (version < 110002):
+        if (self.version >= 110000) and (self.version < 110002):
             raise Exception('PostgreSQL upgrade required to minor version 11.2')
-        if (version >= 100000) and (version < 100007):
+        if (self.version >= 100000) and (self.version < 100007):
             raise Exception('PostgreSQL upgrade required to minor version 10.7')
-        if (version >= 90600) and (version < 90612):
+        if (self.version >= 90600) and (self.version < 90612):
             raise Exception('PostgreSQL upgrade required to minor version 9.6.12')
-        if (version >= 90500) and (version < 90516):
+        if (self.version >= 90500) and (self.version < 90516):
             raise Exception('PostgreSQL upgrade required to minor version 9.5.16')
-        if (version >= 90400) and (version < 90421):
+        if (self.version >= 90400) and (self.version < 90421):
             raise Exception('PostgreSQL upgrade required to minor version 9.4.21')
-        if version < 90400:
+        if self.version < 90400:
             raise Exception('Logical replication not supported before PostgreSQL 9.4')
 
-        # Create replication slot
-        self.create_replication_slot()
+        try:
+            # Create replication slot and obtain the oldest LSN
+            # that it can deliver.
+            oldest_lsn = self.create_replication_slot()
+        except psycopg2.errors.DuplicateObject:
+            # Replication slot exists already so just get the
+            # oldest LSN which the slot can deliver.
+            oldest_lsn = self.get_confirmed_flush_lsn()
 
         # Close replication slot dedicated connection
         self.primary_host_conn.close()
 
-        # is replica_host set ?
+        current_lsn = self.get_current_lsn()
+
         if self.connection_config.get('replica_host'):
-            # Get latest applied lsn from replica_host
-            if version >= 100000:
-                result = self.query('SELECT pg_last_wal_replay_lsn() AS current_lsn')
-            elif version >= 90400:
-                result = self.query(
-                    'SELECT pg_last_xlog_replay_location() AS current_lsn'
-                )
-            else:
-                raise Exception(
-                    'Logical replication not supported before PostgreSQL 9.4'
-                )
-        else:
-            # Get current lsn from primary host
-            if version >= 100000:
-                result = self.query('SELECT pg_current_wal_lsn() AS current_lsn')
-            elif version >= 90400:
-                result = self.query('SELECT pg_current_xlog_location() AS current_lsn')
-            else:
-                raise Exception(
-                    'Logical replication not supported before PostgreSQL 9.4'
-                )
+            # Ensure that the newest LSN availiable on the replica is newer than
+            # the oldest LSN which is deliverable by the replication slot.
+            max_time_waited = 60  # seconds
+            now = time.time()
+            while oldest_lsn > current_lsn:
+                if time.time() - now > max_time_waited:
+                    raise RuntimeError('Replica database is lagging too far behind Primary.')
+                current_lsn = self.get_current_lsn()
 
-        current_lsn = result[0].get('current_lsn')
-        file, index = current_lsn.split('/')
-        lsn = (int(file, 16) << 32) + int(index, 16)
-
-        return {'lsn': lsn, 'version': 1}
+        return {'lsn': current_lsn, 'version': 1}
 
     # pylint: disable=invalid-name
     def fetch_current_incremental_key_pos(self, table, replication_key):
@@ -485,8 +533,9 @@ class FastSyncTapPostgres:
             split_file_chunk_size_mb: File chunk sizes if `split_large_files` enabled. (Default: 1000)
             split_file_max_chunks: Max number of chunks if `split_large_files` enabled. (Default: 20)
         """
-        table_columns = self.get_table_columns(table_name, max_num, date_type)
-        column_safe_sql_values = [c.get('safe_sql_value') for c in table_columns]
+        column_safe_sql_values = [
+            c.get('safe_sql_value') for c in self.get_table_columns(table_name, max_num, date_type)
+        ]
 
         # If self.get_table_columns returns zero row then table not exist
         if len(column_safe_sql_values) == 0:
@@ -513,4 +562,5 @@ class FastSyncTapPostgres:
         )
 
         with gzip_splitter as split_gzip_files:
-            self.curr.copy_expert(sql, split_gzip_files, size=131072)
+            with self.conn.cursor() as cur:
+                cur.copy_expert(sql, split_gzip_files, size=131072)
