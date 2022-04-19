@@ -3,6 +3,8 @@ import shutil
 import unittest
 from pathlib import Path
 
+import pytest
+
 from tests.end_to_end.helpers import assertions, tasks
 from tests.end_to_end.helpers.env import E2EEnv
 
@@ -11,6 +13,7 @@ USER_HOME = os.path.expanduser('~')
 CONFIG_DIR = os.path.join(USER_HOME, '.pipelinewise')
 
 
+@pytest.mark.skipif(not E2EEnv.env['TARGET_SNOWFLAKE']['is_configured'], reason='Snowflake not configured.')
 class TargetSnowflake(unittest.TestCase):
     """
     Base class for E2E tests for target snowflake
