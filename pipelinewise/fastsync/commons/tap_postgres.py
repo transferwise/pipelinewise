@@ -415,9 +415,13 @@ class FastSyncTapPostgres:
                     ,character_maximum_length
                 FROM (SELECT
                 column_name,
-                data_type,
+                CASE 
+                  WHEN data_type = 'USER-DEFINED' AND udt_name = 'hstore' THEN 'hstore'
+                  ELSE data_type
+                END as data_type,
                 CASE
                     WHEN data_type = 'ARRAY' THEN 'array_to_json("' || column_name || '") AS ' || column_name
+                    WHEN data_type = 'USER-DEFINED' AND udt_name = 'hstore' THEN column_name|| '::json AS ' || column_name
                     WHEN data_type = 'date' THEN
                        'CASE WHEN "' ||column_name|| E'" < \\'0001-01-01\\' '
                             'OR "' ||column_name|| E'" > \\'9999-12-31\\' THEN \\'9999-12-31\\' '

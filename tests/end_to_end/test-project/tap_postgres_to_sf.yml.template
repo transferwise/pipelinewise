@@ -67,6 +67,10 @@ schemas:
         replication_method: "INCREMENTAL"
         replication_key: "id"
 
+      ### Table with special data types
+      - table_name: "special_data_types"
+        replication_method: "LOG_BASED"
+
       ### Table with space and mixed upper and lowercase characters
       - table_name: "table_with_space and UPPERCase"
         replication_method: "LOG_BASED"
