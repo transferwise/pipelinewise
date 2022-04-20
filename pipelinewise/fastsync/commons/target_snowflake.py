@@ -3,6 +3,7 @@ import os
 import json
 import boto3
 import snowflake.connector
+import re
 
 from typing import List, Dict
 from snowflake.connector.encryption_util import SnowflakeEncryptionUtil
@@ -436,13 +437,25 @@ select column_name,privacy_properties:turing_strategy:sql::text as sql from "TUR
                            query_tag_props={'schema': target_schema.upper(),
                                             'table': "PRIVACY_PROPERTIES"})
             sql_parts = []
+            sql_full_queries = []
             for row in res:
                 row = dict(row)
                 column_name = row['COLUMN_NAME']
                 sql = row['SQL']
                 if sql is not None:
-                    sql = sql.replace("$column_name$", column_name)
-                sql_parts.append(f"{column_name} = ({sql})")
+                    if isinstance(sql, list):
+                        for sql_query in sql:
+                            sql_query = sql_query.replace("$column_name$", column_name)
+                            sql_query = sql_query.replace("$table_name$", full_qual_table_name)
+                            for match_str in re.findall(r'\$env:(.*?)\$', sql_query):
+                                sql_query = sql_query.replace(f"$env:{match_str}$", os.environ.get(match_str, "unknown"))
+                            sql_full_queries.append(sql_query)
+                    else:
+                        sql = sql.replace("$column_name$", column_name)
+                        sql = sql.replace("$table_name$", full_qual_table_name)
+                        for match_str in re.findall(r'\$env:(.*?)\$', sql):
+                            sql = sql.replace(f"$env:{match_str}$", os.environ.get(match_str, "unknown"))
+                        sql_parts.append(f"{column_name} = ({sql})")
 
             if sql_parts:
                 data_privacy_sql = f'UPDATE {full_qual_table_name} SET ' + ", ".join(sql_parts)
@@ -451,6 +464,13 @@ select column_name,privacy_properties:turing_strategy:sql::text as sql from "TUR
                     data_privacy_sql,
                     query_tag_props={'schema': target_schema, 'table': table_name},
                 )
+            if sql_full_queries:
+                for sql_full_query in sql_full_queries:
+                    LOGGER.info('Running data privacy obfuscation query: %s', sql_full_query)
+                    self.query(
+                        sql_full_query,
+                        query_tag_props={'schema': target_schema, 'table': table_name},
+                    )
 
         else:
             LOGGER.info('No data privacy table found in schema: %s', target_schema.upper())
