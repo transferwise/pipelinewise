@@ -443,6 +443,8 @@ select column_name,privacy_properties:turing_strategy:sql::text as sql from "TUR
                 column_name = row['COLUMN_NAME']
                 sql = row['SQL']
                 if sql is not None:
+                    if sql.startswith('['):
+                        sql = json.loads(sql)
                     if isinstance(sql, list):
                         for sql_query in sql:
                             sql_query = sql_query.replace("$column_name$", column_name)
