@@ -43,12 +43,12 @@ PipelineWise is tested and can run with at least the following
 schedulers:
 
 * `Unix Cron <https://en.wikipedia.org/wiki/Cron/>`_ Unix Cron - This is the simplest option
-  for a single server installation. 
+  for a single server installation.
 
 * `Cronicle <https://github.com/jhuckaby/Cronicle/>`_ - Cronicle is a reasonably good and
   relatively simple tool to schedule PipelineWise jobs in both Single Server and Multi-Server
   cluster installations.
-  
+
 * `Apache Airflow <https://airflow.apache.org/>`_ - Airflow is a robust and mature tool to
   schedule and monitor workflows.
 
@@ -67,11 +67,3 @@ PipelineWise commands on multiple nodes that operate on the same project, then
 every node has to read/write into the same directory, doesn't matter where the nodes are
 located. This is typically done by mounting ``${HOME}/.pipelinewise`` on every node to
 a shared directory on NFS/EFS.
-
-.. warning::
-
-  There are plans to store ``${HOME}/.pipelinewise`` runtime configuration files
-  optionally on different data stores, like S3, RDBMs or on document stores like
-  Couchbase or MongoDB. Once it is implemented, Multi-Server Cluster installation
-  will not require NFS/EFS.
-
