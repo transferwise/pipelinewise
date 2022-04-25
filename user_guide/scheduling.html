@@ -142,6 +142,8 @@ schedulers:</p>
 <ul class="simple">
 <li><p><a class="reference external" href="https://en.wikipedia.org/wiki/Cron/">Unix Cron</a> Unix Cron - This is the simplest option
 for a single server installation.</p></li>
+<li><p><a class="reference external" href="https://github.com/transferwise/cicada/">Cicada</a> Cicada Scheduler - A lightweight multi-server
+CRON manager</p></li>
 <li><p><a class="reference external" href="https://github.com/jhuckaby/Cronicle/">Cronicle</a> - Cronicle is a reasonably good and
 relatively simple tool to schedule PipelineWise jobs in both Single Server and Multi-Server
 cluster installations.</p></li>
@@ -160,13 +162,6 @@ PipelineWise commands on multiple nodes that operate on the same project, then
 every node has to read/write into the same directory, doesn’t matter where the nodes are
 located. This is typically done by mounting <code class="docutils literal notranslate"><span class="pre">${HOME}/.pipelinewise</span></code> on every node to
 a shared directory on NFS/EFS.</p>
-<div class="admonition warning">
-<p class="admonition-title">Warning</p>
-<p>There are plans to store <code class="docutils literal notranslate"><span class="pre">${HOME}/.pipelinewise</span></code> runtime configuration files
-optionally on different data stores, like S3, RDBMs or on document stores like
-Couchbase or MongoDB. Once it is implemented, Multi-Server Cluster installation
-will not require NFS/EFS.</p>
-</div>
 </section>
 
 

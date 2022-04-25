@@ -162,31 +162,31 @@
 <li><p><code class="docutils literal notranslate"><span class="pre">find</span></code> &amp; <code class="docutils literal notranslate"><span class="pre">changeStream</span></code> privileges on the every collection that you want to replicate.</p></li>
 </ul>
 <p>Example:</p>
-<div class="highlight-js notranslate"><div class="highlight"><pre><span></span><span class="nx">db</span><span class="p">.</span><span class="nx">createRole</span><span class="p">({</span>
+<div class="highlight-js notranslate"><div class="highlight"><pre><span></span><span class="nx">db</span><span class="p">.</span><span class="nx">createRole</span><span class="p">({</span><span class="w"></span>
 
-        <span class="s2">&quot;role&quot;</span> <span class="o">:</span> <span class="s2">&quot;PipelineWiseRole&quot;</span><span class="p">,</span>
-        <span class="s2">&quot;privileges&quot;</span> <span class="o">:</span> <span class="p">[{</span>
+<span class="w">        </span><span class="s2">&quot;role&quot;</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;PipelineWiseRole&quot;</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="s2">&quot;privileges&quot;</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="p">[{</span><span class="w"></span>
 
-                <span class="s2">&quot;resource&quot;</span> <span class="o">:</span><span class="p">{</span>
+<span class="w">                </span><span class="s2">&quot;resource&quot;</span><span class="w"> </span><span class="o">:</span><span class="p">{</span><span class="w"></span>
 
-                        <span class="s2">&quot;db&quot;</span> <span class="o">:</span> <span class="s2">&quot;my_db&quot;</span><span class="p">,</span>
-                        <span class="s2">&quot;collection&quot;</span> <span class="o">:</span> <span class="s2">&quot;my_collection&quot;</span>
+<span class="w">                        </span><span class="s2">&quot;db&quot;</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;my_db&quot;</span><span class="p">,</span><span class="w"></span>
+<span class="w">                        </span><span class="s2">&quot;collection&quot;</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;my_collection&quot;</span><span class="w"></span>
 
-                <span class="p">},</span>
-                <span class="s2">&quot;actions&quot;</span> <span class="o">:</span> <span class="p">[</span><span class="s2">&quot;find&quot;</span><span class="p">,</span> <span class="s2">&quot;changeStream&quot;</span><span class="p">]</span>
+<span class="w">                </span><span class="p">},</span><span class="w"></span>
+<span class="w">                </span><span class="s2">&quot;actions&quot;</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;find&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;changeStream&quot;</span><span class="p">]</span><span class="w"></span>
 
-        <span class="p">}],</span>
-        <span class="s2">&quot;roles&quot;</span> <span class="o">:</span> <span class="p">[{</span><span class="s2">&quot;role&quot;</span><span class="o">:</span> <span class="s2">&quot;read&quot;</span><span class="p">,</span> <span class="s2">&quot;db&quot;</span><span class="o">:</span> <span class="s2">&quot;my_db&quot;</span><span class="p">}]</span>
+<span class="w">        </span><span class="p">}],</span><span class="w"></span>
+<span class="w">        </span><span class="s2">&quot;roles&quot;</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="p">[{</span><span class="s2">&quot;role&quot;</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;read&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;db&quot;</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;my_db&quot;</span><span class="p">}]</span><span class="w"></span>
 
-<span class="p">});</span>
+<span class="p">});</span><span class="w"></span>
 
-<span class="nx">db</span><span class="p">.</span><span class="nx">createUser</span><span class="p">({</span>
+<span class="nx">db</span><span class="p">.</span><span class="nx">createUser</span><span class="p">({</span><span class="w"></span>
 
-        <span class="s2">&quot;user&quot;</span> <span class="o">:</span> <span class="s2">&quot;PipelineWiseUser&quot;</span><span class="p">,</span>
-        <span class="s2">&quot;pwd&quot;</span><span class="o">:</span> <span class="s2">&quot;mY_VerY_StRonG_PaSSwoRd&quot;</span><span class="p">,</span>
-        <span class="s2">&quot;roles&quot;</span> <span class="o">:</span> <span class="p">[</span><span class="s2">&quot;PipelineWiseRole&quot;</span><span class="p">]</span>
+<span class="w">        </span><span class="s2">&quot;user&quot;</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;PipelineWiseUser&quot;</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="s2">&quot;pwd&quot;</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;mY_VerY_StRonG_PaSSwoRd&quot;</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="s2">&quot;roles&quot;</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;PipelineWiseRole&quot;</span><span class="p">]</span><span class="w"></span>
 
-<span class="p">});</span>
+<span class="p">});</span><span class="w"></span>
 </pre></div>
 </div>
 </section>
