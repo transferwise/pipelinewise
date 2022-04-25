@@ -45,6 +45,9 @@ schedulers:
 * `Unix Cron <https://en.wikipedia.org/wiki/Cron/>`_ Unix Cron - This is the simplest option
   for a single server installation.
 
+* `Cicada <https://github.com/transferwise/cicada/>`_ Cicada Scheduler - A lightweight multi-server
+  CRON manager
+
 * `Cronicle <https://github.com/jhuckaby/Cronicle/>`_ - Cronicle is a reasonably good and
   relatively simple tool to schedule PipelineWise jobs in both Single Server and Multi-Server
   cluster installations.
