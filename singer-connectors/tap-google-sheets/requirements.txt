@@ -1,1 +1,1 @@
-git+git://github.com/Health-Union/tap-google-sheets@v1.0.6-hu
+git+https://github.com/Health-Union/tap-google-sheets.git@v1.0.6-hu
