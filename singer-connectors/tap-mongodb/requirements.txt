@@ -1,1 +1,1 @@
-pipelinewise-tap-mongodb==1.2.0
+git+https://github.com/Health-Union/pipelinewise-tap-mongodb.git@Connection-support
