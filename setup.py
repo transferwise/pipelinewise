@@ -69,6 +69,7 @@ setup(name='pipelinewise',
               'mongodb-to-snowflake=pipelinewise.fastsync.mongodb_to_snowflake:main',
               'mongodb-to-postgres=pipelinewise.fastsync.mongodb_to_postgres:main',
               'mongodb-to-bigquery=pipelinewise.fastsync.mongodb_to_bigquery:main',
+              'partial-mysql-to-snowflake=pipelinewise.fastsync.partialsync.mysql_to_snowflake:main'
           ]
       },
       packages=find_packages(exclude=['tests*']),
