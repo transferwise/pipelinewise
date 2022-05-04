@@ -449,6 +449,8 @@ select column_name,privacy_properties:turing_strategy:sql::text as sql from "TUR
                         for sql_query in sql:
                             sql_query = sql_query.replace("$column_name$", column_name)
                             sql_query = sql_query.replace("$table_name$", full_qual_table_name)
+                            sql_query = sql_query.replace("$table_shortname$", table_name)
+                            sql_query = sql_query.replace("$schema_name$", target_schema)
                             for match_str in re.findall(r'\$env:(.*?)\$', sql_query):
                                 sql_query = sql_query.replace(f"$env:{match_str}$", os.environ.get(match_str, "unknown"))
                             sql_full_queries.append(sql_query)
