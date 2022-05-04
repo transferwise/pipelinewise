@@ -39,6 +39,7 @@ COMMANDS = [
     'import_config',  # This is for backward compatibility; use 'import' instead
     'validate',
     'encrypt_string',
+    'partial_sync_table'
 ]
 
 
@@ -189,6 +190,10 @@ def main():
         'The stats will be dumped into a folder in .pipelinewise/profiling',
         action='store_true',
     )
+    parser.add_argument('--table', type=str, default='*', help='Name of the table to partial sync')
+    parser.add_argument('--column', type=str, default='*', help='Name of the column to partial sync')
+    parser.add_argument('--start_value', type=str, default='*', help='start value of the column to partial sync')
+    parser.add_argument('--end_value', type=str, default=False, help='end value of the column to partial sync')
 
     args = parser.parse_args()
 
@@ -242,6 +247,27 @@ def main():
             sys.exit(1)
         if not args.string:
             print('You must specify a string to encrypt using the argument --string')
+            sys.exit(1)
+
+    if args.command == 'partial_sync_table':
+        if args.tap == '*':
+            print('You must specify a source name using the argument --tap')
+            sys.exit(1)
+
+        if args.target == '*':
+            print('You must specify a destination name using the argument --target')
+            sys.exit(1)
+
+        if args.table == '*':
+            print('You must specify a source table by using the argument --table')
+            sys.exit(1)
+
+        if args.column == '*':
+            print('You must specify a column by using the argument --column')
+            sys.exit(1)
+
+        if args.start_value == '*':
+            print('You must specify a start value by using the argument --start_value')
             sys.exit(1)
 
     logger = __init_logger(args.log, args.debug)

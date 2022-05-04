@@ -354,6 +354,48 @@ def build_singer_command(
     return command
 
 
+def build_fastsync_partial_command(
+        tap: TapParams,
+        target: TargetParams,
+        transform: TransformParams,
+        venv_dir: str,
+        temp_dir: str,
+        table: str,
+        column: str,
+        start_value: str,
+        end_value: str = None
+
+):
+    partialsync_bin = utils.get_partialsync_bin(venv_dir, tap.type, target.type)
+    ppw_python_bin = utils.get_pipelinewise_python_bin(venv_dir)
+
+    command_args = ' '.join(
+        list(
+            filter(
+                None,
+                [
+                    f'--tap {tap.config}',
+                    f'--properties {tap.properties}',
+                    f'--state {tap.state}',
+                    f'--target {target.config}',
+                    f'--temp_dir {temp_dir}',
+                    f'--transform {transform.config}'
+                    if transform.config and os.path.isfile(transform.config)
+                    else '',
+                    f'--table {table}',
+                    f'--column {column}',
+                    f'--start_value {start_value}',
+                    f'--end_value {end_value}'
+                ],
+            )
+        )
+    )
+
+    command = f'{partialsync_bin} {command_args}'
+
+    LOGGER.debug('PartialSync command: %s', command)
+    return command
+
 # pylint: disable=too-many-arguments
 def build_fastsync_command(
     tap: TapParams,
@@ -415,7 +457,6 @@ def build_fastsync_command(
         command = f'{ppw_python_bin} -m cProfile -o {dump_file} {command}'
 
     LOGGER.debug('FastSync command: %s', command)
-
     return command
 
 

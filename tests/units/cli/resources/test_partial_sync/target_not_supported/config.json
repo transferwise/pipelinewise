@@ -1,0 +1,14 @@
+{
+    "account": "foo",
+    "aws_access_key_id": "secret",
+    "aws_secret_access_key": "secret/",
+    "client_side_encryption_master_key": "secret=",
+    "dbname": "my_db",
+    "file_format": "my_file_format",
+    "password": "secret",
+    "s3_bucket": "foo",
+    "s3_key_prefix": "foo/",
+    "stage": "my_stage",
+    "user": "user",
+    "warehouse": "MY_WAREHOUSE"
+}
