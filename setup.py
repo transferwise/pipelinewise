@@ -46,6 +46,7 @@ setup(name='pipelinewise',
       extras_require={
           'test': [
               'pre-commit==2.18.1',
+              'python-dateutil==2.8.2',
               'flake8==4.0.1',
               'pytest==7.1.1',
               'pytest-dependency==0.4.0',
