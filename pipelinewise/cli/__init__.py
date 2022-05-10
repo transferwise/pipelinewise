@@ -13,9 +13,10 @@ from datetime import datetime
 from typing import Optional, Tuple
 from pkg_resources import get_distribution
 
-from .utils import generate_random_string
-from .pipelinewise import PipelineWise
-from ..logger import Logger
+from pipelinewise.cli.utils import generate_random_string
+from pipelinewise.cli.pipelinewise import PipelineWise
+from pipelinewise.logger import Logger
+from pipelinewise.cli.errors import CommandSpecificArgumentsException
 
 __version__ = get_distribution('pipelinewise').version
 USER_HOME = os.path.expanduser('~')
@@ -143,6 +144,59 @@ def __disable_profiler(
         profiler.clear()
 
 
+def _validate_command_specific_arguments(args):
+    # Command specific argument validations
+    if args.command == 'init' and args.name == '*':
+        raise CommandSpecificArgumentsException('You must specify a project name using the argument --name')
+
+    if args.command in ['discover_tap', 'test_tap_connection', 'run_tap', 'stop_tap']:
+        if args.tap == '*':
+            raise CommandSpecificArgumentsException('You must specify a source name using the argument --tap')
+        if args.target == '*':
+            raise CommandSpecificArgumentsException('You must specify a destination name using the argument --target')
+
+    if args.command == 'sync_tables':
+        if args.tap == '*':
+            raise CommandSpecificArgumentsException('You must specify a source name using the argument --tap')
+        if args.target == '*':
+            raise CommandSpecificArgumentsException('You must specify a destination name using the argument --target')
+
+    if args.command == 'import_config':
+        if args.dir == '*':
+            raise CommandSpecificArgumentsException(
+                'You must specify a directory path with config YAML files using the argument --dir'
+            )
+
+    if args.command == 'validate' and args.dir == '*':
+        raise CommandSpecificArgumentsException(
+            'You must specify a directory path with config YAML files using the argument --dir'
+        )
+
+    if args.command == 'encrypt_string':
+        if not args.secret:
+            raise CommandSpecificArgumentsException(
+                'You must specify a path to a file with vault secret using the argument --secret'
+            )
+        if not args.string:
+            raise CommandSpecificArgumentsException('You must specify a string to encrypt using the argument --string')
+
+    if args.command == 'partial_sync_table':
+        if args.tap == '*':
+            raise CommandSpecificArgumentsException('You must specify a source name using the argument --tap')
+
+        if args.target == '*':
+            raise CommandSpecificArgumentsException('You must specify a destination name using the argument --target')
+
+        if args.table == '*':
+            raise CommandSpecificArgumentsException('You must specify a source table by using the argument --table')
+
+        if args.column == '*':
+            raise CommandSpecificArgumentsException('You must specify a column by using the argument --column')
+
+        if args.start_value == '*':
+            raise CommandSpecificArgumentsException('You must specify a start value by using the argument --start_value')
+
+
 # pylint: disable=too-many-branches,too-many-statements
 def main():
     """Main entry point"""
@@ -191,84 +245,25 @@ def main():
         action='store_true',
     )
     parser.add_argument('--table', type=str, default='*', help='Name of the table to partial sync')
-    parser.add_argument('--column', type=str, default='*', help='Name of the column to partial sync')
+    parser.add_argument('--column', type=str, default='*', help='Name of the column to use as sync key in partial sync')
     parser.add_argument('--start_value', type=str, default='*', help='start value of the column to partial sync')
     parser.add_argument('--end_value', type=str, default=False, help='end value of the column to partial sync')
 
     args = parser.parse_args()
 
-    # Command specific argument validations
-    if args.command == 'init' and args.name == '*':
-        print('You must specify a project name using the argument --name')
-        sys.exit(1)
-
-    if args.command in ['discover_tap', 'test_tap_connection', 'run_tap', 'stop_tap']:
-        if args.tap == '*':
-            print('You must specify a source name using the argument --tap')
-            sys.exit(1)
-        if args.target == '*':
-            print('You must specify a destination name using the argument --target')
-            sys.exit(1)
-
-    if args.command == 'sync_tables':
-        if args.tap == '*':
-            print('You must specify a source name using the argument --tap')
-            sys.exit(1)
-        if args.target == '*':
-            print('You must specify a destination name using the argument --target')
-            sys.exit(1)
-
     # import and import_config commands are synonyms
     #
     # import        : short CLI command name to import project
     # import_config : this is for backward compatibility; use 'import' instead from CLI
-    if args.command == 'import' or args.command == 'import_config':
-        if args.dir == '*':
-            print(
-                'You must specify a directory path with config YAML files using the argument --dir'
-            )
-            sys.exit(1)
-
-        # Every command argument is mapped to a python function with the same name, but 'import' is a
-        # python keyword and can't be used as function name
+    # Every command argument is mapped to a python function with the same name, but 'import' is a
+    # python keyword and can't be used as function name
+    if args.command == 'import':
         args.command = 'import_project'
-
-    if args.command == 'validate' and args.dir == '*':
-        print(
-            'You must specify a directory path with config YAML files using the argument --dir'
-        )
-        sys.exit(1)
-
-    if args.command == 'encrypt_string':
-        if not args.secret:
-            print(
-                'You must specify a path to a file with vault secret using the argument --secret'
-            )
-            sys.exit(1)
-        if not args.string:
-            print('You must specify a string to encrypt using the argument --string')
-            sys.exit(1)
-
-    if args.command == 'partial_sync_table':
-        if args.tap == '*':
-            print('You must specify a source name using the argument --tap')
-            sys.exit(1)
-
-        if args.target == '*':
-            print('You must specify a destination name using the argument --target')
-            sys.exit(1)
-
-        if args.table == '*':
-            print('You must specify a source table by using the argument --table')
-            sys.exit(1)
-
-        if args.column == '*':
-            print('You must specify a column by using the argument --column')
-            sys.exit(1)
-
-        if args.start_value == '*':
-            print('You must specify a start value by using the argument --start_value')
-            sys.exit(1)
+    try:
+        _validate_command_specific_arguments(args)
+    except CommandSpecificArgumentsException as e:
+        print(str(e))
+        exit(1)
 
     logger = __init_logger(args.log, args.debug)
 

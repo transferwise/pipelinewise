@@ -8,9 +8,10 @@ from pipelinewise import cli
 
 @mock.patch.object(cli.pipelinewise, '__name__', 'test_logger')
 class PartialSyncCLITestCase(TestCase):
+    """Testcases for partial sync CLI"""
 
     def setUp(self) -> None:
-        resources_dir = '{}/resources'.format(os.path.dirname(__file__))
+        resources_dir = f'{os.path.dirname(__file__)}/resources'
         self.test_cli = cli
         self.test_cli.CONFIG_DIR = f'{resources_dir}/test_partial_sync'
         self.test_cli.VENV_DIR = './virtualenvs-dummy'
@@ -56,8 +57,7 @@ class PartialSyncCLITestCase(TestCase):
 
             mocked_print.assert_called_with(expected_message)
 
-    @mock.patch('builtins.print')
-    def test_exit_with_error_1_if_not_supporting_target(self, mocked_print):
+    def test_exit_with_error_1_if_not_supporting_target(self):
         """Test partial_sync_table command exit with error code 1 if target is not supported
 
         supporting:
@@ -68,18 +68,19 @@ class PartialSyncCLITestCase(TestCase):
         target_type = 'target-s3-csv'
         tap = 'tap_mysql'
         target = 'target_not_supported'
+        tap_type = 'tap-mysql'
 
-        with self.assertRaises(SystemExit) as system_exit:
+        expected_log_message = f'ERROR:test_logger:Error! {tap}({tap_type})-{target}({target_type})' \
+                               f' pair is not supported for the partial sync!'
+
+        with self.assertLogs('test_logger') as actual_logs, self.assertRaises(SystemExit) as system_exit:
             self._run_cli({'tap': tap, 'target': target,
                            'table': 'foo_table', 'column': 'foo_column', 'start_value': 'foo'})
 
         self.assertEqual(system_exit.exception.code, 1)
+        self.assertEqual(expected_log_message, actual_logs.output[0])
 
-        mocked_print.assert_called_with(f'Error! target "{target} (type: {target_type})"'
-                                        ' is not supported for partial sync!')
-
-    @mock.patch('builtins.print')
-    def test_exit_with_error_1_if_not_supporting_tap(self, mocked_print):
+    def test_exit_with_error_1_if_not_supporting_tap(self):
         """Test partial_sync_table command exit with error code 1 if tap is not supported
 
         supporting:
@@ -90,15 +91,18 @@ class PartialSyncCLITestCase(TestCase):
         target = 'target_snowflake'
         tap = 'tap_not_support'
         tap_type = 'tap-kafka'
+        target_type = 'target-snowflake'
 
-        with self.assertRaises(SystemExit) as system_exit:
+        expected_log_message = f'ERROR:test_logger:Error! {tap}({tap_type})-{target}({target_type})' \
+                               f' pair is not supported for the partial sync!'
+
+        with self.assertLogs('test_logger') as actual_logs, self.assertRaises(SystemExit) as system_exit:
             self._run_cli({'tap': tap, 'target': target,
                            'table': 'foo_table', 'column': 'foo_column', 'start_value': 'foo'})
 
         self.assertEqual(system_exit.exception.code, 1)
+        self.assertEqual(expected_log_message, actual_logs.output[0])
 
-        mocked_print.assert_called_with(f'Error! tap "{tap} (type: {tap_type})"'
-                                        ' is not supported for partial sync!')
 
     def test_it_returns_error_1_if_tap_is_not_enabled(self):
         """Test log message and exit code is 1 if tap is not enabled"""
@@ -150,8 +154,8 @@ class PartialSyncCLITestCase(TestCase):
         arguments = {
             'tap': 'tap_no_state',
             'target': 'target_snowflake',
-            'table': 'foo_table',
-            'column': 'foo_column',
+            'table': 'mysql_source_db.table_one',
+            'column': 'id',
             'start_value': '1',
             'end_value': '10'
         }
@@ -173,8 +177,8 @@ class PartialSyncCLITestCase(TestCase):
         arguments = {
             'tap': 'tap_mysql',
             'target': 'target_snowflake',
-            'table': 'foo_table',
-            'column': 'foo_column',
+            'table': 'mysql_source_db.table_one',
+            'column': 'id',
             'start_value': '1',
             'end_value': '10'
         }
@@ -201,4 +205,48 @@ class PartialSyncCLITestCase(TestCase):
 
         self.assertRegex(call_args[1], f'^{self.test_cli.CONFIG_DIR}/{arguments["target"]}/{arguments["tap"]}/log/'
                                        f'{arguments["target"]}-{arguments["tap"]}-[0-9]{{8}}_[0-9]{{6}}'
-                                       f'\.partialsync\.log')
+                                       r'\.partialsync\.log')
+
+    @mock.patch('pipelinewise.cli.pipelinewise.PipelineWise._check_if_complete_tap_configuration')
+    def test_it_returns_error_1_if_table_does_not_exist_in_config(self, mocked_check):
+        """Test it exit with error 1 if input table not in the config file"""
+
+        mocked_check.return_value = True
+        arguments = {
+            'tap': 'tap_mysql',
+            'target': 'target_snowflake',
+            'table': 'foo_table',
+            'column': 'foo_column',
+            'start_value': '1',
+            'end_value': '10'
+        }
+
+        expected_log_message = f'ERROR:test_logger:Not found table "{arguments["table"]}" in properties!'
+
+        with self.assertLogs('test_logger') as actual_logs, self.assertRaises(SystemExit) as system_exit:
+            self._run_cli(arguments)
+
+        self.assertEqual(system_exit.exception.code, 1)
+        self.assertEqual(expected_log_message, actual_logs.output[1])
+
+    @mock.patch('pipelinewise.cli.pipelinewise.PipelineWise._check_if_complete_tap_configuration')
+    def test_it_returns_error_1_if_column_does_not_exist_in_config(self, mocked_check):
+        """Test it exit with error 1 if input column not in the config file"""
+
+        mocked_check.return_value = True
+        arguments = {
+            'tap': 'tap_mysql',
+            'target': 'target_snowflake',
+            'table': 'mysql_source_db.table_one',
+            'column': 'foo_column',
+            'start_value': '1',
+            'end_value': '10'
+        }
+
+        expected_log_message = f'ERROR:test_logger:Not found column "{arguments["column"]}" in properties!'
+
+        with self.assertLogs('test_logger') as actual_logs, self.assertRaises(SystemExit) as system_exit:
+            self._run_cli(arguments)
+
+        self.assertEqual(system_exit.exception.code, 1)
+        self.assertEqual(expected_log_message, actual_logs.output[1])

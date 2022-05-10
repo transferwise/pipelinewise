@@ -27,3 +27,15 @@ class DuplicateConfigException(Exception):
 
 class InvalidConfigException(Exception):
     """Raised if an invalid config is found"""
+
+
+class CommandSpecificArgumentsException(Exception):
+    """Raised if an invalid command specific argument is found"""
+
+
+class PartialSyncNotSupportedTypeException(Exception):
+    """Raised if tap-target pair is not supported for partial sync"""
+
+
+class PreRunChecksException(Exception):
+    """Raised if a pre check for running the commands fails"""

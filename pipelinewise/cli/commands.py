@@ -353,7 +353,7 @@ def build_singer_command(
 
     return command
 
-
+# pylint: disable=too-many-arguments
 def build_fastsync_partial_command(
         tap: TapParams,
         target: TargetParams,
@@ -366,8 +366,9 @@ def build_fastsync_partial_command(
         end_value: str = None
 
 ):
-    partialsync_bin = utils.get_partialsync_bin(venv_dir, tap.type, target.type)
-    ppw_python_bin = utils.get_pipelinewise_python_bin(venv_dir)
+    """Builds a command that starts a partial sync"""
+
+    partial_sync_bin = utils.get_partialsync_bin(venv_dir, tap.type, target.type)
 
     command_args = ' '.join(
         list(
@@ -391,7 +392,7 @@ def build_fastsync_partial_command(
         )
     )
 
-    command = f'{partialsync_bin} {command_args}'
+    command = f'{partial_sync_bin} {command_args}'
 
     LOGGER.debug('PartialSync command: %s', command)
     return command
