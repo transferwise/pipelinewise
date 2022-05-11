@@ -931,7 +931,7 @@ class PipelineWise:
         # Tap exists and has log in running status
         elif (
             os.path.isdir(log_dir)
-            and len(utils.search_files(log_dir, patterns=['*.log.running'])) > 0
+            and len(utils.search_log_files(log_dir, patterns=['*.log.running'])) > 0
         ):
             status['currentStatus'] = 'running'
 
@@ -941,7 +941,7 @@ class PipelineWise:
 
         # Get last run instance
         if os.path.isdir(log_dir):
-            log_files = utils.search_files(
+            log_files = utils.search_log_files(
                 log_dir, patterns=['*.log.success', '*.log.failed'], sort=True
             )
             if len(log_files) > 0:
@@ -1016,7 +1016,7 @@ class PipelineWise:
         log_dir = os.path.dirname(self.tap_run_log_file)
         if (
             os.path.isdir(log_dir)
-            and len(utils.search_files(log_dir, patterns=['*.log.running'])) > 0
+            and len(utils.search_log_files(log_dir, patterns=['*.log.running'])) > 0
         ):
             self.logger.info(
                 'Failed to run. Another instance of the same tap is already running. '
@@ -1092,7 +1092,7 @@ class PipelineWise:
         log_dir = os.path.dirname(self.tap_run_log_file)
         if (
             os.path.isdir(log_dir)
-            and len(utils.search_files(log_dir, patterns=['*.log.running'])) > 0
+            and len(utils.search_log_files(log_dir, patterns=['*.log.running'])) > 0
         ):
             self.logger.info(
                 'Failed to run. Another instance of the same tap is already running. '

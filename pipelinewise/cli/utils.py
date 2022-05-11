@@ -11,6 +11,7 @@ import secrets
 import string
 import sys
 import tempfile
+from typing import List, Optional
 import warnings
 import jsonschema
 import yaml
@@ -278,7 +279,7 @@ def get_sample_file_paths():
     Get list of every available sample files (YAML, etc.) with absolute paths
     """
     samples_dir = os.path.join(os.path.dirname(__file__), 'samples')
-    return search_files(
+    return search_log_files(
         samples_dir, patterns=['config.yml', '*.yml.sample', 'README.md'], abs_path=True
     )
 
@@ -332,9 +333,14 @@ def silentremove(path):
             raise
 
 
-def search_files(search_dir, patterns=None, sort=False, abs_path=False):
+def search_log_files(
+    search_dir: str,
+    patterns: Optional[List[str]] = None,
+    sort: bool = False,
+    abs_path: bool = False,
+):
     """
-    Searching files in a specific directory that match a pattern
+    Searching log files in a specific directory that match a pattern (assumes no sub-directories)
     """
     if patterns is None:
         patterns = ['*']
@@ -343,11 +349,12 @@ def search_files(search_dir, patterns=None, sort=False, abs_path=False):
         # Search files and sort if required
         p_files = []
         for pattern in patterns:
-            p_files.extend(
-                filter(os.path.isfile, glob.glob(os.path.join(search_dir, pattern)))
-            )
+            p_files.extend(glob.glob(os.path.join(search_dir, pattern)))
         if sort:
-            p_files.sort(key=os.path.getmtime, reverse=True)
+            p_files.sort(
+                key=lambda x: extract_log_attributes(x)['timestamp'],
+                reverse=True,
+            )
 
         # Cut the whole paths, we only need the filenames
         files = list(map(lambda x: os.path.basename(x) if not abs_path else x, p_files))
