@@ -340,7 +340,7 @@ def search_log_files(
     abs_path: bool = False,
 ):
     """
-    Searching log files in a specific directory that match a pattern
+    Searching log files in a specific directory that match a pattern (assumes no sub-directories)
     """
     if patterns is None:
         patterns = ['*']
