@@ -351,22 +351,10 @@ def search_log_files(
         for pattern in patterns:
             p_files.extend(glob.glob(os.path.join(search_dir, pattern)))
         if sort:
-            # We will extract the time of the run from the name
-            # of the log file.
-            timestamp_pattern = re.compile(
-                r'(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})\..+\.log'
+            p_files.sort(
+                key=lambda x: extract_log_attributes(x)['timestamp'],
+                reverse=True,
             )
-            def sort_key(element):
-                match = timestamp_pattern.search(element)
-                return datetime(
-                    year=int(match.group(1)),
-                    month=int(match.group(2)),
-                    day=int(match.group(3)),
-                    hour=int(match.group(4)),
-                    minute=int(match.group(5)),
-                )
-
-            p_files.sort(key=sort_key, reverse=True)
 
         # Cut the whole paths, we only need the filenames
         files = list(map(lambda x: os.path.basename(x) if not abs_path else x, p_files))
