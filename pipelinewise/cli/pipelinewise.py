@@ -1482,8 +1482,8 @@ class PipelineWise:
             self.logger.exception(exc)
             self.send_alert(message=f'Failed to sync tables in {tap_id} tap', exc=exc)
             sys.exit(1)
-        except PreRunChecksException:
-            sys.exit(1)
+        except PreRunChecksException as exc:
+            raise exc
         except Exception as exc:
             self.send_alert(message=f'Failed to sync tables in {tap_id} tap', exc=exc)
             raise exc
@@ -1747,17 +1747,17 @@ class PipelineWise:
 
         except pidfile.AlreadyRunningError:
             self.logger.error('Another instance of the tap is already running.')
-            sys.exit(1)
+            raise SystemExit(1)
         # Delete temp file if there is any
         except commands.RunCommandException as exc:
             self.logger.exception(exc)
             self.send_alert(message=f'Failed to sync tables in {tap_id} tap', exc=exc)
-            sys.exit(1)
+            raise SystemExit(1)
         except PartialSyncNotSupportedTypeException as exc:
             self.logger.error(exc)
-            sys.exit(1)
+            raise SystemExit(1)
         except PreRunChecksException:
-            sys.exit(1)
+            raise SystemExit(1)
         except Exception as exc:
             self.send_alert(message=f'Failed to sync tables in {tap_id} tap', exc=exc)
             raise exc
@@ -1784,7 +1784,7 @@ class PipelineWise:
                 tap_type,
                 target_type
             )
-            raise PreRunChecksException()
+            raise SystemExit(1)
 
     def _check_if_tap_is_enabled(self):
         # Run only if tap enabled
@@ -1816,7 +1816,7 @@ class PipelineWise:
 
         try:
             table_in_properties['schema']['properties'][self.args.column]
-        except Exception as exp:
+        except KeyError as exp:
             self.logger.error('Not found column "%s" in properties!', self.args.column)
             raise PreRunChecksException() from exp
 
