@@ -461,23 +461,28 @@ def run_command(command: str, log_file: str = None, line_callback: callable = No
         log_file_success = log_file_with_status(log_file, STATUS_SUCCESS)
 
         # Start command
-        with Popen(shlex.split(piped_command), stdout=PIPE, stderr=STDOUT) as proc:
-            with open(log_file_running, 'a+', encoding='utf-8') as logfile:
-                stdout = ''
-                while True:
-                    line = proc.stdout.readline()
-                    if line:
-                        decoded_line = line.decode('utf-8')
+        try:
+            with Popen(shlex.split(piped_command), stdout=PIPE, stderr=STDOUT) as proc:
+                with open(log_file_running, 'a+', encoding='utf-8') as logfile:
+                    stdout = ''
+                    while True:
+                        line = proc.stdout.readline()
+                        if line:
+                            decoded_line = line.decode('utf-8')
 
-                        if line_callback is not None:
-                            decoded_line = line_callback(decoded_line)
+                            if line_callback is not None:
+                                decoded_line = line_callback(decoded_line)
 
-                        stdout += decoded_line
+                            stdout += decoded_line
 
-                        logfile.write(decoded_line)
-                        logfile.flush()
-                    if proc.poll() is not None:
-                        break
+                            logfile.write(decoded_line)
+                            logfile.flush()
+                        if proc.poll() is not None:
+                            break
+        except Exception:
+            # If the subprocess failed for any reason then make sure to rename the logfile.
+            os.rename(log_file_running, log_file_failed)
+            raise
 
         proc_rc = proc.poll()
         if proc_rc != 0:
