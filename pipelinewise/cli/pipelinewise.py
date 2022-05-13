@@ -1329,7 +1329,7 @@ class PipelineWise:
                     self.logger.info('Sending SIGTERM to child pid %s...', child.pid)
                     child.terminate()
                     try:
-                        child.wait(timeout=5)
+                        child.wait(timeout=1)
                     except psutil.TimeoutExpired:
                         child.kill()
 
