@@ -9,7 +9,6 @@ import sys
 import json
 import copy
 import psutil
-import pidfile
 
 from datetime import datetime
 from time import time
@@ -25,6 +24,8 @@ from .config import Config
 from .alert_sender import AlertSender
 from .alert_handlers.base_alert_handler import BaseAlertHandler
 from .errors import InvalidTransformationException, DuplicateConfigException, InvalidConfigException
+from .locking import FileBasedLock
+from .errors import AlreadyRunningError
 
 FASTSYNC_PAIRS = {
     ConnectorType.TAP_MYSQL: {
@@ -1192,8 +1193,9 @@ class PipelineWise:
 
         utils.create_backup_of_the_file(tap_state)
         start_time = datetime.now()
+        lock = FileBasedLock(self.tap['files']['pidfile'])
         try:
-            with pidfile.PIDFile(self.tap['files']['pidfile']):
+            if lock.acquire(blocking=False):
                 target_params = TargetParams(
                     target_id=target_id,
                     type=target_type,
@@ -1264,8 +1266,9 @@ class PipelineWise:
                     self.logger.info(
                         'No table available that needs to be sync by singer'
                     )
-
-        except pidfile.AlreadyRunningError:
+            else:
+                raise AlreadyRunningError
+        except AlreadyRunningError:
             self.logger.error('Another instance of the tap is already running.')
             sys.exit(1)
         # Delete temp files if there is any
@@ -1279,6 +1282,7 @@ class PipelineWise:
             self.send_alert(message=f'{tap_id} tap failed', exc=exc)
             raise exc
         finally:
+            lock.release()
             utils.silentremove(cons_target_config)
             utils.silentremove(tap_properties_fastsync)
             utils.silentremove(tap_properties_singer)
@@ -1400,8 +1404,9 @@ class PipelineWise:
         current_time = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
 
         # sync_tables command always using fastsync
+        lock = FileBasedLock(self.tap['files']['pidfile'])
         try:
-            with pidfile.PIDFile(self.tap['files']['pidfile']):
+            if lock.acquire(blocking=False):
                 self.tap_run_log_file = os.path.join(
                     log_dir, f'{target_id}-{tap_id}-{current_time}.fastsync.log'
                 )
@@ -1436,8 +1441,9 @@ class PipelineWise:
                 self.run_tap_fastsync(
                     tap=tap_params, target=target_params, transform=transform_params
                 )
-
-        except pidfile.AlreadyRunningError:
+            else:
+                raise AlreadyRunningError
+        except AlreadyRunningError:
             self.logger.error('Another instance of the tap is already running.')
             sys.exit(1)
         # Delete temp file if there is any
@@ -1449,6 +1455,7 @@ class PipelineWise:
             self.send_alert(message=f'Failed to sync tables in {tap_id} tap', exc=exc)
             raise exc
         finally:
+            lock.release()
             utils.silentremove(cons_target_config)
 
     def validate(self):

@@ -1,3 +1,7 @@
+class AlreadyRunningError(Exception):
+    """Raised if an instance of the tap/target combination is running already."""
+
+
 class BinaryExecutableNotFound(Exception):
     """Raised if binary executable not found"""
 
