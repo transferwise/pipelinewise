@@ -22,6 +22,9 @@ from .errors import ExportError, TableNotFoundError, MongoDBInvalidDatetimeError
 
 LOGGER = logging.getLogger(__name__)
 DEFAULT_WRITE_BATCH_ROWS = 50000
+BSON_CodecOptions = bson.CodecOptions(
+    uuid_representation=3,
+    unicode_decode_error_handler='ignore')
 
 
 class MongoDBJsonEncoder(json.JSONEncoder):
@@ -169,7 +172,7 @@ class FastSyncTapMongoDB:
                 LOGGER.info('Starting data processing...')
 
                 # bson.decode_file_iter will generate one document at a time from the exported file
-                for document in bson.decode_file_iter(export_file):
+                for document in bson.decode_file_iter(export_file, codec_options=BSON_CodecOptions):
                     rows.append({
                         '_ID': str(document['_id']),
                         'DOCUMENT': json.dumps(document, cls=MongoDBJsonEncoder, separators=(',', ':')),
