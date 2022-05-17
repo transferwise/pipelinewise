@@ -247,7 +247,7 @@ def main():
     parser.add_argument('--table', type=str, default='*', help='Name of the table to partial sync')
     parser.add_argument('--column', type=str, default='*', help='Name of the column to use as sync key in partial sync')
     parser.add_argument('--start_value', type=str, default='*', help='start value of the column to partial sync')
-    parser.add_argument('--end_value', type=str, default=False, help='end value of the column to partial sync')
+    parser.add_argument('--end_value', type=str, default=None, help='end value of the column to partial sync')
 
     args = parser.parse_args()
 

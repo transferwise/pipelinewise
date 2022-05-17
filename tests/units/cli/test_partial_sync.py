@@ -200,7 +200,45 @@ class PartialSyncCLITestCase(TestCase):
             f'--temp_dir {self.test_cli.CONFIG_DIR}/tmp '
             f'--transform {self.test_cli.CONFIG_DIR}/target_snowflake/tap_mysql/transformation.json '
             f'--table {arguments["table"]} --column {arguments["column"]} '
-            f'--start_value {arguments["start_value"]} --end_value {arguments["end_value"]}'
+            f'--start_value {arguments["start_value"]} --end_value {arguments["end_value"]}$'
+        )
+
+        self.assertRegex(call_args[1], f'^{self.test_cli.CONFIG_DIR}/{arguments["target"]}/{arguments["tap"]}/log/'
+                                       f'{arguments["target"]}-{arguments["tap"]}-[0-9]{{8}}_[0-9]{{6}}'
+                                       r'\.partialsync\.log')
+
+    @mock.patch('pipelinewise.cli.pipelinewise.PipelineWise._check_if_complete_tap_configuration')
+    def test_not_end_value_in_calling_command_if_no_end_value_in_cli_parameter(self, mocked_check):
+        """Test the generated command for calling the partial sync module has no end value if the main cli is
+        called without end value"""
+
+        mocked_check.return_value = True
+        arguments = {
+            'tap': 'tap_mysql',
+            'target': 'target_snowflake',
+            'table': 'mysql_source_db.table_one',
+            'column': 'id',
+            'start_value': '1',
+        }
+
+        with mock.patch('pipelinewise.cli.commands.run_command') as mocked_run_command:
+            self._run_cli(arguments)
+
+        call_args = mocked_run_command.call_args.args
+        self.assertEqual(2, len(call_args))
+
+        # Because each instance of Pipelinewise has a random postfix for log filename, we test it in this way!
+        self.assertRegex(
+            call_args[0],
+            f'^{self.test_cli.VENV_DIR}/pipelinewise/bin/partial-mysql-to-snowflake '
+            f'--tap {self.test_cli.CONFIG_DIR}/{arguments["target"]}/{arguments["tap"]}/config.json '
+            f'--properties {self.test_cli.CONFIG_DIR}/{arguments["target"]}/{arguments["tap"]}/properties.json '
+            f'--state {self.test_cli.CONFIG_DIR}/target_snowflake/tap_mysql/state.json '
+            f'--target {self.test_cli.CONFIG_DIR}/tmp/target_config_[a-z0-9_]{{8}}.json '
+            f'--temp_dir {self.test_cli.CONFIG_DIR}/tmp '
+            f'--transform {self.test_cli.CONFIG_DIR}/target_snowflake/tap_mysql/transformation.json '
+            f'--table {arguments["table"]} --column {arguments["column"]} '
+            f'--start_value {arguments["start_value"]}$'
         )
 
         self.assertRegex(call_args[1], f'^{self.test_cli.CONFIG_DIR}/{arguments["target"]}/{arguments["tap"]}/log/'

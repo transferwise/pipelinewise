@@ -386,7 +386,7 @@ def build_fastsync_partial_command(
                     f'--table {table}',
                     f'--column {column}',
                     f'--start_value {start_value}',
-                    f'--end_value {end_value}'
+                    f'--end_value {end_value}' if end_value else None
                 ],
             )
         )
