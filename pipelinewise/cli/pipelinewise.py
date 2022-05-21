@@ -1745,19 +1745,19 @@ class PipelineWise:
                     tap=tap_params, target=target_params, transform=transform_params,
                 )
 
-        except pidfile.AlreadyRunningError:
+        except pidfile.AlreadyRunningError as exc:
             self.logger.error('Another instance of the tap is already running.')
-            raise SystemExit(1)
+            raise SystemExit(1) from exc
         # Delete temp file if there is any
         except commands.RunCommandException as exc:
             self.logger.exception(exc)
             self.send_alert(message=f'Failed to sync tables in {tap_id} tap', exc=exc)
-            raise SystemExit(1)
+            raise SystemExit(1) from exc
         except PartialSyncNotSupportedTypeException as exc:
             self.logger.error(exc)
-            raise SystemExit(1)
-        except PreRunChecksException:
-            raise SystemExit(1)
+            raise SystemExit(1) from exc
+        except PreRunChecksException as exp:
+            raise SystemExit(1) from exp
         except Exception as exc:
             self.send_alert(message=f'Failed to sync tables in {tap_id} tap', exc=exc)
             raise exc
