@@ -117,6 +117,12 @@
                             "null",
                             "string"
                         ]
+                    },
+                    "boolean_column": {
+                        "type": [
+                            "null",
+                            "boolean"
+                        ]
                     }
                 },
                 "type": "object"

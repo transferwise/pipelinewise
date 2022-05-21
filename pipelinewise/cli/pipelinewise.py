@@ -1815,7 +1815,10 @@ class PipelineWise:
             raise PreRunChecksException()
 
         try:
-            table_in_properties['schema']['properties'][self.args.column]
+            column_type = table_in_properties['schema']['properties'][self.args.column]['type']
+            if 'boolean' in column_type:
+                self.logger.error('column "%s" has invalid type for partial sync!', self.args.column)
+                raise PreRunChecksException('Invalid type for partial sync!')
         except KeyError as exp:
             self.logger.error('Not found column "%s" in properties!', self.args.column)
             raise PreRunChecksException() from exp

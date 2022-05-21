@@ -288,3 +288,24 @@ class PartialSyncCLITestCase(TestCase):
 
         self.assertEqual(system_exit.exception.code, 1)
         self.assertEqual(expected_log_message, actual_logs.output[1])
+
+    @mock.patch('pipelinewise.cli.pipelinewise.PipelineWise._check_if_complete_tap_configuration')
+    def test_it_returns_error_1_if_column_type_invalid_for_partial_sync(self, mocked_check):
+        """Test it exit with error 1 if input column type is invalid for partial sync"""
+
+        mocked_check.return_value = True
+        arguments = {
+            'tap': 'tap_mysql',
+            'target': 'target_snowflake',
+            'table': 'mysql_source_db.table_one',
+            'column': 'boolean_column',
+            'start_value': '1'
+        }
+
+        expected_log_message = f'ERROR:test_logger:column "{arguments["column"]}" has invalid type for partial sync!'
+
+        with self.assertLogs('test_logger') as actual_logs, self.assertRaises(SystemExit) as system_exit:
+            self._run_cli(arguments)
+
+        self.assertEqual(system_exit.exception.code, 1)
+        self.assertEqual(expected_log_message, actual_logs.output[1])
