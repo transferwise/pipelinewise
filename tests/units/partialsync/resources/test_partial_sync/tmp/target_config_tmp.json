@@ -2,9 +2,9 @@
     "account": "no07372.eu-central-1",
     "add_metadata_columns": false,
     "archive_load_files": true,
-    "aws_access_key_id": "ASIAY6Y6DBLGPMLNTNUD",
-    "aws_secret_access_key": "Zit4JnjKVh74zzyGV0mdYlCSov12pieQMtW/dlxP",
-    "aws_session_token": "IQoJb3JpZ2luX2VjEJD//////////wEaDGV1LWNlbnRyYWwtMSJGMEQCIED6a5hQg8SD/Nvc/Cyz7rm2A8PmJ8SKV3L5ivaEd/noAiAoWnDN5Vh2julYTLp/aJkwamu4NIjpfJeNrFYEDpb7CSqlAwh5EAAaDDYxNTg1NDA0OTk5NiIM+D0SAbE/OamHnc90KoIDJ9EjaFKx/afOMjg0rqST/aHReRedlNOoHpQ4r3IvdXB5lMP+Ge8llBV6eS60E2mF+QZ4zbykzFSe/THlQ1mqYJnHvoxHl2UTD1ucFx2MImYTFJ+5gDeu5gDyef5FiEL6PKsDTjq05qfaksKp2y1CqjiOjSElLH6feOqChYVUjn/5Km2g5vlCqiUT3e3BLM4G8PQap6FUH0Cmjf/g818/pbRU6L8MJwSxnERrN4dMJA1lw0Rgkkj07TVhZ1dEFFl8fpq6sGxeELOMj3d1mZr9tZnVSZqqhuEcExPG4//umeItFGe+TzJZpHSsv2N8wictYk1hq9BaDtPLshVrxIBfBDxnGlC6AGGXmTJQ3FzfE8+Zpr7v+NPihXiaPyvpE5Th0zGIwU6ls51SXjlsdUHqlRC8Km5FvDNRdWfKecxEDGV8SfhtZnFd55lnh6bRpi38hQWIl/AB7hzX6RIeq0Y+AZ0AuGRxXFyIVmSxtRU55KMbzzVhR30jjBO1kkIVk1hjOs8w8Ia0lAY6pwEFg9vA/0dxY5zy8qv/TR5E90dL3+ZH2L347K9j5baXORY06aAFR3U9Xh6vkZ1AA53yrh7W/7FNr/uSHalvdBEb7MkiwCJuwBxPSQkJDgp9+8S+XPFegSO/wsZthyNcomh3/q5Qso7JQpfARn2Y2csbARxb9o4WiTaWEajws1c1f8+jSpZGJgcC9vqfV5Q9nq4txYgiOOj3bQ3HAuUzBs7HP5YOzViylA==",
+    "aws_access_key_id": "FOO_ACCESS_KEY",
+    "aws_secret_access_key": "FOO_SECRET_ACCESS_KEY",
+    "aws_session_token": "FOO_SESSION_TOKEN"
     "batch_size_rows": 20000,
     "client_side_encryption_master_key": "",
     "data_flattening_max_level": 0,
