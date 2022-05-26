@@ -14,69 +14,10 @@ from pipelinewise.fastsync.commons.target_snowflake import FastSyncTargetSnowfla
 
 from pipelinewise.logger import Logger
 from pipelinewise.fastsync.commons import utils
+from pipelinewise.fastsync.mysql_to_snowflake import REQUIRED_CONFIG_KEYS, tap_type_to_target_type
 
 LOGGER = Logger().get_logger(__name__)
-
-REQUIRED_CONFIG_KEYS = {
-    'tap': ['host', 'port', 'user', 'password'],
-    'target': [
-        'account',
-        'dbname',
-        'user',
-        'password',
-        'warehouse',
-        's3_bucket',
-        'stage',
-        'file_format',
-    ],
-}
-
 LOCK = multiprocessing.Lock()
-
-
-def tap_type_to_target_type(mysql_type, mysql_column_type):
-    """Data type mapping from MySQL to Snowflake"""
-    return {
-        'char': 'VARCHAR',
-        'varchar': 'VARCHAR',
-        'binary': 'BINARY',
-        'varbinary': 'BINARY',
-        'blob': 'VARCHAR',
-        'tinyblob': 'VARCHAR',
-        'mediumblob': 'VARCHAR',
-        'longblob': 'VARCHAR',
-        'geometry': 'VARIANT',
-        'point': 'VARIANT',
-        'linestring': 'VARIANT',
-        'polygon': 'VARIANT',
-        'multipoint': 'VARIANT',
-        'multilinestring': 'VARIANT',
-        'multipolygon': 'VARIANT',
-        'geometrycollection': 'VARIANT',
-        'text': 'VARCHAR',
-        'tinytext': 'VARCHAR',
-        'mediumtext': 'VARCHAR',
-        'longtext': 'VARCHAR',
-        'enum': 'VARCHAR',
-        'int': 'NUMBER',
-        'tinyint': 'BOOLEAN'
-        if mysql_column_type and mysql_column_type.startswith('tinyint(1)')
-        else 'NUMBER',
-        'smallint': 'NUMBER',
-        'mediumint': 'NUMBER',
-        'bigint': 'NUMBER',
-        'bit': 'BOOLEAN',
-        'decimal': 'FLOAT',
-        'double': 'FLOAT',
-        'float': 'FLOAT',
-        'bool': 'BOOLEAN',
-        'boolean': 'BOOLEAN',
-        'date': 'TIMESTAMP_NTZ',
-        'datetime': 'TIMESTAMP_NTZ',
-        'timestamp': 'TIMESTAMP_NTZ',
-        'time': 'TIME',
-        'json': 'VARIANT',
-    }.get(mysql_type, 'VARCHAR')
 
 
 def partial_sync_table(args: Namespace) -> Union[bool, str]:

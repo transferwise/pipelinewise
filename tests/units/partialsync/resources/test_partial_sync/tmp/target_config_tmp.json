@@ -4,7 +4,7 @@
     "archive_load_files": true,
     "aws_access_key_id": "FOO_ACCESS_KEY",
     "aws_secret_access_key": "FOO_SECRET_ACCESS_KEY",
-    "aws_session_token": "FOO_SESSION_TOKEN"
+    "aws_session_token": "FOO_SESSION_TOKEN",
     "batch_size_rows": 20000,
     "client_side_encryption_master_key": "",
     "data_flattening_max_level": 0,
