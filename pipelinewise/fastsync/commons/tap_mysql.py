@@ -235,10 +235,15 @@ class FastSyncTapMySql:
         Map MySQL column types to equivalent types in target
         """
         mysql_columns = self.get_table_columns(table_name)
+        lower_dict = []
+        for x in mysql_columns:
+            new_dict = dict((k.lower(), v) for k, v in x.items())
+            lower_dict.append(new_dict)
+
         mapped_columns = [
             '{} {}'.format(safe_column_name(pc.get('column_name')),
                            self.tap_type_to_target_type(pc.get('data_type'), pc.get('column_type')))
-            for pc in mysql_columns]
+            for pc in lower_dict]
 
         return {
             'columns': mapped_columns,
