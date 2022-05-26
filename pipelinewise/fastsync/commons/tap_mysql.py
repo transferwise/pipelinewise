@@ -414,6 +414,7 @@ class FastSyncTapMySql:
             split_file_chunk_size_mb=1000,
             split_file_max_chunks=20,
             compress=True,
+            where_clause_setting=None
     ):
         """
         Export data from table to a zipped csv
@@ -433,15 +434,23 @@ class FastSyncTapMySql:
             raise Exception('{} table not found.'.format(table_name))
 
         table_dict = utils.tablename_to_dict(table_name)
+        where_clause_sql = ''
+        if where_clause_setting:
+            where_clause_sql = f' WHERE {where_clause_setting["column"]} >= {where_clause_setting["start_value"]}'
+            if where_clause_setting['end_value']:
+                where_clause_sql += f' AND {where_clause_setting["column"]} <= {where_clause_setting["end_value"]}'
+
+
         sql = """SELECT {}
         ,CONVERT_TZ( NOW(),@@session.time_zone,'+00:00') AS _SDC_EXTRACTED_AT
         ,CONVERT_TZ( NOW(),@@session.time_zone,'+00:00') AS _SDC_BATCHED_AT
         ,null AS _SDC_DELETED_AT
-        FROM `{}`.`{}`
+        FROM `{}`.`{}` {}
         """.format(
             ','.join(column_safe_sql_values),
             table_dict['schema_name'],
             table_dict['table_name'],
+            where_clause_sql
         )
         export_batch_rows = self.connection_config['export_batch_rows']
         exported_rows = 0
