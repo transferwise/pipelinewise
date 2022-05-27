@@ -60,7 +60,7 @@ PARTIAL_SYNC_PAIRS = {
     ConnectorType.TAP_MYSQL: {
         ConnectorType.TARGET_SNOWFLAKE
     },
-    ConnectorType.TARGET_POSTGRES: {
+    ConnectorType.TAP_POSTGRES: {
         ConnectorType.TARGET_SNOWFLAKE
     }
 
