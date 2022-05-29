@@ -19,6 +19,7 @@ REQUIRED_CONFIG_KEYS = {
     'tap': ['bucket', 'start_date'],
     'target': [
         'project_id',
+        'gcs_bucket',
     ],
 }
 
@@ -38,10 +39,13 @@ def tap_type_to_target_type(csv_type, *_):
     }.get(csv_type, 'STRING')
 
 
+# pylint: disable=too-many-locals
 def sync_table(table_name: str, args: Namespace) -> Union[bool, str]:
     """Sync one table"""
     s3_csv = FastSyncTapS3Csv(args.tap, tap_type_to_target_type, target_quote='`')
     bigquery = FastSyncTargetBigquery(args.target, args.transform)
+    tap_id = args.target.get('tap_id')
+    archive_load_files = args.target.get('archive_load_files', False)
 
     try:
         filename = utils.gen_export_filename(
@@ -51,8 +55,12 @@ def sync_table(table_name: str, args: Namespace) -> Union[bool, str]:
 
         target_schema = utils.get_target_schema(args.target, table_name)
 
-        s3_csv.copy_table(table_name, filepath)
+        s3_csv.copy_table(table_name, filepath, compress=False, include_header=False)
         size_bytes = os.path.getsize(filepath)
+
+        # Uploading to GCS
+        gcs_blob = bigquery.upload_to_gcs(filepath)
+        os.remove(filepath)
 
         bigquery_types = s3_csv.map_column_types_to_target(filepath, table_name)
         bigquery_columns = bigquery_types.get('columns', [])
@@ -69,14 +77,15 @@ def sync_table(table_name: str, args: Namespace) -> Union[bool, str]:
 
         # Load into Bigquery table
         bigquery.copy_to_table(
-            filepath,
-            target_schema,
-            table_name,
-            size_bytes,
-            is_temporary=True,
-            skip_csv_header=True,
+            [gcs_blob], target_schema, table_name, size_bytes, is_temporary=True,
         )
-        os.remove(filepath)
+
+        if archive_load_files:
+            # Copy load file to archive
+            bigquery.copy_to_archive(gcs_blob, tap_id, table_name)
+
+        # Delete all file parts from s3
+        gcs_blob.delete()
 
         # Obfuscate columns
         bigquery.obfuscate_columns(target_schema, table_name)

@@ -20,7 +20,7 @@ LOGGER = logging.getLogger(__name__)
 
 REQUIRED_CONFIG_KEYS = {
     'tap': ['host', 'port', 'user', 'password'],
-    'target': ['project_id'],
+    'target': ['project_id', 'gcs_bucket'],
 }
 
 LOCK = multiprocessing.Lock()
@@ -68,6 +68,8 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
     """Sync one table"""
     postgres = FastSyncTapPostgres(args.tap, tap_type_to_target_type, target_quote='`')
     bigquery = FastSyncTargetBigquery(args.target, args.transform)
+    tap_id = args.target.get('tap_id')
+    archive_load_files = args.target.get('archive_load_files', False)
 
     try:
         dbname = args.tap.get('dbname')
@@ -87,7 +89,14 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
 
         # Exporting table data, get table definitions and close connection to avoid timeouts
         postgres.copy_table(
-            table, filepath, compress=False, max_num=MAX_NUM, date_type='timestamp'
+            table,
+            filepath,
+            compress=False,
+            max_num=MAX_NUM,
+            date_type='timestamp',
+            split_large_files=args.target.get('split_large_files'),
+            split_file_chunk_size_mb=args.target.get('split_file_chunk_size_mb'),
+            split_file_max_chunks=args.target.get('split_file_max_chunks'),
         )
         file_parts = glob.glob(f'{filepath}*')
         size_bytes = sum([os.path.getsize(file_part) for file_part in file_parts])
@@ -96,22 +105,27 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
         bigquery_columns = bigquery_types.get('columns', [])
         postgres.close_connection()
 
+        # Uploading to GCS
+        gcs_blobs = bigquery.multi_upload_to_gcs(file_parts)
+        for file_part in file_parts:
+            os.remove(file_part)
+
         # Creating temp table in Bigquery
         bigquery.create_schema(target_schema)
         bigquery.create_table(target_schema, table, bigquery_columns, is_temporary=True)
 
         # Load into Bigquery table
-        for num, file_part in enumerate(file_parts):
-            write_truncate = num == 0
-            bigquery.copy_to_table(
-                filepath,
-                target_schema,
-                table,
-                size_bytes,
-                is_temporary=True,
-                write_truncate=write_truncate,
-            )
-            os.remove(file_part)
+        bigquery.copy_to_table(
+            gcs_blobs, target_schema, table, size_bytes, is_temporary=True,
+        )
+
+        for blob in gcs_blobs:
+            if archive_load_files:
+                # Copy load file to archive
+                bigquery.copy_to_archive(blob, tap_id, table)
+
+            # Delete all file parts from s3
+            blob.delete()
 
         # Obfuscate columns
         bigquery.obfuscate_columns(target_schema, table)

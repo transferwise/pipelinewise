@@ -3,10 +3,12 @@ import os
 import uuid
 from datetime import datetime, timezone
 from random import randint
+import tempfile
 
 import bson
 import pytest
 from bson import Timestamp
+from google.cloud import storage
 from pipelinewise.fastsync import mysql_to_bigquery, postgres_to_bigquery
 
 from .helpers import tasks
@@ -19,6 +21,7 @@ TAP_MARIADB_SPLIT_LARGE_FILES_ID = 'mariadb_to_bq_split_large_files'
 TAP_MARIADB_BUFFERED_STREAM_ID = 'mariadb_to_bq_buffered_stream'
 TAP_POSTGRES_ID = 'postgres_to_bq'
 TAP_POSTGRES_SPLIT_LARGE_FILES_ID = 'postgres_to_bq_split_large_files'
+TAP_POSTGRES_ARCHIVE_LOAD_FILES_ID = 'postgres_to_bq_archive_load_files'
 TAP_MONGODB_ID = 'mongo_to_bq'
 TAP_S3_CSV_ID = 's3_csv_to_bq'
 TARGET_ID = 'bigquery'
@@ -316,6 +319,66 @@ class TestTargetBigquery:
             self.run_query_target_bigquery,
             postgres_to_bigquery.tap_type_to_target_type,
         )
+
+    # pylint: disable=invalid-name,too-many-locals
+    @pytest.mark.dependency(depends=['import_config'])
+    def test_replicate_pg_to_bq_with_archive_load_files(self):
+        """Fastsync tables from Postgres to Bigquery with archive load files enabled"""
+        archive_prefix = 'archive_folder'  # Custom gcs prefix defined in TAP_POSTGRES_ARCHIVE_LOAD_FILES_ID
+        tap = 'postgres_to_bq_archive_load_files'
+
+        client = storage.Client()
+        bucket_name = os.environ.get('TARGET_BIGQUERY_GCS_BUCKET')
+        bucket = client.get_bucket(bucket_name)
+
+        # Delete any dangling files from archive
+        dangling_blobs = client.list_blobs(
+            bucket, prefix=f'{archive_prefix}/{tap}/'
+        )
+        for blob in dangling_blobs:
+            blob.delete()
+
+        # Run tap
+        assertions.assert_run_tap_success(
+            TAP_POSTGRES_ARCHIVE_LOAD_FILES_ID, TARGET_ID, ['fastsync', 'singer']
+        )
+
+        # Assert expected files in archive folder
+        expected_archive_files_count = {
+            'public.city': 1,  # INCREMENTAL: fastsync and singer (but currently only fastsync archives)
+            'public.country': 1,  # FULL_TABLE : fastsync only
+            'public2.wearehere': 1,  # FULL_TABLE : fastsync only
+        }
+        for schema_table, expected_archive_files in expected_archive_files_count.items():
+            schema, table = schema_table.split('.')
+            blobs_in_archive = list(client.list_blobs(
+                bucket,
+                prefix=f'{archive_prefix}/{tap}/{table}'
+            ))
+
+            assert len(blobs_in_archive) == expected_archive_files
+
+            # Assert expected metadata
+            expected_metadata = {
+                'tap': tap,
+                'schema': schema,
+                'table': table,
+                'archived-by': 'pipelinewise_fastsync',
+            }
+            for blob in blobs_in_archive:
+                assert blob.metadata == expected_metadata
+
+                # Assert expected file contents
+                with tempfile.NamedTemporaryFile() as tmpfile:
+                    blob.download_to_filename(tmpfile.name)
+                    with open(tmpfile.name, 'rt', encoding='utf-8') as f:
+                        rows_in_csv = len(f.readlines())
+
+                rows_in_table = self.run_query_tap_postgres(
+                    'SELECT COUNT(1) FROM {}'.format(schema_table)
+                )[0][0]
+
+                assert rows_in_table == rows_in_csv
 
     @pytest.mark.dependency(depends=['import_config'])
     def test_replicate_s3_to_bq(self):

@@ -13,3 +13,8 @@ type: "target-bigquery"               # !! THIS SHOULD NOT CHANGE !!
 # ------------------------------------------------------------------------------
 db_conn:
   project_id: "${TARGET_BIGQUERY_PROJECT}"        # Bigquery account
+
+  # We use an intermediate external stage on GCS to load data into BigQuery
+  gcs_bucket: "${TARGET_BIGQUERY_GCS_BUCKET}"                    # GCS external staging bucket name
+  gcs_key_prefix: "${TARGET_BIGQUERY_GCS_KEY_PREFIX}"            # Optional: GCS key prefix
+  gcs_parallelism: 1                                             # Optional: (Default: 1)
