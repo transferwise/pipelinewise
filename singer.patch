@@ -1,24 +1,27 @@
 --- singer_orig/messages.py	2022-04-03 13:44:36.000000000 +0200
 +++ singer/messages.py	2022-04-03 14:10:12.000000000 +0200
-@@ -299,6 +300,21 @@
+@@ -299,6 +300,24 @@
  
  
  def write_message(message):
 +    if message.asdict()['type'] == "RECORD":
-+        from tap_postgres import privacy_properties
 +        schema_name, table_name = message.stream.split("-", 1)
-+        table_properties = privacy_properties.get(schema_name, {}).get(table_name, None)
-+        if table_properties is not None:
-+            record = message.record
-+            for column in record:
-+                python_code = table_properties.get(column)
-+                if python_code:
-+                    result = {}
-+                    value = record[column]
-+                    exec(python_code)
-+                    LOGGER.info(f"Applied privacy properties on {schema_name}/{table_name}/{column}: {result['value']}")
-+                    record[column] = result['value']
-+
++        _apply_privacy_properties(schema_name, table_name, message.record)
      sys.stdout.write(format_message(message) + '\n')
      sys.stdout.flush()
++
++
++def _apply_privacy_properties(schema_name, table_name, record):
++    from tap_postgres import privacy_properties
++    table_properties = privacy_properties.get(schema_name, {}).get(table_name, None)
++    if table_properties is not None:
++        for column in record:
++            python_code = table_properties.get(column)
++            if python_code:
++                result = {}
++                value = record[column]
++                exec(python_code)
++                LOGGER.info(f"Applied privacy properties on {schema_name}/{table_name}/{column}: {result['value']}")
++                record[column] = result['value']
++
  
