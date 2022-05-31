@@ -3,8 +3,8 @@ import os
 from tempfile import TemporaryDirectory
 from unittest import TestCase, mock
 
-from pipelinewise.fastsync.partialsync import mysql_to_snowflake
-from tests.units.partialsync.utils import PartialSync2SFArgs, run_mysql_to_snowflake
+from pipelinewise.fastsync.partialsync import postgres_to_snowflake
+from tests.units.partialsync.utils import PartialSync2SFArgs, run_postgres_to_snowflake
 
 
 class PartialSyncTestCase(TestCase):
@@ -14,17 +14,17 @@ class PartialSyncTestCase(TestCase):
         self.config_dir = f'{resources_dir}/test_partial_sync'
         self.maxDiff = None  # pylint: disable=invalid-name
 
-    def test_mysql_to_snowflake_partial_sync_table_if_exception_happens(self):
+    def test_postgres_to_snowflake_partial_sync_table_if_exception_happens(self):
         """Test partial sync if an exception raises"""
         # TODO: an exception in database connection!
 
         args = PartialSync2SFArgs(temp_test_dir='FOO_DIR')
         exception_message = 'FOO Exception!'
         with mock.patch(
-                'pipelinewise.fastsync.partialsync.mysql_to_snowflake.FastSyncTapMySql.open_connections'
-        ) as mocked_mysql_connection:
-            mocked_mysql_connection.side_effect = Exception(exception_message)
-            actual_return = mysql_to_snowflake.partial_sync_table(args)
+                'pipelinewise.fastsync.partialsync.postgres_to_snowflake.FastSyncTapPostgres.open_connection'
+        ) as mocked_postgres_connection:
+            mocked_postgres_connection.side_effect = Exception(exception_message)
+            actual_return = postgres_to_snowflake.partial_sync_table(args)
 
         self.assertEqual(f'{args.table}: {exception_message}', actual_return)
 
@@ -44,15 +44,16 @@ class PartialSyncTestCase(TestCase):
                         data_file.write('foo')
 
             tap_id = 'tap_id_foo'
-            with mock.patch('pipelinewise.fastsync.partialsync.mysql_to_snowflake.FastSyncTapMySql') as mocked_mysql:
-                mysql_instance = mocked_mysql.return_value
-                mysql_instance.copy_table.side_effect = mocked_copy_table
+            with mock.patch(
+                    'pipelinewise.fastsync.partialsync.postgres_to_snowflake.FastSyncTapPostgres') as mocked_postgres:
+                postgres_instance = mocked_postgres.return_value
+                postgres_instance.copy_table.side_effect = mocked_copy_table
 
                 # pylint: disable=protected-access
-                actual_file_parts = mysql_to_snowflake._export_source_table_data(args, tap_id, mysql_instance)
+                actual_file_parts = postgres_to_snowflake._export_source_table_data(args, tap_id, postgres_instance)
 
-                call_args = mysql_instance.copy_table.call_args.args
-                call_kwargs = mysql_instance.copy_table.call_args.kwargs
+                call_args = postgres_instance.copy_table.call_args.args
+                call_kwargs = postgres_instance.copy_table.call_args.kwargs
 
                 expected_call_kwargs = {
                     'split_large_files': False,
@@ -75,22 +76,22 @@ class PartialSyncTestCase(TestCase):
 
 
     # pylint: disable=too-many-locals, too-many-arguments
-    @mock.patch('pipelinewise.fastsync.partialsync.mysql_to_snowflake.utils.save_state_file')
-    @mock.patch('pipelinewise.fastsync.partialsync.mysql_to_snowflake.load_into_snowflake')
-    @mock.patch('pipelinewise.fastsync.partialsync.mysql_to_snowflake.upload_to_s3')
-    @mock.patch('pipelinewise.fastsync.partialsync.mysql_to_snowflake._export_source_table_data')
-    @mock.patch('pipelinewise.fastsync.partialsync.mysql_to_snowflake.utils.get_bookmark_for_table')
-    @mock.patch('pipelinewise.fastsync.partialsync.mysql_to_snowflake.FastSyncTapMySql')
-    @mock.patch('pipelinewise.fastsync.partialsync.mysql_to_snowflake.FastSyncTargetSnowflake')
-    def test_running_partial_sync_mysql_to_snowflake(self,
+    @mock.patch('pipelinewise.fastsync.partialsync.postgres_to_snowflake.utils.save_state_file')
+    @mock.patch('pipelinewise.fastsync.partialsync.postgres_to_snowflake.load_into_snowflake')
+    @mock.patch('pipelinewise.fastsync.partialsync.postgres_to_snowflake.upload_to_s3')
+    @mock.patch('pipelinewise.fastsync.partialsync.postgres_to_snowflake._export_source_table_data')
+    @mock.patch('pipelinewise.fastsync.partialsync.postgres_to_snowflake.utils.get_bookmark_for_table')
+    @mock.patch('pipelinewise.fastsync.partialsync.postgres_to_snowflake.FastSyncTapPostgres')
+    @mock.patch('pipelinewise.fastsync.partialsync.postgres_to_snowflake.FastSyncTargetSnowflake')
+    def test_running_partial_sync_postgres_to_snowflake(self,
                                                      mocked_fastsync_sf,
-                                                     mocked_fastsyncmysql,
+                                                     mocked_fastsyncpostgres,
                                                      mocked_bookmark,
                                                      mocked_export_data,
                                                      mocked_upload_to_s3,
                                                      mocked_load_into_sf,
                                                      mocked_save_state):
-        """Test the whole partial_sync_mysql_to_snowflake module works as expected"""
+        """Test the whole partial_sync_postgres_to_snowflake module works as expected"""
         with TemporaryDirectory() as temp_directory:
             file_size = 5
             file_parts = [f'{temp_directory}/t1',]
@@ -104,7 +105,7 @@ class PartialSyncTestCase(TestCase):
 
                 return file_parts
 
-            mocked_fastsyncmysql.return_value = mock.MagicMock()
+            mocked_fastsyncpostgres.return_value = mock.MagicMock()
             mocked_upload_to_s3.return_value = (s3_keys, s3_key_pattern)
             mocked_bookmark.return_value = bookmark
             mocked_export_data.side_effect = export_data_to_file
@@ -115,7 +116,7 @@ class PartialSyncTestCase(TestCase):
             test_end_values = ('10', None)
             for end_value in test_end_values:
                 arguments = {
-                    'tap': f'{self.config_dir}/target_snowflake/tap_mysql/config.json',
+                    'tap': f'{self.config_dir}/target_snowflake/tap_postgres/config.json',
                     'target': f'{self.config_dir}/tmp/target_config_tmp.json',
                     'properties': 'foo_properties',
                     'state': 'foo_state',
@@ -128,7 +129,7 @@ class PartialSyncTestCase(TestCase):
                 }
 
                 with self.assertLogs('pipelinewise') as actual_logs:
-                    args_namespace = run_mysql_to_snowflake(arguments)
+                    args_namespace = run_postgres_to_snowflake(arguments)
 
                 expected_log_messages = [
                     [
@@ -152,7 +153,9 @@ class PartialSyncTestCase(TestCase):
                         self.assertIn(message, actual_logs.output[log_index])
 
                 mocked_export_data.assert_called_with(
-                    args_namespace, args_namespace.target.get('tap_id'), mocked_fastsyncmysql())
+                    args_namespace, args_namespace.target.get('tap_id'), mocked_fastsyncpostgres()
+                )
+
                 mocked_upload_to_s3.assert_called_with(mocked_fastsync_sf(), file_parts, arguments['temp_dir'])
                 mocked_load_into_sf.assert_called_with(
                     mocked_fastsync_sf(), args_namespace, s3_keys, s3_key_pattern, file_size
