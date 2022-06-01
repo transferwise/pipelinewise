@@ -149,13 +149,7 @@ def _validate_command_specific_arguments(args):
     if args.command == 'init' and args.name == '*':
         raise CommandSpecificArgumentsException('You must specify a project name using the argument --name')
 
-    if args.command in ['discover_tap', 'test_tap_connection', 'run_tap', 'stop_tap']:
-        if args.tap == '*':
-            raise CommandSpecificArgumentsException('You must specify a source name using the argument --tap')
-        if args.target == '*':
-            raise CommandSpecificArgumentsException('You must specify a destination name using the argument --target')
-
-    if args.command == 'sync_tables':
+    if args.command in ['discover_tap', 'test_tap_connection', 'run_tap', 'stop_tap', 'sync_tables']:
         if args.tap == '*':
             raise CommandSpecificArgumentsException('You must specify a source name using the argument --tap')
         if args.target == '*':
@@ -194,7 +188,8 @@ def _validate_command_specific_arguments(args):
             raise CommandSpecificArgumentsException('You must specify a column by using the argument --column')
 
         if args.start_value == '*':
-            raise CommandSpecificArgumentsException('You must specify a start value by using the argument --start_value')
+            raise CommandSpecificArgumentsException(
+                'You must specify a start value by using the argument --start_value')
 
 
 # pylint: disable=too-many-branches,too-many-statements
