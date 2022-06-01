@@ -507,7 +507,7 @@ class FastSyncTapPostgres:
         ,null
         FROM {}."{}"{}) TO STDOUT with CSV DELIMITER ','
         """.format(
-            ','.join(column_safe_sql_values), schema_name, table_name, where_clause_setting
+            ','.join(column_safe_sql_values), schema_name, table_name, where_clause_sql
         )
         LOGGER.info('Exporting data: %s', sql)
 

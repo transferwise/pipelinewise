@@ -71,7 +71,7 @@ class PartialSyncUtilsTestCase(TestCase):
                     def query(self, query_str):
                         """mocked query method"""
                         where_clause_for_end = f' AND {args.column} <= {args.end_value}' if args.end_value else ''
-                        assert query_str == f'DELETE FROM {test_target_schema}.{test_table}' \
+                        assert query_str == f'DELETE FROM {test_target_schema}."{test_table.upper()}"' \
                                             f' WHERE {args.column} >= {args.start_value}{where_clause_for_end}'
 
                     def copy_to_table(self, s3_key_pattern, target_schema, table, size_bytes, is_temporary=False):

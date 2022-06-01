@@ -32,7 +32,7 @@ def load_into_snowflake(snowflake, args, s3_keys, s3_key_pattern, size_bytes):
     if args.end_value:
         where_clause += f' AND {args.column} <= {args.end_value}'
 
-    snowflake.query(f'DELETE FROM {target_schema}.{target_table} {where_clause}')
+    snowflake.query(f'DELETE FROM {target_schema}."{target_table.upper()}" {where_clause}')
     # copy partial data into the table
     archive_load_files = args.target.get('archive_load_files', False)
     tap_id = args.target.get('tap_id')

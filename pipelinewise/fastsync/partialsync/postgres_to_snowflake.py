@@ -13,7 +13,7 @@ from pipelinewise.fastsync.commons.target_snowflake import FastSyncTargetSnowfla
 from pipelinewise.fastsync.commons.tap_postgres import FastSyncTapPostgres
 from pipelinewise.fastsync.postgres_to_snowflake import REQUIRED_CONFIG_KEYS, tap_type_to_target_type
 from pipelinewise.fastsync.commons import utils
-from pipelinewise.fastsync.partialsync.utils import load_into_snowflake,upload_to_s3,update_state_file
+from pipelinewise.fastsync.partialsync.utils import load_into_snowflake, upload_to_s3, update_state_file
 from pipelinewise.logger import Logger
 
 LOGGER = Logger().get_logger(__name__)
