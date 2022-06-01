@@ -1673,7 +1673,7 @@ class PipelineWise:
             tap_type = self.tap['type']
             target_id = self.target['id']
             target_type = self.target['type']
-            fastsync_bin = utils.get_fastsync_bin(self.venv_dir, tap_type, target_type)
+            sync_bin = utils.get_fastsync_bin(self.venv_dir, tap_type, target_type)
 
             self.logger.info(
                 'Partial syncing table from %s (%s) to %s (%s)...',
@@ -1685,7 +1685,7 @@ class PipelineWise:
 
             self._check_if_tap_is_enabled()
 
-            self._check_if_complete_tap_configuration(fastsync_bin, tap_type, target_type)
+            self._check_if_complete_tap_configuration(sync_bin, tap_type, target_type)
 
             self._validate_selected_table_and_column()
 
