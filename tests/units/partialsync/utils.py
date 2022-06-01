@@ -4,14 +4,14 @@ import os
 from argparse import Namespace
 from unittest.mock import patch
 
-from pipelinewise.fastsync.partialsync import mysql_to_snowflake
+from pipelinewise.fastsync.partialsync import mysql_to_snowflake, postgres_to_snowflake
 from pipelinewise.fastsync.commons.utils import parse_args_for_partial_sync
 
 
 # pylint: disable=too-many-instance-attributes, too-few-public-methods
-class MySQL2SFArgs:
+class PartialSync2SFArgs:
     """Arguments for using in mysql to snowflake tests"""
-    def __init__(self, temp_test_dir, table='email', start_value='FOO_START', end_value='FOO_END'):
+    def __init__(self, temp_test_dir, table='email', start_value='FOO_START', end_value='FOO_END', state='state.json'):
         resources_dir = f'{os.path.dirname(__file__)}/resources'
         config_dir = f'{resources_dir}/test_partial_sync'
         tap_config = self._load_json_config(f'{config_dir}/target_snowflake/tap_mysql/config.json')
@@ -28,6 +28,7 @@ class MySQL2SFArgs:
         self.transform = transform_config
         self.temp_dir = temp_test_dir
         self.properties = properties_config
+        self.state = state
 
     @staticmethod
     def _load_json_config(file_name):
@@ -37,6 +38,25 @@ class MySQL2SFArgs:
 
 def run_mysql_to_snowflake(arguments_dict: dict) -> Namespace:
     """Running the mysql_to_snowflake module"""
+
+    argv_list = _get_argv_list(arguments_dict)
+    with patch('sys.argv', argv_list):
+        args = parse_args_for_partial_sync(mysql_to_snowflake.REQUIRED_CONFIG_KEYS)
+        mysql_to_snowflake.main()
+
+    return args
+
+
+def run_postgres_to_snowflake(arguments_dict: dict) -> Namespace:
+    argv_list = _get_argv_list(arguments_dict)
+    with patch('sys.argv', argv_list):
+        args = parse_args_for_partial_sync(postgres_to_snowflake.REQUIRED_CONFIG_KEYS)
+        postgres_to_snowflake.main()
+
+    return args
+
+
+def _get_argv_list(arguments_dict):
     argv_list = ['main']
     if arguments_dict.get('tap'):
         argv_list.extend(['--tap', arguments_dict['tap']])
@@ -55,8 +75,4 @@ def run_mysql_to_snowflake(arguments_dict: dict) -> Namespace:
     if arguments_dict.get('state'):
         argv_list.extend(['--state', arguments_dict['state']])
 
-    with patch('sys.argv', argv_list):
-        args = parse_args_for_partial_sync(mysql_to_snowflake.REQUIRED_CONFIG_KEYS)
-        mysql_to_snowflake.main()
-
-    return args
+    return argv_list

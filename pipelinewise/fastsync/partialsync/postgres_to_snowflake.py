@@ -1,22 +1,23 @@
 #!/usr/bin/env python3
-import sys
 import os
 import glob
-
-from argparse import Namespace
 import multiprocessing
-from typing import Union
+
+
 from datetime import datetime
+from typing import Union
+from argparse import Namespace
 
-from pipelinewise.fastsync.commons.tap_mysql import FastSyncTapMySql
+
 from pipelinewise.fastsync.commons.target_snowflake import FastSyncTargetSnowflake
-
-from pipelinewise.logger import Logger
+from pipelinewise.fastsync.commons.tap_postgres import FastSyncTapPostgres
+from pipelinewise.fastsync.postgres_to_snowflake import REQUIRED_CONFIG_KEYS, tap_type_to_target_type
 from pipelinewise.fastsync.commons import utils
-from pipelinewise.fastsync.mysql_to_snowflake import REQUIRED_CONFIG_KEYS, tap_type_to_target_type
-from pipelinewise.fastsync.partialsync.utils import load_into_snowflake, upload_to_s3, update_state_file
+from pipelinewise.fastsync.partialsync.utils import load_into_snowflake,upload_to_s3,update_state_file
+from pipelinewise.logger import Logger
 
 LOGGER = Logger().get_logger(__name__)
+
 LOCK = multiprocessing.Lock()
 
 
@@ -24,15 +25,16 @@ def partial_sync_table(args: Namespace) -> Union[bool, str]:
     """Partial sync table for MySQL to Snowflake"""
     snowflake = FastSyncTargetSnowflake(args.target, args.transform)
     tap_id = args.target.get('tap_id')
-
+    dbname = args.tap.get('dbname')
     try:
-        mysql = FastSyncTapMySql(args.tap, tap_type_to_target_type)
+        postgres = FastSyncTapPostgres(args.tap, tap_type_to_target_type)
 
         # Get bookmark - Binlog position or Incremental Key value
-        mysql.open_connections()
-        bookmark = utils.get_bookmark_for_table(args.table, args.properties, mysql)
-        file_parts = _export_source_table_data(args, tap_id, mysql)
-        mysql.close_connections()
+        postgres.open_connection()
+        bookmark = utils.get_bookmark_for_table(args.table, args.properties, postgres, dbname=dbname)
+
+        file_parts = _export_source_table_data(args, tap_id, postgres)
+        postgres.close_connection()
         size_bytes = sum([os.path.getsize(file_part) for file_part in file_parts])
         s3_keys, s3_key_pattern = upload_to_s3(snowflake, file_parts, args.temp_dir)
         load_into_snowflake(snowflake, args, s3_keys, s3_key_pattern, size_bytes)
@@ -44,17 +46,16 @@ def partial_sync_table(args: Namespace) -> Union[bool, str]:
         return f'{args.table}: {exc}'
 
 
-def _export_source_table_data(args, tap_id, mysql):
+def _export_source_table_data(args, tap_id, postgres):
     filename = utils.gen_export_filename(tap_id=tap_id, table=args.table, sync_type='partialsync')
     filepath = os.path.join(args.temp_dir, filename)
 
-    # Exporting table data
     where_clause_setting = {
         'column': args.column,
         'start_value': args.start_value,
         'end_value': args.end_value
     }
-    mysql.copy_table(
+    postgres.copy_table(
         args.table,
         filepath,
         split_large_files=args.target.get('split_large_files'),
@@ -68,7 +69,6 @@ def _export_source_table_data(args, tap_id, mysql):
 
 def main_impl():
     """Main sync logic"""
-
     args = utils.parse_args_for_partial_sync(REQUIRED_CONFIG_KEYS)
     pool_size = utils.get_pool_size(args.tap)
     start_time = datetime.now()
@@ -88,6 +88,10 @@ def main_impl():
         -------------------------------------------------------
         ''', args.table, args.column, args.start_value, args.end_value, pool_size
     )
+
+    # if internal arg drop_pg_slot is set to True, then we drop the slot before starting resync
+    if args.drop_pg_slot:
+        FastSyncTapPostgres.drop_slot(args.tap)
 
     partial_sync_table(args=args)
 
@@ -110,7 +114,7 @@ def main_impl():
     )
 
     if len(table_sync_excs) > 0:
-        sys.exit(1)
+        raise SystemExit(1)
 
 
 def main():
@@ -120,7 +124,3 @@ def main():
     except Exception as exc:
         LOGGER.critical(exc)
         raise exc
-
-
-if __name__ == '__main__':
-    main()

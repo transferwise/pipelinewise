@@ -1,0 +1,8 @@
+{
+    "dbname": "postgres_source_db",
+    "host": "db_postgres_source",
+    "password": "secret",
+    "port": 5432,
+    "tap_id": "test_postgres",
+    "user": "pipelinewise"
+}

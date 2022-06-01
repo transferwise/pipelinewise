@@ -474,6 +474,7 @@ class FastSyncTapPostgres:
         split_file_chunk_size_mb=1000,
         split_file_max_chunks=20,
         compress=True,
+        where_clause_setting = None
     ):
         """
         Export data from table to a zipped csv
@@ -494,13 +495,19 @@ class FastSyncTapPostgres:
 
         schema_name, table_name = table_name.split('.')
 
+        where_clause_sql = ''
+        if where_clause_setting:
+            where_clause_sql = f' WHERE {where_clause_setting["column"]} >= {where_clause_setting["start_value"]}'
+            if where_clause_setting['end_value']:
+                where_clause_sql += f' AND {where_clause_setting["column"]} <= {where_clause_setting["end_value"]}'
+
         sql = """COPY (SELECT {}
         ,now() AT TIME ZONE 'UTC'
         ,now() AT TIME ZONE 'UTC'
         ,null
-        FROM {}."{}") TO STDOUT with CSV DELIMITER ','
+        FROM {}."{}"{}) TO STDOUT with CSV DELIMITER ','
         """.format(
-            ','.join(column_safe_sql_values), schema_name, table_name
+            ','.join(column_safe_sql_values), schema_name, table_name, where_clause_setting
         )
         LOGGER.info('Exporting data: %s', sql)
 
