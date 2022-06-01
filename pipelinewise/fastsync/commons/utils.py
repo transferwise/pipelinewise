@@ -305,7 +305,7 @@ def save_state_file(path, table, bookmark, dbname=None):
 def parse_args_for_partial_sync(required_config_keys: Dict) -> argparse.Namespace:
     """Parsing arguments for partial sync"""
 
-    parser = _get_args_parser_for_sync()
+    parser = _get_args_parser_for_partialsync()
 
     parser.add_argument('--table', help='Partial sync table')
     parser.add_argument('--column', help='Column for partial sync table')
@@ -355,7 +355,21 @@ def parse_args(required_config_keys: Dict) -> argparse.Namespace:
     point to JSON files (tap, state, properties, target, transform),
     we will automatically load and parse the JSON file.
     """
-    parser = _get_args_parser_for_sync()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--tap', help='Tap Config file', required=True)
+    parser.add_argument('--state', help='State file')
+    parser.add_argument('--properties', help='Properties file')
+    parser.add_argument('--target', help='Target Config file', required=True)
+    parser.add_argument('--transform', help='Transformations Config file')
+    parser.add_argument('--tables', help='Sync only specific tables')
+    parser.add_argument(
+        '--temp_dir', help='Temporary directory required for CSV exports'
+    )
+    parser.add_argument(
+        '--drop_pg_slot',
+        help='Drop pg replication slot before starting resync',
+        action='store_true',
+    )
 
     args: argparse.Namespace = parser.parse_args()
 
@@ -468,7 +482,7 @@ def gen_export_filename(
     return f'pipelinewise_{tap_id}_{table}_{suffix}_{sync_type}_{postfix}.{ext}'
 
 
-def _get_args_parser_for_sync():
+def _get_args_parser_for_parcialsync():
     parser = argparse.ArgumentParser()
     parser.add_argument('--tap', help='Tap Config file', required=True)
     parser.add_argument('--state', help='State file')
