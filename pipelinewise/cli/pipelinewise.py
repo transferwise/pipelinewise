@@ -1673,7 +1673,7 @@ class PipelineWise:
             tap_type = self.tap['type']
             target_id = self.target['id']
             target_type = self.target['type']
-            sync_bin = utils.get_fastsync_bin(self.venv_dir, tap_type, target_type)
+            sync_bin = utils.get_partialsync_bin(self.venv_dir, tap_type, target_type)
 
             self.logger.info(
                 'Partial syncing table from %s (%s) to %s (%s)...',
