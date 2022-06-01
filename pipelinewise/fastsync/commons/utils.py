@@ -482,7 +482,7 @@ def gen_export_filename(
     return f'pipelinewise_{tap_id}_{table}_{suffix}_{sync_type}_{postfix}.{ext}'
 
 
-def _get_args_parser_for_parcialsync():
+def _get_args_parser_for_partialsync():
     parser = argparse.ArgumentParser()
     parser.add_argument('--tap', help='Tap Config file', required=True)
     parser.add_argument('--state', help='State file')
