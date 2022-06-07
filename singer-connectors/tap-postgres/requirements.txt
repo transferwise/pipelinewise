@@ -1,1 +1,1 @@
-pipelinewise-tap-postgres==1.7.1
+git+https://github.com/Health-Union/pipelinewise-tap-postgres.git@exo-support
