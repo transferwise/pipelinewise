@@ -1,0 +1,8 @@
+{
+    "dbname": "mysql_source_db",
+    "filter_dbs": "db_test_mysql",
+    "host": "localhost",
+    "password": "secret",
+    "port": 13306,
+    "user": "pipelinewise"
+}

@@ -1,0 +1,8 @@
+{
+    "dbname": "db_test_mysql",
+    "filter_dbs": "db_test_mysql",
+    "host": "localhost",
+    "password": "password",
+    "port": 3306,
+    "user": "user"
+}

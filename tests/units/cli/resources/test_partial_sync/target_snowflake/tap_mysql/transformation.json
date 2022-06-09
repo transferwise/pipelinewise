@@ -1,0 +1,10 @@
+{
+    "transformations": [
+        {
+            "field_id": "email",
+            "tap_stream_name": "db_test_mysql-table_one",
+            "type": "HASH",
+            "when": null
+        }
+    ]
+}
