@@ -1,5 +1,5 @@
 {
-    "account": "no07372.eu-central-1",
+    "account": "FOO_ACCOUNT",
     "add_metadata_columns": false,
     "archive_load_files": true,
     "aws_access_key_id": "FOO_ACCESS_KEY",

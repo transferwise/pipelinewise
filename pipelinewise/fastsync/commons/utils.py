@@ -328,8 +328,6 @@ def parse_args_for_partial_sync(required_config_keys: Dict) -> argparse.Namespac
     else:
         args.transform = {}
 
-    # get all selected tables from json schema
-
     if not args.temp_dir:
         args.temp_dir = os.path.realpath('.')
 
