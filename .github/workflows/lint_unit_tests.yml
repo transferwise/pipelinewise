@@ -31,6 +31,10 @@ jobs:
         continue-on-error: true
         run: ./scripts/ci_check_no_file_changes.sh python
 
+      - name: Install dependencies
+        if: steps.check.outcome == 'failure'
+        run: make pipelinewise
+
       - name: Check code formatting
         if: steps.check.outcome == 'failure'
         run: find pipelinewise tests -type f -name '*.py' | xargs unify --check-only
