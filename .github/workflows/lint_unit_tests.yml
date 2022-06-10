@@ -37,20 +37,30 @@ jobs:
 
       - name: Check code formatting
         if: steps.check.outcome == 'failure'
-        run: find pipelinewise tests -type f -name '*.py' | xargs unify --check-only
+        run: |
+          . .virtualenvs/pipelinewise/bin/activate
+          find pipelinewise tests -type f -name '*.py' | xargs unify --check-only
 
       - name: Pylinting
         if: steps.check.outcome == 'failure'
-        run: pylint pipelinewise tests
+        run: |
+          . .virtualenvs/pipelinewise/bin/activate
+          pylint pipelinewise tests
 
       - name: Pep8
         if: steps.check.outcome == 'failure'
-        run: flake8 pipelinewise --count --select=E9,F63,F7,F82 --show-source --statistics
+        run: |
+          . .virtualenvs/pipelinewise/bin/activate
+          flake8 pipelinewise --count --select=E9,F63,F7,F82 --show-source --statistics
 
       - name: Pep8 complexity
         if: steps.check.outcome == 'failure'
-        run: flake8 pipelinewise --count --max-complexity=15 --max-line-length=120 --statistics
+        run: |
+          . .virtualenvs/pipelinewise/bin/activate
+          flake8 pipelinewise --count --max-complexity=15 --max-line-length=120 --statistics
 
       - name: Run Unit tests
         if: steps.check.outcome == 'failure'
-        run: pytest --cov=pipelinewise --cov-fail-under=75 -v tests/units
+        run: |
+          . .virtualenvs/pipelinewise/bin/activate
+          pytest --cov=pipelinewise --cov-fail-under=75 -v tests/units
