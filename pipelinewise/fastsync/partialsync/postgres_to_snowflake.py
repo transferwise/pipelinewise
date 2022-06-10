@@ -12,8 +12,9 @@ from argparse import Namespace
 from pipelinewise.fastsync.commons.target_snowflake import FastSyncTargetSnowflake
 from pipelinewise.fastsync.commons.tap_postgres import FastSyncTapPostgres
 from pipelinewise.fastsync.postgres_to_snowflake import REQUIRED_CONFIG_KEYS, tap_type_to_target_type
-from pipelinewise.fastsync.commons import utils
-from pipelinewise.fastsync.partialsync.utils import load_into_snowflake, upload_to_s3, update_state_file
+from pipelinewise.fastsync.commons import utils as common_utils
+from pipelinewise.fastsync.partialsync.utils import (
+    load_into_snowflake, upload_to_s3, update_state_file, parse_args_for_partial_sync)
 from pipelinewise.logger import Logger
 
 LOGGER = Logger().get_logger(__name__)
@@ -31,7 +32,7 @@ def partial_sync_table(args: Namespace) -> Union[bool, str]:
 
         # Get bookmark - Binlog position or Incremental Key value
         postgres.open_connection()
-        bookmark = utils.get_bookmark_for_table(args.table, args.properties, postgres, dbname=dbname)
+        bookmark = common_utils.get_bookmark_for_table(args.table, args.properties, postgres, dbname=dbname)
 
         file_parts = _export_source_table_data(args, tap_id, postgres)
         postgres.close_connection()
@@ -47,7 +48,7 @@ def partial_sync_table(args: Namespace) -> Union[bool, str]:
 
 
 def _export_source_table_data(args, tap_id, postgres):
-    filename = utils.gen_export_filename(tap_id=tap_id, table=args.table, sync_type='partialsync')
+    filename = common_utils.gen_export_filename(tap_id=tap_id, table=args.table, sync_type='partialsync')
     filepath = os.path.join(args.temp_dir, filename)
 
     where_clause_setting = {
@@ -69,8 +70,8 @@ def _export_source_table_data(args, tap_id, postgres):
 
 def main_impl():
     """Main sync logic"""
-    args = utils.parse_args_for_partial_sync(REQUIRED_CONFIG_KEYS)
-    pool_size = utils.get_pool_size(args.tap)
+    args = parse_args_for_partial_sync(REQUIRED_CONFIG_KEYS)
+    pool_size = common_utils.get_pool_size(args.tap)
     start_time = datetime.now()
     table_sync_excs = []
 

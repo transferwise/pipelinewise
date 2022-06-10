@@ -73,14 +73,12 @@ class PartialSyncTestCase(TestCase):
         for file_part in expected_file_parts:
             self.assertIn(file_part, actual_file_parts)
 
-
-
     # pylint: disable=too-many-locals, too-many-arguments
-    @mock.patch('pipelinewise.fastsync.partialsync.postgres_to_snowflake.utils.save_state_file')
+    @mock.patch('pipelinewise.fastsync.commons.utils.save_state_file')
     @mock.patch('pipelinewise.fastsync.partialsync.postgres_to_snowflake.load_into_snowflake')
     @mock.patch('pipelinewise.fastsync.partialsync.postgres_to_snowflake.upload_to_s3')
     @mock.patch('pipelinewise.fastsync.partialsync.postgres_to_snowflake._export_source_table_data')
-    @mock.patch('pipelinewise.fastsync.partialsync.postgres_to_snowflake.utils.get_bookmark_for_table')
+    @mock.patch('pipelinewise.fastsync.commons.utils.get_bookmark_for_table')
     @mock.patch('pipelinewise.fastsync.partialsync.postgres_to_snowflake.FastSyncTapPostgres')
     @mock.patch('pipelinewise.fastsync.partialsync.postgres_to_snowflake.FastSyncTargetSnowflake')
     def test_running_partial_sync_postgres_to_snowflake(self,

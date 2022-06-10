@@ -12,7 +12,9 @@ from pipelinewise.fastsync.commons.tap_mysql import FastSyncTapMySql
 from pipelinewise.fastsync.commons.target_snowflake import FastSyncTargetSnowflake
 
 from pipelinewise.logger import Logger
-from pipelinewise.fastsync.commons import utils
+from pipelinewise.fastsync.commons import utils as common_utils
+from pipelinewise.fastsync.partialsync import utils
+
 from pipelinewise.fastsync.mysql_to_snowflake import REQUIRED_CONFIG_KEYS, tap_type_to_target_type
 from pipelinewise.fastsync.partialsync.utils import load_into_snowflake, upload_to_s3, update_state_file
 
@@ -30,7 +32,7 @@ def partial_sync_table(args: Namespace) -> Union[bool, str]:
 
         # Get bookmark - Binlog position or Incremental Key value
         mysql.open_connections()
-        bookmark = utils.get_bookmark_for_table(args.table, args.properties, mysql)
+        bookmark = common_utils.get_bookmark_for_table(args.table, args.properties, mysql)
         file_parts = _export_source_table_data(args, tap_id, mysql)
         mysql.close_connections()
         size_bytes = sum([os.path.getsize(file_part) for file_part in file_parts])
@@ -45,7 +47,7 @@ def partial_sync_table(args: Namespace) -> Union[bool, str]:
 
 
 def _export_source_table_data(args, tap_id, mysql):
-    filename = utils.gen_export_filename(tap_id=tap_id, table=args.table, sync_type='partialsync')
+    filename = common_utils.gen_export_filename(tap_id=tap_id, table=args.table, sync_type='partialsync')
     filepath = os.path.join(args.temp_dir, filename)
 
     # Exporting table data
@@ -70,7 +72,7 @@ def main_impl():
     """Main sync logic"""
 
     args = utils.parse_args_for_partial_sync(REQUIRED_CONFIG_KEYS)
-    pool_size = utils.get_pool_size(args.tap)
+    pool_size = common_utils.get_pool_size(args.tap)
     start_time = datetime.now()
     table_sync_excs = []
 

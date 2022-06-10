@@ -302,41 +302,6 @@ def save_state_file(path, table, bookmark, dbname=None):
     save_dict_to_json(path, state)
 
 
-def parse_args_for_partial_sync(required_config_keys: Dict) -> argparse.Namespace:
-    """Parsing arguments for partial sync"""
-
-    parser = _get_args_parser_for_partialsync()
-
-    parser.add_argument('--table', help='Partial sync table')
-    parser.add_argument('--column', help='Column for partial sync table')
-    parser.add_argument('--start_value', help='Start value for partial sync table')
-    parser.add_argument('--end_value', help='End value for partial sync table')
-
-    args: argparse.Namespace = parser.parse_args()
-
-    if args.tap:
-        args.tap = load_json(args.tap)
-
-    if args.properties:
-        args.properties = load_json(args.properties)
-
-    if args.target:
-        args.target = load_json(args.target)
-
-    if args.transform:
-        args.transform = load_json(args.transform)
-    else:
-        args.transform = {}
-
-    if not args.temp_dir:
-        args.temp_dir = os.path.realpath('.')
-
-    check_config(args.tap, required_config_keys['tap'])
-    check_config(args.target, required_config_keys['target'])
-
-    return args
-
-
 def parse_args(required_config_keys: Dict) -> argparse.Namespace:
     """Parse standard command-line args.
 
@@ -478,22 +443,3 @@ def gen_export_filename(
         ext = 'csv.gz'
 
     return f'pipelinewise_{tap_id}_{table}_{suffix}_{sync_type}_{postfix}.{ext}'
-
-
-def _get_args_parser_for_partialsync():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--tap', help='Tap Config file', required=True)
-    parser.add_argument('--state', help='State file')
-    parser.add_argument('--properties', help='Properties file')
-    parser.add_argument('--target', help='Target Config file', required=True)
-    parser.add_argument('--transform', help='Transformations Config file')
-    parser.add_argument(
-        '--temp_dir', help='Temporary directory required for CSV exports'
-    )
-    parser.add_argument(
-        '--drop_pg_slot',
-        help='Drop pg replication slot before starting resync',
-        action='store_true',
-    )
-
-    return parser

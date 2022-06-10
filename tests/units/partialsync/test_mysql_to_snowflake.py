@@ -75,11 +75,11 @@ class PartialSyncTestCase(TestCase):
 
 
     # pylint: disable=too-many-locals, too-many-arguments
-    @mock.patch('pipelinewise.fastsync.partialsync.mysql_to_snowflake.utils.save_state_file')
+    @mock.patch('pipelinewise.fastsync.commons.utils.save_state_file')
     @mock.patch('pipelinewise.fastsync.partialsync.mysql_to_snowflake.load_into_snowflake')
     @mock.patch('pipelinewise.fastsync.partialsync.mysql_to_snowflake.upload_to_s3')
     @mock.patch('pipelinewise.fastsync.partialsync.mysql_to_snowflake._export_source_table_data')
-    @mock.patch('pipelinewise.fastsync.partialsync.mysql_to_snowflake.utils.get_bookmark_for_table')
+    @mock.patch('pipelinewise.fastsync.commons.utils.get_bookmark_for_table')
     @mock.patch('pipelinewise.fastsync.partialsync.mysql_to_snowflake.FastSyncTapMySql')
     @mock.patch('pipelinewise.fastsync.partialsync.mysql_to_snowflake.FastSyncTargetSnowflake')
     def test_running_partial_sync_mysql_to_snowflake(self,

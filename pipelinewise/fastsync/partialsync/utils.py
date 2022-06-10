@@ -1,7 +1,11 @@
+import argparse
 import os
 import re
 
-from pipelinewise.fastsync.commons import utils
+from typing import Dict
+
+
+from pipelinewise.fastsync.commons import utils as common_utils
 
 
 def upload_to_s3(snowflake, file_parts, temp_dir):
@@ -25,8 +29,8 @@ def load_into_snowflake(snowflake, args, s3_keys, s3_key_pattern, size_bytes):
     """load data into Snowflake"""
 
     # delete partial data from the table
-    target_schema = utils.get_target_schema(args.target, args.table)
-    table_dict = utils.tablename_to_dict(args.table)
+    target_schema = common_utils.get_target_schema(args.target, args.table)
+    table_dict = common_utils.tablename_to_dict(args.table)
     target_table = table_dict.get('table_name')
     where_clause = f'WHERE {args.column} >= {args.start_value}'
     if args.end_value:
@@ -58,6 +62,60 @@ def update_state_file(args, bookmark, lock):
     if not args.end_value:
         lock.acquire()
         try:
-            utils.save_state_file(args.state, args.table, bookmark)
+            common_utils.save_state_file(args.state, args.table, bookmark)
         finally:
             lock.release()
+
+
+def parse_args_for_partial_sync(required_config_keys: Dict) -> argparse.Namespace:
+    """Parsing arguments for partial sync"""
+
+    parser = _get_args_parser_for_partialsync()
+
+    parser.add_argument('--table', help='Partial sync table')
+    parser.add_argument('--column', help='Column for partial sync table')
+    parser.add_argument('--start_value', help='Start value for partial sync table')
+    parser.add_argument('--end_value', help='End value for partial sync table')
+
+    args: argparse.Namespace = parser.parse_args()
+
+    if args.tap:
+        args.tap = common_utils.load_json(args.tap)
+
+    if args.properties:
+        args.properties = common_utils.load_json(args.properties)
+
+    if args.target:
+        args.target = common_utils.load_json(args.target)
+
+    if args.transform:
+        args.transform = common_utils.load_json(args.transform)
+    else:
+        args.transform = {}
+
+    if not args.temp_dir:
+        args.temp_dir = os.path.realpath('.')
+
+    common_utils.check_config(args.tap, required_config_keys['tap'])
+    common_utils.check_config(args.target, required_config_keys['target'])
+
+    return args
+
+
+def _get_args_parser_for_partialsync():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--tap', help='Tap Config file', required=True)
+    parser.add_argument('--state', help='State file')
+    parser.add_argument('--properties', help='Properties file')
+    parser.add_argument('--target', help='Target Config file', required=True)
+    parser.add_argument('--transform', help='Transformations Config file')
+    parser.add_argument(
+        '--temp_dir', help='Temporary directory required for CSV exports'
+    )
+    parser.add_argument(
+        '--drop_pg_slot',
+        help='Drop pg replication slot before starting resync',
+        action='store_true',
+    )
+
+    return parser

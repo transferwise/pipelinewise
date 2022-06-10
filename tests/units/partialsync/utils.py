@@ -5,7 +5,7 @@ from argparse import Namespace
 from unittest.mock import patch
 
 from pipelinewise.fastsync.partialsync import mysql_to_snowflake, postgres_to_snowflake
-from pipelinewise.fastsync.commons.utils import parse_args_for_partial_sync
+from pipelinewise.fastsync.partialsync.utils import parse_args_for_partial_sync
 
 
 # pylint: disable=too-many-instance-attributes, too-few-public-methods
@@ -48,6 +48,7 @@ def run_mysql_to_snowflake(arguments_dict: dict) -> Namespace:
 
 
 def run_postgres_to_snowflake(arguments_dict: dict) -> Namespace:
+    """Running PS to SF"""
     argv_list = _get_argv_list(arguments_dict)
     with patch('sys.argv', argv_list):
         args = parse_args_for_partial_sync(postgres_to_snowflake.REQUIRED_CONFIG_KEYS)
