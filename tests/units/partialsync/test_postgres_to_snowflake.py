@@ -4,6 +4,7 @@ from tempfile import TemporaryDirectory
 from unittest import TestCase, mock
 
 from pipelinewise.fastsync.partialsync import postgres_to_snowflake
+from pipelinewise.fastsync.commons.tap_postgres import FastSyncTapPostgres
 from tests.units.partialsync.utils import PartialSync2SFArgs, run_postgres_to_snowflake
 
 
@@ -29,15 +30,14 @@ class PartialSyncTestCase(TestCase):
         self.assertEqual(f'{args.table}: {exception_message}', actual_return)
 
     def test_export_source_table_data(self):
-        """Test _export_source_table_data method"""
+        """Test export_source_table_data method"""
         expected_file_parts = []
 
         with TemporaryDirectory() as temp_test_dir:
-
             args = PartialSync2SFArgs(temp_test_dir=temp_test_dir)
 
             # pylint: disable=unused-argument
-            def mocked_copy_table(table, filepath, **kwargs):
+            def mocked_copy_table_method(table, filepath, **kwargs):
                 for part_number in range(3):
                     with open(f'{filepath}{part_number}', 'w', encoding='utf8') as data_file:
                         expected_file_parts.insert(0, f'{filepath}{part_number}')
@@ -45,15 +45,19 @@ class PartialSyncTestCase(TestCase):
 
             tap_id = 'tap_id_foo'
             with mock.patch(
-                    'pipelinewise.fastsync.partialsync.postgres_to_snowflake.FastSyncTapPostgres') as mocked_postgres:
-                postgres_instance = mocked_postgres.return_value
-                postgres_instance.copy_table.side_effect = mocked_copy_table
+                    'pipelinewise.fastsync.commons.tap_postgres.FastSyncTapPostgres.copy_table') as mocked_copy_table:
+                mocked_copy_table.side_effect = mocked_copy_table_method
 
-                # pylint: disable=protected-access
-                actual_file_parts = postgres_to_snowflake._export_source_table_data(args, tap_id, postgres_instance)
+                test_fast_sync = FastSyncTapPostgres({}, {})
+                where_clause_setting = {
+                    'column': args.column,
+                    'start_value': args.start_value,
+                    'end_value': args.end_value
+                }
+                actual_file_parts = test_fast_sync.export_source_table_data(args, tap_id, where_clause_setting)
 
-                call_args = postgres_instance.copy_table.call_args.args
-                call_kwargs = postgres_instance.copy_table.call_args.kwargs
+                call_args = mocked_copy_table.call_args.args
+                call_kwargs = mocked_copy_table.call_args.kwargs
 
                 expected_call_kwargs = {
                     'split_large_files': False,
@@ -77,7 +81,6 @@ class PartialSyncTestCase(TestCase):
     @mock.patch('pipelinewise.fastsync.commons.utils.save_state_file')
     @mock.patch('pipelinewise.fastsync.partialsync.postgres_to_snowflake.load_into_snowflake')
     @mock.patch('pipelinewise.fastsync.partialsync.postgres_to_snowflake.upload_to_s3')
-    @mock.patch('pipelinewise.fastsync.partialsync.postgres_to_snowflake._export_source_table_data')
     @mock.patch('pipelinewise.fastsync.commons.utils.get_bookmark_for_table')
     @mock.patch('pipelinewise.fastsync.partialsync.postgres_to_snowflake.FastSyncTapPostgres')
     @mock.patch('pipelinewise.fastsync.partialsync.postgres_to_snowflake.FastSyncTargetSnowflake')
@@ -85,7 +88,6 @@ class PartialSyncTestCase(TestCase):
                                                      mocked_fastsync_sf,
                                                      mocked_fastsyncpostgres,
                                                      mocked_bookmark,
-                                                     mocked_export_data,
                                                      mocked_upload_to_s3,
                                                      mocked_load_into_sf,
                                                      mocked_save_state):
@@ -99,13 +101,13 @@ class PartialSyncTestCase(TestCase):
 
             def export_data_to_file(*args, **kwargs):  # pylint: disable=unused-argument
                 with open(f'{temp_directory}/t1', 'w', encoding='utf8') as exported_file:
-                    exported_file.write('F'*file_size)
+                    exported_file.write('F' * file_size)
 
                 return file_parts
 
-            mocked_fastsyncpostgres.return_value = mock.MagicMock()
             mocked_upload_to_s3.return_value = (s3_keys, s3_key_pattern)
             mocked_bookmark.return_value = bookmark
+            mocked_export_data = mocked_fastsyncpostgres.return_value.export_source_table_data
             mocked_export_data.side_effect = export_data_to_file
 
             table_name = 'foo_table'
@@ -150,10 +152,14 @@ class PartialSyncTestCase(TestCase):
                     for message in log_messages:
                         self.assertIn(message, actual_logs.output[log_index])
 
+                where_clause_setting = {
+                    'column': arguments['column'],
+                    'start_value': arguments['start_value'],
+                    'end_value': arguments['end_value']
+                }
                 mocked_export_data.assert_called_with(
-                    args_namespace, args_namespace.target.get('tap_id'), mocked_fastsyncpostgres()
+                    args_namespace, args_namespace.target.get('tap_id'), where_clause_setting
                 )
-
                 mocked_upload_to_s3.assert_called_with(mocked_fastsync_sf(), file_parts, arguments['temp_dir'])
                 mocked_load_into_sf.assert_called_with(
                     mocked_fastsync_sf(), args_namespace, s3_keys, s3_key_pattern, file_size

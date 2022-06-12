@@ -31,7 +31,17 @@ def partial_sync_table(args: Namespace) -> Union[bool, str]:
         # Get bookmark - Binlog position or Incremental Key value
         mysql.open_connections()
         bookmark = common_utils.get_bookmark_for_table(args.table, args.properties, mysql)
-        file_parts = _export_source_table_data(args, tap_id, mysql)
+
+        where_clause_setting = {
+            'column': args.column,
+            'start_value': args.start_value,
+            'end_value': args.end_value
+        }
+
+        file_parts = mysql.export_source_table_data(args, tap_id, where_clause_setting)
+
+        # file_parts = _export_source_table_data(args, tap_id, mysql)
+
         mysql.close_connections()
         size_bytes = sum([os.path.getsize(file_part) for file_part in file_parts])
         s3_keys, s3_key_pattern = upload_to_s3(snowflake, file_parts, args.temp_dir)
@@ -44,7 +54,7 @@ def partial_sync_table(args: Namespace) -> Union[bool, str]:
         return f'{args.table}: {exc}'
 
 
-def _export_source_table_data(args, tap_id, mysql):
+def _export_source_table_data_old(args, tap_id, mysql):
     filename = common_utils.gen_export_filename(tap_id=tap_id, table=args.table, sync_type='partialsync')
     filepath = os.path.join(args.temp_dir, filename)
 

@@ -1,11 +1,14 @@
 import csv
 import datetime
 import decimal
+import glob
 import logging
+import os
 import pymysql
 import pymysql.cursors
 
-from typing import Tuple, Dict, Callable
+from argparse import Namespace
+from typing import Tuple, Dict, Callable, Union
 from pymysql import InterfaceError, OperationalError, Connection
 
 from ...utils import safe_column_name
@@ -496,6 +499,25 @@ class FastSyncTapMySql:
                 LOGGER.info(
                     'Exported total of %s rows from %s...', exported_rows, table_name
                 )
+
+    def export_source_table_data(
+            self, args: Namespace, tap_id: str, where_clause_setting: Union[Dict, None] = None) -> list:
+        """Export source table data"""
+        filename = utils.gen_export_filename(tap_id=tap_id, table=args.table, sync_type='partialsync')
+        filepath = os.path.join(args.temp_dir, filename)
+
+        # Exporting table data
+
+        self.copy_table(
+            args.table,
+            filepath,
+            split_large_files=args.target.get('split_large_files'),
+            split_file_chunk_size_mb=args.target.get('split_file_chunk_size_mb'),
+            split_file_max_chunks=args.target.get('split_file_max_chunks'),
+            where_clause_setting=where_clause_setting
+        )
+        file_parts = glob.glob(f'{filepath}*')
+        return file_parts
 
     def __get_primary_server_uuid(self) -> str:
         """

@@ -1,12 +1,15 @@
 import datetime
 import decimal
+import glob
 import logging
+import os
 import re
 import sys
 import psycopg2
 import psycopg2.extras
 
-from typing import Dict
+from argparse import Namespace
+from typing import Dict, Union
 
 
 from . import utils, split_gzip
@@ -521,3 +524,26 @@ class FastSyncTapPostgres:
 
         with gzip_splitter as split_gzip_files:
             self.curr.copy_expert(sql, split_gzip_files, size=131072)
+
+    def export_source_table_data(
+            self, args: Namespace, tap_id: str, where_clause_setting: Union[Dict, None] = None) -> list:
+        filename = utils.gen_export_filename(tap_id=tap_id, table=args.table, sync_type='partialsync')
+        filepath = os.path.join(args.temp_dir, filename)
+
+        where_clause_setting = {
+            'column': args.column,
+            'start_value': args.start_value,
+            'end_value': args.end_value
+        }
+        self.copy_table(
+            args.table,
+            filepath,
+            split_large_files=args.target.get('split_large_files'),
+            split_file_chunk_size_mb=args.target.get('split_file_chunk_size_mb'),
+            split_file_max_chunks=args.target.get('split_file_max_chunks'),
+            where_clause_setting=where_clause_setting
+        )
+        file_parts = glob.glob(f'{filepath}*')
+        return file_parts
+
+
