@@ -1,5 +1,3 @@
-import multiprocessing
-
 from unittest import TestCase, mock
 from tempfile import TemporaryDirectory
 
@@ -100,7 +98,6 @@ class PartialSyncUtilsTestCase(TestCase):
     def test_update_state_file(self):
         """Test state file updating with and without end value"""
         bookmark = {'foo': 2}
-        lock = multiprocessing.Lock()
         test_end_values = (None, 'bar')
 
         for end_value in test_end_values:
@@ -108,8 +105,8 @@ class PartialSyncUtilsTestCase(TestCase):
                 args = PartialSync2SFArgs(
                     temp_test_dir='foo_temp', table='FOO', start_value='20', end_value=end_value, state='foo_state'
                 )
-                update_state_file(args, bookmark, lock)
-            if end_value :
+                update_state_file(args, bookmark)
+            if end_value:
                 mocked_save_state_file.assert_not_called()
             else:
                 mocked_save_state_file.assert_called_with(args.state, args.table, bookmark)

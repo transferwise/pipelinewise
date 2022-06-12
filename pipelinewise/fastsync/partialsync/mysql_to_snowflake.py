@@ -4,7 +4,6 @@ import os
 import glob
 
 from argparse import Namespace
-import multiprocessing
 from typing import Union
 from datetime import datetime
 
@@ -19,7 +18,6 @@ from pipelinewise.fastsync.mysql_to_snowflake import REQUIRED_CONFIG_KEYS, tap_t
 from pipelinewise.fastsync.partialsync.utils import load_into_snowflake, upload_to_s3, update_state_file
 
 LOGGER = Logger().get_logger(__name__)
-LOCK = multiprocessing.Lock()
 
 
 def partial_sync_table(args: Namespace) -> Union[bool, str]:
@@ -38,7 +36,7 @@ def partial_sync_table(args: Namespace) -> Union[bool, str]:
         size_bytes = sum([os.path.getsize(file_part) for file_part in file_parts])
         s3_keys, s3_key_pattern = upload_to_s3(snowflake, file_parts, args.temp_dir)
         load_into_snowflake(snowflake, args, s3_keys, s3_key_pattern, size_bytes)
-        update_state_file(args, bookmark, LOCK)
+        update_state_file(args, bookmark)
 
         return True
     except Exception as exc:

@@ -55,16 +55,11 @@ def load_into_snowflake(snowflake, args, s3_keys, s3_key_pattern, size_bytes):
         snowflake.s3.delete_object(Bucket=args.target.get('s3_bucket'), Key=s3_key)
 
 
-def update_state_file(args, bookmark, lock):
+def update_state_file(args, bookmark):
     """Update state file"""
     # Save bookmark to singer state file
-    # Lock to ensure that only one process writes the same state file at a time
     if not args.end_value:
-        lock.acquire()
-        try:
-            common_utils.save_state_file(args.state, args.table, bookmark)
-        finally:
-            lock.release()
+        common_utils.save_state_file(args.state, args.table, bookmark)
 
 
 def parse_args_for_partial_sync(required_config_keys: Dict) -> argparse.Namespace:
