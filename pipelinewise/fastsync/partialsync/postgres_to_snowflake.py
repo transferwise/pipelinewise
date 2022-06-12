@@ -71,7 +71,6 @@ def _export_source_table_data(args, tap_id, postgres):
 def main_impl():
     """Main sync logic"""
     args = parse_args_for_partial_sync(REQUIRED_CONFIG_KEYS)
-    pool_size = common_utils.get_pool_size(args.tap)
     start_time = datetime.now()
     table_sync_excs = []
 
@@ -85,9 +84,8 @@ def main_impl():
             Column                         : %s
             Start value                    : %s
             End value                      : %s
-            Pool size                      : %s
         -------------------------------------------------------
-        ''', args.table, args.column, args.start_value, args.end_value, pool_size
+        ''', args.table, args.column, args.start_value, args.end_value
     )
 
     # if internal arg drop_pg_slot is set to True, then we drop the slot before starting resync

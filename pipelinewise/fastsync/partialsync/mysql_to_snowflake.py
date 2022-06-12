@@ -72,7 +72,6 @@ def main_impl():
     """Main sync logic"""
 
     args = utils.parse_args_for_partial_sync(REQUIRED_CONFIG_KEYS)
-    pool_size = common_utils.get_pool_size(args.tap)
     start_time = datetime.now()
     table_sync_excs = []
 
@@ -86,9 +85,8 @@ def main_impl():
             Column                         : %s
             Start value                    : %s
             End value                      : %s
-            Pool size                      : %s
         -------------------------------------------------------
-        ''', args.table, args.column, args.start_value, args.end_value, pool_size
+        ''', args.table, args.column, args.start_value, args.end_value
     )
 
     partial_sync_table(args=args)
