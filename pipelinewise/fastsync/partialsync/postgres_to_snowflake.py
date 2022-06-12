@@ -88,10 +88,6 @@ def main_impl():
         ''', args.table, args.column, args.start_value, args.end_value
     )
 
-    # if internal arg drop_pg_slot is set to True, then we drop the slot before starting resync
-    if args.drop_pg_slot:
-        FastSyncTapPostgres.drop_slot(args.tap)
-
     partial_sync_table(args=args)
 
     # Log summary
