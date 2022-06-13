@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-docker-image:
+  lint_and_test:
     runs-on: ubuntu-20.04
     strategy:
       matrix:
@@ -21,7 +21,7 @@ jobs:
 
     steps:
       - name: Checking out repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Check if python changes are present
         id: check
@@ -31,123 +31,42 @@ jobs:
         continue-on-error: true
         run: ./scripts/ci_check_no_file_changes.sh python
 
-      - name: Login to DockerHub
-        uses: docker/login-action@v1
+      - name: Set up Python ${{ matrix.python-version }}
+        if: steps.check.outcome == 'failure'
+        uses: actions/setup-python@v3
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          python-version: ${{ matrix.python-version }}
 
-      - name: Check whether or not docker image for CI exists remotely
-        id: docker-image-exists-remotely
-        continue-on-error: true
-        run: docker manifest inspect transferwiseworkspace/pipelinewise:ci-py${{ matrix.python-version  }} > /dev/null
-
-      - name: Check if requirements or Dockerfile.CI has changed
-        id: dockerfile-setup-changed
-        continue-on-error: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: python3 scripts/check_any_file_changed.py setup.py Dockerfile.CI
-
-      - name: Rebuild docker image if required
-        if: steps.docker-image-exists-remotely.outcome == 'failure' || steps.dockerfile-setup-changed.outcome == 'success'
-        run: |
-          docker build \
-          --build-arg PYTHON_VERSION=${{ matrix.python-version }} \
-          -t transferwiseworkspace/pipelinewise:ci-py${{ matrix.python-version  }} \
-          -f Dockerfile.CI .
-
-      - name: Push docker image if rebuilt
-        if: steps.docker-image-exists-remotely.outcome == 'failure' || steps.dockerfile-setup-changed.outcome == 'success'
-        run: |
-          docker push transferwiseworkspace/pipelinewise:ci-py${{ matrix.python-version  }}
-
-  lint:
-    needs:
-      - build-docker-image
-    runs-on: ubuntu-20.04
-    strategy:
-      matrix:
-        python-version: ["3.7", "3.8", "3.9"]
-
-    steps:
-      - name: Checking out repo
-        uses: actions/checkout@v2
-
-      - name: Check if python changes are present
-        id: check
-        env:
-          GITHUB_REPO: ${{ github.repository }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-        continue-on-error: true
-        run: ./scripts/ci_check_no_file_changes.sh python
-
-      - name: Login to DockerHub
-        uses: docker/login-action@v1
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Install dependencies
+        if: steps.check.outcome == 'failure'
+        run: make pipelinewise
 
       - name: Check code formatting
         if: steps.check.outcome == 'failure'
         run: |
-          docker run --rm \
-          -v $PWD:/app \
-          transferwiseworkspace/pipelinewise:ci-py${{ matrix.python-version  }} \
-          bash -c "find pipelinewise tests -type f -name '*.py' | xargs unify --check-only"
+          . .virtualenvs/pipelinewise/bin/activate
+          find pipelinewise tests -type f -name '*.py' | xargs unify --check-only
 
       - name: Pylinting
         if: steps.check.outcome == 'failure'
         run: |
-          docker run --rm -v $PWD:/app \
-          transferwiseworkspace/pipelinewise:ci-py${{ matrix.python-version  }} \
-          bash -c "pylint pipelinewise tests"
+          . .virtualenvs/pipelinewise/bin/activate
+          pylint pipelinewise tests
 
       - name: Pep8
         if: steps.check.outcome == 'failure'
         run: |
-          docker run --rm -v $PWD:/app \
-          transferwiseworkspace/pipelinewise:ci-py${{ matrix.python-version  }} \
-          bash -c "flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics"
+          . .virtualenvs/pipelinewise/bin/activate
+          flake8 pipelinewise --count --select=E9,F63,F7,F82 --show-source --statistics
 
       - name: Pep8 complexity
         if: steps.check.outcome == 'failure'
         run: |
-          docker run --rm \
-          -v $PWD:/app \
-          transferwiseworkspace/pipelinewise:ci-py${{ matrix.python-version  }} \
-          bash -c "flake8 . --count --max-complexity=15 --max-line-length=120 --statistics"
-
-  unit-test:
-    needs:
-      - build-docker-image
-    runs-on: ubuntu-20.04
-    strategy:
-      matrix:
-        python-version: ["3.7", "3.8", "3.9"]
-
-    steps:
-      - name: Checking out repo
-        uses: actions/checkout@v2
-
-      - name: Check if python changes are present
-        id: check
-        env:
-          GITHUB_REPO: ${{ github.repository }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-        continue-on-error: true
-        run: ./scripts/ci_check_no_file_changes.sh python
-
-      - name: Login to DockerHub
-        uses: docker/login-action@v1
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          . .virtualenvs/pipelinewise/bin/activate
+          flake8 pipelinewise --count --max-complexity=15 --max-line-length=120 --statistics
 
       - name: Run Unit tests
         if: steps.check.outcome == 'failure'
         run: |
-          docker run --rm \
-          -v $PWD:/app \
-          transferwiseworkspace/pipelinewise:ci-py${{ matrix.python-version  }} \
-          bash -c "pytest --cov=pipelinewise --cov-fail-under=75 -v tests/units"
+          . .virtualenvs/pipelinewise/bin/activate
+          pytest --cov=pipelinewise --cov-fail-under=75 -v tests/units
