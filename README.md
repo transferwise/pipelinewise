@@ -68,10 +68,19 @@ consumes data from taps and do something with it, like load it into a file, API 
 
 **Note**: Extra connectors are experimental connectors and written by community contributors. These connectors are not maintained regularly and not installed by default. To install the extra packages use the `--connectors=all` option when installing PipelineWise.
 
-
 ### Running from docker
 
 If you have [Docker](https://www.docker.com/) installed then using docker is the recommended and easiest method to start using PipelineWise.
+
+#### Use official image
+
+PipelineWise images are built on each release and available on [Dockerhub](https://hub.docker.com/r/transferwiseworkspace/pipelinewise)
+
+    ```sh
+    $ docker pull transferwiseworkspace/pipelinewise
+    ```
+
+#### Build your own docker image
 
 1. Build an executable docker image that has every required dependency and is isolated from your host system. 
 
