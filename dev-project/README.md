@@ -84,6 +84,15 @@ check the [dev-project/.env](../dev-project/.env) file for the credentials.
 
 To run tests:
 
+First, create a .env file from the .env.template file. On your local machine run:
+
+```sh
+cd dev-project
+cp .env.template .env
+```
+
+Then, from within the container:
+
 ```sh
 $ cd /opt/pipelinewise
 $ pytest
