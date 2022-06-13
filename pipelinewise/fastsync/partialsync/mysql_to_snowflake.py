@@ -54,28 +54,6 @@ def partial_sync_table(args: Namespace) -> Union[bool, str]:
         return f'{args.table}: {exc}'
 
 
-def _export_source_table_data_old(args, tap_id, mysql):
-    filename = common_utils.gen_export_filename(tap_id=tap_id, table=args.table, sync_type='partialsync')
-    filepath = os.path.join(args.temp_dir, filename)
-
-    # Exporting table data
-    where_clause_setting = {
-        'column': args.column,
-        'start_value': args.start_value,
-        'end_value': args.end_value
-    }
-    mysql.copy_table(
-        args.table,
-        filepath,
-        split_large_files=args.target.get('split_large_files'),
-        split_file_chunk_size_mb=args.target.get('split_file_chunk_size_mb'),
-        split_file_max_chunks=args.target.get('split_file_max_chunks'),
-        where_clause_setting=where_clause_setting
-    )
-    file_parts = glob.glob(f'{filepath}*')
-    return file_parts
-
-
 def main_impl():
     """Main sync logic"""
 
