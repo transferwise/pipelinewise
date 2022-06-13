@@ -17,6 +17,7 @@
         <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
         <script src="../_static/jquery.js"></script>
         <script src="../_static/underscore.js"></script>
+        <script src="../_static/_sphinx_javascript_frameworks_compat.js"></script>
         <script src="../_static/doctools.js"></script>
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
@@ -112,7 +113,7 @@
            <div itemprop="articleBody">
              
   <section id="schema-changes">
-<span id="id1"></span><h1>Schema Changes<a class="headerlink" href="#schema-changes" title="Permalink to this headline"></a></h1>
+<span id="id1"></span><h1>Schema Changes<a class="headerlink" href="#schema-changes" title="Permalink to this heading"></a></h1>
 <p>Taps detect schema changes in source databases and target connectors alter the
 destination tables automatically. Based on the schema change type, PipelineWise
 performs different actions in the destination tables as per the below:</p>
@@ -127,7 +128,7 @@ or alternatively you can <a class="reference internal" href="resync.html#resync"
 <li><p><strong>When column data type changed</strong>: target connectors are <strong>versioning the column</strong>.</p></li>
 </ul>
 <section id="versioning-columns">
-<span id="id2"></span><h2>Versioning columns<a class="headerlink" href="#versioning-columns" title="Permalink to this headline"></a></h2>
+<span id="id2"></span><h2>Versioning columns<a class="headerlink" href="#versioning-columns" title="Permalink to this heading"></a></h2>
 <p>Target connectors are versioning columns <strong>when data type change is detected</strong> in the source
 table. Versioning columns means that the old column with the old datatype is
 renamed by adding a timestamp to column name and a new column with the new data

@@ -17,6 +17,7 @@
         <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
         <script src="../_static/jquery.js"></script>
         <script src="../_static/underscore.js"></script>
+        <script src="../_static/_sphinx_javascript_frameworks_compat.js"></script>
         <script src="../_static/doctools.js"></script>
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
@@ -115,7 +116,7 @@
            <div itemprop="articleBody">
              
   <section id="replication-methods">
-<span id="id1"></span><h1>Replication Methods<a class="headerlink" href="#replication-methods" title="Permalink to this headline"></a></h1>
+<span id="id1"></span><h1>Replication Methods<a class="headerlink" href="#replication-methods" title="Permalink to this heading"></a></h1>
 <p>Replication Methods define the approach PipelineWise takes (more precisley the <a class="reference external" href="https://www.singer.io/">Singer.io</a>  taps)
 when extracting data from a source during a replication job. Additionally, Replication Methods can also impact
 how data is loaded into your destination and your overall row usage.</p>
@@ -137,7 +138,7 @@ Before configuring the replication settings for a data pipeline, read through th
 so you understand how PipelineWise will replicate your data.</p>
 </div>
 <section id="log-based">
-<span id="id2"></span><h2>Log Based<a class="headerlink" href="#log-based" title="Permalink to this headline"></a></h2>
+<span id="id2"></span><h2>Log Based<a class="headerlink" href="#log-based" title="Permalink to this heading"></a></h2>
 <p>Log-based Replication is a replication method in which the we identify modifications
 to records - including inserts, updates, and deletes - using a database’s binary log files.</p>
 <div class="admonition warning">
@@ -151,7 +152,7 @@ that support log replication.</p>
 </div>
 </section>
 <section id="key-based-incremental">
-<span id="incremental"></span><h2>Key Based Incremental<a class="headerlink" href="#key-based-incremental" title="Permalink to this headline"></a></h2>
+<span id="incremental"></span><h2>Key Based Incremental<a class="headerlink" href="#key-based-incremental" title="Permalink to this heading"></a></h2>
 <p>Key-based Incremental Replication is a replication method in which the <a class="reference internal" href="../connectors/taps.html#taps-list"><span class="std std-ref">Taps (Data Sources)</span></a> identify new and updated
 data using a column called a Replication Key. A Replication Key is a <code class="docutils literal notranslate"><span class="pre">timestamp</span></code>, <code class="docutils literal notranslate"><span class="pre">date-time</span></code>, or <code class="docutils literal notranslate"><span class="pre">integer</span></code>
 column that exists in a source table.</p>
@@ -180,14 +181,14 @@ is the next best option.</p>
 </div>
 </section>
 <section id="full-table">
-<span id="id3"></span><h2>Full Table<a class="headerlink" href="#full-table" title="Permalink to this headline"></a></h2>
+<span id="id3"></span><h2>Full Table<a class="headerlink" href="#full-table" title="Permalink to this heading"></a></h2>
 <p>Full Table Replication is a replication method in which all rows in a table - including new, updated, and existing - are
 replicated during every replication job.</p>
 <p>If a table doesn’t have a column suitable for <a class="reference internal" href="#incremental"><span class="std std-ref">Key Based Incremental</span></a> or if <a class="reference internal" href="#log-based"><span class="std std-ref">Log Based</span></a> is unavailable,
 this method will be used to replicate data.</p>
 </section>
 <section id="fast-sync">
-<span id="id4"></span><h2>Fast Sync<a class="headerlink" href="#fast-sync" title="Permalink to this headline"></a></h2>
+<span id="id4"></span><h2>Fast Sync<a class="headerlink" href="#fast-sync" title="Permalink to this heading"></a></h2>
 <p>Fast Sync Replication is functionally identical to <a class="reference internal" href="#full-table"><span class="std std-ref">Full Table</span></a> replication but Fast Sync
 bypassing the <a class="reference external" href="https://github.com/singer-io/getting-started/blob/master/docs/SPEC.md">Singer Specification</a>
 for optimised performance. Primary use case of Fast Sync is initial sync or to resync large tables

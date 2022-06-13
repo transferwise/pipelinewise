@@ -17,6 +17,7 @@
         <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
         <script src="../../_static/jquery.js"></script>
         <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/_sphinx_javascript_frameworks_compat.js"></script>
         <script src="../../_static/doctools.js"></script>
     <script src="../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../genindex.html" />
@@ -133,7 +134,7 @@
            <div itemprop="articleBody">
              
   <section id="tap-s3-csv">
-<span id="id1"></span><h1>Tap S3 CSV<a class="headerlink" href="#tap-s3-csv" title="Permalink to this headline"></a></h1>
+<span id="id1"></span><h1>Tap S3 CSV<a class="headerlink" href="#tap-s3-csv" title="Permalink to this heading"></a></h1>
 <p>Extracting data from S3 in CSV file format is straightforward. You need to have
 access to an S3 bucket and the tap will download every file that matches the
 configured file pattern. It’s tracking the <code class="docutils literal notranslate"><span class="pre">Last-Modified</span></code> timestamp on the
@@ -159,7 +160,7 @@ PipelineWise will resort to use the IAM role attached to the host.</p></li>
 </div></blockquote>
 </div>
 <section id="configuring-what-to-replicate">
-<h2>Configuring what to replicate<a class="headerlink" href="#configuring-what-to-replicate" title="Permalink to this headline"></a></h2>
+<h2>Configuring what to replicate<a class="headerlink" href="#configuring-what-to-replicate" title="Permalink to this heading"></a></h2>
 <p>PipelineWise configures every tap with a common structured YAML file format.
 A sample YAML for S3 CSV replication can be generated into a project directory by
 following the steps in the <a class="reference internal" href="../../installation_guide/creating_pipelines.html#generating-pipelines"><span class="std std-ref">Generating Sample Pipelines</span></a> section.</p>

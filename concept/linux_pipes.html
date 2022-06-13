@@ -17,6 +17,7 @@
         <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
         <script src="../_static/jquery.js"></script>
         <script src="../_static/underscore.js"></script>
+        <script src="../_static/_sphinx_javascript_frameworks_compat.js"></script>
         <script src="../_static/doctools.js"></script>
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
@@ -113,7 +114,7 @@
            <div itemprop="articleBody">
              
   <section id="linux-pipes-in-pipelinewise">
-<span id="linux-pipes"></span><h1>Linux Pipes in PipelineWise<a class="headerlink" href="#linux-pipes-in-pipelinewise" title="Permalink to this headline"></a></h1>
+<span id="linux-pipes"></span><h1>Linux Pipes in PipelineWise<a class="headerlink" href="#linux-pipes-in-pipelinewise" title="Permalink to this heading"></a></h1>
 <p>A pipe is unidirectional interprocess communication channel. The term was coined by
 <a class="reference external" href="https://en.wikipedia.org/wiki/Douglas_McIlroy">Douglas McIlroy</a> for Unix shell and
 named by analogy with the pipeline.</p>
@@ -126,7 +127,7 @@ extracted data sent to <code class="docutils literal notranslate"><span class="p
 </pre></div>
 </div>
 <section id="logic">
-<h2>Logic<a class="headerlink" href="#logic" title="Permalink to this headline"></a></h2>
+<h2>Logic<a class="headerlink" href="#logic" title="Permalink to this heading"></a></h2>
 <p>Pipes provide asynchronous execution of commands using buffered I/O routines. Thus, all the commands
 in the pipeline operate in parallel, each in its own process.</p>
 <p>The size of the buffer since kernel version 2.6.11 is 65536 bytes (64K) and is equal to the page memory
@@ -139,7 +140,7 @@ operations are performed in memory without loading to/from the disc.</p>
 original <a class="reference external" href="https://blog.dataart.com/linux-pipes-tips-tricks">Linux Pipes Tips &amp; Tricks</a> post.</p>
 </section>
 <section id="increasing-buffer-size">
-<h2>Increasing buffer size<a class="headerlink" href="#increasing-buffer-size" title="Permalink to this headline"></a></h2>
+<h2>Increasing buffer size<a class="headerlink" href="#increasing-buffer-size" title="Permalink to this heading"></a></h2>
 <p>Sometimes the default 64K buffer size that provided by the Linux kernel is too small. For example in the
 example above when you extracting data from a busy postgres database and loading into a busy Snowflake
 database sometimes you will find that that <code class="docutils literal notranslate"><span class="pre">tap-postgres</span></code> is blocked by <code class="docutils literal notranslate"><span class="pre">target-snowflake</span></code>.</p>
