@@ -31,7 +31,9 @@ jobs:
 
       - name: Setup test containers
         if: steps.check.outcome == 'failure'
-        run: docker-compose -f dev-project/docker-compose.yml up -d
+        run: |
+          cp dev-project/.env.template dev-project/.env
+          docker-compose -f dev-project/docker-compose.yml up -d
 
       - name: Wait for test containers to be ready
         if: steps.check.outcome == 'failure'
