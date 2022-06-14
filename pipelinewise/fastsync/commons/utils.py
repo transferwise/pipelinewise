@@ -43,7 +43,7 @@ def load_json(path):
 def save_dict_to_json(path, data):
     LOGGER.info('Saving new state file to %s', path)
     with open(path, 'w', encoding='utf-8') as fil:
-        fil.write(json.dumps(data))
+        fil.write(json.dumps(data, indent=4, sort_keys=True))
 
 
 def check_config(config, required_keys):
