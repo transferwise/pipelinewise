@@ -40,8 +40,6 @@ def partial_sync_table(args: Namespace) -> Union[bool, str]:
 
         file_parts = mysql.export_source_table_data(args, tap_id, where_clause_setting)
 
-        # file_parts = _export_source_table_data(args, tap_id, mysql)
-
         mysql.close_connections()
         size_bytes = sum([os.path.getsize(file_part) for file_part in file_parts])
         s3_keys, s3_key_pattern = upload_to_s3(snowflake, file_parts, args.temp_dir)
