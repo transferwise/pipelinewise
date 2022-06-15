@@ -1,3 +1,12 @@
+0.46.0 (2022-06-14)
+-------------------
+
+- Bump `target-s3-csv` to `2.0.0`
+- Allow non-x86 architectures for dev-project
+- Rename .env to .env.template
+- [CI][Fix] Linting and unit testing not running for external PRs
+- Bump `ujson` from `5.1.0` to `5.3.0`
+
 0.45.0 (2022-05-12)
 -------------------
 
@@ -21,7 +30,7 @@
 
 *Breaking changes*
 - Bump `tap-kafka` to `7.0.0`
-- Drop not null constraints on Snowflake tables PK columns.  
+- Drop not null constraints on Snowflake tables PK columns.
 
 *Added*
 - Send failure alerts to slack channel defined in tap, `slack_alert_channel`
@@ -29,7 +38,7 @@
 
 *Fixes*
 - Patch tap-mysql to `1.5.1`
-- Don't use log files to check tap status before starting it. 
+- Don't use log files to check tap status before starting it.
 - Change to e2e tests structure
 
 0.42.1 (2022-03-17)
@@ -103,7 +112,7 @@
 - Added cleanup method for state file.
 - Bump `pytest-cov` from `2.12.1` to `3.0.0` ([Changelog](https://github.com/pytest-dev/pytest-cov/blob/master/CHANGELOG.rst#300-2021-10-04))
 - Bump `joblib` from `1.0.0` to `1.1.0`
-- Bump `flake8` from `3.9.2` to `4.0.1` 
+- Bump `flake8` from `3.9.2` to `4.0.1`
 - Bump `jinja2` from `3.0.1` to `3.0.2`
 - Bump `python-dotenv` from `0.19.0` to `0.19.1`
 - Bump `target-snowflake` from `1.14.0` to `1.14.1`
@@ -127,14 +136,14 @@
 - Add new transformation type: **MASK-STRING-SKIP-ENDS**
 - Bump `pipelinewise-target-snowflake` from `1.13.1` to `1.14.0` ([Changelog](https://github.com/transferwise/pipelinewise-target-snowflake/blob/master/CHANGELOG.md#1140-2021-09-30))
     - Support `date` property format
-    - Don't log record on failure to avoind exposing data   
+    - Don't log record on failure to avoind exposing data
 
 *Changes*
 - Use Makefile for installation
 - Enforce PEP8
 
 *Fixes*
-- Dates out of range (with year > 9999) in FastSync from PG. 
+- Dates out of range (with year > 9999) in FastSync from PG.
 - Bump `pipelinewise-tap-postgres` from `1.8.0` to `1.8.1` ([Changelog](https://github.com/transferwise/pipelinewise-tap-postgres/blob/master/CHANGELOG.md#181-2021-09-23))
     -  LOG_BASED: Handle dates with year > 9999.
     -  INCREMENTAL & FULL_TABLE: Avoid processing timestamps arrays as timestamp
@@ -159,8 +168,8 @@
 -------------------
 - Support `"none"` as a value for `--connectors` in `install.sh` script to install a stripped down Pipelinewise without any connectors.
 - Optimize Dockerfile
-- Do not log invalid json objects if they fail validation against json schema. 
-- Replace `github-tap` with fork `pipelinewise-tap-github` version `1.0.0` 
+- Do not log invalid json objects if they fail validation against json schema.
+- Replace `github-tap` with fork `pipelinewise-tap-github` version `1.0.0`
 - Add schema validation for github tap
 - Increase batch_size_rows from 1M to 5M
 - Increase split_file_chunk_size_mb from 2500 to 5000
