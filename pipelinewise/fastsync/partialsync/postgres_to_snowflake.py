@@ -18,7 +18,7 @@ LOGGER = Logger().get_logger(__name__)
 
 
 def partial_sync_table(args: Namespace) -> Union[bool, str]:
-    """Partial sync table for MySQL to Snowflake"""
+    """Partial sync table for Postgres to Snowflake"""
     snowflake = FastSyncTargetSnowflake(args.target, args.transform)
     tap_id = args.target.get('tap_id')
     dbname = args.tap.get('dbname')
