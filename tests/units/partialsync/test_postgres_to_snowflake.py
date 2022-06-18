@@ -85,12 +85,12 @@ class PartialSyncTestCase(TestCase):
     @mock.patch('pipelinewise.fastsync.partialsync.postgres_to_snowflake.FastSyncTapPostgres')
     @mock.patch('pipelinewise.fastsync.partialsync.postgres_to_snowflake.FastSyncTargetSnowflake')
     def test_running_partial_sync_postgres_to_snowflake(self,
-                                                     mocked_fastsync_sf,
-                                                     mocked_fastsyncpostgres,
-                                                     mocked_bookmark,
-                                                     mocked_upload_to_s3,
-                                                     mocked_load_into_sf,
-                                                     mocked_save_state):
+                                                        mocked_fastsync_sf,
+                                                        mocked_fastsyncpostgres,
+                                                        mocked_bookmark,
+                                                        mocked_upload_to_s3,
+                                                        mocked_load_into_sf,
+                                                        mocked_save_state):
         """Test the whole partial_sync_postgres_to_snowflake module works as expected"""
         with TemporaryDirectory() as temp_directory:
             file_size = 5
@@ -115,56 +115,57 @@ class PartialSyncTestCase(TestCase):
             start_value = '1'
             test_end_values = ('10', None)
             for end_value in test_end_values:
-                arguments = {
-                    'tap': f'{self.config_dir}/target_snowflake/tap_postgres/config.json',
-                    'target': f'{self.config_dir}/tmp/target_config_tmp.json',
-                    'properties': 'foo_properties',
-                    'state': 'foo_state',
-                    'temp_dir': temp_directory,
-                    'transform': 'foo_transform',
-                    'table': table_name,
-                    'column': column,
-                    'start_value': start_value,
-                    'end_value': end_value
-                }
+                with self.subTest(endvalue=end_value):
+                    arguments = {
+                        'tap': f'{self.config_dir}/target_snowflake/tap_postgres/config.json',
+                        'target': f'{self.config_dir}/tmp/target_config_tmp.json',
+                        'properties': 'foo_properties',
+                        'state': 'foo_state',
+                        'temp_dir': temp_directory,
+                        'transform': 'foo_transform',
+                        'table': table_name,
+                        'column': column,
+                        'start_value': start_value,
+                        'end_value': end_value
+                    }
 
-                with self.assertLogs('pipelinewise') as actual_logs:
-                    args_namespace = run_postgres_to_snowflake(arguments)
+                    with self.assertLogs('pipelinewise') as actual_logs:
+                        args_namespace = run_postgres_to_snowflake(arguments)
 
-                expected_log_messages = [
-                    [
-                        'STARTING PARTIAL SYNC',
-                        f'Table selected to sync         : {table_name}',
-                        f'Column                         : {column}',
-                        f'Start value                    : {start_value}',
-                        f'End value                      : {end_value}',
-                    ],
-                    [
-                        'PARTIAL SYNC FINISHED - SUMMARY',
-                        f'Table selected to sync         : {table_name}',
-                        f'Column                         : {column}',
-                        f'Start value                    : {start_value}',
-                        f'End value                      : {end_value}',
-                        f'Exceptions during table sync   : {[]}',
+                    expected_log_messages = [
+                        [
+                            'STARTING PARTIAL SYNC',
+                            f'Table selected to sync         : {table_name}',
+                            f'Column                         : {column}',
+                            f'Start value                    : {start_value}',
+                            f'End value                      : {end_value}',
+                        ],
+                        [
+                            'PARTIAL SYNC FINISHED - SUMMARY',
+                            f'Table selected to sync         : {table_name}',
+                            f'Column                         : {column}',
+                            f'Start value                    : {start_value}',
+                            f'End value                      : {end_value}',
+                            f'Exceptions during table sync   : {[]}',
+                        ]
                     ]
-                ]
-                for log_index, log_messages in enumerate(expected_log_messages):
-                    for message in log_messages:
-                        self.assertIn(message, actual_logs.output[log_index])
+                    for log_index, log_messages in enumerate(expected_log_messages):
+                        for message in log_messages:
+                            self.assertIn(message, actual_logs.output[log_index])
 
-                where_clause_setting = {
-                    'column': arguments['column'],
-                    'start_value': arguments['start_value'],
-                    'end_value': arguments['end_value']
-                }
-                mocked_export_data.assert_called_with(
-                    args_namespace, args_namespace.target.get('tap_id'), where_clause_setting
-                )
-                mocked_upload_to_s3.assert_called_with(mocked_fastsync_sf(), file_parts, arguments['temp_dir'])
-                mocked_load_into_sf.assert_called_with(
-                    mocked_fastsync_sf(), args_namespace, s3_keys, s3_key_pattern, file_size
-                )
-                if end_value:
-                    mocked_save_state.assert_not_called()
-                else:
-                    mocked_save_state.assert_called_with(arguments['state'], table_name, bookmark)
+                    where_clause_setting = {
+                        'column': arguments['column'],
+                        'start_value': arguments['start_value'],
+                        'end_value': arguments['end_value']
+                    }
+                    mocked_export_data.assert_called_with(
+                        args_namespace, args_namespace.target.get('tap_id'), where_clause_setting
+                    )
+                    mocked_upload_to_s3.assert_called_with(mocked_fastsync_sf(), file_parts, arguments['temp_dir'])
+                    mocked_load_into_sf.assert_called_with(
+                        mocked_fastsync_sf(), args_namespace, s3_keys, s3_key_pattern, file_size
+                    )
+                    if end_value:
+                        mocked_save_state.assert_not_called()
+                    else:
+                        mocked_save_state.assert_called_with(arguments['state'], table_name, bookmark)

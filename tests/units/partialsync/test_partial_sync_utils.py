@@ -101,12 +101,13 @@ class PartialSyncUtilsTestCase(TestCase):
         test_end_values = (None, 'bar')
 
         for end_value in test_end_values:
-            with mock.patch('pipelinewise.fastsync.commons.utils.save_state_file') as mocked_save_state_file:
-                args = PartialSync2SFArgs(
-                    temp_test_dir='foo_temp', table='FOO', start_value='20', end_value=end_value, state='foo_state'
-                )
-                update_state_file(args, bookmark)
-            if end_value:
-                mocked_save_state_file.assert_not_called()
-            else:
-                mocked_save_state_file.assert_called_with(args.state, args.table, bookmark)
+            with self.subTest(endvalue=end_value):
+                with mock.patch('pipelinewise.fastsync.commons.utils.save_state_file') as mocked_save_state_file:
+                    args = PartialSync2SFArgs(
+                        temp_test_dir='foo_temp', table='FOO', start_value='20', end_value=end_value, state='foo_state'
+                    )
+                    update_state_file(args, bookmark)
+                if end_value:
+                    mocked_save_state_file.assert_not_called()
+                else:
+                    mocked_save_state_file.assert_called_with(args.state, args.table, bookmark)
