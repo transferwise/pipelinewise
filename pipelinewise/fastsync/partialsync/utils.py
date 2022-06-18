@@ -2,13 +2,13 @@ import argparse
 import os
 import re
 
-from typing import Dict
-
+from typing import Dict, Tuple, List
 
 from pipelinewise.fastsync.commons import utils as common_utils
+from pipelinewise.fastsync.commons.target_snowflake import FastSyncTargetSnowflake
 
 
-def upload_to_s3(snowflake, file_parts, temp_dir):
+def upload_to_s3(snowflake: FastSyncTargetSnowflake, file_parts: List, temp_dir: str) -> Tuple[List, str]:
     """Upload exported data into S3"""
 
     s3_keys = []
@@ -25,7 +25,10 @@ def upload_to_s3(snowflake, file_parts, temp_dir):
     return s3_keys, s3_key_pattern
 
 
-def load_into_snowflake(snowflake, args, s3_keys, s3_key_pattern, size_bytes):
+def load_into_snowflake(
+        snowflake: FastSyncTargetSnowflake,
+        args: argparse.Namespace,
+        s3_keys: List, s3_key_pattern: str, size_bytes: int) -> None:
     """load data into Snowflake"""
 
     # delete partial data from the table
@@ -55,7 +58,7 @@ def load_into_snowflake(snowflake, args, s3_keys, s3_key_pattern, size_bytes):
         snowflake.s3.delete_object(Bucket=args.target.get('s3_bucket'), Key=s3_key)
 
 
-def update_state_file(args, bookmark):
+def update_state_file(args: argparse.Namespace, bookmark: Dict) -> None:
     """Update state file"""
     # Save bookmark to singer state file
     if not args.end_value:
