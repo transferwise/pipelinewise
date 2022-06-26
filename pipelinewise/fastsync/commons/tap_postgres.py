@@ -9,7 +9,7 @@ import psycopg2
 import psycopg2.extras
 
 from argparse import Namespace
-from typing import Dict, Union
+from typing import Dict
 
 
 from . import utils, split_gzip
@@ -466,7 +466,7 @@ class FastSyncTapPostgres:
             'primary_key': self.get_primary_keys(table_name),
         }
 
-    # pylint: disable=too-many-arguments
+    # pylint: disable=too-many-arguments, too-many-locals
     def copy_table(
         self,
         table_name,
@@ -527,6 +527,7 @@ class FastSyncTapPostgres:
 
     def export_source_table_data(
             self, args: Namespace, tap_id: str) -> list:
+        """Exporting data from the source table"""
         filename = utils.gen_export_filename(tap_id=tap_id, table=args.table, sync_type='partialsync')
         filepath = os.path.join(args.temp_dir, filename)
 
