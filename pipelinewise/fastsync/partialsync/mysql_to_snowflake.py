@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import sys
 import os
-import glob
 
 from argparse import Namespace
 from typing import Union

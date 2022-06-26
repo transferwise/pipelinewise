@@ -49,12 +49,8 @@ class PartialSyncTestCase(TestCase):
                 mocked_copy_table.side_effect = mocked_copy_table_method
 
                 test_fast_sync = FastSyncTapPostgres({}, {})
-                where_clause_setting = {
-                    'column': args.column,
-                    'start_value': args.start_value,
-                    'end_value': args.end_value
-                }
-                actual_file_parts = test_fast_sync.export_source_table_data(args, tap_id, where_clause_setting)
+
+                actual_file_parts = test_fast_sync.export_source_table_data(args, tap_id)
 
                 call_args = mocked_copy_table.call_args.args
                 call_kwargs = mocked_copy_table.call_args.kwargs
@@ -153,13 +149,8 @@ class PartialSyncTestCase(TestCase):
                         for message in log_messages:
                             self.assertIn(message, actual_logs.output[log_index])
 
-                    where_clause_setting = {
-                        'column': arguments['column'],
-                        'start_value': arguments['start_value'],
-                        'end_value': arguments['end_value']
-                    }
                     mocked_export_data.assert_called_with(
-                        args_namespace, args_namespace.target.get('tap_id'), where_clause_setting
+                        args_namespace, args_namespace.target.get('tap_id')
                     )
                     mocked_upload_to_s3.assert_called_with(mocked_fastsync_sf(), file_parts, arguments['temp_dir'])
                     mocked_load_into_sf.assert_called_with(

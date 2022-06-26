@@ -144,6 +144,7 @@ def __disable_profiler(
         profiler.clear()
 
 
+# pylint: disable=too-many-branches
 def _validate_command_specific_arguments(args):
     # Command specific argument validations
     if args.command == 'init' and args.name == '*':
@@ -256,9 +257,9 @@ def main():
         args.command = 'import_project'
     try:
         _validate_command_specific_arguments(args)
-    except CommandSpecificArgumentsException as e:
-        print(str(e))
-        exit(1)
+    except CommandSpecificArgumentsException as exp:
+        print(str(exp))
+        sys.exit(1)
 
     logger = __init_logger(args.log, args.debug)
 

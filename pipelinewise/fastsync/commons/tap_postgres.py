@@ -526,7 +526,7 @@ class FastSyncTapPostgres:
             self.curr.copy_expert(sql, split_gzip_files, size=131072)
 
     def export_source_table_data(
-            self, args: Namespace, tap_id: str, where_clause_setting: Union[Dict, None] = None) -> list:
+            self, args: Namespace, tap_id: str) -> list:
         filename = utils.gen_export_filename(tap_id=tap_id, table=args.table, sync_type='partialsync')
         filepath = os.path.join(args.temp_dir, filename)
 
@@ -545,5 +545,3 @@ class FastSyncTapPostgres:
         )
         file_parts = glob.glob(f'{filepath}*')
         return file_parts
-
-
