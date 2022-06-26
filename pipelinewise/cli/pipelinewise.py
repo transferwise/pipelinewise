@@ -66,6 +66,7 @@ PARTIAL_SYNC_PAIRS = {
 
 }
 
+
 # pylint: disable=too-many-lines,too-many-instance-attributes,too-many-public-methods
 class PipelineWise:
     """PipelineWise main Class"""
@@ -1113,7 +1114,6 @@ class PipelineWise:
         else:
             # Run command
             commands.run_command(command, self.tap_run_log_file)
-
 
     def run_tap_fastsync(
         self, tap: TapParams, target: TargetParams, transform: TransformParams

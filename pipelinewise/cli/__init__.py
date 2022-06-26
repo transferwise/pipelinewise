@@ -176,21 +176,26 @@ def _validate_command_specific_arguments(args):
             raise CommandSpecificArgumentsException('You must specify a string to encrypt using the argument --string')
 
     if args.command == 'partial_sync_table':
-        if args.tap == '*':
-            raise CommandSpecificArgumentsException('You must specify a source name using the argument --tap')
+        _validate_partial_sync_arguments(args)
 
-        if args.target == '*':
-            raise CommandSpecificArgumentsException('You must specify a destination name using the argument --target')
 
-        if args.table == '*':
-            raise CommandSpecificArgumentsException('You must specify a source table by using the argument --table')
+def _validate_partial_sync_arguments(args):
+    """Validating specific arguments for partial sync"""
+    if args.tap == '*':
+        raise CommandSpecificArgumentsException('You must specify a source name using the argument --tap')
 
-        if args.column == '*':
-            raise CommandSpecificArgumentsException('You must specify a column by using the argument --column')
+    if args.target == '*':
+        raise CommandSpecificArgumentsException('You must specify a destination name using the argument --target')
 
-        if args.start_value == '*':
-            raise CommandSpecificArgumentsException(
-                'You must specify a start value by using the argument --start_value')
+    if args.table == '*':
+        raise CommandSpecificArgumentsException('You must specify a source table by using the argument --table')
+
+    if args.column == '*':
+        raise CommandSpecificArgumentsException('You must specify a column by using the argument --column')
+
+    if args.start_value == '*':
+        raise CommandSpecificArgumentsException(
+            'You must specify a start value by using the argument --start_value')
 
 
 # pylint: disable=too-many-branches,too-many-statements

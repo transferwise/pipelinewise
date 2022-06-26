@@ -477,7 +477,7 @@ class FastSyncTapPostgres:
         split_file_chunk_size_mb=1000,
         split_file_max_chunks=20,
         compress=True,
-        where_clause_setting = None
+        where_clause_setting=None
     ):
         """
         Export data from table to a zipped csv

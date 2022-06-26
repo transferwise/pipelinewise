@@ -353,6 +353,7 @@ def build_singer_command(
 
     return command
 
+
 # pylint: disable=too-many-arguments
 def build_fastsync_partial_command(
         tap: TapParams,
@@ -396,6 +397,7 @@ def build_fastsync_partial_command(
 
     LOGGER.debug('PartialSync command: %s', command)
     return command
+
 
 # pylint: disable=too-many-arguments
 def build_fastsync_command(

@@ -443,7 +443,6 @@ class FastSyncTapMySql:
             if where_clause_setting['end_value']:
                 where_clause_sql += f' AND {where_clause_setting["column"]} <= {where_clause_setting["end_value"]}'
 
-
         sql = """SELECT {}
         ,CONVERT_TZ( NOW(),@@session.time_zone,'+00:00') AS _SDC_EXTRACTED_AT
         ,CONVERT_TZ( NOW(),@@session.time_zone,'+00:00') AS _SDC_BATCHED_AT
