@@ -258,7 +258,7 @@ def main():
     # import_config : this is for backward compatibility; use 'import' instead from CLI
     # Every command argument is mapped to a python function with the same name, but 'import' is a
     # python keyword and can't be used as function name
-    if args.command == 'import':
+    if args.command == 'import' or args.command == 'import_config':
         args.command = 'import_project'
     try:
         _validate_command_specific_arguments(args)
