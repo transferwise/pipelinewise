@@ -186,7 +186,7 @@ class PartialSyncCLITestCase(TestCase):
         with mock.patch('pipelinewise.cli.commands.run_command') as mocked_run_command:
             self._run_cli(arguments)
 
-        call_args = mocked_run_command.call_args.args
+        call_args = mocked_run_command.call_args[0]
         self.assertEqual(2, len(call_args))
 
         # Because each instance of Pipelinewise has a random postfix for log filename, we test it in this way!
@@ -224,9 +224,8 @@ class PartialSyncCLITestCase(TestCase):
         with mock.patch('pipelinewise.cli.commands.run_command') as mocked_run_command:
             self._run_cli(arguments)
 
-        call_args = mocked_run_command.call_args.args
+        call_args = mocked_run_command.call_args[0]
         self.assertEqual(2, len(call_args))
-
         # Because each instance of Pipelinewise has a random postfix for log filename, we test it in this way!
         self.assertRegex(
             call_args[0],
