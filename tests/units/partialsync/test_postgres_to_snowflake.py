@@ -52,8 +52,8 @@ class PartialSyncTestCase(TestCase):
 
                 actual_file_parts = test_fast_sync.export_source_table_data(args, tap_id)
 
-                call_args = mocked_copy_table.call_args.args
-                call_kwargs = mocked_copy_table.call_args.kwargs
+                call_args = mocked_copy_table.call_args[0]
+                call_kwargs = mocked_copy_table.call_args[1]
 
                 expected_call_kwargs = {
                     'split_large_files': False,
