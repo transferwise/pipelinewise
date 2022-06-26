@@ -42,6 +42,7 @@ setup(name='pipelinewise',
           'ujson==5.3.0',
           'dnspython==2.1.*',
           'boto3==1.21.*',
+          'chardet==4.0.0',
       ],
       extras_require={
           'test': [
