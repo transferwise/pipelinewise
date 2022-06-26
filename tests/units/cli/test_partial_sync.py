@@ -225,8 +225,8 @@ class PartialSyncCLITestCase(TestCase):
             self._run_cli(arguments)
 
         call_args = mocked_run_command.call_args.args
-        self.assertEqual(2, len(call_args))
-
+        # self.assertEqual(2, len(call_args))
+        self.assertListEqual(call_args, [])
         # Because each instance of Pipelinewise has a random postfix for log filename, we test it in this way!
         self.assertRegex(
             call_args[0],
