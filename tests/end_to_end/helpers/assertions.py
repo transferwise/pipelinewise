@@ -52,6 +52,33 @@ def assert_resync_tables_success(tap, target, profiling=False):
         )
 
 
+# pylint: disable=too-many-arguments
+def assert_partial_sync_table_success(env, tap, tap_type, target, source_db, table, column, start_value, end_value):
+    """Partial sync a specific tap and make sure that it finished successfully and state file is created
+    with the right content"""
+    # It should be ran one time before for partial sync
+    assert_resync_tables_success(tap, target, profiling=False)
+
+    # Deleting all records from the target except the first one
+    env.delete_record_from_target_snowflake(tap_type=tap_type,
+                                            table=table,
+                                            where_clause=f'WHERE {column}>1')
+
+    command = f'pipelinewise partial_sync_table --tap {tap} --target {target}' \
+              f' --table {source_db}.{table} --column {column} --start_value {start_value} --end_value {end_value}'
+
+    [return_code, stdout, stderr] = tasks.run_command(command)
+    log_file = tasks.find_run_tap_log_file(stdout, 'partialsync')
+    assert_command_success(return_code, stdout, stderr, log_file)
+
+
+def assert_partial_sync_rows_in_target(env, tap_type, table, column_index, expected_column_values):
+    """Assert only expected rows are synced in the target snowflake"""
+    records = env.get_records_from_target_snowflake(tap_type=tap_type, table=table)
+    list_of_column_values = [column[column_index] for column in records]
+    assert expected_column_values == list_of_column_values
+
+
 def assert_command_success(return_code, stdout, stderr, log_path=None):
     """Assert helper function to check if command finished successfully.
     In case of failure it logs stdout, stderr and content of the failed command log

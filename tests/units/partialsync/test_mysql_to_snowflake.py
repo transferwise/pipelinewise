@@ -146,7 +146,7 @@ class PartialSyncTestCase(TestCase):
                             f'Column                         : {column}',
                             f'Start value                    : {start_value}',
                             f'End value                      : {end_value}',
-                            f'Exceptions during table sync   : {[]}',
+                            f'Exceptions during table sync   : None',
                         ]
                     ]
                     for log_index, log_messages in enumerate(expected_log_messages):

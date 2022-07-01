@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-import sys
 import os
 
 from argparse import Namespace
@@ -56,7 +55,6 @@ def main_impl():
 
     args = utils.parse_args_for_partial_sync(REQUIRED_CONFIG_KEYS)
     start_time = datetime.now()
-    table_sync_excs = []
 
     # Log start info
     LOGGER.info(
@@ -72,7 +70,9 @@ def main_impl():
         ''', args.table, args.column, args.start_value, args.end_value
     )
 
-    partial_sync_table(args=args)
+    sync_excs = partial_sync_table(args=args)
+    if isinstance(sync_excs, bool):
+        sync_excs = None
 
     # Log summary
     end_time = datetime.now()
@@ -89,11 +89,11 @@ def main_impl():
 
             Runtime                        : %s
         -------------------------------------------------------
-        ''', args.table, args.column, args.start_value, args.end_value, table_sync_excs, end_time - start_time
+        ''', args.table, args.column, args.start_value, args.end_value, sync_excs, end_time - start_time
     )
 
-    if len(table_sync_excs) > 0:
-        sys.exit(1)
+    if sync_excs is not None:
+        raise SystemExit(1)
 
 
 def main():

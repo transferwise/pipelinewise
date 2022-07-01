@@ -1,6 +1,7 @@
 import os
 import re
 import glob
+
 import boto3
 import shutil
 import subprocess
@@ -15,6 +16,7 @@ CONFIG_DIR = os.path.join(USER_HOME, '.pipelinewise')
 DIR = os.path.dirname(os.path.realpath(__file__))
 
 
+# pylint: disable=too-many-public-methods
 class E2EEnv:
     """Utilities class to run End to End tests
 
@@ -294,7 +296,7 @@ class E2EEnv:
             'is_configured'
         ] = self._is_env_connector_configured('TARGET_BIGQUERY')
 
-    def _get_conn_env_var(self, connector, key):
+    def get_conn_env_var(self, connector, key):
         """Get the value of a specific variable in the self.env dict"""
         return self.env[connector]['vars'][key]['value']
 
@@ -418,44 +420,44 @@ class E2EEnv:
         """Run and SQL query in tap postgres database"""
         return db.run_query_postgres(
             query,
-            host=self._get_conn_env_var('TAP_POSTGRES', 'HOST'),
-            port=self._get_conn_env_var('TAP_POSTGRES', 'PORT'),
-            user=self._get_conn_env_var('TAP_POSTGRES', 'USER'),
-            password=self._get_conn_env_var('TAP_POSTGRES', 'PASSWORD'),
-            database=self._get_conn_env_var('TAP_POSTGRES', 'DB'),
+            host=self.get_conn_env_var('TAP_POSTGRES', 'HOST'),
+            port=self.get_conn_env_var('TAP_POSTGRES', 'PORT'),
+            user=self.get_conn_env_var('TAP_POSTGRES', 'USER'),
+            password=self.get_conn_env_var('TAP_POSTGRES', 'PASSWORD'),
+            database=self.get_conn_env_var('TAP_POSTGRES', 'DB'),
         )
 
     def get_tap_mongodb_connection(self):
         """Create and returns tap mongodb database instance to run queries on"""
         return db.get_mongodb_connection(
-            host=self._get_conn_env_var('TAP_MONGODB', 'HOST'),
-            port=self._get_conn_env_var('TAP_MONGODB', 'PORT'),
-            user=self._get_conn_env_var('TAP_MONGODB', 'USER'),
-            password=self._get_conn_env_var('TAP_MONGODB', 'PASSWORD'),
-            database=self._get_conn_env_var('TAP_MONGODB', 'DB'),
-            auth_database=self._get_conn_env_var('TAP_MONGODB', 'AUTH_DB'),
+            host=self.get_conn_env_var('TAP_MONGODB', 'HOST'),
+            port=self.get_conn_env_var('TAP_MONGODB', 'PORT'),
+            user=self.get_conn_env_var('TAP_MONGODB', 'USER'),
+            password=self.get_conn_env_var('TAP_MONGODB', 'PASSWORD'),
+            database=self.get_conn_env_var('TAP_MONGODB', 'DB'),
+            auth_database=self.get_conn_env_var('TAP_MONGODB', 'AUTH_DB'),
         )
 
     def run_query_target_postgres(self, query: object) -> object:
         """Run and SQL query in target postgres database"""
         return db.run_query_postgres(
             query,
-            host=self._get_conn_env_var('TARGET_POSTGRES', 'HOST'),
-            port=self._get_conn_env_var('TARGET_POSTGRES', 'PORT'),
-            user=self._get_conn_env_var('TARGET_POSTGRES', 'USER'),
-            password=self._get_conn_env_var('TARGET_POSTGRES', 'PASSWORD'),
-            database=self._get_conn_env_var('TARGET_POSTGRES', 'DB'),
+            host=self.get_conn_env_var('TARGET_POSTGRES', 'HOST'),
+            port=self.get_conn_env_var('TARGET_POSTGRES', 'PORT'),
+            user=self.get_conn_env_var('TARGET_POSTGRES', 'USER'),
+            password=self.get_conn_env_var('TARGET_POSTGRES', 'PASSWORD'),
+            database=self.get_conn_env_var('TARGET_POSTGRES', 'DB'),
         )
 
     def run_query_target_redshift(self, query):
         """Run an SQL query in target redshift database"""
         return db.run_query_redshift(
             query,
-            host=self._get_conn_env_var('TARGET_REDSHIFT', 'HOST'),
-            port=self._get_conn_env_var('TARGET_REDSHIFT', 'PORT'),
-            user=self._get_conn_env_var('TARGET_REDSHIFT', 'USER'),
-            password=self._get_conn_env_var('TARGET_REDSHIFT', 'PASSWORD'),
-            database=self._get_conn_env_var('TARGET_REDSHIFT', 'DBNAME'),
+            host=self.get_conn_env_var('TARGET_REDSHIFT', 'HOST'),
+            port=self.get_conn_env_var('TARGET_REDSHIFT', 'PORT'),
+            user=self.get_conn_env_var('TARGET_REDSHIFT', 'USER'),
+            password=self.get_conn_env_var('TARGET_REDSHIFT', 'PASSWORD'),
+            database=self.get_conn_env_var('TARGET_REDSHIFT', 'DBNAME'),
         )
 
     # pylint: disable=unnecessary-pass
@@ -468,45 +470,45 @@ class E2EEnv:
         """Run and SQL query in tap mysql database"""
         return db.run_query_mysql(
             query,
-            host=self._get_conn_env_var('TAP_MYSQL', 'HOST'),
-            port=int(self._get_conn_env_var('TAP_MYSQL', 'PORT')),
-            user=self._get_conn_env_var('TAP_MYSQL', 'USER'),
-            password=self._get_conn_env_var('TAP_MYSQL', 'PASSWORD'),
-            database=self._get_conn_env_var('TAP_MYSQL', 'DB'),
+            host=self.get_conn_env_var('TAP_MYSQL', 'HOST'),
+            port=int(self.get_conn_env_var('TAP_MYSQL', 'PORT')),
+            user=self.get_conn_env_var('TAP_MYSQL', 'USER'),
+            password=self.get_conn_env_var('TAP_MYSQL', 'PASSWORD'),
+            database=self.get_conn_env_var('TAP_MYSQL', 'DB'),
         )
 
     def run_query_tap_mysql_2(self, query):
         """Run and SQL query in tap mysql database"""
         return db.run_query_mysql(
             query,
-            host=self._get_conn_env_var('TAP_MYSQL', 'HOST'),
-            port=int(self._get_conn_env_var('TAP_MYSQL', 'PORT')),
-            user=self._get_conn_env_var('TAP_MYSQL', 'USER'),
-            password=self._get_conn_env_var('TAP_MYSQL', 'PASSWORD'),
-            database=self._get_conn_env_var('TAP_MYSQL', 'DB_2'),
+            host=self.get_conn_env_var('TAP_MYSQL', 'HOST'),
+            port=int(self.get_conn_env_var('TAP_MYSQL', 'PORT')),
+            user=self.get_conn_env_var('TAP_MYSQL', 'USER'),
+            password=self.get_conn_env_var('TAP_MYSQL', 'PASSWORD'),
+            database=self.get_conn_env_var('TAP_MYSQL', 'DB_2'),
         )
 
     def run_query_target_snowflake(self, query):
         """Run and SQL query in target snowflake database"""
         return db.run_query_snowflake(
             query,
-            account=self._get_conn_env_var('TARGET_SNOWFLAKE', 'ACCOUNT'),
-            database=self._get_conn_env_var('TARGET_SNOWFLAKE', 'DBNAME'),
-            warehouse=self._get_conn_env_var('TARGET_SNOWFLAKE', 'WAREHOUSE'),
-            user=self._get_conn_env_var('TARGET_SNOWFLAKE', 'USER'),
-            password=self._get_conn_env_var('TARGET_SNOWFLAKE', 'PASSWORD'),
+            account=self.get_conn_env_var('TARGET_SNOWFLAKE', 'ACCOUNT'),
+            database=self.get_conn_env_var('TARGET_SNOWFLAKE', 'DBNAME'),
+            warehouse=self.get_conn_env_var('TARGET_SNOWFLAKE', 'WAREHOUSE'),
+            user=self.get_conn_env_var('TARGET_SNOWFLAKE', 'USER'),
+            password=self.get_conn_env_var('TARGET_SNOWFLAKE', 'PASSWORD'),
         )
 
     def delete_dataset_target_bigquery(self, dataset):
         """Run and SQL query in target bigquery database"""
         return db.delete_dataset_bigquery(
-            dataset, project=self._get_conn_env_var('TARGET_BIGQUERY', 'PROJECT')
+            dataset, project=self.get_conn_env_var('TARGET_BIGQUERY', 'PROJECT')
         )
 
     def run_query_target_bigquery(self, query):
         """Run and SQL query in target bigquery database"""
         return db.run_query_bigquery(
-            query, project=self._get_conn_env_var('TARGET_BIGQUERY', 'PROJECT')
+            query, project=self.get_conn_env_var('TARGET_BIGQUERY', 'PROJECT')
         )
 
     # -------------------------------------------------------------------------
@@ -542,11 +544,11 @@ class E2EEnv:
             DIR, '..', 'test-project', 's3_mock_data', 'mock_data_2.csv'
         )
 
-        bucket = self._get_conn_env_var('TAP_S3_CSV', 'BUCKET')
+        bucket = self.get_conn_env_var('TAP_S3_CSV', 'BUCKET')
         s3 = boto3.client(
             's3',
-            aws_access_key_id=self._get_conn_env_var('TAP_S3_CSV', 'AWS_KEY'),
-            aws_secret_access_key=self._get_conn_env_var(
+            aws_access_key_id=self.get_conn_env_var('TAP_S3_CSV', 'AWS_KEY'),
+            aws_secret_access_key=self.get_conn_env_var(
                 'TAP_S3_CSV', 'AWS_SECRET_ACCESS_KEY'
             ),
         )
@@ -646,6 +648,19 @@ class E2EEnv:
 
         # Clean config directory
         shutil.rmtree(os.path.join(CONFIG_DIR, 'snowflake'), ignore_errors=True)
+
+    def delete_record_from_target_snowflake(self, tap_type, table, where_clause):
+        """Delete all records except the first one from the snowflake target"""
+        self.run_query_target_snowflake(
+            f'DELETE from ppw_e2e_tap_{tap_type}{self.sf_schema_postfix}.{table} {where_clause}'
+        )
+
+    def get_records_from_target_snowflake(self, tap_type, table):
+        """"Getting all records from a specific table of snowflake target"""
+        records = self.run_query_target_snowflake(
+            f'SELECT * from ppw_e2e_tap_{tap_type}{self.sf_schema_postfix}.{table}'
+        )
+        return records
 
     def setup_target_bigquery(self):
         """Clean bigquery target database and prepare for test run"""
