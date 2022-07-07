@@ -43,8 +43,7 @@ and specify the tap and target ids and table, column ,start_value and end_value(
 
     $ pipelinewise partial_sync_table --target <target_id> --tap <tap_id> --table schema.table --column column_name --start_value start_value_from_column --end_value end_value_from_column
 
-if there is no end_value then it will load from start_value to the end of the table
-and will update the bookmark in the internal state file.
+**note** if there is no end_value, the internal state file will be updated with the replication value (gtid, wal, etc) that was captured at the start of the partial sync
 
 .. warning::
 
