@@ -1,11 +1,14 @@
 import datetime
 import decimal
+import glob
 import logging
+import os
 import re
 import sys
 import psycopg2
 import psycopg2.extras
 
+from argparse import Namespace
 from typing import Dict
 
 
@@ -463,7 +466,7 @@ class FastSyncTapPostgres:
             'primary_key': self.get_primary_keys(table_name),
         }
 
-    # pylint: disable=too-many-arguments
+    # pylint: disable=too-many-arguments, too-many-locals
     def copy_table(
         self,
         table_name,
@@ -474,6 +477,7 @@ class FastSyncTapPostgres:
         split_file_chunk_size_mb=1000,
         split_file_max_chunks=20,
         compress=True,
+        where_clause_setting=None
     ):
         """
         Export data from table to a zipped csv
@@ -494,13 +498,19 @@ class FastSyncTapPostgres:
 
         schema_name, table_name = table_name.split('.')
 
+        where_clause_sql = ''
+        if where_clause_setting:
+            where_clause_sql = f' WHERE {where_clause_setting["column"]} >= {where_clause_setting["start_value"]}'
+            if where_clause_setting['end_value']:
+                where_clause_sql += f' AND {where_clause_setting["column"]} <= {where_clause_setting["end_value"]}'
+
         sql = """COPY (SELECT {}
         ,now() AT TIME ZONE 'UTC'
         ,now() AT TIME ZONE 'UTC'
         ,null
-        FROM {}."{}") TO STDOUT with CSV DELIMITER ','
+        FROM {}."{}"{}) TO STDOUT with CSV DELIMITER ','
         """.format(
-            ','.join(column_safe_sql_values), schema_name, table_name
+            ','.join(column_safe_sql_values), schema_name, table_name, where_clause_sql
         )
         LOGGER.info('Exporting data: %s', sql)
 
@@ -514,3 +524,25 @@ class FastSyncTapPostgres:
 
         with gzip_splitter as split_gzip_files:
             self.curr.copy_expert(sql, split_gzip_files, size=131072)
+
+    def export_source_table_data(
+            self, args: Namespace, tap_id: str) -> list:
+        """Exporting data from the source table"""
+        filename = utils.gen_export_filename(tap_id=tap_id, table=args.table, sync_type='partialsync')
+        filepath = os.path.join(args.temp_dir, filename)
+
+        where_clause_setting = {
+            'column': args.column,
+            'start_value': args.start_value,
+            'end_value': args.end_value
+        }
+        self.copy_table(
+            args.table,
+            filepath,
+            split_large_files=args.target.get('split_large_files'),
+            split_file_chunk_size_mb=args.target.get('split_file_chunk_size_mb'),
+            split_file_max_chunks=args.target.get('split_file_max_chunks'),
+            where_clause_setting=where_clause_setting
+        )
+        file_parts = glob.glob(f'{filepath}*')
+        return file_parts

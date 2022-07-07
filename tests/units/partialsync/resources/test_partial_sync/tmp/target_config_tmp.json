@@ -1,0 +1,37 @@
+{
+    "account": "FOO_ACCOUNT",
+    "add_metadata_columns": false,
+    "archive_load_files": true,
+    "aws_access_key_id": "FOO_ACCESS_KEY",
+    "aws_secret_access_key": "FOO_SECRET_ACCESS_KEY",
+    "aws_session_token": "FOO_SESSION_TOKEN",
+    "batch_size_rows": 20000,
+    "client_side_encryption_master_key": "",
+    "data_flattening_max_level": 0,
+    "dbname": "FOO_DB",
+    "file_format": "pipelinewise.pipelinewise_file_format",
+    "flush_all_streams": false,
+    "hard_delete": true,
+    "parallelism": 0,
+    "parallelism_max": 4,
+    "password": "FOOPASS",
+    "primary_key_required": true,
+    "query_tag": "{\"ppw_component\": \"tap-mysql\", \"tap_id\": \"test_tap\", \"database\": \"{{database}}\", \"schema\": \"{{schema}}\", \"table\": \"{{table}}\"}",
+    "s3_bucket": "test-ap-01",
+    "s3_key_prefix": "snowflake-imports-test/",
+    "schema_mapping": {
+        "mysql_source_db": {
+            "target_schema": "ppw_dev_tap_mysql",
+            "target_schema_select_permissions": []
+        }
+    },
+    "split_file_chunk_size_mb": 2000,
+    "split_file_max_chunks": 20,
+    "split_large_files": false,
+    "stage": "pipelinewise.ENCRYPTED_PIPELINEWISE_STAGE",
+    "tap_id": "foo_tap_id",
+    "temp_dir": "/foo",
+    "user": "FOO_USER",
+    "validate_records": false,
+    "warehouse": "FOO_WAREHOUSE"
+}

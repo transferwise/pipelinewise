@@ -1,0 +1,405 @@
+{
+    "streams": [
+        {
+            "metadata": [
+                {
+                    "breadcrumb": [],
+                    "metadata": {
+                        "database-name": "mysql_source_db",
+                        "is-view": false,
+                        "replication-method": "LOG_BASED",
+                        "row-count": 0,
+                        "selected": true,
+                        "table-key-properties": [
+                            "id"
+                        ]
+                    }
+                },
+                {
+                    "breadcrumb": [
+                        "properties",
+                        "id"
+                    ],
+                    "metadata": {
+                        "inclusion": "automatic",
+                        "selected-by-default": true,
+                        "sql-datatype": "integer"
+                    }
+                },
+                {
+                    "breadcrumb": [
+                        "properties",
+                        "email"
+                    ],
+                    "metadata": {
+                        "inclusion": "available",
+                        "selected-by-default": true,
+                        "sql-datatype": "character varying"
+                    }
+                }
+            ],
+            "schema": {
+                "definitions": {
+                    "sdc_recursive_boolean_array": {
+                        "items": {
+                            "$ref": "#/definitions/sdc_recursive_boolean_array"
+                        },
+                        "type": [
+                            "null",
+                            "boolean",
+                            "array"
+                        ]
+                    },
+                    "sdc_recursive_integer_array": {
+                        "items": {
+                            "$ref": "#/definitions/sdc_recursive_integer_array"
+                        },
+                        "type": [
+                            "null",
+                            "integer",
+                            "array"
+                        ]
+                    },
+                    "sdc_recursive_number_array": {
+                        "items": {
+                            "$ref": "#/definitions/sdc_recursive_number_array"
+                        },
+                        "type": [
+                            "null",
+                            "number",
+                            "array"
+                        ]
+                    },
+                    "sdc_recursive_object_array": {
+                        "items": {
+                            "$ref": "#/definitions/sdc_recursive_object_array"
+                        },
+                        "type": [
+                            "null",
+                            "object",
+                            "array"
+                        ]
+                    },
+                    "sdc_recursive_string_array": {
+                        "items": {
+                            "$ref": "#/definitions/sdc_recursive_string_array"
+                        },
+                        "type": [
+                            "null",
+                            "string",
+                            "array"
+                        ]
+                    },
+                    "sdc_recursive_timestamp_array": {
+                        "format": "date-time",
+                        "items": {
+                            "$ref": "#/definitions/sdc_recursive_timestamp_array"
+                        },
+                        "type": [
+                            "null",
+                            "string",
+                            "array"
+                        ]
+                    }
+                },
+                "properties": {
+                    "id": {
+                        "maximum": 2147483647,
+                        "minimum": -2147483648,
+                        "type": [
+                            "null",
+                            "integer"
+                        ]
+                    },
+                    "email": {
+                        "maxLength": 200,
+                        "type": [
+                            "null",
+                            "string"
+                        ]
+                    }
+                },
+                "type": "object"
+            },
+            "stream": "table_one",
+            "table_name": "table_one",
+            "tap_stream_id": "db_test_mysql-table_one"
+        },
+        {
+            "metadata": [
+                {
+                    "breadcrumb": [],
+                    "metadata": {
+                        "database-name": "db_test",
+                        "is-view": false,
+                        "replication-method": "INCREMENTAL",
+                        "replication-key": "id",
+                        "row-count": 628763,
+                        "schema-name": "db_test",
+                        "selected": true,
+                        "table-key-properties": [
+                            "id"
+                        ]
+                    }
+                },
+                {
+                    "breadcrumb": [
+                        "properties",
+                        "id"
+                    ],
+                    "metadata": {
+                        "inclusion": "automatic",
+                        "selected-by-default": true,
+                        "sql-datatype": "integer"
+                    }
+                },
+                {
+                    "breadcrumb": [
+                        "properties",
+                        "type"
+                    ],
+                    "metadata": {
+                        "inclusion": "available",
+                        "selected-by-default": true,
+                        "sql-datatype": "text"
+                    }
+                },
+                {
+                    "breadcrumb": [
+                        "properties",
+                        "sub_type"
+                    ],
+                    "metadata": {
+                        "inclusion": "available",
+                        "selected-by-default": true,
+                        "sql-datatype": "text"
+                    }
+                }
+            ],
+            "schema": {
+                "definitions": {
+                    "sdc_recursive_boolean_array": {
+                        "items": {
+                            "$ref": "#/definitions/sdc_recursive_boolean_array"
+                        },
+                        "type": [
+                            "null",
+                            "boolean",
+                            "array"
+                        ]
+                    },
+                    "sdc_recursive_integer_array": {
+                        "items": {
+                            "$ref": "#/definitions/sdc_recursive_integer_array"
+                        },
+                        "type": [
+                            "null",
+                            "integer",
+                            "array"
+                        ]
+                    },
+                    "sdc_recursive_number_array": {
+                        "items": {
+                            "$ref": "#/definitions/sdc_recursive_number_array"
+                        },
+                        "type": [
+                            "null",
+                            "number",
+                            "array"
+                        ]
+                    },
+                    "sdc_recursive_object_array": {
+                        "items": {
+                            "$ref": "#/definitions/sdc_recursive_object_array"
+                        },
+                        "type": [
+                            "null",
+                            "object",
+                            "array"
+                        ]
+                    },
+                    "sdc_recursive_string_array": {
+                        "items": {
+                            "$ref": "#/definitions/sdc_recursive_string_array"
+                        },
+                        "type": [
+                            "null",
+                            "string",
+                            "array"
+                        ]
+                    },
+                    "sdc_recursive_timestamp_array": {
+                        "format": "date-time",
+                        "items": {
+                            "$ref": "#/definitions/sdc_recursive_timestamp_array"
+                        },
+                        "type": [
+                            "null",
+                            "string",
+                            "array"
+                        ]
+                    }
+                },
+                "properties": {
+                    "id": {
+                        "type": [
+                            "string"
+                        ]
+                    },
+                    "type": {
+                        "type": [
+                            "null",
+                            "string"
+                        ]
+                    },
+                    "sub_type": {
+                        "type": [
+                            "null",
+                            "string"
+                        ]
+                    }
+                },
+                "type": "object"
+            },
+            "stream": "table_two",
+            "table_name": "table_two",
+            "tap_stream_id": "db_test_mysql-table_two"
+        },
+        {
+            "metadata": [
+                {
+                    "breadcrumb": [],
+                    "metadata": {
+                        "database-name": "db_test",
+                        "is-view": false,
+                        "replication-method": "FULL_TABLE",
+                        "row-count": 628763,
+                        "schema-name": "db_test",
+                        "selected": false
+                    }
+                },
+                {
+                    "breadcrumb": [
+                        "properties",
+                        "id"
+                    ],
+                    "metadata": {
+                        "inclusion": "automatic",
+                        "selected-by-default": true,
+                        "sql-datatype": "integer"
+                    }
+                },
+                {
+                    "breadcrumb": [
+                        "properties",
+                        "type"
+                    ],
+                    "metadata": {
+                        "inclusion": "available",
+                        "selected-by-default": true,
+                        "sql-datatype": "text"
+                    }
+                },
+                {
+                    "breadcrumb": [
+                        "properties",
+                        "sub_type"
+                    ],
+                    "metadata": {
+                        "inclusion": "available",
+                        "selected-by-default": true,
+                        "sql-datatype": "text"
+                    }
+                }
+            ],
+            "schema": {
+                "definitions": {
+                    "sdc_recursive_boolean_array": {
+                        "items": {
+                            "$ref": "#/definitions/sdc_recursive_boolean_array"
+                        },
+                        "type": [
+                            "null",
+                            "boolean",
+                            "array"
+                        ]
+                    },
+                    "sdc_recursive_integer_array": {
+                        "items": {
+                            "$ref": "#/definitions/sdc_recursive_integer_array"
+                        },
+                        "type": [
+                            "null",
+                            "integer",
+                            "array"
+                        ]
+                    },
+                    "sdc_recursive_number_array": {
+                        "items": {
+                            "$ref": "#/definitions/sdc_recursive_number_array"
+                        },
+                        "type": [
+                            "null",
+                            "number",
+                            "array"
+                        ]
+                    },
+                    "sdc_recursive_object_array": {
+                        "items": {
+                            "$ref": "#/definitions/sdc_recursive_object_array"
+                        },
+                        "type": [
+                            "null",
+                            "object",
+                            "array"
+                        ]
+                    },
+                    "sdc_recursive_string_array": {
+                        "items": {
+                            "$ref": "#/definitions/sdc_recursive_string_array"
+                        },
+                        "type": [
+                            "null",
+                            "string",
+                            "array"
+                        ]
+                    },
+                    "sdc_recursive_timestamp_array": {
+                        "format": "date-time",
+                        "items": {
+                            "$ref": "#/definitions/sdc_recursive_timestamp_array"
+                        },
+                        "type": [
+                            "null",
+                            "string",
+                            "array"
+                        ]
+                    }
+                },
+                "properties": {
+                    "id": {
+                        "type": [
+                            "string"
+                        ]
+                    },
+                    "type": {
+                        "type": [
+                            "null",
+                            "string"
+                        ]
+                    },
+                    "sub_type": {
+                        "type": [
+                            "null",
+                            "string"
+                        ]
+                    }
+                },
+                "type": "object"
+            },
+            "stream": "table_three",
+            "table_name": "table_three",
+            "tap_stream_id": "db_test_mysql-table_three"
+        }
+    ]
+}

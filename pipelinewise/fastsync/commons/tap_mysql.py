@@ -1,11 +1,14 @@
 import csv
 import datetime
 import decimal
+import glob
 import logging
+import os
 import pymysql
 import pymysql.cursors
 
-from typing import Tuple, Dict, Callable
+from argparse import Namespace
+from typing import Tuple, Dict, Callable, Union
 from pymysql import InterfaceError, OperationalError, Connection
 
 from ...utils import safe_column_name
@@ -414,6 +417,7 @@ class FastSyncTapMySql:
             split_file_chunk_size_mb=1000,
             split_file_max_chunks=20,
             compress=True,
+            where_clause_setting=None
     ):
         """
         Export data from table to a zipped csv
@@ -433,15 +437,22 @@ class FastSyncTapMySql:
             raise Exception('{} table not found.'.format(table_name))
 
         table_dict = utils.tablename_to_dict(table_name)
+        where_clause_sql = ''
+        if where_clause_setting:
+            where_clause_sql = f' WHERE {where_clause_setting["column"]} >= {where_clause_setting["start_value"]}'
+            if where_clause_setting['end_value']:
+                where_clause_sql += f' AND {where_clause_setting["column"]} <= {where_clause_setting["end_value"]}'
+
         sql = """SELECT {}
         ,CONVERT_TZ( NOW(),@@session.time_zone,'+00:00') AS _SDC_EXTRACTED_AT
         ,CONVERT_TZ( NOW(),@@session.time_zone,'+00:00') AS _SDC_BATCHED_AT
         ,null AS _SDC_DELETED_AT
-        FROM `{}`.`{}`
+        FROM `{}`.`{}` {}
         """.format(
             ','.join(column_safe_sql_values),
             table_dict['schema_name'],
             table_dict['table_name'],
+            where_clause_sql
         )
         export_batch_rows = self.connection_config['export_batch_rows']
         exported_rows = 0
@@ -487,6 +498,25 @@ class FastSyncTapMySql:
                 LOGGER.info(
                     'Exported total of %s rows from %s...', exported_rows, table_name
                 )
+
+    def export_source_table_data(
+            self, args: Namespace, tap_id: str, where_clause_setting: Union[Dict, None] = None) -> list:
+        """Export source table data"""
+        filename = utils.gen_export_filename(tap_id=tap_id, table=args.table, sync_type='partialsync')
+        filepath = os.path.join(args.temp_dir, filename)
+
+        # Exporting table data
+
+        self.copy_table(
+            args.table,
+            filepath,
+            split_large_files=args.target.get('split_large_files'),
+            split_file_chunk_size_mb=args.target.get('split_file_chunk_size_mb'),
+            split_file_max_chunks=args.target.get('split_file_max_chunks'),
+            where_clause_setting=where_clause_setting
+        )
+        file_parts = glob.glob(f'{filepath}*')
+        return file_parts
 
     def __get_primary_server_uuid(self) -> str:
         """

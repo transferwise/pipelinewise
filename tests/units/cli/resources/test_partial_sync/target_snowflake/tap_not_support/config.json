@@ -1,0 +1,15 @@
+{
+    "bootstrap_servers": "127.0.0.2:11000",
+    "consumer_timeout_ms": 600000,
+    "encoding": "utf-8",
+    "group_id": "test_group_id",
+    "heartbeat_interval_ms": 10000,
+    "local_store_dir": "/dummy_path",
+    "max_poll_interval_ms": 720000,
+    "max_runtime_ms": 900000,
+    "primary_keys": {
+        "id": "/id"
+    },
+    "session_timeout_ms": 120000,
+    "topic": "Test.Topic"
+}

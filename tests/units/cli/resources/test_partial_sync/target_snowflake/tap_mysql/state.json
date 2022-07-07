@@ -1,0 +1,42 @@
+{
+  "currently_syncing": null,
+  "bookmarks": {
+    "mysql_source_db-full": {
+      "replication_key": "begin",
+      "replication_key_value": 7,
+      "version": 1
+    },
+    "mysql_source_db-table_with_binary": {
+      "log_file": "mysql-bin.000005",
+      "log_pos": 286544,
+      "version": 1
+    },
+    "mysql_source_db-no_pk_table": {},
+    "mysql_source_db-weight_unit": {
+      "log_file": "mysql-bin.000005",
+      "log_pos": 286544,
+      "version": 1
+    },
+    "mysql_source_db-edgydata": {
+      "log_file": "mysql-bin.000005",
+      "log_pos": 286544,
+      "version": 1
+    },
+    "mysql_source_db-all_datatypes": {
+      "log_file": "mysql-bin.000005",
+      "log_pos": 286544,
+      "version": 1
+    },
+    "mysql_source_db-table_with_space and UPPERCase": {
+      "log_file": "mysql-bin.000005",
+      "log_pos": 286544,
+      "version": 1
+    },
+    "mysql_source_db-order": {},
+    "mysql_source_db-address": {
+      "replication_key": "date_updated",
+      "replication_key_value": "2022-03-22T11:47:17+00:00",
+      "version": 1
+    }
+  }
+}
