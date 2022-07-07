@@ -21,7 +21,7 @@
 +                result = {}
 +                value = record[column]
 +                exec(python_code)
-+                LOGGER.info(f"Applied privacy properties on {schema_name}/{table_name}/{column}: {result['value']}")
++                LOGGER.debug(f"Applied privacy properties on {schema_name}/{table_name}/{column}: {result['value']}")
 +                record[column] = result['value']
 +
  
