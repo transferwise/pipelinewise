@@ -500,9 +500,9 @@ class FastSyncTapPostgres:
 
         where_clause_sql = ''
         if where_clause_setting:
-            where_clause_sql = f' WHERE {where_clause_setting["column"]} >= {where_clause_setting["start_value"]}'
+            where_clause_sql = f' WHERE {where_clause_setting["column"]} >= \'{where_clause_setting["start_value"]}\''
             if where_clause_setting['end_value']:
-                where_clause_sql += f' AND {where_clause_setting["column"]} <= {where_clause_setting["end_value"]}'
+                where_clause_sql += f' AND {where_clause_setting["column"]} <= \'{where_clause_setting["end_value"]}\''
 
         sql = """COPY (SELECT {}
         ,now() AT TIME ZONE 'UTC'
