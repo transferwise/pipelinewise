@@ -8,6 +8,8 @@ Sometimes you will need to resync tables in ad-hoc bases. For example when
 binlog position deleted in MySQL or when a database migrated to another server
 and previous CDC bookmarks are not transferable, etc.
 
+1. **Full resync**
+
 If you want to resync every table from a specific tap then use the ``sync_tables``
 command and specify the tap and target ids:
 
@@ -32,3 +34,19 @@ add the ``--tables`` argument:
   list of table names using the ``<schema_name>.<table_name>`` format. Schema and
   table names have to be the names in the source database.
 
+2. **Partial resync**
+
+If you want to partial resync a table from a specific tap then use the ``partial_sync_table`` command
+and specify the tap and target ids and table, column ,start_value and end_value(optional)
+
+.. code-block:: bash
+
+    $ pipelinewise partial_sync_table --target <target_id> --tap <tap_id> --table schema.table --column column_name --start_value start_value_from_column --end_value end_value_from_column
+
+if there is no end_value then it will load from start_value to the end of the table
+and will update the bookmark in the internal state file.
+
+.. warning::
+
+  The value of the ``--table`` argument needs to be in the ``<schema_name>.<table_name>`` format. Schema and
+  table name have to be the names in the source database.

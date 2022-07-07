@@ -114,6 +114,9 @@
 <p>Sometimes you will need to resync tables in ad-hoc bases. For example when
 binlog position deleted in MySQL or when a database migrated to another server
 and previous CDC bookmarks are not transferable, etc.</p>
+<ol class="arabic simple">
+<li><p><strong>Full resync</strong></p></li>
+</ol>
 <p>If you want to resync every table from a specific tap then use the <code class="docutils literal notranslate"><span class="pre">sync_tables</span></code>
 command and specify the tap and target ids:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ pipelinewise sync_tables --target &lt;target_id&gt; --tap &lt;tap_id&gt;
@@ -131,6 +134,21 @@ add the <code class="docutils literal notranslate"><span class="pre">--tables</s
 <p>The value of the optional <code class="docutils literal notranslate"><span class="pre">--tables</span></code> argument needs to be a comma separated
 list of table names using the <code class="docutils literal notranslate"><span class="pre">&lt;schema_name&gt;.&lt;table_name&gt;</span></code> format. Schema and
 table names have to be the names in the source database.</p>
+</div>
+<ol class="arabic simple" start="2">
+<li><p><strong>Partial resync</strong></p></li>
+</ol>
+<p>If you want to partial resync a table from a specific tap then use the <code class="docutils literal notranslate"><span class="pre">partial_sync_table</span></code> command
+and specify the tap and target ids and table, column ,start_value and end_value(optional)</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ pipelinewise partial_sync_table --target &lt;target_id&gt; --tap &lt;tap_id&gt; --table schema.table --column column_name --start_value start_value_from_column --end_value end_value_from_column
+</pre></div>
+</div>
+<p>if there is no end_value then it will load from start_value to the end of the table
+and will update the bookmark in the internal state file.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>The value of the <code class="docutils literal notranslate"><span class="pre">--table</span></code> argument needs to be in the <code class="docutils literal notranslate"><span class="pre">&lt;schema_name&gt;.&lt;table_name&gt;</span></code> format. Schema and
+table name have to be the names in the source database.</p>
 </div>
 </section>
 
