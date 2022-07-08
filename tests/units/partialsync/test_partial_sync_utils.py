@@ -44,7 +44,7 @@ class PartialSyncUtilsTestCase(TestCase):
                     test_s3_keys = ['s3_key_foo']
                     test_tap_id = args.target['tap_id']
                     test_bucket = args.target['s3_bucket']
-                    where_clause_for_end = f' AND {args.column} <= {args.end_value}' if args.end_value else ''
+                    where_clause_for_end = f" AND {args.column} <= '{args.end_value}'" if args.end_value else ''
 
                     mocked_snowflake = mock.MagicMock()
 
@@ -52,7 +52,7 @@ class PartialSyncUtilsTestCase(TestCase):
 
                     mocked_snowflake.query.assert_called_with(
                         f'DELETE FROM {test_target_schema}."{test_table.upper()}"'
-                        f' WHERE {args.column} >= {args.start_value}{where_clause_for_end}')
+                        f' WHERE {args.column} >= \'{args.start_value}\'{where_clause_for_end}')
 
                     mocked_snowflake.copy_to_table.assert_called_with(
                         test_s3_key_pattern, test_target_schema, args.table, test_size_byte, is_temporary=False
