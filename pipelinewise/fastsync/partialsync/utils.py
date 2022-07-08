@@ -35,9 +35,9 @@ def load_into_snowflake(
     target_schema = common_utils.get_target_schema(args.target, args.table)
     table_dict = common_utils.tablename_to_dict(args.table)
     target_table = table_dict.get('table_name')
-    where_clause = f'WHERE {args.column} >= {args.start_value}'
+    where_clause = f'WHERE {args.column} >= \'{args.start_value}\''
     if args.end_value:
-        where_clause += f' AND {args.column} <= {args.end_value}'
+        where_clause += f' AND {args.column} <= \'{args.end_value}\''
 
     snowflake.query(f'DELETE FROM {target_schema}."{target_table.upper()}" {where_clause}')
     # copy partial data into the table
