@@ -1978,14 +1978,13 @@ TAP RUN SUMMARY
         for metadata in table_metadata:
             metadata_properties = metadata.get('metadata', {})
             selected = metadata_properties.get('selected')
-            if isinstance(selected, bool):
+            if selected is True:   # pylint: disable=no-else-return
+                return
+            elif selected is False:
                 break
-            else:
-                selected = False
 
-        if selected is False:
-            self.logger.error('table "%s" is not selected in properties!', self.args.table)
-            raise PreRunChecksException()
+        self.logger.error('table "%s" is not selected in properties!', self.args.table)
+        raise PreRunChecksException()
 
     def __validate_transformations(
         self, transformation_file: str, catalog: Dict, tap_id: str, target_id: str
