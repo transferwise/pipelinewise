@@ -127,9 +127,9 @@
                 },
                 "type": "object"
             },
-            "stream": "table_one",
-            "table_name": "table_one",
-            "tap_stream_id": "db_test_mysql-table_one"
+            "stream": "table one",
+            "table_name": "table one",
+            "tap_stream_id": "db_test_mysql-table one"
         },
         {
             "metadata": [
