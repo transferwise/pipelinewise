@@ -1811,8 +1811,10 @@ class PipelineWise:
             (item for item in streams if item['table_name'] == table_name), None
         )
         if table_in_properties is None:
-            self.logger.error('Not found table "%s" in properties!', table_name)
+            self.logger.error('Not found table "%s" in properties!', self.args.table)
             raise PreRunChecksException()
+
+        self.__check_if_table_is_selected(table_in_properties)
 
         try:
             column_type = table_in_properties['schema']['properties'][self.args.column]['type']
@@ -1970,6 +1972,19 @@ TAP RUN SUMMARY
             pass
         except json.JSONDecodeError:
             pass
+
+    def __check_if_table_is_selected(self, table_in_properties):
+        table_metadata = table_in_properties.get('metadata', [])
+        selected = False
+        for metadata in table_metadata:
+            metadata_properties = metadata.get('metadata', {})
+            if metadata_properties.get('selected') is True:
+                selected = True
+                break
+
+        if selected is False:
+            self.logger.error('table "%s" is not selected in properties!', self.args.table)
+            raise PreRunChecksException()
 
     def __validate_transformations(
         self, transformation_file: str, catalog: Dict, tap_id: str, target_id: str
