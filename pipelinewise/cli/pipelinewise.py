@@ -1975,12 +1975,13 @@ TAP RUN SUMMARY
 
     def __check_if_table_is_selected(self, table_in_properties):
         table_metadata = table_in_properties.get('metadata', [])
-        selected = False
         for metadata in table_metadata:
             metadata_properties = metadata.get('metadata', {})
-            if metadata_properties.get('selected') is True:
-                selected = True
+            selected = metadata_properties.get('selected')
+            if isinstance(selected, bool):
                 break
+            else:
+                selected = False
 
         if selected is False:
             self.logger.error('table "%s" is not selected in properties!', self.args.table)
