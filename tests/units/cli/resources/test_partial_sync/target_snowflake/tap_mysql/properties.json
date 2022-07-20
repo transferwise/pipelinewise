@@ -36,6 +36,17 @@
                         "selected-by-default": true,
                         "sql-datatype": "character varying"
                     }
+                },
+                {
+                    "breadcrumb": [
+                        "properties",
+                        "test column"
+                    ],
+                    "metadata": {
+                        "inclusion": "available",
+                        "selected-by-default": true,
+                        "sql-datatype": "character varying"
+                    }
                 }
             ],
             "schema": {
@@ -112,6 +123,13 @@
                         ]
                     },
                     "email": {
+                        "maxLength": 200,
+                        "type": [
+                            "null",
+                            "string"
+                        ]
+                    },
+                    "test column": {
                         "maxLength": 200,
                         "type": [
                             "null",

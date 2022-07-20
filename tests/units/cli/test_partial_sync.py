@@ -199,8 +199,8 @@ class PartialSyncCLITestCase(TestCase):
             f'--target {self.test_cli.CONFIG_DIR}/tmp/target_config_[a-z0-9_]{{8}}.json '
             f'--temp_dir {self.test_cli.CONFIG_DIR}/tmp '
             f'--transform {self.test_cli.CONFIG_DIR}/target_snowflake/tap_mysql/transformation.json '
-            f'--table \"{arguments["table"]}\" --column {arguments["column"]} '
-            f'--start_value {arguments["start_value"]} --end_value {arguments["end_value"]}$'
+            f'--table "{arguments["table"]}" --column "{arguments["column"]}" '
+            f'--start_value "{arguments["start_value"]}" --end_value "{arguments["end_value"]}"$'
         )
 
         self.assertRegex(call_args[1], f'^{self.test_cli.CONFIG_DIR}/{arguments["target"]}/{arguments["tap"]}/log/'
@@ -217,7 +217,7 @@ class PartialSyncCLITestCase(TestCase):
             'tap': 'tap_mysql',
             'target': 'target_snowflake',
             'table': 'mysql_source_db.table one',
-            'column': 'id',
+            'column': 'test column',
             'start_value': '1',
         }
 
@@ -236,8 +236,8 @@ class PartialSyncCLITestCase(TestCase):
             f'--target {self.test_cli.CONFIG_DIR}/tmp/target_config_[a-z0-9_]{{8}}.json '
             f'--temp_dir {self.test_cli.CONFIG_DIR}/tmp '
             f'--transform {self.test_cli.CONFIG_DIR}/target_snowflake/tap_mysql/transformation.json '
-            f'--table \"{arguments["table"]}\" --column {arguments["column"]} '
-            f'--start_value {arguments["start_value"]}$'
+            f'--table "{arguments["table"]}" --column "{arguments["column"]}" '
+            f'--start_value "{arguments["start_value"]}"$'
         )
 
         self.assertRegex(call_args[1], f'^{self.test_cli.CONFIG_DIR}/{arguments["target"]}/{arguments["tap"]}/log/'
