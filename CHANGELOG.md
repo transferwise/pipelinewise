@@ -1,3 +1,8 @@
+0.48.1 (2022-07-21)
+-------------------
+
+- Partial sync bug fixes for selected tables and space in the name of table and values
+
 0.48.0 (2022-07-14)
 -------------------
 
