@@ -36,6 +36,17 @@
                         "selected-by-default": true,
                         "sql-datatype": "character varying"
                     }
+                },
+                {
+                    "breadcrumb": [
+                        "properties",
+                        "test column"
+                    ],
+                    "metadata": {
+                        "inclusion": "available",
+                        "selected-by-default": true,
+                        "sql-datatype": "character varying"
+                    }
                 }
             ],
             "schema": {
@@ -118,6 +129,13 @@
                             "string"
                         ]
                     },
+                    "test column": {
+                        "maxLength": 200,
+                        "type": [
+                            "null",
+                            "string"
+                        ]
+                    },
                     "boolean_column": {
                         "type": [
                             "null",
@@ -127,9 +145,9 @@
                 },
                 "type": "object"
             },
-            "stream": "table_one",
-            "table_name": "table_one",
-            "tap_stream_id": "db_test_mysql-table_one"
+            "stream": "table one",
+            "table_name": "table one",
+            "tap_stream_id": "db_test_mysql-table one"
         },
         {
             "metadata": [

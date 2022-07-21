@@ -384,10 +384,10 @@ def build_fastsync_partial_command(
                     f'--transform {transform.config}'
                     if transform.config and os.path.isfile(transform.config)
                     else '',
-                    f'--table {table}',
-                    f'--column {column}',
-                    f'--start_value {start_value}',
-                    f'--end_value {end_value}' if end_value else None
+                    f'--table "{table}"',
+                    f'--column "{column}"',
+                    f'--start_value "{start_value}"',
+                    f'--end_value "{end_value}"' if end_value else None
                 ],
             )
         )

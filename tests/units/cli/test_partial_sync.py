@@ -177,7 +177,7 @@ class PartialSyncCLITestCase(TestCase):
         arguments = {
             'tap': 'tap_mysql',
             'target': 'target_snowflake',
-            'table': 'mysql_source_db.table_one',
+            'table': 'mysql_source_db.table one',
             'column': 'id',
             'start_value': '1',
             'end_value': '10'
@@ -199,8 +199,8 @@ class PartialSyncCLITestCase(TestCase):
             f'--target {self.test_cli.CONFIG_DIR}/tmp/target_config_[a-z0-9_]{{8}}.json '
             f'--temp_dir {self.test_cli.CONFIG_DIR}/tmp '
             f'--transform {self.test_cli.CONFIG_DIR}/target_snowflake/tap_mysql/transformation.json '
-            f'--table {arguments["table"]} --column {arguments["column"]} '
-            f'--start_value {arguments["start_value"]} --end_value {arguments["end_value"]}$'
+            f'--table "{arguments["table"]}" --column "{arguments["column"]}" '
+            f'--start_value "{arguments["start_value"]}" --end_value "{arguments["end_value"]}"$'
         )
 
         self.assertRegex(call_args[1], f'^{self.test_cli.CONFIG_DIR}/{arguments["target"]}/{arguments["tap"]}/log/'
@@ -216,8 +216,8 @@ class PartialSyncCLITestCase(TestCase):
         arguments = {
             'tap': 'tap_mysql',
             'target': 'target_snowflake',
-            'table': 'mysql_source_db.table_one',
-            'column': 'id',
+            'table': 'mysql_source_db.table one',
+            'column': 'test column',
             'start_value': '1',
         }
 
@@ -236,8 +236,8 @@ class PartialSyncCLITestCase(TestCase):
             f'--target {self.test_cli.CONFIG_DIR}/tmp/target_config_[a-z0-9_]{{8}}.json '
             f'--temp_dir {self.test_cli.CONFIG_DIR}/tmp '
             f'--transform {self.test_cli.CONFIG_DIR}/target_snowflake/tap_mysql/transformation.json '
-            f'--table {arguments["table"]} --column {arguments["column"]} '
-            f'--start_value {arguments["start_value"]}$'
+            f'--table "{arguments["table"]}" --column "{arguments["column"]}" '
+            f'--start_value "{arguments["start_value"]}"$'
         )
 
         self.assertRegex(call_args[1], f'^{self.test_cli.CONFIG_DIR}/{arguments["target"]}/{arguments["tap"]}/log/'
@@ -252,7 +252,7 @@ class PartialSyncCLITestCase(TestCase):
         arguments = {
             'tap': 'tap_mysql',
             'target': 'target_snowflake',
-            'table': 'foo_table',
+            'table': 'mysql_source_db.foo_table',
             'column': 'foo_column',
             'start_value': '1',
             'end_value': '10'
@@ -274,7 +274,7 @@ class PartialSyncCLITestCase(TestCase):
         arguments = {
             'tap': 'tap_mysql',
             'target': 'target_snowflake',
-            'table': 'mysql_source_db.table_one',
+            'table': 'mysql_source_db.table one',
             'column': 'foo_column',
             'start_value': '1',
             'end_value': '10'
@@ -296,12 +296,33 @@ class PartialSyncCLITestCase(TestCase):
         arguments = {
             'tap': 'tap_mysql',
             'target': 'target_snowflake',
-            'table': 'mysql_source_db.table_one',
+            'table': 'mysql_source_db.table one',
             'column': 'boolean_column',
             'start_value': '1'
         }
 
         expected_log_message = f'ERROR:test_logger:column "{arguments["column"]}" has invalid type for partial sync!'
+
+        with self.assertLogs('test_logger') as actual_logs, self.assertRaises(SystemExit) as system_exit:
+            self._run_cli(arguments)
+
+        self.assertEqual(system_exit.exception.code, 1)
+        self.assertEqual(expected_log_message, actual_logs.output[1])
+
+    @mock.patch('pipelinewise.cli.pipelinewise.PipelineWise._check_if_complete_tap_configuration')
+    def test_it_returns_error_1_if_table_is_not_selected(self, mocked_check):
+        """Test it exit with error 1 if input table exists in config but not selected"""
+
+        mocked_check.return_value = True
+        arguments = {
+            'tap': 'tap_mysql',
+            'target': 'target_snowflake',
+            'table': 'mysql_source_db.table_three',
+            'column': 'id',
+            'start_value': '1'
+        }
+
+        expected_log_message = f'ERROR:test_logger:table "{arguments["table"]}" is not selected in properties!'
 
         with self.assertLogs('test_logger') as actual_logs, self.assertRaises(SystemExit) as system_exit:
             self._run_cli(arguments)
