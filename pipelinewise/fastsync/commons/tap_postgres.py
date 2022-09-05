@@ -501,7 +501,7 @@ class FastSyncTapPostgres:
         column_safe_sql_values = column_safe_sql_values + [
             "now() AT TIME ZONE 'UTC' AS _SDC_EXTRACTED_AT",
             "now() AT TIME ZONE 'UTC' AS _SDC_BATCHED_AT",
-            "null _SDC_DELETED_AT"
+            'null _SDC_DELETED_AT'
         ]
 
         sql = f"""COPY (SELECT {','.join(column_safe_sql_values)}

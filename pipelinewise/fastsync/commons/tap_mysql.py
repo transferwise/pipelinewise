@@ -440,7 +440,7 @@ class FastSyncTapMySql:
         column_safe_sql_values = column_safe_sql_values + [
             "CONVERT_TZ( NOW(),@@session.time_zone,'+00:00') AS `_SDC_EXTRACTED_AT`",
             "CONVERT_TZ( NOW(),@@session.time_zone,'+00:00') AS `_SDC_BATCHED_AT`",
-            "null AS `_SDC_DELETED_AT`"
+            'null AS `_SDC_DELETED_AT`'
         ]
 
         sql = """SELECT {}
