@@ -60,8 +60,8 @@ class PartialSyncUtilsTestCase(TestCase):
             mock.call.merge_tables(
                 target['schema'], target['temp'], target['table'],
                 ['FOO_SOURCE_COLUMN', '_SDC_EXTRACTED_AT', '_SDC_BATCHED_AT', '_SDC_DELETED_AT'], primary_keys),
-            mock.call.partial_hard_delete(target["schema"], target["table"], where_clause_sql),
-            mock.call.drop_table(target["schema"], target["temp"])
+            mock.call.partial_hard_delete(target['schema'], target['table'], where_clause_sql),
+            mock.call.drop_table(target['schema'], target['temp'])
         ])
 
     # pylint: disable=no-self-use
@@ -95,7 +95,7 @@ class PartialSyncUtilsTestCase(TestCase):
             mock.call.merge_tables(target['schema'], target['temp'], target['table'],
                                    ['FOO_SOURCE_COLUMN', '_SDC_EXTRACTED_AT', '_SDC_BATCHED_AT', '_SDC_DELETED_AT'],
                                    primary_keys),
-            mock.call.drop_table(target["schema"], target["temp"])
+            mock.call.drop_table(target['schema'], target['temp'])
         ])
 
     # pylint: disable=no-self-use

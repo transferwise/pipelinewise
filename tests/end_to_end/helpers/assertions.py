@@ -87,8 +87,8 @@ def assert_partial_sync_table_with_target_additional_columns(
 
     # Add a new column in the target
     tap_parameters['env'].add_column_into_target_sf(
-        tap_type=tap_parameters["tap_type"],
-        table=tap_parameters["table"],
+        tap_type=tap_parameters['tap_type'],
+        table=tap_parameters['table'],
         new_column=additional_column
     )
 
@@ -113,8 +113,8 @@ def assert_partial_sync_table_with_source_additional_columns(
 
     # Add a new column in the source
     tap_parameters['env'].add_column_into_source(
-        tap_type=tap_parameters["tap_type"],
-        table=tap_parameters["table"],
+        tap_type=tap_parameters['tap_type'],
+        table=tap_parameters['table'],
         new_column=additional_column
     )
 

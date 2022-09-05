@@ -88,8 +88,8 @@ def load_into_snowflake(target, args, columns_diff, primary_keys, s3_key_pattern
         target['schema'], target['temp'], target['table'],
         list(columns_diff['source_columns'].keys()) + added_metadata_columns, primary_keys)
     if args.target['hard_delete'] is True:
-        snowflake.partial_hard_delete(target["schema"], target["table"], where_clause_sql)
-    snowflake.drop_table(target["schema"], target["temp"])
+        snowflake.partial_hard_delete(target['schema'], target['table'], where_clause_sql)
+    snowflake.drop_table(target['schema'], target['temp'])
 
 
 def update_state_file(args: argparse.Namespace, bookmark: Dict) -> None:
