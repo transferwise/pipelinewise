@@ -417,6 +417,28 @@ class FastSyncTargetSnowflake:
 
         LOGGER.info('Obfuscation rules applied.')
 
+    def merge_tables(self, schema, source_table, target_table, columns, primary_keys):
+        on_clause = ' AND '.join(
+            [f'"{source_table.upper()}".{p.upper()} = "{target_table.upper()}".{p.upper()}' for p in primary_keys]
+        )
+        update_clause = ', '.join(
+            [f'"{target_table.upper()}".{c.upper()} = "{source_table.upper()}".{c.upper()}' for c in columns]
+        )
+        columns_for_insert = ', '.join([f'{c.upper()}' for c in columns])
+        values = ', '.join([f'"{source_table.upper()}".{c.upper()}' for c in columns])
+
+        query = f'MERGE INTO {schema}."{target_table.upper()}" USING {schema}."{source_table.upper()}"'  \
+                   f' ON {on_clause}'  \
+                   f' WHEN MATCHED THEN UPDATE SET {update_clause}'  \
+                   f' WHEN NOT MATCHED THEN INSERT ({columns_for_insert})'  \
+                   f' VALUES ({values})'
+        self.query(query)
+
+    def partial_hard_delete(self, schema, table, where_clause_sql):
+        self.query(
+            f'DELETE FROM {schema}."{table.upper()}"{where_clause_sql} AND _SDC_DELETEd_AT IS NOT NULL'
+        )
+
     def swap_tables(self, schema, table_name) -> None:
         """
         Swaps given target table with its temp version and drops the latter
@@ -439,6 +461,13 @@ class FastSyncTargetSnowflake:
             f'DROP TABLE IF EXISTS {schema}."{temp_table.upper()}"',
             query_tag_props={'schema': schema, 'table': temp_table},
         )
+
+    def add_columns(self, schema: str , table_name: str, adding_columns: dict) -> None:
+        if adding_columns:
+            add_columns_list = [f'{column_name} {column_type}' for column_name, column_type in adding_columns.items()]
+            add_clause = ', '.join(add_columns_list)
+            query = f'ALTER TABLE {schema}."{table_name.upper()}" ADD {add_clause}'
+            self.query(query)
 
     def __apply_transformations(
         self, transformations: List[Dict], target_schema: str, table_name: str

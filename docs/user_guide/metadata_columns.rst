@@ -43,7 +43,7 @@ at the end of the table:
   target database as well. Please also note that Only :ref:`log_based` replication method
   detects delete row events.
 
-  To turn off **Hard Delete** mode add ``hard_delete: False`` to the target :ref:`targets_list`
+  To turn off **Hard Delete** mode add ``hard_delete: false`` to the target :ref:`targets_list`
   YAML config file. In this case when a deleted row captured in source then
   ``_SDC_DELETED_AT`` column will only get flagged and not get deleted in the target.
   Please also note that Only :ref:`log_based` replication method detects delete row events.
