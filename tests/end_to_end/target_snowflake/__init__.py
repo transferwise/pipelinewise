@@ -28,9 +28,10 @@ class TargetSnowflake(unittest.TestCase):
             self.skipTest(f'{tap_type} is not configured properly')
 
         self.remove_dir_from_config_dir(f'{self.target_id}/{self.tap_id}')
-        self.drop_sf_schema_if_exists(f'{self.tap_id}{self.e2e_env.sf_schema_postfix}')
 
         self.check_snowflake_credentials_provided()
+        self.drop_sf_schema_if_exists(f'{self.tap_id}{self.e2e_env.sf_schema_postfix}')
+
         self.check_validate_taps()
         self.check_import_config()
         self.tap_type = tap_type
