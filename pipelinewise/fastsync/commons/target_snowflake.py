@@ -428,10 +428,10 @@ class FastSyncTargetSnowflake:
         values = ', '.join([f'"{source_table.upper()}".{c.upper()}' for c in columns])
 
         query = f'MERGE INTO {schema}."{target_table.upper()}" USING {schema}."{source_table.upper()}"'  \
-                   f' ON {on_clause}'  \
-                   f' WHEN MATCHED THEN UPDATE SET {update_clause}'  \
-                   f' WHEN NOT MATCHED THEN INSERT ({columns_for_insert})'  \
-                   f' VALUES ({values})'
+                f' ON {on_clause}'  \
+                f' WHEN MATCHED THEN UPDATE SET {update_clause}'  \
+                f' WHEN NOT MATCHED THEN INSERT ({columns_for_insert})'  \
+                f' VALUES ({values})'
         self.query(query)
 
     def partial_hard_delete(self, schema, table, where_clause_sql):
@@ -462,7 +462,7 @@ class FastSyncTargetSnowflake:
             query_tag_props={'schema': schema, 'table': temp_table},
         )
 
-    def add_columns(self, schema: str , table_name: str, adding_columns: dict) -> None:
+    def add_columns(self, schema: str, table_name: str, adding_columns: dict) -> None:
         if adding_columns:
             add_columns_list = [f'{column_name} {column_type}' for column_name, column_type in adding_columns.items()]
             add_clause = ', '.join(add_columns_list)

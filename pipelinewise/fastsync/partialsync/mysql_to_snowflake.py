@@ -60,7 +60,6 @@ def partial_sync_table(args: Namespace) -> Union[bool, str]:
         snowflake.query(f'UPDATE {target_schema}."{target_table.upper()}"'
                         f' SET _SDC_DELETEd_AT = CURRENT_TIMESTAMP(){where_clause_sql} AND _SDC_DELETED_AT IS NULL')
 
-
         # Creating temp table in Snowflake
         primary_keys = snowflake_types.get('primary_key')
         snowflake.create_schema(target_schema)
