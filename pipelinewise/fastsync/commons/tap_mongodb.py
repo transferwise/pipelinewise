@@ -22,7 +22,7 @@ from .errors import ExportError, TableNotFoundError, MongoDBInvalidDatetimeError
 
 LOGGER = logging.getLogger(__name__)
 DEFAULT_WRITE_BATCH_ROWS = 50000
-BSON_CodecOptions = bson.CodecOptions(
+BSON_CodecOptions = bson.CodecOptions( # pylint: disable=invalid-name
     uuid_representation=3,
     unicode_decode_error_handler='ignore')
 

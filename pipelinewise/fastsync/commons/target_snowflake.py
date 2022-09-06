@@ -18,6 +18,8 @@ LOGGER = logging.getLogger(__name__)
 logging.getLogger('snowflake.connector').setLevel(logging.WARNING)
 
 # pylint: disable=missing-function-docstring,no-self-use,too-many-arguments
+
+
 class FastSyncTargetSnowflake:
     """
     Common functions for fastsync to Snowflake
@@ -31,7 +33,8 @@ class FastSyncTargetSnowflake:
         # Get the required parameters from config file and/or environment variables
         aws_session_params = dict()
         for val in ("aws_profile", "aws_access_key_id", "aws_secret_access_key", "aws_session_token"):
-            found_val = self.connection_config.get(val) or os.environ.get(val.upper())
+            found_val = self.connection_config.get(
+                val) or os.environ.get(val.upper())
             if found_val:
                 val = "profile_name" if val == "aws_profile" else val
                 aws_session_params[val] = found_val
@@ -41,7 +44,8 @@ class FastSyncTargetSnowflake:
 
         # Create the s3 client
         self.s3 = aws_session.client('s3',
-                                     region_name=self.connection_config.get('s3_region_name'),
+                                     region_name=self.connection_config.get(
+                                         's3_region_name'),
                                      endpoint_url=self.connection_config.get('s3_endpoint_url'))
 
     def open_connection(self):
@@ -51,10 +55,8 @@ class FastSyncTargetSnowflake:
                                            database=self.connection_config['dbname'],
                                            warehouse=self.connection_config['warehouse'],
                                            autocommit=True,
-                                           session_parameters={
-                                               # Quoted identifiers should be case sensitive
-                                               'QUOTED_IDENTIFIERS_IGNORE_CASE': 'FALSE'
-                                           })
+                                           session_parameters={  # Quoted identifiers should be case sensitive
+                                               'QUOTED_IDENTIFIERS_IGNORE_CASE': 'FALSE'})
 
     def query(self, query, params=None):
         LOGGER.debug('Running query: %s', query)
@@ -71,12 +73,15 @@ class FastSyncTargetSnowflake:
         bucket = self.connection_config['s3_bucket']
         s3_acl = self.connection_config.get('s3_acl')
         s3_key_prefix = self.connection_config.get('s3_key_prefix', '')
-        s3_key = '{}pipelinewise_{}_{}.csv.gz'.format(s3_key_prefix, table, time.strftime('%Y%m%d-%H%M%S'))
+        s3_key = '{}pipelinewise_{}_{}.csv.gz'.format(
+            s3_key_prefix, table, time.strftime('%Y%m%d-%H%M%S'))
 
-        LOGGER.info('Uploading to S3 bucket: %s, local file: %s, S3 key: %s', bucket, file, s3_key)
+        LOGGER.info(
+            'Uploading to S3 bucket: %s, local file: %s, S3 key: %s', bucket, file, s3_key)
 
         # Encrypt csv if client side encryption enabled
-        master_key = self.connection_config.get('client_side_encryption_master_key', '')
+        master_key = self.connection_config.get(
+            'client_side_encryption_master_key', '')
         if master_key != '':
             # Encrypt the file
             LOGGER.info('Encrypting file %s...', file)
@@ -99,7 +104,8 @@ class FastSyncTargetSnowflake:
                 'x-amz-key': encryption_metadata.key,
                 'x-amz-iv': encryption_metadata.iv
             }
-            self.s3.upload_file(encrypted_file, bucket, s3_key, ExtraArgs=extra_args)
+            self.s3.upload_file(encrypted_file, bucket,
+                                s3_key, ExtraArgs=extra_args)
 
             # Remove the uploaded encrypted file
             os.remove(encrypted_file)
@@ -117,16 +123,19 @@ class FastSyncTargetSnowflake:
 
     def drop_table(self, target_schema, table_name, is_temporary=False):
         table_dict = utils.tablename_to_dict(table_name)
-        target_table = table_dict.get('table_name') if not is_temporary else table_dict.get('temp_table_name')
+        target_table = table_dict.get(
+            'table_name') if not is_temporary else table_dict.get('temp_table_name')
 
-        sql = 'DROP TABLE IF EXISTS {}."{}"'.format(target_schema, target_table.upper())
+        sql = 'DROP TABLE IF EXISTS {}."{}"'.format(
+            target_schema, target_table.upper())
         self.query(sql)
 
     def create_table(self, target_schema: str, table_name: str, columns: List[str], primary_key: List[str],
                      is_temporary: bool = False, sort_columns=False):
 
         table_dict = utils.tablename_to_dict(table_name)
-        target_table = table_dict.get('table_name') if not is_temporary else table_dict.get('temp_table_name')
+        target_table = table_dict.get(
+            'table_name') if not is_temporary else table_dict.get('temp_table_name')
 
         # skip the EXTRACTED, BATCHED and DELETED columns in case they exist because they gonna be added later
         columns = [c for c in columns if not (c.startswith(utils.SDC_EXTRACTED_AT) or
@@ -155,15 +164,20 @@ class FastSyncTargetSnowflake:
     def copy_to_table(self, s3_key, target_schema, table_name, size_bytes, is_temporary, skip_csv_header=False):
         LOGGER.info('Loading %s into Snowflake...', s3_key)
         table_dict = utils.tablename_to_dict(table_name)
-        target_table = table_dict.get('table_name') if not is_temporary else table_dict.get('temp_table_name')
+        target_table = table_dict.get(
+            'table_name') if not is_temporary else table_dict.get('temp_table_name')
         inserts = 0
         bucket = self.connection_config['s3_bucket']
+        on_error = self.connection_config.get('on_error_fastsync',
+                                              self.connection_config.get('on_error'))
+        on_error_statement = f" ON_ERROR={on_error}" if on_error else ""
 
         stage = self.connection_config['stage']
         sql = f'COPY INTO {target_schema}."{target_table.upper()}" FROM \'@{stage}/{s3_key}\'' \
               f' FILE_FORMAT = (type=CSV escape=\'\\x1e\' escape_unenclosed_field=\'\\x1e\'' \
               f' field_optionally_enclosed_by=\'\"\' skip_header={int(skip_csv_header)}' \
-              f' compression=GZIP binary_format=HEX)'
+              f' compression=GZIP binary_format=HEX)' \
+              f'{on_error_statement}'
 
         # Get number of inserted records - COPY does insert only
         results = self.query(sql)
@@ -186,22 +200,26 @@ class FastSyncTargetSnowflake:
         # Grant role is not mandatory parameter, do nothing if not specified
         if role:
             table_dict = utils.tablename_to_dict(table_name)
-            target_table = table_dict.get('table_name') if not is_temporary else table_dict.get('temp_table_name')
-            sql = 'GRANT SELECT ON {}."{}" TO ROLE {}'.format(target_schema, target_table.upper(), role)
+            target_table = table_dict.get(
+                'table_name') if not is_temporary else table_dict.get('temp_table_name')
+            sql = 'GRANT SELECT ON {}."{}" TO ROLE {}'.format(
+                target_schema, target_table.upper(), role)
             self.query(sql)
 
     # pylint: disable=unused-argument
     def grant_usage_on_schema(self, target_schema, role, to_group=False):
         # Grant role is not mandatory parameter, do nothing if not specified
         if role:
-            sql = 'GRANT USAGE ON SCHEMA {} TO ROLE {}'.format(target_schema, role)
+            sql = 'GRANT USAGE ON SCHEMA {} TO ROLE {}'.format(
+                target_schema, role)
             self.query(sql)
 
     # pylint: disable=unused-argument
     def grant_select_on_schema(self, target_schema, role, to_group=False):
         # Grant role is not mandatory parameter, do nothing if not specified
         if role:
-            sql = 'GRANT SELECT ON ALL TABLES IN SCHEMA {} TO ROLE {}'.format(target_schema, role)
+            sql = 'GRANT SELECT ON ALL TABLES IN SCHEMA {} TO ROLE {}'.format(
+                target_schema, role)
             self.query(sql)
 
     # pylint: disable=duplicate-string-formatting-argument
@@ -230,7 +248,8 @@ class FastSyncTargetSnowflake:
                 if transform_type == 'SET-NULL':
                     trans_cols.append('{} = NULL'.format(column))
                 elif transform_type == 'HASH':
-                    trans_cols.append('{} = SHA2({}, 256)'.format(column, column))
+                    trans_cols.append(
+                        '{} = SHA2({}, 256)'.format(column, column))
                 elif 'HASH-SKIP-FIRST' in transform_type:
                     skip_first_n = transform_type[-1]
                     trans_cols.append(
@@ -240,7 +259,8 @@ class FastSyncTargetSnowflake:
                                                                                                      column,
                                                                                                      skip_first_n))
                 elif transform_type == 'MASK-DATE':
-                    trans_cols.append("{} = TO_CHAR({}::DATE,'YYYY-01-01')::DATE".format(column, column))
+                    trans_cols.append(
+                        "{} = TO_CHAR({}::DATE,'YYYY-01-01')::DATE".format(column, column))
                 elif transform_type == 'MASK-NUMBER':
                     trans_cols.append('{} = 0'.format(column))
                 elif transform_type == 'MASK-HIDDEN':
@@ -248,7 +268,8 @@ class FastSyncTargetSnowflake:
 
         # Generate and run UPDATE if at least one obfuscation rule found
         if len(trans_cols) > 0:
-            sql = 'UPDATE {}.{} SET {}'.format(target_schema, temp_table, ','.join(trans_cols))
+            sql = 'UPDATE {}.{} SET {}'.format(
+                target_schema, temp_table, ','.join(trans_cols))
             self.query(sql)
 
     def swap_tables(self, schema, table_name):
@@ -262,4 +283,5 @@ class FastSyncTargetSnowflake:
                                                                   schema,
                                                                   target_table.upper()))
 
-        self.query('DROP TABLE IF EXISTS {}."{}"'.format(schema, temp_table.upper()))
+        self.query('DROP TABLE IF EXISTS {}."{}"'.format(
+            schema, temp_table.upper()))

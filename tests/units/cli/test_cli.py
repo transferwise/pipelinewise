@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pipelinewise.cli as cli
 import pytest
+import jsonschema
 from unittest.mock import patch
 from tests.units.cli.cli_args import CliArgs
 from pipelinewise.cli.pipelinewise import PipelineWise
@@ -460,7 +461,7 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
         args = CliArgs(dir=test_validate_command_dir)
         pipelinewise = PipelineWise(args, CONFIG_DIR, VIRTUALENVS_DIR)
 
-        with pytest.raises(SystemExit):
+        with pytest.raises(jsonschema.exceptions.ValidationError):
             pipelinewise.validate()
 
     def test_validate_command_2(self):

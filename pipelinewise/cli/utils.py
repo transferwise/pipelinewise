@@ -271,8 +271,6 @@ def validate(instance, schema):
         jsonschema.validate(instance=schema_safe_inst, schema=schema)
     except jsonschema.exceptions.ValidationError as exc:
         raise exc
-        LOGGER.critical('Invalid object %s', exc)
-        sys.exit(1)
 
 
 def delete_empty_keys(dic):

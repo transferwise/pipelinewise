@@ -114,7 +114,7 @@ class PipelineWise:
             raise Exception(f'Cannot merge JSON files {dict_a} {dict_b} - {exc}')
 
     # pylint: disable=too-many-statements,too-many-branches,too-many-nested-blocks,too-many-locals,too-many-arguments
-    def create_filtered_tap_properties(self, target_type, target_config, tap_type, tap_properties, tap_state, filters,
+    def create_filtered_tap_properties(self, target_type, tap_type, tap_properties, tap_state, filters,
                                        create_fallback=False):
         """
         Create a filtered version of tap properties file based on specific filter conditions.
@@ -972,7 +972,6 @@ class PipelineWise:
             singer_stream_ids
         ) = self.create_filtered_tap_properties(
             target_type,
-            target_config,
             tap_type,
             tap_properties,
             tap_state, {
@@ -981,7 +980,8 @@ class PipelineWise:
                 'tap_type': ['tap-mysql', 'tap-postgres', 'tap-s3-csv', 'tap-mongodb'],
                 'initial_sync_required': True,
             },
-            create_fallback=True)
+            create_fallback=True
+            )
 
         start_time = datetime.now()
         try:

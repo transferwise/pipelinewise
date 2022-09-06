@@ -2,6 +2,7 @@ import os
 import shutil
 
 import pipelinewise.cli as cli
+import jsonschema
 import pytest
 
 PIPELINEWISE_TEST_HOME = '/tmp/.pipelinewise'
@@ -128,11 +129,11 @@ class TestConfig:
         yaml_config_dir = '{}/resources/test_invalid_tap_mongo_yaml_config'.format(os.path.dirname(__file__))
         vault_secret = '{}/resources/vault-secret.txt'.format(os.path.dirname(__file__))
         print(yaml_config_dir)
-        with pytest.raises(SystemExit) as pytest_wrapped_e:
+        with pytest.raises(jsonschema.exceptions.ValidationError) as pytest_wrapped_e:
             cli.config.Config.from_yamls(PIPELINEWISE_TEST_HOME, yaml_config_dir, vault_secret)
 
-        assert pytest_wrapped_e.type == SystemExit
-        assert pytest_wrapped_e.value.code == 1
+        assert pytest_wrapped_e.type == jsonschema.exceptions.ValidationError
+        #assert pytest_wrapped_e.value.code == 1
 
     def test_from_invalid_yamls(self):
         """Test creating Config object using invalid YAML configuration directory"""

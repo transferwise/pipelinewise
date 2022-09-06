@@ -2,6 +2,7 @@ import os
 import re
 
 import pipelinewise.cli as cli
+import jsonschema
 import pytest
 
 VIRTUALENVS_DIR = './virtualenvs-dummy'
@@ -13,11 +14,11 @@ class TestUtils:
     Unit Tests for PipelineWise CLI utility functions
     """
     def assert_json_is_invalid(self, schema, invalid_target):
-        """Simple assertion to check if validate function exits with error"""
-        with pytest.raises(SystemExit) as pytest_wrapped_e:
+        """Simple assertion to check if validate function exits with error"""        
+        with pytest.raises(jsonschema.exceptions.ValidationError) as pytest_wrapped_e:
             cli.utils.validate(invalid_target, schema)
-        assert pytest_wrapped_e.type == SystemExit
-        assert pytest_wrapped_e.value.code == 1
+        assert pytest_wrapped_e.type == jsonschema.exceptions.ValidationError
+        #assert pytest_wrapped_e.value.code == 1
 
     def test_json_detectors(self):
         """Testing JSON detector functions"""
@@ -218,7 +219,7 @@ class TestUtils:
         schema = cli.utils.load_schema('tap')
 
         # Valid instance should return None
-        valid_tap = cli.utils.load_yaml('{}/resources/tap-valid-mysql.yml'.format(os.path.dirname(__file__)))
+        valid_tap = cli.utils.load_yaml('{}/resources/tap-valid-mysql.yml'.format(os.path.dirname(__file__)))        
         assert cli.utils.validate(valid_tap, schema) is None
 
         # Invalid instance should exit
@@ -231,6 +232,7 @@ class TestUtils:
 
         # Valid instance should return None
         valid_target = cli.utils.load_yaml('{}/resources/target-valid-s3-csv.yml'.format(os.path.dirname(__file__)))
+        #breakpoint()
         assert cli.utils.validate(valid_target, schema) is None
 
         # Invalid instance should exit
