@@ -173,7 +173,7 @@ in source do not get deleted in target.</p>
 which means that every record that was deleted in source will be deleted in the replicated
 target database as well. Please also note that Only <a class="reference internal" href="../concept/replication_methods.html#log-based"><span class="std std-ref">Log Based</span></a> replication method
 detects delete row events.</p>
-<p>To turn off <strong>Hard Delete</strong> mode add <code class="docutils literal notranslate"><span class="pre">hard_delete:</span> <span class="pre">False</span></code> to the target <a class="reference internal" href="../connectors/targets.html#targets-list"><span class="std std-ref">Targets (Destinations)</span></a>
+<p>To turn off <strong>Hard Delete</strong> mode add <code class="docutils literal notranslate"><span class="pre">hard_delete:</span> <span class="pre">false</span></code> to the target <a class="reference internal" href="../connectors/targets.html#targets-list"><span class="std std-ref">Targets (Destinations)</span></a>
 YAML config file. In this case when a deleted row captured in source then
 <code class="docutils literal notranslate"><span class="pre">_SDC_DELETED_AT</span></code> column will only get flagged and not get deleted in the target.
 Please also note that Only <a class="reference internal" href="../concept/replication_methods.html#log-based"><span class="std std-ref">Log Based</span></a> replication method detects delete row events.</p>
