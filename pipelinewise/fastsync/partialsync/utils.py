@@ -1,3 +1,5 @@
+import json
+
 import argparse
 import os
 import re
@@ -25,37 +27,69 @@ def upload_to_s3(snowflake: FastSyncTargetSnowflake, file_parts: List, temp_dir:
     return s3_keys, s3_key_pattern
 
 
-def load_into_snowflake(
-        snowflake: FastSyncTargetSnowflake,
-        args: argparse.Namespace,
-        s3_keys: List, s3_key_pattern: str, size_bytes: int) -> None:
-    """load data into Snowflake"""
-
-    # delete partial data from the table
-    target_schema = common_utils.get_target_schema(args.target, args.table)
-    table_dict = common_utils.tablename_to_dict(args.table)
-    target_table = table_dict.get('table_name')
-    where_clause = f'WHERE {args.column} >= \'{args.start_value}\''
-    if args.end_value:
-        where_clause += f' AND {args.column} <= \'{args.end_value}\''
-
-    snowflake.query(f'DELETE FROM {target_schema}."{target_table.upper()}" {where_clause}')
-    # copy partial data into the table
-    archive_load_files = args.target.get('archive_load_files', False)
-    tap_id = args.target.get('tap_id')
-
-    # Load into Snowflake table
-    snowflake.copy_to_table(
-        s3_key_pattern, target_schema, args.table, size_bytes, is_temporary=False
+def diff_source_target_columns(target_sf: dict, source_columns: list) -> dict:
+    """Finding the diff between source and target columns"""
+    target_column = target_sf['sf_object'].query(
+        f'SHOW COLUMNS IN TABLE {target_sf["schema"]}."{target_sf["table"].upper()}"'
     )
 
-    for s3_key in s3_keys:
-        if archive_load_files:
-            # Copy load file to archive
-            snowflake.copy_to_archive(s3_key, tap_id, args.table)
+    source_columns_dict = _get_source_columns_dict(source_columns)
+    target_columns_info = _get_target_columns_info(target_column)
+    added_columns = _get_added_columns(source_columns_dict, target_columns_info['columns_dict'])
+    removed_columns = _get_removed_columns(source_columns_dict, target_columns_info['columns_dict'])
 
-        # Delete all file parts from s3
-        snowflake.s3.delete_object(Bucket=args.target.get('s3_bucket'), Key=s3_key)
+    return {
+        'added_columns': added_columns,
+        'removed_columns': removed_columns,
+        'target_columns': target_columns_info['column_names'],
+        'source_columns': source_columns_dict
+    }
+
+
+def _get_target_columns_info(target_column):
+    target_columns_dict = {}
+    list_of_target_column_names = []
+    for column in target_column:
+        list_of_target_column_names.append(column['column_name'])
+        column_type_str = column['data_type']
+        column_type_dict = json.loads(column_type_str)
+        target_columns_dict[f'"{column["column_name"]}"'] = column_type_dict['type']
+    return {
+        'column_names': list_of_target_column_names,
+        'columns_dict': target_columns_dict
+    }
+
+
+def _get_source_columns_dict(source_columns):
+    source_columns_dict = {}
+    for column in source_columns:
+        column_info = column.split(' ')
+        column_name = column_info[0]
+        column_type = ' '.join(column_info[1:])
+        source_columns_dict[column_name] = column_type
+    return source_columns_dict
+
+
+def load_into_snowflake(target, args, columns_diff, primary_keys, s3_key_pattern, size_bytes,
+                        where_clause_sql):
+    """Loading data from S3 to the temp table in snowflake and then merge it with the target table"""
+
+    snowflake = target['sf_object']
+    # Load into Snowflake temp table
+    snowflake.copy_to_table(
+        s3_key_pattern, target['schema'], args.table, size_bytes, is_temporary=True
+    )
+    # Obfuscate columns
+    snowflake.obfuscate_columns(target['schema'], args.table)
+
+    snowflake.add_columns(target['schema'], target['table'], columns_diff['added_columns'])
+    added_metadata_columns = ['_SDC_EXTRACTED_AT', '_SDC_BATCHED_AT', '_SDC_DELETED_AT']
+    snowflake.merge_tables(
+        target['schema'], target['temp'], target['table'],
+        list(columns_diff['source_columns'].keys()) + added_metadata_columns, primary_keys)
+    if args.target['hard_delete'] is True:
+        snowflake.partial_hard_delete(target['schema'], target['table'], where_clause_sql)
+    snowflake.drop_table(target['schema'], target['temp'])
 
 
 def update_state_file(args: argparse.Namespace, bookmark: Dict) -> None:
@@ -117,3 +151,19 @@ def _get_args_parser_for_partialsync():
     )
 
     return parser
+
+
+def _get_removed_columns(source_columns_dict, target_columns_dict):
+    # ignoring columns added by PPW
+    default_columns_added_by_ppw = {'"_SDC_EXTRACTED_AT"', '"_SDC_BATCHED_AT"', '"_SDC_DELETED_AT"'}
+
+    removed_columns = set(target_columns_dict) - set(source_columns_dict)
+    removed_columns = removed_columns - default_columns_added_by_ppw
+    removed_columns = {key: target_columns_dict[key] for key in removed_columns}
+    return removed_columns
+
+
+def _get_added_columns(source_columns_dict, target_columns_dict):
+    added_columns = set(source_columns_dict) - set(target_columns_dict)
+    added_columns = {key: source_columns_dict[key] for key in added_columns}
+    return added_columns

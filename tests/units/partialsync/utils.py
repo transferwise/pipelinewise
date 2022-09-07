@@ -11,13 +11,16 @@ from pipelinewise.fastsync.partialsync.utils import parse_args_for_partial_sync
 # pylint: disable=too-many-instance-attributes, too-few-public-methods
 class PartialSync2SFArgs:
     """Arguments for using in mysql to snowflake tests"""
-    def __init__(self, temp_test_dir, table='email', start_value='FOO_START', end_value='FOO_END', state='state.json'):
+    def __init__(self, temp_test_dir, table='email',
+                 start_value='FOO_START', end_value='FOO_END', state='state.json', hard_delete=None):
         resources_dir = f'{os.path.dirname(__file__)}/resources'
         config_dir = f'{resources_dir}/test_partial_sync'
         tap_config = self._load_json_config(f'{config_dir}/target_snowflake/tap_mysql/config.json')
         target_config = self._load_json_config(f'{config_dir}/tmp/target_config_tmp.json')
         transform_config = self._load_json_config(f'{config_dir}/target_snowflake/tap_mysql/transformation.json')
         properties_config = self._load_json_config(f'{config_dir}/target_snowflake/tap_mysql/properties.json')
+        if hard_delete is not None:
+            target_config['hard_delete'] = hard_delete
 
         self.table = f'{tap_config["dbname"]}.{table}'
         self.column = 'FOO_COLUMN'

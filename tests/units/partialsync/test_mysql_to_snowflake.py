@@ -30,7 +30,7 @@ class PartialSyncTestCase(TestCase):
         self.assertEqual(f'{args.table}: {exception_message}', actual_return)
 
 
-    def test_export_source_table_data_new(self):
+    def test_export_source_table_data(self):
         """Test export_source_table_data method"""
         expected_file_parts = []
 
@@ -49,12 +49,10 @@ class PartialSyncTestCase(TestCase):
                 mocked_copy_table.side_effect = mocked_copy_table_method
 
                 test_fast_sync = FastSyncTapMySql({}, {})
-                where_clause_setting = {
-                    'column': args.column,
-                    'start_value': args.start_value,
-                    'end_value': args.end_value
-                }
-                actual_file_parts = test_fast_sync.export_source_table_data(args, tap_id, where_clause_setting)
+
+                where_clause = 'FOO WHERE'
+                actual_file_parts = test_fast_sync.export_source_table_data(
+                    args, tap_id, where_clause)
 
                 call_args = mocked_copy_table.call_args[0]
                 call_kwargs = mocked_copy_table.call_args[1]
@@ -63,7 +61,7 @@ class PartialSyncTestCase(TestCase):
                     'split_large_files': False,
                     'split_file_chunk_size_mb': args.target['split_file_chunk_size_mb'],
                     'split_file_max_chunks': args.target['split_file_max_chunks'],
-                    'where_clause_setting': {'column': 'FOO_COLUMN', 'start_value': 'FOO_START', 'end_value': 'FOO_END'}
+                    'where_clause_sql': where_clause
                 }
 
         self.assertEqual(2, len(call_args))
@@ -79,7 +77,6 @@ class PartialSyncTestCase(TestCase):
 
     # pylint: disable=too-many-locals, too-many-arguments
     @mock.patch('pipelinewise.fastsync.commons.utils.save_state_file')
-    @mock.patch('pipelinewise.fastsync.partialsync.mysql_to_snowflake.load_into_snowflake')
     @mock.patch('pipelinewise.fastsync.partialsync.mysql_to_snowflake.upload_to_s3')
     @mock.patch('pipelinewise.fastsync.commons.utils.get_bookmark_for_table')
     @mock.patch('pipelinewise.fastsync.partialsync.mysql_to_snowflake.FastSyncTapMySql')
@@ -89,7 +86,6 @@ class PartialSyncTestCase(TestCase):
                                                      mocked_fastsyncmysql,
                                                      mocked_bookmark,
                                                      mocked_upload_to_s3,
-                                                     mocked_load_into_sf,
                                                      mocked_save_state):
         """Test the whole partial_sync_mysql_to_snowflake module works as expected"""
         with TemporaryDirectory() as temp_directory:
@@ -98,6 +94,10 @@ class PartialSyncTestCase(TestCase):
             s3_keys = ['FOO_S3_KEYS', ]
             s3_key_pattern = 'BAR_S3_KEY_PATTERN'
             bookmark = 'foo_bookmark'
+            maped_column_types_to_target = {
+                'columns': ['foo type1', 'bar type2'],
+                'primary_key': 'foo_primary'
+            }
 
             def export_data_to_file(*args, **kwargs):  # pylint: disable=unused-argument
                 with open(f'{temp_directory}/t1', 'w', encoding='utf8') as exported_file:
@@ -108,6 +108,7 @@ class PartialSyncTestCase(TestCase):
             mocked_upload_to_s3.return_value = (s3_keys, s3_key_pattern)
             mocked_bookmark.return_value = bookmark
             mocked_export_data = mocked_fastsyncmysql.return_value.export_source_table_data
+            mocked_fastsyncmysql.return_value.map_column_types_to_target.return_value = maped_column_types_to_target
             mocked_export_data.side_effect = export_data_to_file
 
             table_name = 'foo_table'
@@ -153,18 +154,19 @@ class PartialSyncTestCase(TestCase):
                         for message in log_messages:
                             self.assertIn(message, actual_logs.output[log_index])
 
-                    where_clause_setting = {
-                        'column': arguments['column'],
-                        'start_value': arguments['start_value'],
-                        'end_value': arguments['end_value']
-                    }
+                    expected_where_clause = f" WHERE {column} >= '{start_value}'"
+                    if end_value:
+                        expected_where_clause += f" AND {column} <= '10'"
                     mocked_export_data.assert_called_with(
-                        args_namespace, args_namespace.target.get('tap_id'), where_clause_setting
+                        args_namespace, args_namespace.target.get('tap_id'), expected_where_clause
                     )
                     mocked_upload_to_s3.assert_called_with(mocked_fastsync_sf(), file_parts, arguments['temp_dir'])
-                    mocked_load_into_sf.assert_called_with(
-                        mocked_fastsync_sf(), args_namespace, s3_keys, s3_key_pattern, file_size
+                    mocked_fastsync_sf.return_value.merge_tables.assert_called_with(
+                        'foo_schema', f'{table_name}_temp', table_name,
+                        ['foo', 'bar', '_SDC_EXTRACTED_AT', '_SDC_BATCHED_AT', '_SDC_DELETED_AT'],
+                        maped_column_types_to_target['primary_key']
                     )
+                    mocked_fastsync_sf.return_value.drop_table.assert_called_with('foo_schema', f'{table_name}_temp')
                     if end_value:
                         mocked_save_state.assert_not_called()
                     else:

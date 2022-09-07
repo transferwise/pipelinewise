@@ -655,10 +655,45 @@ class E2EEnv:
             f'DELETE from ppw_e2e_tap_{tap_type}{self.sf_schema_postfix}.{table} {where_clause}'
         )
 
-    def get_records_from_target_snowflake(self, tap_type, table):
+    def add_column_into_target_sf(self, tap_type, table, new_column) :
+        """Add a record into the target"""
+        self.run_query_target_snowflake(
+            f'ALTER TABLE ppw_e2e_tap_{tap_type}{self.sf_schema_postfix}.{table} ADD {new_column["name"]} int'
+        )
+        self.run_query_target_snowflake(
+            f'UPDATE ppw_e2e_tap_{tap_type}{self.sf_schema_postfix}.{table}'
+            f' SET {new_column["name"]}={new_column["value"]} WHERE 1=1'
+        )
+
+    def add_column_into_source(self, tap_type, table, new_column):
+        """Add a column into the source table"""
+        run_query_method = getattr(self, f'run_query_tap_{tap_type}')
+        run_query_method(
+            f'ALTER TABLE {table} ADD {new_column["name"]} int'
+        )
+        run_query_method(
+            f'UPDATE {table} set {new_column["name"]}={new_column["value"]} where 1=1'
+        )
+
+    def delete_record_from_source(self, tap_type, table, where_clause):
+        """Delete a record from the source"""
+        run_query_method = getattr(self, f'run_query_tap_{tap_type}')
+        run_query_method(
+            f'DELETE FROM {table} {where_clause}'
+        )
+
+    def run_query_on_source(self, tap_type, query):
+        """Running a query on the source"""
+        run_query_method = getattr(self, f'run_query_tap_{tap_type}')
+        run_query_method(
+            query
+        )
+
+    def get_records_from_target_snowflake(self, tap_type, table, column, primary_key):
         """"Getting all records from a specific table of snowflake target"""
         records = self.run_query_target_snowflake(
-            f'SELECT * from ppw_e2e_tap_{tap_type}{self.sf_schema_postfix}.{table}'
+            f'SELECT {column} FROM ppw_e2e_tap_{tap_type}{self.sf_schema_postfix}.{table}'
+            f' ORDER BY "{primary_key.upper()}"'
         )
         return records
 

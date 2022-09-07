@@ -33,5 +33,7 @@
     "temp_dir": "/foo",
     "user": "FOO_USER",
     "validate_records": false,
-    "warehouse": "FOO_WAREHOUSE"
+    "warehouse": "FOO_WAREHOUSE",
+    "default_target_schema": "foo_schema"
+
 }

@@ -34,10 +34,12 @@ class TargetSnowflake(unittest.TestCase):
 
         self.check_validate_taps()
         self.check_import_config()
+        self.tap_type = tap_type
 
     def tearDown(self):
         self.remove_dir_from_config_dir(f'{self.target_id}/{self.tap_id}')
-        self.drop_sf_schema_if_exists(f'{self.tap_id}{self.e2e_env.sf_schema_postfix}')
+        self.drop_sf_schema_if_exists(f'ppw_e2e_{self.tap_type}{self.e2e_env.sf_schema_postfix}'.upper())
+        self.drop_sf_schema_if_exists(f'ppw_e2e_{self.tap_type}_public2{self.e2e_env.sf_schema_postfix}'.upper())
         super().tearDown()
 
     # pylint: disable=no-self-use

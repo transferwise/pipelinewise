@@ -2,7 +2,11 @@ from unittest import TestCase, mock
 from tempfile import TemporaryDirectory
 
 from pipelinewise.fastsync.partialsync.utils import load_into_snowflake, upload_to_s3, update_state_file
+from pipelinewise.fastsync.partialsync.utils import diff_source_target_columns
+
+
 from tests.units.partialsync.utils import PartialSync2SFArgs
+from tests.units.partialsync.resources.test_partial_sync_utils.sample_sf_columns import SAMPLE_OUTPUT_FROM_SF
 
 
 class PartialSyncUtilsTestCase(TestCase):
@@ -25,41 +29,74 @@ class PartialSyncUtilsTestCase(TestCase):
             self.assertTupleEqual(([test_s3_key], test_s3_key), actual_return)
             mocked_upload_to_s3.assert_called_with(test_file_part, tmp_dir=temp_test_dir)
 
-    # pylint: disable=protected-access
-    def test_load_into_snowflake(self):
+    # pylint: disable=no-self-use
+    def test_load_into_snowflake_hard_delete(self):
         """Test load_into_snowflake method"""
-        test_table = 'weight_unit'
+        snowflake = mock.MagicMock()
+        target = {
+            'sf_object': snowflake,
+            'schema': 'FOO_SCHEMA',
+            'table': 'FOO_TABLE',
+            'temp': 'FOO_TEMP'
+        }
+        args = PartialSync2SFArgs(
+            temp_test_dir='temp_test_dir', start_value='20', end_value='30'
+        )
+        columns_diff = {
+            'added_columns': ['FOO_ADDED_COLUMN'],
+            'source_columns': {'FOO_SOURCE_COLUMN': 'FOO_TYPE'}
+        }
+        primary_keys = ['FOO_PRIMARY']
+        s3_key_pattern = 'FOO_PATTERN'
+        size_bytes = 3
+        where_clause_sql = 'test'
+        load_into_snowflake(target, args, columns_diff, primary_keys, s3_key_pattern, size_bytes,
+                            where_clause_sql)
 
-        with TemporaryDirectory() as temp_test_dir:
-            test_end_value_cases = (None, '30')
+        snowflake.assert_has_calls([
+            mock.call.copy_to_table(s3_key_pattern, target['schema'], args.table, size_bytes, is_temporary=True),
+            mock.call.obfuscate_columns(target['schema'], args.table),
+            mock.call.add_columns(target['schema'], target['table'], columns_diff['added_columns']),
+            mock.call.merge_tables(
+                target['schema'], target['temp'], target['table'],
+                ['FOO_SOURCE_COLUMN', '_SDC_EXTRACTED_AT', '_SDC_BATCHED_AT', '_SDC_DELETED_AT'], primary_keys),
+            mock.call.partial_hard_delete(target['schema'], target['table'], where_clause_sql),
+            mock.call.drop_table(target['schema'], target['temp'])
+        ])
 
-            for test_end_value in test_end_value_cases:
-                with self.subTest(endvalue= test_end_value):
-                    args = PartialSync2SFArgs(
-                        temp_test_dir=temp_test_dir, table=test_table, start_value='20', end_value=test_end_value
-                    )
-                    test_target_schema = args.target['schema_mapping'][args.tap['dbname']]['target_schema']
-                    test_s3_key_pattern = ['s3_key_pattern_foo']
-                    test_size_byte = 4000
-                    test_s3_keys = ['s3_key_foo']
-                    test_tap_id = args.target['tap_id']
-                    test_bucket = args.target['s3_bucket']
-                    where_clause_for_end = f" AND {args.column} <= '{args.end_value}'" if args.end_value else ''
+    # pylint: disable=no-self-use
+    def test_load_into_snowflake_soft_delete(self):
+        """Test load_into_snowflake method"""
+        snowflake = mock.MagicMock()
+        target = {
+            'sf_object': snowflake,
+            'schema': 'FOO_SCHEMA',
+            'table': 'FOO_TABLE',
+            'temp': 'FOO_TEMP'
+        }
+        args = PartialSync2SFArgs(
+            temp_test_dir='temp_test_dir', start_value='20', end_value='30', hard_delete=False
+        )
+        columns_diff = {
+            'added_columns': ['FOO_ADDED_COLUMN'],
+            'source_columns': {'FOO_SOURCE_COLUMN': 'FOO_TYPE'}
+        }
+        primary_keys = ['FOO_PRIMARY']
+        s3_key_pattern = 'FOO_PATTERN'
+        size_bytes = 3
+        where_clause_sql = 'test'
+        load_into_snowflake(target, args, columns_diff, primary_keys, s3_key_pattern, size_bytes,
+                            where_clause_sql)
 
-                    mocked_snowflake = mock.MagicMock()
-
-                    load_into_snowflake(mocked_snowflake, args, test_s3_keys, test_s3_key_pattern, test_size_byte)
-
-                    mocked_snowflake.query.assert_called_with(
-                        f'DELETE FROM {test_target_schema}."{test_table.upper()}"'
-                        f' WHERE {args.column} >= \'{args.start_value}\'{where_clause_for_end}')
-
-                    mocked_snowflake.copy_to_table.assert_called_with(
-                        test_s3_key_pattern, test_target_schema, args.table, test_size_byte, is_temporary=False
-                    )
-
-                    mocked_snowflake.copy_to_archive.assert_called_with(test_s3_keys[0], test_tap_id, args.table)
-                    mocked_snowflake.s3.delete_object.assert_called_with(Bucket=test_bucket, Key=test_s3_keys[0])
+        snowflake.assert_has_calls([
+            mock.call.copy_to_table(s3_key_pattern, target['schema'], args.table, size_bytes, is_temporary=True),
+            mock.call.obfuscate_columns(target['schema'], args.table),
+            mock.call.add_columns(target['schema'], target['table'], columns_diff['added_columns']),
+            mock.call.merge_tables(target['schema'], target['temp'], target['table'],
+                                   ['FOO_SOURCE_COLUMN', '_SDC_EXTRACTED_AT', '_SDC_BATCHED_AT', '_SDC_DELETED_AT'],
+                                   primary_keys),
+            mock.call.drop_table(target['schema'], target['temp'])
+        ])
 
     # pylint: disable=no-self-use
     def test_update_state_file(self):
@@ -78,3 +115,39 @@ class PartialSyncUtilsTestCase(TestCase):
                     mocked_save_state_file.assert_not_called()
                 else:
                     mocked_save_state_file.assert_called_with(args.state, args.table, bookmark)
+
+    def test_find_diff_columns(self):
+        """Test find_diff_columns method works as expected"""
+        sample_source_columns = [
+            '"FOO_COLUMN_0" NUMBER', '"FOO_COLUMN_1" NUMBER', '"FOO_COLUMN_3" VARCHAR', '"FOO_COLUMN_5" VARCHAR'
+        ]
+        schema = 'FOO_SCHEMA'
+        table = 'BAR_TABLE'
+        mocked_snowflake = mock.MagicMock()
+        mocked_snowflake.query.return_value = SAMPLE_OUTPUT_FROM_SF
+        sample_target_sf = {
+            'sf_object': mocked_snowflake,
+            'schema': schema,
+            'table': table
+        }
+
+        expected_output = {
+            'added_columns': {'"FOO_COLUMN_0"': 'NUMBER',
+                              '"FOO_COLUMN_5"': 'VARCHAR'},
+            'removed_columns': {
+                '"FOO_COLUMN_2"': 'TEXT',
+                '"FOO_COLUMN_4"': 'NUMBER',
+                '"_SDC_FOO_BAR"': 'TIMESTAMP_NTZ'
+            },
+            'source_columns': {
+                '"FOO_COLUMN_0"': 'NUMBER',
+                '"FOO_COLUMN_1"': 'NUMBER',
+                '"FOO_COLUMN_3"': 'VARCHAR',
+                '"FOO_COLUMN_5"': 'VARCHAR'
+            },
+            'target_columns': ['FOO_COLUMN_1', 'FOO_COLUMN_2',
+                               'FOO_COLUMN_3', 'FOO_COLUMN_4',
+                               '_SDC_EXTRACTED_AT', '_SDC_BATCHED_AT', '_SDC_DELETED_AT', '_SDC_FOO_BAR'],
+        }
+        actual_output = diff_source_target_columns(target_sf=sample_target_sf, source_columns=sample_source_columns)
+        self.assertDictEqual(actual_output, expected_output)
