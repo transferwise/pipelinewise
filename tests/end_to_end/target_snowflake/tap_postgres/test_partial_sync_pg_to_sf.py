@@ -37,12 +37,17 @@ class TestPartialSyncPGToSF(TapPostgres):
         """
         Test partial sync table from MariaDB to Snowflake
         """
+        # Deleting all records from the target with primary key greater than 1
+        self.e2e_env.delete_record_from_target_snowflake(
+            tap_type=self.tap_parameters['tap_type'],
+            table=self.tap_parameters['table'],
+            where_clause=f'WHERE {self.column} > 1'
+        )
 
         assertions.assert_partial_sync_table_success(
             self.tap_parameters,
             start_value=3,
             end_value=7,
-            min_pk_value_for_target_missed_records=1
         )
 
         # for this test, all records with id > 1 are deleted from the target and then will do a partial sync
@@ -60,12 +65,18 @@ class TestPartialSyncPGToSF(TapPostgres):
         additional_column = 'FOO_NEW_COLUMN_SOURCE'
         additional_column_value = 567
 
+        # Deleting all records from the target with primary key greater than 2
+        self.e2e_env.delete_record_from_target_snowflake(
+            tap_type=self.tap_parameters['tap_type'],
+            table=self.tap_parameters['table'],
+            where_clause=f'WHERE {self.column} > 2'
+        )
+
         assertions.assert_partial_sync_table_with_source_additional_columns(
             self.tap_parameters,
             additional_column={'name': additional_column, 'value': additional_column_value},
             start_value=4,
             end_value=6,
-            min_pk_value_for_target_missed_records=2
         )
 
         # for this test, all records with id > 2 are deleted from the target and then will do a partial sync
@@ -85,18 +96,24 @@ class TestPartialSyncPGToSF(TapPostgres):
         """
         additional_column_value = 987
         additional_column = 'FOO_NEW_COLUMN_TARGET'
+
+        # Deleting all records from the target with primary key greater than 2
+        self.e2e_env.delete_record_from_target_snowflake(
+            tap_type=self.tap_parameters['tap_type'],
+            table=self.tap_parameters['table'],
+            where_clause=f'WHERE {self.column} > 2'
+        )
         assertions.assert_partial_sync_table_with_target_additional_columns(
             self.tap_parameters,
-            additional_column={'name': additional_column, 'value': additional_column_value },
+            additional_column={'name': additional_column, 'value': additional_column_value},
             start_value=4,
             end_value=7,
-            min_pk_value_for_target_missed_records=2
         )
 
         # for this test, all records with id > 2 are deleted from the target and then will do a partial sync
         # It is expected records 4 to 7 be None value because this column does not exist in the source and records
         # out of this range wont be touched and they will have their original value
-        expected_records_for_column = [additional_column_value , additional_column_value , None, None, None, None]
+        expected_records_for_column = [additional_column_value, additional_column_value, None, None, None, None]
         primary_key = self.column
 
         assertions.assert_partial_sync_rows_in_target(
@@ -108,15 +125,42 @@ class TestPartialSyncPGToSF(TapPostgres):
         Test partial sync table from PG to Snowflake if hard delete is selected and a record is deleted from the source
         """
         self.e2e_env.delete_record_from_source('postgres', self.table, 'WHERE cid=5')
+
+        # Deleting all records from the target with primary key greater than 1
+        self.e2e_env.delete_record_from_target_snowflake(
+            tap_type=self.tap_parameters['tap_type'],
+            table=self.tap_parameters['table'],
+            where_clause=f'WHERE {self.column} > 1'
+        )
+
         assertions.assert_partial_sync_table_success(
             self.tap_parameters,
             start_value=4,
             end_value=6,
-            min_pk_value_for_target_missed_records=1
         )
 
         # for this test, all records with id > 1 are deleted from the target and then will do a partial sync
         expected_records_for_column = [1, 4, 6]
+        column_to_check = primary_key = self.column
+
+        assertions.assert_partial_sync_rows_in_target(
+            self.e2e_env, 'postgres', self.table, column_to_check, primary_key, expected_records_for_column
+        )
+
+    def test_partial_sync_if_table_does_not_exist_in_target(self):
+        """Test partial sync if table does not exist in target"""
+
+        # Dropping the table
+        self.e2e_env.run_query_target_snowflake(
+            f'DROP TABLE ppw_e2e_tap_{self.tap_parameters["tap_type"]}{self.e2e_env.sf_schema_postfix}.{self.table}')
+
+        assertions.assert_partial_sync_table_success(
+            self.tap_parameters,
+            start_value=4,
+            end_value=6,
+        )
+
+        expected_records_for_column = [4, 5, 6]
         column_to_check = primary_key = self.column
 
         assertions.assert_partial_sync_rows_in_target(
@@ -157,11 +201,16 @@ class TestPartialSyncPGToSFSoftDelete(TapPostgres):
         """
         self.e2e_env.delete_record_from_source('postgres', self.table, 'WHERE cid=5')
 
+        # Deleting all records from the target with primary key greater than 5
+        self.e2e_env.delete_record_from_target_snowflake(
+            tap_type=self.tap_parameters['tap_type'],
+            table=self.tap_parameters['table'],
+            where_clause=f'WHERE {self.column} > 5'
+        )
         assertions.assert_partial_sync_table_success(
             self.tap_parameters,
             start_value=4,
             end_value=6,
-            min_pk_value_for_target_missed_records=5
         )
 
         # for this test, all records with id > 3 are deleted from the target and then will do a partial sync

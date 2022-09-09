@@ -30,7 +30,6 @@ def partial_sync_table(args: Namespace) -> Union[bool, str]:
 
         mysql.open_connections()
 
-        # Get column differences
         target_schema = common_utils.get_target_schema(args.target, args.table)
         table_dict = common_utils.tablename_to_dict(args.table)
         target_table = table_dict.get('table_name')
@@ -43,6 +42,18 @@ def partial_sync_table(args: Namespace) -> Union[bool, str]:
         }
 
         snowflake_types = mysql.map_column_types_to_target(args.table)
+
+        # making target table if not exists
+        snowflake.create_table(
+            target_schema=target_schema,
+            table_name=target_table,
+            columns=snowflake_types['columns'],
+            primary_key=snowflake_types.get('primary_key'),
+            is_temporary=False,
+            sort_columns=False,
+            if_not_exists=True
+        )
+
         source_columns = snowflake_types.get('columns', [])
         columns_diff = diff_source_target_columns(target_sf, source_columns=source_columns)
 
