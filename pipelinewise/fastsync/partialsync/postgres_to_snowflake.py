@@ -50,7 +50,7 @@ def partial_sync_table(args: Namespace) -> Union[bool, str]:
             primary_key=snowflake_types.get('primary_key'),
             is_temporary=False,
             sort_columns=False,
-            if_not_exists=True
+            allow_replace_table=False
         )
 
         source_columns = snowflake_types.get('columns', [])

@@ -220,7 +220,7 @@ class FastSyncTargetSnowflake:
         primary_key: Optional[List[str]],
         is_temporary: bool = False,
         sort_columns=False,
-        if_not_exists=False
+        allow_replace_table=True
     ):
 
         table_dict = utils.tablename_to_dict(table_name)
@@ -257,7 +257,7 @@ class FastSyncTargetSnowflake:
 
         sql_columns = ','.join(columns)
         sql_primary_keys = ','.join(primary_key) if primary_key else None
-        create_sql = 'TABLE IF NOT EXISTS' if if_not_exists else 'OR REPLACE TABLE'
+        create_sql = 'OR REPLACE TABLE' if allow_replace_table else 'TABLE IF NOT EXISTS'
 
         sql = (
             f'CREATE {create_sql} {full_table_name} ({sql_columns}'
