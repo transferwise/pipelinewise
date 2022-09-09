@@ -55,16 +55,9 @@ def assert_resync_tables_success(tap, target, profiling=False):
 
 
 # pylint: disable=invalid-name
-def assert_partial_sync_table_success(tap_parameters, start_value, end_value, min_pk_value_for_target_missed_records):
+def assert_partial_sync_table_success(tap_parameters, start_value, end_value):
     """Partial sync a specific tap and make sure that it finished successfully and state file is created
     with the right content"""
-
-    # Deleting all records from the target with primary key greater than 5
-    tap_parameters['env'].delete_record_from_target_snowflake(
-        tap_type=tap_parameters['tap_type'],
-        table=tap_parameters['table'],
-        where_clause=f'WHERE {tap_parameters["column"]}>{min_pk_value_for_target_missed_records}'
-    )
 
     command = _get_command_for_partial_sync(tap_parameters, start_value, end_value)
 
@@ -75,15 +68,8 @@ def assert_partial_sync_table_success(tap_parameters, start_value, end_value, mi
 
 def assert_partial_sync_table_with_target_additional_columns(
         tap_parameters, additional_column,
-        start_value, end_value, min_pk_value_for_target_missed_records):
+        start_value, end_value):
     """Assert partial sync table command with additional column in the target"""
-
-    # Deleting all records from the target except the first one
-    tap_parameters['env'].delete_record_from_target_snowflake(
-        tap_type=tap_parameters['tap_type'],
-        table=tap_parameters['table'],
-        where_clause=f'WHERE {tap_parameters["column"]}>{min_pk_value_for_target_missed_records}'
-    )
 
     # Add a new column in the target
     tap_parameters['env'].add_column_into_target_sf(
@@ -101,15 +87,8 @@ def assert_partial_sync_table_with_target_additional_columns(
 
 def assert_partial_sync_table_with_source_additional_columns(
         tap_parameters, additional_column,
-        start_value, end_value, min_pk_value_for_target_missed_records):
+        start_value, end_value):
     """Assert partial sync table command with additional columns in the source"""
-
-    # Deleting all records from the target except the first one
-    tap_parameters['env'].delete_record_from_target_snowflake(
-        tap_type=tap_parameters['tap_type'],
-        table=tap_parameters['table'],
-        where_clause=f'WHERE {tap_parameters["column"]}>{min_pk_value_for_target_missed_records}'
-    )
 
     # Add a new column in the source
     tap_parameters['env'].add_column_into_source(
@@ -500,6 +479,7 @@ def assert_profiling_stats_files_created(
     if isinstance(tap, list):
         for tap_ in tap:
             assert f'tap_{tap_}.pstat' in pstat_files
+
 
 # pylint: disable=raise-missing-from
 @contextmanager

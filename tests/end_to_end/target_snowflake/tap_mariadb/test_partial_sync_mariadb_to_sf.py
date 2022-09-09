@@ -25,6 +25,13 @@ class TestPartialSyncMariaDBToSF(TapMariaDB):
             'column': self.column
         }
 
+        # Deleting all records from the target with primary key greater than 1
+        self.e2e_env.delete_record_from_target_snowflake(
+            tap_type=self.tap_parameters['tap_type'],
+            table=self.tap_parameters['table'],
+            where_clause=f'WHERE {self.column} > 1'
+        )
+
     def test_partial_sync_mariadb_to_sf(self):
         """
         Test partial sync table from MariaDB to Snowflake
@@ -34,7 +41,6 @@ class TestPartialSyncMariaDBToSF(TapMariaDB):
             self.tap_parameters,
             start_value=4,
             end_value=6,
-            min_pk_value_for_target_missed_records=1
         )
 
         # for this test, all records with id > 1 are deleted from the target and then will do a partial sync
@@ -57,7 +63,6 @@ class TestPartialSyncMariaDBToSF(TapMariaDB):
             additional_column={'name': additional_column, 'value': additional_column_value},
             start_value=4,
             end_value=6,
-            min_pk_value_for_target_missed_records=1
         )
 
         # for this test, all records with id > 1 are deleted from the target and then will do a partial sync
@@ -82,7 +87,6 @@ class TestPartialSyncMariaDBToSF(TapMariaDB):
             additional_column={'name': additional_column, 'value': additional_column_value},
             start_value=4,
             end_value=6,
-            min_pk_value_for_target_missed_records=1
         )
 
         # for this test, all records with id > 1 are deleted from the target and then will do a partial sync
@@ -105,11 +109,30 @@ class TestPartialSyncMariaDBToSF(TapMariaDB):
             self.tap_parameters,
             start_value=4,
             end_value=6,
-            min_pk_value_for_target_missed_records=1
         )
 
         # for this test, all records with id > 1 are deleted from the target and then will do a partial sync
         expected_records_for_column = [1, 4, 6]
+        column_to_check = primary_key = self.column
+
+        assertions.assert_partial_sync_rows_in_target(
+            self.e2e_env, 'mysql', self.table, column_to_check, primary_key, expected_records_for_column
+        )
+
+    def test_partial_sync_if_table_does_not_exist_in_target(self):
+        """Test partial sync if table does not exist in target"""
+        # Dropping the table
+        self.e2e_env.run_query_target_snowflake(
+            f'DROP TABLE ppw_e2e_tap_{self.tap_parameters["tap_type"]}{self.e2e_env.sf_schema_postfix}.{self.table}'
+        )
+
+        assertions.assert_partial_sync_table_success(
+            self.tap_parameters,
+            start_value=4,
+            end_value=6,
+        )
+
+        expected_records_for_column = [4, 5, 6]
         column_to_check = primary_key = self.column
 
         assertions.assert_partial_sync_rows_in_target(
@@ -145,11 +168,17 @@ class TestPartialSyncMariaDBToSFSoftDelete(TapMariaDB):
         """
         self.e2e_env.delete_record_from_source('mysql', self.table, 'WHERE weight_unit_id=5')
 
+        # Deleting all records from the target with primary key greater than 5
+        self.e2e_env.delete_record_from_target_snowflake(
+            tap_type=self.tap_parameters['tap_type'],
+            table=self.tap_parameters['table'],
+            where_clause=f'WHERE {self.column} > 5'
+        )
+
         assertions.assert_partial_sync_table_success(
             self.tap_parameters,
             start_value=4,
             end_value=6,
-            min_pk_value_for_target_missed_records=5
         )
 
         # for this test, all records with id > 1 are deleted from the target and then will do a partial sync
