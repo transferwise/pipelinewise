@@ -49,3 +49,6 @@ and specify the tap and target ids and table, column ,start_value and end_value(
 
   The value of the ``--table`` argument needs to be in the ``<schema_name>.<table_name>`` format. Schema and
   table name have to be the names in the source database.
+
+More description about different cases of partial resync can be found here :ref:`partial_sync_cases`
+
