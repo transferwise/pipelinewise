@@ -1,3 +1,8 @@
+0.48.5 (2022-09-22)
+-------------------
+
+- Partial sync will now create table in target if it doesn't exist. [#1014](https://github.com/transferwise/pipelinewise/pull/1014)
+
 0.48.4 (2022-09-09)
 -------------------
 
