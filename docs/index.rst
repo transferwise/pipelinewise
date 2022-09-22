@@ -88,6 +88,7 @@ Content
    user_guide/logging
    user_guide/alerts
    user_guide/resync
+   user_guide/partial_sync
 
 .. toctree::
    :maxdepth: 2
