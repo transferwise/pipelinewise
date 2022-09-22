@@ -4,12 +4,12 @@
   <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>YAML configuration &mdash; PipelineWise  documentation</title>
+  <title>Different cases of partial resync &mdash; PipelineWise  documentation</title>
       <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
       <link rel="stylesheet" href="../_static/css/custom.css" type="text/css" />
     <link rel="shortcut icon" href="../_static/pipelinewise.png"/>
-    <link rel="canonical" href="https://docs.ansible.com/ansible/latest/user_guide/yaml_config.html"/>
+    <link rel="canonical" href="https://docs.ansible.com/ansible/latest/user_guide/partial_sync.html"/>
   <!--[if lt IE 9]>
     <script src="../_static/js/html5shiv.min.js"></script>
   <![endif]-->
@@ -22,8 +22,8 @@
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Encrypting Passwords" href="encrypting_passwords.html" />
-    <link rel="prev" title="Linux Pipes in PipelineWise" href="../concept/linux_pipes.html" /> 
+    <link rel="next" title="Taps (Data Sources)" href="../connectors/taps.html" />
+    <link rel="prev" title="Resync Tables" href="resync.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -59,7 +59,7 @@
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Using PipelineWise</span></p>
 <ul class="current">
-<li class="toctree-l1 current"><a class="current reference internal" href="#">YAML configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="yaml_config.html">YAML configuration</a></li>
 <li class="toctree-l1"><a class="reference internal" href="encrypting_passwords.html">Encrypting Passwords</a></li>
 <li class="toctree-l1"><a class="reference internal" href="cli.html">Command Line Interface</a></li>
 <li class="toctree-l1"><a class="reference internal" href="scheduling.html">Scheduling</a></li>
@@ -70,7 +70,7 @@
 <li class="toctree-l1"><a class="reference internal" href="logging.html">Logging</a></li>
 <li class="toctree-l1"><a class="reference internal" href="alerts.html">Alerts</a></li>
 <li class="toctree-l1"><a class="reference internal" href="resync.html">Resync Tables</a></li>
-<li class="toctree-l1"><a class="reference internal" href="partial_sync.html">Different cases of partial resync</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Different cases of partial resync</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Connectors</span></p>
 <ul>
@@ -100,9 +100,9 @@
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
       <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
-      <li>YAML configuration</li>
+      <li>Different cases of partial resync</li>
       <li class="wy-breadcrumbs-aside">
-            <a href="../_sources/user_guide/yaml_config.rst.txt" rel="nofollow"> View page source</a>
+            <a href="../_sources/user_guide/partial_sync.rst.txt" rel="nofollow"> View page source</a>
       </li>
   </ul>
   <hr/>
@@ -110,47 +110,50 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="yaml-configuration">
-<span id="id1"></span><h1>YAML configuration<a class="headerlink" href="#yaml-configuration" title="Permalink to this heading"></a></h1>
-<div class="admonition warning">
-<p class="admonition-title">Warning</p>
-<p>This section of the documentation is work in progress.</p>
-<p>Pipelines using YAML format for configurations. You can find some information
-and usage of these YAML files in the following sections:</p>
-<ul class="simple">
-<li><p><a class="reference internal" href="../installation_guide/creating_pipelines.html#creating-pipelines"><span class="std std-ref">Creating Pipelines</span></a></p></li>
-<li><p><a class="reference internal" href="alerts.html#alerts"><span class="std std-ref">Alerts</span></a></p></li>
-<li><p><a class="reference internal" href="../connectors/taps/google_analytics.html#tap-google-analytics"><span class="std std-ref">Tap Google Analytics</span></a></p></li>
-<li><p><a class="reference internal" href="../connectors/taps/jira.html#tap-jira"><span class="std std-ref">Tap Jira</span></a></p></li>
-<li><p><a class="reference internal" href="../connectors/taps/kafka.html#tap-kafka"><span class="std std-ref">Tap Kafka</span></a></p></li>
-<li><p><a class="reference internal" href="../connectors/taps/mongodb.html#tap-mongodb"><span class="std std-ref">Tap MongoDB</span></a></p></li>
-<li><p><a class="reference internal" href="../connectors/taps/mysql.html#tap-mysql"><span class="std std-ref">Tap MySQL</span></a></p></li>
-<li><p><a class="reference internal" href="../connectors/taps/oracle.html#tap-oracle"><span class="std std-ref">Tap Oracle</span></a></p></li>
-<li><p><a class="reference internal" href="../connectors/taps/postgres.html#tap-postgres"><span class="std std-ref">Tap PostgreSQL</span></a></p></li>
-<li><p><a class="reference internal" href="../connectors/taps/s3_csv.html#tap-s3-csv"><span class="std std-ref">Tap S3 CSV</span></a></p></li>
-<li><p><a class="reference internal" href="../connectors/taps/salesforce.html#tap-salesforce"><span class="std std-ref">Tap Salesforce</span></a></p></li>
-<li><p><a class="reference internal" href="../connectors/taps/snowflake.html#tap-snowflake"><span class="std std-ref">Tap Snowflake</span></a></p></li>
-<li><p><a class="reference internal" href="../connectors/taps/zendesk.html#tap-zendesk"><span class="std std-ref">Tap Zendesk</span></a></p></li>
-<li><p><a class="reference internal" href="../connectors/taps/zuora.html#tap-zuora"><span class="std std-ref">Tap Zuora</span></a></p></li>
-<li><p><a class="reference internal" href="../connectors/taps/github.html#tap-github"><span class="std std-ref">Tap Github</span></a></p></li>
-<li><p><a class="reference internal" href="../connectors/taps/slack.html#tap-slack"><span class="std std-ref">Tap Slack</span></a></p></li>
-<li><p><a class="reference internal" href="../connectors/taps/shopify.html#tap-shopify"><span class="std std-ref">Tap Shopify</span></a></p></li>
-<li><p><a class="reference internal" href="../connectors/taps/mixpanel.html#tap-mixpanel"><span class="std std-ref">Tap Mixpanel</span></a></p></li>
-<li><p><a class="reference internal" href="../connectors/taps/twilio.html#tap-twilio"><span class="std std-ref">Tap Twilio</span></a></p></li>
-<li><p><a class="reference internal" href="../connectors/targets/postgres.html#target-postgres"><span class="std std-ref">Target Postgres</span></a></p></li>
-<li><p><a class="reference internal" href="../connectors/targets/redshift.html#target-redshift"><span class="std std-ref">Target Redshift</span></a></p></li>
-<li><p><a class="reference internal" href="../connectors/targets/snowflake.html#target-snowflake"><span class="std std-ref">Target Snowflake</span></a></p></li>
-<li><p><a class="reference internal" href="../connectors/targets/s3_csv.html#target-s3-csv"><span class="std std-ref">Target S3 CSV</span></a></p></li>
-</ul>
-</div>
+  <section id="different-cases-of-partial-resync">
+<span id="partial-sync-cases"></span><h1>Different cases of partial resync<a class="headerlink" href="#different-cases-of-partial-resync" title="Permalink to this heading"></a></h1>
+<ol class="arabic simple">
+<li><p><strong>Normal</strong></p></li>
+</ol>
+<img alt="../_images/partial_sync_case_1.png" src="../_images/partial_sync_case_1.png" />
+<p>This is the normal case which all source columns exist in the target.
+after exporting data from the source into S3, a temp table will be created on Snowflake and then it will be merged
+with the target table.</p>
+<ol class="arabic simple" start="2">
+<li><p><strong>Some columns are deleted from the target</strong></p></li>
+</ol>
+<img alt="../_images/partial_sync_case_2.png" src="../_images/partial_sync_case_2.png" />
+<p><code class="docutils literal notranslate"><span class="pre">Col2</span></code> is deleted from the target. after merging the temp and target tables only rows 2 and 3 in the target will have
+value.</p>
+<ol class="arabic simple" start="3">
+<li><p><strong>Some columns are deleted from the source</strong></p></li>
+</ol>
+<img alt="../_images/partial_sync_case_3.png" src="../_images/partial_sync_case_3.png" />
+<p>In this example, <code class="docutils literal notranslate"><span class="pre">Col2</span></code> is removed from the source table and it causes the values for this column not be updated in
+the synced table and row <code class="docutils literal notranslate"><span class="pre">3</span></code> has <code class="docutils literal notranslate"><span class="pre">null</span></code> value.</p>
+<ol class="arabic simple" start="4">
+<li><p><strong>Hard delete is disabled (soft delete)</strong></p></li>
+</ol>
+<img alt="../_images/partial_sync_case_4.png" src="../_images/partial_sync_case_4.png" />
+<p>If <code class="docutils literal notranslate"><span class="pre">hard_delete</span></code> setting  is <code class="docutils literal notranslate"><span class="pre">false</span></code> the records which are deleted from the source, won’t be deleted from the target. they
+just will have a time stamp in meta column.</p>
+<ol class="arabic simple" start="5">
+<li><p><strong>Hard delete is enabled</strong></p></li>
+</ol>
+<img alt="../_images/partial_sync_case_5.png" src="../_images/partial_sync_case_5.png" />
+<p>If <code class="docutils literal notranslate"><span class="pre">hard_delete</span></code> setting  is <code class="docutils literal notranslate"><span class="pre">true</span></code> the records which are deleted from the source, will be deleted from the target.</p>
+<ol class="arabic simple" start="6">
+<li><p><strong>Combination of all cases</strong></p></li>
+</ol>
+<img alt="../_images/partial_sync_case_all.png" src="../_images/partial_sync_case_all.png" />
 </section>
 
 
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="../concept/linux_pipes.html" class="btn btn-neutral float-left" title="Linux Pipes in PipelineWise" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="encrypting_passwords.html" class="btn btn-neutral float-right" title="Encrypting Passwords" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="resync.html" class="btn btn-neutral float-left" title="Resync Tables" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../connectors/taps.html" class="btn btn-neutral float-right" title="Taps (Data Sources)" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>
