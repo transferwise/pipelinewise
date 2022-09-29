@@ -451,6 +451,6 @@ def gen_export_filename(
 
 def remove_duplicate_rows_from_csv(file_path: str, primary_keys: list, chunk_size) -> None:
     pandas_obj = reduce(lambda df_i, df_j: pandas.concat([df_i, df_j]).drop_duplicates(
-        subset=primary_keys, keep="last"), pandas.read_csv(file_path, sep=',', chunksize=chunk_size)
+        subset=primary_keys, keep='last'), pandas.read_csv(file_path, sep=',', chunksize=chunk_size)
     )
     pandas_obj.to_csv(file_path, index=False)
