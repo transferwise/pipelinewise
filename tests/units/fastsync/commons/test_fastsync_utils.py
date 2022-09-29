@@ -1,6 +1,7 @@
 import argparse
 import os
 from unittest.mock import patch
+from tempfile import TemporaryDirectory
 
 import pytest
 
@@ -631,3 +632,34 @@ class TestFastSyncUtils(TestCase):
             ),
             'pipelinewise_tap_table_suffix_fastsync_postfix.ext',
         )
+
+    def test_remove_duplicated_rows_from_csv(self):
+        with TemporaryDirectory() as temp_dir:
+            test_file = f'{temp_dir}/test.csv'
+            original_columns = [
+                'COL1,COL2,COL3',
+                '1,11,111',
+                '2,22,222',
+                '1,33,333',
+                '1,11,444',
+                '2,22,foo',
+                '3,33,333'
+            ]
+
+            expected_columns = [
+                'COL1,COL2,COL3',
+                '1,33,333',
+                '1,11,444',
+                '2,22,foo',
+                '3,33,333',
+                ''
+            ]
+            with open(test_file, 'w', encoding='utf8') as test_csv:
+                test_csv.write('\n'.join(original_columns))
+
+            utils.remove_duplicate_rows_from_csv(test_file, ['COL1', 'COL2'])
+            with open(test_file, 'r', encoding='utf8') as fixed_file:
+                actual_columns = fixed_file.read().split('\n')
+
+
+            self.assertListEqual(expected_columns, actual_columns)

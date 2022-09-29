@@ -66,6 +66,8 @@ def sync_table(table_name: str, args: Namespace) -> Union[bool, str]:
             sort_columns=True,
         )
 
+        utils.remove_duplicate_rows_from_csv(filepath, primary_key)
+
         # Load into Postgres table
         postgres.copy_to_table(
             filepath,

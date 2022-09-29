@@ -6,6 +6,9 @@ import logging
 import datetime
 
 from typing import Dict
+
+import pandas
+
 from pipelinewise.cli.utils import generate_random_string
 
 LOGGER = logging.getLogger(__name__)
@@ -443,3 +446,9 @@ def gen_export_filename(
         ext = 'csv.gz'
 
     return f'pipelinewise_{tap_id}_{table}_{suffix}_{sync_type}_{postfix}.{ext}'
+
+
+def remove_duplicate_rows_from_csv(file_path: str, primary_keys: list) -> None:
+    pandas_obj = pandas.read_csv(file_path, sep=',', engine='python')
+    pandas_obj.drop_duplicates(subset=primary_keys, inplace=True, keep="last")
+    pandas_obj.to_csv(file_path, index=False)
