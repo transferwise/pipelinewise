@@ -1,11 +1,10 @@
 import argparse
 import os
-from unittest.mock import patch
-from tempfile import TemporaryDirectory
-
 import pytest
 
 from unittest import TestCase, mock
+from unittest.mock import patch
+from tempfile import TemporaryDirectory
 
 from pipelinewise.fastsync.commons import utils
 from pipelinewise.fastsync.commons.utils import NotSelectedTableException
