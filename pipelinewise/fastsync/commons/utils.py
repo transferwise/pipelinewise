@@ -451,4 +451,4 @@ def gen_export_filename(
 def remove_duplicate_rows_from_csv(file_path: str, primary_keys: list) -> None:
     pandas_obj = pandas.read_csv(file_path, sep=',', engine='python')
     pandas_obj.drop_duplicates(subset=primary_keys, inplace=True, keep='last')
-    pandas_obj.to_csv(file_path, index=False)
+    pandas_obj.to_csv(file_path, index=False)    # pylint: disable=no-member
