@@ -656,7 +656,7 @@ class TestFastSyncUtils(TestCase):
             with open(test_file, 'w', encoding='utf8') as test_csv:
                 test_csv.write('\n'.join(original_columns))
 
-            utils.remove_duplicate_rows_from_csv(test_file, ['COL1', 'COL2'])
+            utils.remove_duplicate_rows_from_csv(test_file, ['COL1', 'COL2'], chunk_size=2)
             with open(test_file, 'r', encoding='utf8') as fixed_file:
                 actual_columns = fixed_file.read().split('\n')
 
