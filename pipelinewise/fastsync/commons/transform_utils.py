@@ -32,6 +32,16 @@ class TransformationType(Enum):
     MASK_STRING_SKIP_ENDS_8 = 'MASK-STRING-SKIP-ENDS-8'
     MASK_STRING_SKIP_ENDS_9 = 'MASK-STRING-SKIP-ENDS-9'
 
+@unique
+class ExternalTransformationType(Enum):
+    """
+    List of external supported transformation types
+    """
+
+    NULL_OR_REDACTED = 'NULL-OR-REDACTED'
+    NULL_OR_REDACTED_SKIP_FIRST = 'NULL-OR-REDACTED-SKIP-FIRST'
+    INTERNAL = 'INTERNAL'
+
 
 @unique
 class SQLFlavor(Enum):
@@ -78,6 +88,11 @@ class TransformationHelper:
 
                 transform_type = TransformationType(trans_item['type'])
 
+                external_type = ExternalTransformationType(trans_item['external_type'])
+
+                param = trans_item['param']
+
+
                 # Make the field id safe in case it's a reserved word
                 column = cls.__safe_column(trans_item['field_id'], sql_flavor)
 
@@ -92,13 +107,29 @@ class TransformationHelper:
                     )
 
                 elif transform_type == TransformationType.HASH:
+                    if external_type == ExternalTransformationType.INTERNAL:
+                        trans_map.append(
+                            {
+                                'trans': cls.__hash_to_sql(column, sql_flavor),
+                                'conditions': conditions,
+                            }
+                        )
+                    elif external_type == ExternalTransformationType.NULL_OR_REDACTED:
+                        trans_map.append(
+                            {
+                                'trans': cls.__null_or_redacted_to_sql(column, sql_flavor),
+                                'conditions': conditions,
+                            }
 
-                    trans_map.append(
-                        {
-                            'trans': cls.__hash_to_sql(column, sql_flavor),
-                            'conditions': conditions,
-                        }
-                    )
+                        )
+                    elif external_type == ExternalTransformationType.NULL_OR_REDACTED_SKIP_FIRST:
+                        trans_map.append(
+                            {
+                                'trans': cls.__null_or_redacted_skip_first_to_sql(column, param, sql_flavor),
+                                'conditions': conditions,
+                            }
+
+                        )
 
                 elif transform_type.value.startswith('HASH-SKIP-FIRST-'):
 
@@ -139,6 +170,15 @@ class TransformationHelper:
                 elif transform_type == TransformationType.MASK_HIDDEN:
                     trans_map.append(
                         {'trans': f"{column} = 'hidden'", 'conditions': conditions}
+                    )
+
+                elif transform_type == TransformationType.NULL_OR_REDACTED:
+                    trans_map.append(
+                        {
+                            'trans': cls.__null_or_redacted_to_sql(
+                                column, sql_flavor
+                            ),
+                            'conditions': conditions}
                     )
 
         return trans_map
@@ -386,5 +426,102 @@ class TransformationHelper:
         else:
             raise NotImplementedError(f'MASK-STRING-SKIP-ENDS transformation in {sql_flavor.value} SQL flavor '
                                       f'not implemented!')
+
+        return trans
+
+    @classmethod
+    # pylint: disable=W0238  # False positive when it is used by another classmethod
+    def __mask_string_skip_ends_to_sql(
+            cls, transform_type: TransformationType, column: str, sql_flavor: SQLFlavor
+    ) -> str:
+        """
+        convert MASK-STRING-SKIP-ENDS-n transformation into the right sql string
+        Args:
+            column: column to apply the masking to
+            sql_flavor: the sql flavor to use
+
+        Raises: NotImplementedError if mask-string-skip-ends is not implemented for the given sql flavor
+
+        Returns: sql string equivalent of the mask-string-skip-ends
+        """
+        skip_ends_n = int(transform_type.value[-1])
+
+        if sql_flavor == SQLFlavor.SNOWFLAKE:
+            trans = '{0} = CASE WHEN LENGTH({0}) > 2 * {1} THEN ' \
+                    'CONCAT(SUBSTRING({0}, 1, {1}), REPEAT(\'*\', LENGTH({0})-(2 * {1})), ' \
+                    'SUBSTRING({0}, LENGTH({0})-{1}+1, {1})) ' \
+                    'ELSE REPEAT(\'*\', LENGTH({0})) END'.format(column, skip_ends_n)
+        elif sql_flavor == SQLFlavor.POSTGRES:
+            trans = '{0} = CASE WHEN LENGTH({0}) > 2 * {1} THEN ' \
+                    'CONCAT(SUBSTRING({0}, 1, {1}), REPEAT(\'*\', LENGTH({0})-(2 * {1})), ' \
+                    'SUBSTRING({0}, LENGTH({0})-{1}+1, {1})) ' \
+                    'ELSE REPEAT(\'*\', LENGTH({0})) END'.format(column, skip_ends_n)
+        elif sql_flavor == SQLFlavor.BIGQUERY:
+            trans = '{0} = CASE WHEN LENGTH({0}) > 2 * {1} THEN ' \
+                    'CONCAT(SUBSTRING({0}, 1, {1}), REPEAT(\'*\', LENGTH({0})-(2 * {1})), ' \
+                    'SUBSTRING({0}, LENGTH({0})-{1}+1, {1})) ' \
+                    'ELSE REPEAT(\'*\', LENGTH({0})) END'.format(column, skip_ends_n)
+        else:
+            raise NotImplementedError(f'MASK-STRING-SKIP-ENDS transformation in {sql_flavor.value} SQL flavor '
+                                      f'not implemented!')
+
+        return trans
+
+    @classmethod
+    # pylint: disable=W0238  # False positive when it is used by another classmethod
+    def __null_or_redacted_to_sql(cls, column: str, sql_flavor: SQLFlavor) -> str:
+        """
+        convert NULL-OR-REDACTED to the right sql string
+        Args:
+            column: column to apply the hash to
+            sql_flavor: the sql flavor to use
+
+        Raises: NotImplementedError if hash is not implemented for the given sql flavor
+
+        Returns: sql string equivalent of the hash
+        """
+        if sql_flavor == SQLFlavor.SNOWFLAKE:
+            trans = f'{column} = CASE WHEN {column} IS NULL THEN NULL ELSE \'<redacted>\' END'
+
+        elif sql_flavor == SQLFlavor.POSTGRES:
+            trans = f'{column} = CASE WHEN {column} IS NULL THEN NULL ELSE \'<redacted>\' END'
+
+        elif sql_flavor == SQLFlavor.BIGQUERY:
+            trans = f'{column} = CASE WHEN {column} IS NULL THEN NULL ELSE \'<redacted>\' END'
+
+        else:
+            raise NotImplementedError(
+                f'NULL-OR-REDACTED transformation in {sql_flavor.value} SQL flavor not implemented!'
+            )
+
+        return trans
+
+    @classmethod
+    # pylint: disable=W0238  # False positive when it is used by another classmethod
+    def __null_or_redacted_skip_first_to_sql(cls, column: str, param: int, sql_flavor: SQLFlavor) -> str:
+        """
+        convert NULL-OR-REDACTED-SKIP-FIRST to the right sql string
+        Args:
+            column: column to apply the hash to
+            param: number of characters to skip
+            sql_flavor: the sql flavor to use
+
+        Raises: NotImplementedError if hash is not implemented for the given sql flavor
+
+        Returns: sql string equivalent of the hash
+        """
+        if sql_flavor == SQLFlavor.SNOWFLAKE:
+            trans = f'{column} = CASE WHEN {column} IS NULL THEN NULL ELSE SUBSTR({column}, 1, {param}) || \'<redacted>\' END'
+
+        elif sql_flavor == SQLFlavor.POSTGRES:
+            trans = f'{column} = CASE WHEN {column} IS NULL THEN NULL ELSE SUBSTR({column}, 1, {param}) || \'<redacted>\' END'
+
+        elif sql_flavor == SQLFlavor.BIGQUERY:
+            trans = f'{column} = CASE WHEN {column} IS NULL THEN NULL ELSE SUBSTR({column}, 1, {param}) || \'<redacted>\' END'
+
+        else:
+            raise NotImplementedError(
+                f'NULL-OR-REDACTED transformation in {sql_flavor.value} SQL flavor not implemented!'
+            )
 
         return trans
