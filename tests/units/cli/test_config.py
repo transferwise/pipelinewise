@@ -7,6 +7,7 @@ from pipelinewise.cli.config import Config
 from pipelinewise.cli.errors import InvalidConfigException
 
 PIPELINEWISE_TEST_HOME = '/tmp/.pipelinewise'
+PIPELINEWISE_TEST_TEMP_DIR = '/tmp/pipelinewise_tmp'
 
 
 # Todo: Inherit from unittest.TestCase
@@ -208,10 +209,10 @@ class TestConfig:
 
     def test_getters(self):
         """Test Config getter functions"""
-        config = Config(PIPELINEWISE_TEST_HOME)
+        config = Config(PIPELINEWISE_TEST_HOME, PIPELINEWISE_TEST_TEMP_DIR)
 
         # Target and tap directory should be g
-        assert config.get_temp_dir() == '{}/tmp'.format(PIPELINEWISE_TEST_HOME)
+        assert config.temp_dir == PIPELINEWISE_TEST_TEMP_DIR
         assert config.get_target_dir('test-target-id') == '{}/test-target-id'.format(
             PIPELINEWISE_TEST_HOME
         )
