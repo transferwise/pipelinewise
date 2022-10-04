@@ -4,7 +4,6 @@ import re
 import time
 import shutil
 import psutil
-import pidfile
 import pytest
 
 from pathlib import Path
@@ -614,7 +613,7 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
         # Stop tap command should stop all the child processes
         # 1. Start the pipelinewise mock executable that's running
         #    linux piped dummy tap and target connectors
-        with pidfile.PIDFile(pipelinewise.tap['files']['pidfile']):
+        with pipelinewise.get_lock('target_one', 'tap_one'):
             os.spawnl(
                 os.P_NOWAIT,
                 f'{RESOURCES_DIR}/test_stop_tap/scheduler-mock.sh',
