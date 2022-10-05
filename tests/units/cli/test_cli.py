@@ -613,6 +613,7 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
         # Stop tap command should stop all the child processes
         # 1. Start the pipelinewise mock executable that's running
         #    linux piped dummy tap and target connectors
+        pipelinewise.target = {'id': 'target_one'}
         with pipelinewise.get_lock('target_one', 'tap_one'):
             os.spawnl(
                 os.P_NOWAIT,
