@@ -82,7 +82,7 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
         filepath = os.path.join(args.temp_dir, filename)
         target_schema = utils.get_target_schema(args.target, table)
 
-        # Open connection and get binlog file position
+        # Open connections
         mysql.open_connections()
 
         # Get bookmark - Binlog position or Incremental Key value
@@ -90,11 +90,13 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
 
         # Exporting table data, get table definitions and close connection to avoid timeouts
         mysql.copy_table(table, filepath)
-        size_bytes = os.path.getsize(filepath)
         postgres_types = mysql.map_column_types_to_target(table)
+
+        mysql.close_connections()
+
+        size_bytes = os.path.getsize(filepath)
         postgres_columns = postgres_types.get('columns', [])
         primary_key = postgres_types.get('primary_key')
-        mysql.close_connections()
 
         # Creating temp table in Postgres
         postgres.drop_table(target_schema, table, is_temporary=True)
@@ -133,6 +135,9 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
         LOGGER.exception(exc)
         return '{}: {}'.format(table, exc)
 
+    finally:
+        # try closing connections again just in case, silence errors
+        mysql.close_connections(silent=True)
 
 def main_impl():
     """Main sync logic"""
