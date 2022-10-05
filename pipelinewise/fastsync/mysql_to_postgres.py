@@ -139,6 +139,7 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
         # try closing connections again just in case, silence errors
         mysql.close_connections(silent=True)
 
+
 def main_impl():
     """Main sync logic"""
     args = utils.parse_args(REQUIRED_CONFIG_KEYS)
