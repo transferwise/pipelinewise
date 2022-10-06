@@ -1481,7 +1481,6 @@ class PipelineWise:
                         stream_buffer_size=stream_buffer_size,
                     )
 
-
         except pidfile.AlreadyRunningError:
             self.logger.error('Another instance of the tap is already running.')
             sys.exit(1)
