@@ -91,7 +91,7 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
         filepath = os.path.join(args.temp_dir, filename)
         target_schema = utils.get_target_schema(args.target, table)
 
-        # Open connection and get binlog file position
+        # Open connections
         mysql.open_connections()
 
         # Get bookmark - Binlog position or Incremental Key value
@@ -105,12 +105,14 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
             split_file_chunk_size_mb=args.target.get('split_file_chunk_size_mb'),
             split_file_max_chunks=args.target.get('split_file_max_chunks'),
         )
+        snowflake_types = mysql.map_column_types_to_target(table)
+
+        mysql.close_connections()
+
         file_parts = glob.glob(f'{filepath}*')
         size_bytes = sum([os.path.getsize(file_part) for file_part in file_parts])
-        snowflake_types = mysql.map_column_types_to_target(table)
         snowflake_columns = snowflake_types.get('columns', [])
         primary_key = snowflake_types.get('primary_key')
-        mysql.close_connections()
 
         # Uploading to S3
         s3_keys = []
@@ -169,6 +171,10 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
     except Exception as exc:
         LOGGER.exception(exc)
         return '{}: {}'.format(table, exc)
+
+    finally:
+        # try closing connections again just in case, silence errors
+        mysql.close_connections(silent=True)
 
 
 def main_impl():

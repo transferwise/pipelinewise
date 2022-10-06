@@ -93,11 +93,12 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
 
         # Exporting table data, get table definitions and close connection to avoid timeouts
         mysql.copy_table(table, filepath)
-        size_bytes = os.path.getsize(filepath)
         redshift_types = mysql.map_column_types_to_target(table)
+        mysql.close_connections()
+
+        size_bytes = os.path.getsize(filepath)
         redshift_columns = redshift_types.get('columns', [])
         primary_key = redshift_types.get('primary_key')
-        mysql.close_connections()
 
         # Uploading to S3
         s3_key = redshift.upload_to_s3(filepath)
@@ -138,6 +139,9 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
     except Exception as exc:
         LOGGER.exception(exc)
         return '{}: {}'.format(table, exc)
+    finally:
+        # try closing connections again just in case, silence errors
+        mysql.close_connections(silent=True)
 
 
 def main_impl():

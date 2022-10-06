@@ -86,11 +86,12 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
         mysql.copy_table(
             table, filepath, compress=False, max_num=MAX_NUM, date_type='datetime'
         )
+        bigquery_types = mysql.map_column_types_to_target(table)
+        mysql.close_connections()
+
         file_parts = glob.glob(f'{filepath}*')
         size_bytes = sum([os.path.getsize(file_part) for file_part in file_parts])
-        bigquery_types = mysql.map_column_types_to_target(table)
         bigquery_columns = bigquery_types.get('columns', [])
-        mysql.close_connections()
 
         # Creating temp table in Bigquery
         bigquery.create_schema(target_schema)
@@ -134,6 +135,9 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
     except Exception as exc:
         LOGGER.exception(exc)
         return '{}: {}'.format(table, exc)
+    finally:
+        # try closing connections again just in case, silence errors
+        mysql.close_connections(silent=True)
 
 
 def main_impl():
