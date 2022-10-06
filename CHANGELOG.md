@@ -1,3 +1,10 @@
+0.48.6 (2022-10-06)
+-------------------
+
+- Bump `joblib` from `1.1.0` to `1.2.0`
+- Bugfix for closing `MySQL`/`MariaDB` conenctions in `FastSync`
+- Removing `FastSync` from `s3-csv` and using only `singer`
+
 0.48.5 (2022-09-22)
 -------------------
 
