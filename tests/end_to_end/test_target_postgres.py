@@ -368,15 +368,15 @@ class TestTargetPostgres:
                 ],
             )
 
-        # 1. Run tap first time - both fastsync and a singer should be triggered
+        # 1. Run tap first time - singer should be triggered
         assertions.assert_run_tap_success(
-            TAP_S3_CSV_ID, TARGET_ID, ['fastsync', 'singer']
+            TAP_S3_CSV_ID, TARGET_ID, ['singer']
         )
         assert_columns_exist()
 
-        # 2. Run tap second time - both fastsync and a singer should be triggered
+        # 2. Run tap second time - singer should be triggered
         assertions.assert_run_tap_success(
-            TAP_S3_CSV_ID, TARGET_ID, ['fastsync', 'singer']
+            TAP_S3_CSV_ID, TARGET_ID, ['singer']
         )
         assert_columns_exist()
 

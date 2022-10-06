@@ -1470,6 +1470,9 @@ class PipelineWise:
                     )
 
                 else:
+                    self.tap_run_log_file = os.path.join(
+                        log_dir, f'{target_id}-{tap_id}-{current_time}.singer.log'
+                    )
                     stream_buffer_size = self.tap.get(
                         'stream_buffer_size', commands.DEFAULT_STREAM_BUFFER_SIZE
                     )
