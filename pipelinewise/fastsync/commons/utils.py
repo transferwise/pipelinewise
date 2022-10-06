@@ -6,10 +6,6 @@ import logging
 import datetime
 
 from typing import Dict
-from functools import reduce
-
-import pandas
-
 from pipelinewise.cli.utils import generate_random_string
 
 LOGGER = logging.getLogger(__name__)
