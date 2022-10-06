@@ -1,10 +1,9 @@
 import argparse
 import os
-from unittest.mock import patch
-
 import pytest
 
 from unittest import TestCase, mock
+from unittest.mock import patch
 
 from pipelinewise.fastsync.commons import utils
 from pipelinewise.fastsync.commons.utils import NotSelectedTableException

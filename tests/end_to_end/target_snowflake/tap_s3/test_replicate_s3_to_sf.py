@@ -49,14 +49,14 @@ class TestReplicateS3ToSF(TapS3):
         Replicate csv files from s3 to Snowflake, check if return code is zero and success log file created
         """
 
-        # 1. Run tap first time - both fastsync and a singer should be triggered
+        # 1. Run tap first time - singer should be triggered
         assertions.assert_run_tap_success(
-            self.tap_id, self.target_id, ['fastsync', 'singer']
+            self.tap_id, self.target_id, ['singer']
         )
         self.assert_columns_exist()
 
-        # 2. Run tap second time - both fastsync and a singer should be triggered
+        # 2. Run tap second time - singer should be triggered
         assertions.assert_run_tap_success(
-            self.tap_id, self.target_id, ['fastsync', 'singer']
+            self.tap_id, self.target_id, ['singer']
         )
         self.assert_columns_exist()
