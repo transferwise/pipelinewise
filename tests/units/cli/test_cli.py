@@ -89,6 +89,26 @@ class TestCli:
             pipelinewise.sync_tables()
         mocked_fastsync.assert_called_once()
 
+    def _assert_import_command(self, args):
+        if args.taps == '*':
+            expected_taps = ['tap_one', 'tap_two', 'tap_three']
+            expected_save_arg = ['*']
+        else:
+            expected_save_arg = expected_taps = args.taps.split(',')
+
+        with patch.object(PipelineWise, 'discover_tap') as mocked_parallel:
+            with patch.object(Config, 'save') as mocked_config_save:
+                pipelinewise = PipelineWise(args, CONFIG_DIR, VIRTUALENVS_DIR)
+                mocked_parallel.return_value = None
+
+                pipelinewise.import_project()
+
+                mocked_config_save.assert_called_with(expected_save_arg)
+
+                assert mocked_parallel.call_count == len(expected_taps)
+                for call_arg in mocked_parallel.call_args_list:
+                    assert call_arg[1]['tap']['id'] in expected_taps
+
     def test_target_dir(self):
         """Singer target connector config path must be relative to the project config dir"""
         assert self.pipelinewise.get_target_dir(
@@ -552,6 +572,16 @@ class TestCli:
             pipelinewise.init()
         assert pytest_wrapped_e.type == SystemExit
         assert pytest_wrapped_e.value.code == 1
+
+    def test_command_import_all_taps(self):
+        """Test import command for all taps"""
+        args = CliArgs(dir=f'{os.path.dirname(__file__)}/resources/test_import_command')
+        self._assert_import_command(args)
+
+    def test_command_import_selected_taps(self):
+        """Test import command for selected taps"""
+        args = CliArgs(dir=f'{os.path.dirname(__file__)}/resources/test_import_command', taps='tap_one,tap_three')
+        self._assert_import_command(args)
 
     def test_command_status(self, capsys):
         """Test status command output"""

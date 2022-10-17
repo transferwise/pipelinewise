@@ -1597,7 +1597,8 @@ class PipelineWise:
         # Read the YAML config files and transform/save into singer compatible
         # JSON files in a common directory structure
         config = Config.from_yamls(self.config_dir, self.args.dir, self.args.secret)
-        config.save()
+        selected_taps_id = self.args.taps.split(',')
+        config.save(selected_taps_id)
 
         # Activating tap stream selections
         #
@@ -1618,7 +1619,17 @@ class PipelineWise:
         start_time = datetime.now()
         for target in config.targets.values():
             total_targets += 1
-            total_taps += len(target.get('taps'))
+            selected_taps = []
+
+            if selected_taps_id == ['*']:
+                total_taps += len(target.get('taps'))
+                selected_taps = target.get('taps')
+
+            else:
+                for tap in target.get('taps'):
+                    if tap['id'] in selected_taps_id:
+                        total_taps += 1
+                        selected_taps.append(tap)
 
             with parallel_backend('threading', n_jobs=-1):
                 # Discover taps in parallel and return the list of exception of the failed ones
@@ -1628,7 +1639,7 @@ class PipelineWise:
                             None,
                             Parallel(verbose=100)(
                                 delayed(self.discover_tap)(tap=tap, target=target)
-                                for tap in target.get('taps')
+                                for tap in selected_taps
                             ),
                         )
                     )

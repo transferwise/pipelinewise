@@ -11,6 +11,7 @@ class CliArgs:
         self,
         target='*',
         tap='*',
+        taps='*',
         tables=None,
         dir='*',
         name='*',
@@ -23,6 +24,7 @@ class CliArgs:
     ):
         self.target = target
         self.tap = tap
+        self.taps = taps
         self.tables = tables
         self.dir = dir
         self.name = name
