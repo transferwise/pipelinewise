@@ -16,6 +16,24 @@ class TestConfig:
     Unit Tests for PipelineWise CLI Config class
     """
 
+    @staticmethod
+    def _get_config(json_config_dir, yaml_path):
+        # Load a full configuration set from YAML files
+        yaml_config_dir = f'{os.path.dirname(__file__)}/resources/{yaml_path}'
+        vault_secret = f'{os.path.dirname(__file__)}/resources/vault-secret.txt'
+        return Config.from_yamls(json_config_dir, yaml_config_dir, vault_secret)
+
+    @staticmethod
+    def _get_json_files_path(tap_id, json_config_dir):
+        return {
+            'main_config_json': f'{json_config_dir}/config.json',
+            'target_config_json': f'{json_config_dir}/test_snowflake_target/config.json',
+            'tap_config_json': f'{json_config_dir}/test_snowflake_target/{tap_id}/config.json',
+            'tap_inheritable_config_json': f'{json_config_dir}/test_snowflake_target/{tap_id}/inheritable_config.json',
+            'tap_selection_json': f'{json_config_dir}/test_snowflake_target/{tap_id}/selection.json',
+            'tap_transformation_json': f'{json_config_dir}/test_snowflake_target/{tap_id}/transformation.json',
+        }
+
     def test_constructor(self):
         """Test Config construction functions"""
         config = Config(PIPELINEWISE_TEST_HOME)
@@ -232,44 +250,16 @@ class TestConfig:
     def test_save_config(self):
         """Test config target and tap JSON save functionalities"""
 
-        # Load a full configuration set from YAML files
-        yaml_config_dir = '{}/resources/test_yaml_config'.format(
-            os.path.dirname(__file__)
-        )
-        vault_secret = '{}/resources/vault-secret.txt'.format(os.path.dirname(__file__))
-
         json_config_dir = './pipelinewise-test-config'
-        config = Config.from_yamls(json_config_dir, yaml_config_dir, vault_secret)
 
+        config = self._get_config(json_config_dir, yaml_path='test_yaml_config')
         # Save the config as singer compatible JSON files
         config.save()
 
-        # Check if every required JSON file created, both for target and tap
-        main_config_json = '{}/config.json'.format(json_config_dir)
-        target_config_json = '{}/test_snowflake_target/config.json'.format(
-            json_config_dir
-        )
-        tap_config_json = '{}/test_snowflake_target/mysql_sample/config.json'.format(
-            json_config_dir
-        )
-        tap_inheritable_config_json = (
-            '{}/test_snowflake_target/mysql_sample/inheritable_config.json'.format(
-                json_config_dir
-            )
-        )
-        tap_selection_json = (
-            '{}/test_snowflake_target/mysql_sample/selection.json'.format(
-                json_config_dir
-            )
-        )
-        tap_transformation_json = (
-            '{}/test_snowflake_target/mysql_sample/transformation.json'.format(
-                json_config_dir
-            )
-        )
+        json_files = self._get_json_files_path('mysql_sample', json_config_dir)
 
         # Check content of the generated JSON files
-        assert cli.utils.load_json(main_config_json) == {
+        assert cli.utils.load_json(json_files['main_config_json']) == {
             'alert_handlers': {
                 'slack': {
                     'token': 'Vault Encrypted Secret Fruit',
@@ -296,7 +286,7 @@ class TestConfig:
                 }
             ],
         }
-        assert cli.utils.load_json(target_config_json) == {
+        assert cli.utils.load_json(json_files['target_config_json']) == {
             'account': 'account',
             'aws_access_key_id': 'access_key_id',
             'aws_secret_access_key': 'secret_access_key',
@@ -310,15 +300,15 @@ class TestConfig:
             'user': 'user',
             'warehouse': 'MY_WAREHOUSE',
         }
-        assert cli.utils.load_json(tap_config_json) == {
+        assert cli.utils.load_json(json_files['tap_config_json']) == {
             'dbname': '<DB_NAME>',
             'host': '<HOST>',
             'port': 3306,
             'user': '<USER>',
             'password': '<PASSWORD>',
-            'server_id': cli.utils.load_json(tap_config_json)['server_id'],
+            'server_id': cli.utils.load_json(json_files['tap_config_json'])['server_id'],
         }
-        assert cli.utils.load_json(tap_selection_json) == {
+        assert cli.utils.load_json(json_files['tap_selection_json']) == {
             'selection': [
                 {
                     'replication_key': 'last_update',
@@ -328,8 +318,8 @@ class TestConfig:
                 {'replication_method': 'LOG_BASED', 'tap_stream_id': 'my_db-table_two'},
             ]
         }
-        assert cli.utils.load_json(tap_transformation_json) == {'transformations': []}
-        assert cli.utils.load_json(tap_inheritable_config_json) == {
+        assert cli.utils.load_json(json_files['tap_transformation_json']) == {'transformations': []}
+        assert cli.utils.load_json(json_files['tap_inheritable_config_json']) == {
             'batch_size_rows': 20000,
             'batch_wait_limit_seconds': 3600,
             'data_flattening_max_level': 0,
@@ -361,45 +351,15 @@ class TestConfig:
 
     def test_save_config_selected_tap(self):
         """Test config target and tap JSON save functionalities if specific taps are selected"""
-
-        # Load a full configuration set from YAML files
-        yaml_config_dir = '{}/resources/test_yaml_config_selected_tap'.format(
-            os.path.dirname(__file__)
-        )
-        vault_secret = '{}/resources/vault-secret.txt'.format(os.path.dirname(__file__))
-
         json_config_dir = './pipelinewise-test-config'
-        config = Config.from_yamls(json_config_dir, yaml_config_dir, vault_secret)
+        config = self._get_config(json_config_dir, yaml_path='test_yaml_config_selected_tap')
+        json_files = self._get_json_files_path('tap_two', json_config_dir)
 
         # Save the config as singer compatible JSON files
         config.save(['tap_two'])
 
-        # Check if every required JSON file created, both for target and tap
-        main_config_json = '{}/config.json'.format(json_config_dir)
-        target_config_json = '{}/test_snowflake_target/config.json'.format(
-            json_config_dir
-        )
-        tap_config_json = '{}/test_snowflake_target/tap_two/config.json'.format(
-            json_config_dir
-        )
-        tap_inheritable_config_json = (
-            '{}/test_snowflake_target/tap_two/inheritable_config.json'.format(
-                json_config_dir
-            )
-        )
-        tap_selection_json = (
-            '{}/test_snowflake_target/tap_two/selection.json'.format(
-                json_config_dir
-            )
-        )
-        tap_transformation_json = (
-            '{}/test_snowflake_target/tap_two/transformation.json'.format(
-                json_config_dir
-            )
-        )
-
         # Check content of the generated JSON files
-        generated_json_content = cli.utils.load_json(main_config_json)
+        generated_json_content = cli.utils.load_json(json_files['main_config_json'])
         assert generated_json_content.get('alert_handlers') == {
             'slack': {
                 'token': 'Vault Encrypted Secret Fruit',
@@ -410,7 +370,7 @@ class TestConfig:
         generated_targets = generated_json_content.get('targets')
         generated_targets_taps = generated_targets[0].pop('taps')
 
-        assert generated_targets == [
+        assert generated_json_content.get('targets') == [
             {
                 'id': 'test_snowflake_target',
                 'type': 'target-snowflake',
@@ -443,7 +403,7 @@ class TestConfig:
         for tap in expected_generated_taps:
             assert tap in generated_targets_taps
 
-        assert cli.utils.load_json(target_config_json) == {
+        assert cli.utils.load_json(json_files['target_config_json']) == {
             'account': 'account',
             'aws_access_key_id': 'access_key_id',
             'aws_secret_access_key': 'secret_access_key',
@@ -457,15 +417,15 @@ class TestConfig:
             'user': 'user',
             'warehouse': 'MY_WAREHOUSE',
         }
-        assert cli.utils.load_json(tap_config_json) == {
+        assert cli.utils.load_json(json_files['tap_config_json']) == {
             'dbname': '<DB_NAME>',
             'host': '<HOST>',
             'port': 3306,
             'user': '<USER>',
             'password': '<PASSWORD>',
-            'server_id': cli.utils.load_json(tap_config_json)['server_id'],
+            'server_id': cli.utils.load_json(json_files['tap_config_json'])['server_id'],
         }
-        assert cli.utils.load_json(tap_selection_json) == {
+        assert cli.utils.load_json(json_files['tap_selection_json']) == {
             'selection': [
                 {
                     'replication_key': 'last_update',
@@ -475,8 +435,8 @@ class TestConfig:
                 {'replication_method': 'LOG_BASED', 'tap_stream_id': 'my_db-table_two'},
             ]
         }
-        assert cli.utils.load_json(tap_transformation_json) == {'transformations': []}
-        assert cli.utils.load_json(tap_inheritable_config_json) == {
+        assert cli.utils.load_json(json_files['tap_transformation_json']) == {'transformations': []}
+        assert cli.utils.load_json(json_files['tap_inheritable_config_json']) == {
             'batch_size_rows': 20000,
             'batch_wait_limit_seconds': 3600,
             'data_flattening_max_level': 0,
@@ -503,14 +463,13 @@ class TestConfig:
             'archive_load_files': False,
         }
 
-
-        # Assert only tap_two is created
-        tap_one_existance = os.path.exists(f'{json_config_dir}/test_snowflake_target/tap_one')
+        tap_one_existence = os.path.exists(f'{json_config_dir}/test_snowflake_target/tap_one')
 
         # Delete the generated JSON config directory
         shutil.rmtree(json_config_dir)
 
-        assert tap_one_existance == False
+        # Assert only tap_two is created
+        assert tap_one_existence is False
 
     def test_save_config_with_optional_slack_channel_for_alerts(self):
         """Test config target and tap JSON save functionalities if there is a optional setting for slack channel"""
