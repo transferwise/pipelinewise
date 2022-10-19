@@ -352,7 +352,7 @@ class TestConfig:
     def test_save_config_selected_tap(self):
         """Test config target and tap JSON save functionalities if specific taps are selected"""
         json_config_dir = './pipelinewise-test-config'
-        config = self._get_config(json_config_dir, yaml_path='test_yaml_config_selected_tap')
+        config = self._get_config(json_config_dir, yaml_path='test_import_command')
         json_files = self._get_json_files_path('tap_two', json_config_dir)
 
         # Save the config as singer compatible JSON files
@@ -360,13 +360,7 @@ class TestConfig:
 
         # Check content of the generated JSON files
         generated_json_content = cli.utils.load_json(json_files['main_config_json'])
-        assert generated_json_content.get('alert_handlers') == {
-            'slack': {
-                'token': 'Vault Encrypted Secret Fruit',
-                'channel': '#slack-channel',
-            }
-        }
-
+        
         generated_targets = generated_json_content.get('targets')
         generated_targets_taps = generated_targets[0].pop('taps')
 
@@ -391,6 +385,15 @@ class TestConfig:
             },
             {
                 'id': 'tap_two',
+                'type': 'tap-mysql',
+                'name': 'Sample MySQL Database',
+                'owner': 'somebody@foo.com',
+                'stream_buffer_size': None,
+                'send_alert': True,
+                'enabled': True,
+            },
+            {
+                'id': 'tap_three',
                 'type': 'tap-mysql',
                 'name': 'Sample MySQL Database',
                 'owner': 'somebody@foo.com',
