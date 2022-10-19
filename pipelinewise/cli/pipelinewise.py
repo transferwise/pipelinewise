@@ -1648,6 +1648,7 @@ class PipelineWise:
                 )
 
         # Log summary
+
         if selected_taps_id != ['*']:
             not_found_taps = set(selected_taps_id) - found_selected_taps
             for tap in not_found_taps:
