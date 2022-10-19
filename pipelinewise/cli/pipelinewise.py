@@ -1614,6 +1614,7 @@ class PipelineWise:
         total_targets = 0
         total_taps = 0
         discover_excs = []
+        found_selected_taps = set()
 
         # Import every tap from every target
         start_time = datetime.now()
@@ -1626,10 +1627,11 @@ class PipelineWise:
                 selected_taps = target.get('taps')
 
             else:
+                total_taps = len(selected_taps_id)
                 for tap in target.get('taps'):
                     if tap['id'] in selected_taps_id:
-                        total_taps += 1
                         selected_taps.append(tap)
+                        found_selected_taps.add(tap['id'])
 
             with parallel_backend('threading', n_jobs=-1):
                 # Discover taps in parallel and return the list of exception of the failed ones
@@ -1646,6 +1648,11 @@ class PipelineWise:
                 )
 
         # Log summary
+        if selected_taps_id != ['*']:
+            not_found_taps = set(selected_taps_id) - found_selected_taps
+            for tap in not_found_taps:
+                discover_excs.append(f'tap "{tap}" not found!')
+
         end_time = datetime.now()
         # pylint: disable=logging-too-many-args
         self.logger.info(
