@@ -360,7 +360,7 @@ class TestConfig:
 
         # Check content of the generated JSON files
         generated_json_content = cli.utils.load_json(json_files['main_config_json'])
-        
+
         generated_targets = generated_json_content.get('targets')
         generated_targets_taps = generated_targets[0].pop('taps')
 
