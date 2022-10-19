@@ -1,3 +1,9 @@
+0.48.7 (2022-10-19)
+-------------------
+
+- Bump `pipelinewise-tap-kafka` from `7.1.0` to `7.1.2`
+  - Introducing the use of the seek method to reset the source partition offsets at the start of a run
+
 0.48.6 (2022-10-06)
 -------------------
 
