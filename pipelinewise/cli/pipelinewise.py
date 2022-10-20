@@ -1625,9 +1625,7 @@ class PipelineWise:
             if selected_taps_id == ['*']:
                 total_taps += len(target.get('taps'))
                 selected_taps = target.get('taps')
-
             else:
-                total_taps = len(selected_taps_id)
                 for tap in target.get('taps'):
                     if tap['id'] in selected_taps_id:
                         selected_taps.append(tap)
@@ -1650,6 +1648,7 @@ class PipelineWise:
         # Log summary
 
         if selected_taps_id != ['*']:
+            total_taps = len(selected_taps_id)
             not_found_taps = set(selected_taps_id) - found_selected_taps
             for tap in not_found_taps:
                 discover_excs.append(f'tap "{tap}" not found!')
