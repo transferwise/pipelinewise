@@ -122,6 +122,9 @@ the tap and target connectors into ``~/.pipelinewise``.
 
 :--dir: relative path to the project directory to import
 
+:--taps: Optional: Comma seperated list of tap id's to create.
+
+
 .. _cli_validate:
 
 validate
