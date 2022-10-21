@@ -1597,7 +1597,8 @@ class PipelineWise:
         # Read the YAML config files and transform/save into singer compatible
         # JSON files in a common directory structure
         config = Config.from_yamls(self.config_dir, self.args.dir, self.args.secret)
-        config.save()
+        selected_taps_id = self.args.taps.split(',')
+        config.save(selected_taps_id)
 
         # Activating tap stream selections
         #
@@ -1613,12 +1614,22 @@ class PipelineWise:
         total_targets = 0
         total_taps = 0
         discover_excs = []
+        found_selected_taps = set()
 
         # Import every tap from every target
         start_time = datetime.now()
         for target in config.targets.values():
             total_targets += 1
-            total_taps += len(target.get('taps'))
+            selected_taps = []
+
+            if selected_taps_id == ['*']:
+                total_taps += len(target.get('taps'))
+                selected_taps = target.get('taps')
+            else:
+                for tap in target.get('taps'):
+                    if tap['id'] in selected_taps_id:
+                        selected_taps.append(tap)
+                        found_selected_taps.add(tap['id'])
 
             with parallel_backend('threading', n_jobs=-1):
                 # Discover taps in parallel and return the list of exception of the failed ones
@@ -1628,13 +1639,20 @@ class PipelineWise:
                             None,
                             Parallel(verbose=100)(
                                 delayed(self.discover_tap)(tap=tap, target=target)
-                                for tap in target.get('taps')
+                                for tap in selected_taps
                             ),
                         )
                     )
                 )
 
         # Log summary
+
+        if selected_taps_id != ['*']:
+            total_taps = len(selected_taps_id)
+            not_found_taps = set(selected_taps_id) - found_selected_taps
+            for tap in not_found_taps:
+                discover_excs.append(f'tap "{tap}" not found!')
+
         end_time = datetime.now()
         # pylint: disable=logging-too-many-args
         self.logger.info(

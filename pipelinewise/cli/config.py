@@ -6,7 +6,7 @@ import os
 import sys
 import json
 
-from typing import Dict, List
+from typing import Dict, List, Union
 
 from pipelinewise.utils import safe_column_name
 from . import utils
@@ -159,7 +159,7 @@ class Config:
             'pidfile': os.path.join(connector_dir, 'pipelinewise.pid'),
         }
 
-    def save(self):
+    def save(self, selected_taps: Union[None, List] = None):
         """
         Generating pipelinewise configuration directory layout on the disk.
 
@@ -167,6 +167,7 @@ class Config:
         into a common directory structure and usually deployed into
         ~/.pipelinewise
         """
+        selected_taps_list = selected_taps if selected_taps else ['*']
         self.logger.info('SAVING CONFIG')
         self.save_main_config_json()
 
@@ -176,10 +177,11 @@ class Config:
 
             # Save every tap JSON files
             for tap in target['taps']:
-                extra_config_keys = utils.get_tap_extra_config_keys(
-                    tap, self.get_temp_dir()
-                )
-                self.save_tap_jsons(target, tap, extra_config_keys)
+                if tap['id'] in selected_taps_list or selected_taps_list == ['*']:
+                    extra_config_keys = utils.get_tap_extra_config_keys(
+                        tap, self.get_temp_dir()
+                    )
+                    self.save_tap_jsons(target, tap, extra_config_keys)
 
     def save_main_config_json(self):
         """

@@ -208,6 +208,7 @@ def main():
     parser.add_argument('command', type=str, choices=COMMANDS)
     parser.add_argument('--target', type=str, default='*', help='"Name of the target')
     parser.add_argument('--tap', type=str, default='*', help='Name of the tap')
+    parser.add_argument('--taps', type=str, default='*', help='Comma separated list of tap IDs to import')
     parser.add_argument('--tables', type=str, help='List of tables to sync')
     parser.add_argument(
         '--dir', type=str, default='*', help='Path to directory with config'
