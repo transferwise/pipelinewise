@@ -1,3 +1,7 @@
+0.48.8 (2022-10-27)
+-------------------
+- Added `taps` option for `import` command to make it possible for importing specific taps.
+
 0.48.7 (2022-10-19)
 -------------------
 
