@@ -72,7 +72,7 @@ services:
   db_postgres_source:
     build:
       context: ./pg
-      dockerfile: pg/Dockerfile
+      dockerfile: Dockerfile
     container_name: pipelinewise_dev_postgres_source
     # Making some logical decoding adjustments
     command: -c "wal_level=logical" -c "max_replication_slots=5" -c "max_wal_senders=5"
