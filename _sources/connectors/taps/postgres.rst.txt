@@ -8,8 +8,6 @@ Tap PostgreSQL
 PostgreSQL setup requirements
 '''''''''''''''''''''''''''''
 
-*(Section based on Stitch documentation)*
-
 **Step 1: Check if you have all the required credentials for replicating data from PostgreSQL**
 
 * ``CREATEROLE`` or ``SUPERUSER`` privilege - Either permission is required to create a database user for PipelineWise.
@@ -59,7 +57,9 @@ In order for pipelinewise user to automatically be able to access any tables cre
 
 **Step 3.1: Install the wal2json plugin**
 
-To use :ref:`log_based` for your PostgreSQL integration, you must install the `wal2json <https://github.com/eulerto/wal2json>`_ plugin. The wal2json plugin outputs JSON objects for logical decoding, which Stitch then uses to perform Log-based Replication.
+To use :ref:`log_based` for your PostgreSQL integration, you must install the `wal2json <https://github
+.com/eulerto/wal2json>`_ plugin that has support for format-version=2 (wal2json >= 2.3). The wal2json plugin outputs
+JSON objects for logical decoding, which the tap then uses to perform Log-based Replication.
 
 Steps for installing the plugin vary depending on your operating system. Instructions for each operating system type are in the wal2json’s GitHub repository:
 

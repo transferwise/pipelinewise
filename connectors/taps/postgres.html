@@ -124,9 +124,9 @@
         <div class="rst-content">
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
-      <li><a href="../../index.html" class="icon icon-home"></a> &raquo;</li>
-          <li><a href="../taps.html">Taps (Data Sources)</a> &raquo;</li>
-      <li>Tap PostgreSQL</li>
+      <li><a href="../../index.html" class="icon icon-home"></a></li>
+          <li class="breadcrumb-item"><a href="../taps.html">Taps (Data Sources)</a></li>
+      <li class="breadcrumb-item active">Tap PostgreSQL</li>
       <li class="wy-breadcrumbs-aside">
             <a href="../../_sources/connectors/taps/postgres.rst.txt" rel="nofollow"> View page source</a>
       </li>
@@ -140,7 +140,6 @@
 <span id="tap-postgres"></span><h1>Tap PostgreSQL<a class="headerlink" href="#tap-postgresql" title="Permalink to this heading"></a></h1>
 <section id="postgresql-setup-requirements">
 <h2>PostgreSQL setup requirements<a class="headerlink" href="#postgresql-setup-requirements" title="Permalink to this heading"></a></h2>
-<p><em>(Section based on Stitch documentation)</em></p>
 <p><strong>Step 1: Check if you have all the required credentials for replicating data from PostgreSQL</strong></p>
 <ul class="simple">
 <li><p><code class="docutils literal notranslate"><span class="pre">CREATEROLE</span></code> or <code class="docutils literal notranslate"><span class="pre">SUPERUSER</span></code> privilege - Either permission is required to create a database user for PipelineWise.</p></li>
@@ -182,7 +181,8 @@ on the database, schema and tables that you want to replicate:</p>
 </ul>
 </div>
 <p><strong>Step 3.1: Install the wal2json plugin</strong></p>
-<p>To use <a class="reference internal" href="../../concept/replication_methods.html#log-based"><span class="std std-ref">Log Based</span></a> for your PostgreSQL integration, you must install the <a class="reference external" href="https://github.com/eulerto/wal2json">wal2json</a> plugin. The wal2json plugin outputs JSON objects for logical decoding, which Stitch then uses to perform Log-based Replication.</p>
+<p>To use <a class="reference internal" href="../../concept/replication_methods.html#log-based"><span class="std std-ref">Log Based</span></a> for your PostgreSQL integration, you must install the <a class="reference external" href="https://github.com/eulerto/wal2json">wal2json</a> plugin that has support for format-version=2 (wal2json &gt;= 2.3). The wal2json plugin outputs
+JSON objects for logical decoding, which the tap then uses to perform Log-based Replication.</p>
 <p>Steps for installing the plugin vary depending on your operating system. Instructions for each operating system type are in the wal2json’s GitHub repository:</p>
 <ul class="simple">
 <li><p><a class="reference external" href="https://github.com/eulerto/wal2json#unix-based-operating-systems">Unix-based operating systems</a></p></li>
