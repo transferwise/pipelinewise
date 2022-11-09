@@ -53,7 +53,6 @@ jobs:
           -e TAP_S3_CSV_AWS_KEY=$TAP_S3_CSV_AWS_KEY \
           -e TAP_S3_CSV_AWS_SECRET_ACCESS_KEY=$TAP_S3_CSV_AWS_SECRET_ACCESS_KEY \
           -e TAP_S3_CSV_BUCKET=$TAP_S3_CSV_BUCKET \
-
           pipelinewise_dev pytest tests/end_to_end/test_target_postgres.py -vx
 
   e2e_tests_target_sf:
@@ -122,7 +121,6 @@ jobs:
           -e TARGET_SNOWFLAKE_STAGE=$TARGET_SNOWFLAKE_STAGE \
           -e TARGET_SNOWFLAKE_USER=$TARGET_SNOWFLAKE_USER \
           -e TARGET_SNOWFLAKE_WAREHOUSE=$TARGET_SNOWFLAKE_WAREHOUSE \
-          
           pipelinewise_dev pytest tests/end_to_end/target_snowflake -vx
 
   e2e_tests_other_targets:
@@ -167,5 +165,4 @@ jobs:
           -e TAP_S3_CSV_AWS_KEY=$TAP_S3_CSV_AWS_KEY \
           -e TAP_S3_CSV_AWS_SECRET_ACCESS_KEY=$TAP_S3_CSV_AWS_SECRET_ACCESS_KEY \
           -e TAP_S3_CSV_BUCKET=$TAP_S3_CSV_BUCKET \
-          
           pipelinewise_dev pytest tests/end_to_end -vx --ignore=tests/end_to_end/test_target_postgres.py --ignore=tests/end_to_end/target_snowflake
