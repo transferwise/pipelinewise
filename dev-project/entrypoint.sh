@@ -9,8 +9,9 @@ apt-get install -y --no-install-recommends \
 
 # Add Mongodb ppa
 wget -qO - https://www.mongodb.org/static/pgp/server-4.4.asc | apt-key add -
-echo "deb https://repo.mongodb.org/apt/ubuntu bionic/mongodb-org/4.4 multiverse" | tee /etc/apt/sources.list.d/mongodb.list
+echo "deb http://repo.mongodb.org/apt/debian buster/mongodb-org/4.4 main" | tee /etc/apt/sources.list.d/mongodb-org-4.4.list
 
+apt-get update
 apt-get install -y --no-install-recommends \
   alien \
   gettext-base \
