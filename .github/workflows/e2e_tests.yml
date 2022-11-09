@@ -11,13 +11,13 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  e2e_tests:
+  e2e_tests_target_pg:
     runs-on: ubuntu-20.04
     environment: ci_tests
 
     steps:
       - name: Checking out repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Check if python changes are present
         id: check
@@ -38,11 +38,56 @@ jobs:
         run: |
           until docker logs pipelinewise_dev | grep "PipelineWise Dev environment is ready"
           do
-            echo 'Sleeping for 1min';
-            sleep 60;
+            echo 'Sleeping for 10s';
+            sleep 10;
           done
 
-      - name: Run target end-to-end tests
+      - name: Run target postgres end-to-end tests
+        if: steps.check.outcome == 'failure'
+        env:
+          TAP_S3_CSV_AWS_KEY: ${{ secrets.TAP_S3_CSV_AWS_KEY }}
+          TAP_S3_CSV_AWS_SECRET_ACCESS_KEY: ${{ secrets.TAP_S3_CSV_AWS_SECRET_ACCESS_KEY }}
+          TAP_S3_CSV_BUCKET: ${{ secrets.TAP_S3_CSV_BUCKET }}
+        run: |
+          docker exec -t \
+          -e TAP_S3_CSV_AWS_KEY=$TAP_S3_CSV_AWS_KEY \
+          -e TAP_S3_CSV_AWS_SECRET_ACCESS_KEY=$TAP_S3_CSV_AWS_SECRET_ACCESS_KEY \
+          -e TAP_S3_CSV_BUCKET=$TAP_S3_CSV_BUCKET \
+
+          pipelinewise_dev pytest tests/end_to_end/test_target_postgres.py -vx
+
+  e2e_tests_target_sf:
+    runs-on: ubuntu-20.04
+    environment: ci_tests
+
+    steps:
+      - name: Checking out repo
+        uses: actions/checkout@v3
+
+      - name: Check if python changes are present
+        id: check
+        env:
+          GITHUB_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        continue-on-error: true
+        run: ./scripts/ci_check_no_file_changes.sh python
+
+      - name: Setup test containers
+        if: steps.check.outcome == 'failure'
+        run: |
+          cp dev-project/.env.template dev-project/.env
+          docker-compose -f dev-project/docker-compose.yml up -d
+
+      - name: Wait for test containers to be ready
+        if: steps.check.outcome == 'failure'
+        run: |
+          until docker logs pipelinewise_dev | grep "PipelineWise Dev environment is ready"
+          do
+            echo 'Sleeping for 10s';
+            sleep 10;
+          done
+
+      - name: Run target snowflake end-to-end tests
         if: steps.check.outcome == 'failure'
         env:
           TARGET_SNOWFLAKE_ACCOUNT: ${{ secrets.TARGET_SNOWFLAKE_ACCOUNT }}
@@ -77,4 +122,50 @@ jobs:
           -e TARGET_SNOWFLAKE_STAGE=$TARGET_SNOWFLAKE_STAGE \
           -e TARGET_SNOWFLAKE_USER=$TARGET_SNOWFLAKE_USER \
           -e TARGET_SNOWFLAKE_WAREHOUSE=$TARGET_SNOWFLAKE_WAREHOUSE \
-          pipelinewise_dev pytest tests/end_to_end -vx
+          
+          pipelinewise_dev pytest tests/end_to_end/target_snowflake -vx
+
+  e2e_tests_other_targets:
+    runs-on: ubuntu-20.04
+    environment: ci_tests
+
+    steps:
+      - name: Checking out repo
+        uses: actions/checkout@v3
+
+      - name: Check if python changes are present
+        id: check
+        env:
+          GITHUB_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        continue-on-error: true
+        run: ./scripts/ci_check_no_file_changes.sh python
+
+      - name: Setup test containers
+        if: steps.check.outcome == 'failure'
+        run: |
+          cp dev-project/.env.template dev-project/.env
+          docker-compose -f dev-project/docker-compose.yml up -d
+
+      - name: Wait for test containers to be ready
+        if: steps.check.outcome == 'failure'
+        run: |
+          until docker logs pipelinewise_dev | grep "PipelineWise Dev environment is ready"
+          do
+            echo 'Sleeping for 10s';
+            sleep 10;
+          done
+
+      - name: Run target bigquery and redshift end-to-end tests
+        if: steps.check.outcome == 'failure'
+        env:
+          TAP_S3_CSV_AWS_KEY: ${{ secrets.TAP_S3_CSV_AWS_KEY }}
+          TAP_S3_CSV_AWS_SECRET_ACCESS_KEY: ${{ secrets.TAP_S3_CSV_AWS_SECRET_ACCESS_KEY }}
+          TAP_S3_CSV_BUCKET: ${{ secrets.TAP_S3_CSV_BUCKET }}
+        run: |
+          docker exec -t \
+          -e TAP_S3_CSV_AWS_KEY=$TAP_S3_CSV_AWS_KEY \
+          -e TAP_S3_CSV_AWS_SECRET_ACCESS_KEY=$TAP_S3_CSV_AWS_SECRET_ACCESS_KEY \
+          -e TAP_S3_CSV_BUCKET=$TAP_S3_CSV_BUCKET \
+          
+          pipelinewise_dev pytest tests/end_to_end -vx --ignore=tests/end_to_end/test_target_postgres.py --ignore=tests/end_to_end/target_snowflake
