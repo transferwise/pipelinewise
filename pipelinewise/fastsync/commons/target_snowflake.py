@@ -437,7 +437,9 @@ select column_name,privacy_properties:turing_strategy:sql::text as sql from "TUR
                            query_tag_props={'schema': target_schema.upper(),
                                             'table': "PRIVACY_PROPERTIES"})
             sql_parts = []
+            sql_parts_safe_logging = [] # with os env variable replaced by placeholders to avoid leaking encryption keys in logs
             sql_full_queries = []
+            sql_full_queries_safe_logging = [] # with os env variable replaced by placeholders to avoid leaking encryption keys in logs
             for row in res:
                 row = dict(row)
                 column_name = row['COLUMN_NAME']
@@ -451,26 +453,33 @@ select column_name,privacy_properties:turing_strategy:sql::text as sql from "TUR
                             sql_query = sql_query.replace("$table_name$", full_qual_table_name)
                             sql_query = sql_query.replace("$table_shortname$", table_name)
                             sql_query = sql_query.replace("$schema_name$", target_schema)
+                            sql_query_safe_logging = sql_query
                             for match_str in re.findall(r'\$env:(.*?)\$', sql_query):
                                 sql_query = sql_query.replace(f"$env:{match_str}$", os.environ.get(match_str, "unknown"))
+                                sql_query_safe_logging = sql_query_safe_logging.replace(f"$env:{match_str}$", "...hidden...")
                             sql_full_queries.append(sql_query)
+                            sql_full_queries_safe_logging.append(sql_query_safe_logging)
                     else:
                         sql = sql.replace("$column_name$", column_name)
                         sql = sql.replace("$table_name$", full_qual_table_name)
+                        sql_safe_logging = sql
                         for match_str in re.findall(r'\$env:(.*?)\$', sql):
                             sql = sql.replace(f"$env:{match_str}$", os.environ.get(match_str, "unknown"))
+                            sql_safe_logging = sql_safe_logging.replace(f"$env:{match_str}$", "...hidden...")
                         sql_parts.append(f"{column_name} = ({sql})")
+                        sql_parts_safe_logging.append(f"{column_name} = ({sql_safe_logging})")
 
             if sql_parts:
                 data_privacy_sql = f'UPDATE {full_qual_table_name} SET ' + ", ".join(sql_parts)
-                LOGGER.info('Running data privacy obfuscation query: %s', data_privacy_sql)
+                data_privacy_sql_safe_logging = f'UPDATE {full_qual_table_name} SET ' + ", ".join(sql_parts_safe_logging)
+                LOGGER.info('Running data privacy obfuscation query: %s', data_privacy_sql_safe_logging)
                 self.query(
                     data_privacy_sql,
                     query_tag_props={'schema': target_schema, 'table': table_name},
                 )
             if sql_full_queries:
-                for sql_full_query in sql_full_queries:
-                    LOGGER.info('Running data privacy obfuscation query: %s', sql_full_query)
+                for i, sql_full_query in enumerate(sql_full_queries):
+                    LOGGER.info('Running data privacy obfuscation query: %s', sql_full_queries_safe_logging[i])
                     self.query(
                         sql_full_query,
                         query_tag_props={'schema': target_schema, 'table': table_name},
