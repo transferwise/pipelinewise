@@ -305,4 +305,4 @@ jobs:
           -e TAP_S3_CSV_AWS_KEY=$TAP_S3_CSV_AWS_KEY \
           -e TAP_S3_CSV_AWS_SECRET_ACCESS_KEY=$TAP_S3_CSV_AWS_SECRET_ACCESS_KEY \
           -e TAP_S3_CSV_BUCKET=$TAP_S3_CSV_BUCKET \
-          pipelinewise_dev pytest tests/end_to_end -vx --timer-top-n 10--ignore=tests/end_to_end/test_target_postgres.py --ignore=tests/end_to_end/target_snowflake --timer-top-n 10
+          pipelinewise_dev pytest tests/end_to_end -vx --ignore=tests/end_to_end/test_target_postgres.py --ignore=tests/end_to_end/target_snowflake --timer-top-n 10
