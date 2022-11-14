@@ -55,7 +55,193 @@ jobs:
           -e TAP_S3_CSV_BUCKET=$TAP_S3_CSV_BUCKET \
           pipelinewise_dev pytest tests/end_to_end/test_target_postgres.py -vx
 
-  e2e_tests_target_sf:
+  e2e_tests_mariadb_to_sf:
+    runs-on: ubuntu-20.04
+    environment: ci_tests
+
+    steps:
+      - name: Checking out repo
+        uses: actions/checkout@v3
+
+      - name: Check if python changes are present
+        id: check
+        env:
+          GITHUB_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        continue-on-error: true
+        run: ./scripts/ci_check_no_file_changes.sh python
+
+      - name: Setup test containers
+        if: steps.check.outcome == 'failure'
+        run: |
+          cp dev-project/.env.template dev-project/.env
+          docker-compose -f dev-project/docker-compose.yml up -d
+
+      - name: Wait for test containers to be ready
+        if: steps.check.outcome == 'failure'
+        run: |
+          until docker logs pipelinewise_dev | grep "PipelineWise Dev environment is ready"
+          do
+            echo 'Sleeping for 10s';
+            sleep 10;
+          done
+
+      - name: Run target snowflake end-to-end tests
+        if: steps.check.outcome == 'failure'
+        env:
+          TARGET_SNOWFLAKE_ACCOUNT: ${{ secrets.TARGET_SNOWFLAKE_ACCOUNT }}
+          TARGET_SNOWFLAKE_AWS_ACCESS_KEY: ${{ secrets.TARGET_SNOWFLAKE_AWS_ACCESS_KEY }}
+          TARGET_SNOWFLAKE_AWS_SECRET_ACCESS_KEY: ${{ secrets.TARGET_SNOWFLAKE_AWS_SECRET_ACCESS_KEY }}
+          TARGET_SNOWFLAKE_DBNAME: ${{ secrets.TARGET_SNOWFLAKE_DBNAME }}
+          TARGET_SNOWFLAKE_FILE_FORMAT: ${{ secrets.TARGET_SNOWFLAKE_FILE_FORMAT }}
+          TARGET_SNOWFLAKE_PASSWORD: ${{ secrets.TARGET_SNOWFLAKE_PASSWORD }}
+          TARGET_SNOWFLAKE_S3_BUCKET: ${{ secrets.TARGET_SNOWFLAKE_S3_BUCKET }}
+          TARGET_SNOWFLAKE_S3_KEY_PREFIX: ${{ secrets.TARGET_SNOWFLAKE_S3_KEY_PREFIX }}
+          TARGET_SNOWFLAKE_SCHEMA: ${{ secrets.TARGET_SNOWFLAKE_SCHEMA }}
+          TARGET_SNOWFLAKE_STAGE: ${{ secrets.TARGET_SNOWFLAKE_STAGE }}
+          TARGET_SNOWFLAKE_USER: ${{ secrets.TARGET_SNOWFLAKE_USER }}
+          TARGET_SNOWFLAKE_WAREHOUSE: ${{ secrets.TARGET_SNOWFLAKE_WAREHOUSE }}
+        run: |
+          docker exec -t \
+          -e TARGET_SNOWFLAKE_ACCOUNT=$TARGET_SNOWFLAKE_ACCOUNT \
+          -e TARGET_SNOWFLAKE_AWS_ACCESS_KEY=$TARGET_SNOWFLAKE_AWS_ACCESS_KEY \
+          -e TARGET_SNOWFLAKE_AWS_SECRET_ACCESS_KEY=$TARGET_SNOWFLAKE_AWS_SECRET_ACCESS_KEY \
+          -e TARGET_SNOWFLAKE_DBNAME=$TARGET_SNOWFLAKE_DBNAME \
+          -e TARGET_SNOWFLAKE_FILE_FORMAT=$TARGET_SNOWFLAKE_FILE_FORMAT \
+          -e TARGET_SNOWFLAKE_PASSWORD=$TARGET_SNOWFLAKE_PASSWORD \
+          -e TARGET_SNOWFLAKE_S3_BUCKET=$TARGET_SNOWFLAKE_S3_BUCKET \
+          -e TARGET_SNOWFLAKE_S3_KEY_PREFIX=$TARGET_SNOWFLAKE_S3_KEY_PREFIX \
+          -e TARGET_SNOWFLAKE_SCHEMA=$TARGET_SNOWFLAKE_SCHEMA \
+          -e TARGET_SNOWFLAKE_STAGE=$TARGET_SNOWFLAKE_STAGE \
+          -e TARGET_SNOWFLAKE_USER=$TARGET_SNOWFLAKE_USER \
+          -e TARGET_SNOWFLAKE_WAREHOUSE=$TARGET_SNOWFLAKE_WAREHOUSE \
+          pipelinewise_dev pytest tests/end_to_end/target_snowflake/tap_mariadb -vx
+
+  e2e_tests_pg_to_sf:
+    runs-on: ubuntu-20.04
+    environment: ci_tests
+
+    steps:
+      - name: Checking out repo
+        uses: actions/checkout@v3
+
+      - name: Check if python changes are present
+        id: check
+        env:
+          GITHUB_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        continue-on-error: true
+        run: ./scripts/ci_check_no_file_changes.sh python
+
+      - name: Setup test containers
+        if: steps.check.outcome == 'failure'
+        run: |
+          cp dev-project/.env.template dev-project/.env
+          docker-compose -f dev-project/docker-compose.yml up -d
+
+      - name: Wait for test containers to be ready
+        if: steps.check.outcome == 'failure'
+        run: |
+          until docker logs pipelinewise_dev | grep "PipelineWise Dev environment is ready"
+          do
+            echo 'Sleeping for 10s';
+            sleep 10;
+          done
+
+      - name: Run target snowflake end-to-end tests
+        if: steps.check.outcome == 'failure'
+        env:
+          TARGET_SNOWFLAKE_ACCOUNT: ${{ secrets.TARGET_SNOWFLAKE_ACCOUNT }}
+          TARGET_SNOWFLAKE_AWS_ACCESS_KEY: ${{ secrets.TARGET_SNOWFLAKE_AWS_ACCESS_KEY }}
+          TARGET_SNOWFLAKE_AWS_SECRET_ACCESS_KEY: ${{ secrets.TARGET_SNOWFLAKE_AWS_SECRET_ACCESS_KEY }}
+          TARGET_SNOWFLAKE_DBNAME: ${{ secrets.TARGET_SNOWFLAKE_DBNAME }}
+          TARGET_SNOWFLAKE_FILE_FORMAT: ${{ secrets.TARGET_SNOWFLAKE_FILE_FORMAT }}
+          TARGET_SNOWFLAKE_PASSWORD: ${{ secrets.TARGET_SNOWFLAKE_PASSWORD }}
+          TARGET_SNOWFLAKE_S3_BUCKET: ${{ secrets.TARGET_SNOWFLAKE_S3_BUCKET }}
+          TARGET_SNOWFLAKE_S3_KEY_PREFIX: ${{ secrets.TARGET_SNOWFLAKE_S3_KEY_PREFIX }}
+          TARGET_SNOWFLAKE_SCHEMA: ${{ secrets.TARGET_SNOWFLAKE_SCHEMA }}
+          TARGET_SNOWFLAKE_STAGE: ${{ secrets.TARGET_SNOWFLAKE_STAGE }}
+          TARGET_SNOWFLAKE_USER: ${{ secrets.TARGET_SNOWFLAKE_USER }}
+          TARGET_SNOWFLAKE_WAREHOUSE: ${{ secrets.TARGET_SNOWFLAKE_WAREHOUSE }}
+        run: |
+          docker exec -t \
+          -e TARGET_SNOWFLAKE_ACCOUNT=$TARGET_SNOWFLAKE_ACCOUNT \
+          -e TARGET_SNOWFLAKE_AWS_ACCESS_KEY=$TARGET_SNOWFLAKE_AWS_ACCESS_KEY \
+          -e TARGET_SNOWFLAKE_AWS_SECRET_ACCESS_KEY=$TARGET_SNOWFLAKE_AWS_SECRET_ACCESS_KEY \
+          -e TARGET_SNOWFLAKE_DBNAME=$TARGET_SNOWFLAKE_DBNAME \
+          -e TARGET_SNOWFLAKE_FILE_FORMAT=$TARGET_SNOWFLAKE_FILE_FORMAT \
+          -e TARGET_SNOWFLAKE_PASSWORD=$TARGET_SNOWFLAKE_PASSWORD \
+          -e TARGET_SNOWFLAKE_S3_BUCKET=$TARGET_SNOWFLAKE_S3_BUCKET \
+          -e TARGET_SNOWFLAKE_S3_KEY_PREFIX=$TARGET_SNOWFLAKE_S3_KEY_PREFIX \
+          -e TARGET_SNOWFLAKE_SCHEMA=$TARGET_SNOWFLAKE_SCHEMA \
+          -e TARGET_SNOWFLAKE_STAGE=$TARGET_SNOWFLAKE_STAGE \
+          -e TARGET_SNOWFLAKE_USER=$TARGET_SNOWFLAKE_USER \
+          -e TARGET_SNOWFLAKE_WAREHOUSE=$TARGET_SNOWFLAKE_WAREHOUSE \
+          pipelinewise_dev pytest tests/end_to_end/target_snowflake/tap_postgres -vx
+
+  e2e_tests_mg_to_sf:
+    runs-on: ubuntu-20.04
+    environment: ci_tests
+
+    steps:
+      - name: Checking out repo
+        uses: actions/checkout@v3
+
+      - name: Check if python changes are present
+        id: check
+        env:
+          GITHUB_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        continue-on-error: true
+        run: ./scripts/ci_check_no_file_changes.sh python
+
+      - name: Setup test containers
+        if: steps.check.outcome == 'failure'
+        run: |
+          cp dev-project/.env.template dev-project/.env
+          docker-compose -f dev-project/docker-compose.yml up -d
+
+      - name: Wait for test containers to be ready
+        if: steps.check.outcome == 'failure'
+        run: |
+          until docker logs pipelinewise_dev | grep "PipelineWise Dev environment is ready"
+          do
+            echo 'Sleeping for 10s';
+            sleep 10;
+          done
+
+      - name: Run target snowflake end-to-end tests
+        if: steps.check.outcome == 'failure'
+        env:
+          TARGET_SNOWFLAKE_ACCOUNT: ${{ secrets.TARGET_SNOWFLAKE_ACCOUNT }}
+          TARGET_SNOWFLAKE_AWS_ACCESS_KEY: ${{ secrets.TARGET_SNOWFLAKE_AWS_ACCESS_KEY }}
+          TARGET_SNOWFLAKE_AWS_SECRET_ACCESS_KEY: ${{ secrets.TARGET_SNOWFLAKE_AWS_SECRET_ACCESS_KEY }}
+          TARGET_SNOWFLAKE_DBNAME: ${{ secrets.TARGET_SNOWFLAKE_DBNAME }}
+          TARGET_SNOWFLAKE_FILE_FORMAT: ${{ secrets.TARGET_SNOWFLAKE_FILE_FORMAT }}
+          TARGET_SNOWFLAKE_PASSWORD: ${{ secrets.TARGET_SNOWFLAKE_PASSWORD }}
+          TARGET_SNOWFLAKE_S3_BUCKET: ${{ secrets.TARGET_SNOWFLAKE_S3_BUCKET }}
+          TARGET_SNOWFLAKE_S3_KEY_PREFIX: ${{ secrets.TARGET_SNOWFLAKE_S3_KEY_PREFIX }}
+          TARGET_SNOWFLAKE_SCHEMA: ${{ secrets.TARGET_SNOWFLAKE_SCHEMA }}
+          TARGET_SNOWFLAKE_STAGE: ${{ secrets.TARGET_SNOWFLAKE_STAGE }}
+          TARGET_SNOWFLAKE_USER: ${{ secrets.TARGET_SNOWFLAKE_USER }}
+          TARGET_SNOWFLAKE_WAREHOUSE: ${{ secrets.TARGET_SNOWFLAKE_WAREHOUSE }}
+        run: |
+          docker exec -t \
+          -e TARGET_SNOWFLAKE_ACCOUNT=$TARGET_SNOWFLAKE_ACCOUNT \
+          -e TARGET_SNOWFLAKE_AWS_ACCESS_KEY=$TARGET_SNOWFLAKE_AWS_ACCESS_KEY \
+          -e TARGET_SNOWFLAKE_AWS_SECRET_ACCESS_KEY=$TARGET_SNOWFLAKE_AWS_SECRET_ACCESS_KEY \
+          -e TARGET_SNOWFLAKE_DBNAME=$TARGET_SNOWFLAKE_DBNAME \
+          -e TARGET_SNOWFLAKE_FILE_FORMAT=$TARGET_SNOWFLAKE_FILE_FORMAT \
+          -e TARGET_SNOWFLAKE_PASSWORD=$TARGET_SNOWFLAKE_PASSWORD \
+          -e TARGET_SNOWFLAKE_S3_BUCKET=$TARGET_SNOWFLAKE_S3_BUCKET \
+          -e TARGET_SNOWFLAKE_S3_KEY_PREFIX=$TARGET_SNOWFLAKE_S3_KEY_PREFIX \
+          -e TARGET_SNOWFLAKE_SCHEMA=$TARGET_SNOWFLAKE_SCHEMA \
+          -e TARGET_SNOWFLAKE_STAGE=$TARGET_SNOWFLAKE_STAGE \
+          -e TARGET_SNOWFLAKE_USER=$TARGET_SNOWFLAKE_USER \
+          -e TARGET_SNOWFLAKE_WAREHOUSE=$TARGET_SNOWFLAKE_WAREHOUSE \
+          pipelinewise_dev pytest tests/end_to_end/target_snowflake/tap_mongodb -vx
+
+  e2e_tests_s3_to_sf:
     runs-on: ubuntu-20.04
     environment: ci_tests
 
@@ -106,9 +292,6 @@ jobs:
           TAP_S3_CSV_BUCKET: ${{ secrets.TAP_S3_CSV_BUCKET }}
         run: |
           docker exec -t \
-          -e TAP_S3_CSV_AWS_KEY=$TAP_S3_CSV_AWS_KEY \
-          -e TAP_S3_CSV_AWS_SECRET_ACCESS_KEY=$TAP_S3_CSV_AWS_SECRET_ACCESS_KEY \
-          -e TAP_S3_CSV_BUCKET=$TAP_S3_CSV_BUCKET \
           -e TARGET_SNOWFLAKE_ACCOUNT=$TARGET_SNOWFLAKE_ACCOUNT \
           -e TARGET_SNOWFLAKE_AWS_ACCESS_KEY=$TARGET_SNOWFLAKE_AWS_ACCESS_KEY \
           -e TARGET_SNOWFLAKE_AWS_SECRET_ACCESS_KEY=$TARGET_SNOWFLAKE_AWS_SECRET_ACCESS_KEY \
@@ -121,7 +304,10 @@ jobs:
           -e TARGET_SNOWFLAKE_STAGE=$TARGET_SNOWFLAKE_STAGE \
           -e TARGET_SNOWFLAKE_USER=$TARGET_SNOWFLAKE_USER \
           -e TARGET_SNOWFLAKE_WAREHOUSE=$TARGET_SNOWFLAKE_WAREHOUSE \
-          pipelinewise_dev pytest tests/end_to_end/target_snowflake -vx
+          -e TAP_S3_CSV_AWS_KEY=$TAP_S3_CSV_AWS_KEY \
+          -e TAP_S3_CSV_AWS_SECRET_ACCESS_KEY=$TAP_S3_CSV_AWS_SECRET_ACCESS_KEY \
+          -e TAP_S3_CSV_BUCKET=$TAP_S3_CSV_BUCKET \
+          pipelinewise_dev pytest tests/end_to_end/target_snowflake/tap_mongodb -vx
 
   e2e_tests_other_targets:
     runs-on: ubuntu-20.04
