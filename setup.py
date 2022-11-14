@@ -53,7 +53,8 @@ setup(name='pipelinewise',
               'pytest-cov==3.0.0',
               'python-dotenv==0.19.1',
               'pylint==2.10.*',
-              'unify==0.5'
+              'unify==0.5',
+              'pytest-timer~=0.0',
           ]
       },
       entry_points={
