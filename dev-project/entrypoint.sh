@@ -2,11 +2,15 @@
 
 set -e
 
+apt-get update
+apt-get install -y --no-install-recommends \
+  wget \
+  gnupg
+
 # Add Mongodb ppa
 wget -qO - https://www.mongodb.org/static/pgp/server-4.4.asc | apt-key add -
-echo "deb https://repo.mongodb.org/apt/ubuntu bionic/mongodb-org/4.4 multiverse" | tee /etc/apt/sources.list.d/mongodb.list
+echo "deb https://repo.mongodb.org/apt/debian buster/mongodb-org/4.4 main" | tee /etc/apt/sources.list.d/mongodb-org-4.4.list
 
-# Install OS dependencies
 apt-get update
 apt-get install -y --no-install-recommends \
   alien \
@@ -37,7 +41,7 @@ tests/db/tap_mongodb.sh
 tests/db/target_postgres.sh
 
 # Install PipelineWise and connectors in the container
-make pipelinewise connectors -e pw_acceptlicenses=y -e pw_connector=target-snowflake,target-postgres,target-bigquery,tap-mysql,tap-postgres,tap-mongodb,transform-field,tap-s3-csv
+make pipelinewise connectors -e pw_acceptlicenses=y -e pw_connector=target-snowflake,target-postgres,tap-mysql,tap-postgres,tap-mongodb,transform-field,tap-s3-csv
 if [[ $? != 0 ]]; then
     echo
     echo "ERROR: Docker container not started. Failed to install one or more PipelineWise components."
