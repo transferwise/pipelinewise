@@ -11,6 +11,7 @@ services:
       - .env
     environment:
       TARGET: postgres
+      PATH: /opt/pipelinewise/dev-project/.virtualenvs/pipelinewise/bin:${PATH}
     volumes:
       - ../:/opt/pipelinewise
     depends_on:
@@ -31,6 +32,7 @@ services:
       - .env
     environment:
       TARGET: snowflake
+      PATH: /opt/pipelinewise/dev-project/.virtualenvs/pipelinewise/bin:${PATH}
     volumes:
       - ../:/opt/pipelinewise
     depends_on:
