@@ -1,0 +1,140 @@
+version: '3'
+
+services:
+
+  pipelinewise_target_postgres:
+    image: python:3.8-slim-buster
+    container_name:  pipelinewise_target_postgres
+    working_dir: /opt/pipelinewise
+    entrypoint: /opt/pipelinewise/tests/entrypoint.sh
+    env_file:
+      - .env
+    environment:
+      TARGET: postgres
+    volumes:
+      - ../:/opt/pipelinewise
+    depends_on:
+      - db_mongo_source
+      - db_mysql_source
+      - db_mysql_source_replica
+      - db_postgres_source
+      - db_postgres_dwh
+    networks:
+      - pipelinewise_network
+
+  pipelinewise_target_snowflake:
+    image: python:3.8-slim-buster
+    container_name: pipelinewise_target_snowflake
+    working_dir: /opt/pipelinewise
+    entrypoint: /opt/pipelinewise/tests/entrypoint.sh
+    env_file:
+      - .env
+    environment:
+      TARGET: snowflake
+    volumes:
+      - ../:/opt/pipelinewise
+    depends_on:
+      - db_mongo_source
+      - db_mysql_source
+      - db_mysql_source_replica
+      - db_postgres_source
+    networks:
+      - pipelinewise_network
+
+  ### TAP (Data source) containers
+  # PostgreSQL service container used as test source database
+  # Using Debezium image with wal2json plugin for logical decoding
+  db_postgres_source:
+    build:
+      context: ../dev-project/pg
+      dockerfile: Dockerfile
+    container_name: pipelinewise_test_postgres_source
+    # Making some logical decoding adjustments
+    command: -c "wal_level=logical" -c "max_replication_slots=5" -c "max_wal_senders=5"
+    ports:
+      - ${TAP_POSTGRES_PORT_ON_HOST}:${TAP_POSTGRES_PORT}
+    environment:
+      POSTGRES_USER: ${TAP_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${TAP_POSTGRES_PASSWORD}
+      POSTGRES_DB: ${TAP_POSTGRES_DB}
+    networks:
+      - pipelinewise_network
+
+  # MySQL service container used as test source database
+  db_mysql_source:
+    image: mariadb:10.2.26
+    container_name: pipelinewise_test_mysql_source
+    ports:
+      - ${TAP_MYSQL_PORT_ON_HOST}:${TAP_MYSQL_PORT}
+    command: |
+      --default-authentication-plugin=mysql_native_password 
+      --server-id=1 
+      --log-bin=mysql-bin 
+      --binlog-format=ROW 
+      --binlog-do-db=${TAP_MYSQL_DB} 
+      --binlog-do-db=${TAP_MYSQL_REPLICA_DB}
+    environment:
+      MYSQL_ROOT_PASSWORD: ${TAP_MYSQL_ROOT_PASSWORD}
+      MYSQL_USER: ${TAP_MYSQL_USER}
+      MYSQL_PASSWORD: ${TAP_MYSQL_PASSWORD}
+      MYSQL_DATABASE: ${TAP_MYSQL_DB}
+    networks:
+      - pipelinewise_network
+
+  db_mysql_source_replica:
+    image: mariadb:10.2.26
+    container_name: pipelinewise_test_mysql_source_replica
+    ports:
+      - ${TAP_MYSQL_REPLICA_PORT_ON_HOST}:${TAP_MYSQL_REPLICA_PORT}
+    command: |
+      --default-authentication-plugin=mysql_native_password 
+      --server-id=2 
+      --log-bin=mysql-bin 
+      --relay-log=mysql-relay-log 
+      --replicate-do-db=${TAP_MYSQL_REPLICA_DB}
+    environment:
+      MYSQL_ROOT_PASSWORD: ${TAP_MYSQL_REPLICA_ROOT_PASSWORD}
+      MYSQL_USER: ${TAP_MYSQL_REPLICA_USER}
+      MYSQL_PASSWORD: ${TAP_MYSQL_REPLICA_PASSWORD}
+      MYSQL_DATABASE: ${TAP_MYSQL_REPLICA_DB}
+    networks:
+      - pipelinewise_network
+
+  db_mongo_source:
+    container_name: "pipelinewise_test_mongodb_source"
+    image: "mongo:4.2-bionic"
+    ports:
+      - ${TAP_MONGODB_PORT_ON_HOST}:${TAP_MONGODB_PORT}
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${TAP_MONGODB_ROOT_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${TAP_MONGODB_ROOT_PASSWORD}
+      MONGO_INITDB_DATABASE: ${TAP_MONGODB_DB}
+      MONGO_USERNAME: ${TAP_MONGODB_USER}
+      MONGO_PASSWORD: ${TAP_MONGODB_PASSWORD}
+      MONGO_REPLICA_HOST: db_mongo_source
+    volumes:
+      - ../dev-project/mongo/create_user.sh:/docker-entrypoint-initdb.d/create_user.sh
+    command: [mongod, --replSet, rs0]
+    networks:
+      - pipelinewise_network
+
+  ### Target containers
+  # PostgreSQL service container used as test target database
+  db_postgres_dwh:
+    image: postgres:11.4
+    container_name: pipelinewise_test_postgres_dwh
+    ports:
+      - ${TARGET_POSTGRES_PORT_ON_HOST}:${TARGET_POSTGRES_PORT}
+    environment:
+      POSTGRES_USER: ${TARGET_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${TARGET_POSTGRES_PASSWORD}
+      POSTGRES_DB: ${TARGET_POSTGRES_DB}
+    networks:
+      - pipelinewise_network
+
+networks:
+  pipelinewise_network:
+    ipam:
+      driver: default
+      config:
+        - subnet: 192.168.56.0/24
