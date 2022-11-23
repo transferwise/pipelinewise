@@ -112,7 +112,7 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
         file_exist = os.path.exists(filepath)
         file_parts = glob.glob(f'{filepath}*')
         if len(file_parts) == 0 and file_exist:
-            LOGGER.warning('DATA LOSS! -> %s'.format(filepath))
+            LOGGER.warning('DATA LOSS! -> %s', filepath)
 
         size_bytes = sum([os.path.getsize(file_part) for file_part in file_parts])
         snowflake_columns = snowflake_types.get('columns', [])
