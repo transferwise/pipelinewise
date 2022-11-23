@@ -108,7 +108,11 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
             split_file_chunk_size_mb=args.target.get('split_file_chunk_size_mb'),
             split_file_max_chunks=args.target.get('split_file_max_chunks'),
         )
+        file_exist = os.path.exists(filepath)
         file_parts = glob.glob(f'{filepath}*')
+        if len(file_parts) == 0 and file_exist:
+            LOGGER.warning(f'DATA LOSS! -> {filepath}')
+
         size_bytes = sum([os.path.getsize(file_part) for file_part in file_parts])
         snowflake_types = postgres.map_column_types_to_target(table)
         snowflake_columns = snowflake_types.get('columns', [])
