@@ -187,7 +187,7 @@ class PartialSyncCLITestCase(TestCase):
             self._run_cli(arguments)
 
         call_args = mocked_run_command.call_args[0]
-        self.assertEqual(2, len(call_args))
+        self.assertEqual(3, len(call_args))
 
         # Because each instance of Pipelinewise has a random postfix for log filename, we test it in this way!
         self.assertRegex(
@@ -203,7 +203,7 @@ class PartialSyncCLITestCase(TestCase):
             f'--start_value "{arguments["start_value"]}" --end_value "{arguments["end_value"]}"$'
         )
 
-        self.assertRegex(call_args[1], f'^{self.test_cli.CONFIG_DIR}/{arguments["target"]}/{arguments["tap"]}/log/'
+        self.assertRegex(call_args[2], f'^{self.test_cli.CONFIG_DIR}/{arguments["target"]}/{arguments["tap"]}/log/'
                                        f'{arguments["target"]}-{arguments["tap"]}-[0-9]{{8}}_[0-9]{{6}}'
                                        r'\.partialsync\.log')
 
@@ -225,7 +225,7 @@ class PartialSyncCLITestCase(TestCase):
             self._run_cli(arguments)
 
         call_args = mocked_run_command.call_args[0]
-        self.assertEqual(2, len(call_args))
+        self.assertEqual(3, len(call_args))
         # Because each instance of Pipelinewise has a random postfix for log filename, we test it in this way!
         self.assertRegex(
             call_args[0],
@@ -240,7 +240,7 @@ class PartialSyncCLITestCase(TestCase):
             f'--start_value "{arguments["start_value"]}"$'
         )
 
-        self.assertRegex(call_args[1], f'^{self.test_cli.CONFIG_DIR}/{arguments["target"]}/{arguments["tap"]}/log/'
+        self.assertRegex(call_args[2], f'^{self.test_cli.CONFIG_DIR}/{arguments["target"]}/{arguments["tap"]}/log/'
                                        f'{arguments["target"]}-{arguments["tap"]}-[0-9]{{8}}_[0-9]{{6}}'
                                        r'\.partialsync\.log')
 

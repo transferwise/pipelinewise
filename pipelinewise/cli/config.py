@@ -156,7 +156,6 @@ class Config:
             'state': os.path.join(connector_dir, 'state.json'),
             'transformation': os.path.join(connector_dir, 'transformation.json'),
             'selection': os.path.join(connector_dir, 'selection.json'),
-            'pidfile': os.path.join(connector_dir, 'pipelinewise.pid'),
         }
 
     def save(self, selected_taps: Union[None, List] = None):

@@ -52,7 +52,6 @@ class TestConfig:
             'state': '/var/singer-connector/state.json',
             'transformation': '/var/singer-connector/transformation.json',
             'selection': '/var/singer-connector/selection.json',
-            'pidfile': '/var/singer-connector/pipelinewise.pid',
         }
 
     def test_from_yamls(self):
@@ -109,7 +108,6 @@ class TestConfig:
                     'selection': f'{PIPELINEWISE_TEST_HOME}/test_snowflake_target/selection.json',
                     'state': f'{PIPELINEWISE_TEST_HOME}/test_snowflake_target/state.json',
                     'transformation': f'{PIPELINEWISE_TEST_HOME}/test_snowflake_target/transformation.json',
-                    'pidfile': f'{PIPELINEWISE_TEST_HOME}/test_snowflake_target/pipelinewise.pid',
                 },
                 'taps': [
                     {
@@ -140,7 +138,6 @@ class TestConfig:
                             'state': f'{PIPELINEWISE_TEST_HOME}/test_snowflake_target/mysql_sample/state.json',
                             'transformation': f'{PIPELINEWISE_TEST_HOME}'
                                               f'/test_snowflake_target/mysql_sample/transformation.json',
-                            'pidfile': f'{PIPELINEWISE_TEST_HOME}/test_snowflake_target/mysql_sample/pipelinewise.pid',
                         },
                         'schemas': [
                             {
@@ -244,7 +241,6 @@ class TestConfig:
             'state': '/var/singer-connector/state.json',
             'transformation': '/var/singer-connector/transformation.json',
             'selection': '/var/singer-connector/selection.json',
-            'pidfile': '/var/singer-connector/pipelinewise.pid',
         }
 
     def test_save_config(self):
