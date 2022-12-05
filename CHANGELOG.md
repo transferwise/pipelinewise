@@ -1,3 +1,11 @@
+0.50.0 (2022-12-05)
+-------------------
+
+- Bump `pipelinewise-tap-postgres` from `1.8.4` to `2.0.0`:
+  - Use wal2json format version 2
+ 
+- Bump `psycopg2-binary` from `2.8.6` to `2.9.5`
+
 0.49.0 (2022-10-27)
 -------------------
 - Added `taps` option for `import` command to make it possible for importing specific taps.
