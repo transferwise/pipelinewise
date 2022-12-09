@@ -1,9 +1,19 @@
+0.51.0 (2022-12-10)
+-------------------
+
+- Drop `pipelinewise-tap-postgres` from `2.0.0` to `1.8.4`:
+  - wal2json format version 2 causing issues on older Postgres servers
+
+- Bump `pipelinewise-tap-kafka` from `7.1.2` to `8.0.0`
+  - Switch from `subscribe` to `assign` for better initial offset control
+  - Implement specifying partitions in configuration
+
 0.50.0 (2022-12-05)
 -------------------
 
 - Bump `pipelinewise-tap-postgres` from `1.8.4` to `2.0.0`:
   - Use wal2json format version 2
- 
+
 - Bump `psycopg2-binary` from `2.8.6` to `2.9.5`
 
 0.49.0 (2022-10-27)
