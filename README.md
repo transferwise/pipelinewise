@@ -9,6 +9,19 @@ Documentation is available at https://transferwise.github.io/pipelinewise/
 ![Logo](docs/img/pipelinewise-diagram-circle-bold.png)
 
 
+## Table of Contents
+
+- [PipelineWise](#pipelinewise)
+  - [Features](#features)
+  - [Official docker images](#official-docker-images)
+  - [Connectors](#connectors)
+    - [Running from docker](#running-from-docker)
+    - [Building from source](#building-from-source)
+  - [Developing with Docker](#developing-with-docker)
+  - [Contribution](#contribution)
+  - [Links](#links)
+  - [License](#license)
+
 ## Features
 
 * **Built with ELT in mind**: PipelineWise fits into the ELT landscape and is not a traditional ETL tool. PipelineWise aims to reproduce the data from the source to an Analytics-Data-Store in as close to the original format as possible. Some minor load time transformations are supported but complex mapping and joins have to be done in the Analytics-Data-Store to extract meaning.
@@ -20,19 +33,14 @@ Documentation is available at https://transferwise.github.io/pipelinewise/
 * **Extensible**: PipelineWise is using [Singer.io](https://www.singer.io/) compatible taps and target connectors. New connectors can be added to PipelineWise with relatively small effort
 
 
-## Table of Contents
+## Official docker images
 
-- [PipelineWise](#pipelinewise)
-  - [Features](#features)
-  - [Table of Contents](#table-of-contents)
-  - [Connectors](#connectors)
-    - [Running from docker](#running-from-docker)
-    - [Building from source](#building-from-source)
-  - [Developing with Docker](#developing-with-docker)
-  - [Contribution](#contribution)
-  - [Links](#links)
-  - [License](#license)
+Pipelinewise images are published to: [dockerhub](https://hub.docker.com/r/transferwiseworkspace/pipelinewise)
 
+Pull image with:
+```shell
+docker pull transferwiseworkspace/pipelinewise:{tag}
+```
 
 ## Connectors
 
