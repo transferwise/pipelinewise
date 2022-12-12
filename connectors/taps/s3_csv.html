@@ -35,7 +35,7 @@
             <a href="../../index.html" class="icon icon-home"> PipelineWise
           </a>
               <div class="version">
-                0.49.0
+                0.51.0
               </div>
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
@@ -138,9 +138,13 @@
   <section id="tap-s3-csv">
 <span id="id1"></span><h1>Tap S3 CSV<a class="headerlink" href="#tap-s3-csv" title="Permalink to this heading"></a></h1>
 <p>Extracting data from S3 in CSV file format is straightforward. You need to have
-access to an S3 bucket and the tap will download every file that matches the
+access to an S3 bucket and the tap will download every CSV file that matches the
 configured file pattern. It’s tracking the <code class="docutils literal notranslate"><span class="pre">Last-Modified</span></code> timestamp on the
 S3 objects to incrementally download only the new or updated files.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Every column in the csv files will be interpreted as string.</p>
+</div>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
 <p><strong>Authentication Methods</strong></p>
