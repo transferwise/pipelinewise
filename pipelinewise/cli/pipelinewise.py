@@ -1464,25 +1464,9 @@ class PipelineWise:
                     target_id=target_id,
                 )
 
-                if ConnectorType(target_type) in FASTSYNC_PAIRS.get(ConnectorType(tap_type), set()):
-                    self.run_tap_fastsync(
-                        tap=tap_params, target=target_params, transform=transform_params
-                    )
-
-                else:
-                    self.tap_run_log_file = os.path.join(
-                        log_dir, f'{target_id}-{tap_id}-{current_time}.singer.log'
-                    )
-                    stream_buffer_size = self.tap.get(
-                        'stream_buffer_size', commands.DEFAULT_STREAM_BUFFER_SIZE
-                    )
-
-                    self.run_tap_singer(
-                        tap=tap_params,
-                        target=target_params,
-                        transform=transform_params,
-                        stream_buffer_size=stream_buffer_size,
-                    )
+                self.run_tap_fastsync(
+                    tap=tap_params, target=target_params, transform=transform_params
+                )
 
         except pidfile.AlreadyRunningError:
             self.logger.error('Another instance of the tap is already running.')
