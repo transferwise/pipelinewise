@@ -82,6 +82,8 @@ is the next best option.
 
   **Key Based Incremental** replication doesn't detect deletes in source.
 
+  **Key Based Incremental** replication from tables with long running transactions could lead to skipping rows in certain conditions.
+
 
 .. _full_table:
 

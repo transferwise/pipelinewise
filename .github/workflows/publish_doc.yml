@@ -21,6 +21,10 @@ jobs:
           fetch-depth: 0
           path: gh_doc_automation
 
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.8'
+
       - name: check structure
         run: ls -l gh_doc_automation
 

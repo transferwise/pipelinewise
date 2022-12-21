@@ -33,7 +33,7 @@ if [ -z "$GH_TOKEN" ]; then
 fi
 
 # Install dependencies in a virtual env
-python3 -m venv ~/venv-doc
+python3.8 -m venv ~/venv-doc
 . ~/venv-doc/bin/activate
 pip install --upgrade pip
 pip install sphinx sphinx-rtd-theme
