@@ -318,6 +318,7 @@ class Config:
             schema_name = schema.get('source_schema')
             for table in schema.get('tables', []):
                 table_name = table.get('table_name')
+                sync_start_from = table.get('sync_start_from')
                 replication_method = table.get(
                     'replication_method', utils.get_tap_default_replication_method(tap)
                 )
@@ -331,6 +332,8 @@ class Config:
                             # Add replication_key only if replication_method is INCREMENTAL
                             'replication_key': table.get('replication_key')
                             if replication_method == 'INCREMENTAL' else None,
+                            'sync_start_from': sync_start_from
+                            if sync_start_from else None
                         }
                     )
                 )

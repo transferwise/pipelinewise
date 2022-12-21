@@ -4,8 +4,11 @@ import argparse
 import os
 import re
 
+from datetime import datetime
+
 from typing import Dict, Tuple, List
 
+from pipelinewise.cli.errors import InvalidConfigException
 from pipelinewise.fastsync.commons import utils as common_utils
 from pipelinewise.fastsync.commons.target_snowflake import FastSyncTargetSnowflake
 
@@ -84,12 +87,16 @@ def load_into_snowflake(target, args, columns_diff, primary_keys, s3_key_pattern
 
     snowflake.add_columns(target['schema'], target['table'], columns_diff['added_columns'])
     added_metadata_columns = ['_SDC_EXTRACTED_AT', '_SDC_BATCHED_AT', '_SDC_DELETED_AT']
-    snowflake.merge_tables(
-        target['schema'], target['temp'], target['table'],
-        list(columns_diff['source_columns'].keys()) + added_metadata_columns, primary_keys)
-    if args.target['hard_delete'] is True:
-        snowflake.partial_hard_delete(target['schema'], target['table'], where_clause_sql)
-    snowflake.drop_table(target['schema'], target['temp'])
+    if args.drop_target_table:
+        snowflake.swap_tables(target['schema'], target['table'])
+    else:
+        snowflake.merge_tables(
+            target['schema'], target['temp'], target['table'],
+            list(columns_diff['source_columns'].keys()) + added_metadata_columns, primary_keys)
+
+        if args.target['hard_delete'] is True:
+            snowflake.partial_hard_delete(target['schema'], target['table'], where_clause_sql)
+        snowflake.drop_table(target['schema'], target['temp'])
 
 
 def update_state_file(args: argparse.Namespace, bookmark: Dict) -> None:
@@ -108,6 +115,7 @@ def parse_args_for_partial_sync(required_config_keys: Dict) -> argparse.Namespac
     parser.add_argument('--column', help='Column for partial sync table')
     parser.add_argument('--start_value', help='Start value for partial sync table')
     parser.add_argument('--end_value', help='End value for partial sync table')
+    parser.add_argument('--drop_target_table', help='Dropping target table before sync')
 
     args: argparse.Namespace = parser.parse_args()
 
@@ -132,6 +140,28 @@ def parse_args_for_partial_sync(required_config_keys: Dict) -> argparse.Namespac
     common_utils.check_config(args.target, required_config_keys['target'])
 
     return args
+
+
+def validate_boundary_value(string_to_check: str) -> str:
+    """Validating if the boundary values are valid and there is no injection"""
+    if not string_to_check:
+        return string_to_check
+
+    # Validating string and number format
+    pattern = re.compile(r'[A-Za-z0-9\\.\\-]+')
+    if re.fullmatch(pattern, string_to_check):
+        return string_to_check
+
+    # Validating timestamp format
+    try:
+        datetime.strptime(string_to_check, '%Y-%m-%d %H:%M:%S')
+    except ValueError:
+        try:
+            datetime.strptime(string_to_check, '%Y-%m-%d')
+        except ValueError:
+            raise InvalidConfigException(f'Invalid boundary value: {string_to_check}') from Exception
+
+    return string_to_check
 
 
 def _get_args_parser_for_partialsync():

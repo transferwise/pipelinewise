@@ -83,11 +83,18 @@ class TestCli:
 
     @staticmethod
     def _assert_calling_sync_tables(pipelinewise: PipelineWise, side_effect_method: Optional[Callable] = None) -> None:
-        with patch('pipelinewise.cli.pipelinewise.PipelineWise.run_tap_fastsync') as mocked_fastsync:
-            if side_effect_method:
-                mocked_fastsync.side_effect = side_effect_method
+        with patch('pipelinewise.cli.pipelinewise.multiprocessing') as mocked_multiprocessing:
             pipelinewise.sync_tables()
-        mocked_fastsync.assert_called_once()
+
+        mocked_multiprocessing.assert_has_calls([
+            call.Process(target=pipelinewise.sync_tables_partial_sync, args=(
+                {'db_test_mysql.table_one': {'column': 'id', 'value': '5'}},)),
+            call.Process().start(),
+            call.Process(target=pipelinewise.sync_tables_fast_sync, args=(['db_test_mysql.table_two'],)),
+            call.Process().start(),
+            call.Process().join(),
+            call.Process().join(),
+        ])
 
     def _assert_import_command(self, args):
         if args.taps == '*':
@@ -676,10 +683,13 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
         # Running sync_tables should detect the tap type and path to the connector
         # Since the executable is not available in this test then it should fail
         # TODO: sync discover_tap and run_tap behaviour. run_tap sys.exit but discover_tap does not.
-        with pytest.raises(SystemExit) as pytest_wrapped_e:
-            pipelinewise.sync_tables()
-        assert pytest_wrapped_e.type == SystemExit
-        assert pytest_wrapped_e.value.code == 1
+        all_sync_methods = (pipelinewise.sync_tables_partial_sync, pipelinewise.sync_tables_fast_sync)
+
+        for sync_method in all_sync_methods:
+            with pytest.raises(SystemExit) as pytest_wrapped_e:
+                sync_method(['foo'])
+            assert pytest_wrapped_e.type == SystemExit
+            assert pytest_wrapped_e.value.code == 1
 
     def test_command_sync_tables_cleanup_state_if_file_not_exists_and_no_tables_argument(self):
         """Testing sync_tables cleanup state if file not exists and there is no tables argument"""
@@ -688,7 +698,8 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
 
     def test_command_sync_tables_cleanup_state_if_file_not_exists_and_tables_argument(self):
         """Testing sync_tables cleanup state if file not exists and there is tables argument"""
-        pipelinewise = self._init_for_sync_tables_states_cleanup(tables_arg='table1,table3')
+        pipelinewise = self._init_for_sync_tables_states_cleanup(
+            tables_arg='db_test_mysql.table_one,db_test_mysql.table_two')
         self._assert_calling_sync_tables(pipelinewise)
 
     def test_command_sync_tables_cleanup_state_if_file_exists_and_no_table_argument(self):
@@ -716,14 +727,16 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
                 state_data = json.load(state_file)
             assert state_data == expected_state_data
 
-        pipelinewise = self._init_for_sync_tables_states_cleanup(tables_arg='table1,table3')
+        pipelinewise = self._init_for_sync_tables_states_cleanup(
+            tables_arg='db_test_mysql.table_one,db_test_mysql.table_two')
         test_state_file = pipelinewise.tap['files']['state']
         self._make_sample_state_file(test_state_file)
         self._assert_calling_sync_tables(pipelinewise, _assert_state_file_is_cleaned)
 
     def test_command_sync_tables_cleanup_state_if_file_empty_and_table_argument(self):
         """Testing sync_tables cleanup state if file empty and there is table argument"""
-        pipelinewise = self._init_for_sync_tables_states_cleanup(tables_arg='table1,table3')
+        pipelinewise = self._init_for_sync_tables_states_cleanup(
+            tables_arg='db_test_mysql.table_one,db_test_mysql.table_two')
         test_state_file = pipelinewise.tap['files']['state']
         with open(test_state_file, 'a', encoding='UTF-8'):
             pass

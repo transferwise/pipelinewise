@@ -34,6 +34,12 @@ add the ``--tables`` argument:
   list of table names using the ``<schema_name>.<table_name>`` format. Schema and
   table names have to be the names in the source database.
 
+.. warning::
+
+  Based on the tap setting, tables can be fully synced or partial synced if they are defined
+  as partial synced.
+  Currently this option is available only for :ref:`tap-mysql` and :ref:`tap-postgres` to Snowflake.
+
 2. **Partial resync**
 
 If you want to partial resync a table from a specific tap then use the ``partial_sync_table`` command
