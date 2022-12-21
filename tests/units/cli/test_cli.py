@@ -82,7 +82,7 @@ class TestCli:
             json.dump(sample_state_data, state_file)
 
     @staticmethod
-    def _assert_calling_sync_tables(pipelinewise: PipelineWise, side_effect_method: Optional[Callable] = None) -> None:
+    def _assert_calling_sync_tables(pipelinewise: PipelineWise) -> None:
         with patch('pipelinewise.cli.pipelinewise.multiprocessing') as mocked_multiprocessing:
             pipelinewise.sync_tables()
 
@@ -95,6 +95,15 @@ class TestCli:
             call.Process().join(),
             call.Process().join(),
         ])
+
+    @staticmethod
+    def _assert_calling_fastsync_tables(
+            pipelinewise: PipelineWise, selected_tables, side_effect_method: Optional[Callable] = None) -> None:
+        with patch('pipelinewise.cli.pipelinewise.PipelineWise.run_tap_fastsync') as mocked_fastsync:
+            if side_effect_method:
+                mocked_fastsync.side_effect = side_effect_method
+            pipelinewise.sync_tables_fast_sync(selected_tables)
+        mocked_fastsync.assert_called_once()
 
     def _assert_import_command(self, args):
         if args.taps == '*':
@@ -378,7 +387,6 @@ class TestCli:
 
     def test_merge_updated_catalog(self):
         """Test merging not empty schemas"""
-        # TODO: Check if pipelinewise.merge_schemas is required at all or not
         tap_one_catalog = cli.utils.load_json(
             '{}/resources/sample_json_config/target_one/tap_one/properties.json'.format(
                 os.path.dirname(__file__)
@@ -702,36 +710,34 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
             tables_arg='db_test_mysql.table_one,db_test_mysql.table_two')
         self._assert_calling_sync_tables(pipelinewise)
 
-    def test_command_sync_tables_cleanup_state_if_file_exists_and_no_table_argument(self):
+    def test_fast_sync_tables_cleanup_state_for_selected_tables(self):
         """Testing sync_tables cleanup state if file exists and there is no table argument"""
-        def _assert_state_file_is_deleted(*args, **kwargs):
+        def _assert_state_file(*args, **kwargs):
             # pylint: disable=unused-argument
-            assert os.path.isfile(test_state_file) is False
+            with open(test_state_file, 'r', encoding='utf-8') as state_file:
+                bookmarks = json.load(state_file)
+
+            assert bookmarks == {'bookmarks': {'table2': {'foo': 'bar'}},  'currently_syncing': None}
 
         pipelinewise = self._init_for_sync_tables_states_cleanup()
         test_state_file = pipelinewise.tap['files']['state']
         self._make_sample_state_file(test_state_file)
-        self._assert_calling_sync_tables(pipelinewise, _assert_state_file_is_deleted)
 
-    def test_command_sync_tables_cleanup_state_if_file_exists_and_table_argument(self):
-        """Testing sync_tables cleanup state if file exists and there is table argument"""
-        def _assert_state_file_is_cleaned(*args, **kwargs):
-            # pylint: disable=unused-argument
-            expected_state_data = {
-                'currently_syncing': None,
-                'bookmarks': {
-                    'table2': {'foo': 'bar'},
-                }
-            }
-            with open(test_state_file, encoding='UTF-8') as state_file:
-                state_data = json.load(state_file)
-            assert state_data == expected_state_data
+        # TODO: fix side effect!
+        original_bookmarks = {
+            'bookmarks': {
+                'table1': {'foo': 'bar'},
+                'table2': {'foo': 'bar'},
+                'table3': {'foo': 'bar'}
+            },
+            'currently_syncing': None
+        }
+        with open(test_state_file, 'r', encoding='utf-8') as state_file:
+            bookmarks = json.load(state_file)
 
-        pipelinewise = self._init_for_sync_tables_states_cleanup(
-            tables_arg='db_test_mysql.table_one,db_test_mysql.table_two')
-        test_state_file = pipelinewise.tap['files']['state']
-        self._make_sample_state_file(test_state_file)
-        self._assert_calling_sync_tables(pipelinewise, _assert_state_file_is_cleaned)
+        assert bookmarks == original_bookmarks
+        self._assert_calling_fastsync_tables(pipelinewise, ['table1','table3'], _assert_state_file)
+
 
     def test_command_sync_tables_cleanup_state_if_file_empty_and_table_argument(self):
         """Testing sync_tables cleanup state if file empty and there is table argument"""

@@ -1986,8 +1986,6 @@ TAP RUN SUMMARY
         state_file = self.tap['files']['state']
         if tables:
             self._clean_tables_from_bookmarks_in_state_file(state_file, tables)
-        else:
-            utils.silentremove(state_file)
 
     @staticmethod
     def _clean_tables_from_bookmarks_in_state_file(state_file_to_clean: str, tables: str) -> None:
@@ -1998,7 +1996,7 @@ TAP RUN SUMMARY
                 list_of_tables = tables.split(',')
                 if bookmarks:
                     for table_name in list_of_tables:
-                        bookmarks.pop(table_name, None)
+                        bookmarks.pop(table_name.replace('"', ''), None)
 
                 state_file.seek(0)
                 json.dump(state_data, state_file)
