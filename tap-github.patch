@@ -1,0 +1,80 @@
+--- tap_github/__init__.py	2023-01-04 14:07:53.000000000 +0100
++++ tap_github/__init__.patch.py	2023-01-04 14:08:46.000000000 +0100
+@@ -5,6 +5,7 @@
+ import requests
+ import backoff
+ import singer
++import functools
+ 
+ from singer import (bookmarks, metrics, metadata)
+ from simplejson import JSONDecodeError
+@@ -189,6 +190,7 @@
+         error_code, ERROR_CODE_EXCEPTION_MAPPING.get(error_code, {}).get("message", "Unknown Error") if response_json == {} else response_json)
+ 
+     exc = ERROR_CODE_EXCEPTION_MAPPING.get(error_code, {}).get("raise_exception", GithubException)
++
+     raise exc(message) from None
+ 
+ def calculate_seconds(epoch):
+@@ -206,10 +208,43 @@
+         logger.info("API rate limit exceeded. Tap will retry the data collection after %s seconds.", seconds_to_sleep)
+         time.sleep(seconds_to_sleep)
+ 
++def retry(max_tries: int = 5, sleep_time: float = 1):
++    """
++    Decorator that will retry to execute a function after it fails.
++
++    :param max_tries: The maximum amount of time the function will try to execute.
++    :param sleep_time: The amount of time to sleep between two retries (in seconds).
++    :return: A retry decorator
++    """
++
++    def inner(func):
++        @functools.wraps(func)
++        def wrapper(*args, **kwargs):
++            tries = 1
++            while tries <= max_tries:
++                try:
++                    return func(*args, **kwargs)
++                except Exception as err:
++                    if tries < max_tries:
++                        logger.info(
++                            f"Attempt {tries} out of {max_tries} failed. Sleeping "
++                            f"{sleep_time} seconds and retrying."
++                        )
++                        tries += 1
++                        time.sleep(sleep_time)
++                        continue
++                    logger.error(f"{max_tries} attempts failed after retries, raising error.")
++                    raise err
++
++        return wrapper
++
++    return inner
++
+ # pylint: disable=dangerous-default-value
+ # during 'Timeout' error there is also possibility of 'ConnectionError',
+ # hence added backoff for 'ConnectionError' too.
+-@backoff.on_exception(backoff.expo, (requests.Timeout, requests.ConnectionError), max_tries=5, factor=2)
++@retry(15, 4)
+ def authed_get(source, url, headers={}):
+     with metrics.http_request_timer(source) as timer:
+         session.headers.update(headers)
+@@ -384,7 +419,7 @@
+ def verify_access_for_repo(config):
+ 
+     access_token = config['access_token']
+-    session.headers.update({'authorization': 'token ' + access_token, 'per_page': '1', 'page': '1'})
++    session.headers.update({'Authorization': 'Bearer ' + access_token, 'per_page': '1', 'page': '1'})
+ 
+     repositories = extract_repos_from_config(config)
+ 
+@@ -1117,7 +1152,7 @@
+ 
+ def do_sync(config, state, catalog):
+     access_token = config['access_token']
+-    session.headers.update({'authorization': 'token ' + access_token})
++    session.headers.update({'Authorization': 'Bearer ' + access_token})
+ 
+     start_date = config['start_date'] if 'start_date' in config else None
+     # get selected streams, make sure stream dependencies are met
