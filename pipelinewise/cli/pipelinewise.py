@@ -86,6 +86,7 @@ class PipelineWise:
             self.venv_dir, 'cli', 'bin', 'pipelinewise'
         )
         self.config_path = os.path.join(self.config_dir, 'config.json')
+        self.config = {}
         self.load_config()
         self.alert_sender = AlertSender(self.config.get('alert_handlers'))
 
@@ -362,15 +363,13 @@ class PipelineWise:
 
     def load_config(self):
         """
-        Load configuration
+        Load ppw main configuration at ~/.pipelinewise/config.json
         """
-        self.logger.debug('Loading config at %s', self.config_path)
+        self.logger.debug('Loading main config at %s', self.config_path)
         config = utils.load_json(self.config_path)
 
         if config:
             self.config = config
-        else:
-            self.config = {}
 
     def get_temp_dir(self):
         """
