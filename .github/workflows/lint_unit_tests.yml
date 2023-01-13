@@ -67,4 +67,4 @@ jobs:
         if: steps.check.outcome == 'failure'
         run: |
           . .virtualenvs/pipelinewise/bin/activate
-          pytest --cov=pipelinewise --cov-fail-under=75 -v tests/units
+          pytest --cov=pipelinewise --cov-fail-under=77 -v tests/units
