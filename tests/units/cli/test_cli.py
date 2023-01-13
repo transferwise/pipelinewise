@@ -2,13 +2,14 @@ import json
 import os
 import re
 import time
-import shutil
 import psutil
 import pidfile
 import pytest
+import shutil
 
 from pathlib import Path
 from unittest.mock import patch, call
+from tempfile import NamedTemporaryFile
 from typing import Callable, Optional
 from slack import WebClient
 
@@ -582,6 +583,158 @@ class TestCli:
         """Test import command for selected taps"""
         args = CliArgs(dir=f'{os.path.dirname(__file__)}/resources/test_import_command', taps='tap_one,tap_three')
         self._assert_import_command(args)
+
+    def test_cleanup_after_deleted_config(self):
+        """Test that cleanup of config of deleted taps and target takes place"""
+        old_config = {
+            "targets": [
+                {
+                    "id": "target_one",
+                    "name": "Target One",
+                    "type": "target-snowflake",
+                    "status": "ready",
+                    "taps": [
+                        {
+                            "enabled": True,
+                            "id": "tap_one",
+                            "name": "Source One",
+                            "owner": "somebody@transferwise.com",
+                            "send_alert": True,
+                            "type": "tap-mysql"
+                        },
+                        {
+                            "enabled": True,
+                            "id": "tap_two",
+                            "name": "Source Two",
+                            "owner": "marten.hallik@transferwise.com",
+                            "send_alert": False,
+                            "type": "tap-postgres"
+                        }
+                    ]
+                },
+                {
+                    "id": "target_two",
+                    "name": "Target Two",
+                    "type": "target-s3-csv",
+                    "status": "ready",
+                    "taps": [
+                        {
+                            "enabled": True,
+                            "id": "tap_three",
+                            "name": "Source Three",
+                            "owner": "somebody@transferwise.com",
+                            "type": "tap-mysql"
+                        },
+                        {
+                            "enabled": True,
+                            "id": "tap_four",
+                            "name": "Source Four",
+                            "owner": "somebody@transferwise.com",
+                            "type": "tap-kafka"
+                        }
+                    ]
+                },
+                {
+                    "id": "target_three",
+                    "name": "Target 3",
+                    "type": "target-snowflake",
+                    "status": "ready",
+                    "taps": [
+                        {
+                            "enabled": True,
+                            "id": "tap_five",
+                            "name": "Source five",
+                            "owner": "somebody@transferwise.com",
+                            "type": "tap-s3-csv"
+                        }
+                    ]
+                }
+            ]
+        }
+
+        with patch('pipelinewise.cli.pipelinewise.utils.silentremove') as silentremove:
+            with patch('pipelinewise.cli.pipelinewise.FastSyncTapPostgres.drop_slot') as drop_slot:
+                deleted_taps_count = self.pipelinewise.cleanup_after_deleted_config(old_config)
+
+        assert deleted_taps_count == 2
+        assert silentremove.call_args_list == [
+            call(f'{CONFIG_DIR}/target_two/tap_four'),
+            call(f'{CONFIG_DIR}/target_three/tap_five'),
+            call(f'{CONFIG_DIR}/target_three'),
+        ]
+        # not called because none of the deleted taps are tap-postgres
+        drop_slot.assert_not_called()
+
+    def test_cleanup_after_deleted_config_of_tap_postgres(self):
+        """Test that cleanup of config and slot of deleted postgres tap takes place"""
+        old_config = {
+            "targets": [
+                {
+                    "id": "target_one",
+                    "name": "Target One",
+                    "type": "target-snowflake",
+                    "status": "ready",
+                    "taps": [
+                        {
+                            "enabled": True,
+                            "id": "tap_one",
+                            "name": "Source One",
+                            "owner": "somebody@transferwise.com",
+                            "send_alert": True,
+                            "type": "tap-mysql"
+                        },
+                        {
+                            "enabled": True,
+                            "id": "tap_two",
+                            "name": "Source Two",
+                            "owner": "marten.hallik@transferwise.com",
+                            "send_alert": False,
+                            "type": "tap-postgres"
+                        }
+                    ]
+                },
+                {
+                    "id": "target_two",
+                    "name": "Target Two",
+                    "type": "target-s3-csv",
+                    "status": "ready",
+                    "taps": [
+                        {
+                            "enabled": True,
+                            "id": "tap_three",
+                            "name": "Source Three",
+                            "owner": "somebody@transferwise.com",
+                            "type": "tap-mysql"
+                        },
+                        {
+                            "enabled": True,
+                            "id": "tap_four",
+                            "name": "Source Four",
+                            "owner": "somebody@transferwise.com",
+                            "type": "tap-postgres"
+                        }
+                    ]
+                }
+            ]
+        }
+
+        with patch('pipelinewise.cli.pipelinewise.utils.silentremove') as silentremove:
+            with patch('pipelinewise.cli.pipelinewise.FastSyncTapPostgres.drop_slot') as drop_slot:
+                with patch('pipelinewise.cli.pipelinewise.Config.get_connector_config_file') as get_connector_config_file:
+                    with NamedTemporaryFile(suffix='.json') as f:
+                        f.write(b'{"host": "localhost"}')
+                        f.seek(0)
+                        get_connector_config_file.return_value = f.name
+
+                        deleted_taps_count = self.pipelinewise.cleanup_after_deleted_config(old_config)
+
+        assert deleted_taps_count == 1
+        assert silentremove.call_args_list == [
+            call(f'{CONFIG_DIR}/target_two/tap_four'),
+        ]
+
+        # called because the deleted tap is a tap-postgres
+        drop_slot.assert_called_once()
 
     def test_command_status(self, capsys):
         """Test status command output"""
