@@ -587,65 +587,65 @@ class TestCli:
     def test_cleanup_after_deleted_config(self):
         """Test that cleanup of config of deleted taps and target takes place"""
         old_config = {
-            "targets": [
+            'targets': [
                 {
-                    "id": "target_one",
-                    "name": "Target One",
-                    "type": "target-snowflake",
-                    "status": "ready",
-                    "taps": [
+                    'id': 'target_one',
+                    'name': 'Target One',
+                    'type': 'target-snowflake',
+                    'status': 'ready',
+                    'taps': [
                         {
-                            "enabled": True,
-                            "id": "tap_one",
-                            "name": "Source One",
-                            "owner": "somebody@transferwise.com",
-                            "send_alert": True,
-                            "type": "tap-mysql"
+                            'enabled': True,
+                            'id': 'tap_one',
+                            'name': 'Source One',
+                            'owner': 'somebody@transferwise.com',
+                            'send_alert': True,
+                            'type': 'tap-mysql'
                         },
                         {
-                            "enabled": True,
-                            "id": "tap_two",
-                            "name": "Source Two",
-                            "owner": "marten.hallik@transferwise.com",
-                            "send_alert": False,
-                            "type": "tap-postgres"
+                            'enabled': True,
+                            'id': 'tap_two',
+                            'name': 'Source Two',
+                            'owner': 'marten.hallik@transferwise.com',
+                            'send_alert': False,
+                            'type': 'tap-postgres'
                         }
                     ]
                 },
                 {
-                    "id": "target_two",
-                    "name": "Target Two",
-                    "type": "target-s3-csv",
-                    "status": "ready",
-                    "taps": [
+                    'id': 'target_two',
+                    'name': 'Target Two',
+                    'type': 'target-s3-csv',
+                    'status': 'ready',
+                    'taps': [
                         {
-                            "enabled": True,
-                            "id": "tap_three",
-                            "name": "Source Three",
-                            "owner": "somebody@transferwise.com",
-                            "type": "tap-mysql"
+                            'enabled': True,
+                            'id': 'tap_three',
+                            'name': 'Source Three',
+                            'owner': 'somebody@transferwise.com',
+                            'type': 'tap-mysql'
                         },
                         {
-                            "enabled": True,
-                            "id": "tap_four",
-                            "name": "Source Four",
-                            "owner": "somebody@transferwise.com",
-                            "type": "tap-kafka"
+                            'enabled': True,
+                            'id': 'tap_four',
+                            'name': 'Source Four',
+                            'owner': 'somebody@transferwise.com',
+                            'type': 'tap-kafka'
                         }
                     ]
                 },
                 {
-                    "id": "target_three",
-                    "name": "Target 3",
-                    "type": "target-snowflake",
-                    "status": "ready",
-                    "taps": [
+                    'id': 'target_three',
+                    'name': 'Target 3',
+                    'type': 'target-snowflake',
+                    'status': 'ready',
+                    'taps': [
                         {
-                            "enabled": True,
-                            "id": "tap_five",
-                            "name": "Source five",
-                            "owner": "somebody@transferwise.com",
-                            "type": "tap-s3-csv"
+                            'enabled': True,
+                            'id': 'tap_five',
+                            'name': 'Source five',
+                            'owner': 'somebody@transferwise.com',
+                            'type': 'tap-s3-csv'
                         }
                     ]
                 }
@@ -668,50 +668,50 @@ class TestCli:
     def test_cleanup_after_deleted_config_of_tap_postgres(self):
         """Test that cleanup of config and slot of deleted postgres tap takes place"""
         old_config = {
-            "targets": [
+            'targets': [
                 {
-                    "id": "target_one",
-                    "name": "Target One",
-                    "type": "target-snowflake",
-                    "status": "ready",
-                    "taps": [
+                    'id': 'target_one',
+                    'name': 'Target One',
+                    'type': 'target-snowflake',
+                    'status': 'ready',
+                    'taps': [
                         {
-                            "enabled": True,
-                            "id": "tap_one",
-                            "name": "Source One",
-                            "owner": "somebody@transferwise.com",
-                            "send_alert": True,
-                            "type": "tap-mysql"
+                            'enabled': True,
+                            'id': 'tap_one',
+                            'name': 'Source One',
+                            'owner': 'somebody@transferwise.com',
+                            'send_alert': True,
+                            'type': 'tap-mysql'
                         },
                         {
-                            "enabled": True,
-                            "id": "tap_two",
-                            "name": "Source Two",
-                            "owner": "marten.hallik@transferwise.com",
-                            "send_alert": False,
-                            "type": "tap-postgres"
+                            'enabled': True,
+                            'id': 'tap_two',
+                            'name': 'Source Two',
+                            'owner': 'marten.hallik@transferwise.com',
+                            'send_alert': False,
+                            'type': 'tap-postgres'
                         }
                     ]
                 },
                 {
-                    "id": "target_two",
-                    "name": "Target Two",
-                    "type": "target-s3-csv",
-                    "status": "ready",
-                    "taps": [
+                    'id': 'target_two',
+                    'name': 'Target Two',
+                    'type': 'target-s3-csv',
+                    'status': 'ready',
+                    'taps': [
                         {
-                            "enabled": True,
-                            "id": "tap_three",
-                            "name": "Source Three",
-                            "owner": "somebody@transferwise.com",
-                            "type": "tap-mysql"
+                            'enabled': True,
+                            'id': 'tap_three',
+                            'name': 'Source Three',
+                            'owner': 'somebody@transferwise.com',
+                            'type': 'tap-mysql'
                         },
                         {
-                            "enabled": True,
-                            "id": "tap_four",
-                            "name": "Source Four",
-                            "owner": "somebody@transferwise.com",
-                            "type": "tap-postgres"
+                            'enabled': True,
+                            'id': 'tap_four',
+                            'name': 'Source Four',
+                            'owner': 'somebody@transferwise.com',
+                            'type': 'tap-postgres'
                         }
                     ]
                 }
