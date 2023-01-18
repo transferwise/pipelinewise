@@ -1,3 +1,4 @@
+import dataclasses
 import json
 import os
 import re
@@ -143,13 +144,6 @@ class TestCli:
         # It should return and empty config with empty list targets
         # TODO: Make this scenario to fail with error message of "config dir not exists"
         assert pipelinewise_with_no_config.config == {}
-        assert pipelinewise_with_no_config.get_targets() == []
-
-    def test_get_targets(self):
-        """Targets should be loaded from JSON as is"""
-        assert self.pipelinewise.get_targets() == cli.utils.load_json(
-            '{}/config.json'.format(CONFIG_DIR)
-        ).get('targets', [])
 
     def test_get_target(self):
         """Selecting target by ID should append connector files"""
@@ -586,8 +580,19 @@ class TestCli:
     def test_command_status(self, capsys):
         """Test status command output"""
         # Status table should be printed to stdout
-        self.pipelinewise.status()
+        with patch('pipelinewise.cli.pipelinewise.pidfile.PIDFile') as PIDFile:
+            @dataclasses.dataclass
+            class MockedPidFile:
+                is_running: bool
+
+            PIDFile.side_effect = [
+                MockedPidFile(False),
+                MockedPidFile(True),
+            ]
+            self.pipelinewise.status()
+
         stdout, stderr = capsys.readouterr()
+
         assert not stderr.strip()
 
         # Exact output match
@@ -597,11 +602,13 @@ class TestCli:
             == """Tap ID     Tap Type      Target ID    Target Type       Enabled    Status          Last Sync    Last Sync Result
 ---------  ------------  -----------  ----------------  ---------  --------------  -----------  ------------------
 tap_one    tap-mysql     target_one   target-snowflake  True       ready                        unknown
-tap_two    tap-postgres  target_one   target-snowflake  True       ready                        unknown
+tap_two    tap-postgres  target_one   target-snowflake  True       running                      unknown
 tap_three  tap-mysql     target_two   target-s3-csv     True       not-configured               unknown
 3 pipeline(s)
 """
         )
+
+        assert PIDFile.call_count == 2
 
     def test_command_discover_tap(self):
         """Test discover tap command"""
