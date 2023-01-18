@@ -925,9 +925,9 @@ class PipelineWise:
         # Tap exists but configuration not completed
         if not os.path.isfile(connector_files['config']):
             status['currentStatus'] = 'not-configured'
-
-        pid = pidfile.PIDFile(connector_files['pidfile'])
-        status['currentStatus'] = 'running' if pid.is_running else 'ready'
+        else:
+            pid = pidfile.PIDFile(connector_files['pidfile'])
+            status['currentStatus'] = 'running' if pid.is_running else 'ready'
 
         # Get last run instance
         if os.path.isdir(log_dir):
