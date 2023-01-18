@@ -580,12 +580,13 @@ class TestCli:
     def test_command_status(self, capsys):
         """Test status command output"""
         # Status table should be printed to stdout
-        with patch('pipelinewise.cli.pipelinewise.pidfile.PIDFile') as PIDFile:
+        with patch('pipelinewise.cli.pipelinewise.pidfile.PIDFile') as pidfile_class:
             @dataclasses.dataclass
             class MockedPidFile:
+                """Mocked PIDFile class"""
                 is_running: bool
 
-            PIDFile.side_effect = [
+            pidfile_class.side_effect = [
                 MockedPidFile(False),
                 MockedPidFile(True),
             ]
@@ -608,7 +609,7 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
 """
         )
 
-        assert PIDFile.call_count == 2
+        assert pidfile_class.call_count == 2
 
     def test_command_discover_tap(self):
         """Test discover tap command"""
