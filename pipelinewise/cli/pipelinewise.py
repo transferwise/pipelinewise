@@ -1115,19 +1115,6 @@ class PipelineWise:
             drop_pg_slot=self.drop_pg_slot,
         )
 
-        # Do not run if another instance is already running
-        log_dir = os.path.dirname(self.tap_run_log_file)
-        if (
-            os.path.isdir(log_dir)
-            and len(utils.search_files(log_dir, patterns=['*.log.running'])) > 0
-        ):
-            self.logger.info(
-                'Failed to run. Another instance of the same tap is already running. '
-                'Log file detected in running status at %s',
-                log_dir,
-            )
-            sys.exit(1)
-
         # Fastsync is running in subprocess.
         # Collect the formatted logs and log it in the main PipelineWise process as well
         # Logs are already formatted at this stage so not using logging functions to avoid double formatting.
