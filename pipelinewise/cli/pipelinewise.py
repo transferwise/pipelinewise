@@ -946,8 +946,6 @@ class PipelineWise:
         """
         Prints a status summary table of every imported pipeline with their tap and target.
         """
-        targets = self.get_targets()
-
         tab_headers = [
             'Tap ID',
             'Tap Type',
@@ -960,20 +958,20 @@ class PipelineWise:
         ]
         tab_body = []
         pipelines = 0
-        for target in targets:
-            taps = self.get_taps(target['id'])
+        for target in self.config.get('targets', []):
+            for tap in target['taps']:
+                status = self.detect_tap_status(target['id'], tap['id'])
 
-            for tap in taps:
                 tab_body.append(
                     [
-                        tap.get('id', '<Unknown>'),
-                        tap.get('type', '<Unknown>'),
-                        target.get('id', '<Unknown>'),
-                        target.get('type', '<Unknown>'),
-                        tap.get('enabled', '<Unknown>'),
-                        tap.get('status', {}).get('currentStatus', '<Unknown>'),
-                        tap.get('status', {}).get('lastTimestamp', '<Unknown>'),
-                        tap.get('status', {}).get('lastStatus', '<Unknown>'),
+                        tap['id'],
+                        tap['type'],
+                        target['id'],
+                        target['type'],
+                        tap['enabled'],
+                        status['currentStatus'],
+                        status['lastTimestamp'],
+                        status['lastStatus'],
                     ]
                 )
                 pipelines += 1
