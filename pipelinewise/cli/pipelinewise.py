@@ -408,25 +408,12 @@ class PipelineWise:
         """
         return os.path.join(self.venv_dir, connector_type, 'bin', 'python')
 
-    def get_targets(self):
-        """
-        Get every target
-        """
-        self.logger.debug('Getting targets from %s', self.config_path)
-        self.load_config()
-        try:
-            targets = self.config.get('targets', [])
-        except Exception as exc:
-            raise Exception('Targets not defined') from exc
-
-        return targets
-
     def get_target(self, target_id: str) -> Dict:
         """
         Get target by id
         """
         self.logger.debug('Getting %s target', target_id)
-        targets = self.get_targets()
+        targets = self.config.get('targets', [])
 
         target = next((item for item in targets if item['id'] == target_id), None)
 
