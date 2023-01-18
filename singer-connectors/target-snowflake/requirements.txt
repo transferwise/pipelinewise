@@ -1,1 +1,1 @@
-https://github.com/entera-ai/pipelinewise-target-snowflake/archive/master.tar.gz
+git+ssh://git@github.com/entera-ai/pipelinewise-target-snowflake.git@aa6ac2e392b6148994f9138241630ba8d684adac#egg=pipelinewise-target-snowflake
