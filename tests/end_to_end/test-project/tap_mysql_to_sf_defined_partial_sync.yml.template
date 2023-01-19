@@ -50,7 +50,7 @@ schemas:
         replication_key: "date_updated"
         sync_start_from:
             column: "address_id"
-            value: "400"
+            value: 400
 
       - table_name: "customers"
         replication_method: "LOG_BASED"

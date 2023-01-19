@@ -52,7 +52,7 @@ schemas:
         replication_key: "id"
         sync_start_from:
             column: "id"
-            value: "5"
+            value: 5
             drop_target_table: true
 
       - table_name: "customers"

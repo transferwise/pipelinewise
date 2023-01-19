@@ -2,7 +2,6 @@
 import os
 import multiprocessing
 from functools import partial
-from ast import literal_eval
 
 from datetime import datetime
 from typing import Union
@@ -13,8 +12,6 @@ from pipelinewise.fastsync.commons.tap_postgres import FastSyncTapPostgres
 from pipelinewise.fastsync.postgres_to_snowflake import REQUIRED_CONFIG_KEYS, tap_type_to_target_type
 from pipelinewise.fastsync.commons import utils as common_utils
 from pipelinewise.fastsync.partialsync import utils
-
-
 from pipelinewise.logger import Logger
 
 LOGGER = Logger().get_logger(__name__)
@@ -127,27 +124,7 @@ def main_impl():
         ''', args.table, args.column, args.start_value, args.end_value
     )
 
-    table_names = args.table.split(',')
-    column_names = args.column.split(',')
-
-    start_values = args.start_value.split(',')
-    if args.end_value:
-        end_values = args.end_value.split(',')
-    else:
-        end_values = [None] * len(table_names)
-    if args.drop_target_table:
-        drop_target_tables = [literal_eval(x) for x in args.drop_target_table.split(',')]
-    else:
-        drop_target_tables = [False] * len(table_names)
-
-    sync_tables = {}
-    for ind, table in enumerate(table_names):
-        sync_tables[table] = {
-            'column': column_names[ind],
-            'start_value': start_values[ind],
-            'end_value': end_values[ind],
-            'drop_target_table': drop_target_tables[ind],
-        }
+    sync_tables = utils.get_sync_tables(args)
 
     with multiprocessing.Pool(pool_size) as proc:
         sync_excs = list(

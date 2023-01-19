@@ -5,6 +5,7 @@ import os
 import re
 
 from datetime import datetime
+from ast import literal_eval
 
 from typing import Dict, Tuple, List
 
@@ -162,6 +163,32 @@ def validate_boundary_value(string_to_check: str) -> str:
             raise InvalidConfigException(f'Invalid boundary value: {string_to_check}') from Exception
 
     return string_to_check
+
+
+def get_sync_tables(args: argparse.Namespace) -> Dict:
+    """
+    getting all needed information of tables for using in partial sync.
+    """
+    table_names = args.table.split(',')
+    column_names = args.column.split(',')
+    start_values = args.start_value.split(',')
+    if args.end_value:
+        end_values = args.end_value.split(',')
+    else:
+        end_values = [None] * len(table_names)
+    if args.drop_target_table:
+        drop_target_tables = [literal_eval(x) for x in args.drop_target_table.split(',')]
+    else:
+        drop_target_tables = [False] * len(table_names)
+    sync_tables = {}
+    for ind, table in enumerate(table_names):
+        sync_tables[table] = {
+            'column': column_names[ind],
+            'start_value': start_values[ind],
+            'end_value': end_values[ind],
+            'drop_target_table': drop_target_tables[ind],
+        }
+    return sync_tables
 
 
 def _get_args_parser_for_partialsync():

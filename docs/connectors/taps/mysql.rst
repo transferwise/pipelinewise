@@ -187,7 +187,7 @@ Example YAML for ``tap-mysql``:
         - table_name: "table_three"
           replication_method: "LOG_BASED"
           sync_start_from:                   # Optional, applies for then first sync and fast sync
-            column: "column_name"            # column name to be picked for partial sync
+            column: "column_name"            # column name to be picked for partial sync with incremental or timestamp value
             value: "start_value"             # The first sync always starts from column >= value
             drop_target_table: true          # Optional, drops target table before syncing. default value is false
 

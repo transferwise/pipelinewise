@@ -30,7 +30,7 @@ PROFILING_DIR = './profiling'
 # Can't inherit from unittest.TestCase because it breaks pytest fixture
 # https://github.com/pytest-dev/pytest/issues/2504#issuecomment-308828149
 
-# pylint: disable=no-self-use,too-many-public-methods,attribute-defined-outside-init,fixme
+# pylint: disable=no-self-use,too-many-public-methods,attribute-defined-outside-init,too-many-lines,fixme
 class TestCli:
     """
     Unit Tests for PipelineWise CLI executable
@@ -83,18 +83,17 @@ class TestCli:
 
     @staticmethod
     def _assert_calling_sync_tables(pipelinewise: PipelineWise) -> None:
-        with patch('pipelinewise.cli.pipelinewise.multiprocessing') as mocked_multiprocessing:
+        with patch('pipelinewise.cli.pipelinewise.MultiProcess') as mocked_process:
+            mocked_process.return_value.exception = None
+            mocked_process.return_value.exitcode = 0
             pipelinewise.sync_tables()
 
-        mocked_multiprocessing.assert_has_calls([
-            call.Process(target=pipelinewise.sync_tables_partial_sync, args=(
+        assert mocked_process.call_args_list == [
+            call(target=pipelinewise.sync_tables_partial_sync, args=(
                 {'db_test_mysql.table_one': {'column': 'id', 'value': '5'}},)),
-            call.Process().start(),
-            call.Process(target=pipelinewise.sync_tables_fast_sync, args=(['db_test_mysql.table_two'],)),
-            call.Process().start(),
-            call.Process().join(),
-            call.Process().join(),
-        ])
+            call(target=pipelinewise.sync_tables_fast_sync, args=(['db_test_mysql.table_two'],)),
+        ]
+
 
     @staticmethod
     def _assert_calling_fastsync_tables(
@@ -124,6 +123,16 @@ class TestCli:
                 assert mocked_parallel.call_count == len(expected_taps)
                 for call_arg in mocked_parallel.call_args_list:
                     assert call_arg[1]['tap']['id'] in expected_taps
+
+    def _assert_run_command_exit_with_error_1(self, command):
+        with patch('pipelinewise.cli.pipelinewise.PipelineWise.run_tap_singer'):
+            args = CliArgs(target='target_one', tap='tap_one')
+            pipelinewise = PipelineWise(args, CONFIG_DIR, VIRTUALENVS_DIR)
+            with pytest.raises(SystemExit) as pytest_wrapped_e:
+                ppw_command = getattr(pipelinewise, command)
+                ppw_command()
+            assert pytest_wrapped_e.type == SystemExit
+            assert pytest_wrapped_e.value.code == 1
 
     def test_target_dir(self):
         """Singer target connector config path must be relative to the project config dir"""
@@ -682,6 +691,32 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
 
         # Delete test log file
         os.remove('{}.terminated'.format(pipelinewise.tap_run_log_file))
+
+
+    def test_command_run_tap_exit_with_error_1_if_fastsync_exception(self):
+        """Test if run_tap command returns error 1 if exception in fastsync"""
+        with patch('pipelinewise.cli.pipelinewise.PipelineWise.run_tap_fastsync') as mocked_fastsync:
+            mocked_fastsync.side_effect = Exception('FOO')
+            self._assert_run_command_exit_with_error_1('run_tap')
+
+    def test_command_run_tap_exit_with_error_1_if_partial_sync_exception(self):
+        """Test if run_tap command returns error 1 if exception in partialsync"""
+        with patch('pipelinewise.cli.pipelinewise.PipelineWise.run_tap_partialsync') as mocked_partial_sync:
+            mocked_partial_sync.side_effect = Exception('FOO')
+            self._assert_run_command_exit_with_error_1('run_tap')
+
+    def test_command_sync_tables_exit_with_error_1_if_fast_sync_exception(self):
+        """Test if sync_tables command returns error 1 if exception in fastsync"""
+        with patch('pipelinewise.cli.pipelinewise.PipelineWise.run_tap_fastsync') as mocked_fastsync:
+            mocked_fastsync.side_effect = Exception('FOO')
+            self._assert_run_command_exit_with_error_1('sync_tables')
+
+    def test_command_sync_tables_exit_with_error_1_if_partial_sync_exception(self):
+        """Test if sync_tables command returns error 1 if exception in partial sync"""
+        with patch('pipelinewise.cli.pipelinewise.PipelineWise.run_tap_partialsync') as mocked_partial_sync:
+            mocked_partial_sync.side_effect = Exception('FOO')
+            self._assert_run_command_exit_with_error_1('sync_tables')
+
 
     def test_command_sync_tables(self):
         """Test run tap command"""
