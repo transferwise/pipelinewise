@@ -29,6 +29,8 @@ from .errors import (
     InvalidConfigException, PartialSyncNotSupportedTypeException,
     PreRunChecksException
 )
+from pipelinewise.db.backend_database import BackendDatabase
+from pipelinewise.scheduler.scheduler import Scheduler
 
 FASTSYNC_PAIRS = {
     ConnectorType.TAP_MYSQL: {
@@ -88,6 +90,7 @@ class PipelineWise:
         self.config_path = os.path.join(self.config_dir, 'config.json')
         self.load_config()
         self.alert_sender = AlertSender(self.config.get('alert_handlers'))
+        self.backend_db = BackendDatabase(self.config.get('backend_database'))
 
         if args.tap != '*':
             self.tap = self.get_tap(args.target, args.tap)
@@ -1660,6 +1663,10 @@ class PipelineWise:
         if len(discover_excs) > 0:
             sys.exit(1)
 
+        # Refreshing the backend database using the imported config
+        if self.backend_db.enabled:
+            self.backend_db.refresh_schedules(targets=config.targets.values())
+
     def encrypt_string(self):
         """
         Encrypt the supplied string using the provided vault secret
@@ -1776,6 +1783,27 @@ class PipelineWise:
         finally:
             if cons_target_config:
                 utils.silentremove(cons_target_config)
+
+    def db_upgrade(self):
+        """
+        Scheduler
+        """
+        if not self.backend_db.enabled:
+            self.logger.error('Backend metadata database is disabled.')
+            sys.exit(1)
+
+        self.backend_db.upgrade_db()
+
+    def scheduler(self):
+        """
+        Starts the scheduler
+        """
+        if not self.backend_db.enabled:
+            self.logger.error('Backend metadata database is disabled but it''s required for the scheduler.')
+            sys.exit(1)
+
+        scheduler = Scheduler(self.backend_db)
+        scheduler.run()
 
     def _check_supporting_tap_and_target_for_partial_sync(self):
         tap_type = self.tap['type']

@@ -1,4 +1,13 @@
 ---
+backend_database:
+  enabled: true
+  conn:
+    driver: postgresql
+    host: db_pipelinewise
+    port: 5432
+    username: pipelinewise
+    password: secret
+    dbname: pipelinewise
 
 # Alert handlers send alerts on run failures
 # Configure the certain alert handler if you want to send alerts

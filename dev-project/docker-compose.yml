@@ -19,10 +19,24 @@ services:
 
     # Build only when test databases are ready
     depends_on:
+      - db_pipelinewise
       - db_postgres_source
       - db_mysql_source
       - db_postgres_dwh
       - db_mongo_source
+    networks:
+      - pipelinewise_network
+
+  # Pipelinewise metadata database
+  db_pipelinewise:
+    image: postgres:11.4
+    container_name: pipelinewise_dev_db
+    ports:
+      - ${PPW_POSTGRES_PORT_ON_HOST}:${PPW_POSTGRES_PORT}
+    environment:
+      POSTGRES_USER: ${PPW_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${PPW_POSTGRES_PASSWORD}
+      POSTGRES_DB: ${PPW_POSTGRES_DB}
     networks:
       - pipelinewise_network
 
