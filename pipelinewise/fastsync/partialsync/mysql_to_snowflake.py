@@ -163,9 +163,6 @@ def main_impl():
         raise SystemExit(1)
 
 
-
-
-
 def main():
     """Main entry point"""
     try:
