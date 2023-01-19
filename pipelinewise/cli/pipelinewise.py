@@ -1379,8 +1379,6 @@ class PipelineWise:
             if process.exitcode != 0:
                 raise SystemExit(process.exitcode)
 
-
-
     def sync_tables_fast_sync(self, selected_tables):
         """
         Sync every or a list of selected tables from a specific tap.
