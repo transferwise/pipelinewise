@@ -1,5 +1,5 @@
 """
-PipelineWise CLI - Alert sender class
+PipelineWise Backend Database
 """
 # pylint: disable=no-value-for-parameter
 import contextlib
