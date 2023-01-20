@@ -1,6 +1,7 @@
 """
 Pipelinewise common utils between cli and fastsync
 """
+import socket
 from typing import Optional
 
 
@@ -21,3 +22,11 @@ def safe_column_name(
     if name:
         return f'{quote_character}{name.upper()}{quote_character}'
     return name
+
+
+def get_hostname() -> str:
+    """
+    Get the hostname of the machine
+    Returns: hostname
+    """
+    return socket.gethostname()

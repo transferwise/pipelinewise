@@ -40,7 +40,10 @@ COMMANDS = [
     'import_config',  # This is for backward compatibility; use 'import' instead
     'validate',
     'encrypt_string',
-    'partial_sync_table'
+    'partial_sync_table',
+    'db_upgrade',
+    'scheduler',
+    'webserver',
 ]
 
 
