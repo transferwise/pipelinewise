@@ -31,6 +31,7 @@ from .errors import (
 )
 from pipelinewise.db.backend_database import BackendDatabase
 from pipelinewise.scheduler.scheduler import Scheduler
+from pipelinewise.www.app import PipelinewiseApp
 
 FASTSYNC_PAIRS = {
     ConnectorType.TAP_MYSQL: {
@@ -1804,6 +1805,13 @@ class PipelineWise:
 
         scheduler = Scheduler(self.backend_db)
         scheduler.run()
+
+    def webserver(self):
+        """
+        Start the webserver
+        """
+        ppw_app = PipelinewiseApp(backend_db=self.backend_db)
+        ppw_app.run()
 
     def _check_supporting_tap_and_target_for_partial_sync(self):
         tap_type = self.tap['type']

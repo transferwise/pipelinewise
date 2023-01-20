@@ -16,6 +16,8 @@ services:
       - /opt/pipelinewise/dev-project/.virtualenvs/
       # mount pipelinewise pipe configuration directory to host for ease of troubleshooting
       - .pipelinewise:/root/.pipelinewise
+    ports:
+      - 127.0.0.1:${WEBSERVER_PORT_ON_HOST}:${WEBSERVER_PORT}
 
     # Build only when test databases are ready
     depends_on:

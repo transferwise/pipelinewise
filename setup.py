@@ -43,6 +43,7 @@ setup(name='pipelinewise',
           'dnspython==2.1.*',
           'boto3==1.21.*',
           'chardet==4.0.0',
+          'flask==2.2.2',
       ],
       extras_require={
           'test': [

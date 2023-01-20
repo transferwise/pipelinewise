@@ -42,7 +42,8 @@ COMMANDS = [
     'encrypt_string',
     'partial_sync_table',
     'db_upgrade',
-    'scheduler'
+    'scheduler',
+    'webserver',
 ]
 
 
