@@ -205,7 +205,7 @@ class BackendDatabase:
                             tap_type=tap['type'],
                             ppw_host=None,
                             is_enabled=True,
-                            state=TapScheduleState.WAITING_FOR_PPW_HOST,
+                            state=TapScheduleState.QUEUING,
                             sync_period=tap.get('sync_period'),
                             first_run=datetime.date(1000, 1, 1),
                             last_run=datetime.date(9999, 1, 1),
@@ -230,19 +230,19 @@ class BackendDatabase:
         session.execute(
             """UPDATE tap_schedule
                   SET ppw_host = :ppw_host,
-                      state = :ready_to_run,
+                      state = :ready,
                       updated_at = NOW()
                 WHERE id = (
                              SELECT id
                                FROM tap_schedule
                               WHERE is_enabled = TRUE
-                                AND state NOT IN (:ready_to_run, :running)
+                                AND state NOT IN (:ready, :running)
                               LIMIT 1 FOR UPDATE SKIP LOCKED
                             )
             """,
             {
                 'ppw_host': get_hostname(),
-                'ready_to_run': TapScheduleState.READY_TO_RUN.name,
+                'ready': TapScheduleState.READY.name,
                 'running': TapScheduleState.RUNNING.name,
             }
         )
@@ -256,7 +256,7 @@ class BackendDatabase:
         # Get all schedules that are enabled and attached to this host
         tap_schedules = session.query(TapSchedule).filter(
             TapSchedule.is_enabled is True,
-            TapSchedule.state == TapScheduleState.READY_TO_RUN,
+            TapSchedule.state == TapScheduleState.READY,
             TapSchedule.first_run <= datetime.datetime.now(),
             TapSchedule.last_run >= datetime.datetime.now(),
             TapSchedule.ppw_host == get_hostname(),

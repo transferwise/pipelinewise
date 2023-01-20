@@ -7,8 +7,8 @@ from pipelinewise.db.models.base import Base
 
 class TapScheduleState(enum.Enum):
     """Enum class for Schedule states"""
-    WAITING_FOR_PPW_HOST = 'WAITING_FOR_PPW_HOST'
-    READY_TO_RUN = 'READY_TO_RUN'
+    QUEUING = 'QUEUING'
+    READY = 'READY'
     RUNNING = 'RUNNING'
     FAILED = 'FAILED'
     SUCCESS = 'SUCCESS'
