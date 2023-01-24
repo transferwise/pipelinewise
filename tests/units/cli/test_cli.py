@@ -2,10 +2,10 @@ import json
 import os
 import re
 import time
-import shutil
 import psutil
 import pidfile
 import pytest
+import shutil
 
 from pathlib import Path
 from unittest.mock import patch, call

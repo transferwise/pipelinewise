@@ -13,7 +13,7 @@ import pidfile
 
 from datetime import datetime
 from time import time
-from typing import Dict, Optional, List, Any
+from typing import Dict, Optional, List, Any, NoReturn
 from joblib import Parallel, delayed, parallel_backend
 from tabulate import tabulate
 
@@ -29,6 +29,7 @@ from .errors import (
     InvalidConfigException, PartialSyncNotSupportedTypeException,
     PreRunChecksException
 )
+from pipelinewise.fastsync.commons.tap_postgres import FastSyncTapPostgres
 
 FASTSYNC_PAIRS = {
     ConnectorType.TAP_MYSQL: {
@@ -86,6 +87,7 @@ class PipelineWise:
             self.venv_dir, 'cli', 'bin', 'pipelinewise'
         )
         self.config_path = os.path.join(self.config_dir, 'config.json')
+        self.config = {}
         self.load_config()
         self.alert_sender = AlertSender(self.config.get('alert_handlers'))
 
@@ -362,15 +364,13 @@ class PipelineWise:
 
     def load_config(self):
         """
-        Load configuration
+        Load ppw main configuration at ~/.pipelinewise/config.json
         """
-        self.logger.debug('Loading config at %s', self.config_path)
+        self.logger.debug('Loading main config at %s', self.config_path)
         config = utils.load_json(self.config_path)
 
         if config:
             self.config = config
-        else:
-            self.config = {}
 
     def get_temp_dir(self):
         """
@@ -1578,6 +1578,8 @@ class PipelineWise:
         Take a list of YAML files from a directory and use it as the source to build
         singer compatible json files and organise them into pipeline directory structure
         """
+        old_config = self.config.copy()
+
         # Read the YAML config files and transform/save into singer compatible
         # JSON files in a common directory structure
         config = Config.from_yamls(self.config_dir, self.args.dir, self.args.secret)
@@ -1629,15 +1631,19 @@ class PipelineWise:
                     )
                 )
 
-        # Log summary
-
         if selected_taps_id != ['*']:
             total_taps = len(selected_taps_id)
             not_found_taps = set(selected_taps_id) - found_selected_taps
             for tap in not_found_taps:
                 discover_excs.append(f'tap "{tap}" not found!')
 
+        # reloading the new config
+        self.load_config()
+        deleted_taps_count = self.cleanup_after_deleted_config(old_config)
+
         end_time = datetime.now()
+
+        # Log summary
         # pylint: disable=logging-too-many-args
         self.logger.info(
             """
@@ -1647,6 +1653,7 @@ class PipelineWise:
                 Total targets to import        : %s
                 Total taps to import           : %s
                 Taps imported successfully     : %s
+                Taps deleted                   : %s
                 Taps failed to import          : %s
                 Runtime                        : %s
             -------------------------------------------------------
@@ -1654,6 +1661,7 @@ class PipelineWise:
             total_targets,
             total_taps,
             total_taps - len(discover_excs),
+            deleted_taps_count,
             str(discover_excs),
             end_time - start_time,
         )
@@ -2053,3 +2061,87 @@ TAP RUN SUMMARY
             Boolean, True if FastSync exists, False otherwise.
         """
         return ConnectorType(target_type) in FASTSYNC_PAIRS.get(ConnectorType(tap_type), {})
+
+    def cleanup_after_deleted_config(self, old_config: Dict) -> int:
+        """
+        Running cleanup of all files/folders...etc after yaml config of a target or tap is deleted
+
+        Args:
+            old_config: old config dictionary representing targets and their taps
+
+        Returns: Number of deleted taps
+        """
+        if not old_config:
+            return 0
+
+        old_config_dict = {}
+        new_config_dict = {}
+
+        for target in old_config.get('targets', []):
+            if target['id'] not in old_config_dict:
+                old_config_dict[target['id']] = {
+                    tap['id']: tap['type']
+                    for tap in target['taps']
+                }
+
+        for target in self.config.get('targets', []):
+            if target['id'] not in new_config_dict:
+                new_config_dict[target['id']] = {
+                    tap['id']
+                    for tap in target['taps']
+                }
+
+        deleted_taps_count = 0
+        for target_id, taps in old_config_dict.items():
+            if target_id not in new_config_dict:
+                # target is no longer configured, thus we need to remove all its config and taps tied to it
+                self._remove_target_config(target_id, taps)
+                deleted_taps_count += len(taps)
+
+            else:
+                deleted_tap_ids = set(taps.keys()) - new_config_dict[target_id]
+
+                for deleted_tap_id in deleted_tap_ids:
+                    # we have taps whose config was deleted, thus need to clean up their files
+                    self._remove_tap_config(deleted_tap_id, target_id, taps[deleted_tap_id])
+
+                deleted_taps_count += len(deleted_tap_ids)
+
+        return deleted_taps_count
+
+    def _remove_tap_config(self, tap_id: str, target_id: str, tap_type: str) -> NoReturn:
+        """
+        Remove the tap config and do any necessary cleanup.
+        Args:
+            tap_id: ID of the tap to remove, also matches the name of the folder where the tap config lives.
+            target_id:  ID of the target used by this tap.
+            tap_type: the type of the tap, e.g: tap-postgres, tap-kafka..etc
+        """
+        self.logger.info('Deleting tap "%s" config', tap_id)
+
+        if tap_type == 'tap-postgres':
+            # drop the slot if it exists
+            self.logger.info('Dropping tap "%s" slot on the DB', tap_id)
+            tap_config = utils.load_json(Config.get_connector_config_file(
+                self.get_tap_dir(target_id, tap_id)
+            ))
+            if tap_config:
+                FastSyncTapPostgres.drop_slot(tap_config)
+
+        utils.silentremove(self.get_tap_dir(target_id, tap_id))
+
+    def _remove_target_config(self, target_id: str, taps: Dict[str, str]) -> NoReturn:
+        """
+        Remove all files and config and taps that are tied to the given target.
+
+        Args:
+            target_id: ID of the target whose config to remove, also matches the name of the folder where
+                said config lives.
+            taps: Dictionary of taps using this target, it's a dictionary of tap_id: tap_type
+        """
+        self.logger.info('Deleting target "%s" config and all its taps', target_id)
+
+        for tap_id, tap_type in taps.items():
+            self._remove_tap_config(tap_id, target_id, tap_type)
+
+        utils.silentremove(self.get_target_dir(target_id))
