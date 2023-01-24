@@ -1,42 +1,80 @@
+
+
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+  <meta charset="utf-8" />
+  <meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
   <title>Schema Changes &mdash; PipelineWise  documentation</title>
-      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
-      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
-      <link rel="stylesheet" href="../_static/css/custom.css" type="text/css" />
-    <link rel="shortcut icon" href="../_static/pipelinewise.png"/>
+  
+
+  
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/css/custom.css" type="text/css" />
+
+  
+  
+
+  
+  
     <link rel="canonical" href="https://docs.ansible.com/ansible/latest/user_guide/schema_changes.html"/>
+  
+
+  
+
+  
   <!--[if lt IE 9]>
     <script src="../_static/js/html5shiv.min.js"></script>
   <![endif]-->
   
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
         <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
-        <script src="../_static/jquery.js"></script>
-        <script src="../_static/underscore.js"></script>
-        <script src="../_static/_sphinx_javascript_frameworks_compat.js"></script>
         <script src="../_static/doctools.js"></script>
         <script src="../_static/sphinx_highlight.js"></script>
-    <script src="../_static/js/theme.js"></script>
+    
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+    
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="Transformations" href="transformations.html" />
     <link rel="prev" title="Metadata Columns" href="metadata_columns.html" /> 
 </head>
 
-<body class="wy-body-for-nav"> 
+<body class="wy-body-for-nav">
+
+   
   <div class="wy-grid-for-nav">
+    
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
         <div class="wy-side-nav-search" >
+          
+
+          
             <a href="../index.html" class="icon icon-home"> PipelineWise
+          
+
+          
           </a>
+
+          
+            
+            
               <div class="version">
                 0.51.0
               </div>
+            
+          
+
+          
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
     <input type="text" name="q" placeholder="Search docs" />
@@ -44,7 +82,18 @@
     <input type="hidden" name="area" value="default" />
   </form>
 </div>
-        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
               <p class="caption" role="heading"><span class="caption-text">Installation</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../installation_guide/installation.html">Installation</a></li>
@@ -90,32 +139,73 @@
 <li class="toctree-l1"><a class="reference internal" href="../project/licenses.html">Licenses</a></li>
 </ul>
 
+            
+          
         </div>
+        
       </div>
     </nav>
 
-    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
           <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
           <a href="../index.html">PipelineWise</a>
+        
       </nav>
 
+
       <div class="wy-nav-content">
+        
         <div class="rst-content">
-          <div role="navigation" aria-label="Page navigation">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
   <ul class="wy-breadcrumbs">
-      <li><a href="../index.html" class="icon icon-home"></a></li>
-      <li class="breadcrumb-item active">Schema Changes</li>
+    
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+      <li>Schema Changes</li>
+    
+    
       <li class="wy-breadcrumbs-aside">
+        
+          
             <a href="../_sources/user_guide/schema_changes.rst.txt" rel="nofollow"> View page source</a>
+          
+        
       </li>
+    
   </ul>
+
+  
   <hr/>
 </div>
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
-             
+            
   <section id="schema-changes">
-<span id="id1"></span><h1>Schema Changes<a class="headerlink" href="#schema-changes" title="Permalink to this heading"></a></h1>
+<span id="id1"></span><h1>Schema Changes<a class="headerlink" href="#schema-changes" title="Permalink to this heading">¶</a></h1>
 <p>Taps detect schema changes in source databases and target connectors alter the
 destination tables automatically. Based on the schema change type, PipelineWise
 performs different actions in the destination tables as per the below:</p>
@@ -130,7 +220,7 @@ or alternatively you can <a class="reference internal" href="resync.html#resync"
 <li><p><strong>When column data type changed</strong>: target connectors are <strong>versioning the column</strong>.</p></li>
 </ul>
 <section id="versioning-columns">
-<span id="id2"></span><h2>Versioning columns<a class="headerlink" href="#versioning-columns" title="Permalink to this heading"></a></h2>
+<span id="id2"></span><h2>Versioning columns<a class="headerlink" href="#versioning-columns" title="Permalink to this heading">¶</a></h2>
 <p>Target connectors are versioning columns <strong>when data type change is detected</strong> in the source
 table. Versioning columns means that the old column with the old datatype is
 renamed by adding a timestamp to column name and a new column with the new data
@@ -141,11 +231,6 @@ PipelineWise will replicate data in this order:</p>
 <li><p>Before changing data type <code class="docutils literal notranslate"><span class="pre">COLUMN_THREE</span></code> is <code class="docutils literal notranslate"><span class="pre">INTEGER</span></code> just like in in source table:</p></li>
 </ol>
 <table class="docutils align-default">
-<colgroup>
-<col style="width: 32%" />
-<col style="width: 32%" />
-<col style="width: 36%" />
-</colgroup>
 <tbody>
 <tr class="row-odd"><td><p><strong>COLUMN_ONE</strong></p></td>
 <td><p><strong>COLUMN_TWO</strong></p></td>
@@ -173,12 +258,6 @@ PipelineWise will replicate data in this order:</p>
 the old data and a new <code class="docutils literal notranslate"><span class="pre">COLUMN_TREE</span></code> column created with <code class="docutils literal notranslate"><span class="pre">VARCHAR</span></code> type that keeps
 data only after the change.</p>
 <table class="docutils align-default">
-<colgroup>
-<col style="width: 20%" />
-<col style="width: 20%" />
-<col style="width: 39%" />
-<col style="width: 22%" />
-</colgroup>
 <tbody>
 <tr class="row-odd"><td><p><strong>COLUMN_ONE</strong></p></td>
 <td><p><strong>COLUMN_TWO</strong></p></td>
@@ -226,12 +305,6 @@ the old data and a new <code class="docutils literal notranslate"><span class="p
 data only after the change.
 The suffix added to the new column indicates the new column type.</p>
 <table class="docutils align-default">
-<colgroup>
-<col style="width: 22%" />
-<col style="width: 22%" />
-<col style="width: 25%" />
-<col style="width: 31%" />
-</colgroup>
 <tbody>
 <tr class="row-odd"><td><p><strong>COLUMN_ONE</strong></p></td>
 <td><p><strong>COLUMN_TWO</strong></p></td>
@@ -286,33 +359,50 @@ you need to <a class="reference internal" href="resync.html#resync"><span class=
 
 
            </div>
+           
           </div>
-          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="metadata_columns.html" class="btn btn-neutral float-left" title="Metadata Columns" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+          <footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
         <a href="transformations.html" class="btn btn-neutral float-right" title="Transformations" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="metadata_columns.html" class="btn btn-neutral float-left" title="Metadata Columns" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
     </div>
 
   <hr/>
 
   <div role="contentinfo">
-    <p>&#169; Copyright 2022, Wise Ltd..</p>
-  </div>
+    <p>
+        &#169; Copyright 2023, Wise Ltd..
 
-  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
     <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
-    provided by <a href="https://readthedocs.org">Read the Docs</a>.
-   
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
 
 </footer>
         </div>
       </div>
+
     </section>
+
   </div>
-  <script>
+  
+
+  <script type="text/javascript">
       jQuery(function () {
           SphinxRtdTheme.Navigation.enable(true);
       });
-  </script> 
+  </script>
+
+  
+  
+    
+   
 
 </body>
 </html>

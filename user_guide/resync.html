@@ -1,42 +1,80 @@
+
+
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+  <meta charset="utf-8" />
+  <meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
   <title>Resync Tables &mdash; PipelineWise  documentation</title>
-      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
-      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
-      <link rel="stylesheet" href="../_static/css/custom.css" type="text/css" />
-    <link rel="shortcut icon" href="../_static/pipelinewise.png"/>
+  
+
+  
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/css/custom.css" type="text/css" />
+
+  
+  
+
+  
+  
     <link rel="canonical" href="https://docs.ansible.com/ansible/latest/user_guide/resync.html"/>
+  
+
+  
+
+  
   <!--[if lt IE 9]>
     <script src="../_static/js/html5shiv.min.js"></script>
   <![endif]-->
   
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
         <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
-        <script src="../_static/jquery.js"></script>
-        <script src="../_static/underscore.js"></script>
-        <script src="../_static/_sphinx_javascript_frameworks_compat.js"></script>
         <script src="../_static/doctools.js"></script>
         <script src="../_static/sphinx_highlight.js"></script>
-    <script src="../_static/js/theme.js"></script>
+    
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+    
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="Different cases of partial resync" href="partial_sync.html" />
     <link rel="prev" title="Alerts" href="alerts.html" /> 
 </head>
 
-<body class="wy-body-for-nav"> 
+<body class="wy-body-for-nav">
+
+   
   <div class="wy-grid-for-nav">
+    
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
         <div class="wy-side-nav-search" >
+          
+
+          
             <a href="../index.html" class="icon icon-home"> PipelineWise
+          
+
+          
           </a>
+
+          
+            
+            
               <div class="version">
                 0.51.0
               </div>
+            
+          
+
+          
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
     <input type="text" name="q" placeholder="Search docs" />
@@ -44,7 +82,18 @@
     <input type="hidden" name="area" value="default" />
   </form>
 </div>
-        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
               <p class="caption" role="heading"><span class="caption-text">Installation</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../installation_guide/installation.html">Installation</a></li>
@@ -87,32 +136,73 @@
 <li class="toctree-l1"><a class="reference internal" href="../project/licenses.html">Licenses</a></li>
 </ul>
 
+            
+          
         </div>
+        
       </div>
     </nav>
 
-    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
           <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
           <a href="../index.html">PipelineWise</a>
+        
       </nav>
 
+
       <div class="wy-nav-content">
+        
         <div class="rst-content">
-          <div role="navigation" aria-label="Page navigation">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
   <ul class="wy-breadcrumbs">
-      <li><a href="../index.html" class="icon icon-home"></a></li>
-      <li class="breadcrumb-item active">Resync Tables</li>
+    
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+      <li>Resync Tables</li>
+    
+    
       <li class="wy-breadcrumbs-aside">
+        
+          
             <a href="../_sources/user_guide/resync.rst.txt" rel="nofollow"> View page source</a>
+          
+        
       </li>
+    
   </ul>
+
+  
   <hr/>
 </div>
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
-             
+            
   <section id="resync-tables">
-<span id="resync"></span><h1>Resync Tables<a class="headerlink" href="#resync-tables" title="Permalink to this heading"></a></h1>
+<span id="resync"></span><h1>Resync Tables<a class="headerlink" href="#resync-tables" title="Permalink to this heading">¶</a></h1>
 <p>Sometimes you will need to resync tables in ad-hoc bases. For example when
 binlog position deleted in MySQL or when a database migrated to another server
 and previous CDC bookmarks are not transferable, etc.</p>
@@ -121,14 +211,14 @@ and previous CDC bookmarks are not transferable, etc.</p>
 </ol>
 <p>If you want to resync every table from a specific tap then use the <code class="docutils literal notranslate"><span class="pre">sync_tables</span></code>
 command and specify the tap and target ids:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ pipelinewise sync_tables --target &lt;target_id&gt; --tap &lt;tap_id&gt;
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>pipelinewise<span class="w"> </span>sync_tables<span class="w"> </span>--target<span class="w"> </span>&lt;target_id&gt;<span class="w"> </span>--tap<span class="w"> </span>&lt;tap_id&gt;
 </pre></div>
 </div>
 <p>PipelineWise will update the bookmark(s) in the internal state files automatically
 and at the next normal run it will load only the changes since the resync.</p>
 <p>If you want to resync only a list of specific tables then
 add the <code class="docutils literal notranslate"><span class="pre">--tables</span></code> argument:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ pipelinewise sync_tables --target &lt;target_id&gt; --tap &lt;tap_id&gt; --tables schema.table_one,schema.table_two
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>pipelinewise<span class="w"> </span>sync_tables<span class="w"> </span>--target<span class="w"> </span>&lt;target_id&gt;<span class="w"> </span>--tap<span class="w"> </span>&lt;tap_id&gt;<span class="w"> </span>--tables<span class="w"> </span>schema.table_one,schema.table_two
 </pre></div>
 </div>
 <div class="admonition warning">
@@ -142,7 +232,7 @@ table names have to be the names in the source database.</p>
 </ol>
 <p>If you want to partial resync a table from a specific tap then use the <code class="docutils literal notranslate"><span class="pre">partial_sync_table</span></code> command
 and specify the tap and target ids and table, column ,start_value and end_value(optional)</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ pipelinewise partial_sync_table --target &lt;target_id&gt; --tap &lt;tap_id&gt; --table schema.table --column column_name --start_value start_value_from_column --end_value end_value_from_column
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>pipelinewise<span class="w"> </span>partial_sync_table<span class="w"> </span>--target<span class="w"> </span>&lt;target_id&gt;<span class="w"> </span>--tap<span class="w"> </span>&lt;tap_id&gt;<span class="w"> </span>--table<span class="w"> </span>schema.table<span class="w"> </span>--column<span class="w"> </span>column_name<span class="w"> </span>--start_value<span class="w"> </span>start_value_from_column<span class="w"> </span>--end_value<span class="w"> </span>end_value_from_column
 </pre></div>
 </div>
 <p><strong>note</strong> if there is no end_value, the internal state file will be updated with the replication value (gtid, wal, etc) that was captured at the start of the partial sync</p>
@@ -156,33 +246,50 @@ table name have to be the names in the source database.</p>
 
 
            </div>
+           
           </div>
-          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="alerts.html" class="btn btn-neutral float-left" title="Alerts" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+          <footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
         <a href="partial_sync.html" class="btn btn-neutral float-right" title="Different cases of partial resync" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="alerts.html" class="btn btn-neutral float-left" title="Alerts" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
     </div>
 
   <hr/>
 
   <div role="contentinfo">
-    <p>&#169; Copyright 2022, Wise Ltd..</p>
-  </div>
+    <p>
+        &#169; Copyright 2023, Wise Ltd..
 
-  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
     <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
-    provided by <a href="https://readthedocs.org">Read the Docs</a>.
-   
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
 
 </footer>
         </div>
       </div>
+
     </section>
+
   </div>
-  <script>
+  
+
+  <script type="text/javascript">
       jQuery(function () {
           SphinxRtdTheme.Navigation.enable(true);
       });
-  </script> 
+  </script>
+
+  
+  
+    
+   
 
 </body>
 </html>

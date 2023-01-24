@@ -1,42 +1,80 @@
+
+
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+  <meta charset="utf-8" />
+  <meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
   <title>Creating Pipelines &mdash; PipelineWise  documentation</title>
-      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
-      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
-      <link rel="stylesheet" href="../_static/css/custom.css" type="text/css" />
-    <link rel="shortcut icon" href="../_static/pipelinewise.png"/>
+  
+
+  
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/css/custom.css" type="text/css" />
+
+  
+  
+
+  
+  
     <link rel="canonical" href="https://docs.ansible.com/ansible/latest/installation_guide/creating_pipelines.html"/>
+  
+
+  
+
+  
   <!--[if lt IE 9]>
     <script src="../_static/js/html5shiv.min.js"></script>
   <![endif]-->
   
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
         <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
-        <script src="../_static/jquery.js"></script>
-        <script src="../_static/underscore.js"></script>
-        <script src="../_static/_sphinx_javascript_frameworks_compat.js"></script>
         <script src="../_static/doctools.js"></script>
         <script src="../_static/sphinx_highlight.js"></script>
-    <script src="../_static/js/theme.js"></script>
+    
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+    
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="Running Pipelines" href="running_pipelines.html" />
     <link rel="prev" title="Installation" href="installation.html" /> 
 </head>
 
-<body class="wy-body-for-nav"> 
+<body class="wy-body-for-nav">
+
+   
   <div class="wy-grid-for-nav">
+    
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
         <div class="wy-side-nav-search" >
+          
+
+          
             <a href="../index.html" class="icon icon-home"> PipelineWise
+          
+
+          
           </a>
+
+          
+            
+            
               <div class="version">
                 0.51.0
               </div>
+            
+          
+
+          
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
     <input type="text" name="q" placeholder="Search docs" />
@@ -44,7 +82,18 @@
     <input type="hidden" name="area" value="default" />
   </form>
 </div>
-        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
               <p class="caption" role="heading"><span class="caption-text">Installation</span></p>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
@@ -93,32 +142,73 @@
 <li class="toctree-l1"><a class="reference internal" href="../project/licenses.html">Licenses</a></li>
 </ul>
 
+            
+          
         </div>
+        
       </div>
     </nav>
 
-    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
           <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
           <a href="../index.html">PipelineWise</a>
+        
       </nav>
 
+
       <div class="wy-nav-content">
+        
         <div class="rst-content">
-          <div role="navigation" aria-label="Page navigation">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
   <ul class="wy-breadcrumbs">
-      <li><a href="../index.html" class="icon icon-home"></a></li>
-      <li class="breadcrumb-item active">Creating Pipelines</li>
+    
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+      <li>Creating Pipelines</li>
+    
+    
       <li class="wy-breadcrumbs-aside">
+        
+          
             <a href="../_sources/installation_guide/creating_pipelines.rst.txt" rel="nofollow"> View page source</a>
+          
+        
       </li>
+    
   </ul>
+
+  
   <hr/>
 </div>
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
-             
+            
   <section id="creating-pipelines">
-<span id="id1"></span><h1>Creating Pipelines<a class="headerlink" href="#creating-pipelines" title="Permalink to this heading"></a></h1>
+<span id="id1"></span><h1>Creating Pipelines<a class="headerlink" href="#creating-pipelines" title="Permalink to this heading">¶</a></h1>
 <p>Pipelines define how the data should flow from source system to target. It defines the data source
 credentials, the data that needs to be captured, replication methods, load time transformations,
 destination database credentials, source to target mapping, grants etc.</p>
@@ -131,30 +221,30 @@ operate properly, but you will never need to edit these JSON config files direct
 PipelineWise will generate it from the YAML files and install into a correct place automatically
 whenever it’s needed.</p>
 <section id="generating-sample-pipelines">
-<span id="generating-pipelines"></span><h2>Generating Sample Pipelines<a class="headerlink" href="#generating-sample-pipelines" title="Permalink to this heading"></a></h2>
+<span id="generating-pipelines"></span><h2>Generating Sample Pipelines<a class="headerlink" href="#generating-sample-pipelines" title="Permalink to this heading">¶</a></h2>
 <p>The easiest way to understand these pipeline YAML files is to generate the sample set for each
 of the supported connectors, which you can then adjust for your own purposes.</p>
 <p>Once you completed the <a class="reference internal" href="installation.html#installation-guide"><span class="std std-ref">Installation</span></a> section you should be able to create a new
 project with the PipelineWise  <a class="reference internal" href="../user_guide/cli.html#cli-init"><span class="std std-ref">init</span></a> command:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ pipelinewise init --name pipelinewise_samples
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>pipelinewise<span class="w"> </span>init<span class="w"> </span>--name<span class="w"> </span>pipelinewise_samples
 </pre></div>
 </div>
 <p>This will create a <code class="docutils literal notranslate"><span class="pre">pipelinewise_samples</span></code> directory with samples for each supported component:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>└── pipelinewise_samples
-    ├── README.md
-    ├── config.yml
-    ├── tap_jira.yml.sample
-    ├── tap_kafka.yml.sample
-    ├── tap_mysql_mariadb.yml.sample
-    ├── tap_postgres.yml.sample
-    ├── tap_s3_csv.yml.sample
-    ├── tap_salesforce.yml.sample
-    ├── tap_snowflake.yml.sample
-    ├── tap_zendesk.yml.sample
-    ├── target_postgres.yml.sample
-    ├── target_redshift.yml.sample
-    ├── target_s3_csv.yml.sample
-    └── target_snowflake.yml.sample
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>└──<span class="w"> </span>pipelinewise_samples
+<span class="w">    </span>├──<span class="w"> </span>README.md
+<span class="w">    </span>├──<span class="w"> </span>config.yml
+<span class="w">    </span>├──<span class="w"> </span>tap_jira.yml.sample
+<span class="w">    </span>├──<span class="w"> </span>tap_kafka.yml.sample
+<span class="w">    </span>├──<span class="w"> </span>tap_mysql_mariadb.yml.sample
+<span class="w">    </span>├──<span class="w"> </span>tap_postgres.yml.sample
+<span class="w">    </span>├──<span class="w"> </span>tap_s3_csv.yml.sample
+<span class="w">    </span>├──<span class="w"> </span>tap_salesforce.yml.sample
+<span class="w">    </span>├──<span class="w"> </span>tap_snowflake.yml.sample
+<span class="w">    </span>├──<span class="w"> </span>tap_zendesk.yml.sample
+<span class="w">    </span>├──<span class="w"> </span>target_postgres.yml.sample
+<span class="w">    </span>├──<span class="w"> </span>target_redshift.yml.sample
+<span class="w">    </span>├──<span class="w"> </span>target_s3_csv.yml.sample
+<span class="w">    </span>└──<span class="w"> </span>target_snowflake.yml.sample
 </pre></div>
 </div>
 <p>To create a new pipeline you need to enable at least one tap and target by renaming the
@@ -168,56 +258,56 @@ for a real life example.</p>
 <p>Once you configured the YAML files you can go to <a class="reference internal" href="#import-project-from-yaml"><span class="std std-ref">Activating the Pipelines from the YAML files</span></a> section.</p>
 </section>
 <section id="environment-variables-in-yaml-config">
-<span id="passing-environment-variables-via-jinja"></span><h2>Environment variables in YAML config<a class="headerlink" href="#environment-variables-in-yaml-config" title="Permalink to this heading"></a></h2>
+<span id="passing-environment-variables-via-jinja"></span><h2>Environment variables in YAML config<a class="headerlink" href="#environment-variables-in-yaml-config" title="Permalink to this heading">¶</a></h2>
 <p>It is possible to use environment variables in the YAML config files.
 This feature is implemented using jinja templates and requires the following syntax to work:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>---
-id: <span class="s2">&quot;snowflake_test&quot;</span>
-name: <span class="s2">&quot;Snowflake Test&quot;</span>
-type: <span class="s2">&quot;target-snowflake&quot;</span>
+id:<span class="w"> </span><span class="s2">&quot;snowflake_test&quot;</span>
+name:<span class="w"> </span><span class="s2">&quot;Snowflake Test&quot;</span>
+type:<span class="w"> </span><span class="s2">&quot;target-snowflake&quot;</span>
 db_conn:
-  account: <span class="s2">&quot;rtxxxxxx.eu-central-1&quot;</span>
-  dbname: <span class="s2">&quot;analytics_db_test&quot;</span>
-  user: <span class="s2">&quot;snowflake_user&quot;</span>
-  password: <span class="s2">&quot;{{ env_var[&#39;MY_PASSWORD&#39;] }}&quot;</span>
+<span class="w">  </span>account:<span class="w"> </span><span class="s2">&quot;rtxxxxxx.eu-central-1&quot;</span>
+<span class="w">  </span>dbname:<span class="w"> </span><span class="s2">&quot;analytics_db_test&quot;</span>
+<span class="w">  </span>user:<span class="w"> </span><span class="s2">&quot;snowflake_user&quot;</span>
+<span class="w">  </span>password:<span class="w"> </span><span class="s2">&quot;{{ env_var[&#39;MY_PASSWORD&#39;] }}&quot;</span>
 </pre></div>
 </div>
 </section>
 <section id="example-replication-from-mysql-to-snowflake">
-<span id="example-replication-mysql-to-snowflake"></span><h2>Example replication from MySQL to Snowflake<a class="headerlink" href="#example-replication-from-mysql-to-snowflake" title="Permalink to this heading"></a></h2>
+<span id="example-replication-mysql-to-snowflake"></span><h2>Example replication from MySQL to Snowflake<a class="headerlink" href="#example-replication-from-mysql-to-snowflake" title="Permalink to this heading">¶</a></h2>
 <p>In this example we will replicate three tables from a MySQL database into a Snowflake Data Warehouse,
 using a mix of <a class="reference internal" href="../concept/replication_methods.html#full-table"><span class="std std-ref">Full Table</span></a>, <a class="reference internal" href="../concept/replication_methods.html#incremental"><span class="std std-ref">Key Based Incremental</span></a> and <a class="reference internal" href="../concept/replication_methods.html#log-based"><span class="std std-ref">Log Based</span></a> replication methods.
 We will need the <code class="docutils literal notranslate"><span class="pre">tap_mysql_mariadb.yml</span></code> and <code class="docutils literal notranslate"><span class="pre">target_snowflake.yml</span></code>:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ <span class="nb">cd</span> pipelinewise_samples
-$ mv tap_mysql_mariadb.yml.sample tap_my_mysql_db_one.yml
-$ mv target_snowflake.yml.sample  target_snowflake.yml
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span><span class="nb">cd</span><span class="w"> </span>pipelinewise_samples
+$<span class="w"> </span>mv<span class="w"> </span>tap_mysql_mariadb.yml.sample<span class="w"> </span>tap_my_mysql_db_one.yml
+$<span class="w"> </span>mv<span class="w"> </span>target_snowflake.yml.sample<span class="w">  </span>target_snowflake.yml
 </pre></div>
 </div>
 <p>1.  Edit <code class="docutils literal notranslate"><span class="pre">target_snowflake.yml</span></code>. This will be the destination of one or more sources.
 You can edit it with the text editor of your choice:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>---
-id: <span class="s2">&quot;snowflake_test&quot;</span>
-name: <span class="s2">&quot;Snowflake Test&quot;</span>
-type: <span class="s2">&quot;target-snowflake&quot;</span>
+id:<span class="w"> </span><span class="s2">&quot;snowflake_test&quot;</span>
+name:<span class="w"> </span><span class="s2">&quot;Snowflake Test&quot;</span>
+type:<span class="w"> </span><span class="s2">&quot;target-snowflake&quot;</span>
 db_conn:
-  account: <span class="s2">&quot;rtxxxxxx.eu-central-1&quot;</span>
-  dbname: <span class="s2">&quot;analytics_db_test&quot;</span>
-  user: <span class="s2">&quot;snowflake_user&quot;</span>
-  password: <span class="s2">&quot;PASSWORD&quot;</span>                                   <span class="c1"># Plain string or Vault Encrypted password</span>
-  warehouse: <span class="s2">&quot;LOAD_WH&quot;</span>
-  s3_bucket: <span class="s2">&quot;pipelinewise-bucket&quot;</span>
-  s3_key_prefix: <span class="s2">&quot;snowflake-imports-test/&quot;</span>
-  aws_access_key_id: <span class="s2">&quot;ACCESS_KEY_ID&quot;</span>                     <span class="c1"># Plain string or Vault Encrypted password</span>
-  <span class="c1"># stage and file_format are pre-created objects in Snowflake that requires to load and</span>
-  <span class="c1"># merge data correctly from S3 to tables in one step without using temp tables</span>
-  <span class="c1">#  stage      : External stage object pointing to an S3 bucket</span>
-  <span class="c1">#  file_format: Named file format object used for bulk loading data from S3 into</span>
-  <span class="c1">#               snowflake tables.</span>
-  stage: <span class="s2">&quot;pipelinewise.encrypted_etl_stage_test&quot;</span>
-  file_format: <span class="s2">&quot;pipelinewise.etl_stage_file_format&quot;</span>
-  aws_secret_access_key: <span class="s2">&quot;&lt;SECRET_ASCCESS_KEY&gt;&quot;</span>          <span class="c1"># Plain string or Vault Encrypted password</span>
-  <span class="c1"># The same master key has to be added to the external stage object created in snowflake</span>
-  client_side_encryption_master_key: <span class="s2">&quot;&lt;CSE_MASTER_KEY&gt;&quot;</span>  <span class="c1"># Plain string or Vault Encrypted password</span>
+<span class="w">  </span>account:<span class="w"> </span><span class="s2">&quot;rtxxxxxx.eu-central-1&quot;</span>
+<span class="w">  </span>dbname:<span class="w"> </span><span class="s2">&quot;analytics_db_test&quot;</span>
+<span class="w">  </span>user:<span class="w"> </span><span class="s2">&quot;snowflake_user&quot;</span>
+<span class="w">  </span>password:<span class="w"> </span><span class="s2">&quot;PASSWORD&quot;</span><span class="w">                                   </span><span class="c1"># Plain string or Vault Encrypted password</span>
+<span class="w">  </span>warehouse:<span class="w"> </span><span class="s2">&quot;LOAD_WH&quot;</span>
+<span class="w">  </span>s3_bucket:<span class="w"> </span><span class="s2">&quot;pipelinewise-bucket&quot;</span>
+<span class="w">  </span>s3_key_prefix:<span class="w"> </span><span class="s2">&quot;snowflake-imports-test/&quot;</span>
+<span class="w">  </span>aws_access_key_id:<span class="w"> </span><span class="s2">&quot;ACCESS_KEY_ID&quot;</span><span class="w">                     </span><span class="c1"># Plain string or Vault Encrypted password</span>
+<span class="w">  </span><span class="c1"># stage and file_format are pre-created objects in Snowflake that requires to load and</span>
+<span class="w">  </span><span class="c1"># merge data correctly from S3 to tables in one step without using temp tables</span>
+<span class="w">  </span><span class="c1">#  stage      : External stage object pointing to an S3 bucket</span>
+<span class="w">  </span><span class="c1">#  file_format: Named file format object used for bulk loading data from S3 into</span>
+<span class="w">  </span><span class="c1">#               snowflake tables.</span>
+<span class="w">  </span>stage:<span class="w"> </span><span class="s2">&quot;pipelinewise.encrypted_etl_stage_test&quot;</span>
+<span class="w">  </span>file_format:<span class="w"> </span><span class="s2">&quot;pipelinewise.etl_stage_file_format&quot;</span>
+<span class="w">  </span>aws_secret_access_key:<span class="w"> </span><span class="s2">&quot;&lt;SECRET_ASCCESS_KEY&gt;&quot;</span><span class="w">          </span><span class="c1"># Plain string or Vault Encrypted password</span>
+<span class="w">  </span><span class="c1"># The same master key has to be added to the external stage object created in snowflake</span>
+<span class="w">  </span>client_side_encryption_master_key:<span class="w"> </span><span class="s2">&quot;&lt;CSE_MASTER_KEY&gt;&quot;</span><span class="w">  </span><span class="c1"># Plain string or Vault Encrypted password</span>
 </pre></div>
 </div>
 <div class="admonition note">
@@ -230,54 +320,54 @@ making them safe to distribute or place in source control. For further details, 
 <li><p>Edit <code class="docutils literal notranslate"><span class="pre">tap_mysql_mariadb.yml</span></code>:</p></li>
 </ol>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>---
-id: <span class="s2">&quot;fx&quot;</span>
-name: <span class="s2">&quot;FX (Monolith)&quot;</span>
-type: <span class="s2">&quot;tap-mysql&quot;</span>
-owner: <span class="s2">&quot;somebody@transferwise.com&quot;</span>
+id:<span class="w"> </span><span class="s2">&quot;fx&quot;</span>
+name:<span class="w"> </span><span class="s2">&quot;FX (Monolith)&quot;</span>
+type:<span class="w"> </span><span class="s2">&quot;tap-mysql&quot;</span>
+owner:<span class="w"> </span><span class="s2">&quot;somebody@transferwise.com&quot;</span>
 
 <span class="c1"># Source connection details</span>
 db_conn:
-  host: <span class="s2">&quot;localhost&quot;</span>
-  port: <span class="m">10602</span>
-  user: <span class="s2">&quot;my_user&quot;</span>
-  password: <span class="s2">&quot;&lt;PASSWORD&gt;&quot;</span>                  <span class="c1"># Plain string or Vault Encrypted password</span>
+<span class="w">  </span>host:<span class="w"> </span><span class="s2">&quot;localhost&quot;</span>
+<span class="w">  </span>port:<span class="w"> </span><span class="m">10602</span>
+<span class="w">  </span>user:<span class="w"> </span><span class="s2">&quot;my_user&quot;</span>
+<span class="w">  </span>password:<span class="w"> </span><span class="s2">&quot;&lt;PASSWORD&gt;&quot;</span><span class="w">                  </span><span class="c1"># Plain string or Vault Encrypted password</span>
 
-target: <span class="s2">&quot;snowflake_test&quot;</span>                  <span class="c1"># Target ID, should match the id from target_snowflake.yml</span>
-batch_size_rows: <span class="m">100000</span>                   <span class="c1"># Batch size for the stream to optimise load performance</span>
+target:<span class="w"> </span><span class="s2">&quot;snowflake_test&quot;</span><span class="w">                  </span><span class="c1"># Target ID, should match the id from target_snowflake.yml</span>
+batch_size_rows:<span class="w"> </span><span class="m">100000</span><span class="w">                   </span><span class="c1"># Batch size for the stream to optimise load performance</span>
 
 <span class="c1"># Source to Destination Schema mapping</span>
 schemas:
-  - source_schema: <span class="s2">&quot;fx&quot;</span>                   <span class="c1"># You can replicate from multiple schemas</span>
-      target_schema: <span class="s2">&quot;fx_clear&quot;</span>           <span class="c1"># Target schema in snowflake</span>
-      target_schema_select_permissions:   <span class="c1"># Grant permission once the table created</span>
-        - grp_power
-      tables:                             <span class="c1"># List Tables to replicate</span>
-        - table_name: <span class="s2">&quot;table_one&quot;</span>
-          replication_method: FULL_TABLE  <span class="c1"># 1) FULL_TABLE replication</span>
-        - table_name: <span class="s2">&quot;table_two&quot;</span>         <span class="c1">#</span>
-          replication_method: LOG_BASED   <span class="c1"># 2) LOG_BASED replication</span>
-        - table_name: <span class="s2">&quot;table_three&quot;</span>       <span class="c1">#</span>
-          replication_method: INCREMENTAL <span class="c1"># 3) INCREMENTAL replication</span>
-          replication_key: <span class="s2">&quot;updated_at&quot;</span>   <span class="c1">#    Incremental load needs replication key</span>
+<span class="w">  </span>-<span class="w"> </span>source_schema:<span class="w"> </span><span class="s2">&quot;fx&quot;</span><span class="w">                   </span><span class="c1"># You can replicate from multiple schemas</span>
+<span class="w">      </span>target_schema:<span class="w"> </span><span class="s2">&quot;fx_clear&quot;</span><span class="w">           </span><span class="c1"># Target schema in snowflake</span>
+<span class="w">      </span>target_schema_select_permissions:<span class="w">   </span><span class="c1"># Grant permission once the table created</span>
+<span class="w">        </span>-<span class="w"> </span>grp_power
+<span class="w">      </span>tables:<span class="w">                             </span><span class="c1"># List Tables to replicate</span>
+<span class="w">        </span>-<span class="w"> </span>table_name:<span class="w"> </span><span class="s2">&quot;table_one&quot;</span>
+<span class="w">          </span>replication_method:<span class="w"> </span>FULL_TABLE<span class="w">  </span><span class="c1"># 1) FULL_TABLE replication</span>
+<span class="w">        </span>-<span class="w"> </span>table_name:<span class="w"> </span><span class="s2">&quot;table_two&quot;</span><span class="w">         </span><span class="c1">#</span>
+<span class="w">          </span>replication_method:<span class="w"> </span>LOG_BASED<span class="w">   </span><span class="c1"># 2) LOG_BASED replication</span>
+<span class="w">        </span>-<span class="w"> </span>table_name:<span class="w"> </span><span class="s2">&quot;table_three&quot;</span><span class="w">       </span><span class="c1">#</span>
+<span class="w">          </span>replication_method:<span class="w"> </span>INCREMENTAL<span class="w"> </span><span class="c1"># 3) INCREMENTAL replication</span>
+<span class="w">          </span>replication_key:<span class="w"> </span><span class="s2">&quot;updated_at&quot;</span><span class="w">   </span><span class="c1">#    Incremental load needs replication key</span>
 </pre></div>
 </div>
 </section>
 <section id="activating-the-pipelines-from-the-yaml-files">
-<span id="import-project-from-yaml"></span><h2>Activating the Pipelines from the YAML files<a class="headerlink" href="#activating-the-pipelines-from-the-yaml-files" title="Permalink to this heading"></a></h2>
+<span id="import-project-from-yaml"></span><h2>Activating the Pipelines from the YAML files<a class="headerlink" href="#activating-the-pipelines-from-the-yaml-files" title="Permalink to this heading">¶</a></h2>
 <p>When you are happy with the configuration you need to import it with the <a class="reference internal" href="../user_guide/cli.html#cli-import"><span class="std std-ref">import</span></a> command:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ pipelinewise import --dir pipelinewise_samples
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>pipelinewise<span class="w"> </span>import<span class="w"> </span>--dir<span class="w"> </span>pipelinewise_samples
 
-        ... detailed messages about import and discovery...
+<span class="w">        </span>...<span class="w"> </span>detailed<span class="w"> </span>messages<span class="w"> </span>about<span class="w"> </span>import<span class="w"> </span>and<span class="w"> </span>discovery...
 
-        -------------------------------------------------------
-        IMPORTING YAML CONFIGS FINISHED
-        -------------------------------------------------------
-            Total targets to import        : <span class="m">1</span>
-            Total taps to import           : <span class="m">1</span>
-            Taps imported successfully     : <span class="m">1</span>
-            Taps failed to import          : <span class="o">[]</span>
-            Runtime                        : <span class="m">0</span>:00:01.835720
-        -------------------------------------------------------
+<span class="w">        </span>-------------------------------------------------------
+<span class="w">        </span>IMPORTING<span class="w"> </span>YAML<span class="w"> </span>CONFIGS<span class="w"> </span>FINISHED
+<span class="w">        </span>-------------------------------------------------------
+<span class="w">            </span>Total<span class="w"> </span>targets<span class="w"> </span>to<span class="w"> </span>import<span class="w">        </span>:<span class="w"> </span><span class="m">1</span>
+<span class="w">            </span>Total<span class="w"> </span>taps<span class="w"> </span>to<span class="w"> </span>import<span class="w">           </span>:<span class="w"> </span><span class="m">1</span>
+<span class="w">            </span>Taps<span class="w"> </span>imported<span class="w"> </span>successfully<span class="w">     </span>:<span class="w"> </span><span class="m">1</span>
+<span class="w">            </span>Taps<span class="w"> </span>failed<span class="w"> </span>to<span class="w"> </span>import<span class="w">          </span>:<span class="w"> </span><span class="o">[]</span>
+<span class="w">            </span>Runtime<span class="w">                        </span>:<span class="w"> </span><span class="m">0</span>:00:01.835720
+<span class="w">        </span>-------------------------------------------------------
 </pre></div>
 </div>
 <p>At this point PipelineWise will connect to and analyse every source database, discovering
@@ -288,11 +378,11 @@ tracking the state files for <a class="reference internal" href="../concept/repl
 Normally you will need to go into <code class="docutils literal notranslate"><span class="pre">~/.pipelinewise</span></code> only when you want to access the
 log files.</p>
 <p>Once the config YAML files are imported, you can see the new pipelines with the <a class="reference internal" href="../user_guide/cli.html#cli-status"><span class="std std-ref">status</span></a> command:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ pipelinewise status
-Tap ID        Tap Type    Target ID    Target Type       Enabled    Status    Last Sync    Last Sync Result
-------------  ----------  -----------  ----------------  ---------  --------  -----------  ------------------
-mysql_sample  tap-mysql   snowflake    target-snowflake  True       ready                  unknown
-<span class="m">1</span> pipeline<span class="o">(</span>s<span class="o">)</span>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>pipelinewise<span class="w"> </span>status
+Tap<span class="w"> </span>ID<span class="w">        </span>Tap<span class="w"> </span>Type<span class="w">    </span>Target<span class="w"> </span>ID<span class="w">    </span>Target<span class="w"> </span>Type<span class="w">       </span>Enabled<span class="w">    </span>Status<span class="w">    </span>Last<span class="w"> </span>Sync<span class="w">    </span>Last<span class="w"> </span>Sync<span class="w"> </span>Result
+------------<span class="w">  </span>----------<span class="w">  </span>-----------<span class="w">  </span>----------------<span class="w">  </span>---------<span class="w">  </span>--------<span class="w">  </span>-----------<span class="w">  </span>------------------
+mysql_sample<span class="w">  </span>tap-mysql<span class="w">   </span>snowflake<span class="w">    </span>target-snowflake<span class="w">  </span>True<span class="w">       </span>ready<span class="w">                  </span>unknown
+<span class="m">1</span><span class="w"> </span>pipeline<span class="o">(</span>s<span class="o">)</span>
 </pre></div>
 </div>
 <p>Congratulations! At this point you have successfully created your first pipeline in PipelineWise and it’s now
@@ -304,33 +394,50 @@ directory to keep everything under version control.</p>
 
 
            </div>
+           
           </div>
-          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="installation.html" class="btn btn-neutral float-left" title="Installation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+          <footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
         <a href="running_pipelines.html" class="btn btn-neutral float-right" title="Running Pipelines" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="installation.html" class="btn btn-neutral float-left" title="Installation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
     </div>
 
   <hr/>
 
   <div role="contentinfo">
-    <p>&#169; Copyright 2022, Wise Ltd..</p>
-  </div>
+    <p>
+        &#169; Copyright 2023, Wise Ltd..
 
-  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
     <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
-    provided by <a href="https://readthedocs.org">Read the Docs</a>.
-   
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
 
 </footer>
         </div>
       </div>
+
     </section>
+
   </div>
-  <script>
+  
+
+  <script type="text/javascript">
       jQuery(function () {
           SphinxRtdTheme.Navigation.enable(true);
       });
-  </script> 
+  </script>
+
+  
+  
+    
+   
 
 </body>
 </html>

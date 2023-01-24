@@ -1,42 +1,80 @@
+
+
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+  <meta charset="utf-8" />
+  <meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
   <title>Linux Pipes in PipelineWise &mdash; PipelineWise  documentation</title>
-      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
-      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
-      <link rel="stylesheet" href="../_static/css/custom.css" type="text/css" />
-    <link rel="shortcut icon" href="../_static/pipelinewise.png"/>
+  
+
+  
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/css/custom.css" type="text/css" />
+
+  
+  
+
+  
+  
     <link rel="canonical" href="https://docs.ansible.com/ansible/latest/concept/linux_pipes.html"/>
+  
+
+  
+
+  
   <!--[if lt IE 9]>
     <script src="../_static/js/html5shiv.min.js"></script>
   <![endif]-->
   
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
         <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
-        <script src="../_static/jquery.js"></script>
-        <script src="../_static/underscore.js"></script>
-        <script src="../_static/_sphinx_javascript_frameworks_compat.js"></script>
         <script src="../_static/doctools.js"></script>
         <script src="../_static/sphinx_highlight.js"></script>
-    <script src="../_static/js/theme.js"></script>
+    
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+    
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="YAML configuration" href="../user_guide/yaml_config.html" />
     <link rel="prev" title="Fast Sync" href="fastsync.html" /> 
 </head>
 
-<body class="wy-body-for-nav"> 
+<body class="wy-body-for-nav">
+
+   
   <div class="wy-grid-for-nav">
+    
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
         <div class="wy-side-nav-search" >
+          
+
+          
             <a href="../index.html" class="icon icon-home"> PipelineWise
+          
+
+          
           </a>
+
+          
+            
+            
               <div class="version">
                 0.51.0
               </div>
+            
+          
+
+          
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
     <input type="text" name="q" placeholder="Search docs" />
@@ -44,7 +82,18 @@
     <input type="hidden" name="area" value="default" />
   </form>
 </div>
-        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
               <p class="caption" role="heading"><span class="caption-text">Installation</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../installation_guide/installation.html">Installation</a></li>
@@ -91,32 +140,73 @@
 <li class="toctree-l1"><a class="reference internal" href="../project/licenses.html">Licenses</a></li>
 </ul>
 
+            
+          
         </div>
+        
       </div>
     </nav>
 
-    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
           <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
           <a href="../index.html">PipelineWise</a>
+        
       </nav>
 
+
       <div class="wy-nav-content">
+        
         <div class="rst-content">
-          <div role="navigation" aria-label="Page navigation">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
   <ul class="wy-breadcrumbs">
-      <li><a href="../index.html" class="icon icon-home"></a></li>
-      <li class="breadcrumb-item active">Linux Pipes in PipelineWise</li>
+    
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+      <li>Linux Pipes in PipelineWise</li>
+    
+    
       <li class="wy-breadcrumbs-aside">
+        
+          
             <a href="../_sources/concept/linux_pipes.rst.txt" rel="nofollow"> View page source</a>
+          
+        
       </li>
+    
   </ul>
+
+  
   <hr/>
 </div>
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
-             
+            
   <section id="linux-pipes-in-pipelinewise">
-<span id="linux-pipes"></span><h1>Linux Pipes in PipelineWise<a class="headerlink" href="#linux-pipes-in-pipelinewise" title="Permalink to this heading"></a></h1>
+<span id="linux-pipes"></span><h1>Linux Pipes in PipelineWise<a class="headerlink" href="#linux-pipes-in-pipelinewise" title="Permalink to this heading">¶</a></h1>
 <p>A pipe is unidirectional interprocess communication channel. The term was coined by
 <a class="reference external" href="https://en.wikipedia.org/wiki/Douglas_McIlroy">Douglas McIlroy</a> for Unix shell and
 named by analogy with the pipeline.</p>
@@ -125,11 +215,11 @@ one command (stdout) to the input (stdin) followed by using a pipe symbol ‘<ci
 hence PipelineWise is also using linux pipes to connect <a class="reference internal" href="../connectors/taps.html#taps-list"><span class="std std-ref">Taps (Data Sources)</span></a> and <a class="reference internal" href="../connectors/targets.html#targets-list"><span class="std std-ref">Targets (Destinations)</span></a> connectors.</p>
 <p>For example in the following command <code class="docutils literal notranslate"><span class="pre">tap-postgres</span></code> Extracts data from a postgres database and the
 extracted data sent to <code class="docutils literal notranslate"><span class="pre">target-snowflake</span></code> to Load it into a Snowflake database:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>tap-postgres <span class="p">|</span> target-snowflake
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>tap-postgres<span class="w"> </span><span class="p">|</span><span class="w"> </span>target-snowflake
 </pre></div>
 </div>
 <section id="logic">
-<h2>Logic<a class="headerlink" href="#logic" title="Permalink to this heading"></a></h2>
+<h2>Logic<a class="headerlink" href="#logic" title="Permalink to this heading">¶</a></h2>
 <p>Pipes provide asynchronous execution of commands using buffered I/O routines. Thus, all the commands
 in the pipeline operate in parallel, each in its own process.</p>
 <p>The size of the buffer since kernel version 2.6.11 is 65536 bytes (64K) and is equal to the page memory
@@ -142,7 +232,7 @@ operations are performed in memory without loading to/from the disc.</p>
 original <a class="reference external" href="https://blog.dataart.com/linux-pipes-tips-tricks">Linux Pipes Tips &amp; Tricks</a> post.</p>
 </section>
 <section id="increasing-buffer-size">
-<h2>Increasing buffer size<a class="headerlink" href="#increasing-buffer-size" title="Permalink to this heading"></a></h2>
+<h2>Increasing buffer size<a class="headerlink" href="#increasing-buffer-size" title="Permalink to this heading">¶</a></h2>
 <p>Sometimes the default 64K buffer size that provided by the Linux kernel is too small. For example in the
 example above when you extracting data from a busy postgres database and loading into a busy Snowflake
 database sometimes you will find that that <code class="docutils literal notranslate"><span class="pre">tap-postgres</span></code> is blocked by <code class="docutils literal notranslate"><span class="pre">target-snowflake</span></code>.</p>
@@ -163,7 +253,7 @@ create custom sized buffer between taps and targets.</p>
 value. If <code class="docutils literal notranslate"><span class="pre">stream_buffer_size</span></code> is greater than 0 then the following piped command will be
 generated to create larger buffer between taps and targets than the default
 buffer that’s provided by the Linux kernel:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>tap-postgres <span class="p">|</span> mbuffer -m 10M <span class="p">|</span> target-snowflake
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>tap-postgres<span class="w"> </span><span class="p">|</span><span class="w"> </span>mbuffer<span class="w"> </span>-m<span class="w"> </span>10M<span class="w"> </span><span class="p">|</span><span class="w"> </span>target-snowflake
 </pre></div>
 </div>
 </section>
@@ -171,33 +261,50 @@ buffer that’s provided by the Linux kernel:</p>
 
 
            </div>
+           
           </div>
-          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="fastsync.html" class="btn btn-neutral float-left" title="Fast Sync" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+          <footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
         <a href="../user_guide/yaml_config.html" class="btn btn-neutral float-right" title="YAML configuration" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="fastsync.html" class="btn btn-neutral float-left" title="Fast Sync" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
     </div>
 
   <hr/>
 
   <div role="contentinfo">
-    <p>&#169; Copyright 2022, Wise Ltd..</p>
-  </div>
+    <p>
+        &#169; Copyright 2023, Wise Ltd..
 
-  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
     <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
-    provided by <a href="https://readthedocs.org">Read the Docs</a>.
-   
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
 
 </footer>
         </div>
       </div>
+
     </section>
+
   </div>
-  <script>
+  
+
+  <script type="text/javascript">
       jQuery(function () {
           SphinxRtdTheme.Navigation.enable(true);
       });
-  </script> 
+  </script>
+
+  
+  
+    
+   
 
 </body>
 </html>
