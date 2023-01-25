@@ -159,6 +159,15 @@ class Config:
             'pidfile': os.path.join(connector_dir, 'pipelinewise.pid'),
         }
 
+    @staticmethod
+    def get_connector_config_file(connector_dir: str) -> str:
+        """
+        Returns the absolute path of a tap configuration file
+        Args:
+            connector_dir: the absolute path of the connector
+        """
+        return os.path.join(connector_dir, 'config.json')
+
     def save(self, selected_taps: Union[None, List] = None):
         """
         Generating pipelinewise configuration directory layout on the disk.
