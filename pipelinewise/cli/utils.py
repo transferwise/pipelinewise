@@ -328,6 +328,8 @@ def silentremove(path):
             shutil.rmtree(path)
         else:
             os.remove(path)
+    except FileNotFoundError:
+        pass
     except OSError as exc:
         # errno.ENOENT = no such file or directory
         if exc.errno != errno.ENOENT:
