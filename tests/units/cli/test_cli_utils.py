@@ -285,11 +285,12 @@ class TestUtils:
             cli.utils.silentremove(file.name)
             assert os.path.exists(file.name) is False
 
+    # pylint: disable=consider-using-with
     def test_silentremove_successfully_removes_directory(self):
         """Test removing an existing directory works"""
-        with TemporaryDirectory() as directory:
-            cli.utils.silentremove(directory)
-            assert os.path.exists(directory) is False
+        directory = TemporaryDirectory().name
+        cli.utils.silentremove(directory)
+        assert os.path.exists(directory) is False
 
     def test_silentremove_success_if_directory_doesnt_exist(self):
         """Test removing an existing directory works"""
