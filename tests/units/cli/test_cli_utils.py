@@ -2,7 +2,7 @@ import os
 import pytest
 import re
 
-from tempfile import TemporaryDirectory, NamedTemporaryFile, TemporaryFile
+from tempfile import TemporaryDirectory, NamedTemporaryFile
 
 from pipelinewise import cli
 from pipelinewise.cli.errors import InvalidConfigException
