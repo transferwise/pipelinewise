@@ -279,7 +279,6 @@ class TestUtils:
         """Test removing a non-existing file should not raise exception"""
         assert cli.utils.silentremove('this-file-not-exists.json') is None
 
-    # pylint: disable=R1732
     def test_silentremove_successfully_removes_file(self):
         """Test removing a file that exists"""
         with NamedTemporaryFile(delete=False) as file:
