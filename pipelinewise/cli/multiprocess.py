@@ -2,9 +2,9 @@ import multiprocessing
 import traceback
 
 
-class MultiProcess(multiprocessing.Process):
+class Process(multiprocessing.Process):
     """
-    This is an extend of Process to let catching raised exceptions inside the
+    This is an extension of Process to let catching raised exceptions inside the
     process.
     """
     def __init__(self, *args, **kwargs):

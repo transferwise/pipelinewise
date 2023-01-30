@@ -30,8 +30,8 @@ from .errors import (
     PreRunChecksException
 )
 
-from pipelinewise.cli.multiprocess import MultiProcess
 from pipelinewise.fastsync.commons.tap_postgres import FastSyncTapPostgres
+from pipelinewise.cli.multiprocess import Process
 
 FASTSYNC_PAIRS = {
     ConnectorType.TAP_MYSQL: {
@@ -1306,7 +1306,7 @@ class PipelineWise:
 
                 # Terminate all the processes in the current process' process group.
                 for child in parent.children(recursive=True):
-                    if os.getpgid(child.pid) == pgid:
+                    if os.getpgid(child.pid) == pgid and child.status == 'running':
                         self.logger.info('Sending SIGTERM to child pid %s...', child.pid)
                         child.terminate()
                         try:
@@ -1329,7 +1329,10 @@ class PipelineWise:
             sys.exit(1)
 
         # Remove pidfile.
-        os.remove(pidfile_path)
+        try:
+            os.remove(pidfile_path)
+        except Exception:
+            pass
 
         # Rename log files from running to terminated status
         if self.tap_run_log_file:
@@ -1361,13 +1364,13 @@ class PipelineWise:
         selected_tables = self._get_sync_tables_setting_from_selection_file(self.args.tables)
         processes_list = []
         if selected_tables['partial_sync']:
-            partial_sync_process = MultiProcess(
+            partial_sync_process = Process(
                 target=self.sync_tables_partial_sync, args=(selected_tables['partial_sync'],))
             partial_sync_process.start()
             processes_list.append(partial_sync_process)
 
         if selected_tables['full_sync']:
-            fast_sync_process = MultiProcess(
+            fast_sync_process = Process(
                 target=self.sync_tables_fast_sync, args=(selected_tables['full_sync'],))
             fast_sync_process.start()
             processes_list.append(fast_sync_process)
