@@ -83,7 +83,7 @@ class TestCli:
 
     @staticmethod
     def _assert_calling_sync_tables(pipelinewise: PipelineWise) -> None:
-        with patch('pipelinewise.cli.pipelinewise.MultiProcess') as mocked_process:
+        with patch('pipelinewise.cli.pipelinewise.Process') as mocked_process:
             mocked_process.return_value.exception = None
             mocked_process.return_value.exitcode = 0
             pipelinewise.sync_tables()
