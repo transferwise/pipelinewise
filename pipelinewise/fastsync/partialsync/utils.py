@@ -50,29 +50,6 @@ def diff_source_target_columns(target_sf: dict, source_columns: list) -> dict:
     }
 
 
-def _get_target_columns_info(target_column):
-    target_columns_dict = {}
-    list_of_target_column_names = []
-    for column in target_column:
-        list_of_target_column_names.append(column['column_name'])
-        column_type_str = column['data_type']
-        column_type_dict = json.loads(column_type_str)
-        target_columns_dict[f'"{column["column_name"]}"'] = column_type_dict['type']
-    return {
-        'column_names': list_of_target_column_names,
-        'columns_dict': target_columns_dict
-    }
-
-
-def _get_source_columns_dict(source_columns):
-    source_columns_dict = {}
-    for column in source_columns:
-        column_info = column.split(' ')
-        column_name = column_info[0]
-        column_type = ' '.join(column_info[1:])
-        source_columns_dict[column_name] = column_type
-    return source_columns_dict
-
 
 def load_into_snowflake(target, args, columns_diff, primary_keys, s3_key_pattern, size_bytes,
                         where_clause_sql):
@@ -189,6 +166,30 @@ def get_sync_tables(args: argparse.Namespace) -> Dict:
             'drop_target_table': drop_target_tables[ind],
         }
     return sync_tables
+
+
+def _get_target_columns_info(target_column):
+    target_columns_dict = {}
+    list_of_target_column_names = []
+    for column in target_column:
+        list_of_target_column_names.append(column['column_name'])
+        column_type_str = column['data_type']
+        column_type_dict = json.loads(column_type_str)
+        target_columns_dict[f'"{column["column_name"]}"'] = column_type_dict['type']
+    return {
+        'column_names': list_of_target_column_names,
+        'columns_dict': target_columns_dict
+    }
+
+
+def _get_source_columns_dict(source_columns):
+    source_columns_dict = {}
+    for column in source_columns:
+        column_info = column.split(' ')
+        column_name = column_info[0]
+        column_type = ' '.join(column_info[1:])
+        source_columns_dict[column_name] = column_type
+    return source_columns_dict
 
 
 def _get_args_parser_for_partialsync():

@@ -1162,6 +1162,8 @@ class PipelineWise:
             'stream_buffer_size', commands.DEFAULT_STREAM_BUFFER_SIZE
         )
 
+        not_partial_syned_tables = set()
+
         self.logger.info('Running %s tap in %s target', tap_id, target_id)
 
         # Run only if tap enabled
@@ -1235,6 +1237,16 @@ class PipelineWise:
                     )
                     self.do_sync_tables()
 
+                    # Finding out which partial syn tables are not synced yet for not running singer for them
+                    with open(tap_state, 'r', encoding='utf8') as state_file:
+                        try:
+                            state_dict = json.load(state_file)
+                        except Exception:
+                            state_dict = {}
+                    stored_bookmarks = state_dict.get('bookmarks', {})
+                    stored_bookmarks_keys = set(stored_bookmarks.keys())
+                    not_partial_syned_tables = set(singer_stream_ids).difference(stored_bookmarks_keys)
+
                 else:
                     self.logger.info(
                         'No table available that needs to be sync by fastsync'
@@ -1257,6 +1269,8 @@ class PipelineWise:
                         properties=tap_properties_singer,
                         state=tap_state,
                     )
+
+                    self._remove_not_partial_synced_tables_from_properties(tap_params, not_partial_syned_tables)
 
                     self.run_tap_singer(
                         tap=tap_params,
@@ -1364,6 +1378,7 @@ class PipelineWise:
         selected_tables = self._get_sync_tables_setting_from_selection_file(self.args.tables)
         processes_list = []
         if selected_tables['partial_sync']:
+            self._reset_state_file_for_partial_sync(selected_tables)
             partial_sync_process = Process(
                 target=self.sync_tables_partial_sync, args=(selected_tables['partial_sync'],))
             partial_sync_process.start()
@@ -1807,6 +1822,33 @@ class PipelineWise:
         finally:
             if cons_target_config:
                 utils.silentremove(cons_target_config)
+
+    @staticmethod
+    def _remove_not_partial_synced_tables_from_properties(tap_params, not_synced_tables):
+        """" Remove partial sync table which are not synced yet from properties """
+        with open(tap_params.properties, 'r', encoding='utf8') as properties_temp_file:
+            properties_temp = json.load(properties_temp_file)
+            streams = properties_temp.get('streams')
+            filtered_streams = list(filter(lambda d: d['tap_stream_id'] not in not_synced_tables, streams))
+            properties_temp['streams'] = filtered_streams
+        with open(tap_params.properties, 'w', encoding='utf8') as properties_temp_file:
+            json.dump(properties_temp, properties_temp_file)
+
+    def _reset_state_file_for_partial_sync(self, selected_tables):
+        tap_state = self.tap['files']['state']
+        try:
+            with open(tap_state, 'r', encoding='utf8') as state_file:
+                state_content = json.load(state_file)
+                bookmarks = state_content.get('bookmarks')
+        except Exception:
+            bookmarks = None
+        if bookmarks:
+            selected_partial_sync_tables = set(selected_tables['partial_sync'].keys())
+            selected_partial_sync_tables = {sub.replace('.', '-') for sub in selected_partial_sync_tables}
+            filtered_bookmarks = dict(filter(lambda k: k[0] not in selected_partial_sync_tables, bookmarks.items()))
+            state_content['bookmarks'] = filtered_bookmarks
+            with open(tap_state, 'w', encoding='utf8') as state_file:
+                json.dump(state_content, state_file)
 
     def _check_supporting_tap_and_target_for_partial_sync(self):
         tap_type = self.tap['type']

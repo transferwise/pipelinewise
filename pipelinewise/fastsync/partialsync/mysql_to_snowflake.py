@@ -98,7 +98,8 @@ def partial_sync_table(table: tuple, args: Namespace) -> Union[bool, str]:
         utils.load_into_snowflake(
             target_sf, args, columns_diff, primary_keys, s3_key_pattern, size_bytes, where_clause_sql)
 
-        utils.update_state_file(args, bookmark)
+        if file_parts:
+            utils.update_state_file(args, bookmark)
 
         return True
     except Exception as exc:
