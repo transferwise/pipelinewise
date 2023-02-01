@@ -50,7 +50,6 @@ def diff_source_target_columns(target_sf: dict, source_columns: list) -> dict:
     }
 
 
-
 def load_into_snowflake(target, args, columns_diff, primary_keys, s3_key_pattern, size_bytes,
                         where_clause_sql):
     """Loading data from S3 to the temp table in snowflake and then merge it with the target table"""
