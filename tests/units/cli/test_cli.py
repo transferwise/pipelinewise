@@ -69,15 +69,18 @@ class TestCli:
         return pipelinewise
 
     @staticmethod
-    def _make_sample_state_file(test_state_file: str) -> None:
-        sample_state_data = {
-            'currently_syncing': None,
-            'bookmarks': {
-                'table1': {'foo': 'bar'},
-                'table2': {'foo': 'bar'},
-                'table3': {'foo': 'bar'}
+    def _make_sample_state_file(test_state_file: str, content=None) -> None:
+        if content:
+            sample_state_data = content
+        else:
+            sample_state_data = {
+                'currently_syncing': None,
+                'bookmarks': {
+                    'table1': {'foo': 'bar'},
+                    'table2': {'foo': 'bar'},
+                    'table3': {'foo': 'bar'}
+                }
             }
-        }
         with open(test_state_file, 'w', encoding='UTF-8') as state_file:
             json.dump(sample_state_data, state_file)
 
@@ -93,7 +96,6 @@ class TestCli:
                 {'db_test_mysql.table_one': {'column': 'id', 'value': '5'}},)),
             call(target=pipelinewise.sync_tables_fast_sync, args=(['db_test_mysql.table_two'],)),
         ]
-
 
     @staticmethod
     def _assert_calling_fastsync_tables(
@@ -692,7 +694,6 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
         # Delete test log file
         os.remove('{}.terminated'.format(pipelinewise.tap_run_log_file))
 
-
     def test_command_run_tap_exit_with_error_1_if_fastsync_exception(self):
         """Test if run_tap command returns error 1 if exception in fastsync"""
         with patch('pipelinewise.cli.pipelinewise.PipelineWise.run_tap_fastsync') as mocked_fastsync:
@@ -716,7 +717,6 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
         with patch('pipelinewise.cli.pipelinewise.PipelineWise.run_tap_partialsync') as mocked_partial_sync:
             mocked_partial_sync.side_effect = Exception('FOO')
             self._assert_run_command_exit_with_error_1('sync_tables')
-
 
     def test_command_sync_tables(self):
         """Test run tap command"""
@@ -745,6 +745,28 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
             tables_arg='db_test_mysql.table_one,db_test_mysql.table_two')
         self._assert_calling_sync_tables(pipelinewise)
 
+    def test_do_sync_tables_reset_state_file_for_partial_sync(self):
+        """Testing if selected partial sync tables are filtered from state file if sync_tables run"""
+        pipelinewise = self._init_for_sync_tables_states_cleanup()
+        test_state_file = pipelinewise.tap['files']['state']
+        state_content = {
+            'currently_syncing': None,
+            'bookmarks': {
+                'tb1': {'foo': 'bar'},
+                'db_test_mysql-table_one': {'column': 'id', 'value': '5'}
+            }
+        }
+        self._make_sample_state_file(test_state_file, content=state_content)
+        with patch('pipelinewise.cli.pipelinewise.Process') as mocked_process:
+            mocked_process.return_value.exception = None
+            mocked_process.return_value.exitcode = 0
+            pipelinewise.do_sync_tables()
+
+        with open(test_state_file, 'r', encoding='utf-8') as state_file:
+            bookmarks = json.load(state_file)
+
+        assert bookmarks == {'bookmarks': {'tb1': {'foo': 'bar'}}, 'currently_syncing': None}
+
     def test_fast_sync_tables_cleanup_state_for_selected_tables(self):
         """Testing sync_tables cleanup state if file exists and there is no table argument"""
         def _assert_state_file(*args, **kwargs):
@@ -771,8 +793,7 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
             bookmarks = json.load(state_file)
 
         assert bookmarks == original_bookmarks
-        self._assert_calling_fastsync_tables(pipelinewise, ['table1','table3'], _assert_state_file)
-
+        self._assert_calling_fastsync_tables(pipelinewise, ['table1', 'table3'], _assert_state_file)
 
     def test_command_sync_tables_cleanup_state_if_file_empty_and_table_argument(self):
         """Testing sync_tables cleanup state if file empty and there is table argument"""

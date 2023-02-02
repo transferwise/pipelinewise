@@ -1238,11 +1238,11 @@ class PipelineWise:
                     self.do_sync_tables()
 
                     # Finding out which partial syn tables are not synced yet for not running singer for them
-                    with open(tap_state, 'r', encoding='utf8') as state_file:
-                        try:
+                    try:
+                        with open(tap_state, 'r', encoding='utf8') as state_file:
                             state_dict = json.load(state_file)
-                        except Exception:
-                            state_dict = {}
+                    except Exception:
+                        state_dict = {}
                     stored_bookmarks = state_dict.get('bookmarks', {})
                     stored_bookmarks_keys = set(stored_bookmarks.keys())
                     not_partial_syned_tables = set(singer_stream_ids).difference(stored_bookmarks_keys)
