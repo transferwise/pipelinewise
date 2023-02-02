@@ -227,6 +227,12 @@ add the <code class="docutils literal notranslate"><span class="pre">--tables</s
 list of table names using the <code class="docutils literal notranslate"><span class="pre">&lt;schema_name&gt;.&lt;table_name&gt;</span></code> format. Schema and
 table names have to be the names in the source database.</p>
 </div>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Based on the tap setting, tables can be fully synced or partial synced if they are defined
+as partial synced.
+Currently this option is available only for <a class="reference internal" href="../connectors/taps/mysql.html#tap-mysql"><span class="std std-ref">Tap MySQL</span></a> and <a class="reference internal" href="../connectors/taps/postgres.html#tap-postgres"><span class="std std-ref">Tap PostgreSQL</span></a> to Snowflake.</p>
+</div>
 <ol class="arabic simple" start="2">
 <li><p><strong>Partial resync</strong></p></li>
 </ol>
