@@ -1,3 +1,9 @@
+0.52.0 (2023-02-02)
+-------------------
+
+- Bump `tap-s3-csv` from `2.0.0` to `3.0.0`
+- Implement Defined Partial Sync for `MariaDB` and `Postgres` to `SnowFlake`
+
 0.51.0 (2022-12-10)
 -------------------
 
