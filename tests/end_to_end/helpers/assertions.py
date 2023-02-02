@@ -491,6 +491,14 @@ def assert_not_raises(exc_type):
         raise TestCase.failureException(f'{exc_type.__name__} raised!')
 
 
+def assert_record_count_in_sf(env, tap_type, table, expected_records, where_clause=''):
+    """Assert record count in target Snowflake"""
+    result = env.run_query_target_snowflake(
+        f'SELECT count(1) FROM ppw_e2e_{tap_type}{env.sf_schema_postfix}."{table.upper()}" {where_clause};'
+    )[0][0]
+    assert result == expected_records
+
+
 def _get_command_for_partial_sync(tap_parameters, start_value, end_value=None):
     end_value_command = f' --end_value {end_value}' if end_value else ''
     command = f'pipelinewise partial_sync_table --tap {tap_parameters["tap"]} --target {tap_parameters["target"]}' \
