@@ -1235,7 +1235,7 @@ class PipelineWise:
                     self.logger.info(
                         'Table(s) selected to sync by fastsync/partialsync: %s', fastsync_stream_ids
                     )
-                    self.do_sync_tables()
+                    self.do_sync_tables(fastsync_stream_ids)
 
                     # Finding out which partial syn tables are not synced yet for not running singer for them
                     try:
@@ -1370,12 +1370,16 @@ class PipelineWise:
             self.logger.error('Another instance of the tap is already running.')
             raise SystemExit(1) from exc
 
-    def do_sync_tables(self):
+    def do_sync_tables(self, fastsync_stream_ids=None):
         """
         syncing tables by using fast sync
         """
+        if fastsync_stream_ids:
+            tables_to_sync = ','.join(fastsync_stream_ids).replace('-', '.')
+        else:
+            tables_to_sync = self.args.tables
 
-        selected_tables = self._get_sync_tables_setting_from_selection_file(self.args.tables)
+        selected_tables = self._get_sync_tables_setting_from_selection_file(tables_to_sync)
         processes_list = []
         if selected_tables['partial_sync']:
             self._reset_state_file_for_partial_sync(selected_tables)
