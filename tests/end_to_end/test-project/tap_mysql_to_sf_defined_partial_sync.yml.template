@@ -1,0 +1,56 @@
+---
+
+# ------------------------------------------------------------------------------
+# General Properties
+# ------------------------------------------------------------------------------
+id: "mariadb_to_sf_defined_partial_sync"
+name: "MariaDB source test database"
+type: "tap-mysql"
+owner: "test-runner"
+
+
+# ------------------------------------------------------------------------------
+# Source (Tap) - MySQL connection details
+# ------------------------------------------------------------------------------
+db_conn:
+  host: "${TAP_MYSQL_HOST}"             # MySQL host
+  port: ${TAP_MYSQL_PORT}               # MySQL port
+  user: "${TAP_MYSQL_USER}"             # MySQL user
+  password: "${TAP_MYSQL_PASSWORD}"     # Plain string or vault encrypted
+  dbname: "${TAP_MYSQL_DB}"             # MySQL database name
+  use_gtid: true
+  engine: mariadb
+
+# ------------------------------------------------------------------------------
+# Destination (Target) - Target properties
+# Connection details should be in the relevant target YAML file
+# ------------------------------------------------------------------------------
+target: "snowflake"                    # ID of the target connector where the data will be loaded
+batch_size_rows: 20000                 # Batch size for the stream to optimise load performance
+stream_buffer_size: 0                  # In-memory buffer size (MB) between taps and targets for asynchronous data pipes
+
+
+# ------------------------------------------------------------------------------
+# Source to target Schema mapping
+# ------------------------------------------------------------------------------
+schemas:
+  - source_schema: "mysql_source_db"
+    target_schema: "ppw_e2e_tap_mysql${TARGET_SNOWFLAKE_SCHEMA_POSTFIX}"
+
+    tables:
+      - table_name: "weight_unit"
+        replication_method: "LOG_BASED"
+        sync_start_from:
+            column: "weight_unit_id"
+            value: "5"
+            drop_target_table: true
+
+      - table_name: "address"
+        replication_method: "INCREMENTAL"
+        replication_key: "date_updated"
+        sync_start_from:
+            column: "address_id"
+            value: 400
+
+      - table_name: "customers"
+        replication_method: "LOG_BASED"

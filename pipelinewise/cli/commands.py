@@ -355,7 +355,7 @@ def build_singer_command(
 
 
 # pylint: disable=too-many-arguments
-def build_fastsync_partial_command(
+def build_partialsync_command(
         tap: TapParams,
         target: TargetParams,
         transform: TransformParams,
@@ -364,7 +364,8 @@ def build_fastsync_partial_command(
         table: str,
         column: str,
         start_value: str,
-        end_value: str = None
+        end_value: str = None,
+        drop_target_table: str = None
 
 ):
     """Builds a command that starts a partial sync"""
@@ -387,7 +388,8 @@ def build_fastsync_partial_command(
                     f'--table "{table}"',
                     f'--column "{column}"',
                     f'--start_value "{start_value}"',
-                    f'--end_value "{end_value}"' if end_value else None
+                    f'--end_value "{end_value}"' if end_value else None,
+                    f'--drop_target_table {drop_target_table}' if drop_target_table else None
                 ],
             )
         )

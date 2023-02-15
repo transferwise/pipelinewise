@@ -655,7 +655,7 @@ class E2EEnv:
             f'DELETE from ppw_e2e_tap_{tap_type}{self.sf_schema_postfix}.{table} {where_clause}'
         )
 
-    def add_column_into_target_sf(self, tap_type, table, new_column) :
+    def add_column_into_target_sf(self, tap_type, table, new_column):
         """Add a record into the target"""
         self.run_query_target_snowflake(
             f'ALTER TABLE ppw_e2e_tap_{tap_type}{self.sf_schema_postfix}.{table} ADD {new_column["name"]} int'
@@ -682,12 +682,11 @@ class E2EEnv:
             f'DELETE FROM {table} {where_clause}'
         )
 
-    def run_query_on_source(self, tap_type, query):
-        """Running a query on the source"""
-        run_query_method = getattr(self, f'run_query_tap_{tap_type}')
-        run_query_method(
-            query
-        )
+    def get_source_records_count(self, tap_type, table):
+        """Getting count of records from the source"""
+        run_query_method = getattr(self, f'run_query_{tap_type.lower()}')
+        result = run_query_method(f'SELECT count(1) FROM {table}')
+        return result[0][0]
 
     def get_records_from_target_snowflake(self, tap_type, table, column, primary_key):
         """"Getting all records from a specific table of snowflake target"""
@@ -712,3 +711,13 @@ class E2EEnv:
         """Clean up state files to ensure tests behave the same every time"""
         for state_file in Path(CONFIG_DIR).glob('**/state.json'):
             state_file.unlink()
+
+    @staticmethod
+    def clean_up_temp_dir():
+        """Clean up temp folder to ensure tests behave the same every time"""
+        files = glob.glob(f'{CONFIG_DIR}/tmp/*')
+        for f in files:
+            try:
+                os.remove(f)
+            except Exception:
+                pass
