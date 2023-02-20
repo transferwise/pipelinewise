@@ -320,13 +320,15 @@ def delete_keys_from_dict(dic, keys):
 
 def silentremove(path):
     """
-    Deleting file with no error message if the file not exists
+    Deleting file/folder with no error message if it doesn't exist
     """
-    LOGGER.debug('Removing file at %s', path)
+    LOGGER.debug('Removing folder/file at %s', path)
     try:
-        os.remove(path)
+        if os.path.isdir(path):
+            shutil.rmtree(path)
+        else:
+            os.remove(path)
     except OSError as exc:
-
         # errno.ENOENT = no such file or directory
         if exc.errno != errno.ENOENT:
             raise

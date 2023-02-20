@@ -1,8 +1,8 @@
 import os
-import re
 import pytest
+import re
 
-from tempfile import TemporaryDirectory
+from tempfile import TemporaryDirectory, NamedTemporaryFile
 
 from pipelinewise import cli
 from pipelinewise.cli.errors import InvalidConfigException
@@ -15,6 +15,7 @@ class TestUtils:
     """
     Unit Tests for PipelineWise CLI utility functions
     """
+
     def assert_json_is_invalid(self, schema, invalid_target):
         """Simple assertion to check if validate function exits with error"""
         with pytest.raises(InvalidConfigException):
@@ -274,10 +275,26 @@ class TestUtils:
              {'foo3': {'nested_foo': 'nested_bar', 'nested_foo2': 'nested_bar2'}}],
             ['foo2', 'nested_foo']) == [{'foo': 'bar'}, {'foo3': {'nested_foo2': 'nested_bar2'}}]
 
-    def test_silentremove(self):
-        """Test removing functions"""
-        # Deleting non existing file should not raise exception
+    def test_silentremove_success_if_file_doesnt_exist(self):
+        """Test removing a non-existing file should not raise exception"""
         assert cli.utils.silentremove('this-file-not-exists.json') is None
+
+    def test_silentremove_successfully_removes_file(self):
+        """Test removing a file that exists"""
+        with NamedTemporaryFile(delete=False) as file:
+            cli.utils.silentremove(file.name)
+            assert os.path.exists(file.name) is False
+
+    # pylint: disable=consider-using-with
+    def test_silentremove_successfully_removes_directory(self):
+        """Test removing an existing directory works"""
+        directory = TemporaryDirectory().name
+        cli.utils.silentremove(directory)
+        assert os.path.exists(directory) is False
+
+    def test_silentremove_success_if_directory_doesnt_exist(self):
+        """Test removing an existing directory works"""
+        assert cli.utils.silentremove('tmp/folder_doesnt_exist') is None
 
     def test_tap_properties(self):
         """Test tap property getter functions"""
