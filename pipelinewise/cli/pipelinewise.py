@@ -1320,7 +1320,7 @@ class PipelineWise:
 
                 # Terminate all the processes in the current process' process group.
                 for child in parent.children(recursive=True):
-                    if os.getpgid(child.pid) == pgid and child.status() == 'running':
+                    if os.getpgid(child.pid) == pgid:
                         self.logger.info('Sending SIGTERM to child pid %s...', child.pid)
                         child.terminate()
                         try:
