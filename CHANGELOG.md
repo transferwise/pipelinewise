@@ -1,3 +1,10 @@
+0.52.1 (2023-02-22)
+-------------------
+
+- Extend silentremove to support deleting folders
+- Bugfix for selected fastsync tables
+- Bugfix for graceful exit
+
 0.52.0 (2023-02-02)
 -------------------
 
