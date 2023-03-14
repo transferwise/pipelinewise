@@ -348,6 +348,7 @@
         "tap-postgres",
         "tap-mongodb",
         "tap-mysql",
+        "tap-mssql",
         "tap-oracle",
         "tap-adwords",
         "tap-zendesk",

@@ -120,6 +120,15 @@ def get_tap_properties(tap=None, temp_dir=None):
             'default_replication_method': 'LOG_BASED',
             'default_data_flattening_max_level': 0,
         },
+        },
+        'tap-mssql': {
+            'tap_config_extras': {},
+            'tap_stream_id_pattern': '{{schema_name}}-{{table_name}}',
+            'tap_stream_name_pattern': '{{schema_name}}-{{table_name}}',
+            'tap_catalog_argument': '--properties',
+            'default_replication_method': 'LOG_BASED',
+            'default_data_flattening_max_level': 0,
+        },
         'tap-zuora': {
             'tap_config_extras': {
                 'username': tap.get('db_conn', {}).get('username') if tap else None,

@@ -13,6 +13,7 @@ class ConnectorType(enum.Enum):
     TAP_KAFKA = 'tap-kafka'
     TAP_MIXPANEL = 'tap-mixpanel'
     TAP_MONGODB = 'tap-mongodb'
+    TAP_MSSQL = 'tap-mssql'
     TAP_MYSQL = 'tap-mysql'
     TAP_ORACLE = 'tap-oracle'
     TAP_POSTGRES = 'tap-postgres'
