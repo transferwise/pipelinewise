@@ -1,0 +1,57 @@
+---
+# ------------------------------------------------------------------------------
+# General Properties
+# Doc: https://transferwise.github.io/pipelinewise/connectors/taps/postgres.html
+# ------------------------------------------------------------------------------
+id: "mssql_db"                      # Unique identifier of the tap
+name: "Sample MsSQL Database"       # Name of the tap
+type: "tap-mssql"                   # !! THIS SHOULD NOT CHANGE !!
+owner: "somebody@foo.com"              # Data owner to contact
+sync_period: "*/1 * * * *"
+
+
+# ------------------------------------------------------------------------------
+# Source (Tap) - PostgreSQL connection details
+# ------------------------------------------------------------------------------
+db_conn:
+  host: "db_mssql_source"
+  port: 1433                           # PostgreSQL port
+  user: "sa"                 # PostfreSQL user
+  password: "A_Str0ng_Required_Password"                   # Plain string or vault encrypted
+  database: "master"         # MsSQL database name
+  filter_dbs: "dbo"   # Optional: Scan only the required schemas
+                                       #    to improve the performance of
+                                       #    data extraction
+
+
+# ------------------------------------------------------------------------------
+# Destination (Target) - Target properties
+# Connection details should be in the relevant target YAML file
+# ------------------------------------------------------------------------------
+target: "postgres_dwh"                 # ID of the target connector where the data will be loaded
+batch_size_rows: 20000                 # Batch size for the stream to optimise load performance
+stream_buffer_size: 0                  # In-memory buffer size (MB) between taps and targets for asynchronous data pipes
+flush_all_streams: false               # Target to flush all streams if any stream reaches batch_size_rows. Default false
+
+
+# ------------------------------------------------------------------------------
+# Source to target Schema mapping for FULL_TABLE and INCREMENTAL replication
+# ------------------------------------------------------------------------------
+schemas:
+
+  ### SOURCE SCHEMA 1: public
+  - source_schema: "dbo"               # Source schema in postgres with tables
+    target_schema: "public" # Target schema in the destination Data Warehouse
+    # target_schema_select_permissions:   # Optional: Grant SELECT on schema and tables that created
+    #  - grp_read_only
+
+    # List of tables to replicate from Postgres to destination Data Warehouse
+    #
+    # Please check the Replication Strategies section in the documentation to understand the differences.
+    # LOG_BASED requires wal2json plugin and other postgres adjustments.
+    tables:
+
+      ### Table with full table replication
+      - table_name: "[zTWFINANCE Updated Transactions]"
+        replication_method: "INCREMENTAL"
+        replication_key: "Id"

@@ -51,6 +51,10 @@ FASTSYNC_PAIRS = {
         ConnectorType.TARGET_POSTGRES,
         ConnectorType.TARGET_BIGQUERY,
     },
+    ConnectorType.TAP_MSSQL: {
+        ConnectorType.TARGET_SNOWFLAKE,
+        ConnectorType.TARGET_POSTGRES
+    }
 }
 
 PARTIAL_SYNC_PAIRS = {
