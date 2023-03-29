@@ -1311,30 +1311,37 @@ class PipelineWise:
         a SIGTERM to the process.
         """
         self.logger.info('Trying to stop tap gracefully...')
+
+        pid = os.getpid()
+        pid_from_file = None
         pidfile_path = self.tap['files']['pidfile']
         try:
-            with open(pidfile_path, encoding='utf-8') as pidf:
-                pid = int(pidf.read())
-                pgid = os.getpgid(pid)
-                parent = psutil.Process(pid)
+            with open(pidfile_path, encoding='utf-8') as pid_file:
+                pid_from_file = int(pid_file.read())
 
-                # Terminate all the processes in the current process' process group.
-                for child in parent.children(recursive=True):
-                    if os.getpgid(child.pid) == pgid:
-                        self.logger.info('Sending SIGTERM to child pid %s...', child.pid)
+            pgid = os.getpgid(pid)
+            parent = psutil.Process(pid)
+
+            for child in parent.children(recursive=True):
+                if os.getpgid(child.pid) == pgid:
+                    self.logger.info('Sending SIGTERM to child pid %s...', child.pid)
+                    try:
                         child.terminate()
                         try:
                             child.wait(timeout=5)
                         except psutil.TimeoutExpired:
                             child.kill()
+                    except psutil.NoSuchProcess:
+                        pass
 
         except ProcessLookupError:
-            self.logger.error(
-                'Pid %s not found. Is the tap running on this machine? '
-                'Stopping taps remotely is not supported.',
-                pid,
-            )
-            sys.exit(1)
+            if os.getpgid(pid) != pid_from_file:
+                self.logger.error(
+                    'Pid %s not found. Is the tap running on this machine? '
+                    'Stopping taps remotely is not supported.',
+                    pid,
+                )
+                sys.exit(1)
 
         except FileNotFoundError:
             self.logger.error(
@@ -1342,13 +1349,6 @@ class PipelineWise:
             )
             sys.exit(1)
 
-        # Remove pidfile.
-        try:
-            os.remove(pidfile_path)
-        except Exception:
-            pass
-
-        # Rename log files from running to terminated status
         if self.tap_run_log_file:
             tap_run_log_file_running = f'{self.tap_run_log_file}.running'
             tap_run_log_file_terminated = f'{self.tap_run_log_file}.terminated'
