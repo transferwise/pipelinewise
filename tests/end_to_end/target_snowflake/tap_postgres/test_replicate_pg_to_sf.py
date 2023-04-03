@@ -132,7 +132,7 @@ class TestReplicatePGToSF(TapPostgres):
             f"where cvarchar='faaaar future';"
         )[0][0]
 
-        self.assertEqual(result, datetime(9999, 12, 31, 23, 59, 59, 998993))
+        self.assertEqual(result, datetime(9999, 12, 31, 23, 59, 59, 999000))
 
         result = self.e2e_env.run_query_target_snowflake(
             f'SELECT updated_at FROM '
@@ -140,4 +140,4 @@ class TestReplicatePGToSF(TapPostgres):
             f"where cvarchar='BC';"
         )[0][0]
 
-        self.assertEqual(result, datetime(9999, 12, 31, 23, 59, 59, 998993))
+        self.assertEqual(result, datetime(9999, 12, 31, 23, 59, 59, 999000))
