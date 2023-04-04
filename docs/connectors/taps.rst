@@ -203,4 +203,3 @@ Configuring taps
    taps/slack
    taps/mixpanel
    taps/twilio
-   taps/adwords
