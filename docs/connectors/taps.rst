@@ -115,26 +115,6 @@ PipelineWise can replicate data from the following data sources:
 
         .. container:: img-hover-zoom
 
-          .. image:: ../img/jira-logo.png
-             :target: taps/jira.html
-
-        :ref:`tap-jira`
-
-    .. container:: tile
-
-        .. container:: img-hover-zoom
-
-          .. image:: ../img/adwords-logo.png
-             :target: taps/adwords.html
-
-        :ref:`tap-adwords`
-
-.. container:: tile-wrapper
-
-    .. container:: tile
-
-        .. container:: img-hover-zoom
-
           .. image:: ../img/zuora-logo.png
              :target: taps/zuora.html
 
