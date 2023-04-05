@@ -6,7 +6,6 @@ class ConnectorType(enum.Enum):
     Enums for various Singer connector type names
     """
 
-    TAP_ADWORDS = 'tap-adwords'
     TAP_GITHUB = 'tap-github'
     TAP_GOOGLE_ANALYTICS = 'tap-google-analytics'
     TAP_JIRA = 'tap-jira'

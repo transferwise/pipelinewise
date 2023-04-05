@@ -39,7 +39,6 @@ transform-field
 endef
 
 define EXTRA_CONNECTORS
-tap-adwords\
 tap-oracle\
 tap-zuora\
 tap-google-analytics\
