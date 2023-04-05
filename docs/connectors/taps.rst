@@ -115,6 +115,26 @@ PipelineWise can replicate data from the following data sources:
 
         .. container:: img-hover-zoom
 
+          .. image:: ../img/jira-logo.png
+             :target: taps/jira.html
+
+        :ref:`tap-jira`
+
+    .. container:: tile
+
+        .. container:: img-hover-zoom
+
+          .. image:: ../img/twilio-logo.png
+             :target: taps/twilio.html
+
+        :ref:`tap-twilio`
+
+.. container:: tile-wrapper
+
+    .. container:: tile
+
+        .. container:: img-hover-zoom
+
           .. image:: ../img/zuora-logo.png
              :target: taps/zuora.html
 
@@ -170,16 +190,7 @@ PipelineWise can replicate data from the following data sources:
 
         :ref:`tap-mixpanel`
 
-.. container:: tile-wrapper
 
-    .. container:: tile
-
-        .. container:: img-hover-zoom
-
-          .. image:: ../img/twilio-logo.png
-             :target: taps/twilio.html
-
-        :ref:`tap-twilio`
 
 Configuring taps
 ----------------
