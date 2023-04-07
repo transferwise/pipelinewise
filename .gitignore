@@ -1,3 +1,6 @@
+vault-*
+pipelinewise_config/
+
 # IDE
 .vscode
 .idea/*

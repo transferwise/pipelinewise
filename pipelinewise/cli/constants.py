@@ -24,6 +24,7 @@ class ConnectorType(enum.Enum):
     TAP_TWILIO = 'tap-twilio'
     TAP_ZENDESK = 'tap-zendesk'
     TAP_ZUORA = 'tap-zuora'
+    TAP_HARVESTR = 'tap-harvestr'
 
     TARGET_BIGQUERY = 'target-bigquery'
     TARGET_POSTGRES = 'target-postgres'
