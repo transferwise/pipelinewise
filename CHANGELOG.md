@@ -1,3 +1,10 @@
+0.53.0 (2023-04-13)
+-------------------
+
+- Bugfix for renaming log files when stopping the tap
+- Bump `snowflake-connector-python` from `2.7.6` to `2.8.2`
+- Remove `tap-adwords` 
+
 0.52.2 (2023-03-20)
 -------------------
 
