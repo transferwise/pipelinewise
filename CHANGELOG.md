@@ -1,3 +1,7 @@
+0.53.2 (2023-04-25)
+-------------------
+- Bump `pipelinewise-tap-mysql` from `1.5.2` to `1.5.3` to mitigate bug in MariaDB 10.6.12
+
 0.53.1 (2023-04-21)
 -------------------
 
