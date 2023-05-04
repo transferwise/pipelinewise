@@ -1356,6 +1356,12 @@ class PipelineWise:
             if os.path.isfile(tap_run_log_file_running):
                 os.rename(tap_run_log_file_running, tap_run_log_file_terminated)
 
+        # Remove pidfile.
+        try:
+            os.remove(pidfile_path)
+        except Exception:
+            pass
+
         sys.exit(1)
 
     # pylint: disable=too-many-locals
