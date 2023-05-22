@@ -5,8 +5,7 @@ set -e
 apt-get update
 apt-get install -y --no-install-recommends \
   wget \
-  gnupg \
-  git
+  gnupg
 
 # Add Mongodb ppa
 wget -qO - https://www.mongodb.org/static/pgp/server-4.4.asc | apt-key add -
