@@ -5,7 +5,7 @@ set -e
 apt-get update
 apt-get install -y --no-install-recommends \
   wget \
-  gnupg \ 
+  gnupg \
   git
 
 # Add Mongodb ppa
