@@ -358,7 +358,6 @@ class PipelineWise:
                 dir=self.get_temp_dir(), prefix='properties_', suffix='.json'
             )[1]
             utils.save_json(properties, temp_properties_path)
-
             return temp_properties_path, filtered_tap_stream_ids
 
         except Exception as exc:
@@ -1190,7 +1189,7 @@ class PipelineWise:
         current_time = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
 
         # Create fastsync and singer specific filtered tap properties that contains only
-        # the the tables that needs to be synced by the specific command
+        # the tables that needs to be synced by the specific command
         (
             tap_properties_fastsync,
             fastsync_stream_ids,
@@ -2074,10 +2073,11 @@ TAP RUN SUMMARY
         selection = utils.load_json(self.tap['files']['selection'])
         selection = selection.get('selection')
         all_tables = {'full_sync': [], 'partial_sync': {}}
+        tables_list = tables.split(',') if tables else tables
         if selection:
             for table in selection:
                 table_name = self._get_fixed_name_of_table(table['tap_stream_id'])
-                if tables is None or table_name in tables:
+                if tables_list is None or table_name in tables_list:
                     if table.get('sync_start_from'):
                         all_tables['partial_sync'][table_name] = table['sync_start_from']
                     else:

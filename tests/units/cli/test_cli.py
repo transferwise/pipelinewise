@@ -1026,3 +1026,54 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
             )
 
             assert run_command_mock.call_count == 4
+
+    def test_get_sync_tables_setting_from_selection_file(self):
+        """Test if the method for getting list of tables for syncing works as expected"""
+        tables = 'foo_1_2,foo_bar,par_foo,bar_baz'
+        with patch('pipelinewise.cli.pipelinewise.utils.load_json') as mocked_load_json:
+            self.pipelinewise.tap = {
+                'files': {
+                    'selection': 'foo.json'
+                }
+            }
+            mocked_load_json.return_value = {
+                'selection': [
+                    {'tap_stream_id': 'foo'},
+                    {'tap_stream_id': 'foo_bar'},
+                    {'tap_stream_id': 'foo_bar_baz'},
+                    {'tap_stream_id': 'bar_baz'},
+                    {'tap_stream_id': 'bar'},
+                    {'tap_stream_id': 'par', 'sync_start_from': 'PARTIAL_par'},
+                    {'tap_stream_id': 'par_foo', 'sync_start_from': 'PARTIAL_par_foo'},
+                ]
+            }
+            actual_selected_tables = self.pipelinewise._get_sync_tables_setting_from_selection_file(tables)
+            expected_selected_tables = {
+                'full_sync': ['foo_bar', 'bar_baz'],
+                'partial_sync': {'par_foo': 'PARTIAL_par_foo'}
+            }
+            assert actual_selected_tables == expected_selected_tables
+
+    def test_get_sync_tables_setting_from_selection_file_if_tables_parameter_in_none(self):
+        """Test if the method for getting list of tables for syncing works as expected while input parameter is None"""
+        tables = None
+        with patch('pipelinewise.cli.pipelinewise.utils.load_json') as mocked_load_json:
+            self.pipelinewise.tap = {
+                'files': {
+                    'selection': 'foo.json'
+                }
+            }
+            mocked_load_json.return_value = {
+                'selection': [
+                    {'tap_stream_id': 'foo'},
+                    {'tap_stream_id': 'bar'},
+                    {'tap_stream_id': 'baz', 'sync_start_from': 'PARTIAL'},
+                    {'tap_stream_id': 'par', 'sync_start_from': 'PARTIAL_par'},
+                ]
+            }
+            actual_selected_tables = self.pipelinewise._get_sync_tables_setting_from_selection_file(tables)
+            expected_selected_tables = {
+                'full_sync': ['foo', 'bar'],
+                'partial_sync': {'baz': 'PARTIAL', 'par': 'PARTIAL_par'}
+            }
+            assert actual_selected_tables == expected_selected_tables
