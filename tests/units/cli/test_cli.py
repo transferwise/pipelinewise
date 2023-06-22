@@ -1054,7 +1054,7 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
             }
             assert actual_selected_tables == expected_selected_tables
 
-    def test_get_sync_tables_setting_from_selection_file_if_tables_parameter_in_none(self):
+    def test_get_sync_tables_setting_from_selection_file_if_tables_parameter_is_none(self):
         """Test if the method for getting list of tables for syncing works as expected while input parameter is None"""
         tables = None
         with patch('pipelinewise.cli.pipelinewise.utils.load_json') as mocked_load_json:
