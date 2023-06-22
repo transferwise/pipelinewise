@@ -1,3 +1,11 @@
+0.53.4 (2023-06-22)
+-------------------
+
+- Bugfix for trigger unwanted tables syncing trigger
+- Bugfix for building `wal2json` in PostgreSQL Docker image
+- Bump `pipelinewise-tap-mysql` from `1.5.3` to `1.5.4`
+
+
 0.53.3 (2023-05-16)
 -------------------
 
