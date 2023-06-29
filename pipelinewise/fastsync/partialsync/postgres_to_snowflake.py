@@ -36,8 +36,11 @@ def partial_sync_table(table: tuple, args: Namespace) -> Union[bool, str]:
 
         postgres = FastSyncTapPostgres(args.tap, tap_type_to_target_type)
 
-        # Get bookmark - Binlog position or Incremental Key value
+        # Open connection
         postgres.open_connection()
+
+        # Get bookmark - Binlog position or Incremental Key value
+        bookmark = common_utils.get_bookmark_for_table(table_name, args.properties, postgres, dbname=dbname)
 
         # Get column differences
         target_schema = common_utils.get_target_schema(args.target, table_name)
@@ -67,8 +70,6 @@ def partial_sync_table(table: tuple, args: Namespace) -> Union[bool, str]:
 
         source_columns = snowflake_types.get('columns', [])
         columns_diff = utils.diff_source_target_columns(target_sf, source_columns=source_columns)
-
-        bookmark = common_utils.get_bookmark_for_table(table_name, args.properties, postgres, dbname=dbname)
 
         where_clause_sql = f' WHERE {column_name} >= \'{start_value}\''
         if args.end_value:

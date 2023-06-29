@@ -41,6 +41,9 @@ def partial_sync_table(table: tuple, args: Namespace) -> Union[bool, str]:
 
         mysql.open_connections()
 
+        # Get bookmark - Binlog position or Incremental Key value
+        bookmark = common_utils.get_bookmark_for_table(table_name, args.properties, mysql)
+
         target_schema = common_utils.get_target_schema(args.target, table_name)
         table_dict = common_utils.tablename_to_dict(table_name)
         target_table = table_dict.get('table_name')
@@ -68,9 +71,6 @@ def partial_sync_table(table: tuple, args: Namespace) -> Union[bool, str]:
 
         source_columns = snowflake_types.get('columns', [])
         columns_diff = utils.diff_source_target_columns(target_sf, source_columns=source_columns)
-
-        # Get bookmark - Binlog position or Incremental Key value
-        bookmark = common_utils.get_bookmark_for_table(table_name, args.properties, mysql)
 
         where_clause_sql = f' WHERE {column_name} >= \'{start_value}\''
         if end_value:
