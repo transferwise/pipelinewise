@@ -38,6 +38,11 @@
         },
         "use_message_key": {
           "type": "boolean"
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 1000000
         }
       }
     },

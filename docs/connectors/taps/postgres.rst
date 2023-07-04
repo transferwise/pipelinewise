@@ -4,6 +4,7 @@
 Tap PostgreSQL
 --------------
 
+The Singer tap is at `pipelinewise-tap-postgres <https://github.com/transferwise/pipelinewise-tap-postgres>`_
 
 PostgreSQL setup requirements
 '''''''''''''''''''''''''''''
@@ -151,6 +152,7 @@ Example YAML for ``tap-postgres``:
       fastsync_parallelism: <int>          # Optional: size of multiprocessing pool used by FastSync
                                            #           Min: 1
                                            #           Default: number of CPU cores
+      #limit: 50000                        # Optional: limit to add to incremental queries, this is useful to avoid long running transactions on the DB
 
     # ------------------------------------------------------------------------------
     # Destination (Target) - Target properties
