@@ -354,7 +354,6 @@
         "tap-mongodb",
         "tap-mysql",
         "tap-oracle",
-        "tap-adwords",
         "tap-zendesk",
         "tap-kafka",
         "tap-s3-csv",

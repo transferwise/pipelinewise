@@ -1,3 +1,33 @@
+0.53.4 (2023-06-22)
+-------------------
+
+- Bugfix for trigger unwanted tables syncing trigger
+- Bugfix for building `wal2json` in PostgreSQL Docker image
+- Bump `pipelinewise-tap-mysql` from `1.5.3` to `1.5.4`
+
+
+0.53.3 (2023-05-16)
+-------------------
+
+- Bugfix for removing pid file in stop_tap command
+
+0.53.2 (2023-04-25)
+-------------------
+
+- Bump `pipelinewise-tap-mysql` from `1.5.2` to `1.5.3` to mitigate bug in MariaDB 10.6.12
+
+0.53.1 (2023-04-21)
+-------------------
+
+- Rollback `snowflake-connector-python` from `2.8.2` to `2.7.6`
+
+0.53.0 (2023-04-13)
+-------------------
+
+- Bugfix for renaming log files when stopping the tap
+- Bump `snowflake-connector-python` from `2.7.6` to `2.8.2`
+- Remove `tap-adwords` 
+
 0.52.2 (2023-03-20)
 -------------------
 

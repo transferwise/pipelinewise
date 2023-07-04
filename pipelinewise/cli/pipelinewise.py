@@ -358,7 +358,6 @@ class PipelineWise:
                 dir=self.get_temp_dir(), prefix='properties_', suffix='.json'
             )[1]
             utils.save_json(properties, temp_properties_path)
-
             return temp_properties_path, filtered_tap_stream_ids
 
         except Exception as exc:
@@ -1190,7 +1189,7 @@ class PipelineWise:
         current_time = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
 
         # Create fastsync and singer specific filtered tap properties that contains only
-        # the the tables that needs to be synced by the specific command
+        # the tables that needs to be synced by the specific command
         (
             tap_properties_fastsync,
             fastsync_stream_ids,
@@ -1311,30 +1310,37 @@ class PipelineWise:
         a SIGTERM to the process.
         """
         self.logger.info('Trying to stop tap gracefully...')
+
+        pid = os.getpid()
+        pid_from_file = None
         pidfile_path = self.tap['files']['pidfile']
         try:
-            with open(pidfile_path, encoding='utf-8') as pidf:
-                pid = int(pidf.read())
-                pgid = os.getpgid(pid)
-                parent = psutil.Process(pid)
+            with open(pidfile_path, encoding='utf-8') as pid_file:
+                pid_from_file = int(pid_file.read())
 
-                # Terminate all the processes in the current process' process group.
-                for child in parent.children(recursive=True):
-                    if os.getpgid(child.pid) == pgid:
-                        self.logger.info('Sending SIGTERM to child pid %s...', child.pid)
+            pgid = os.getpgid(pid)
+            parent = psutil.Process(pid)
+
+            for child in parent.children(recursive=True):
+                if os.getpgid(child.pid) == pgid:
+                    self.logger.info('Sending SIGTERM to child pid %s...', child.pid)
+                    try:
                         child.terminate()
                         try:
                             child.wait(timeout=5)
                         except psutil.TimeoutExpired:
                             child.kill()
+                    except psutil.NoSuchProcess:
+                        pass
 
         except ProcessLookupError:
-            self.logger.error(
-                'Pid %s not found. Is the tap running on this machine? '
-                'Stopping taps remotely is not supported.',
-                pid,
-            )
-            sys.exit(1)
+            if os.getpgid(pid) != pid_from_file:
+                self.logger.error(
+                    'Pid %s not found. Is the tap running on this machine? '
+                    'Stopping taps remotely is not supported.',
+                    pid,
+                )
+                sys.exit(1)
 
         except FileNotFoundError:
             self.logger.error(
@@ -1342,19 +1348,18 @@ class PipelineWise:
             )
             sys.exit(1)
 
-        # Remove pidfile.
-        try:
-            os.remove(pidfile_path)
-        except Exception:
-            pass
-
-        # Rename log files from running to terminated status
         if self.tap_run_log_file:
             tap_run_log_file_running = f'{self.tap_run_log_file}.running'
             tap_run_log_file_terminated = f'{self.tap_run_log_file}.terminated'
 
             if os.path.isfile(tap_run_log_file_running):
                 os.rename(tap_run_log_file_running, tap_run_log_file_terminated)
+
+        # Remove pidfile.
+        try:
+            os.remove(pidfile_path)
+        except Exception:
+            pass
 
         sys.exit(1)
 
@@ -2068,10 +2073,11 @@ TAP RUN SUMMARY
         selection = utils.load_json(self.tap['files']['selection'])
         selection = selection.get('selection')
         all_tables = {'full_sync': [], 'partial_sync': {}}
+        tables_list = tables.split(',') if tables else tables
         if selection:
             for table in selection:
                 table_name = self._get_fixed_name_of_table(table['tap_stream_id'])
-                if tables is None or table_name in tables:
+                if tables_list is None or table_name in tables_list:
                     if table.get('sync_start_from'):
                         all_tables['partial_sync'][table_name] = table['sync_start_from']
                     else:
