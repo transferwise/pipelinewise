@@ -1,1 +1,1 @@
-git+https://github.com/transferwise/pipelinewise-tap-postgres.git@master#egg=pipelinewise-tap-postgres
+pipelinewise-tap-postgres==2.1.0
