@@ -1608,7 +1608,7 @@ DROP TABLE IF EXISTS `all_datatypes`;
 CREATE TABLE `all_datatypes` (
     c_char                  CHAR        PRIMARY KEY,
     c_varchar               VARCHAR(100),
-    c_binary                BINARY,
+    c_binary                BINARY(6),
     c_varbinary             VARBINARY(100),
     c_blob                  BLOB,
     c_tinyblob              TINYBLOB,
