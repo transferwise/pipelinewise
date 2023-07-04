@@ -140,6 +140,7 @@
              
   <section id="tap-postgresql">
 <span id="tap-postgres"></span><h1>Tap PostgreSQL<a class="headerlink" href="#tap-postgresql" title="Permalink to this heading"></a></h1>
+<p>The Singer tap is at <a class="reference external" href="https://github.com/transferwise/pipelinewise-tap-postgres">pipelinewise-tap-postgres</a></p>
 <section id="postgresql-setup-requirements">
 <h2>PostgreSQL setup requirements<a class="headerlink" href="#postgresql-setup-requirements" title="Permalink to this heading"></a></h2>
 <p><strong>Step 1: Check if you have all the required credentials for replicating data from PostgreSQL</strong></p>
@@ -262,6 +263,7 @@ following the steps in the <a class="reference internal" href="../../installatio
 <span class="w">  </span><span class="nt">fastsync_parallelism</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">&lt;int&gt;</span><span class="w">          </span><span class="c1"># Optional: size of multiprocessing pool used by FastSync</span>
 <span class="w">                                       </span><span class="c1">#           Min: 1</span>
 <span class="w">                                       </span><span class="c1">#           Default: number of CPU cores</span>
+<span class="w">  </span><span class="c1">#limit: 50000                        # Optional: limit to add to incremental queries, this is useful to avoid long running transactions on the DB</span>
 
 <span class="c1"># ------------------------------------------------------------------------------</span>
 <span class="c1"># Destination (Target) - Target properties</span>
