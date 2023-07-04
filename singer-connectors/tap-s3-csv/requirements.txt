@@ -1,1 +1,1 @@
-pipelinewise-tap-s3-csv==3.0.0
+pipelinewise-tap-s3-csv==3.0.1
