@@ -26,7 +26,6 @@ def partial_sync_table(table: tuple, args: Namespace) -> Union[bool, str]:
     try:
         table_name = table[0]
 
-
         column_name = table[1]['column']
 
         drop_target_table = table[1]['drop_target_table']
