@@ -124,7 +124,6 @@ def parse_args_for_partial_sync(required_config_keys: Dict) -> argparse.Namespac
 def _validate_static_boundary_value(string_to_check: str) -> str:
     """Validating if the static boundary values are valid and there is no injection"""
 
-
     # Validating string and number format
     pattern = re.compile(r'[A-Za-z0-9\\.\\-]+')
     if re.fullmatch(pattern, string_to_check):
@@ -140,6 +139,7 @@ def _validate_static_boundary_value(string_to_check: str) -> str:
             raise InvalidConfigException(f'Invalid boundary value: {string_to_check}') from Exception
 
     return string_to_check
+
 
 def _validate_dynamic_boundary_value(query_object, string_to_check: str) -> str:
     """Validating if the dynamic boundary values are valid and there is no injection"""
@@ -188,12 +188,14 @@ def get_sync_tables(args: argparse.Namespace) -> Dict:
         }
     return sync_tables
 
+
 def quote_tag_to_char(value_string: Union[str, None]) -> Union[str, None]:
     """convert quote tag in a string to its original qoute character"""
     if value_string:
         return value_string.replace('<<quote>>', "'")
 
     return value_string
+
 
 def _check_for_allowed_query(query_string):
     statements = sqlparse.split(query_string)
