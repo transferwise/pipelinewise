@@ -191,7 +191,7 @@ def get_sync_tables(args: argparse.Namespace) -> Dict:
 def quote_tag_to_char(value_string: Union[str, None]) -> Union[str, None]:
     """convert quote tag in a string to its original qoute character"""
     if value_string:
-        return value_string.replace("<<quote>>", "'")
+        return value_string.replace('<<quote>>', "'")
 
     return value_string
 

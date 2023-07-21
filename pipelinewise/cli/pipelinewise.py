@@ -1771,10 +1771,10 @@ class PipelineWise:
                     if static_value and dynamic_value:
                         raise Exception('It is not allowed to have both dynamic and static values!')
                     if static_value:
-                        table_values.append(f"<S>{str(static_value)}")
+                        table_values.append(f'<S>{str(static_value)}')
 
                     if dynamic_value:
-                        table_values.append(f"<D>{str(dynamic_value)}")
+                        table_values.append(f'<D>{str(dynamic_value)}')
 
                     table_drop_targets.append(sync_settings.get('drop_target_table'))
 
@@ -2261,6 +2261,6 @@ TAP RUN SUMMARY
     def _quote_char_to_tag(value_string: str) -> str:
         """converting all quote characters to quote tag"""
         if value_string:
-            return value_string.replace("'", "<<quote>>")
+            return value_string.replace("'", '<<quote>>')
 
         return value_string

@@ -208,9 +208,9 @@ class PartialSyncUtilsTestCase(TestCase):
 
     def test_validate_dynamic_boundary_value_works_as_expected(self):
         """Testing validate_boundary_value method for dynamic values"""
-        test_cases = [("<D>select get_foo();", [('foo',)]),
+        test_cases = [('<D>select get_foo();', [('foo',)]),
                       ("<D>SELECT NOW() - INTERVAL '1 day';", [('2023-01-01 00:00:00',)]),
-                      ("<D>SELECT max('inserted_time');", [('foo',)])
+                      ('<D>SELECT max('inserted_time');', [('foo',)])
                       ]
         query_object = mock.MagicMock()
 
@@ -236,9 +236,9 @@ class PartialSyncUtilsTestCase(TestCase):
         mocked_args = mock.MagicMock()
         mocked_args.table = 'foo_table,bar_table,baz_table'
         mocked_args.column = 'foo_column,bar_column,baz_column'
-        mocked_args.start_value = "foo_start,bar_start,baz_start"
-        mocked_args.end_value = "foo_end,bar_end,baz_end"
-        mocked_args.drop_target_table = "True,False,True"
+        mocked_args.start_value = 'foo_start,bar_start,baz_start'
+        mocked_args.end_value = 'foo_end,bar_end,baz_end'
+        mocked_args.drop_target_table = 'True,False,True'
 
         expected_output = {
             'foo_table': {
@@ -265,6 +265,6 @@ class PartialSyncUtilsTestCase(TestCase):
 
     def test_quote_tag_to_char(self):
         """Test if the method works as expected and replaces quote tags with quote character"""
-        input_string = "foo <<quote>>bar<<quote>> baz"
+        input_string = 'foo <<quote>>bar<<quote>> baz'
         expected_string = "foo 'bar' baz"
         self.assertEqual(expected_string, quote_tag_to_char(input_string))
