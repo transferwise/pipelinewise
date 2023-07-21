@@ -156,10 +156,11 @@ def _validate_dynamic_boundary_value(query_object, string_to_check: str) -> str:
 
 def validate_boundary_value(query_object: object, string_to_check: Union[str, None]) -> Union[str, None]:
     """Validate and finding the boundary value"""
-    if string_to_check.startswith('<S>'):
-        return _validate_static_boundary_value(string_to_check[3:])
-    if string_to_check.startswith('<D>'):
-        return _validate_dynamic_boundary_value(query_object, string_to_check[3:])
+    if string_to_check:
+        if string_to_check.startswith('<S>'):
+            return _validate_static_boundary_value(string_to_check[3:])
+        if string_to_check.startswith('<D>'):
+            return _validate_dynamic_boundary_value(query_object, string_to_check[3:])
     return None
 
 
