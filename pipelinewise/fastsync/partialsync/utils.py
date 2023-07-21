@@ -146,9 +146,17 @@ def _validate_dynamic_boundary_value(query_object, string_to_check: str) -> str:
     try:
         _check_for_allowed_query(string_to_check)
         return_value = query_object(string_to_check)
-        if len(return_value) != 1:
+        if return_value == []:
+            # in this case it returns NULL and this NULL will be used in generating where clause later and
+            # partial sync can be selected again next time until this dynamic value returns something from the source!
+            return 'NULL'
+        if len(return_value) > 1 or len(return_value[0]) != 1:
             raise Exception
-        boundary_value = return_value[0][0]
+
+        if isinstance(return_value[0], dict):
+            boundary_value = list(return_value[0].values())[0]
+        else:
+            boundary_value = return_value[0][0]
     except Exception:
         raise(InvalidConfigException(f'Invalid query for boundary value: {string_to_check}')) from Exception
     return boundary_value

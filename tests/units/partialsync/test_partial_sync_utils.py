@@ -208,9 +208,10 @@ class PartialSyncUtilsTestCase(TestCase):
 
     def test_validate_dynamic_boundary_value_works_as_expected(self):
         """Testing validate_boundary_value method for dynamic values"""
-        test_cases = [('<D>select get_foo();', [('foo',)]),
-                      ("<D>SELECT NOW() - INTERVAL '1 day';", [('2023-01-01 00:00:00',)]),
-                      ("<D>SELECT max('inserted_time');", [('foo',)])
+        test_cases = [('<D>select get_foo();', [['foo', ]]),
+                      ("<D>SELECT NOW() - INTERVAL '1 day';", [['2023-01-01 00:00:00', ]]),
+                      ("<D>SELECT max('inserted_time');", [['foo', ]]),
+                      ('<D>select bar();', [{'bar()': 5}])
                       ]
         query_object = mock.MagicMock()
 
@@ -226,10 +227,31 @@ class PartialSyncUtilsTestCase(TestCase):
                           '<D>INSERT into foo (bar) values (baz);', '<D>foo')
 
         query_object = mock.MagicMock()
-        query_object.return_value = [('foo',)]
+        query_object.return_value = [['foo', ]]
 
         for test_value in invalid_values:
             self.assertRaises(InvalidConfigException, validate_boundary_value, query_object, test_value)
+
+    def test_validate_dynamic_value_raise_exception_if_return_has_than_one_column_or_row(self):
+        """Test if validate_boundary_value raise exception for dynamic values
+         which return more than one row or column"""
+        query_object = mock.MagicMock()
+        query_returns = (
+            [['foo', 'bar']],
+            [{'foo': 1, 'bar': 2}],
+            [['foo'], ['bar']],
+            [{'foo': 1}, {'bar': 2}]
+        )
+        for test_value in query_returns:
+            query_object.return_value = test_value
+            test_query = '<D>SELECT * FROM baz'
+            self.assertRaises(InvalidConfigException, validate_boundary_value, query_object, test_query)
+
+    def test_validate_dynamic_value_returns_null_if_dynamic_value_returns_nothing(self):
+        query_object = mock.MagicMock()
+        query_object.return_value = []
+        test_query = '<D>SELECT id FROM foo WHERE id=1;'
+        self.assertEqual('NULL', validate_boundary_value(query_object, test_query))
 
     def test_get_sync_tables(self):
         """Test if get_sync_tables wotks as expected"""

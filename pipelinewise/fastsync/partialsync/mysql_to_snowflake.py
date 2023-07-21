@@ -73,7 +73,8 @@ def partial_sync_table(table: tuple, args: Namespace) -> Union[bool, str]:
         source_columns = snowflake_types.get('columns', [])
         columns_diff = utils.diff_source_target_columns(target_sf, source_columns=source_columns)
 
-        where_clause_sql = f' WHERE {column_name} >= \'{start_value}\''
+        start_value_for_query = start_value if start_value == 'NULL' else f'\'{start_value}\''
+        where_clause_sql = f' WHERE {column_name} >= {start_value_for_query}'
         if end_value:
             where_clause_sql += f' AND {column_name} <= \'{end_value}\''
 
