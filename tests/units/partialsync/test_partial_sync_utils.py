@@ -214,10 +214,13 @@ class PartialSyncUtilsTestCase(TestCase):
                       ('<D>select bar();', [{'bar()': 5}])
                       ]
         query_object = mock.MagicMock()
-
         for dynamic_value, query_return_from_source in test_cases:
             query_object.return_value = query_return_from_source
-            self.assertEqual(query_return_from_source[0][0], validate_boundary_value(query_object, dynamic_value))
+            if isinstance(query_return_from_source[0], dict):
+                expected_value = list(query_return_from_source[0].values())[0]
+            else:
+                expected_value = query_return_from_source[0][0]
+            self.assertEqual(expected_value, validate_boundary_value(query_object, dynamic_value))
             query_object.assert_called_with(dynamic_value[3:])
 
     def test_validate_dynamic_boindary_value_raise_exception_if_invalid_value(self):
