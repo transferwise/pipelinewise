@@ -35,7 +35,7 @@ class TestPartialSyncPGToSF(TapPostgres):
 
     def test_partial_sync_pg_to_sf(self):
         """
-        Test partial sync table from MariaDB to Snowflake
+        Test partial sync table from PG to Snowflake
         """
         # Deleting all records from the target with primary key greater than 1
         self.e2e_env.delete_record_from_target_snowflake(

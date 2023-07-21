@@ -210,7 +210,7 @@ class PartialSyncUtilsTestCase(TestCase):
         """Testing validate_boundary_value method for dynamic values"""
         test_cases = [('<D>select get_foo();', [('foo',)]),
                       ("<D>SELECT NOW() - INTERVAL '1 day';", [('2023-01-01 00:00:00',)]),
-                      ('<D>SELECT max('inserted_time');', [('foo',)])
+                      ("<D>SELECT max('inserted_time');", [('foo',)])
                       ]
         query_object = mock.MagicMock()
 
