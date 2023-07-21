@@ -248,6 +248,7 @@ class PartialSyncUtilsTestCase(TestCase):
             self.assertRaises(InvalidConfigException, validate_boundary_value, query_object, test_query)
 
     def test_validate_dynamic_value_returns_null_if_dynamic_value_returns_nothing(self):
+        """Test if validate_boundary_value returns NULL if dynamic value returns nothing"""
         query_object = mock.MagicMock()
         query_object.return_value = []
         test_query = '<D>SELECT id FROM foo WHERE id=1;'
