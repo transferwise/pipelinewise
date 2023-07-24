@@ -235,7 +235,7 @@ class PartialSyncUtilsTestCase(TestCase):
         for test_value in invalid_values:
             self.assertRaises(InvalidConfigException, validate_boundary_value, query_object, test_value)
 
-    def test_validate_dynamic_value_raise_exception_if_return_has_more_than_one_column_or_row(self):
+    def test_validate_dynamic_value_raise_excp_if_return_more_than_one_column_or_row(self):
         """Test if validate_boundary_value raise exception for dynamic values
          which return more than one row or column"""
         query_object = mock.MagicMock()
