@@ -107,6 +107,37 @@
             },
             "s3_csv_mapping:": {
               "$ref": "#/definitions/s3_csv_mapping"
+            },
+            "sync_start_from": {
+              "type": "object",
+              "properties": {
+                "column": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "drop_target_table": {
+                  "type": "boolean"
+                },
+                "static_value": {
+                  "type": ["number", "string"],
+                  "minLength": 1
+                },
+                "dynamic_value": {
+                  "type": ["number", "string"],
+                  "minLength": 1
+                }
+              },
+              "oneOf": [
+                 {
+                  "type": "object",
+                   "required": ["static_value"]
+                },
+                {
+                  "type": "object",
+                  "required": ["dynamic_value"]
+                }
+              ],
+              "required": ["column"]
             }
           },
           "required": [
@@ -135,6 +166,37 @@
             },
             "s3_csv_mapping:": {
               "$ref": "#/definitions/s3_csv_mapping"
+            },
+            "sync_start_from": {
+              "type": "object",
+              "properties": {
+                "column": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "drop_target_table": {
+                  "type": "boolean"
+                },
+                "static_value": {
+                  "type": ["number", "string"],
+                  "minLength": 1
+                },
+                "dynamic_value": {
+                  "type": ["number", "string"],
+                  "minLength": 1
+                }
+              },
+              "oneOf": [
+                 {
+                  "type": "object",
+                   "required": ["static_value"]
+                },
+                {
+                  "type": "object",
+                  "required": ["dynamic_value"]
+                }
+              ],
+              "required": ["column"]
             }
           },
           "required": [
