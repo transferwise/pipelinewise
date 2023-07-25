@@ -1,3 +1,9 @@
+0.55.0 (2023-07-25)
+-------------------
+
+- Bump `pipelinewise-tap-mysql`from `1.5.4` to `1.5.5`
+- Support for dynamic values in defined partial sync
+
 0.54.0 (2023-07-04)
 -------------------
 
