@@ -51,7 +51,7 @@ class TestReplicatePGToSF(TapPostgres):
             f"where cvarchar='H';"
         )[0][0]
 
-        self.assertEqual(result, datetime(9999, 12, 31, 23, 59, 59, 998993)) # if bump snowflake-connector -> 999000
+        self.assertEqual(result, datetime(9999, 12, 31, 23, 59, 59, 999000))
 
         result = self.e2e_env.run_query_target_snowflake(
             f'SELECT updated_at FROM '
@@ -59,7 +59,7 @@ class TestReplicatePGToSF(TapPostgres):
             f"where cvarchar='I';"
         )[0][0]
 
-        self.assertEqual(result, datetime(9999, 12, 31, 23, 59, 59, 998993))  # if bump snowflake-connector -> 999000
+        self.assertEqual(result, datetime(9999, 12, 31, 23, 59, 59, 999000))
 
         # 2. Make changes in PG source database
         #  LOG_BASED
