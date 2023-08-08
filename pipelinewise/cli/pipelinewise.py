@@ -358,7 +358,6 @@ class PipelineWise:
                 dir=self.get_temp_dir(), prefix='properties_', suffix='.json'
             )[1]
             utils.save_json(properties, temp_properties_path)
-
             return temp_properties_path, filtered_tap_stream_ids
 
         except Exception as exc:
@@ -1081,8 +1080,12 @@ class PipelineWise:
             temp_dir=self.get_temp_dir(),
             table=self.args.table,
             column=self.args.column,
-            start_value=self.args.start_value,
-            end_value=self.args.end_value,
+            # all quote characters inside the value strings will be changed into a tag and then later they will be
+            # changed back to the original value in the destination.
+            # because shlex which is used to run the command, will split it and this causes it not be the correct
+            # in the destination.
+            start_value=self._quote_char_to_tag(self.args.start_value),
+            end_value=self._quote_char_to_tag(self.args.end_value),
             drop_target_table=self.args.drop_target_table
         )
 
@@ -1190,7 +1193,7 @@ class PipelineWise:
         current_time = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
 
         # Create fastsync and singer specific filtered tap properties that contains only
-        # the the tables that needs to be synced by the specific command
+        # the tables that needs to be synced by the specific command
         (
             tap_properties_fastsync,
             fastsync_stream_ids,
@@ -1710,6 +1713,13 @@ class PipelineWise:
         """
         try:
             with pidfile.PIDFile(self.tap['files']['pidfile']):
+
+                # this command allows only static values!
+                if self.args.start_value:
+                    self.args.start_value = f'<S>{self.args.start_value}'
+                if self.args.end_value:
+                    self.args.end_value = f'<S>{self.args.end_value}'
+
                 self.sync_tables_partial_sync()
         except pidfile.AlreadyRunningError as exc:
             self.logger.error('Another instance of the tap is already running.')
@@ -1756,7 +1766,16 @@ class PipelineWise:
                 for table, sync_settings in defined_tables.items():
                     table_names.append(table)
                     table_columns.append(sync_settings['column'])
-                    table_values.append(str(sync_settings['value']))
+                    static_value = sync_settings.get('static_value')
+                    dynamic_value = sync_settings.get('dynamic_value')
+                    if static_value and dynamic_value:
+                        raise Exception('It is not allowed to have both dynamic and static values!')
+                    if static_value:
+                        table_values.append(f'<S>{str(static_value)}')
+
+                    if dynamic_value:
+                        table_values.append(f'<D>{str(dynamic_value)}')
+
                     table_drop_targets.append(sync_settings.get('drop_target_table'))
 
                 self.args.table = ','.join(table_names)
@@ -2074,10 +2093,11 @@ TAP RUN SUMMARY
         selection = utils.load_json(self.tap['files']['selection'])
         selection = selection.get('selection')
         all_tables = {'full_sync': [], 'partial_sync': {}}
+        tables_list = tables.split(',') if tables else tables
         if selection:
             for table in selection:
                 table_name = self._get_fixed_name_of_table(table['tap_stream_id'])
-                if tables is None or table_name in tables:
+                if tables_list is None or table_name in tables_list:
                     if table.get('sync_start_from'):
                         all_tables['partial_sync'][table_name] = table['sync_start_from']
                     else:
@@ -2236,3 +2256,11 @@ TAP RUN SUMMARY
             self._remove_tap_config(tap_id, target_id, tap_type)
 
         utils.silentremove(self.get_target_dir(target_id))
+
+    @staticmethod
+    def _quote_char_to_tag(value_string: str) -> str:
+        """converting all quote characters to quote tag"""
+        if value_string:
+            return value_string.replace("'", '<<quote>>')
+
+        return value_string
