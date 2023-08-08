@@ -45,14 +45,14 @@ schemas:
         replication_key: "id"
         sync_start_from:
             column: "id"
-            value: "500"
+            static_value: "500"
 
       - table_name: "order"
         replication_method: "INCREMENTAL"
         replication_key: "id"
         sync_start_from:
             column: "id"
-            value: 5
+            dynamic_value: "SELECT 5;"
             drop_target_table: true
 
       - table_name: "customers"

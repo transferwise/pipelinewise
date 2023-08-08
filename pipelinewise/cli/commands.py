@@ -366,7 +366,6 @@ def build_partialsync_command(
         start_value: str,
         end_value: str = None,
         drop_target_table: str = None
-
 ):
     """Builds a command that starts a partial sync"""
 

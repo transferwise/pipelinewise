@@ -1,10 +1,23 @@
+0.55.0 (2023-07-25)
+-------------------
+
+- Bump `pipelinewise-tap-mysql`from `1.5.4` to `1.5.5`
+- Support for dynamic values in defined partial sync
+
+0.54.0 (2023-07-04)
+-------------------
+
+- Add support for the new limit config in `tap-postgres` 
+- Bump pipelinewise_tap_s3_csv from `3.0.0` to `3.0.1` 
+- Bump pipelinewise-tap-postgres from `1.8.4` to `2.1.0`
+- Bugfix replication slot creation in partial sync
+
 0.53.4 (2023-06-22)
 -------------------
 
 - Bugfix for trigger unwanted tables syncing trigger
 - Bugfix for building `wal2json` in PostgreSQL Docker image
 - Bump `pipelinewise-tap-mysql` from `1.5.3` to `1.5.4`
-
 
 0.53.3 (2023-05-16)
 -------------------
