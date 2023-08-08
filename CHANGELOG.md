@@ -1,3 +1,82 @@
+0.55.0 (2023-07-25)
+-------------------
+
+- Bump `pipelinewise-tap-mysql`from `1.5.4` to `1.5.5`
+- Support for dynamic values in defined partial sync
+
+0.54.0 (2023-07-04)
+-------------------
+
+- Add support for the new limit config in `tap-postgres` 
+- Bump pipelinewise_tap_s3_csv from `3.0.0` to `3.0.1` 
+- Bump pipelinewise-tap-postgres from `1.8.4` to `2.1.0`
+- Bugfix replication slot creation in partial sync
+
+0.53.4 (2023-06-22)
+-------------------
+
+- Bugfix for trigger unwanted tables syncing trigger
+- Bugfix for building `wal2json` in PostgreSQL Docker image
+- Bump `pipelinewise-tap-mysql` from `1.5.3` to `1.5.4`
+
+0.53.3 (2023-05-16)
+-------------------
+
+- Bugfix for removing pid file in stop_tap command
+
+0.53.2 (2023-04-25)
+-------------------
+
+- Bump `pipelinewise-tap-mysql` from `1.5.2` to `1.5.3` to mitigate bug in MariaDB 10.6.12
+
+0.53.1 (2023-04-21)
+-------------------
+
+- Rollback `snowflake-connector-python` from `2.8.2` to `2.7.6`
+
+0.53.0 (2023-04-13)
+-------------------
+
+- Bugfix for renaming log files when stopping the tap
+- Bump `snowflake-connector-python` from `2.7.6` to `2.8.2`
+- Remove `tap-adwords` 
+
+0.52.2 (2023-03-20)
+-------------------
+
+- Bump `pipelinewise-tap-slack` from `1.1.0` to `1.1.1`
+
+0.52.1 (2023-02-22)
+-------------------
+
+- Extend silentremove to support deleting folders
+- Bugfix for selected fastsync tables
+- Bugfix for graceful exit
+
+0.52.0 (2023-02-02)
+-------------------
+
+- Bump `tap-s3-csv` from `2.0.0` to `3.0.0`
+- Implement Defined Partial Sync for `MariaDB` and `Postgres` to `SnowFlake`
+
+0.51.0 (2022-12-10)
+-------------------
+
+- Drop `pipelinewise-tap-postgres` from `2.0.0` to `1.8.4`:
+  - wal2json format version 2 causing issues on older Postgres servers
+
+- Bump `pipelinewise-tap-kafka` from `7.1.2` to `8.0.0`
+  - Switch from `subscribe` to `assign` for better initial offset control
+  - Implement specifying partitions in configuration
+
+0.50.0 (2022-12-05)
+-------------------
+
+- Bump `pipelinewise-tap-postgres` from `1.8.4` to `2.0.0`:
+  - Use wal2json format version 2
+
+- Bump `psycopg2-binary` from `2.8.6` to `2.9.5`
+
 0.49.0 (2022-10-27)
 -------------------
 - Added `taps` option for `import` command to make it possible for importing specific taps.

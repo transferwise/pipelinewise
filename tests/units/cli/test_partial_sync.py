@@ -200,7 +200,7 @@ class PartialSyncCLITestCase(TestCase):
             f'--temp_dir {self.test_cli.CONFIG_DIR}/tmp '
             f'--transform {self.test_cli.CONFIG_DIR}/target_snowflake/tap_mysql/transformation.json '
             f'--table "{arguments["table"]}" --column "{arguments["column"]}" '
-            f'--start_value "{arguments["start_value"]}" --end_value "{arguments["end_value"]}"$'
+            f'--start_value "<S>{arguments["start_value"]}" --end_value "<S>{arguments["end_value"]}"$'
         )
 
         self.assertRegex(call_args[1], f'^{self.test_cli.CONFIG_DIR}/{arguments["target"]}/{arguments["tap"]}/log/'
@@ -237,7 +237,7 @@ class PartialSyncCLITestCase(TestCase):
             f'--temp_dir {self.test_cli.CONFIG_DIR}/tmp '
             f'--transform {self.test_cli.CONFIG_DIR}/target_snowflake/tap_mysql/transformation.json '
             f'--table "{arguments["table"]}" --column "{arguments["column"]}" '
-            f'--start_value "{arguments["start_value"]}"$'
+            f'--start_value "<S>{arguments["start_value"]}"$'
         )
 
         self.assertRegex(call_args[1], f'^{self.test_cli.CONFIG_DIR}/{arguments["target"]}/{arguments["tap"]}/log/'

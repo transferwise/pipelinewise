@@ -39,7 +39,6 @@ transform-field
 endef
 
 define EXTRA_CONNECTORS
-tap-adwords\
 tap-oracle\
 tap-zuora\
 tap-google-analytics\
@@ -139,7 +138,7 @@ define make_virtualenv
 	@test ! -s $(2)setup.py ||\
 		(echo "Installing the package..."\
 		 && echo -e "$(YELLOW)"\
-		 && $(VENV_DIR)/$(1)/bin/pip install --upgrade -e .$(PIP_ARGS)\
+		 && $(VENV_DIR)/$(1)/bin/python3 -m pip install --upgrade -e .$(PIP_ARGS)\
 		 && echo -e "$(RESET_COLOR)"\
 		 && echo -n "Package installation completed..."\
 		 && echo -e "$(OK_MSG)")

@@ -9,6 +9,19 @@ Documentation is available at https://transferwise.github.io/pipelinewise/
 ![Logo](docs/img/pipelinewise-diagram-circle-bold.png)
 
 
+## Table of Contents
+
+- [PipelineWise](#pipelinewise)
+  - [Features](#features)
+  - [Official docker images](#official-docker-images)
+  - [Connectors](#connectors)
+    - [Running from docker](#running-from-docker)
+    - [Building from source](#building-from-source)
+  - [Developing with Docker](#developing-with-docker)
+  - [Contribution](#contribution)
+  - [Links](#links)
+  - [License](#license)
+
 ## Features
 
 * **Built with ELT in mind**: PipelineWise fits into the ELT landscape and is not a traditional ETL tool. PipelineWise aims to reproduce the data from the source to an Analytics-Data-Store in as close to the original format as possible. Some minor load time transformations are supported but complex mapping and joins have to be done in the Analytics-Data-Store to extract meaning.
@@ -20,19 +33,14 @@ Documentation is available at https://transferwise.github.io/pipelinewise/
 * **Extensible**: PipelineWise is using [Singer.io](https://www.singer.io/) compatible taps and target connectors. New connectors can be added to PipelineWise with relatively small effort
 
 
-## Table of Contents
+## Official docker images
 
-- [PipelineWise](#pipelinewise)
-  - [Features](#features)
-  - [Table of Contents](#table-of-contents)
-  - [Connectors](#connectors)
-    - [Running from docker](#running-from-docker)
-    - [Building from source](#building-from-source)
-  - [Developing with Docker](#developing-with-docker)
-  - [Contribution](#contribution)
-  - [Links](#links)
-  - [License](#license)
+Pipelinewise images are published to: [dockerhub](https://hub.docker.com/r/transferwiseworkspace/pipelinewise)
 
+Pull image with:
+```shell
+docker pull transferwiseworkspace/pipelinewise:{tag}
+```
 
 ## Connectors
 
@@ -51,7 +59,6 @@ consumes data from taps and do something with it, like load it into a file, API 
 | Tap       | **[Salesforce](https://github.com/singer-io/tap-salesforce)** | | [![PyPI version](https://badge.fury.io/py/tap-salesforce.svg)](https://badge.fury.io/py/tap-salesforce) | Extracts data from Salesforce database using BULK and REST extraction API with Key-Based incremental replications |
 | Tap       | **[Jira](https://github.com/singer-io/tap-jira)** | | [![PyPI version](https://badge.fury.io/py/tap-jira.svg)](https://badge.fury.io/py/tap-jira) | Extracts data from Atlassian Jira using Base auth or OAuth credentials |
 | Tap       | **[MongoDB](https://github.com/transferwise/pipelinewise-tap-mongodb)** | | [![PyPI version](https://badge.fury.io/py/pipelinewise-tap-mongodb.svg)](https://badge.fury.io/py/pipelinewise-tap-mongodb) | Extracts data from MongoDB databases. Supporting Log-Based and Full Table replications |
-| Tap       | **[AdWords](https://github.com/singer-io/tap-adwords)** | Extra | [![PyPI version](https://badge.fury.io/py/tap-adwords.svg)](https://badge.fury.io/py/tap-adwords) | Extracts data Google Ads API (former Google Adwords) using OAuth and support incremental loading based on input state |
 | Tap       | **[Google Analytics](https://github.com/transferwise/pipelinewise-tap-google-analytics)** | Extra | [![PyPI version](https://badge.fury.io/py/pipelinewise-tap-google-analytics.svg)](https://badge.fury.io/py/tap-adwords) | Extracts data from Google Analytics |
 | Tap       | **[Oracle](https://github.com/transferwise/pipelinewise-tap-oracle)** | Extra | [![PyPI version](https://badge.fury.io/py/pipelinewise-tap-oracle.svg)](https://badge.fury.io/py/pipelinewise-tap-oracle) | Extracts data from Oracle databases. Supporting Log-Based, Key-Based Incremental and Full Table replications |
 | Tap       | **[Zuora](https://github.com/transferwise/pipelinewise-tap-zuora)** | Extra | [![PyPI version](https://badge.fury.io/py/pipelinewise-tap-zuora.svg)](https://badge.fury.io/py/pipelinewise-tap-zuora) | Extracts data from Zuora database using AQAA and REST extraction API with Key-Based incremental replications |
