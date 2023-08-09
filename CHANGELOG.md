@@ -1,3 +1,9 @@
+0.56.0 (2023-08-09)
+-------------------
+
+- Bump `pipelinewise-target-snowflake`from `2.2.0` to `2.3.0`
+- Update dependencies
+
 0.55.0 (2023-07-25)
 -------------------
 
