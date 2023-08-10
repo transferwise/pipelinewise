@@ -42,7 +42,7 @@ schemas:
         replication_method: "LOG_BASED"
         sync_start_from:
             column: "weight_unit_id"
-            value: "5"
+            dynamic_value: "SELECT 5;"
             drop_target_table: true
 
       - table_name: "address"
@@ -50,7 +50,7 @@ schemas:
         replication_key: "date_updated"
         sync_start_from:
             column: "address_id"
-            value: 400
+            static_value: 400
 
       - table_name: "customers"
         replication_method: "LOG_BASED"
