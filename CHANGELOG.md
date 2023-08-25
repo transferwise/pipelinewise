@@ -1,3 +1,9 @@
+0.57.0 (2023-08-09)
+-------------------
+
+- Bump `pipelinewise-tap-kafka`from `8.0.0` to `8.1.0`
+- Update dependencies
+
 0.56.0 (2023-08-09)
 -------------------
 
@@ -13,8 +19,8 @@
 0.54.0 (2023-07-04)
 -------------------
 
-- Add support for the new limit config in `tap-postgres` 
-- Bump pipelinewise_tap_s3_csv from `3.0.0` to `3.0.1` 
+- Add support for the new limit config in `tap-postgres`
+- Bump pipelinewise_tap_s3_csv from `3.0.0` to `3.0.1`
 - Bump pipelinewise-tap-postgres from `1.8.4` to `2.1.0`
 - Bugfix replication slot creation in partial sync
 
@@ -45,7 +51,7 @@
 
 - Bugfix for renaming log files when stopping the tap
 - Bump `snowflake-connector-python` from `2.7.6` to `2.8.2`
-- Remove `tap-adwords` 
+- Remove `tap-adwords`
 
 0.52.2 (2023-03-20)
 -------------------
