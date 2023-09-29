@@ -1,3 +1,9 @@
+0.57.0 (2023-09-29)
+-------------------
+
+- Bump `pipelinewise-tap-github`from `1.0.3` to `1.1.0`
+- Update dependencies
+
 0.57.0 (2023-08-09)
 -------------------
 
