@@ -1,3 +1,7 @@
+0.58.1 (2023-09-09)
+-------------------
+- Bump `pipelinewise-tap-github`from `1.1.0` to `1.1.1`
+
 0.58.0 (2023-09-04)
 -------------------
 - Bump `pipelinewise-tap-github`from `1.0.3` to `1.1.0`
