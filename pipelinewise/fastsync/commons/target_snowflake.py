@@ -440,9 +440,12 @@ select column_name,privacy_properties:turing_strategy:sql::text as sql from "TUR
             sql_parts_safe_logging = [] # with os env variable replaced by placeholders to avoid leaking encryption keys in logs
             sql_full_queries = []
             sql_full_queries_safe_logging = [] # with os env variable replaced by placeholders to avoid leaking encryption keys in logs
+            all_columns = []
+
             for row in res:
                 row = dict(row)
                 column_name = '"' + row['COLUMN_NAME'].upper() + '"'
+                all_columns.append(column_name)
                 sql = row['SQL']
                 if sql is not None:
                     if sql.startswith('['):
@@ -466,12 +469,12 @@ select column_name,privacy_properties:turing_strategy:sql::text as sql from "TUR
                         for match_str in re.findall(r'\$env:(.*?)\$', sql):
                             sql = sql.replace(f"$env:{match_str}$", os.environ.get(match_str, "unknown"))
                             sql_safe_logging = sql_safe_logging.replace(f"$env:{match_str}$", "...hidden...")
-                        sql_parts.append(f"{column_name} = ({sql})")
-                        sql_parts_safe_logging.append(f"{column_name} = ({sql_safe_logging})")
+                        sql_parts.append(f"({sql}) AS {column_name}")
+                        sql_parts_safe_logging.append(f"({sql_safe_logging}) AS {column_name}")
 
             if sql_parts:
-                data_privacy_sql = f'UPDATE {full_qual_table_name} SET ' + ", ".join(sql_parts)
-                data_privacy_sql_safe_logging = f'UPDATE {full_qual_table_name} SET ' + ", ".join(sql_parts_safe_logging)
+                data_privacy_sql = f'CREATE OR REPLACE TABLE {full_qual_table_name} AS SELECT * EXCLUDE ({",".join(columns)}) ' + ", ".join(sql_parts) + f' FROM {full_qual_table_name}'
+                data_privacy_sql_safe_logging = f'CREATE OR REPLACE TABLE {full_qual_table_name} AS SELECT * EXCLUDE ({",".join(columns)}) ' + ", ".join(sql_parts_safe_logging) + f' FROM {full_qual_table_name}'
                 LOGGER.info('Running data privacy obfuscation query: %s', data_privacy_sql_safe_logging)
                 self.query(
                     data_privacy_sql,
