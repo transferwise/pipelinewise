@@ -473,8 +473,8 @@ select column_name,privacy_properties:turing_strategy:sql::text as sql from "TUR
                         sql_parts_safe_logging.append(f"({sql_safe_logging}) AS {column_name}")
 
             if sql_parts:
-                data_privacy_sql = f'CREATE OR REPLACE TABLE {full_qual_table_name} AS SELECT * EXCLUDE ({",".join(columns)}) ' + ", ".join(sql_parts) + f' FROM {full_qual_table_name}'
-                data_privacy_sql_safe_logging = f'CREATE OR REPLACE TABLE {full_qual_table_name} AS SELECT * EXCLUDE ({",".join(columns)}) ' + ", ".join(sql_parts_safe_logging) + f' FROM {full_qual_table_name}'
+                data_privacy_sql = f'CREATE OR REPLACE TABLE {full_qual_table_name} AS SELECT * EXCLUDE ({",".join(columns)}), ' + ", ".join(sql_parts) + f' FROM {full_qual_table_name}'
+                data_privacy_sql_safe_logging = f'CREATE OR REPLACE TABLE {full_qual_table_name} AS SELECT * EXCLUDE ({",".join(columns)}), ' + ", ".join(sql_parts_safe_logging) + f' FROM {full_qual_table_name}'
                 LOGGER.info('Running data privacy obfuscation query: %s', data_privacy_sql_safe_logging)
                 self.query(
                     data_privacy_sql,
