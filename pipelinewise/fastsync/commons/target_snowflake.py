@@ -442,7 +442,7 @@ select column_name,privacy_properties:turing_strategy:sql::text as sql from "TUR
             sql_full_queries_safe_logging = [] # with os env variable replaced by placeholders to avoid leaking encryption keys in logs
             for row in res:
                 row = dict(row)
-                column_name = row['COLUMN_NAME']
+                column_name = '"' + row['COLUMN_NAME'].upper() + '"'
                 sql = row['SQL']
                 if sql is not None:
                     if sql.startswith('['):
