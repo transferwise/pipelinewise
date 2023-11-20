@@ -92,7 +92,7 @@ Example YAML for ``tap-kafka``:
       #       int32 result_per_page = 3;
       #     }
       #proto_classess_dir:                      # (Default: current working dir) Directory where to store runtime compiled proto classes
-
+      #debug_contexts: ""                       # comma separated list of debug contexts to enable for the consumer [see librkafka](https://github.com/confluentinc/librdkafka/blob/master/INTRODUCTION.md#debug-contexts) 
 
     # ------------------------------------------------------------------------------
     # Destination (Target) - Target properties
