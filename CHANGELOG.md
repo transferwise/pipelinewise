@@ -1,3 +1,7 @@
+0.58.2 (2023-11-20)
+-------------------
+- Bump `pipelinewise-tap-kafka`from `8.1.0` to `8.2.0`
+
 0.58.1 (2023-10-09)
 -------------------
 - Bump `pipelinewise-tap-github`from `1.1.0` to `1.1.1`
