@@ -15,7 +15,7 @@ RUN apt-get -qq update \
 
 # Add Mongodb ppa
 RUN wget -qO - https://www.mongodb.org/static/pgp/server-4.4.asc | apt-key add - \
-    && echo "deb [ arch=amd64 ] https://repo.mongodb.org/apt/ubuntu bionic/mongodb-org/4.4 multiverse" | tee /etc/apt/sources.list.d/mongodb.list \
+    && echo "deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu bionic/mongodb-org/4.4 multiverse" | tee /etc/apt/sources.list.d/mongodb.list \
     && apt-get -qq update \
     && apt-get -qqy --no-install-recommends install \
         mongodb-database-tools \
