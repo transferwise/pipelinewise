@@ -26,7 +26,7 @@ on the database, schema and tables that you want to replicate:
     * ``CREATE USER pipelinewise IDENTIFIEDBY <password>``
     * ``GRANT CONNECT TO pipelinewise``
     * ``GRANT CREATE SESSION TO pipelinewise``
-    * ``GRANT UNLIMITED TABLESPACE TO TO pipelinewise``
+    * ``GRANT UNLIMITED TABLESPACE TO pipelinewise``
     * ``GRANT USAGE ON SCHEMA <schema_name> TO pipelinewise``
     * ``GRANT SELECT ON <schema_name>.<table_name> TO pipelinewise`` (Repeat this grant on every table that you want to replicate)
 
