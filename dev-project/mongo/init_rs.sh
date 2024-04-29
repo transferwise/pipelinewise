@@ -1,6 +1,6 @@
 echo 'Initializing MongoDB ReplicaSet'
 
-mongo mongodb://$TAP_MONGODB_HOST:$TAP_MONGODB_PORT/admin?authSource=admin -u $TAP_MONGODB_ROOT_USER -p $TAP_MONGODB_ROOT_PASSWORD <<EOF
+mongosh mongodb://$TAP_MONGODB_HOST:$TAP_MONGODB_PORT/admin?authSource=admin -u $TAP_MONGODB_ROOT_USER -p $TAP_MONGODB_ROOT_PASSWORD <<EOF
   db.getName();
   let cfg = {};
   rs.initiate({

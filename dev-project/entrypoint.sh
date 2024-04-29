@@ -19,9 +19,10 @@ apt-get install -y --no-install-recommends \
   libaio1 \
   mariadb-client \
   mbuffer \
-  mongodb-database-tools \
-  mongodb-org-shell \
-  postgresql-client
+  postgresql-client \
+  mongo-tools \
+  mongocli \
+  mongodb-mongosh
 
 rm -rf /var/lib/apt/lists/* \
 
