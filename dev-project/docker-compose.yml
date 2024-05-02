@@ -34,8 +34,17 @@ services:
       context: ./pg
       dockerfile: Dockerfile
     container_name: pipelinewise_dev_postgres_source
-    # Making some logical decoding adjustments
-    command: -c "wal_level=logical" -c "max_replication_slots=5" -c "max_wal_senders=5"
+    volumes:
+      - ./pg/pg_hba.conf:/var/lib/postgresql/pg_hba.conf
+    # Making some logical decoding and ssl adjustments
+    command: >
+      -c "wal_level=logical"
+      -c "max_replication_slots=5"
+      -c "max_wal_senders=5"
+      -c "ssl=on"
+      -c "ssl_cert_file=/var/lib/postgresql/server.crt"
+      -c "ssl_key_file=/var/lib/postgresql/server.key"
+      -c "hba_file=/var/lib/postgresql/pg_hba.conf"
     ports:
       - ${TAP_POSTGRES_PORT_ON_HOST}:${TAP_POSTGRES_PORT}
     environment:
