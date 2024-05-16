@@ -1,6 +1,6 @@
 #!/bin/bash -e
 #
-# Building a test MySQL database for integration testing of tap-mysql 
+# Building a test MySQL database for integration testing of tap-mysql
 # The sample database available at https://github.com/ikostan/RESTAURANT-DATABASE
 PWD="$(dirname "$0")"
 
@@ -26,6 +26,7 @@ fi
 echo "SETTING UP MYSQL PRIMARY SERVER FOR REPLICATION"
 
 mysql --protocol TCP \
+--ssl \
 --host ${TAP_MYSQL_HOST} \
 --port ${TAP_MYSQL_PORT} \
 --user root \
@@ -43,7 +44,7 @@ mysql --protocol TCP \
 
 echo "GETTING MYSQL PRIMARY SERVER LOG INFO"
 
-MASTER_LOG_STATUS=`mysql --protocol TCP --host ${TAP_MYSQL_HOST} --port ${TAP_MYSQL_PORT} --user root --password=${TAP_MYSQL_ROOT_PASSWORD} -e "SHOW MASTER STATUS;"`
+MASTER_LOG_STATUS=`mysql --protocol TCP --ssl --host ${TAP_MYSQL_HOST} --port ${TAP_MYSQL_PORT} --user root --password=${TAP_MYSQL_ROOT_PASSWORD} -e "SHOW MASTER STATUS;"`
 CURRENT_LOG=`echo $MASTER_LOG_STATUS | awk '{print $5}'`
 CURRENT_POS=`echo $MASTER_LOG_STATUS | awk '{print $6}'`
 
@@ -54,13 +55,13 @@ mysql --protocol TCP \
 --port ${TAP_MYSQL_REPLICA_PORT} \
 --user ${TAP_MYSQL_REPLICA_USER} \
 --password=${TAP_MYSQL_REPLICA_PASSWORD} \
--e "STOP SLAVE; CHANGE MASTER TO MASTER_HOST='${TAP_MYSQL_HOST}',MASTER_USER='${TAP_MYSQL_USER}',MASTER_PASSWORD='${TAP_MYSQL_PASSWORD}',MASTER_LOG_FILE='${CURRENT_LOG}',MASTER_LOG_POS=${CURRENT_POS}; START SLAVE;"
+-e "STOP SLAVE; CHANGE MASTER TO MASTER_SSL=1,MASTER_SSL_VERIFY_SERVER_CERT=0,MASTER_HOST='${TAP_MYSQL_HOST}',MASTER_USER='${TAP_MYSQL_USER}',MASTER_PASSWORD='${TAP_MYSQL_PASSWORD}',MASTER_LOG_FILE='${CURRENT_LOG}',MASTER_LOG_POS=${CURRENT_POS}; START SLAVE;"
 
 # Download the sample database and build it
-
 echo "DUMPING DATA INTO PRIMARY MYSQL DATABASE"
 
 mysql --protocol TCP \
+--ssl \
 --host ${TAP_MYSQL_HOST} \
 --port ${TAP_MYSQL_PORT} \
 --user ${TAP_MYSQL_USER} \
@@ -70,6 +71,7 @@ ${TAP_MYSQL_DB} < ${TEST_DB_SQL}
 echo "DUMPING DATA INTO PRIMARY MYSQL DATABASE2"
 
 mysql --protocol TCP \
+--ssl \
 --host ${TAP_MYSQL_HOST} \
 --port ${TAP_MYSQL_PORT} \
 --user ${TAP_MYSQL_USER} \

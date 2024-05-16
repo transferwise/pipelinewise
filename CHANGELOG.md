@@ -1,3 +1,8 @@
+0.60.0 (2024-05-10)
+-------------------
+- Bump `pipelinewise-tap-mysql`from `1.5.6` to `1.6.0`
+- Attempt SSL for MariaDB and PG sources as Preferred connection method
+
 0.58.3 (2023-11-28)
 -------------------
 - Bump `pipelinewise-tap-kafka`from `8.2.0` to `8.2.1`

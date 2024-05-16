@@ -52,7 +52,7 @@ Maatjies', 20, 'A', null, '09:16:10'),
   (8,'Liewe	Maatjies', 10, null, '[{"key": "Value''s One", "actions": []},{"key": "Value\U00000027s Two", "actions": ' ||
                                  '[]}]', '00:30:00'),
   (9, 'dolor sit amet', 19, 'C', '[]', '23:50:19'),
-  (10, 'sit amet', 100, 'E', '', '19:30:19')
+  (10, 'sit amet', 100, 'E', null, '19:30:19')
 ;
 
 /*!40000 ALTER TABLE `edgydata` ENABLE KEYS */;
