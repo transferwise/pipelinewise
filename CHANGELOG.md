@@ -1,3 +1,7 @@
+0.61.0 (2024-05-28)
+-------------------
+- Bump `pipelinewise-tap-mongodb`from `1.3.0` to `1.4.0`
+
 0.60.0 (2024-05-10)
 -------------------
 - Bump `pipelinewise-tap-mysql`from `1.5.6` to `1.6.0`
