@@ -41,7 +41,7 @@ def serialize_document(document: Dict) -> Dict:
     return {
         key: transform_value(val, [key])
         for key, val in document.items()
-        if not isinstance(val, (bson.min_key.MinKey, bson.max_key.MaxKey))
+        if not isinstance(val, (bson.min_key.MinKey, bson.max_key.MaxKey, bson.binary.Binary))
     }
 
 
@@ -148,6 +148,13 @@ def transform_value(value: Any, path) -> Any:
     }
 
     if isinstance(value, tuple(conversion.keys())):
+        try:
+            a = conversion[type(value)](value, path)
+        except Exception as e:
+            print(f'======>>> {e}')
+            print(f'-=-=-=->> {conversion[type(value)]}')
+            print(f'----->>> {type(value)} , {value}, {path}')
+            raise e
         return conversion[type(value)](value, path)
 
     return value

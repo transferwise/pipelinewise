@@ -430,17 +430,17 @@ class TestTargetPostgres:
                 {
                     'age': randint(10, 30),
                     'id': 1001,
-                    'uuid': uuid.uuid4(),
+                    'uuid': str(uuid.uuid4()),
                     'ts': Timestamp(12030, 500),
                 },
                 {
                     'date': datetime.utcnow(),
                     'id': 1002,
-                    'uuid': uuid.uuid4(),
+                    'uuid': str(uuid.uuid4()),
                     'regex': bson.Regex(r'^[A-Z]\\w\\d{2,6}.*$'),
                 },
                 {
-                    'uuid': uuid.uuid4(),
+                    'uuid': str(uuid.uuid4()),
                     'id': 1003,
                     'decimal': bson.Decimal128(
                         decimal.Decimal('5.64547548425446546546644')
