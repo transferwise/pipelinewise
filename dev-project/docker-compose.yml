@@ -21,8 +21,25 @@ services:
     depends_on:
       - db_postgres_source
       - db_mysql_source
+      - db_mssql_source
       - db_postgres_dwh
       - db_mongo_source
+    networks:
+      - pipelinewise_network
+
+  ### TAP (Data source) containers
+  # PostgreSQL service container used as test source database
+  # Using Debezium image with wal2json plugin for logical decoding
+  db_mssql_source:
+    image: mcr.microsoft.com/mssql/server:2019-latest
+    container_name: pipelinewise_dev_mssql_source
+    # Making some logical decoding adjustments
+    # command: -c "wal_level=logical" -c "max_replication_slots=5" -c "max_wal_senders=5"
+    ports:
+      - ${TAP_MSSQL_PORT_ON_HOST}:${TAP_MSSQL_PORT}
+    environment:
+      ACCEPT_EULA: "Y"
+      SA_PASSWORD: ${TAP_MSSQL_PASSWORD}
     networks:
       - pipelinewise_network
 
