@@ -1,5 +1,3 @@
-# FROM mongo:4.2-bionic
-# FROM mongo:5.0.22-focal
 FROM mongo:5.0.26-focal
 
 COPY --chown=mongodb:root --chmod=400 rootCA.pem /etc/ssl/rootCA.pem

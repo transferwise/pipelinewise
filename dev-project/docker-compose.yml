@@ -1,8 +1,8 @@
-version: '3'
 services:
   ### Primary container with PipelineWise CLI
   pipelinewise:
-    image: python:3.8-slim-buster
+    platform: linux/amd64
+    image: ubuntu:20.04
     container_name: pipelinewise_dev
     working_dir: /opt/pipelinewise
     entrypoint: /opt/pipelinewise/dev-project/entrypoint.sh

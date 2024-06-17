@@ -3,6 +3,9 @@
 set -e
 
 apt update
+
+DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC apt-get -y install tzdata
+
 apt install -y --no-install-recommends \
   wget \
   gnupg \
@@ -12,18 +15,20 @@ apt install -y --no-install-recommends \
   libaio1 \
   mariadb-client \
   mbuffer \
-  postgresql-client
+  postgresql-client \
+  python3.8 python3-pip python3-venv python3-dev
 
 apt upgrade -y
 # rm -rf /var/lib/apt/lists/* \
 
 # Do a bunch of Mongo things
-wget -q https://downloads.mongodb.com/compass/mongodb-mongosh_2.2.6_arm64.deb
-apt install ./mongodb-mongosh_2.2.6_arm64.deb
-rm -f mongodb-mongosh_2.2.6_arm64.deb
-wget -q https://fastdl.mongodb.org/tools/db/mongodb-database-tools-ubuntu2004-arm64-100.9.4.deb
-apt install ./mongodb-database-tools-ubuntu2004-arm64-100.9.4.deb
-rm -f mongodb-database-tools-ubuntu2004-arm64-100.9.4.deb
+wget -q --no-check-certificate https://downloads.mongodb.com/compass/mongodb-mongosh_2.2.9_amd64.deb
+apt install ./mongodb-mongosh_2.2.9_amd64.deb
+rm -f mongodb-mongosh_2.2.9_amd64.deb
+wget -q --no-check-certificate https://fastdl.mongodb.org/tools/db/mongodb-database-tools-ubuntu2004-x86_64-100.9.5.deb
+apt install ./mongodb-database-tools-ubuntu2004-x86_64-100.9.5.deb
+rm -f mongodb-database-tools-ubuntu2004-x86_64-100.9.5.deb
+
 dev-project/mongo/initiate-replica-set.sh
 
 # Install Oracle Instant Client required for tap-oracle

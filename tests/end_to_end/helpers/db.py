@@ -313,5 +313,8 @@ def get_mongodb_connection(
     Returns: Database instance with established connection
 
     """
-    connection_string = f"mongodb://{user}:{password}@{host}:{port}/{database}?authSource={auth_database}&tls=true&tlsAllowInvalidCertificates=true&directConnection=true"
+    connection_string = (
+        f'mongodb://{user}:{password}@{host}:{port}/{database}?authSource={auth_database}'
+        '&tls=true&tlsAllowInvalidCertificates=true&directConnection=true'
+    )
     return pymongo.MongoClient(connection_string)[database]
