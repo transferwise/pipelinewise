@@ -181,7 +181,7 @@ def get_connection_string(config: Dict):
 
     # NB: "sslAllowInvalidCertificates" must ONLY be supplied if `SSL` is true.
     if not verify_mode and use_ssl:
-        connection_query['tlsAllowInvalidCertificates'] = 'true'
+        connection_query['tlsInsecure'] = 'true'
 
     query_string = parse.urlencode(connection_query)
 

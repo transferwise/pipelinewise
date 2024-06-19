@@ -1,8 +1,8 @@
-version: '3'
 services:
   ### Primary container with PipelineWise CLI
   pipelinewise:
-    image: python:3.8-slim-buster
+    platform: linux/amd64
+    image: ubuntu:20.04
     container_name: pipelinewise_dev
     working_dir: /opt/pipelinewise
     entrypoint: /opt/pipelinewise/dev-project/entrypoint.sh
@@ -100,7 +100,9 @@ services:
 
   db_mongo_source:
     container_name: "pipelinewise_dev_mongodb_source"
-    image: "mongo:4.2-bionic"
+    build:
+      context: ./mongo
+      dockerfile: Dockerfile
     ports:
       - ${TAP_MONGODB_PORT_ON_HOST}:${TAP_MONGODB_PORT}
     environment:
@@ -110,9 +112,15 @@ services:
       MONGO_USERNAME: ${TAP_MONGODB_USER}
       MONGO_PASSWORD: ${TAP_MONGODB_PASSWORD}
       MONGO_REPLICA_HOST: db_mongo_source
-    volumes:
-      - ./mongo/create_user.sh:/docker-entrypoint-initdb.d/create_user.sh
-    command: [mongod, --replSet, rs0]
+    command: >
+      mongod
+      --bind_ip_all
+      --replSet rs0
+      --keyFile /etc/ssl/replica.key
+      --tlsMode requireTLS
+      --tlsAllowConnectionsWithoutCertificates
+      --tlsCertificateKeyFile /etc/ssl/mongodb.pem
+      --tlsCAFile /etc/ssl/rootCA.pem
     networks:
       - pipelinewise_network
 
