@@ -122,10 +122,12 @@ class FastSyncTapMySql:
         self.conn: Connection = pymysql.connect(
             **conn_params,
             cursorclass=pymysql.cursors.DictCursor,
+            ssl={'': True}
         )
         self.conn_unbuffered: Connection = pymysql.connect(
             **conn_params,
             cursorclass=pymysql.cursors.SSCursor,
+            ssl={'': True}
         )
 
         # Set session variables by running a list of SQLs which is defined
@@ -521,8 +523,11 @@ class FastSyncTapMySql:
 
         Returns: server uuid
         """
-        conn = pymysql.connect(**self.get_connection_parameters(prioritize_primary=True)[0],
-                               cursorclass=pymysql.cursors.DictCursor) if self.is_replica else None
+        conn = pymysql.connect(
+            **self.get_connection_parameters(prioritize_primary=True)[0],
+            cursorclass=pymysql.cursors.DictCursor,
+            ssl={'': True}
+        ) if self.is_replica else None
 
         result = self.query('select @@server_uuid as server_uuid;', conn)
 
@@ -537,8 +542,11 @@ class FastSyncTapMySql:
 
         Returns: server uuid
         """
-        conn = pymysql.connect(**self.get_connection_parameters(prioritize_primary=True)[0],
-                               cursorclass=pymysql.cursors.DictCursor) if self.is_replica else None
+        conn = pymysql.connect(
+            **self.get_connection_parameters(prioritize_primary=True)[0],
+            cursorclass=pymysql.cursors.DictCursor,
+            ssl={'': True}
+        ) if self.is_replica else None
 
         result = self.query('select @@server_id as server_id;', conn)
 

@@ -15,6 +15,8 @@ owner: "test-runner"
 db_conn:
   host: "${TAP_MONGODB_HOST}"               	# Mongodb host
   port: ${TAP_MONGODB_PORT}                     # Mongodb port
+  ssl: "true"                           # Mongodb SSL enabled
+  verify_mode: "false"                  # Mongodb SSL verify mode
   user: "${TAP_MONGODB_USER}"                  	# Mongodb user
   password: "${TAP_MONGODB_PASSWORD}"           # Mongodb plain string or vault encrypted
   auth_database: "admin"            			# Mongodb database to authenticate on
