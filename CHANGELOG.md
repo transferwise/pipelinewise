@@ -1,3 +1,45 @@
+0.60.2b1 (2024-06-12)
+---------------------
+- Bump `pymongo`from `4.7.3` to `3.13.0`
+
+0.60.1 (2024-06-12)
+-------------------
+- Bump `pymongo`from `3.12.3` to `4.7.3`
+
+0.60.0 (2024-05-10)
+-------------------
+- Bump `pipelinewise-tap-mysql`from `1.5.6` to `1.6.0`
+- Attempt SSL for MariaDB and PG sources as Preferred connection method
+
+0.58.3 (2023-11-28)
+-------------------
+- Bump `pipelinewise-tap-kafka`from `8.2.0` to `8.2.1`
+
+0.58.2 (2023-11-20)
+-------------------
+- Bump `pipelinewise-tap-kafka`from `8.1.0` to `8.2.0`
+
+0.58.1 (2023-10-09)
+-------------------
+- Bump `pipelinewise-tap-github`from `1.1.0` to `1.1.1`
+
+0.58.0 (2023-10-04)
+-------------------
+- Bump `pipelinewise-tap-github`from `1.0.3` to `1.1.0`
+- Bump `joblib`from `1.2.0` to `1.3.2`
+
+0.57.0 (2023-08-09)
+-------------------
+
+- Bump `pipelinewise-tap-kafka`from `8.0.0` to `8.1.0`
+- Update dependencies
+
+0.56.0 (2023-08-09)
+-------------------
+
+- Bump `pipelinewise-target-snowflake`from `2.2.0` to `2.3.0`
+- Update dependencies
+
 0.55.0 (2023-07-25)
 -------------------
 
@@ -7,8 +49,8 @@
 0.54.0 (2023-07-04)
 -------------------
 
-- Add support for the new limit config in `tap-postgres` 
-- Bump pipelinewise_tap_s3_csv from `3.0.0` to `3.0.1` 
+- Add support for the new limit config in `tap-postgres`
+- Bump pipelinewise_tap_s3_csv from `3.0.0` to `3.0.1`
 - Bump pipelinewise-tap-postgres from `1.8.4` to `2.1.0`
 - Bugfix replication slot creation in partial sync
 
@@ -39,7 +81,7 @@
 
 - Bugfix for renaming log files when stopping the tap
 - Bump `snowflake-connector-python` from `2.7.6` to `2.8.2`
-- Remove `tap-adwords` 
+- Remove `tap-adwords`
 
 0.52.2 (2023-03-20)
 -------------------
