@@ -13,9 +13,6 @@ concurrency:
 jobs:
   lint_and_test:
     runs-on: ubuntu-20.04
-    strategy:
-      matrix:
-        python-version: ["3.7", "3.8", "3.9"]
 
     steps:
       - name: Checking out repo
@@ -29,11 +26,11 @@ jobs:
         continue-on-error: true
         run: ./scripts/ci_check_no_file_changes.sh python
 
-      - name: Set up Python ${{ matrix.python-version }}
+      - name: Set up Python 3.8
         if: steps.check.outcome == 'failure'
         uses: actions/setup-python@v3
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: 3.8
 
       - name: Install dependencies
         if: steps.check.outcome == 'failure'
