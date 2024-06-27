@@ -48,7 +48,7 @@ jobs:
         if: steps.check.outcome == 'failure'
         run: |
           cp dev-project/.env.template dev-project/.env
-          docker-compose -f dev-project/docker-compose.yml up -d
+          docker compose -f dev-project/docker-compose.yml up -d
 
       - name: Wait for test containers to be ready
         timeout-minutes: 5
@@ -89,7 +89,7 @@ jobs:
         if: steps.check.outcome == 'failure'
         run: |
           cp dev-project/.env.template dev-project/.env
-          docker-compose -f dev-project/docker-compose.yml up -d
+          docker compose -f dev-project/docker-compose.yml up -d
 
       - name: Wait for test containers to be ready
         if: steps.check.outcome == 'failure'
@@ -139,7 +139,7 @@ jobs:
         if: steps.check.outcome == 'failure'
         run: |
           cp dev-project/.env.template dev-project/.env
-          docker-compose -f dev-project/docker-compose.yml up -d
+          docker compose -f dev-project/docker-compose.yml up -d
 
       - name: Wait for test containers to be ready
         if: steps.check.outcome == 'failure'
@@ -189,7 +189,7 @@ jobs:
         if: steps.check.outcome == 'failure'
         run: |
           cp dev-project/.env.template dev-project/.env
-          docker-compose -f dev-project/docker-compose.yml up -d
+          docker compose -f dev-project/docker-compose.yml up -d
 
       - name: Wait for test containers to be ready
         if: steps.check.outcome == 'failure'
@@ -239,7 +239,7 @@ jobs:
         if: steps.check.outcome == 'failure'
         run: |
           cp dev-project/.env.template dev-project/.env
-          docker-compose -f dev-project/docker-compose.yml up -d
+          docker compose -f dev-project/docker-compose.yml up -d
 
       - name: Wait for test containers to be ready
         if: steps.check.outcome == 'failure'
@@ -292,7 +292,7 @@ jobs:
         if: steps.check.outcome == 'failure'
         run: |
           cp dev-project/.env.template dev-project/.env
-          docker-compose -f dev-project/docker-compose.yml up -d
+          docker compose -f dev-project/docker-compose.yml up -d
 
       - name: Wait for test containers to be ready
         if: steps.check.outcome == 'failure'

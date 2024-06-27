@@ -38,6 +38,7 @@ def run_query_mysql(query, host, port, user, password, database):
         database=database,
         charset='utf8mb4',
         cursorclass=pymysql.cursors.Cursor,
+        ssl={'': True}
     ) as cur:
         cur.execute(query)
         if cur.rowcount > 0:
@@ -312,10 +313,8 @@ def get_mongodb_connection(
     Returns: Database instance with established connection
 
     """
-    return pymongo.MongoClient(
-        host=host,
-        port=int(port),
-        username=user,
-        password=password,
-        authSource=auth_database,
-    )[database]
+    connection_string = (
+        f'mongodb://{user}:{password}@{host}:{port}/{database}?authSource={auth_database}'
+        '&tls=true&tlsAllowInvalidCertificates=true&directConnection=true'
+    )
+    return pymongo.MongoClient(connection_string)[database]
