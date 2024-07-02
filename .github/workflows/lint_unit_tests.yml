@@ -16,7 +16,7 @@ jobs:
 
     steps:
       - name: Checking out repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4.1.7
 
       - name: Check if python changes are present
         id: check
@@ -28,9 +28,9 @@ jobs:
 
       - name: Set up Python 3.8
         if: steps.check.outcome == 'failure'
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5.1.0
         with:
-          python-version: 3.8
+          python-version: '3.8'
 
       - name: Install dependencies
         if: steps.check.outcome == 'failure'
