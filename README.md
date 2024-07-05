@@ -88,7 +88,7 @@ PipelineWise images are built on each release and available on [Dockerhub](https
     ```
 
 #### Build your own docker image
-
+ 
 1. Build an executable docker image that has every required dependency and is isolated from your host system. 
 
 By default, the image will build with *all* connectors. In order to keep image size small, we strongly recommend you change it to just the connectors you need by supplying the `--build-arg` command:
