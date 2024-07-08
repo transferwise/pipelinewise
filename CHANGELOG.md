@@ -1,3 +1,9 @@
+0.63.0 (2024-07-08)
+---------------------
+- Bump `pipelinewise-tap-jira`from `2.0.1` to `2.2.0`
+- Bump `jinja2`from `3.0.2` to `3.1.2`
+- Update Github Actions
+
 0.60.2b1 (2024-06-12)
 ---------------------
 - Bump `pymongo`from `4.7.3` to `3.13.0`
