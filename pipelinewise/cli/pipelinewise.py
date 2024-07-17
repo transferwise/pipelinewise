@@ -110,6 +110,7 @@ class PipelineWise:
             self.TRANSFORM_FIELD_CONNECTOR_NAME
         )
         self.tap_run_log_file = None
+        self.force_fast_sync = True
 
         # Catch SIGINT and SIGTERM to exit gracefully
         for sig in [signal.SIGINT, signal.SIGTERM]:
