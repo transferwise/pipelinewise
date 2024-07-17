@@ -29,10 +29,10 @@ def get_tables_size(schema: str, tap) -> dict:
     if 'FastSyncTapMySql' in str(type(tap)):
         tap.open_connections()
         result_list = tap.query(
-            "select TABLE_NAME as table_name,"
-            " TABLE_ROWS as table_rows,"
-            " DATA_LENGTH + INDEX_LENGTH as table_size"
-            f" from information_schema.TABLES where TABLE_SCHEMA = '{schema}';")
+            'select TABLE_NAME as table_name,'
+            ' TABLE_ROWS as table_rows,'
+            ' DATA_LENGTH + INDEX_LENGTH as table_size'
+            f' from information_schema.TABLES where TABLE_SCHEMA = \'{schema}\';')
         tap.close_connections()
         for res in result_list:
             result.append({
@@ -44,13 +44,13 @@ def get_tables_size(schema: str, tap) -> dict:
     if 'FastSyncTapPostgres' in str(type(tap)):
         tap.open_connection()
         result_list = tap.query(
-            "SELECT TABLE_NAME as table_name,"
-            " (xpath('/row/c/text()',"
-            " query_to_xml(format('select count(*) as c from %I.%I', table_schema, TABLE_NAME), FALSE, TRUE, ''))"
-            ")[1]::text::int AS table_rows,"
-            " pg_total_relation_size('\"'||table_schema||'\".\"'||table_name||'\"') as table_size "
-            "FROM (SELECT table_schema, TABLE_NAME FROM information_schema.tables "
-            f"WHERE TABLE_NAME not like 'pg_%' AND table_schema in ('{schema}')) as tb"
+            'SELECT TABLE_NAME as table_name,'
+            ' (xpath(\'/row/c/text()\','
+            ' query_to_xml(format(\'select count(*) as c from %I.%I\', table_schema, TABLE_NAME), FALSE, TRUE, \'\'))'
+            ')[1]::text::int AS table_rows,'
+            ' pg_total_relation_size(\'"\'||table_schema||\'"."\'||table_name||\'"\') as table_size '
+            'FROM (SELECT table_schema, TABLE_NAME FROM information_schema.tables '
+            f'WHERE TABLE_NAME not like \'pg_%\' AND table_schema in (\'{schema}\')) as tb'
             )
         for res in result_list:
             result.append({
