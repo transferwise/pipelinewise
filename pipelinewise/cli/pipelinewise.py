@@ -1109,6 +1109,10 @@ class PipelineWise:
         Generating and running shell command to sync tables using the native fastsync components
         """
         # Build the fastsync executable command
+        max_autoresync_table_size = None
+        if tap.type in ('tap-mysql', 'tap-postgres') and target.type == 'target-snowflake' and not self.args.force:
+            max_autoresync_table_size = self.config.get('allowed_resync_max_size', {}).get('table_bytes')
+
         command = commands.build_fastsync_command(
             tap=tap,
             target=target,
@@ -1119,6 +1123,7 @@ class PipelineWise:
             profiling_mode=self.profiling_mode,
             profiling_dir=self.profiling_dir,
             drop_pg_slot=self.drop_pg_slot,
+            autoresync_size=max_autoresync_table_size
         )
 
         # Fastsync is running in subprocess.
@@ -1385,8 +1390,10 @@ class PipelineWise:
         """
         if fastsync_stream_ids:
             tables_to_sync = ','.join(fastsync_stream_ids).replace('-', '.')
+            self.force_fast_sync = True
         else:
             tables_to_sync = self.args.tables
+            self.force_fast_sync = self.args.force
 
         selected_tables = self._get_sync_tables_setting_from_selection_file(tables_to_sync)
         processes_list = []
@@ -1399,7 +1406,7 @@ class PipelineWise:
 
         if selected_tables['full_sync']:
             fast_sync_process = Process(
-                target=self.sync_tables_fast_sync, args=(selected_tables['full_sync'],))
+                target=self.sync_tables_fast_sync, args=(selected_tables['full_sync'], ))
             fast_sync_process.start()
             processes_list.append(fast_sync_process)
 

@@ -641,7 +641,7 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
         exp_err_pattern = '/tap-mysql/bin/tap-mysql: No such file or directory'
         assert exp_err_pattern in result
 
-    def _test_command_run_tap(self):
+    def test_command_run_tap(self):
         """Test run tap command"""
         args = CliArgs(target='target_one', tap='tap_one')
         pipelinewise = PipelineWise(args, CONFIG_DIR, VIRTUALENVS_DIR)

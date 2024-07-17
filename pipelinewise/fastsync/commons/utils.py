@@ -333,6 +333,9 @@ def parse_args(required_config_keys: Dict) -> argparse.Namespace:
         help='Drop pg replication slot before starting resync',
         action='store_true',
     )
+    parser.add_argument('--autoresync_size',
+                       help='maximum value for table size to resync',
+                       )
 
     args: argparse.Namespace = parser.parse_args()
 
