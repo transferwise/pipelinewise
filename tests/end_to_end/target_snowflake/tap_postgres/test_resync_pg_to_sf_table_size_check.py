@@ -62,3 +62,14 @@ class TestResyncPGToSF(TapPostgres):
         [return_code, _, _] = tasks.run_command(command)
 
         assert return_code == 0
+
+    def test_run_tap_pg_to_sf_if_size_greater_than_limit(self):   # pylint: disable = no-self-use
+        """test run_tap postgres to sf if table size is greater than the limit"""
+        a_small_number = 3
+        _create_ppw_config_file(table_byte=a_small_number)
+
+        command = f'pipelinewise run_tap --tap {TAP_ID} --target {TARGET_ID}'
+
+        [return_code, _, _] = tasks.run_command(command)
+
+        assert return_code == 0

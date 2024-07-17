@@ -1111,7 +1111,7 @@ class PipelineWise:
         """
         # Build the fastsync executable command
         max_autoresync_table_size = None
-        if tap.type in ('tap-mysql', 'tap-postgres') and target.type == 'target-snowflake' and not self.args.force:
+        if tap.type in ('tap-mysql', 'tap-postgres') and target.type == 'target-snowflake' and not self.force_fast_sync:
             max_autoresync_table_size = self.config.get('allowed_resync_max_size', {}).get('table_bytes')
 
         command = commands.build_fastsync_command(
@@ -1172,6 +1172,8 @@ class PipelineWise:
         )
 
         not_partial_syned_tables = set()
+
+        self.force_fast_sync = True
 
         self.logger.info('Running %s tap in %s target', tap_id, target_id)
 
@@ -1378,6 +1380,7 @@ class PipelineWise:
         """
         This method calls do_sync_tables if sync_tables command is chosen
         """
+        self.force_fast_sync = self.args.force
         try:
             with pidfile.PIDFile(self.tap['files']['pidfile']):
                 self.do_sync_tables()
@@ -1391,10 +1394,8 @@ class PipelineWise:
         """
         if fastsync_stream_ids:
             tables_to_sync = ','.join(fastsync_stream_ids).replace('-', '.')
-            self.force_fast_sync = True
         else:
             tables_to_sync = self.args.tables
-            self.force_fast_sync = self.args.force
 
         selected_tables = self._get_sync_tables_setting_from_selection_file(tables_to_sync)
         processes_list = []
