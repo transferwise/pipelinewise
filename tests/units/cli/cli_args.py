@@ -35,7 +35,7 @@ class CliArgs:
         self.extra_log = extra_log
         self.debug = debug
         self.profiler = profiler
-        self.force = False
+        self.force = force
 
     # "log" Getters and setters
     @property
