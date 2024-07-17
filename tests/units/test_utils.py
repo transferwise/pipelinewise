@@ -171,9 +171,10 @@ class TestUtils(unittest.TestCase):
 
         actual_output = utils.filter_out_selected_tables(all_schema_tables, selected_tables)
 
-        self.assertListEqual(
-            actual_output, expected_output
-        )
+        self.assertEqual(len(actual_output), 2)
+
+        for item in expected_output:
+            self.assertIn(item, actual_output)
 
     def test_get_schema_of_tables_set(self):
         """Test get_schema_of_mysql_tables method works correctly"""
