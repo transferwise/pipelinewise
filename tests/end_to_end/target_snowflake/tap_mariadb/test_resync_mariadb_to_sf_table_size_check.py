@@ -2,7 +2,7 @@ import os
 
 from tests.end_to_end.target_snowflake.tap_mariadb import TapMariaDB
 from tests.end_to_end.helpers import tasks
-from tests.end_to_end.target_snowflake import TEST_PROJECTS_DIR_PATH
+from tests.end_to_end.target_snowflake import TEST_PROJECTS_DIR_PATH, CONFIG_DIR
 
 
 TAP_ID = 'mariadb_to_sf'
@@ -32,7 +32,7 @@ class TestResyncMariaDBToSF(TapMariaDB):
     def test_resync_mariadb_to_sf_if_table_size_greater_than_limit(self):  # pylint: disable = no-self-use
         """test resync mariadb to SF returns error 1 if table size is greater than the limit"""
 
-        a_small_number = -1   # Mb
+        a_small_number = 0.001   # Mb
         _create_ppw_config_file(table_mb=a_small_number)
 
         command = f'pipelinewise sync_tables --tap {TAP_ID} --target {TARGET_ID}'
@@ -49,11 +49,15 @@ class TestResyncMariaDBToSF(TapMariaDB):
         command = f'pipelinewise sync_tables --tap {TAP_ID} --target {TARGET_ID}'
         [return_code, _, _] = tasks.run_command(command)
 
+        with open(f'{CONFIG_DIR}/config.json', 'r', encoding='utf-8') as config_file:
+            a = config_file.readlines()
+            for i in a:
+                print(i)
         assert return_code == 0
 
     def test_resync_mariadb_to_sf_if_table_size_greater_than_limit_and_force(self):  # pylint: disable = no-self-use
         """test resync mariadb to SF returns error if table size is greater than the limit and --force is used"""
-        a_small_number = -1  # Mb
+        a_small_number = 0.001  # Mb
         _create_ppw_config_file(table_mb=a_small_number)
 
         command = f'pipelinewise sync_tables --tap {TAP_ID} --target {TARGET_ID} --force'
@@ -64,7 +68,7 @@ class TestResyncMariaDBToSF(TapMariaDB):
 
     def test_run_tap_mariadb_to_sf_if_size_greater_than_limit(self):   # pylint: disable = no-self-use
         """test run_tap mariadb to sf if table size is greater than the limit"""
-        a_small_number = -1  # Mb
+        a_small_number = 0.001  # Mb
         _create_ppw_config_file(table_mb=a_small_number)
 
         command = f'pipelinewise run_tap --tap {TAP_ID} --target {TARGET_ID}'
