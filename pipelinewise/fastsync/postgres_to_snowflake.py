@@ -213,7 +213,7 @@ def main_impl():
             all_tables_in_this_schema = get_tables_size(schema, tap_obj)
             only_selected_tables = filter_out_selected_tables(all_tables_in_this_schema, args.tables)
             table_with_maximum_size = get_maximum_value_from_list_of_dicts(only_selected_tables, 'table_size')
-            if table_with_maximum_size.get('table_size') > int(args.autoresync_size):
+            if table_with_maximum_size.get('table_size') > float(args.autoresync_size):
                 can_run_sync = False
                 table_sync_excs.append(
                     f're-sync can not be done because size of table '

@@ -53,7 +53,7 @@ add the ``--tables`` argument:
   .. code-block:: yaml
 
      allowed_resync_max_size:
-       table_bytes: <integer>
+       table_mb: <integer/float>
 
 
 
