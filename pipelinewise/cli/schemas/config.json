@@ -46,11 +46,11 @@
     "allowed_resync_max_size": {
       "type": "object",
       "properties": {
-        "table_bytes": {
+        "table_mb": {
           "type": "number"
         }
       },
-      "required": ["table_bytes"]
+      "required": ["table_mb"]
     }
   },
   "required": [],
