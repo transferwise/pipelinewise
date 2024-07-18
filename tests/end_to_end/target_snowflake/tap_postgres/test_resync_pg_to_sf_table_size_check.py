@@ -2,7 +2,7 @@ import os
 
 from tests.end_to_end.target_snowflake.tap_postgres import TapPostgres
 from tests.end_to_end.helpers import tasks
-from tests.end_to_end.target_snowflake import TEST_PROJECTS_DIR_PATH, CONFIG_DIR
+from tests.end_to_end.target_snowflake import TEST_PROJECTS_DIR_PATH
 
 
 TAP_ID = 'postgres_to_sf'

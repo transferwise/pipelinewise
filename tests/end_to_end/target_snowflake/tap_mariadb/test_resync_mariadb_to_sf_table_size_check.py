@@ -2,7 +2,7 @@ import os
 
 from tests.end_to_end.target_snowflake.tap_mariadb import TapMariaDB
 from tests.end_to_end.helpers import tasks
-from tests.end_to_end.target_snowflake import TEST_PROJECTS_DIR_PATH, CONFIG_DIR
+from tests.end_to_end.target_snowflake import TEST_PROJECTS_DIR_PATH
 
 
 TAP_ID = 'mariadb_to_sf'
