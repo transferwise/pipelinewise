@@ -222,7 +222,6 @@ def main_impl():
                     f'`{table_with_maximum_size["table_name"]}` is greater than `{args.autoresync_size}`!'
                     f' Use --force argument to force sync_tables!')
 
-
     # Start loading tables in parallel in spawning processes
     if can_run_sync:
         with multiprocessing.Pool(pool_size) as proc:
