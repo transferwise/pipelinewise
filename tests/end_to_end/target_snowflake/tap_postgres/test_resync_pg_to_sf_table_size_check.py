@@ -9,10 +9,10 @@ TAP_ID = 'postgres_to_sf'
 TARGET_ID = 'snowflake'
 
 
-def _create_ppw_config_file(table_byte):
+def _create_ppw_config_file(table_mb):
     with open(f'{TEST_PROJECTS_DIR_PATH}/config.yml', 'w', encoding='utf-8') as config_file:
         config_file.write('allowed_resync_max_size:\n')
-        config_file.write(f'  table_bytes: {table_byte}\n')
+        config_file.write(f'  table_mb: {table_mb}\n')
 
     tasks.run_command(f'pipelinewise import_config --dir {TEST_PROJECTS_DIR_PATH}')
 

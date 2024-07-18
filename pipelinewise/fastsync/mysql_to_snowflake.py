@@ -219,7 +219,9 @@ def main_impl():
                 can_run_sync = False
                 table_sync_excs.append(
                     f're-sync can not be done because size of table '
-                    f'`{table_with_maximum_size["table_name"]}` is greater than `{args.autoresync_size}`!')
+                    f'`{table_with_maximum_size["table_name"]}` is greater than `{args.autoresync_size}`!'
+                    f' Use --force argument to force sync_tables!')
+
 
     # Start loading tables in parallel in spawning processes
     if can_run_sync:
