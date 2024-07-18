@@ -32,7 +32,7 @@ class TestResyncMariaDBToSF(TapMariaDB):
     def test_resync_mariadb_to_sf_if_table_size_greater_than_limit(self):  # pylint: disable = no-self-use
         """test resync mariadb to SF returns error 1 if table size is greater than the limit"""
 
-        a_small_number = 3
+        a_small_number = 0.1   # Mb
         _create_ppw_config_file(table_mb=a_small_number)
 
         command = f'pipelinewise sync_tables --tap {TAP_ID} --target {TARGET_ID}'
@@ -53,7 +53,7 @@ class TestResyncMariaDBToSF(TapMariaDB):
 
     def test_resync_mariadb_to_sf_if_table_size_greater_than_limit_and_force(self):  # pylint: disable = no-self-use
         """test resync mariadb to SF returns error if table size is greater than the limit and --force is used"""
-        a_small_number = 3
+        a_small_number = 0.1  # Mb
         _create_ppw_config_file(table_mb=a_small_number)
 
         command = f'pipelinewise sync_tables --tap {TAP_ID} --target {TARGET_ID} --force'
@@ -64,7 +64,7 @@ class TestResyncMariaDBToSF(TapMariaDB):
 
     def test_run_tap_mariadb_to_sf_if_size_greater_than_limit(self):   # pylint: disable = no-self-use
         """test run_tap mariadb to sf if table size is greater than the limit"""
-        a_small_number = 3
+        a_small_number = 0.1  # Mb
         _create_ppw_config_file(table_mb=a_small_number)
 
         command = f'pipelinewise run_tap --tap {TAP_ID} --target {TARGET_ID}'
