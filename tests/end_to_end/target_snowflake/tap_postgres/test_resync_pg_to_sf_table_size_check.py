@@ -2,7 +2,7 @@ import os
 
 from tests.end_to_end.target_snowflake.tap_postgres import TapPostgres
 from tests.end_to_end.helpers import tasks
-from tests.end_to_end.target_snowflake import TEST_PROJECTS_DIR_PATH
+from tests.end_to_end.target_snowflake import TEST_PROJECTS_DIR_PATH, CONFIG_DIR
 
 
 TAP_ID = 'postgres_to_sf'
@@ -32,12 +32,16 @@ class TestResyncPGToSF(TapPostgres):
     def test_resync_pg_to_sf_if_table_size_greater_than_limit(self):   # pylint: disable = no-self-use
         """test resync pg to SF returns error 1 if table size is greater than the limit"""
 
-        a_small_number = -1   # Mb
+        a_small_number = 0.001   # Mb
         _create_ppw_config_file(table_mb=a_small_number)
 
         command = f'pipelinewise sync_tables --tap {TAP_ID} --target {TARGET_ID}'
 
         [return_code, _, _] = tasks.run_command(command)
+        with open(f'{CONFIG_DIR}/config.json', 'r', encoding='utf-8') as config_file:
+            aa = config_file.readlines()
+            for ii in aa:
+                print(ii)
 
         assert return_code == 1
 
@@ -54,7 +58,7 @@ class TestResyncPGToSF(TapPostgres):
     def test_resync_pg_to_sf_if_table_size_greater_than_limit_and_force(self):   # pylint: disable = no-self-use
 
         """test resync pg to SF returns error if table size is greater than the limit and --force is used"""
-        a_small_number = -1  # Mb
+        a_small_number = 0.001  # Mb
         _create_ppw_config_file(table_mb=a_small_number)
 
         command = f'pipelinewise sync_tables --tap {TAP_ID} --target {TARGET_ID} --force'
@@ -65,7 +69,7 @@ class TestResyncPGToSF(TapPostgres):
 
     def test_run_tap_pg_to_sf_if_size_greater_than_limit(self):   # pylint: disable = no-self-use
         """test run_tap postgres to sf if table size is greater than the limit"""
-        a_small_number = -1 # Mb
+        a_small_number = 0.001 # Mb
         _create_ppw_config_file(table_mb=a_small_number)
 
         command = f'pipelinewise run_tap --tap {TAP_ID} --target {TARGET_ID}'

@@ -39,6 +39,12 @@ class TestResyncMariaDBToSF(TapMariaDB):
 
         [return_code, _, _] = tasks.run_command(command)
 
+        with open(f'{CONFIG_DIR}/config.json', 'r', encoding='utf-8') as config_file:
+            aa = config_file.readlines()
+            for ii in aa:
+                print(ii)
+
+
         assert return_code == 1
 
     def test_resync_mariadb_to_sf_if_table_size_less_than_limit(self):  # pylint: disable = no-self-use
@@ -49,10 +55,6 @@ class TestResyncMariaDBToSF(TapMariaDB):
         command = f'pipelinewise sync_tables --tap {TAP_ID} --target {TARGET_ID}'
         [return_code, _, _] = tasks.run_command(command)
 
-        with open(f'{CONFIG_DIR}/config.json', 'r', encoding='utf-8') as config_file:
-            a = config_file.readlines()
-            for i in a:
-                print(i)
         assert return_code == 0
 
     def test_resync_mariadb_to_sf_if_table_size_greater_than_limit_and_force(self):  # pylint: disable = no-self-use
