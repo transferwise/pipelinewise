@@ -148,6 +148,20 @@ table names have to be the names in the source database.</p>
 as partial synced.
 Currently this option is available only for <a class="reference internal" href="../connectors/taps/mysql.html#tap-mysql"><span class="std std-ref">Tap MySQL</span></a> and <a class="reference internal" href="../connectors/taps/postgres.html#tap-postgres"><span class="std std-ref">Tap PostgreSQL</span></a> to Snowflake.</p>
 </div>
+<div class="admonition attention">
+<p class="admonition-title">Attention</p>
+<p>There is an option for <a class="reference internal" href="../connectors/taps/mysql.html#tap-mysql"><span class="std std-ref">Tap MySQL</span></a> and <a class="reference internal" href="../connectors/taps/postgres.html#tap-postgres"><span class="std std-ref">Tap PostgreSQL</span></a> to <a class="reference internal" href="../connectors/targets/snowflake.html#target-snowflake"><span class="std std-ref">Target Snowflake</span></a> in main pipelinewise
+config file for ignoring resync in a case the size of a table in the tap is greater than the defined value.
+this setting is optional and even yet you can force the resync by using <code class="docutils literal notranslate"><span class="pre">--force</span></code> argument.</p>
+<blockquote>
+<div><p>$ pipelinewise sync_tables –target &lt;target_id&gt; –tap &lt;tap_id&gt; –force</p>
+</div></blockquote>
+<p>this setting can be added in the <cite>config.yml</cite> for checking the table size:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">allowed_resync_max_size</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">table_mb</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">&lt;integer/float&gt;</span>
+</pre></div>
+</div>
+</div>
 <ol class="arabic simple" start="2">
 <li><p><strong>Partial resync</strong></p></li>
 </ol>
