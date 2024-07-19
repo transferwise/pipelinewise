@@ -1,3 +1,11 @@
+0.64.0 (2024-07-19)
+-------------------
+- Update `sync_tables` and `import_config` commands
+  - new optional config setting for source tables size checking
+  - checking the size of source tables in `tap_mysql` and `tap_postgres` to `target_snowflake` and failing fast sync 
+    if the size is not allowed
+  - added `--force` argument for `sync_tables` command to ignore size checking
+
 0.63.0 (2024-07-08)
 ---------------------
 - Bump `pipelinewise-tap-jira`from `2.0.1` to `2.2.0`
