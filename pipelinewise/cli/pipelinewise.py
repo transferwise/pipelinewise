@@ -110,6 +110,7 @@ class PipelineWise:
             self.TRANSFORM_FIELD_CONNECTOR_NAME
         )
         self.tap_run_log_file = None
+        self.force_fast_sync = True
 
         # Catch SIGINT and SIGTERM to exit gracefully
         for sig in [signal.SIGINT, signal.SIGTERM]:
@@ -1109,6 +1110,10 @@ class PipelineWise:
         Generating and running shell command to sync tables using the native fastsync components
         """
         # Build the fastsync executable command
+        max_autoresync_table_size = None
+        if tap.type in ('tap-mysql', 'tap-postgres') and target.type == 'target-snowflake' and not self.force_fast_sync:
+            max_autoresync_table_size = self.config.get('allowed_resync_max_size', {}).get('table_mb')
+
         command = commands.build_fastsync_command(
             tap=tap,
             target=target,
@@ -1119,6 +1124,7 @@ class PipelineWise:
             profiling_mode=self.profiling_mode,
             profiling_dir=self.profiling_dir,
             drop_pg_slot=self.drop_pg_slot,
+            autoresync_size=max_autoresync_table_size
         )
 
         # Fastsync is running in subprocess.
@@ -1166,6 +1172,8 @@ class PipelineWise:
         )
 
         not_partial_syned_tables = set()
+
+        self.force_fast_sync = True
 
         self.logger.info('Running %s tap in %s target', tap_id, target_id)
 
@@ -1372,6 +1380,7 @@ class PipelineWise:
         """
         This method calls do_sync_tables if sync_tables command is chosen
         """
+        self.force_fast_sync = self.args.force
         try:
             with pidfile.PIDFile(self.tap['files']['pidfile']):
                 self.do_sync_tables()
@@ -1399,7 +1408,7 @@ class PipelineWise:
 
         if selected_tables['full_sync']:
             fast_sync_process = Process(
-                target=self.sync_tables_fast_sync, args=(selected_tables['full_sync'],))
+                target=self.sync_tables_fast_sync, args=(selected_tables['full_sync'], ))
             fast_sync_process.start()
             processes_list.append(fast_sync_process)
 

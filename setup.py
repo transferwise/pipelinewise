@@ -40,6 +40,7 @@ setup(name='pipelinewise',
           'dnspython==2.1.*',
           'boto3>=1.21,<1.27',
           'chardet==4.0.0',
+          'backports.tarfile==1.2.0'
       ],
       extras_require={
           'test': [
