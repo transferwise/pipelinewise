@@ -1,4 +1,12 @@
-# PipelineWise
+<span style="color:red">
+<h1>Notice</h1>
+</span>
+To better serve Wise business and customer needs, PipelineWise is shrinking.
+Going forward many components of PipelineWise will be removed or incorporated in the main repo
+
+The last version before this decision is [v0.64.0](https://github.com/transferwise/pipelinewise/tree/v0.64.0)
+
+## PipelineWise
 
 [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/pipelinewise-tap-mysql.svg)](https://pypi.org/project/pipelinewise-tap-mysql/)
 [![License: Apache2](https://img.shields.io/badge/License-Apache2-yellow.svg)](https://opensource.org/licenses/Apache-2.0)
@@ -88,8 +96,8 @@ PipelineWise images are built on each release and available on [Dockerhub](https
     ```
 
 #### Build your own docker image
- 
-1. Build an executable docker image that has every required dependency and is isolated from your host system. 
+
+1. Build an executable docker image that has every required dependency and is isolated from your host system.
 
 By default, the image will build with *all* connectors. In order to keep image size small, we strongly recommend you change it to just the connectors you need by supplying the `--build-arg` command:
 
