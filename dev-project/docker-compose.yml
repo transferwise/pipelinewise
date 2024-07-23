@@ -56,7 +56,7 @@ services:
 
   # MySQL service container used as test source database
   db_mysql_source:
-    image: mariadb:10.6.17
+    image: mariadb:10.6.18
     container_name: pipelinewise_dev_mysql_source
     ports:
       - ${TAP_MYSQL_PORT_ON_HOST}:${TAP_MYSQL_PORT}
@@ -66,6 +66,7 @@ services:
       - ./my/ca-cert.pem:/etc/my.cnf.d/certificates/ca-cert.pem
     command: >
       --default-authentication-plugin=mysql_native_password
+      --performance_schema=ON
       --server-id=1
       --log-bin=mysql-bin
       --binlog-format=ROW
@@ -85,7 +86,7 @@ services:
       - pipelinewise_network
 
   db_mysql_source_replica:
-    image: mariadb:10.6.17
+    image: mariadb:10.6.18
     container_name: pipelinewise_dev_mysql_source_replica
     ports:
       - ${TAP_MYSQL_REPLICA_PORT_ON_HOST}:${TAP_MYSQL_REPLICA_PORT}
