@@ -25,14 +25,14 @@ class MockCursor:
         """Mock fetchall method"""
         if self.type == 'mysql':
             return [
-                {'table_name': 't1', 'table_rows': 1, 'table_size': 1234},
-                {'table_name': 't2', 'table_rows': 3, 'table_size': 1234}
+                {'table_name': 't1', 'table_size': 1234},
+                {'table_name': 't2', 'table_size': 1234}
             ]
 
         if self.type == 'postgres':
             return [
-                ['t1', 1, 1234],
-                ['t2', 3, 1234],
+                ['t1', 1234],
+                ['t2', 1234],
             ]
         return None
 
@@ -119,8 +119,8 @@ class TestUtils(unittest.TestCase):
         """Test get_tables_size method works correctly"""
         test_schema = 'foo_schema'
         expected_tables_info = [
-            {'table_name': f'{test_schema}.t1', 'table_rows': 1, 'table_size': 1234},
-            {'table_name': f'{test_schema}.t2', 'table_rows': 3, 'table_size': 1234}
+            {'table_name': f'{test_schema}.t1', 'table_size': 1234},
+            {'table_name': f'{test_schema}.t2', 'table_size': 1234}
         ]
 
         connection_config = {'host': 'foo_host',
@@ -158,15 +158,15 @@ class TestUtils(unittest.TestCase):
         """Test filter_out_selected_tables method works correctly"""
         selected_tables = {'foo.t1', 'foo.t3', 'bar.t2'}
         all_schema_tables = [
-            {'table_name': 'foo.t1', 'table_rows': 1, 'table_size': 1111},
-            {'table_name': 'foo.t2', 'table_rows': 2, 'table_size': 2222},
-            {'table_name': 'foo.t3', 'table_rows': 3, 'table_size': 3333},
-            {'table_name': 'foo.something t1 Uppercase', 'table_rows': 4, 'table_size': 1234}
+            {'table_name': 'foo.t1', 'table_size': 1111},
+            {'table_name': 'foo.t2', 'table_size': 2222},
+            {'table_name': 'foo.t3', 'table_size': 3333},
+            {'table_name': 'foo.something t1 Uppercase', 'table_size': 1234}
         ]
 
         expected_output = [
-            {'table_name': 'foo.t1', 'table_rows': 1, 'table_size': 1111},
-            {'table_name': 'foo.t3', 'table_rows': 3, 'table_size': 3333},
+            {'table_name': 'foo.t1', 'table_size': 1111},
+            {'table_name': 'foo.t3', 'table_size': 3333},
         ]
 
         actual_output = utils.filter_out_selected_tables(all_schema_tables, selected_tables)
