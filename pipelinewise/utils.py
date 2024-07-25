@@ -30,14 +30,12 @@ def get_tables_size(schema: str, tap) -> dict:
         tap.open_connections()
         result_list = tap.query(
             'select TABLE_NAME as table_name,'
-            ' TABLE_ROWS as table_rows,'
             ' (DATA_LENGTH + INDEX_LENGTH)/ 1024 / 1024 as table_size'
             f' from information_schema.TABLES where TABLE_SCHEMA = \'{schema}\';')
         tap.close_connections()
         for res in result_list:
             result.append({
                 'table_name': f'{schema}.{res["table_name"]}',
-                'table_rows': res['table_rows'],
                 'table_size': res['table_size']
             })
 
@@ -45,9 +43,6 @@ def get_tables_size(schema: str, tap) -> dict:
         tap.open_connection()
         result_list = tap.query(
             'SELECT TABLE_NAME as table_name,'
-            ' (xpath(\'/row/c/text()\','
-            ' query_to_xml(format(\'select count(*) as c from %I.%I\', table_schema, TABLE_NAME), FALSE, TRUE, \'\'))'
-            ')[1]::text::int AS table_rows,'
             ' pg_total_relation_size('
             '\'"\'||table_schema||\'"."\'||table_name||\'"\')::NUMERIC/1024::NUMERIC/1024 as table_size '
             'FROM (SELECT table_schema, TABLE_NAME FROM information_schema.tables '
@@ -56,8 +51,7 @@ def get_tables_size(schema: str, tap) -> dict:
         for res in result_list:
             result.append({
                 'table_name': f'{schema}.{res[0]}',
-                'table_rows': res[1],
-                'table_size': res[2]
+                'table_size': res[1]
             })
         tap.close_connection()
     return result
