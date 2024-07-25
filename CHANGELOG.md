@@ -1,3 +1,7 @@
+0.64.1 (2024-07-25)
+-------------------
+- Remove row count check in `sync_tables` for `tap_mysql` and `tap_postgres`
+
 0.64.0 (2024-07-19)
 -------------------
 - Update `sync_tables` and `import_config` commands
