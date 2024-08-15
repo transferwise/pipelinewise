@@ -1,0 +1,19 @@
+{
+  "transformations":[
+    {
+      "tap_stream_name":"dummy_stream",
+      "field_id":"column_1",
+      "type":"SET-NULL"
+    },
+    {
+      "tap_stream_name":"dummy_stream",
+      "field_id":"column_2",
+      "type":"MASK-NUMBER"
+    },
+    {
+      "tap_stream_name": "dummy_stream",
+      "field_id": "column_5",
+      "type": "MASK-DATE"
+    }
+  ]
+}

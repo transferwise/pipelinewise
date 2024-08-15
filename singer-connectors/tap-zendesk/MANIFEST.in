@@ -1,0 +1,4 @@
+include LICENSE
+include tap_zendesk/*.json
+include tap_zendesk/schemas/*.json
+include tap_zendesk/schemas/shared/*.json

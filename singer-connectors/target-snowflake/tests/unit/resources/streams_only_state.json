@@ -1,0 +1,11 @@
+{"type": "SCHEMA", "stream": "tap_mysql_test-test_simple_table", "schema": {"properties": {"id": {"maximum": 9223372036854775807, "minimum": -9223372036854775808, "type": ["integer"]}, "results": {"type": ["null", "string"]}, "time_created": {"type": ["null", "string"]}}, "type": "date-time"}, "key_properties": ["id"], "bookmark_properties": ["id"]}
+{"type": "STATE", "value": {"bookmarks": {"tap_mysql_test-test_simple_table": {"replication_key": "id", "replication_key_value": 1, "version": 1}}}}
+{"type": "ACTIVATE_VERSION", "stream": "tap_mysql_test-test_simple_table", "version": 1}
+{"type": "STATE", "value": {"bookmarks": {"tap_mysql_test-test_simple_table": {"replication_key": "id", "replication_key_value": 2, "version": 1}}}}
+{"type": "STATE", "value": {"bookmarks": {"tap_mysql_test-test_simple_table": {"replication_key": "id", "replication_key_value": 3, "version": 1}}}}
+{"type": "STATE", "value": {"bookmarks": {"tap_mysql_test-test_simple_table": {"replication_key": "id", "replication_key_value": 5, "version": 1}}}}
+{"type": "STATE", "value": {"bookmarks": {"tap_mysql_test-test_simple_table": {"replication_key": "id", "replication_key_value": 6, "version": 1}}}}
+{"type": "STATE", "value": {"bookmarks": {"tap_mysql_test-test_simple_table": {"replication_key": "id", "replication_key_value": 7, "version": 1}}}}
+{"type": "STATE", "value": {"bookmarks": {"tap_mysql_test-test_simple_table": {"replication_key": "id", "replication_key_value": 10, "version": 1}}}}
+{"type": "STATE", "value": {"bookmarks": {"tap_mysql_test-test_simple_table": {"replication_key": "id", "replication_key_value": 45, "version": 1}}}}
+{"type": "STATE", "value": {"bookmarks": {"tap_mysql_test-test_simple_table": {"replication_key": "id", "replication_key_value": 100, "version": 1}}}}

@@ -1,0 +1,23 @@
+{
+  "host": "<Db host>",
+  "port": "<port>",
+  "user": "<username>",
+  "password": "<passwd>",
+  "filter_db": "db1,db2",
+  "engine": "<mysql|mariadb>",
+  "use_gtid": <boolean>,
+  "cursorclass": "<pymysql cursor Class>"
+  "server_id": "",
+  "database": "",
+  "ssl": "",
+  "ssl_ca": "",
+  "ssl_cert": "",
+  "ssl_key": "",
+  "internal_hostname": "",
+  "session_sqls": [
+    "SET @@session.time_zone=\"+0:00\"",
+    "SET @@session.wait_timeout=28800",
+    "SET @@session.net_read_timeout=3600",
+    "SET @@session.innodb_lock_wait_timeout=3600"
+  ]
+}

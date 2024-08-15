@@ -1,0 +1,205 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "account_sid": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "actor_sid": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "actor_type": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "actor_url": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "description": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "event_data": {
+      "type": [
+        "null",
+        "object"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "task_age": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "task_queue_entered_date": {
+          "type": [
+            "null",
+            "string"
+          ],
+          "format": "date-time"
+        },
+        "task_queue_name": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "task_queue_sid": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "task_sid": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "worker_activity_name": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "worker_activity_sid": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "worker_attributes": {
+          "type": [
+            "null",
+            "object",
+            "array"
+          ]
+        },
+        "worker_name": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "worker_sid": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "worker_time_in_previous_activity": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "worker_time_in_previous_activity_ms": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "workspace_name": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "workspace_sid": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "task_attributes": {
+          "type": [
+            "null",
+            "object",
+            "array"
+          ]
+        }
+      }
+    },
+    "event_date": {
+      "type": [
+        "null",
+        "integer"
+      ],
+      "format": "date-time"
+    },
+    "event_date_ms": {
+      "type": [
+        "null",
+        "integer"
+      ]
+    },
+    "event_type": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "resource_sid": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "resource_type": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "resource_url": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "sid": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "source": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "source_ip_address": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "workspace_sid": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "url": {
+      "type": [
+        "null",
+        "string"
+      ]
+    }
+  }
+}

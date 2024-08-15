@@ -1,0 +1,115 @@
+{
+  "type": ["null", "object"],
+  "additionalProperties": false,
+  "properties": {
+    "_sdc_repository": {
+      "type": ["string"]
+    },
+    "id": {
+      "type": ["null", "string"]
+    },
+    "url": {
+      "type": ["null", "string"]
+    },
+    "number": {
+      "type": ["null", "integer"]
+    },
+    "state": {
+      "type": ["null", "string"]
+    },
+    "title": {
+      "type": ["null", "string"]
+    },
+    "body": {
+      "type": ["null", "string"]
+    },
+    "labels": {
+      "type": ["null", "array"],
+      "items": {
+        "type": ["null", "object"],
+        "properties": {
+          "id": {
+            "type": ["null", "integer"]
+          },
+          "node_id": {
+            "type": ["null", "string"]
+          },
+          "url": {
+            "type": ["null", "string"]
+          },
+          "name": {
+            "type": ["null", "string"]
+          },
+          "description": {
+            "type": ["null", "string"]
+          },
+          "color": {
+            "type": ["null", "string"]
+          },
+          "default": {
+            "type": ["null", "boolean"]
+          }
+        }
+      }
+    },
+    "user": {
+      "type": ["null", "object"],
+      "additionalProperties": false,
+      "properties": {
+        "login": {
+          "type": ["null", "string"]
+        },
+        "id": {
+          "type": ["null", "integer"]
+        }
+      }
+    },
+    "base": {
+      "type": ["null", "object"],
+      "properties": {
+        "ref": {
+          "type": ["null", "string"]
+        },
+        "label": {
+          "type": ["null", "string"]
+        },
+        "repo": {
+          "type": ["null", "object"],
+          "properties": {
+            "id": {
+              "type": [ "null", "integer" ]
+            },
+            "name": {
+              "type": [ "null", "string" ]
+            },
+            "url": {
+              "type": [ "null", "string" ]
+            }
+          }
+        },
+        "sha": {
+          "type": ["null", "string"]
+        }
+      }
+    },
+    "merge_commit_sha": {
+      "type": ["null", "string"]
+    },
+    "merged_at": {
+      "type": ["null", "string"],
+      "format": "date-time"
+    },
+    "closed_at": {
+      "type": ["null", "string"],
+      "format": "date-time"
+    },
+    "created_at": {
+      "type": ["null", "string"],
+      "format": "date-time"
+    },
+    "updated_at": {
+      "type": ["null", "string"],
+      "format": "date-time"
+    }
+  }
+}

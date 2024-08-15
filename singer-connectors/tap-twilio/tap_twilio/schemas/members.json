@@ -1,0 +1,87 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "sid": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "account_sid": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "channel_sid": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "service_sid": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "identity": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "role_sid": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "last_consumed_message_index": {
+      "type": [
+        "null",
+        "integer"
+      ]
+    },
+    "last_consumption_timestamp": {
+      "type": [
+        "null",
+        "string"
+      ],
+      "format": "date-time"
+    },
+    "date_created": {
+      "type": [
+        "null",
+        "string"
+      ],
+      "format": "date-time"
+    },
+    "date_updated": {
+      "type": [
+        "null",
+        "string"
+      ],
+      "format": "date-time"
+    },
+    "created_by": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "attributes": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "url": {
+      "type": [
+        "null",
+        "string"
+      ]
+    }
+  }
+}

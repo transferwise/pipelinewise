@@ -1,0 +1,94 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "subresource_uris": {
+      "anyOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "subresource": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "uri": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "type": "null"
+        },
+        {
+          "type": [
+            "null",
+            "object"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "yesterday": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "all_time": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "today": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "yearly": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "this_month": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "monthly": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "daily": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "last_month": {
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  }
+}

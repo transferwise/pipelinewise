@@ -1,0 +1,47 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "account_sid": {
+      "type": ["null", "string"]
+    },
+    "call_sid": {
+      "type": ["null", "string"]
+    },
+    "conference_sid": {
+      "type": ["null", "string"]
+    },
+    "date_created": {
+      "type": ["null", "string"],
+      "format": "date-time"
+    },
+    "date_updated": {
+      "type": ["null", "string"],
+      "format": "date-time"
+    },
+    "end_conference_on_exit": {
+      "type": ["null", "boolean"]
+    },
+    "muted": {
+      "type": ["null", "boolean"]
+    },
+    "hold": {
+      "type": ["null", "boolean"]
+    },
+    "status": {
+      "type": ["null", "string"]
+    },
+    "start_conference_on_enter": {
+      "type": ["null", "boolean"]
+    },
+    "coaching": {
+      "type": ["null", "boolean"]
+    },
+    "call_sid_to_coach": {
+      "type": ["null", "string"]
+    },    
+    "uri": {
+      "type": ["null", "string"]
+    }
+  }
+}

@@ -1,0 +1,126 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "sid": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "account_sid": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "service_sid": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "friendly_name": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "unique_name": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "attributes": {
+      "type": [
+        "null",
+        "object",
+        "array"
+      ]
+    },
+    "type": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "date_created": {
+      "type": [
+        "null",
+        "string"
+      ],
+      "format": "date-time"
+    },
+    "date_updated": {
+      "type": [
+        "null",
+        "string"
+      ],
+      "format": "date-time"
+    },
+    "created_by": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "members_count": {
+      "type": [
+        "null",
+        "integer"
+      ]
+    },
+    "messages_count": {
+      "type": [
+        "null",
+        "integer"
+      ]
+    },
+    "url": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "links": {
+      "type": [
+        "null",
+        "object"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "members": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "messages": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "invites": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "webhooks": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "last_message": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      }
+    }
+  }
+}

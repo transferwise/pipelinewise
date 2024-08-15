@@ -1,0 +1,11 @@
+{
+  "account": "xxxxx.eu-central-1",
+  "dbname": "database_name",
+  "user": "my_user",
+  "role": "my_role",
+  "password": "password",
+  "private_key_path": "/path/pk",
+  "private_key_passphrase": "strong passphrase",
+  "warehouse": "my_virtual_warehouse",
+  "tables": "db.schema.table1,db.schema.table2"
+}

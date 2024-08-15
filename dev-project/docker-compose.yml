@@ -122,6 +122,7 @@ services:
       --tlsAllowConnectionsWithoutCertificates
       --tlsCertificateKeyFile /etc/ssl/mongodb.pem
       --tlsCAFile /etc/ssl/rootCA.pem
+      --quiet
     networks:
       - pipelinewise_network
 

@@ -1,0 +1,86 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "account_sid": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "assigned_tasks": {
+      "type": [
+        "null",
+        "integer"
+      ]
+    },
+    "available": {
+      "type": [
+        "null",
+        "boolean"
+      ]
+    },
+    "available_capacity_percentage": {
+      "type": [
+        "null",
+        "integer"
+      ]
+    },
+    "configured_capacity": {
+      "type": [
+        "null",
+        "integer"
+      ]
+    },
+    "date_created": {
+      "type": [
+        "null",
+        "string"
+      ],
+      "format": "date-time"
+    },
+    "date_updated": {
+      "type": [
+        "null",
+        "string"
+      ],
+      "format": "date-time"
+    },
+    "sid": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "task_channel_sid": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "task_channel_unique_name": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "url": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "workspace_sid": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "worker_sid": {
+      "type": [
+        "null",
+        "string"
+      ]
+    }
+  }
+}

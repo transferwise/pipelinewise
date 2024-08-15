@@ -26,4 +26,4 @@ jobs:
 
       - name: Check all connectors are installable
         run: |
-          make all_connectors -e pw_acceptlicenses=y
+          make all_connectors

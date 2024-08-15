@@ -95,19 +95,19 @@ Then, from within the container:
 
 ```sh
 $ cd /opt/pipelinewise
-$ pytest
+$ pytest tests/
 ```
 
 To run tests and report code coverage:
 
 ```
-$ coverage run -m pytest && coverage report
+$ coverage run -m pytest tests/ && coverage report
 ```
 
 To generate HTML coverage report.
 
 ```
-$ coverage run -m pytest && coverage html -d coverage_html
+$ coverage run -m pytest tests/ && coverage html -d coverage_html
 ```
 
 **Note**: The HTML report will be generated in `coverage_html/index.html`

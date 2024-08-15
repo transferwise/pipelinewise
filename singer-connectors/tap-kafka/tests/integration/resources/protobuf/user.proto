@@ -1,0 +1,7 @@
+syntax = "proto3";
+
+message User {
+    string name = 1;
+    int64 favourite_number = 2;
+    string favourite_color = 3;
+}
