@@ -1,0 +1,41 @@
+runChecks: true
+
+actions:
+  repo-settings:
+    deleteBranchOnMerge: true
+  branch-protection-settings:
+    branches:
+      - name: master
+        dismissStaleReviews: true
+        numRequiredReviews: 1
+        requireLinearHistory: true
+        requireConversationResolution: true
+        requireBranchUpToDate: true
+        restrictMerge:
+          teams:
+            - name: analytics-platform
+            - name: machine-users
+        checks:
+          - name: lint_and_test
+            type: tests
+          - name: test_install_connectors
+            type: tests
+          - name: publish
+            type: tests
+          - name: e2e_tests_target_pg
+            type: tests
+          - name: e2e_tests_mariadb_to_sf
+            type: tests
+          - name: e2e_tests_pg_to_sf
+            type: tests
+          - name: e2e_tests_mg_to_sf
+            type: tests
+          - name: e2e_tests_s3_to_sf
+            type: tests
+          - name: e2e_tests_target_pg
+            type: tests
+
+  sync-codeowners:
+    extraWriters:
+      - full-time-technical-staff
+      - machine-users
