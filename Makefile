@@ -79,13 +79,13 @@ define make_connector
 	@echo -e "$(OK_MSG)"
 	@echo -e -n "$(YELLOW)"
 	@test ! -s $(2)pre_requirements.txt ||\
- 		($(VENV_DIR)/$(1)/bin/pip install --upgrade -r $(2)pre_requirements.txt\
+ 		($(VENV_DIR)/$(1)/bin/python3 -m pip install --use-pep517 --upgrade -r $(2)pre_requirements.txt\
  		&& echo -e "$(RESET_COLOR)"\
  		&& echo -n "Pre requirements installed..."\
  		&& echo -e "$(OK_MSG)")
 	@echo -e -n "$(YELLOW)"
 	@test ! -s $(2)requirements.txt ||\
-		($(VENV_DIR)/$(1)/bin/pip install --upgrade -r $(2)requirements.txt\
+		($(VENV_DIR)/$(1)/bin/python3 -m pip install --use-pep517 --upgrade -r $(2)requirements.txt\
  		&& echo -e "$(RESET_COLOR)"\
  		&& echo -n "Requirements installed..."\
  		&& echo -e "$(OK_MSG)")
@@ -93,7 +93,7 @@ define make_connector
 	@test ! -s $(2)setup.py ||\
 		(echo "Installing the package..."\
 		&& echo -e "$(YELLOW)"\
-		&& $(VENV_DIR)/$(1)/bin/python3 -m pip install --upgrade -e $(2)\
+		&& $(VENV_DIR)/$(1)/bin/python3 -m pip install --use-pep517 --upgrade -e $(2)\
 		&& echo -e "$(RESET_COLOR)"\
 		&& echo -n "Package installation completed..."\
 		&& echo -e "$(OK_MSG)")
@@ -114,7 +114,7 @@ define make_pipelinewise
 	@echo -e -n "$(YELLOW)"
 	@echo "Installing the package..."
 	@echo -e "$(YELLOW)"
-	@$(VENV_DIR)/$(1)/bin/python3 -m pip install --upgrade -e $(2)$(PIP_ARGS)
+	@$(VENV_DIR)/$(1)/bin/python3 -m pip install --use-pep517 --upgrade -e $(2)$(PIP_ARGS)
 	@echo -e "$(RESET_COLOR)"
 	@echo -n "Package installation completed..."
 	@echo -e "$(OK_MSG)"

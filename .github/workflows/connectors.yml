@@ -32,6 +32,6 @@ jobs:
         with:
           python-version: '3.8'
 
-      - name: Check all connectors are installable
+      - name: Check PipelineWise and all connectors are installable
         run: |
-          make all_connectors
+          make pipelinewise_no_test_extras all_connectors
