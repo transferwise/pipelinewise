@@ -1,0 +1,14 @@
+{"type": "STATE", "value": {"currently_syncing": "tap_mysql_test-test_table_invalid_record"}}
+{"type": "SCHEMA", "stream": "tap_mysql_test-test_table_invalid_record", "schema": {"properties": {"c_pk": {"inclusion": "automatic", "minimum": -2147483648, "maximum": 2147483647, "type": ["null", "integer"]}, "c_varchar": {"inclusion": "available", "maxLength": 16, "type": ["null", "string"]}, "c_int": {"inclusion": "available", "minimum": -2147483648, "maximum": 2147483647, "type": ["null", "integer"]}}, "type": "object"}, "key_properties": ["c_pk"]}
+{"type": "ACTIVATE_VERSION", "stream": "tap_mysql_test-test_table_invalid_record", "version": 1}
+{"type": "RECORD", "stream": "tap_mysql_test-test_table_invalid_record", "record": {"c_pk": "Non Numeric PK", "c_varchar": "Hello World", "c_int": 1}, "version": 1, "time_extracted": "2019-01-31T15:51:50.215998Z"}
+{"type": "RECORD", "stream": "tap_mysql_test-test_table_invalid_record", "record": {"c_pk": 2, "c_varchar": "Hello Asia", "c_int": 2}, "version": 1, "time_extracted": "2019-01-31T15:51:50.215998Z"}
+{"type": "RECORD", "stream": "tap_mysql_test-test_table_invalid_record", "record": {"c_pk": 3, "c_varchar": "Hello Europe", "c_int": 3}, "version": 1, "time_extracted": "2019-01-31T15:51:50.215998Z"}
+{"type": "RECORD", "stream": "tap_mysql_test-test_table_invalid_record", "record": {"c_pk": 4, "c_varchar": "Hello Americas", "c_int": 4}, "version": 1, "time_extracted": "2019-01-31T15:51:50.215998Z"}
+{"type": "RECORD", "stream": "tap_mysql_test-test_table_invalid_record", "record": {"c_pk": 5, "c_varchar": "Hello Africa", "c_int": 5}, "version": 1, "time_extracted": "2019-01-31T15:51:50.215998Z"}
+{"type": "RECORD", "stream": "tap_mysql_test-test_table_invalid_record", "record": {"c_pk": 6, "c_varchar": "Hello Antarctica", "c_int": 6}, "version": 1, "time_extracted": "2019-01-31T15:51:50.215998Z"}
+{"type": "RECORD", "stream": "tap_mysql_test-test_table_invalid_record", "record": {"c_pk": 7, "c_varchar": "Hello Oceania", "c_int": 7}, "version": 1, "time_extracted": "2019-01-31T15:51:50.215998Z"}
+{"type": "RECORD", "stream": "tap_mysql_test-test_table_invalid_record", "record": {"c_pk": 8, "c_varchar": "Hello Australia", "c_int": 8}, "version": 1, "time_extracted": "2019-01-31T15:51:50.215998Z"}
+{"type": "STATE", "value": {"currently_syncing": "tap_mysql_test-test_table_invalid_record", "bookmarks": {"tap_mysql_test-test_table_one": {"initial_full_table_complete": true}, "tap_mysql_test-test_table_two": {"initial_full_table_complete": true}}}}
+{"type": "ACTIVATE_VERSION", "stream": "tap_mysql_test-test_table_invalid_record", "version": 1}
+{"type": "STATE", "value": {"currently_syncing": null, "bookmarks": {"tap_mysql_test-test_table_invalid_record": {"initial_full_table_complete": true}}}}

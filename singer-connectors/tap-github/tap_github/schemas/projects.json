@@ -1,0 +1,102 @@
+{
+    "type": [
+      "null",
+      "object"
+    ],
+    "properties": {
+      "owner_url": {
+        "type": [
+          "null",
+          "string"
+        ]
+      },
+      "url": {
+        "type": [
+          "null",
+          "string"
+        ]
+      },
+      "html_url": {
+        "type": [
+          "null",
+          "string"
+        ]
+      },
+      "columns_url": {
+        "type": [
+          "null",
+          "string"
+        ]
+      },
+      "id": {
+        "type": [
+          "null",
+          "number"
+        ]
+      },
+      "node_id": {
+        "type": [
+          "null",
+          "string"
+        ]
+      },
+      "name": {
+        "type": [
+          "null",
+          "string"
+        ]
+      },
+      "body": {
+        "type": [
+          "null",
+          "string"
+        ]
+      },
+      "number": {
+        "type": [
+          "null",
+          "number"
+        ]
+      },
+      "state": {
+        "type": [
+          "null",
+          "string"
+        ]
+      },
+      "creator": {
+        "type": [
+          "null",
+          "object"
+        ],
+        "properties": {
+          "login": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "id": {
+            "type": [
+              "null",
+              "number"
+            ]
+          }
+        }
+      },
+      "created_at": {
+        "type": [
+          "null",
+          "string"
+        ],
+        "format": "date-time"
+      },
+      "updated_at": {
+        "type": [
+          "null",
+          "string"
+        ],
+        "format": "date-time"
+      }
+    }
+  }

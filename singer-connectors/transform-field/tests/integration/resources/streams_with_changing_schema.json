@@ -1,0 +1,6 @@
+{"type": "SCHEMA", "stream":"dummy_stream", "schema": {"properties": {"column_2": {"type": ["null", "integer"]}}}, "key_properties": []}
+{"type": "RECORD", "stream":"dummy_stream", "record": {"column_2": 1}}
+{"type": "RECORD", "stream":"dummy_stream", "record": {"column_2": 2}}
+{"type": "RECORD", "stream":"dummy_stream", "record": {"column_2": 3}}
+{"type": "SCHEMA", "stream":"dummy_stream", "schema": {"properties": {"column_2": {"type": ["null", "string"]}}}, "key_properties": []}
+{"type": "RECORD", "stream":"dummy_stream", "record": {"column_2": "ABC"}}

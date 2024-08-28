@@ -1,1 +1,0 @@
-pipelinewise-tap-mongodb==1.5.0

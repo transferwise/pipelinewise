@@ -1,0 +1,13 @@
+{
+  "password": "<password>",
+  "user": "<username>",
+  "host": "<host ip address>",
+  "port": "<port>",
+  "auth_database": "<database to authenticate on>",
+  "database": "<collection database name>",
+  "replica_set": "<replicaSet name if exist, null otherwise>",
+  "verify_mode": "<SSL verify mode | optional, default 'true'>",
+  "ssl": "<enable SSL | optional>",
+  "update_buffer_size": "<int>",
+  "await_time_ms": "<int>"
+}

@@ -1,0 +1,26 @@
+# emacs generated files
+\#*\#
+.\#*
+*~
+
+/.vscode/*
+/.ipynb_checkpoints/*
+config/
+virtualenvs/
+*catalog*.json
+*config*.json
+*state*.json
+target*.json
+*.sublime-*
+.python-version
+singer-check-tap-data
+*.pyc
+*.egg-info
+dist/
+__pycache__/
+venv/
+build/
+tap_mixpanel/.vscode/settings.json
+*.ipynb
+.DS_Store
+tap_target_commands.sh

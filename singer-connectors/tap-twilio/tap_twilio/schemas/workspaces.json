@@ -1,0 +1,167 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "account_sid": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "date_created": {
+      "type": [
+        "null",
+        "string"
+      ],
+      "format": "date-time"
+    },
+    "date_updated": {
+      "type": [
+        "null",
+        "string"
+      ],
+      "format": "date-time"
+    },
+    "default_activity_name": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "default_activity_sid": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "event_callback_url": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "events_filter": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "friendly_name": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "links": {
+      "type": [
+        "null",
+        "object"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "activities": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "statistics": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "real_time_statistics": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "cumulative_statistics": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "task_queues": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "tasks": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "workers": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "workflows": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "task_channels": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "events": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      }
+    },
+    "multitask_enabled": {
+      "type": [
+        "null",
+        "boolean"
+      ]
+    },
+    "multi_task_enabled": {
+      "type": [
+        "null",
+        "boolean"
+      ]
+    },
+    "prioritize_queue_order": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "sid": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "timeout_activity_name": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "timeout_activity_sid": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "url": {
+      "type": [
+        "null",
+        "string"
+      ]
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{"type": "SCHEMA", "stream": "tap_mysql_test-test_simple_table", "schema": {"properties": {"id": {"type": ["integer"]}, "results": {"type": ["null", "string"]}, "time_created": {"type": ["null", "string"]}}, "type": "date-time"}, "key_properties": []}
+{"type": "STATE", "value": {"bookmarks": {"tap_mysql_test-test_simple_table": {"replication_key": "id", "replication_key_value": 1, "version": 1}}}}
+{"type": "ACTIVATE_VERSION", "stream": "tap_mysql_test-test_simple_table", "version": 1}
+{"type": "RECORD", "stream": "tap_mysql_test-test_simple_table", "record": {"id": 1, "results": "xyz1", "time_created": "2019-12-01T19:12:12.006049Z"}, "version": 1, "time_extracted": "2019-12-17T19:12:12.006049Z"}
+{"type": "RECORD", "stream": "tap_mysql_test-test_simple_table", "record": {"id": 2, "results": "xyz2", "time_created": "2019-12-03T19:12:12.006049Z"}, "version": 1, "time_extracted": "2019-12-17T19:12:12.006049Z"}
+{"type": "STATE", "value": {"bookmarks": {"tap_mysql_test-test_simple_table": {"replication_key": "id", "replication_key_value": 2, "version": 1}}}}
+{"type": "RECORD", "stream": "tap_mysql_test-test_simple_table", "record": {"id": 3, "results": "xyz3", "time_created": "2019-12-09T19:12:12.006049Z"}, "version": 1, "time_extracted": "2019-12-17T19:12:12.006049Z"}
+{"type": "RECORD", "stream": "tap_mysql_test-test_simple_table", "record": {"id": 4, "results": "xyz4", "time_created": "2019-12-11T19:12:12.006049Z"}, "version": 1, "time_extracted": "2019-12-17T19:12:12.006049Z"}
+{"type": "STATE", "value": {"bookmarks": {"tap_mysql_test-test_simple_table": {"replication_key": "id", "replication_key_value": 4, "version": 1}}}}
+{"type": "SCHEMA", "stream": "tap_mysql_test-test_simple_table", "schema": {"properties": {"id": {"type": ["integer"]}, "name": {"type":  "string"}, "results": {"type": ["null", "string"]}, "time_created": {"type": ["null", "string"]}}, "type": "date-time"}, "key_properties": ["id", "name"]}
+{"type": "RECORD", "stream": "tap_mysql_test-test_simple_table", "record": {"id": 5, "name": "A", "results": "xyz5", "time_created": "2019-12-17T19:12:12.006049Z"}, "version": 1, "time_extracted": "2019-12-17T19:12:12.006049Z"}
+{"type": "RECORD", "stream": "tap_mysql_test-test_simple_table", "record": {"id": 6, "name": "B", "results": "xyz6", "time_created": "2019-12-17T19:12:12.006049Z"}, "version": 1, "time_extracted": "2019-12-17T19:12:12.006049Z"}
+{"type": "STATE", "value": {"bookmarks": {"tap_mysql_test-test_simple_table": {"replication_key": "id", "replication_key_value": 6, "version": 1}}}}

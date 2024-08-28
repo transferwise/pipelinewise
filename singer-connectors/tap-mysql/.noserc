@@ -1,0 +1,15 @@
+[nosetests]
+# enable coverage
+with-coverage=1
+
+# cover only the main package tap_mysql
+cover-package=tap_mysql
+
+# product html coverage report
+cover-html=1
+
+# folder where to produce the html coverage report
+cover-html-dir=coverage_report
+
+# Erase previously collected coverage statistics before run
+cover-erase=1

@@ -1,0 +1,68 @@
+{
+  "streams": [
+    {
+      "metadata": [
+        {
+          "breadcrumb": [],
+          "metadata": {
+            "replication-method": "FULL_TABLE",
+            "selected": true,
+            "selected-by-default": false,
+            "table-key-properties": [
+              "column_1"
+            ]
+          }
+        }
+      ],
+      "schema": {
+        "properties": {
+          "column_1": {
+            "format": "date-time",
+            "inclusion": "available",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "column_2": {
+            "inclusion": "automatic",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "type": [
+              "null",
+              "integer"
+            ]
+          },
+          "column_3": {
+            "inclusion": "automatic",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "type": [
+              "null",
+              "integer"
+            ]
+          },
+          "column_4": {
+            "inclusion": "automatic",
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "type": [
+              "null",
+              "integer"
+            ]
+          },
+          "column_5": {
+            "format": "date-time",
+            "inclusion": "available",
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "tap_stream_id": "dummy_stream"
+    }
+  ]
+}

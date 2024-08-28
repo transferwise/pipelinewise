@@ -1,0 +1,36 @@
+version: "3.3"
+
+services:
+  db_primary:
+    container_name: "primary"
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRESQL_REPLICATION_MODE=master
+      - POSTGRESQL_REPLICATION_USER=repl_user
+      - POSTGRESQL_REPLICATION_PASSWORD=repl_password
+      - POSTGRES_USER=test_user
+      - POSTGRES_PASSWORD=my-secret-passwd
+      - POSTGRESQL_POSTGRES_PASSWORD=my-secret-passwd
+      - POSTGRESQL_DATABASE=tap_postgres_test
+      - ALLOW_EMPTY_PASSWORD=yes
+    volumes:
+      -  ./db_setup/config:/bitnami/postgresql/conf
+
+  db_replica:
+    image: "docker.io/bitnami/postgresql:12"
+    container_name: replica
+    ports:
+      - "5433:5432"
+    depends_on:
+      - db_primary
+    environment:
+      - POSTGRESQL_REPLICATION_MODE=slave
+      - POSTGRESQL_REPLICATION_USER=repl_user
+      - POSTGRESQL_REPLICATION_PASSWORD=repl_password
+      - POSTGRESQL_MASTER_HOST=db_primary
+      - POSTGRESQL_MASTER_PORT_NUMBER=5432
+      - ALLOW_EMPTY_PASSWORD=yes

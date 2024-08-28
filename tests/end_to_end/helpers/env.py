@@ -212,60 +212,6 @@ class E2EEnv:
                     }
                 },
             },
-            # ------------------------------------------------------------------
-            # Target BigQuery is an OPTIONAL test connector because it's not open sourced and not part of
-            # the docker environment.
-            # To run the related test cases add real BigQuery credentials to ../../../dev-project/.env
-            # ------------------------------------------------------------------
-            'TARGET_BIGQUERY': {
-                'optional': True,
-                'template_patterns': ['target_bigquery', 'to_bq'],
-                'vars': {
-                    'PROJECT': {'value': os.environ.get('TARGET_BIGQUERY_PROJECT')},
-                },
-            },
-            # ------------------------------------------------------------------
-            # Target Redshift is an OPTIONAL test connector because it's not open sourced and not part of
-            # the docker environment.
-            # To run the related test cases add real Amazon Redshift credentials to ../../../dev-project/.env
-            # ------------------------------------------------------------------
-            'TARGET_REDSHIFT': {
-                'optional': True,
-                'template_patterns': ['target_redshift', 'to_rs'],
-                'vars': {
-                    'HOST': {'value': os.environ.get('TARGET_REDSHIFT_HOST')},
-                    'PORT': {'value': os.environ.get('TARGET_REDSHIFT_PORT')},
-                    'USER': {'value': os.environ.get('TARGET_REDSHIFT_USER')},
-                    'PASSWORD': {'value': os.environ.get('TARGET_REDSHIFT_PASSWORD')},
-                    'DBNAME': {'value': os.environ.get('TARGET_REDSHIFT_DBNAME')},
-                    'AWS_ACCESS_KEY': {
-                        'value': os.environ.get('TARGET_REDSHIFT_AWS_ACCESS_KEY'),
-                        'optional': True,
-                    },
-                    'AWS_SECRET_ACCESS_KEY': {
-                        'value': os.environ.get(
-                            'TARGET_REDSHIFT_AWS_SECRET_ACCESS_KEY'
-                        ),
-                        'optional': True,
-                    },
-                    'SESSION_TOKEN': {
-                        'value': os.environ.get('TARGET_REDSHIFT_SESSION_TOKEN'),
-                        'optional': True,
-                    },
-                    'COPY_ROLE_ARN': {
-                        'value': os.environ.get('TARGET_REDSHIFT_COPY_ROLE_ARN'),
-                        'optional': True,
-                    },
-                    'S3_BUCKET': {'value': os.environ.get('TARGET_REDSHIFT_S3_BUCKET')},
-                    'S3_KEY_PREFIX': {
-                        'value': os.environ.get('TARGET_REDSHIFT_S3_KEY_PREFIX')
-                    },
-                    'S3_ACL': {
-                        'value': os.environ.get('TARGET_REDSHIFT_S3_ACL'),
-                        'optional': True,
-                    },
-                },
-            },
         }
 
         # Add is_configured keys for every connector
@@ -286,15 +232,9 @@ class E2EEnv:
         self.env['TARGET_POSTGRES'][
             'is_configured'
         ] = self._is_env_connector_configured('TARGET_POSTGRES')
-        self.env['TARGET_REDSHIFT'][
-            'is_configured'
-        ] = self._is_env_connector_configured('TARGET_REDSHIFT')
         self.env['TARGET_SNOWFLAKE'][
             'is_configured'
         ] = self._is_env_connector_configured('TARGET_SNOWFLAKE')
-        self.env['TARGET_BIGQUERY'][
-            'is_configured'
-        ] = self._is_env_connector_configured('TARGET_BIGQUERY')
 
     def get_conn_env_var(self, connector, key):
         """Get the value of a specific variable in the self.env dict"""
@@ -449,17 +389,6 @@ class E2EEnv:
             database=self.get_conn_env_var('TARGET_POSTGRES', 'DB'),
         )
 
-    def run_query_target_redshift(self, query):
-        """Run an SQL query in target redshift database"""
-        return db.run_query_redshift(
-            query,
-            host=self.get_conn_env_var('TARGET_REDSHIFT', 'HOST'),
-            port=self.get_conn_env_var('TARGET_REDSHIFT', 'PORT'),
-            user=self.get_conn_env_var('TARGET_REDSHIFT', 'USER'),
-            password=self.get_conn_env_var('TARGET_REDSHIFT', 'PASSWORD'),
-            database=self.get_conn_env_var('TARGET_REDSHIFT', 'DBNAME'),
-        )
-
     # pylint: disable=unnecessary-pass
     def run_query_tap_s3_csv(self, file):
         """Get file from S3 and read into the file
@@ -497,18 +426,6 @@ class E2EEnv:
             warehouse=self.get_conn_env_var('TARGET_SNOWFLAKE', 'WAREHOUSE'),
             user=self.get_conn_env_var('TARGET_SNOWFLAKE', 'USER'),
             password=self.get_conn_env_var('TARGET_SNOWFLAKE', 'PASSWORD'),
-        )
-
-    def delete_dataset_target_bigquery(self, dataset):
-        """Run and SQL query in target bigquery database"""
-        return db.delete_dataset_bigquery(
-            dataset, project=self.get_conn_env_var('TARGET_BIGQUERY', 'PROJECT')
-        )
-
-    def run_query_target_bigquery(self, query):
-        """Run and SQL query in target bigquery database"""
-        return db.run_query_bigquery(
-            query, project=self.get_conn_env_var('TARGET_BIGQUERY', 'PROJECT')
         )
 
     # -------------------------------------------------------------------------
@@ -586,36 +503,6 @@ class E2EEnv:
 
         # Clean config directory
         shutil.rmtree(os.path.join(CONFIG_DIR, 'postgres_dwh'), ignore_errors=True)
-
-    def setup_target_redshift(self):
-        """Clean redshift target database and prepare for test run"""
-        self.run_query_target_redshift(
-            'DROP SCHEMA IF EXISTS ppw_e2e_tap_postgres CASCADE'
-        )
-        self.run_query_target_redshift(
-            'DROP SCHEMA IF EXISTS ppw_e2e_tap_postgres_public2 CASCADE'
-        )
-        self.run_query_target_redshift(
-            'DROP SCHEMA IF EXISTS ppw_e2e_tap_postgres_logical1 CASCADE'
-        )
-        self.run_query_target_redshift(
-            'DROP SCHEMA IF EXISTS ppw_e2e_tap_postgres_logical2 CASCADE'
-        )
-        self.run_query_target_redshift(
-            'DROP SCHEMA IF EXISTS ppw_e2e_tap_mysql CASCADE'
-        )
-        self.run_query_target_redshift(
-            'DROP SCHEMA IF EXISTS ppw_e2e_tap_s3_csv CASCADE'
-        )
-        self.run_query_target_redshift('DROP SCHEMA IF EXISTS ppw_e2e_helper CASCADE')
-        self.run_query_target_redshift('CREATE SCHEMA ppw_e2e_helper')
-        self.run_query_target_redshift(
-            'CREATE TABLE ppw_e2e_helper.dual (dummy VARCHAR)'
-        )
-        self.run_query_target_redshift('INSERT INTO ppw_e2e_helper.dual VALUES (\'X\')')
-
-        # Clean config directory
-        shutil.rmtree(os.path.join(CONFIG_DIR, 'redshift'), ignore_errors=True)
 
     def setup_target_snowflake(self):
         """Clean snowflake target database and prepare for test run"""
@@ -695,16 +582,6 @@ class E2EEnv:
             f' ORDER BY "{primary_key.upper()}"'
         )
         return records
-
-    def setup_target_bigquery(self):
-        """Clean bigquery target database and prepare for test run"""
-        self.delete_dataset_target_bigquery('ppw_e2e_tap_postgres')
-        self.delete_dataset_target_bigquery('ppw_e2e_tap_postgres_public2')
-        self.delete_dataset_target_bigquery('ppw_e2e_tap_postgres_logical1')
-        self.delete_dataset_target_bigquery('ppw_e2e_tap_postgres_logical2')
-        self.delete_dataset_target_bigquery('ppw_e2e_tap_mysql')
-        self.delete_dataset_target_bigquery('ppw_e2e_tap_s3_csv')
-        self.delete_dataset_target_bigquery('ppw_e2e_tap_mongodb')
 
     @staticmethod
     def remove_all_state_files():

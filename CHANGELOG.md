@@ -1,3 +1,11 @@
+0.65.0 (2024-08-27)
+-------------------
+- Remove FastSync for target Redshift
+- Remove FastSync for target Bigquery
+- Incorporate used singer connectors into main codebase
+- Reduce testing codebase
+- Simplify Makefile
+
 0.64.1 (2024-07-25)
 -------------------
 - Remove row count check in `sync_tables` for `tap_mysql` and `tap_postgres`
@@ -6,7 +14,7 @@
 -------------------
 - Update `sync_tables` and `import_config` commands
   - new optional config setting for source tables size checking
-  - checking the size of source tables in `tap_mysql` and `tap_postgres` to `target_snowflake` and failing fast sync 
+  - checking the size of source tables in `tap_mysql` and `tap_postgres` to `target_snowflake` and failing fast sync
     if the size is not allowed
   - added `--force` argument for `sync_tables` command to ignore size checking
 
