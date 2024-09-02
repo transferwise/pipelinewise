@@ -1,0 +1,4 @@
+{"type": "STATE", "value": {"currently_syncing": "tap_mysql_test-test_table_one"}}
+{"type": "SCHEMA", "stream": "tap_mysql_test-test_table_one", "schema": {"properties": {"c_pk": {"inclusion": "automatic", "minimum": -2147483648, "maximum": 2147483647, "type": ["null", "integer"]}, "c_varchar": {"inclusion": "available", "maxLength": 16, "type": ["null", "string"]}, "c_int": {"inclusion": "available", "minimum": -2147483648, "maximum": 2147483647, "type": ["null", "integer"]}}, "type": "object"}, "key_properties": ["c_pk"]}
+THIS IS A TEST INPUT FROM A TAP WITH A LINE WITH INVALID JSON
+{"type": "ACTIVATE_VERSION", "stream": "tap_mysql_test-test_table_one", "version": 1}
