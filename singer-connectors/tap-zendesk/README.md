@@ -86,19 +86,26 @@ The tap will write bookmarks to stdout which can be captured and passed as an op
 
 ### To run tests:
 
-1. Install python test dependencies in a virtual env and run tests
+1. Install python test dependencies in a virtual env and run nose unit and integration tests
 ```
-make venv
+  python3 -m venv venv
+  . venv/bin/activate
+  pip install --upgrade pip
+  pip install .[test]
 ```
 
 2. To run tests:
 ```
-make unit_test
+  nosetests test
 ```
 
 ### To run pylint:
 
 1. Install python dependencies and run python linter
 ```
-make venv pylint
+  python3 -m venv venv
+  . venv/bin/activate
+  pip install --upgrade pip
+  pip install .[test]
+  pylint --rcfile .pylintrc tap_zendesk
 ```

@@ -10,7 +10,7 @@ import pytz
 from singer import Catalog
 
 from tap_zendesk import do_sync
-from tests.helper.zenpymock import ZenpyMock
+from test.helper.zenpymock import ZenpyMock
 
 DIR = os.path.dirname(__file__)
 
@@ -26,8 +26,7 @@ class DoSync(unittest.TestCase):
     def test_network_failure(self):
         client = ZenpyMock(n_tickets=10000, p_sleep=0.01, p_failure=0.1, subdomain='xyz', oauth_token=123)
 
-        with self.assertRaises(RuntimeError):
-            do_sync(client, self.catalog, self.state, self.start_date)
+        self.failUnlessRaises(RuntimeError, do_sync, client, self.catalog, self.state, self.start_date)
 
     def test_data_consistency(self):
         client = ZenpyMock(n_tickets=1000, p_sleep=0.01, subdomain='xyz', oauth_token=123)
