@@ -7,7 +7,7 @@ with open('README.md') as f:
 
 setup(name='pipelinewise',
       python_requires='==3.8.*',
-      version='0.65.1',
+      version='0.65.2',
       description='PipelineWise',
       long_description=LONG_DESCRIPTION,
       long_description_content_type='text/markdown',

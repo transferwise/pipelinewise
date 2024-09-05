@@ -1,3 +1,7 @@
+0.65.2 (2024-09-05)
+-------------------
+- Pin tap-zendesk to v1.2.1
+
 0.65.0 (2024-08-27)
 -------------------
 - Remove FastSync for target Redshift

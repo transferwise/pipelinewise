@@ -1,23 +1,20 @@
 # pylint: disable=invalid-name,missing-function-docstring,missing-class-docstring
 import json
-import singer
-
 from zenpy.lib.api_objects import BaseObject
 from zenpy.lib.proxy import ProxyList
 
-from singer import metrics
+import singer
+import singer.metrics as metrics
 from singer import metadata
 from singer import Transformer
 
 LOGGER = singer.get_logger('tap_zendesk')
-
 
 def process_record(record):
     """ Serializes Zenpy's internal classes into Python objects via ZendeskEncoder. """
     rec_str = json.dumps(record, cls=ZendeskEncoder)
     rec_dict = json.loads(rec_str)
     return rec_dict
-
 
 def sync_stream(state, start_date, instance):
     stream = instance.stream
@@ -44,23 +41,22 @@ def sync_stream(state, start_date, instance):
             singer.write_record(stream.tap_stream_id, rec)
             # NB: We will only write state at the end of a stream's sync:
             #  We may find out that there exists a sync that takes too long and can never emit a bookmark
-            #  but we don't know if we can guarantee the order of emitted records.
+            #  but we don't know if we can guarentee the order of emitted records.
 
         if instance.replication_method == "INCREMENTAL":
             singer.write_state(state)
 
         return counter.value
 
-
 class ZendeskEncoder(json.JSONEncoder):
-    def default(self, o):  # pylint: disable=arguments-differ,method-hidden
-        if isinstance(o, BaseObject):
-            obj_dict = o.to_dict()
+    def default(self, obj): # pylint: disable=arguments-differ,method-hidden
+        if isinstance(obj, BaseObject):
+            obj_dict = obj.to_dict()
             for k, v in list(obj_dict.items()):
                 # NB: This might fail if the object inside is callable
                 if callable(v):
                     obj_dict.pop(k)
             return obj_dict
-        if isinstance(o, ProxyList):
-            return o.copy()
-        return json.JSONEncoder.default(self, o)
+        if isinstance(obj, ProxyList):
+            return obj.copy()
+        return json.JSONEncoder.default(self, obj)
