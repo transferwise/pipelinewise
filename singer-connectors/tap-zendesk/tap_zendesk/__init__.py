@@ -219,7 +219,7 @@ def main():
     # OAuth has precedence
     creds = oauth_auth(parsed_args) or api_token_auth(parsed_args)
     session = get_session(parsed_args.config)
-    client = Zenpy(session=session, ratelimit=internal_config['rate_limit'], **creds)
+    client = Zenpy(session=session, proactive_ratelimit=internal_config['rate_limit'], **creds)
     client.internal_config = internal_config
 
     add_session_hooks(client.tickets.session)
