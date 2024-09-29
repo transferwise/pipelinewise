@@ -35,6 +35,8 @@ Example YAML for ``tap-jira``:
       # Method 1: Base authentication
       base_url: "https://<your_domain>.atlassian.net"  # the URL where your Jira installation can be found
       username: "<USERNAME>"
+      # For basic authentication the password is a token you can create as described here:
+      # https://support.atlassian.com/atlassian-account/docs/manage-api-tokens-for-your-atlassian-account/#Create-an-API-token
       password: "<PASSWORD>"                            # Plain string or vault encrypted
 
       # Method 2: OAuth authentication
