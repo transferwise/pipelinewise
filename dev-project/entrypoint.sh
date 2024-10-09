@@ -4,7 +4,7 @@ set -e
 
 apt update
 
-rm /usr/bin/python3
+rm -f /usr/bin/python3
 ln -s /usr/bin/python3.8 /usr/bin/python3
 
 apt install -y software-properties-common python3-apt
