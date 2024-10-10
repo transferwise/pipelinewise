@@ -23,7 +23,8 @@ setup(name='pipelinewise-tap-mysql',
           'mysql-replication==0.43',
           'PyMySQL==1.1.*',
           'plpygis==0.2.1',
-          'tzlocal==2.1',
+          'tzlocal==5.2',
+          'pytz==2024.2'
       ],
       extras_require={
           'test': [

@@ -21,7 +21,8 @@ setup(name="pipelinewise-target-postgres",
           'pipelinewise-singer-python==1.*',
           'psycopg2-binary==2.9.5',
           'inflection==0.3.1',
-          'joblib==1.2.0'
+          'joblib==1.2.0',
+          'pytz==2024.2'
       ],
       extras_require={
           "test": [
