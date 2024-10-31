@@ -30,4 +30,7 @@ class Process(multiprocessing.Process):
         return self._exception
 
     def set_start_method_as_spawn(self):
+        """
+        set start method as spawn
+        """
         multiprocessing.set_start_method('spawn', force=True)
