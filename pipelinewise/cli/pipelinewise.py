@@ -1403,6 +1403,7 @@ class PipelineWise:
             self._reset_state_file_for_partial_sync(selected_tables)
             partial_sync_process = Process(
                 target=self.sync_tables_partial_sync, args=(selected_tables['partial_sync'],))
+            partial_sync_process.set_start_method_as_spawn()
             partial_sync_process.start()
             processes_list.append(partial_sync_process)
 

@@ -9,9 +9,6 @@ class Process(multiprocessing.Process):
     """
     def __init__(self, *args, **kwargs):
         multiprocessing.Process.__init__(self, *args, **kwargs)
-        multiprocessing.freeze_support()
-        multiprocessing.set_start_method('spawn', force=True)
-
         self._pconn, self._cconn = multiprocessing.Pipe()
         self._exception = None
 
@@ -31,3 +28,6 @@ class Process(multiprocessing.Process):
         if self._pconn.poll():
             self._exception = self._pconn.recv()
         return self._exception
+
+    def set_start_method_as_spawn(self):
+        multiprocessing.set_start_method('spawn', force=True)
