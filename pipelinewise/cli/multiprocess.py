@@ -28,10 +28,3 @@ class Process(multiprocessing.Process):
         if self._pconn.poll():
             self._exception = self._pconn.recv()
         return self._exception
-
-    @classmethod
-    def set_start_method_as_spawn(cls):
-        """
-        set start method as spawn
-        """
-        multiprocessing.set_start_method('spawn', force=True)
