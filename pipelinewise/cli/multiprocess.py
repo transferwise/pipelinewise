@@ -9,6 +9,9 @@ class Process(multiprocessing.Process):
     """
     def __init__(self, *args, **kwargs):
         multiprocessing.Process.__init__(self, *args, **kwargs)
+        multiprocessing.freeze_support()
+        multiprocessing.set_start_method('spawn', force=True)
+
         self._pconn, self._cconn = multiprocessing.Pipe()
         self._exception = None
 

@@ -138,6 +138,7 @@ def main_impl():
 
     sync_tables = utils.get_sync_tables(args)
 
+    pool_size = len(sync_tables) if len(sync_tables) < pool_size else pool_size
     with multiprocessing.Pool(pool_size) as proc:
         sync_excs = list(
             filter(

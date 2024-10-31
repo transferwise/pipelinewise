@@ -1,3 +1,8 @@
+0.66.1 (2024-10-31)
+-------------------
+- Bug fix for partial sync multiprocessing
+
+
 0.66.0 (2024-10-11)
 -------------------
 - Bump programming language to Python 3.10
