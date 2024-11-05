@@ -58,6 +58,8 @@ class TestUnit(unittest.TestCase):
         json_str_or_null =  {"type": ["string", "null"]     }
         json_dt =           {"type": ["string"]             , "format": "date-time"}
         json_dt_or_null =   {"type": ["string", "null"]     , "format": "date-time"}
+        json_date =         {"type": ["string"]             , "format": "date"}
+        json_date_or_null = {"type": ["string", "null"]     , "format": "date"}
         json_t =            {"type": ["string"]             , "format": "time"}
         json_t_or_null =    {"type": ["string", "null"]     , "format": "time"}
         json_num =          {"type": ["number"]             }
@@ -75,6 +77,8 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(mapper(json_str_or_null)  , 'character varying')
         self.assertEqual(mapper(json_dt)           , 'timestamp without time zone')
         self.assertEqual(mapper(json_dt_or_null)   , 'timestamp without time zone')
+        self.assertEqual(mapper(json_date)         , 'date')
+        self.assertEqual(mapper(json_date_or_null) , 'date')
         self.assertEqual(mapper(json_t)            , 'time without time zone')
         self.assertEqual(mapper(json_t_or_null)    , 'time without time zone')
         self.assertEqual(mapper(json_num)          , 'double precision')
