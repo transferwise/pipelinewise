@@ -240,18 +240,6 @@ def _map_tap_to_target_functions(
             'target_sql_get_cols_fn': db.sql_get_columns_snowflake,
             'target_sql_dynamic_row_count_fn': db.sql_dynamic_row_count_snowflake,
         },
-        # target-bigquery specific attributes and functions
-        'run_query_target_bigquery': {
-            'target_sql_get_cols_fn': db.sql_get_columns_bigquery,
-            'target_sql_get_table_cols_fn': db.sql_get_columns_for_table_bigquery,
-            'target_sql_dynamic_row_count_fn': db.sql_dynamic_row_count_bigquery,
-            'target_sql_safe_name_fn': db.safe_name_bigquery,
-        },
-        # target-redshift specific attributes and functions
-        'run_query_target_redshift': {
-            'target_sql_get_cols_fn': db.sql_get_columns_redshift,
-            'target_sql_dynamic_row_count_fn': db.sql_dynamic_row_count_redshift,
-        },
     }
 
     # Merge the keys into one dict by tap and target query runner names

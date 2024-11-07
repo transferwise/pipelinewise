@@ -1,0 +1,16 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "currency": {
+      "type": ["null", "string"]
+    },
+    "balance": {
+      "type": ["null", "number"],
+      "multipleOf": 1e-8
+    },
+    "account_sid": {
+      "type": ["null", "string"]
+    }
+  }
+}

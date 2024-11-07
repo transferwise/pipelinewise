@@ -1,0 +1,32 @@
+{
+  "type": [
+    "null",
+    "object"
+  ],
+  "properties": {
+    "url": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "role": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "state": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "_sdc_repository": {
+      "type": [
+        "null",
+        "string"
+      ]
+    }
+  }
+}

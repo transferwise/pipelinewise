@@ -1,0 +1,5 @@
+{"message_key": "1", "message": {"id":1, "value":"initial id 1"}}
+{"message_key": "1", "message": {"id":1, "value":"updated id 1"}}
+{"message_key": "2", "message": {"id":2, "value":"initial id 2"}}
+{"message_key": "2", "message": {"id":2, "value":"updated id 2"}}
+{"message_key": "3", "message": {"id":3, "value":"initial id 3"}}

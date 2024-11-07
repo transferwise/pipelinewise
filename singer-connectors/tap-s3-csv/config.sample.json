@@ -1,0 +1,14 @@
+{
+    "aws_endpoint_url": "http://0.0.0.0:9000",
+    "aws_access_key_id": "ACCESS_KEY",
+    "aws_secret_access_key": "SECRET_ACCESS_KEY",
+    "start_date": "2000-01-01T00:00:00Z",
+    "bucket": "awesome_bucket",
+    "tables": [{
+        "search_prefix": "feeds",
+        "search_pattern": ".csv",
+        "table_name": "my_table",
+        "key_properties": ["id"],
+        "delimiter": ","
+    }]
+}

@@ -1,0 +1,143 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "account_sid": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "assignment_activity_name": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "assignment_activity_sid": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "date_created": {
+      "type": [
+        "null",
+        "string"
+      ],
+      "format": "date-time"
+    },
+    "date_updated": {
+      "type": [
+        "null",
+        "string"
+      ],
+      "format": "date-time"
+    },
+    "friendly_name": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "max_reserved_workers": {
+      "type": [
+        "null",
+        "integer"
+      ]
+    },
+    "links": {
+      "type": [
+        "null",
+        "object"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "assignment_activity": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "cumulative_statistics": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "list_statistics": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "real_time_statistics": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "reservation_activity": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "statistics": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "workspace": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      }
+    },
+    "reservation_activity_name": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "reservation_activity_sid": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "sid": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "target_workers": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "task_order": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "url": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "workspace_sid": {
+      "type": [
+        "null",
+        "string"
+      ]
+    }
+  }
+}

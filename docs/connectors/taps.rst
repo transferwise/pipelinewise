@@ -54,26 +54,6 @@ PipelineWise can replicate data from the following data sources:
 
         .. container:: img-hover-zoom
 
-          .. image:: ../img/snowflake-logo.png
-             :target: taps/snowflake.html
-
-        :ref:`tap-snowflake`
-
-    .. container:: tile
-
-        .. container:: img-hover-zoom
-
-          .. image:: ../img/oracle-logo.png
-             :target: taps/oracle.html
-
-        :ref:`tap-oracle`
-
-.. container:: tile-wrapper
-
-    .. container:: tile
-
-        .. container:: img-hover-zoom
-
           .. image:: ../img/s3-logo.png
              :target: taps/s3_csv.html
 
@@ -88,17 +68,6 @@ PipelineWise can replicate data from the following data sources:
 
         :ref:`tap-kafka`
 
-
-.. container:: tile-wrapper
-
-    .. container:: tile
-
-        .. container:: img-hover-zoom
-
-          .. image:: ../img/salesforce-logo.png
-             :target: taps/salesforce.html
-
-        :ref:`tap-salesforce`
 
     .. container:: tile
 
@@ -120,35 +89,6 @@ PipelineWise can replicate data from the following data sources:
 
         :ref:`tap-jira`
 
-    .. container:: tile
-
-        .. container:: img-hover-zoom
-
-          .. image:: ../img/twilio-logo.png
-             :target: taps/twilio.html
-
-        :ref:`tap-twilio`
-
-.. container:: tile-wrapper
-
-    .. container:: tile
-
-        .. container:: img-hover-zoom
-
-          .. image:: ../img/zuora-logo.png
-             :target: taps/zuora.html
-
-        :ref:`tap-zuora`
-
-    .. container:: tile
-
-        .. container:: img-hover-zoom
-
-          .. image:: ../img/google-analytics-logo.png
-             :target: taps/google_analytics.html
-
-        :ref:`tap-google-analytics`
-
 .. container:: tile-wrapper
 
     .. container:: tile
@@ -159,16 +99,6 @@ PipelineWise can replicate data from the following data sources:
              :target: taps/github.html
 
         :ref:`tap-github`
-
-    .. container:: tile
-
-        .. container:: img-hover-zoom
-
-          .. image:: ../img/shopify-logo.png
-             :target: taps/shopify.html
-
-        :ref:`tap-shopify`
-
 
 .. container:: tile-wrapper
 
@@ -199,18 +129,12 @@ Configuring taps
 
    taps/mysql
    taps/postgres
-   taps/oracle
    taps/s3_csv
    taps/kafka
    taps/snowflake
    taps/mongodb
-   taps/salesforce
    taps/zendesk
    taps/jira
-   taps/zuora
-   taps/google_analytics
    taps/github
-   taps/shopify
    taps/slack
    taps/mixpanel
-   taps/twilio

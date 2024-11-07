@@ -1,0 +1,16 @@
+{"type": "STATE", "value": {"currently_syncing": "my_db-order"}}
+{"type": "SCHEMA", "stream": "my_db-order", "schema": {"properties": {"data": {"inclusion": "available", "format": "binary", "type": ["null", "string"]}, "new": {"inclusion": "automatic", "format": "binary", "type": ["null", "string"]}, "created_at": {"inclusion": "available", "format": "date-time", "type": ["null", "string"]}}, "type": "object"}, "key_properties": ["new"]}
+{"type": "ACTIVATE_VERSION", "stream": "my_db-order", "version": 1576670613163}
+{"type": "RECORD", "stream": "my_db-order", "record": {"data": "6461746132", "new": "706b32", "created_at": "2019-12-17T16:02:55+00:00"}, "version": 1576670613163, "time_extracted": "2019-12-18T12:03:33.174343Z"}
+{"type": "RECORD", "stream": "my_db-order", "record": {"data": "64617461313030", "new": "706b33", "created_at": "2019-12-18T11:46:38+00:00"}, "version": 1576670613163, "time_extracted": "2019-12-18T12:03:33.174343Z"}
+{"type": "RECORD", "stream": "my_db-order", "record": {"data": "6461746134", "new": "706b34", "created_at": "2019-12-17T16:32:22+00:00"}, "version": 1576670613163, "time_extracted": "2019-12-18T12:03:33.174343Z"}
+{"type": "STATE", "value": {"currently_syncing": "my_db-order", "bookmarks": {"my_db-order": {"version": 1576670613163}}}}
+{"type": "ACTIVATE_VERSION", "stream": "my_db-order", "version": 1576670613163}
+{"type": "STATE", "value": {"currently_syncing": null, "bookmarks": {"my_db-order": {"version": 1576670613163, "log_file": "mysql-bin.000004", "log_pos": 945}}}}
+{"type": "STATE", "value": {"currently_syncing": null, "bookmarks": {"my_db-order": {"version": 1576670613163, "log_file": "mysql-bin.000004", "log_pos": 945}}}}
+{"type": "SCHEMA", "stream": "my_db-order", "schema": {"properties": {"data": {"inclusion": "available", "format": "binary", "type": ["null", "string"]}, "created_at": {"inclusion": "available", "format": "date-time", "type": ["null", "string"]}, "new": {"inclusion": "automatic", "format": "binary", "type": ["null", "string"]}}, "type": "object"}, "key_properties": ["new"]}
+{"type": "RECORD", "stream": "my_db-order", "record": {"new": "706b35", "data": "6461746135", "created_at": "2019-12-18T13:19:20+00:00"}, "version": 1576670613163, "time_extracted": "2019-12-18T13:24:31.441849Z"}
+{"type": "RECORD", "stream": "my_db-order", "record": {"new": "706b35", "data": "64617461313030", "created_at": "2019-12-18T13:19:35+00:00"}, "version": 1576670613163, "time_extracted": "2019-12-18T13:24:31.441849Z"}
+{"type": "RECORD", "stream": "my_db-order", "record": {"new": "706b33", "data": "64617461313030", "created_at": "2019-12-18T11:46:38+00:00", "_sdc_deleted_at": "2019-12-18T13:19:44+00:00+00:00"}, "version": 1576670613163, "time_extracted": "2019-12-18T13:24:31.441849Z"}
+{"type": "RECORD", "stream": "my_db-order", "record": {"new": "706b35", "data": "64617461313030", "created_at": "2019-12-18T13:19:35+00:00", "_sdc_deleted_at": "2019-12-18T13:19:44+00:00+00:00"}, "version": 1576670613163, "time_extracted": "2019-12-18T13:24:31.441849Z"}
+{"type": "STATE", "value": {"currently_syncing": null, "bookmarks": {"my_db-order": {"version": 1576670613163, "log_file": "mysql-bin.000004", "log_pos": 1867}}}}

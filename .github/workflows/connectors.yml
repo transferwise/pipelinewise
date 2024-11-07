@@ -12,21 +12,26 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  check:
+  test_install_connectors:
     runs-on: ubuntu-20.04
-    strategy:
-      matrix:
-        python-version: [3.7, 3.8, 3.9]
 
     steps:
       - name: Checking out repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4.1.7
 
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v3
+      - name: Check if python changes are present
+        id: check
+        env:
+          GITHUB_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        continue-on-error: true
+        run: ./scripts/ci_check_no_file_changes.sh python
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5.1.0
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: '3.10'
 
-      - name: Check all connectors are installable
+      - name: Check PipelineWise and all connectors are installable
         run: |
-          make all_connectors -e pw_acceptlicenses=y
+          make pipelinewise_no_test_extras all_connectors

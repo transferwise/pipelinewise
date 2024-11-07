@@ -110,6 +110,7 @@ class PipelineWise:
             self.TRANSFORM_FIELD_CONNECTOR_NAME
         )
         self.tap_run_log_file = None
+        self.force_fast_sync = True
 
         # Catch SIGINT and SIGTERM to exit gracefully
         for sig in [signal.SIGINT, signal.SIGTERM]:
@@ -1080,8 +1081,12 @@ class PipelineWise:
             temp_dir=self.get_temp_dir(),
             table=self.args.table,
             column=self.args.column,
-            start_value=self.args.start_value,
-            end_value=self.args.end_value,
+            # all quote characters inside the value strings will be changed into a tag and then later they will be
+            # changed back to the original value in the destination.
+            # because shlex which is used to run the command, will split it and this causes it not be the correct
+            # in the destination.
+            start_value=self._quote_char_to_tag(self.args.start_value),
+            end_value=self._quote_char_to_tag(self.args.end_value),
             drop_target_table=self.args.drop_target_table
         )
 
@@ -1105,6 +1110,10 @@ class PipelineWise:
         Generating and running shell command to sync tables using the native fastsync components
         """
         # Build the fastsync executable command
+        max_autoresync_table_size = None
+        if tap.type in ('tap-mysql', 'tap-postgres') and target.type == 'target-snowflake' and not self.force_fast_sync:
+            max_autoresync_table_size = self.config.get('allowed_resync_max_size', {}).get('table_mb')
+
         command = commands.build_fastsync_command(
             tap=tap,
             target=target,
@@ -1115,6 +1124,7 @@ class PipelineWise:
             profiling_mode=self.profiling_mode,
             profiling_dir=self.profiling_dir,
             drop_pg_slot=self.drop_pg_slot,
+            autoresync_size=max_autoresync_table_size
         )
 
         # Fastsync is running in subprocess.
@@ -1162,6 +1172,8 @@ class PipelineWise:
         )
 
         not_partial_syned_tables = set()
+
+        self.force_fast_sync = True
 
         self.logger.info('Running %s tap in %s target', tap_id, target_id)
 
@@ -1368,6 +1380,7 @@ class PipelineWise:
         """
         This method calls do_sync_tables if sync_tables command is chosen
         """
+        self.force_fast_sync = self.args.force
         try:
             with pidfile.PIDFile(self.tap['files']['pidfile']):
                 self.do_sync_tables()
@@ -1395,7 +1408,7 @@ class PipelineWise:
 
         if selected_tables['full_sync']:
             fast_sync_process = Process(
-                target=self.sync_tables_fast_sync, args=(selected_tables['full_sync'],))
+                target=self.sync_tables_fast_sync, args=(selected_tables['full_sync'], ))
             fast_sync_process.start()
             processes_list.append(fast_sync_process)
 
@@ -1709,6 +1722,13 @@ class PipelineWise:
         """
         try:
             with pidfile.PIDFile(self.tap['files']['pidfile']):
+
+                # this command allows only static values!
+                if self.args.start_value:
+                    self.args.start_value = f'<S>{self.args.start_value}'
+                if self.args.end_value:
+                    self.args.end_value = f'<S>{self.args.end_value}'
+
                 self.sync_tables_partial_sync()
         except pidfile.AlreadyRunningError as exc:
             self.logger.error('Another instance of the tap is already running.')
@@ -1755,7 +1775,16 @@ class PipelineWise:
                 for table, sync_settings in defined_tables.items():
                     table_names.append(table)
                     table_columns.append(sync_settings['column'])
-                    table_values.append(str(sync_settings['value']))
+                    static_value = sync_settings.get('static_value')
+                    dynamic_value = sync_settings.get('dynamic_value')
+                    if static_value and dynamic_value:
+                        raise Exception('It is not allowed to have both dynamic and static values!')
+                    if static_value:
+                        table_values.append(f'<S>{str(static_value)}')
+
+                    if dynamic_value:
+                        table_values.append(f'<D>{str(dynamic_value)}')
+
                     table_drop_targets.append(sync_settings.get('drop_target_table'))
 
                 self.args.table = ','.join(table_names)
@@ -2236,3 +2265,11 @@ TAP RUN SUMMARY
             self._remove_tap_config(tap_id, target_id, tap_type)
 
         utils.silentremove(self.get_target_dir(target_id))
+
+    @staticmethod
+    def _quote_char_to_tag(value_string: str) -> str:
+        """converting all quote characters to quote tag"""
+        if value_string:
+            return value_string.replace("'", '<<quote>>')
+
+        return value_string

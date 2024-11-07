@@ -1,0 +1,20 @@
+services:
+  db:
+    container_name: "tap_mongodb_dev"
+    image: "mongo:5.0.26-focal"
+
+    ports:
+      - 27017:27017
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: mongoAdmin # These are dummy credentials for dev and test only
+      MONGO_INITDB_ROOT_PASSWORD: Password1
+    command: [mongod, --replSet, rs0]
+    networks:
+      - default
+
+networks:
+  default:
+    ipam:
+      driver: default
+      config:
+        - subnet: 192.169.57.0/24

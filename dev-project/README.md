@@ -19,7 +19,7 @@ Go to the main folder of the repository (the parent of this one) and To create l
 
 ```sh
 $ cd dev-project/
-$ docker-compose up --build
+$ docker compose up --build
 ```
 
 Wait until `PipelineWise Dev environment is ready in Docker container(s).` message. At the first run this can
@@ -95,19 +95,19 @@ Then, from within the container:
 
 ```sh
 $ cd /opt/pipelinewise
-$ pytest
+$ pytest tests/
 ```
 
 To run tests and report code coverage:
 
 ```
-$ coverage run -m pytest && coverage report
+$ coverage run -m pytest tests/ && coverage report
 ```
 
 To generate HTML coverage report.
 
 ```
-$ coverage run -m pytest && coverage html -d coverage_html
+$ coverage run -m pytest tests/ && coverage html -d coverage_html
 ```
 
 **Note**: The HTML report will be generated in `coverage_html/index.html`

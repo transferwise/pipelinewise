@@ -1,0 +1,6 @@
+{
+    "account_sid": "YOUR_ACCOUNT_SID",
+    "auth_token": "YOUR_AUTH_TOKEN",
+    "start_date": "2019-01-01T00:00:00Z",
+    "user_agent": "tap-twilio <api_user_email@your_company.com>",
+}

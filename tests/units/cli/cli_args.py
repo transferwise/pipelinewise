@@ -21,6 +21,7 @@ class CliArgs:
         extra_log=False,
         debug=False,
         profiler=False,
+        force=False
     ):
         self.target = target
         self.tap = tap
@@ -34,6 +35,7 @@ class CliArgs:
         self.extra_log = extra_log
         self.debug = debug
         self.profiler = profiler
+        self.force = force
 
     # "log" Getters and setters
     @property

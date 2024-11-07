@@ -1,0 +1,5 @@
+{
+  "rate_limit": 1000,
+  "max_workers": 10,
+  "batch_size": 50
+}

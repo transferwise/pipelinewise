@@ -42,6 +42,15 @@
         "victorops": { "$ref": "#/definitions/alert_victorops" }
       },
       "additionalProperties": false
+    },
+    "allowed_resync_max_size": {
+      "type": "object",
+      "properties": {
+        "table_mb": {
+          "type": "number"
+        }
+      },
+      "required": ["table_mb"]
     }
   },
   "required": [],

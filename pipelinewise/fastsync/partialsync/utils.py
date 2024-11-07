@@ -7,7 +7,9 @@ import re
 from datetime import datetime
 from ast import literal_eval
 
-from typing import Dict, Tuple, List
+import sqlparse
+
+from typing import Dict, Tuple, List, Union
 
 from pipelinewise.cli.errors import InvalidConfigException
 from pipelinewise.fastsync.commons import utils as common_utils
@@ -119,10 +121,8 @@ def parse_args_for_partial_sync(required_config_keys: Dict) -> argparse.Namespac
     return args
 
 
-def validate_boundary_value(string_to_check: str) -> str:
-    """Validating if the boundary values are valid and there is no injection"""
-    if not string_to_check:
-        return string_to_check
+def _validate_static_boundary_value(string_to_check: str) -> str:
+    """Validating if the static boundary values are valid and there is no injection"""
 
     # Validating string and number format
     pattern = re.compile(r'[A-Za-z0-9\\.\\-]+')
@@ -139,6 +139,37 @@ def validate_boundary_value(string_to_check: str) -> str:
             raise InvalidConfigException(f'Invalid boundary value: {string_to_check}') from Exception
 
     return string_to_check
+
+
+def _validate_dynamic_boundary_value(query_object, string_to_check: str) -> str:
+    """Validating if the dynamic boundary values are valid and there is no injection"""
+    try:
+        _check_for_allowed_query(string_to_check)
+        return_value = query_object(string_to_check)
+        if return_value == []:
+            # in this case it returns NULL and this NULL will be used in generating where clause later and
+            # partial sync can be selected again next time until this dynamic value returns something from the source!
+            return 'NULL'
+        if len(return_value) > 1 or len(return_value[0]) != 1:
+            raise Exception
+
+        if isinstance(return_value[0], dict):
+            boundary_value = list(return_value[0].values())[0]
+        else:
+            boundary_value = return_value[0][0]
+    except Exception:
+        raise(InvalidConfigException(f'Invalid query for boundary value: {string_to_check}')) from Exception
+    return boundary_value
+
+
+def validate_boundary_value(query_object: object, string_to_check: Union[str, None]) -> Union[str, None]:
+    """Validate and finding the boundary value"""
+    if string_to_check:
+        if string_to_check.startswith('<S>'):
+            return _validate_static_boundary_value(string_to_check[3:])
+        if string_to_check.startswith('<D>'):
+            return _validate_dynamic_boundary_value(query_object, string_to_check[3:])
+    return None
 
 
 def get_sync_tables(args: argparse.Namespace) -> Dict:
@@ -165,6 +196,24 @@ def get_sync_tables(args: argparse.Namespace) -> Dict:
             'drop_target_table': drop_target_tables[ind],
         }
     return sync_tables
+
+
+def quote_tag_to_char(value_string: Union[str, None]) -> Union[str, None]:
+    """convert quote tag in a string to its original qoute character"""
+    if value_string:
+        return value_string.replace('<<quote>>', "'")
+
+    return value_string
+
+
+def _check_for_allowed_query(query_string):
+    statements = sqlparse.split(query_string)
+    if len(statements) != 1:
+        raise Exception('More than one statement is not allowed!')
+
+    sql_type = sqlparse.parse(statements[0])[0].get_type()
+    if sql_type != 'SELECT':
+        raise Exception('Not allowed statement!')
 
 
 def _get_target_columns_info(target_column):

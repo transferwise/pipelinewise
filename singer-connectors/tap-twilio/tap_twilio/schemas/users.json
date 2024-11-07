@@ -1,0 +1,107 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "sid": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "account_sid": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "service_sid": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "role_sid": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "identity": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "attributes": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "is_online": {
+      "type": [
+        "null",
+        "boolean"
+      ]
+    },
+    "is_notifiable": {
+      "type": [
+        "null",
+        "boolean"
+      ]
+    },
+    "friendly_name": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "date_created": {
+      "type": [
+        "null",
+        "string"
+      ],
+      "format": "date-time"
+    },
+    "date_updated": {
+      "type": [
+        "null",
+        "string"
+      ],
+      "format": "date-time"
+    },
+    "joined_channels_count": {
+      "type": [
+        "null",
+        "integer"
+      ]
+    },
+    "links": {
+      "type": [
+        "null",
+        "object"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "user_channels": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "user_bindings": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      }
+    },
+    "url": {
+      "type": [
+        "null",
+        "string"
+      ]
+    }
+  }
+}

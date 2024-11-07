@@ -1,0 +1,57 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "account_sid": {
+      "type": ["null", "string"]
+    },
+    "api_version": {
+      "type": ["null", "string"]
+    },
+    "date_created": {
+      "type": ["null", "string"],
+      "format": "date-time"
+    },
+    "date_updated": {
+      "type": ["null", "string"],
+      "format": "date-time"
+    },
+    "friendly_name": {
+      "type": ["null", "string"]
+    },
+    "sid": {
+      "type": ["null", "string"]
+    },
+    "region": {
+      "type": ["null", "string"]
+    },
+    "status": {
+      "type": ["null", "string"]
+    },
+    "uri": {
+      "type": ["null", "string"]
+    },
+    "subresource_uris": {
+      "anyOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": ["null", "object"],
+            "additionalProperties": false,
+            "properties": {
+              "subresource": {
+                "type": ["null", "string"]
+              },
+              "uri": {
+                "type": ["null", "string"]
+              }
+            }
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  }
+}

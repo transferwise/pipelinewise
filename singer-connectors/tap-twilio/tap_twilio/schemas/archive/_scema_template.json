@@ -1,0 +1,72 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "string_field": {
+      "type": ["null", "string"]
+    },
+    "boolean_field": {
+      "type": ["null", "boolean"]
+    },
+    "integer_field": {
+      "type": ["null", "integer"]
+    },
+    "datetime_field": {
+      "type": ["null", "string"],
+      "format": "date-time"
+    },
+    "flexible_nested_object": {
+      "type": ["null", "object"],
+      "additionalProperties": true
+    },
+    "nested_object": {
+      "type": ["null", "object"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": ["null", "integer"]
+        },
+        "name": {
+          "type": ["null", "string"]
+        }
+      }
+    },
+    "nested_array": {
+      "anyOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": ["null", "object"],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": ["null", "integer"]
+              },
+              "name": {
+                "type": ["null", "string"]
+              }
+            }
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "single_field_array": {
+      "anyOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    
+    "ADD_FIELDS_HERE": ""
+  }
+}

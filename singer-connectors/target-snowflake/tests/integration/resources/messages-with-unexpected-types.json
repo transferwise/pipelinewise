@@ -1,0 +1,8 @@
+{"type": "SCHEMA", "stream": "db-table_1", "schema": {"properties": {"c_pk": {"inclusion": "automatic", "minimum": -2147483648, "maximum": 2147483647, "type": ["null", "integer"]}, "c_time": {"format": "time", "inclusion": "available", "type": ["null", "string"]}}, "type": "object"}, "key_properties": ["c_pk"]}
+{"type": "ACTIVATE_VERSION", "stream": "db-table_1", "version": 2}
+{"type": "RECORD", "stream": "db-table_1", "record": {"c_pk": 1, "c_time": "04:00:00"}, "version": 2, "time_extracted": "2019-01-31T15:51:50.215998Z"}
+{"type": "RECORD", "stream": "db-table_1", "record": {"c_pk": 2, "c_time": "07:15:00"}, "version": 2, "time_extracted": "2019-01-31T15:51:50.215998Z"}
+{"type": "RECORD", "stream": "db-table_1", "record": {"c_pk": 3, "c_time": 235667, "_sdc_deleted_at": "2019-02-10T15:51:50.215998Z"}, "version": 2, "time_extracted": "2019-01-31T15:51:50.215998Z"}
+{"type": "STATE", "value": {"currently_syncing": "db-table_1", "bookmarks": {}}}
+{"type": "ACTIVATE_VERSION", "stream": "db-table_1", "version": 2}
+{"type": "STATE", "value": {"currently_syncing": null, "bookmarks": {"db-table_1": {"initial_full_table_complete": true}}}}

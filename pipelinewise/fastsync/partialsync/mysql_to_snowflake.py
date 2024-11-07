@@ -28,8 +28,6 @@ def partial_sync_table(table: tuple, args: Namespace) -> Union[bool, str]:
 
     try:
         table_name = table[0]
-        start_value = utils.validate_boundary_value(table[1]['start_value'])
-        end_value = utils.validate_boundary_value(table[1]['end_value'])
 
         column_name = table[1]['column']
 
@@ -40,6 +38,9 @@ def partial_sync_table(table: tuple, args: Namespace) -> Union[bool, str]:
         mysql = FastSyncTapMySql(args.tap, tap_type_to_target_type)
 
         mysql.open_connections()
+
+        start_value = utils.validate_boundary_value(mysql.query, table[1]['start_value'])
+        end_value = utils.validate_boundary_value(mysql.query, table[1]['end_value'])
 
         # Get bookmark - Binlog position or Incremental Key value
         bookmark = common_utils.get_bookmark_for_table(table_name, args.properties, mysql)
@@ -72,7 +73,8 @@ def partial_sync_table(table: tuple, args: Namespace) -> Union[bool, str]:
         source_columns = snowflake_types.get('columns', [])
         columns_diff = utils.diff_source_target_columns(target_sf, source_columns=source_columns)
 
-        where_clause_sql = f' WHERE {column_name} >= \'{start_value}\''
+        start_value_for_query = start_value if start_value == 'NULL' else f'\'{start_value}\''
+        where_clause_sql = f' WHERE {column_name} >= {start_value_for_query}'
         if end_value:
             where_clause_sql += f' AND {column_name} <= \'{end_value}\''
 
@@ -87,7 +89,7 @@ def partial_sync_table(table: tuple, args: Namespace) -> Union[bool, str]:
         primary_keys = snowflake_types.get('primary_key')
         snowflake.create_schema(target_schema)
         snowflake.create_table(
-            target_schema, table_name, source_columns, primary_keys, is_temporary=True
+            target_schema, target_table, source_columns, primary_keys, is_temporary=True
         )
 
         mysql.close_connections()
@@ -111,6 +113,11 @@ def main_impl():
     """Main sync logic"""
 
     args = utils.parse_args_for_partial_sync(REQUIRED_CONFIG_KEYS)
+
+    # changing back all quote tags to their original quote character
+    args.start_value = utils.quote_tag_to_char(args.start_value)
+    args.end_value = utils.quote_tag_to_char(args.end_value)
+
     start_time = datetime.now()
 
     pool_size = common_utils.get_pool_size(args.tap)
@@ -131,6 +138,7 @@ def main_impl():
 
     sync_tables = utils.get_sync_tables(args)
 
+    pool_size = len(sync_tables) if len(sync_tables) < pool_size else pool_size
     with multiprocessing.Pool(pool_size) as proc:
         sync_excs = list(
             filter(

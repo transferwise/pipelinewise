@@ -1,0 +1,221 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "reservations_created": {
+      "type": [
+        "null",
+        "integer"
+      ]
+    },
+    "account_sid": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "reservations_rejected": {
+      "type": [
+        "null",
+        "integer"
+      ]
+    },
+    "tasks_completed": {
+      "type": [
+        "null",
+        "integer"
+      ]
+    },
+    "end_time": {
+      "format": "date-time",
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "tasks_entered": {
+      "type": [
+        "null",
+        "integer"
+      ]
+    },
+    "tasks_canceled": {
+      "type": [
+        "null",
+        "integer"
+      ]
+    },
+    "reservations_accepted": {
+      "type": [
+        "null",
+        "integer"
+      ]
+    },
+    "task_queue_sid": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "reservations_timed_out": {
+      "type": [
+        "null",
+        "integer"
+      ]
+    },
+    "url": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "wait_duration_until_canceled": {
+      "type": [
+        "null",
+        "object"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "avg": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "min": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "max": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "total": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        }
+      }
+    },
+    "wait_duration_until_accepted": {
+      "type": [
+        "null",
+        "object"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "avg": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "min": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "max": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "total": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        }
+      }
+    },
+    "wait_duration_in_queue_until_accepted": {
+      "type": [
+        "null",
+        "object"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "avg": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "min": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "max": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "total": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        }
+      }
+    },
+    "split_by_wait_time": {
+      "type": [
+        "null",
+        "object"
+      ]
+    },
+    "start_time": {
+      "format": "date-time",
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "tasks_moved": {
+      "type": [
+        "null",
+        "integer"
+      ]
+    },
+    "reservations_canceled": {
+      "type": [
+        "null",
+        "integer"
+      ]
+    },
+    "workspace_sid": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "tasks_deleted": {
+      "type": [
+        "null",
+        "integer"
+      ]
+    },
+    "reservations_rescinded": {
+      "type": [
+        "null",
+        "integer"
+      ]
+    },
+    "avg_task_acceptance_time": {
+      "type": [
+        "null",
+        "integer"
+      ]
+    }
+  }
+}

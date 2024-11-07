@@ -1,0 +1,202 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "archived": {
+      "type": [
+        "null",
+        "boolean"
+      ]
+    },
+    "avatar_base_url": {
+      "format": "uri",
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "created": {
+      "type": [
+        "null",
+        "string"
+      ],
+      "format": "date-time"
+    },
+    "date_create": {
+      "type": [
+        "null",
+        "string"
+      ],
+      "format": "date-time"
+    },
+    "deleted": {
+      "type": [
+        "null",
+        "string"
+      ],
+      "format": "date-time"
+    },
+    "description": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "discoverable": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "domain": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "email_domain": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "enterprise_id": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "enterprise_name": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "has_compliance_export": {
+      "type": [
+        "null",
+        "boolean"
+      ]
+    },
+    "icon": {
+      "properties": {
+        "image_102": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "image_132": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "image_230": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "image_34": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "image_44": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "image_68": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "image_88": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "image_default": {
+          "type": [
+            "null",
+            "boolean"
+          ]
+        }
+      },
+      "type": [
+        "null",
+        "object"
+      ]
+    },
+    "id": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "is_assigned": {
+      "type": [
+        "null",
+        "boolean"
+      ]
+    },
+    "is_enterprise": {
+      "type": [
+        "null",
+        "integer"
+      ]
+    },
+    "messages_count": {
+      "type": [
+        "null",
+        "integer"
+      ]
+    },
+    "msg_edit_window_mins": {
+      "type": [
+        "null",
+        "integer"
+      ]
+    },
+    "name": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "over_integrations_limit": {
+      "type": [
+        "null",
+        "boolean"
+      ]
+    },
+    "over_storage_limit": {
+      "type": [
+        "null",
+        "boolean"
+      ]
+    },
+    "plan": {
+      "enum": [
+        "",
+        "std",
+        "plus",
+        "compliance",
+        "enterprise"
+      ],
+      "type": [
+        "null",
+        "string"
+      ]
+    }
+  },
+  "type": [
+    "null",
+    "object"
+  ]
+}

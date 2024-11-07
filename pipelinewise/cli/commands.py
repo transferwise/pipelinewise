@@ -366,7 +366,6 @@ def build_partialsync_command(
         start_value: str,
         end_value: str = None,
         drop_target_table: str = None
-
 ):
     """Builds a command that starts a partial sync"""
 
@@ -412,6 +411,7 @@ def build_fastsync_command(
     profiling_mode: bool = False,
     profiling_dir: str = None,
     drop_pg_slot: bool = False,
+    autoresync_size: int = None
 ) -> str:
     """
     Builds a command that starts fastsync from a given tap to a
@@ -450,6 +450,7 @@ def build_fastsync_command(
                     else '',
                     f'--tables {tables}' if tables else '',
                     '--drop_pg_slot' if drop_pg_slot else '',
+                    f'--autoresync_size {autoresync_size}' if autoresync_size else ''
                 ],
             )
         )

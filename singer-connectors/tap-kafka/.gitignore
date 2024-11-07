@@ -1,0 +1,37 @@
+# IDE
+.vscode
+.idea/*
+
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.virtualenvs
+*.egg-info/
+*__pycache__/
+*~
+build/
+dist/
+test_dir/
+tap-kafka-proto-classes/
+.coverage
+
+# Singer JSON files
+properties.json
+catalog.json
+config.json
+state.json
+
+*.db
+.DS_Store
+venv
+env
+blog_old.md
+node_modules
+*.pyc
+tmp
+
+# Docs
+docs/_build/
+docs/_templates/
