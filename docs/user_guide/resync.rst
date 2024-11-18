@@ -56,7 +56,12 @@ add the ``--tables`` argument:
        table_mb: <integer/float>
 
 
+.. attention::
 
+  There is an option to chose tables for re-sync which has a specific
+  replication method by ``--replication_method_only <name of replication method> ``
+
+   $ pipelinewise sync_tables --target <target_id> --tap <tap_id> --replication_method_only log_based
 
 
 
