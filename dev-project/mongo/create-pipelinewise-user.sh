@@ -1,6 +1,6 @@
 echo 'CREATE MONGODB PIPELINEWISE USER'
 
-mongo --tls --tlsAllowInvalidCertificates -u $MONGO_INITDB_ROOT_USERNAME -p $MONGO_INITDB_ROOT_PASSWORD --authenticationDatabase admin admin <<EOF
+mongo --tls --tlsAllowInvalidCertificates --tlsAllowInvalidHostnames -u $MONGO_INITDB_ROOT_USERNAME -p $MONGO_INITDB_ROOT_PASSWORD --authenticationDatabase admin admin <<EOF
     db.getName();
     db.createUser({
         user: $(jq --arg 'user' $MONGO_USERNAME --null-input '$user'),
