@@ -253,6 +253,8 @@ def main():
     parser.add_argument('--force', default=False, required=False,
                         help='Force sync_tables for full sync', action='store_true'
                         )
+    parser.add_argument('--replication_method_only', default='*', type=str,
+                        help='Sync only tables which their replication method is as entered value')
 
     args = parser.parse_args()
 

@@ -1397,7 +1397,9 @@ class PipelineWise:
         else:
             tables_to_sync = self.args.tables
 
-        selected_tables = self._get_sync_tables_setting_from_selection_file(tables_to_sync)
+        selected_tables = self._get_sync_tables_setting_from_selection_file(
+            tables_to_sync, self.args.replication_method_only)
+
         processes_list = []
         if selected_tables['partial_sync']:
             self._reset_state_file_for_partial_sync(selected_tables)
@@ -2098,7 +2100,8 @@ TAP RUN SUMMARY
     def _get_fixed_name_of_table(stream_id):
         return stream_id.replace('-', '.', 1)
 
-    def _get_sync_tables_setting_from_selection_file(self, tables):
+    def _get_sync_tables_setting_from_selection_file(self, tables, replication_method_only='*'):
+        replication_method = replication_method_only.upper()
         selection = utils.load_json(self.tap['files']['selection'])
         selection = selection.get('selection')
         all_tables = {'full_sync': [], 'partial_sync': {}}
@@ -2107,10 +2110,11 @@ TAP RUN SUMMARY
             for table in selection:
                 table_name = self._get_fixed_name_of_table(table['tap_stream_id'])
                 if tables_list is None or table_name in tables_list:
-                    if table.get('sync_start_from'):
-                        all_tables['partial_sync'][table_name] = table['sync_start_from']
-                    else:
-                        all_tables['full_sync'].append(table_name)
+                    if replication_method in ['*', table.get('replication_method')]:
+                        if table.get('sync_start_from'):
+                            all_tables['partial_sync'][table_name] = table['sync_start_from']
+                        else:
+                            all_tables['full_sync'].append(table_name)
             return all_tables
 
     def __check_if_table_is_selected(self, table_in_properties):

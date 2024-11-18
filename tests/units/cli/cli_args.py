@@ -21,7 +21,8 @@ class CliArgs:
         extra_log=False,
         debug=False,
         profiler=False,
-        force=False
+        force=False,
+        replication_method_only='*'
     ):
         self.target = target
         self.tap = tap
@@ -36,6 +37,7 @@ class CliArgs:
         self.debug = debug
         self.profiler = profiler
         self.force = force
+        self.replication_method_only = replication_method_only
 
     # "log" Getters and setters
     @property
