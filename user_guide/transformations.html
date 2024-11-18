@@ -1,26 +1,24 @@
+
+
 <!DOCTYPE html>
-<html class="writer-html5" lang="en">
+<html class="writer-html5" lang="en" data-content_root="../">
 <head>
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Transformations &mdash; PipelineWise  documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=80d5e7a1" />
-      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=19f00094" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
       <link rel="stylesheet" type="text/css" href="../_static/css/custom.css?v=1c6dfede" />
 
   
     <link rel="shortcut icon" href="../_static/pipelinewise.png"/>
     <link rel="canonical" href="https://docs.ansible.com/ansible/latest/user_guide/transformations.html"/>
-  <!--[if lt IE 9]>
-    <script src="../_static/js/html5shiv.min.js"></script>
-  <![endif]-->
-  
-        <script src="../_static/jquery.js?v=5d32c60e"></script>
-        <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js?v=b3ba4146"></script>
-        <script src="../_static/doctools.js?v=888ff710"></script>
-        <script src="../_static/sphinx_highlight.js?v=4825356b"></script>
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
@@ -39,9 +37,6 @@
           <a href="../index.html" class="icon icon-home">
             PipelineWise
           </a>
-              <div class="version">
-                0.65.3
-              </div>
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
     <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
@@ -123,7 +118,7 @@
            <div itemprop="articleBody">
              
   <section id="transformations">
-<span id="id1"></span><h1>Transformations<a class="headerlink" href="#transformations" title="Permalink to this heading"></a></h1>
+<span id="id1"></span><h1>Transformations<a class="headerlink" href="#transformations" title="Link to this heading"></a></h1>
 <p>PipelineWise can perform row level load time transformations between tap and target components and makes and ideal
 place to obfuscate, mask or filter sensitive data that should never be replicated into the data warehouse.</p>
 <div class="admonition warning">
@@ -138,7 +133,7 @@ doing traditional ETL. ELT ingests data first into DWH in the original format an
 “transformation” is shifting to the end of the data pipeline.</p>
 </div>
 <section id="transformation-methods">
-<span id="id2"></span><h2>Transformation Methods<a class="headerlink" href="#transformation-methods" title="Permalink to this heading"></a></h2>
+<span id="id2"></span><h2>Transformation Methods<a class="headerlink" href="#transformation-methods" title="Link to this heading"></a></h2>
 <p>The following transformations can be added optionally into the <a class="reference internal" href="yaml_config.html#yaml-configuration"><span class="std std-ref">YAML configuration</span></a>:</p>
 <ul class="simple">
 <li><p><strong>SET-NULL</strong>: Transforms any column to NULL.</p></li>
@@ -151,7 +146,7 @@ doing traditional ETL. ELT ingests data first into DWH in the original format an
 </ul>
 </section>
 <section id="transformation-validation">
-<span id="id3"></span><h2>Transformation validation<a class="headerlink" href="#transformation-validation" title="Permalink to this heading"></a></h2>
+<span id="id3"></span><h2>Transformation validation<a class="headerlink" href="#transformation-validation" title="Link to this heading"></a></h2>
 <p>PipelineWise will run a transformation validation as part of the <cite>import</cite> logic, the validation consists of making sure
 that the transformation type is compatible with the column/field it’s being applied to, e.g <cite>HASH</cite> can only be
 applied to string type fields.</p>
@@ -159,14 +154,14 @@ applied to string type fields.</p>
 compatible with the configured transformation.</p>
 </section>
 <section id="conditional-transformations">
-<span id="id4"></span><h2>Conditional Transformations<a class="headerlink" href="#conditional-transformations" title="Permalink to this heading"></a></h2>
+<span id="id4"></span><h2>Conditional Transformations<a class="headerlink" href="#conditional-transformations" title="Link to this heading"></a></h2>
 <p>Using the optional <code class="docutils literal notranslate"><span class="pre">when</span></code> keyword, you can specify conditions how
 the transformation should be applied. If the condition matches
 PipelineWise performs the transformation, otherwise it keeps
 the original value.</p>
 </section>
 <section id="example">
-<span id="transformations-example"></span><h2>Example<a class="headerlink" href="#example" title="Permalink to this heading"></a></h2>
+<span id="transformations-example"></span><h2>Example<a class="headerlink" href="#example" title="Link to this heading"></a></h2>
 <p>Load Time transformations needs to be defined in the tables section
 in the <a class="reference internal" href="yaml_config.html#yaml-configuration"><span class="std std-ref">YAML configuration</span></a>:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>...

@@ -1,26 +1,24 @@
+
+
 <!DOCTYPE html>
-<html class="writer-html5" lang="en">
+<html class="writer-html5" lang="en" data-content_root="../">
 <head>
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Command Line Interface &mdash; PipelineWise  documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=80d5e7a1" />
-      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=19f00094" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
       <link rel="stylesheet" type="text/css" href="../_static/css/custom.css?v=1c6dfede" />
 
   
     <link rel="shortcut icon" href="../_static/pipelinewise.png"/>
     <link rel="canonical" href="https://docs.ansible.com/ansible/latest/user_guide/cli.html"/>
-  <!--[if lt IE 9]>
-    <script src="../_static/js/html5shiv.min.js"></script>
-  <![endif]-->
-  
-        <script src="../_static/jquery.js?v=5d32c60e"></script>
-        <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js?v=b3ba4146"></script>
-        <script src="../_static/doctools.js?v=888ff710"></script>
-        <script src="../_static/sphinx_highlight.js?v=4825356b"></script>
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
@@ -39,9 +37,6 @@
           <a href="../index.html" class="icon icon-home">
             PipelineWise
           </a>
-              <div class="version">
-                0.65.3
-              </div>
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
     <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
@@ -140,14 +135,14 @@
            <div itemprop="articleBody">
              
   <section id="command-line-interface">
-<span id="id1"></span><h1>Command Line Interface<a class="headerlink" href="#command-line-interface" title="Permalink to this heading"></a></h1>
+<span id="id1"></span><h1>Command Line Interface<a class="headerlink" href="#command-line-interface" title="Link to this heading"></a></h1>
 <p>PipelineWise’s command line interface allows for a number of operation types on a pipeline.</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>usage:<span class="w"> </span>pipelinewise<span class="w"> </span><span class="o">[</span>-h<span class="o">]</span>
 <span class="w">                    </span><span class="o">{</span>init,run_tap,discover_tap,status,test_tap_connection,sync_tables,import_config,validate<span class="o">}</span>
 </pre></div>
 </div>
 <section id="positional-arguments">
-<h2>Positional Arguments<a class="headerlink" href="#positional-arguments" title="Permalink to this heading"></a></h2>
+<h2>Positional Arguments<a class="headerlink" href="#positional-arguments" title="Link to this heading"></a></h2>
 <dl class="field-list simple">
 <dt class="field-odd">subcommand<span class="colon">:</span></dt>
 <dd class="field-odd"><p>Possible choices: init, run_tap, discover_tap, status, test_tap_connection, sync_tables, import_config, validate</p>
@@ -155,13 +150,13 @@
 </dl>
 </section>
 <section id="sub-commands">
-<h2>Sub-commands:<a class="headerlink" href="#sub-commands" title="Permalink to this heading"></a></h2>
+<h2>Sub-commands:<a class="headerlink" href="#sub-commands" title="Link to this heading"></a></h2>
 <section id="init">
-<span id="cli-init"></span><h3>init<a class="headerlink" href="#init" title="Permalink to this heading"></a></h3>
+<span id="cli-init"></span><h3>init<a class="headerlink" href="#init" title="Link to this heading"></a></h3>
 <p>Initialise and create a sample project. The project will contain sample YAML
 configuration for every supported tap and target connects.</p>
 <section id="id2">
-<h4>Positional Arguments<a class="headerlink" href="#id2" title="Permalink to this heading"></a></h4>
+<h4>Positional Arguments<a class="headerlink" href="#id2" title="Link to this heading"></a></h4>
 <dl class="field-list simple">
 <dt class="field-odd">–name<span class="colon">:</span></dt>
 <dd class="field-odd"><p>name of the project</p>
@@ -170,7 +165,7 @@ configuration for every supported tap and target connects.</p>
 </section>
 </section>
 <section id="run-tap">
-<span id="cli-run-tap"></span><h3>run_tap<a class="headerlink" href="#run-tap" title="Permalink to this heading"></a></h3>
+<span id="cli-run-tap"></span><h3>run_tap<a class="headerlink" href="#run-tap" title="Link to this heading"></a></h3>
 <p>Run a specific pipeline</p>
 <dl class="field-list simple">
 <dt class="field-odd">–target<span class="colon">:</span></dt>
@@ -185,7 +180,7 @@ configuration for every supported tap and target connects.</p>
 </dl>
 </section>
 <section id="stop-tap">
-<span id="cli-stop-tap"></span><h3>stop_tap<a class="headerlink" href="#stop-tap" title="Permalink to this heading"></a></h3>
+<span id="cli-stop-tap"></span><h3>stop_tap<a class="headerlink" href="#stop-tap" title="Link to this heading"></a></h3>
 <p>Stop running a specific pipeline</p>
 <dl class="field-list simple">
 <dt class="field-odd">–target<span class="colon">:</span></dt>
@@ -197,7 +192,7 @@ configuration for every supported tap and target connects.</p>
 </dl>
 </section>
 <section id="discover-tap">
-<span id="cli-discover-tap"></span><h3>discover_tap<a class="headerlink" href="#discover-tap" title="Permalink to this heading"></a></h3>
+<span id="cli-discover-tap"></span><h3>discover_tap<a class="headerlink" href="#discover-tap" title="Link to this heading"></a></h3>
 <p>Run a specific tap in discovery mode. Discovery mode is connecting to the data source
 and collecting information that is required for running the tap.</p>
 <dl class="field-list simple">
@@ -210,11 +205,11 @@ and collecting information that is required for running the tap.</p>
 </dl>
 </section>
 <section id="status">
-<span id="cli-status"></span><h3>status<a class="headerlink" href="#status" title="Permalink to this heading"></a></h3>
+<span id="cli-status"></span><h3>status<a class="headerlink" href="#status" title="Link to this heading"></a></h3>
 <p>Prints a status summary table of every imported pipeline with their tap and target.</p>
 </section>
 <section id="test-tap-connection">
-<span id="cli-test-tap-connection"></span><h3>test_tap_connection<a class="headerlink" href="#test-tap-connection" title="Permalink to this heading"></a></h3>
+<span id="cli-test-tap-connection"></span><h3>test_tap_connection<a class="headerlink" href="#test-tap-connection" title="Link to this heading"></a></h3>
 <p>Test the tap connection. It will connect to the data source that is defined in the tap
 and will return success if it’s available.</p>
 <dl class="field-list simple">
@@ -227,7 +222,7 @@ and will return success if it’s available.</p>
 </dl>
 </section>
 <section id="sync-tables">
-<span id="cli-sync-tables"></span><h3>sync_tables<a class="headerlink" href="#sync-tables" title="Permalink to this heading"></a></h3>
+<span id="cli-sync-tables"></span><h3>sync_tables<a class="headerlink" href="#sync-tables" title="Link to this heading"></a></h3>
 <p>Sync or resync one or more tables from a specific datasource. It performs an initial
 sync and resets the table bookmarks to their new location.</p>
 <dl class="field-list simple">
@@ -243,7 +238,7 @@ sync and resets the table bookmarks to their new location.</p>
 </dl>
 </section>
 <section id="import">
-<span id="cli-import"></span><h3>import<a class="headerlink" href="#import" title="Permalink to this heading"></a></h3>
+<span id="cli-import"></span><h3>import<a class="headerlink" href="#import" title="Link to this heading"></a></h3>
 <p>Import a project directory into PipelineWise. It will create every JSON file required for
 the tap and target connectors into <code class="docutils literal notranslate"><span class="pre">~/.pipelinewise</span></code>.</p>
 <dl class="field-list simple">
@@ -256,7 +251,7 @@ the tap and target connectors into <code class="docutils literal notranslate"><s
 </dl>
 </section>
 <section id="validate">
-<span id="cli-validate"></span><h3>validate<a class="headerlink" href="#validate" title="Permalink to this heading"></a></h3>
+<span id="cli-validate"></span><h3>validate<a class="headerlink" href="#validate" title="Link to this heading"></a></h3>
 <p>Validates a project directory with YAML tap and target files.</p>
 <dl class="field-list simple">
 <dt class="field-odd">–dir<span class="colon">:</span></dt>
@@ -266,13 +261,13 @@ the tap and target connectors into <code class="docutils literal notranslate"><s
 </section>
 </section>
 <section id="environment-variables">
-<h2>Environment variables<a class="headerlink" href="#environment-variables" title="Permalink to this heading"></a></h2>
+<h2>Environment variables<a class="headerlink" href="#environment-variables" title="Link to this heading"></a></h2>
 <section id="pipelinewise-home">
-<h3><cite>PIPELINEWISE_HOME</cite><a class="headerlink" href="#pipelinewise-home" title="Permalink to this heading"></a></h3>
+<h3><cite>PIPELINEWISE_HOME</cite><a class="headerlink" href="#pipelinewise-home" title="Link to this heading"></a></h3>
 <p>Configures the directory at which PipelineWise expects to find installed tap and targets.</p>
 </section>
 <section id="pipelinewise-config-directory">
-<h3><cite>PIPELINEWISE_CONFIG_DIRECTORY</cite><a class="headerlink" href="#pipelinewise-config-directory" title="Permalink to this heading"></a></h3>
+<h3><cite>PIPELINEWISE_CONFIG_DIRECTORY</cite><a class="headerlink" href="#pipelinewise-config-directory" title="Link to this heading"></a></h3>
 <p>Overrides the default directory at which PipelineWise expects to find configuration files generated by <cite>pipelinewise import</cite>.</p>
 </section>
 </section>

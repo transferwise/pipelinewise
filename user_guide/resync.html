@@ -1,26 +1,24 @@
+
+
 <!DOCTYPE html>
-<html class="writer-html5" lang="en">
+<html class="writer-html5" lang="en" data-content_root="../">
 <head>
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Resync Tables &mdash; PipelineWise  documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=80d5e7a1" />
-      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=19f00094" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
       <link rel="stylesheet" type="text/css" href="../_static/css/custom.css?v=1c6dfede" />
 
   
     <link rel="shortcut icon" href="../_static/pipelinewise.png"/>
     <link rel="canonical" href="https://docs.ansible.com/ansible/latest/user_guide/resync.html"/>
-  <!--[if lt IE 9]>
-    <script src="../_static/js/html5shiv.min.js"></script>
-  <![endif]-->
-  
-        <script src="../_static/jquery.js?v=5d32c60e"></script>
-        <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js?v=b3ba4146"></script>
-        <script src="../_static/doctools.js?v=888ff710"></script>
-        <script src="../_static/sphinx_highlight.js?v=4825356b"></script>
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
@@ -39,9 +37,6 @@
           <a href="../index.html" class="icon icon-home">
             PipelineWise
           </a>
-              <div class="version">
-                0.65.3
-              </div>
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
     <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
@@ -117,7 +112,7 @@
            <div itemprop="articleBody">
              
   <section id="resync-tables">
-<span id="resync"></span><h1>Resync Tables<a class="headerlink" href="#resync-tables" title="Permalink to this heading"></a></h1>
+<span id="resync"></span><h1>Resync Tables<a class="headerlink" href="#resync-tables" title="Link to this heading"></a></h1>
 <p>Sometimes you will need to resync tables in ad-hoc bases. For example when
 binlog position deleted in MySQL or when a database migrated to another server
 and previous CDC bookmarks are not transferable, etc.</p>
@@ -161,6 +156,13 @@ this setting is optional and even yet you can force the resync by using <code cl
 <span class="w">  </span><span class="nt">table_mb</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">&lt;integer/float&gt;</span>
 </pre></div>
 </div>
+</div>
+<div class="admonition attention">
+<p class="admonition-title">Attention</p>
+<p>There is an option to chose tables for re-sync which has a specific replication method by <code class="docutils literal notranslate"><span class="pre">--replication_method_only</span> <span class="pre">&lt;name</span> <span class="pre">of</span> <span class="pre">replication</span> <span class="pre">method&gt;</span></code></p>
+<blockquote>
+<div><p>$ pipelinewise sync_tables –target &lt;target_id&gt; –tap &lt;tap_id&gt; –replication_method_only log_based</p>
+</div></blockquote>
 </div>
 <ol class="arabic simple" start="2">
 <li><p><strong>Partial resync</strong></p></li>

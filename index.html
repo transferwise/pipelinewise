@@ -1,26 +1,24 @@
+
+
 <!DOCTYPE html>
-<html class="writer-html5" lang="en">
+<html class="writer-html5" lang="en" data-content_root="./">
 <head>
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Notice &mdash; PipelineWise  documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=80d5e7a1" />
-      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=19f00094" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
       <link rel="stylesheet" type="text/css" href="_static/css/custom.css?v=1c6dfede" />
 
   
     <link rel="shortcut icon" href="_static/pipelinewise.png"/>
     <link rel="canonical" href="https://docs.ansible.com/ansible/latest/index.html"/>
-  <!--[if lt IE 9]>
-    <script src="_static/js/html5shiv.min.js"></script>
-  <![endif]-->
-  
-        <script src="_static/jquery.js?v=5d32c60e"></script>
-        <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js?v=b3ba4146"></script>
-        <script src="_static/doctools.js?v=888ff710"></script>
-        <script src="_static/sphinx_highlight.js?v=4825356b"></script>
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
@@ -38,9 +36,6 @@
           <a href="#" class="icon icon-home">
             PipelineWise
           </a>
-              <div class="version">
-                0.65.3
-              </div>
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
     <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
@@ -116,21 +111,22 @@
            <div itemprop="articleBody">
              
   <section id="notice">
-<h1>Notice<a class="headerlink" href="#notice" title="Permalink to this heading"></a></h1>
+<h1>Notice<a class="headerlink" href="#notice" title="Link to this heading"></a></h1>
 <p>To better serve Wise business and customer needs, the PipelineWise codebase needs to shrink.
 We have made the difficult decision that, going forward many components of PipelineWise will be removed or incorporated in the main repo.
 The last version before this decision is <a class="reference external" href="https://github.com/transferwise/pipelinewise/tree/v0.64.1">v0.64.1</a></p>
 <p>We thank all in the open-source community, that over the past 6 years, have helped to make PipelineWise a robust product for heterogeneous replication of many many Terabytes, daily</p>
-<a class="reference internal image-reference" href="_images/pipelinewise-with-text.png"><img alt="_images/pipelinewise-with-text.png" src="_images/pipelinewise-with-text.png" style="width: 300px;" /></a>
+<a class="reference internal image-reference" href="_images/pipelinewise-with-text.png"><img alt="_images/pipelinewise-with-text.png" src="_images/pipelinewise-with-text.png" style="width: 300px;" />
+</a>
 </section>
 <section id="documentation">
-<h1>Documentation<a class="headerlink" href="#documentation" title="Permalink to this heading"></a></h1>
+<h1>Documentation<a class="headerlink" href="#documentation" title="Link to this heading"></a></h1>
 <p>PipelineWise is a Data Pipeline Framework using the <a class="reference external" href="https://www.singer.io/">Singer.io</a>
 specification to ingest and replicate data from various sources to various destinations.</p>
 <img alt="_images/pipelinewise-diagram-circle-bold.png" src="_images/pipelinewise-diagram-circle-bold.png" />
 <hr class="docutils" />
 <section id="features">
-<h2>Features<a class="headerlink" href="#features" title="Permalink to this heading"></a></h2>
+<h2>Features<a class="headerlink" href="#features" title="Link to this heading"></a></h2>
 <ul class="simple">
 <li><p><strong>Built with ELT in mind</strong>: PipelineWise fits into the ELT landscape and is not a traditional ETL tool. PipelineWise aims to reproduce the data from the source to an Analytics-Data-Store in as close to the original format as possible. Some minor load time transformations are supported but complex mapping and joins have to be done in the Analytics-Data-Store to extract meaning.</p></li>
 <li><p><strong>Lightweight</strong>: No daemons or database setup are required</p></li>
@@ -142,7 +138,7 @@ specification to ingest and replicate data from various sources to various desti
 </ul>
 </section>
 <section id="beyond-the-horizon">
-<h2>Beyond the Horizon<a class="headerlink" href="#beyond-the-horizon" title="Permalink to this heading"></a></h2>
+<h2>Beyond the Horizon<a class="headerlink" href="#beyond-the-horizon" title="Link to this heading"></a></h2>
 <p>PipelineWise is built on top of several <a class="reference external" href="https://www.singer.io/">Singer.io</a> components. Singer.io components
 are responsible for certain tasks like extracting data from a specific data source or loading data into a
 specific destination, however to replicate data end to end you’ll need an extra layer on top of these components to
@@ -152,19 +148,19 @@ targets to add the required functionalities to create, run and maintain data pip
 environment without the extra hassle.</p>
 </section>
 <section id="taps-data-source-connectors">
-<h2>Taps (Data Source Connectors)<a class="headerlink" href="#taps-data-source-connectors" title="Permalink to this heading"></a></h2>
+<h2>Taps (Data Source Connectors)<a class="headerlink" href="#taps-data-source-connectors" title="Link to this heading"></a></h2>
 <p><a class="reference internal" href="connectors/taps.html#taps-list"><span class="std std-ref">Taps (Data Sources)</span></a></p>
 </section>
 <section id="target-destination-connectors">
-<h2>Target (Destination Connectors)<a class="headerlink" href="#target-destination-connectors" title="Permalink to this heading"></a></h2>
+<h2>Target (Destination Connectors)<a class="headerlink" href="#target-destination-connectors" title="Link to this heading"></a></h2>
 <p><a class="reference internal" href="connectors/targets.html#targets-list"><span class="std std-ref">Targets (Destinations)</span></a></p>
 </section>
 <section id="transformation-at-load-time">
-<h2>Transformation at load time<a class="headerlink" href="#transformation-at-load-time" title="Permalink to this heading"></a></h2>
+<h2>Transformation at load time<a class="headerlink" href="#transformation-at-load-time" title="Link to this heading"></a></h2>
 <p><a class="reference internal" href="user_guide/transformations.html#transformations"><span class="std std-ref">Transformations</span></a></p>
 </section>
 <section id="content">
-<h2>Content<a class="headerlink" href="#content" title="Permalink to this heading"></a></h2>
+<h2>Content<a class="headerlink" href="#content" title="Link to this heading"></a></h2>
 <div class="toctree-wrapper compound">
 <p class="caption" role="heading"><span class="caption-text">Installation</span></p>
 <ul>
@@ -296,7 +292,7 @@ environment without the extra hassle.</p>
 </section>
 </section>
 <section id="indices-and-tables">
-<h1>Indices and tables<a class="headerlink" href="#indices-and-tables" title="Permalink to this heading"></a></h1>
+<h1>Indices and tables<a class="headerlink" href="#indices-and-tables" title="Link to this heading"></a></h1>
 <ul class="simple">
 <li><p><a class="reference internal" href="genindex.html"><span class="std std-ref">Index</span></a></p></li>
 <li><p><a class="reference internal" href="py-modindex.html"><span class="std std-ref">Module Index</span></a></p></li>

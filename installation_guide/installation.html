@@ -1,26 +1,24 @@
+
+
 <!DOCTYPE html>
-<html class="writer-html5" lang="en">
+<html class="writer-html5" lang="en" data-content_root="../">
 <head>
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Installation &mdash; PipelineWise  documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=80d5e7a1" />
-      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=19f00094" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
       <link rel="stylesheet" type="text/css" href="../_static/css/custom.css?v=1c6dfede" />
 
   
     <link rel="shortcut icon" href="../_static/pipelinewise.png"/>
     <link rel="canonical" href="https://docs.ansible.com/ansible/latest/installation_guide/installation.html"/>
-  <!--[if lt IE 9]>
-    <script src="../_static/js/html5shiv.min.js"></script>
-  <![endif]-->
-  
-        <script src="../_static/jquery.js?v=5d32c60e"></script>
-        <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js?v=b3ba4146"></script>
-        <script src="../_static/doctools.js?v=888ff710"></script>
-        <script src="../_static/sphinx_highlight.js?v=4825356b"></script>
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
@@ -39,9 +37,6 @@
           <a href="../index.html" class="icon icon-home">
             PipelineWise
           </a>
-              <div class="version">
-                0.65.3
-              </div>
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
     <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
@@ -126,9 +121,9 @@
            <div itemprop="articleBody">
              
   <section id="installation">
-<span id="intro-installation-guide"></span><span id="installation-guide"></span><h1>Installation<a class="headerlink" href="#installation" title="Permalink to this heading"></a></h1>
+<span id="intro-installation-guide"></span><span id="installation-guide"></span><h1>Installation<a class="headerlink" href="#installation" title="Link to this heading"></a></h1>
 <section id="getting-pipelinewise">
-<h2>Getting PipelineWise<a class="headerlink" href="#getting-pipelinewise" title="Permalink to this heading"></a></h2>
+<h2>Getting PipelineWise<a class="headerlink" href="#getting-pipelinewise" title="Link to this heading"></a></h2>
 <p>PipelineWise source code is available on GitHub at <a class="reference external" href="https://github.com/transferwise/pipelinewise">https://github.com/transferwise/pipelinewise</a>
 and can be installed in the following methods:</p>
 <ul class="simple">
@@ -153,7 +148,7 @@ at runtime.</p>
 </div>
 </section>
 <section id="running-in-docker">
-<span id="id1"></span><h2>Running in Docker<a class="headerlink" href="#running-in-docker" title="Permalink to this heading"></a></h2>
+<span id="id1"></span><h2>Running in Docker<a class="headerlink" href="#running-in-docker" title="Link to this heading"></a></h2>
 <p>Running PipelineWise from docker is usually the easiest and the recommended method. We will
 build an executable docker images that has every required dependency and it’s isolated from
 your host system. First you need to install docker on your computer:</p>
@@ -186,7 +181,7 @@ Tap<span class="w"> </span>ID<span class="w">    </span>Tap<span class="w"> </sp
 <p>From this point, you can go to the <a class="reference internal" href="creating_pipelines.html#creating-pipelines"><span class="std std-ref">Creating Pipelines</span></a> section to create pipelines and to start replicating data.</p>
 </section>
 <section id="installing-from-source">
-<span id="building-from-source"></span><h2>Installing from source<a class="headerlink" href="#installing-from-source" title="Permalink to this heading"></a></h2>
+<span id="building-from-source"></span><h2>Installing from source<a class="headerlink" href="#installing-from-source" title="Link to this heading"></a></h2>
 <p>When building PipelineWise from source make sure that every OS dependencies are installed:</p>
 <ul class="simple">
 <li><p>Ubuntu: <code class="docutils literal notranslate"><span class="pre">apt-get</span> <span class="pre">install</span> <span class="pre">python3-dev</span> <span class="pre">python3-pip</span> <span class="pre">python3-venv</span></code></p></li>
@@ -218,7 +213,7 @@ To<span class="w"> </span>start<span class="w"> </span>CLI:
 </pre></div>
 </div>
 <section id="selecting-singer-connectors">
-<span id="id2"></span><h3>Selecting singer connectors<a class="headerlink" href="#selecting-singer-connectors" title="Permalink to this heading"></a></h3>
+<span id="id2"></span><h3>Selecting singer connectors<a class="headerlink" href="#selecting-singer-connectors" title="Link to this heading"></a></h3>
 <p>You can install PipelineWise only with required connectors by using the <code class="docutils literal notranslate"><span class="pre">--connectors=</span></code> argument. For example if you
 need to replicate data only from MySQL and PostgreSQL into a Snowflake database you can install PipelineWise by
 running:</p>
@@ -347,7 +342,7 @@ was successful.</p>
 </section>
 </section>
 <section id="cool-what-s-next">
-<h2>Cool, what’s Next?<a class="headerlink" href="#cool-what-s-next" title="Permalink to this heading"></a></h2>
+<h2>Cool, what’s Next?<a class="headerlink" href="#cool-what-s-next" title="Link to this heading"></a></h2>
 <p>From this point, you can go to the <a class="reference internal" href="creating_pipelines.html#creating-pipelines"><span class="std std-ref">Creating Pipelines</span></a> section to create pipelines and to start replicating data.</p>
 </section>
 </section>
