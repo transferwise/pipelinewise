@@ -1,3 +1,8 @@
+0.67.0 (2024-11-19)
+-------------------
+- Fix map date column to correct Postgres type
+- New argument for sync tables to select replication method
+
 0.66.1 (2024-10-31)
 -------------------
 - Bug fix for partial sync multiprocessing
