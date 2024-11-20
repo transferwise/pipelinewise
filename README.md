@@ -90,15 +90,15 @@ If you have [Docker](https://www.docker.com/) installed then using docker is the
 
 PipelineWise images are built on each release and available on [Dockerhub](https://hub.docker.com/r/transferwiseworkspace/pipelinewise)
 
-    ```sh
-    $ docker pull transferwiseworkspace/pipelinewise
-    ```
+```sh
+$ docker pull transferwiseworkspace/pipelinewise
+```
 
 #### Build your own docker image
 
 1. Build an executable docker image that has every required dependency and is isolated from your host system.
 
-By default, the image will build with *all* connectors. In order to keep image size small, we strongly recommend you change it to just the connectors you need by supplying the `--build-arg` command:
+    By default, the image will build with *all* connectors. In order to keep image size small, we strongly recommend you change it to just the connectors you need by supplying the `--build-arg` command:
 
     ```sh
     $ docker build --build-arg connectors=tap-mysql,target-snowflake -t pipelinewise:latest .
