@@ -8,6 +8,8 @@ import signal
 import sys
 import json
 import copy
+from csv import excel
+
 import psutil
 import pidfile
 
@@ -1863,6 +1865,39 @@ class PipelineWise:
             if cons_target_config:
                 utils.silentremove(cons_target_config)
 
+    def reset_state(self):
+        """Reset state file"""
+
+        if self.tap.get("type") == 'tap-postgres':
+            self._update_state_file('lsn', 1)
+            self.logger.info('state file is reset for log based tables!')
+        else:
+            self.logger.error('state reset is not supported for %s (%s)!',
+                              self.tap.get("id"), self.tap.get("type"))
+            raise SystemExit(1)
+
+
+    def _update_state_file(self, table_property, new_value):
+        tap_state = self.tap['files']['state']
+        try:
+            with open(tap_state, 'r', encoding='utf8') as state_file:
+                state_content = json.load(state_file)
+                bookmarks = state_content.get('bookmarks')
+                for table, properties in bookmarks.items():
+                    if table_property in properties:
+                        bookmarks[table][table_property] = new_value
+                state_content['bookmarks'] = bookmarks
+
+            with open(tap_state, 'w', encoding='utf8') as state_file:
+                json.dump(state_content, state_file, indent=4)
+
+        except Exception as exp:
+            self.logger.error(exp)
+            raise SystemExit(1) from exp
+
+
+
+
     @staticmethod
     def _remove_not_partial_synced_tables_from_properties(tap_params, not_synced_tables):
         """" Remove partial sync table which are not synced yet from properties """
@@ -1888,7 +1923,7 @@ class PipelineWise:
             filtered_bookmarks = dict(filter(lambda k: k[0] not in selected_partial_sync_tables, bookmarks.items()))
             state_content['bookmarks'] = filtered_bookmarks
             with open(tap_state, 'w', encoding='utf8') as state_file:
-                json.dump(state_content, state_file)
+                json.dump(state_content, state_file, indent=4)
 
     def _check_supporting_tap_and_target_for_partial_sync(self):
         tap_type = self.tap['type']
@@ -2088,7 +2123,7 @@ TAP RUN SUMMARY
                         bookmarks.pop(table_name.replace('"', ''), None)
 
                 state_file.seek(0)
-                json.dump(state_data, state_file)
+                json.dump(state_data, state_file, indent=4)
                 state_file.truncate()
 
         except FileNotFoundError:
