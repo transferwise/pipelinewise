@@ -8,7 +8,6 @@ import signal
 import sys
 import json
 import copy
-from csv import excel
 
 import psutil
 import pidfile
