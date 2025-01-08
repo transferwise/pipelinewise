@@ -1868,12 +1868,12 @@ class PipelineWise:
     def reset_state(self):
         """Reset state file"""
 
-        if self.tap.get("type") == 'tap-postgres':
+        if self.tap.get('type') == 'tap-postgres':
             self._update_state_file('lsn', 1)
             self.logger.info('state file is reset for log based tables!')
         else:
             self.logger.error('state reset is not supported for %s (%s)!',
-                              self.tap.get("id"), self.tap.get("type"))
+                              self.tap.get('id'), self.tap.get('type'))
             raise SystemExit(1)
 
 
