@@ -1875,7 +1875,6 @@ class PipelineWise:
                               self.tap.get('id'), self.tap.get('type'))
             raise SystemExit(1)
 
-
     def _update_state_file(self, table_property, new_value):
         tap_state = self.tap['files']['state']
         try:
@@ -1893,9 +1892,6 @@ class PipelineWise:
         except Exception as exp:
             self.logger.error(exp)
             raise SystemExit(1) from exp
-
-
-
 
     @staticmethod
     def _remove_not_partial_synced_tables_from_properties(tap_params, not_synced_tables):
