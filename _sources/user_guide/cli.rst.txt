@@ -135,6 +135,18 @@ Validates a project directory with YAML tap and target files.
 :--dir: relative path to the project directory with YAML taps and targets.
 
 
+reset_state
+"""""""""""
+
+Reset state file for log based tables. It works only for PostgresSQL databases!
+
+:--target: Target connector id
+
+:--tap: Tap connector id
+
+.. _cli_reset_state:
+
+
 Environment variables
 ---------------------
 

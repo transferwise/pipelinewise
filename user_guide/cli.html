@@ -7,7 +7,7 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Command Line Interface &mdash; PipelineWise  documentation</title>
-      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
       <link rel="stylesheet" type="text/css" href="../_static/css/custom.css?v=1c6dfede" />
 
@@ -77,6 +77,7 @@
 <li class="toctree-l3"><a class="reference internal" href="#sync-tables">sync_tables</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#import">import</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#validate">validate</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#reset-state">reset_state</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="#environment-variables">Environment variables</a><ul>
@@ -259,9 +260,21 @@ the tap and target connectors into <code class="docutils literal notranslate"><s
 </dd>
 </dl>
 </section>
+<section id="reset-state">
+<h3>reset_state<a class="headerlink" href="#reset-state" title="Link to this heading"></a></h3>
+<p>Reset state file for log based tables. It works only for PostgresSQL databases!</p>
+<dl class="field-list simple">
+<dt class="field-odd">–target<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Target connector id</p>
+</dd>
+<dt class="field-even">–tap<span class="colon">:</span></dt>
+<dd class="field-even"><p>Tap connector id</p>
+</dd>
+</dl>
+</section>
 </section>
 <section id="environment-variables">
-<h2>Environment variables<a class="headerlink" href="#environment-variables" title="Link to this heading"></a></h2>
+<span id="cli-reset-state"></span><h2>Environment variables<a class="headerlink" href="#environment-variables" title="Link to this heading"></a></h2>
 <section id="pipelinewise-home">
 <h3><cite>PIPELINEWISE_HOME</cite><a class="headerlink" href="#pipelinewise-home" title="Link to this heading"></a></h3>
 <p>Configures the directory at which PipelineWise expects to find installed tap and targets.</p>
@@ -284,7 +297,7 @@ the tap and target connectors into <code class="docutils literal notranslate"><s
   <hr/>
 
   <div role="contentinfo">
-    <p>&#169; Copyright 2024, Wise Ltd..</p>
+    <p>&#169; Copyright 2025, Wise Ltd..</p>
   </div>
 
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
