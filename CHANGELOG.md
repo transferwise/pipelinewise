@@ -1,4 +1,4 @@
-0.67.0 (2024-11-19)
+0.67.0 (2024-11-10)
 -------------------
 - Fix map date column to correct Postgres type
 - New argument for sync tables to select replication method
