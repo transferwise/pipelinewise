@@ -1,6 +1,7 @@
 0.68.0 (2025-01-09)
 -------------------
 - Add `reset_state` command for resetting state of PG taps
+- Bump `requests` from `2.20.0` to `2.32.2` in `/singer-connectors/tap-github`
 
 0.67.0 (2024-11-19)
 -------------------
