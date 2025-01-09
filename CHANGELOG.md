@@ -1,3 +1,7 @@
+0.68.0 (2025-01-09)
+-------------------
+- Add `reset_state` command for resetting state of PG taps
+
 0.67.0 (2024-11-19)
 -------------------
 - Fix map date column to correct Postgres type
