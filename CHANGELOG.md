@@ -1,3 +1,31 @@
+0.67.0 (2024-11-19)
+-------------------
+- Fix map date column to correct Postgres type
+- New argument for sync tables to select replication method
+
+0.66.1 (2024-10-31)
+-------------------
+- Bug fix for partial sync multiprocessing
+
+
+0.66.0 (2024-10-11)
+-------------------
+- Bump programming language to Python 3.10
+- Bump `ansible-core` from `2.11.8` to `2.17.5`
+- Bump `tzlocal` from `2.1.*` to `4.0.2` in `tap-mongodb`
+- Bump `tzlocal` from `2.1` to `4.0.2` in `tap-mysql`
+- Bump `pipelinewise-singer-python` from `1.*` to `2.*` in `target-postgres`
+- Bump `pipelinewise-singer-python` from `1.*` to `2.*` in `target-snowflake`
+
+
+0.65.3 (2024-09-13)
+-------------------
+- Bump `zenpy` in `tap-zendesk` from `2.0.0` to `2.0.52`
+
+0.65.2 (2024-09-05)
+-------------------
+- Pin tap-zendesk to v1.2.1
+
 0.65.0 (2024-08-27)
 -------------------
 - Remove FastSync for target Redshift

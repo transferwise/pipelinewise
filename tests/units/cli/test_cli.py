@@ -1077,3 +1077,33 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
                 'partial_sync': {'baz': 'PARTIAL', 'par': 'PARTIAL_par'}
             }
             assert actual_selected_tables == expected_selected_tables
+
+    def test_get_sync_tables_if_using_replication_method_only(self):
+        """Test if the method for getting list of tables for syncing returns only tables with selected
+        replication method"""
+        tables = 'foo,foo_bar,foo_bar_baz,bar_baz,bar,par,par_foo'
+        with patch('pipelinewise.cli.pipelinewise.utils.load_json') as mocked_load_json:
+            self.pipelinewise.tap = {
+                'files': {
+                    'selection': 'foo.json'
+                }
+            }
+            mocked_load_json.return_value = {
+                'selection': [
+                    {'tap_stream_id': 'foo', 'replication_method': 'FULL_TABLE'},
+                    {'tap_stream_id': 'foo_bar', 'replication_method': 'LOG_BASED'},
+                    {'tap_stream_id': 'foo_bar_baz', 'replication_method': 'INCREMENTAL'},
+                    {'tap_stream_id': 'bar_baz', 'replication_method': 'FULL_TABLE'},
+                    {'tap_stream_id': 'bar', 'replication_method': 'LOG_BASED'},
+                    {'tap_stream_id': 'par', 'sync_start_from': 'PARTIAL_par', 'replication_method': 'INCREMENTAL'},
+                    {'tap_stream_id': 'par_foo', 'sync_start_from': 'PARTIAL_par_foo',
+                     'replication_method': 'LOG_BASED'}
+                ]
+            }
+            actual_selected_tables = self.pipelinewise._get_sync_tables_setting_from_selection_file(
+                tables, replication_method_only='log_based')
+            expected_selected_tables = {
+                'full_sync': ['foo_bar', 'bar'],
+                'partial_sync': {'par_foo': 'PARTIAL_par_foo'}
+            }
+            assert actual_selected_tables == expected_selected_tables

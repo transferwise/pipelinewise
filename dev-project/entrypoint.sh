@@ -4,6 +4,14 @@ set -e
 
 apt update
 
+rm -f /usr/bin/python3
+ln -s /usr/bin/python3.8 /usr/bin/python3
+
+apt install -y software-properties-common python3-apt
+add-apt-repository ppa:deadsnakes/ppa
+apt update
+
+
 DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC apt-get -y install tzdata
 
 apt install -y --no-install-recommends \
@@ -16,7 +24,10 @@ apt install -y --no-install-recommends \
   mariadb-client \
   mbuffer \
   postgresql-client \
-  python3.8 python3-pip python3-venv python3-dev
+  python3.10 python3-pip python3.10-venv python3.10-dev
+
+rm /usr/bin/python3
+ln -s /usr/bin/python3.10 /usr/bin/python3
 
 apt upgrade -y
 # rm -rf /var/lib/apt/lists/* \

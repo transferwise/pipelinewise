@@ -121,6 +121,7 @@ services:
       --tlsMode requireTLS
       --tlsAllowConnectionsWithoutCertificates
       --tlsCertificateKeyFile /etc/ssl/mongodb.pem
+      --tlsAllowInvalidHostnames
       --tlsCAFile /etc/ssl/rootCA.pem
       --quiet
     networks:

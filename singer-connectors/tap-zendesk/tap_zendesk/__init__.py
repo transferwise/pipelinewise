@@ -3,13 +3,12 @@
 import json
 import os
 import sys
-import itertools
-import requests
-import singer
 
 from zenpy import Zenpy
+import requests
 from requests import Session
 from requests.adapters import HTTPAdapter
+import singer
 from singer import metadata, metrics as singer_metrics
 from tap_zendesk import metrics as zendesk_metrics
 from tap_zendesk.discover import discover_streams
@@ -37,15 +36,11 @@ API_TOKEN_CONFIG_KEYS = [
 # patch Session.request to record HTTP request metrics
 request = Session.request
 
-
 def request_metrics_patch(self, method, url, **kwargs):
     with singer_metrics.http_request_timer(None):
         return request(self, method, url, **kwargs)
 
-
 Session.request = request_metrics_patch
-
-
 # end patch
 
 def do_discover(client):
@@ -54,10 +49,8 @@ def do_discover(client):
     json.dump(catalog, sys.stdout, indent=2)
     LOGGER.info("Finished discover")
 
-
 def stream_is_selected(mdata):
     return mdata.get((), {}).get('selected', False)
-
 
 def get_selected_streams(catalog):
     selected_stream_names = []
@@ -72,23 +65,21 @@ SUB_STREAMS = {
     'tickets': ['ticket_audits', 'ticket_metrics', 'ticket_comments']
 }
 
-
 def get_sub_stream_names():
-    """
-    Get all sub_streams as one list
-    """
-    return list(itertools.chain(*SUB_STREAMS.values()))
-
+    sub_stream_names = []
+    for parent_stream in SUB_STREAMS:
+        sub_stream_names.extend(SUB_STREAMS[parent_stream])
+    return sub_stream_names
 
 class DependencyException(Exception):
     pass
-
 
 def validate_dependencies(selected_stream_ids):
     errs = []
     msg_tmpl = ("Unable to extract {0} data. "
                 "To receive {0} data, you also need to select {1}.")
-    for parent_stream_name, sub_stream_names in SUB_STREAMS.items():
+    for parent_stream_name in SUB_STREAMS:
+        sub_stream_names = SUB_STREAMS[parent_stream_name]
         for sub_stream_name in sub_stream_names:
             if sub_stream_name in selected_stream_ids and parent_stream_name not in selected_stream_ids:
                 errs.append(msg_tmpl.format(sub_stream_name, parent_stream_name))
@@ -96,15 +87,14 @@ def validate_dependencies(selected_stream_ids):
     if errs:
         raise DependencyException(" ".join(errs))
 
-
 def populate_class_schemas(catalog, selected_stream_names):
     for stream in catalog.streams:
         if stream.tap_stream_id in selected_stream_names:
             STREAMS[stream.tap_stream_id].stream = stream
 
-
 # pylint: disable=too-many-locals
 def do_sync(client, catalog, state, start_date):
+
     selected_stream_names = get_selected_streams(catalog)
     validate_dependencies(selected_stream_names)
     populate_class_schemas(catalog, selected_stream_names)
@@ -126,6 +116,7 @@ def do_sync(client, catalog, state, start_date):
         #         continue
         # else:
         #     LOGGER.info("%s: Starting", stream_name)
+
 
         key_properties = metadata.get(mdata, (), 'table-key-properties')
         singer.write_schema(stream_name, stream.schema.to_dict(), key_properties)
@@ -155,7 +146,6 @@ def do_sync(client, catalog, state, start_date):
     LOGGER.info("Finished sync")
     zendesk_metrics.log_aggregate_rates()
 
-
 def oauth_auth(args):
     if not set(OAUTH_CONFIG_KEYS).issubset(args.config.keys()):
         LOGGER.debug("OAuth authentication unavailable.")
@@ -166,7 +156,6 @@ def oauth_auth(args):
         "subdomain": args.config['subdomain'],
         "oauth_token": args.config['access_token'],
     }
-
 
 def api_token_auth(args):
     if not set(API_TOKEN_CONFIG_KEYS).issubset(args.config.keys()):
@@ -180,19 +169,16 @@ def api_token_auth(args):
         "token": args.config['api_token']
     }
 
-
 def convert_x_rate_limit_remaining_to_int(response, *args, **kwargs):
     if 'X-Rate-Limit-Remaining' in response.headers and isinstance(response.headers['X-Rate-Limit-Remaining'], str):
         response.headers['X-Rate-Limit-Remaining'] = int(response.headers['X-Rate-Limit-Remaining'])
 
     return response
 
-
 def add_session_hooks(session):
     # This is due version conflict between singer-python and ZenPy
     # Link: https://github.com/singer-io/singer-python/issues/114
     session.hooks['response'].append(convert_x_rate_limit_remaining_to_int)
-
 
 def get_session(config):
     """ Add partner information to requests Session object if specified in the config. """
@@ -217,14 +203,12 @@ def get_default_config():
 
     return config
 
-
 def get_internal_config(user_config, default_config):
     config = {}
     for key in default_config.keys():
         config[key] = user_config.get(key, default_config[key])
 
     return config
-
 
 @singer.utils.handle_top_exception(LOGGER)
 def main():
@@ -235,7 +219,7 @@ def main():
     # OAuth has precedence
     creds = oauth_auth(parsed_args) or api_token_auth(parsed_args)
     session = get_session(parsed_args.config)
-    client = Zenpy(session=session, ratelimit=internal_config['rate_limit'], **creds)
+    client = Zenpy(session=session, proactive_ratelimit=internal_config['rate_limit'], **creds)
     client.internal_config = internal_config
 
     add_session_hooks(client.tickets.session)

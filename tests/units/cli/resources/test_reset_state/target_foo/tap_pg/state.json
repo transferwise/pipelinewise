@@ -1,0 +1,10 @@
+{
+    "bookmarks": {
+        "foo_table": {
+            "lsn": 456321
+        },
+        "bar_table": {
+            "foo": "bar"
+        }
+    }
+}

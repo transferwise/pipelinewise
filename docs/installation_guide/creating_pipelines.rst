@@ -46,11 +46,9 @@ This will create a ``pipelinewise_samples`` directory with samples for each supp
         ├── tap_mysql_mariadb.yml.sample
         ├── tap_postgres.yml.sample
         ├── tap_s3_csv.yml.sample
-        ├── tap_salesforce.yml.sample
         ├── tap_snowflake.yml.sample
         ├── tap_zendesk.yml.sample
         ├── target_postgres.yml.sample
-        ├── target_redshift.yml.sample
         ├── target_s3_csv.yml.sample
         └── target_snowflake.yml.sample
 
@@ -71,7 +69,7 @@ Once you configured the YAML files you can go to :ref:`import_project_from_yaml`
 Environment variables in YAML config
 ------------------------------------
 
-It is possible to use environment variables in the YAML config files. 
+It is possible to use environment variables in the YAML config files.
 This feature is implemented using jinja templates and requires the following syntax to work:
 
 .. code-block:: bash
@@ -156,7 +154,7 @@ You can edit it with the text editor of your choice:
       port: 10602
       user: "my_user"
       password: "<PASSWORD>"                  # Plain string or Vault Encrypted password
-      
+
     target: "snowflake_test"                  # Target ID, should match the id from target_snowflake.yml
     batch_size_rows: 100000                   # Batch size for the stream to optimise load performance
 

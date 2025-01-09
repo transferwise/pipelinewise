@@ -6,8 +6,8 @@ with open('README.md') as f:
     LONG_DESCRIPTION = f.read()
 
 setup(name='pipelinewise',
-      python_requires='==3.8.*',
-      version='0.65.1',
+      python_requires='==3.10.*',
+      version='0.67.0',
       description='PipelineWise',
       long_description=LONG_DESCRIPTION,
       long_description_content_type='text/markdown',
@@ -16,17 +16,18 @@ setup(name='pipelinewise',
       classifiers=[
           'License :: OSI Approved :: Apache Software License',
           'Programming Language :: Python :: 3 :: Only',
-          'Programming Language :: Python :: 3.8',
+          'Programming Language :: Python :: 3.10',
       ],
       install_requires=[
           'argparse==1.4.0',
           'tabulate==0.8.9',
           'PyYAML==6.0',
-          'ansible-core==2.11.8',
+          'ansible-core==2.17.5',
           'Jinja2==3.1.2',
           'joblib==1.3.2',
           'PyMySQL==0.7.11',
           'psycopg2-binary==2.9.5',
+          'numpy==1.26.4',          #  numpy 2.X is not compatible with our used pandas
           'snowflake-connector-python[pandas]==3.0.4',
           'pipelinewise-singer-python==1.*',
           'python-pidfile==3.0.0',
