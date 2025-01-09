@@ -4,6 +4,8 @@ import re
 
 from typing import List, Set, Union
 from pathlib import Path
+from unittest import TestCase
+from contextlib import contextmanager
 
 from . import tasks
 from . import db
@@ -50,6 +52,65 @@ def assert_resync_tables_success(tap, target, profiling=False):
         assert_profiling_stats_files_created(
             stdout, 'sync_tables', ['fastsync'], tap, target
         )
+
+
+# pylint: disable=invalid-name
+def assert_partial_sync_table_success(tap_parameters, start_value, end_value):
+    """Partial sync a specific tap and make sure that it finished successfully and state file is created
+    with the right content"""
+
+    command = _get_command_for_partial_sync(tap_parameters, start_value, end_value)
+
+    [return_code, stdout, stderr] = tasks.run_command(command)
+    log_file = tasks.find_run_tap_log_file(stdout, 'partialsync')
+    assert_command_success(return_code, stdout, stderr, log_file)
+
+
+def assert_partial_sync_table_with_target_additional_columns(
+        tap_parameters, additional_column,
+        start_value, end_value):
+    """Assert partial sync table command with additional column in the target"""
+
+    # Add a new column in the target
+    tap_parameters['env'].add_column_into_target_sf(
+        tap_type=tap_parameters['tap_type'],
+        table=tap_parameters['table'],
+        new_column=additional_column
+    )
+
+    command = _get_command_for_partial_sync(tap_parameters, start_value, end_value)
+
+    [return_code, stdout, stderr] = tasks.run_command(command)
+    log_file = tasks.find_run_tap_log_file(stdout, 'partialsync')
+    assert_command_success(return_code, stdout, stderr, log_file)
+
+
+def assert_partial_sync_table_with_source_additional_columns(
+        tap_parameters, additional_column,
+        start_value, end_value):
+    """Assert partial sync table command with additional columns in the source"""
+
+    # Add a new column in the source
+    tap_parameters['env'].add_column_into_source(
+        tap_type=tap_parameters['tap_type'],
+        table=tap_parameters['table'],
+        new_column=additional_column
+    )
+
+    command = _get_command_for_partial_sync(tap_parameters, start_value, end_value)
+
+    [return_code, stdout, stderr] = tasks.run_command(command)
+    log_file = tasks.find_run_tap_log_file(stdout, 'partialsync')
+    assert_command_success(return_code, stdout, stderr, log_file)
+
+
+def assert_partial_sync_rows_in_target(env, tap_type, table, column, primary_key, expected_column_values):
+    """Assert only expected rows are synced in the target snowflake"""
+    records = env.get_records_from_target_snowflake(
+        tap_type=tap_type, table=table, column=column, primary_key=primary_key
+    )
+    list_of_column_values = [column[0] for column in records]
+    assert expected_column_values == list_of_column_values
 
 
 def assert_command_success(return_code, stdout, stderr, log_path=None):
@@ -178,18 +239,6 @@ def _map_tap_to_target_functions(
         'run_query_target_snowflake': {
             'target_sql_get_cols_fn': db.sql_get_columns_snowflake,
             'target_sql_dynamic_row_count_fn': db.sql_dynamic_row_count_snowflake,
-        },
-        # target-bigquery specific attributes and functions
-        'run_query_target_bigquery': {
-            'target_sql_get_cols_fn': db.sql_get_columns_bigquery,
-            'target_sql_get_table_cols_fn': db.sql_get_columns_for_table_bigquery,
-            'target_sql_dynamic_row_count_fn': db.sql_dynamic_row_count_bigquery,
-            'target_sql_safe_name_fn': db.safe_name_bigquery,
-        },
-        # target-redshift specific attributes and functions
-        'run_query_target_redshift': {
-            'target_sql_get_cols_fn': db.sql_get_columns_redshift,
-            'target_sql_dynamic_row_count_fn': db.sql_dynamic_row_count_redshift,
         },
     }
 
@@ -418,3 +467,30 @@ def assert_profiling_stats_files_created(
     if isinstance(tap, list):
         for tap_ in tap:
             assert f'tap_{tap_}.pstat' in pstat_files
+
+
+# pylint: disable=raise-missing-from
+@contextmanager
+def assert_not_raises(exc_type):
+    """Assert exception not raised"""
+    try:
+        yield None
+    except exc_type:
+        raise TestCase.failureException(f'{exc_type.__name__} raised!')
+
+
+def assert_record_count_in_sf(env, tap_type, table, expected_records, where_clause=''):
+    """Assert record count in target Snowflake"""
+    result = env.run_query_target_snowflake(
+        f'SELECT count(1) FROM ppw_e2e_{tap_type}{env.sf_schema_postfix}."{table.upper()}" {where_clause};'
+    )[0][0]
+    assert result == expected_records
+
+
+def _get_command_for_partial_sync(tap_parameters, start_value, end_value=None):
+    end_value_command = f' --end_value {end_value}' if end_value else ''
+    command = f'pipelinewise partial_sync_table --tap {tap_parameters["tap"]} --target {tap_parameters["target"]}' \
+              f' --table {tap_parameters["source_db"]}.{tap_parameters["table"]} --column {tap_parameters["column"]}' \
+              f' --start_value {start_value} --end_value {end_value}{end_value_command}'
+
+    return command

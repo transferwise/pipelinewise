@@ -1,0 +1,56 @@
+{
+  "type": ["null", "object"],
+  "additionalProperties": false,
+  "properties": {
+    "_sdc_repository": {
+      "type": ["string"]
+    },
+    "id": {
+      "type": ["null", "string"]
+    },
+    "url": {
+      "type": ["null", "string"]
+    },
+    "html_url": {
+      "type": ["null", "string"]
+    },
+    "target_commitish": {
+      "type": ["null", "string"]
+    },
+    "tag_name": {
+      "type": ["null", "string"]
+    },
+    "name": {
+      "type": ["null", "string"]
+    },
+    "body": {
+      "type": ["null", "string"]
+    },
+    "draft": {
+      "type": ["null", "boolean"]
+    },
+    "prerelease": {
+      "type": ["null", "boolean"]
+    },
+    "author": {
+      "type": ["null", "object"],
+      "additionalProperties": false,
+      "properties": {
+        "login": {
+          "type": ["null", "string"]
+        },
+        "id": {
+          "type": ["null", "integer"]
+        }
+      }
+    },
+    "created_at": {
+      "type": ["null", "string"],
+      "format": "date-time"
+    },
+    "published_at": {
+      "type": ["null", "string"],
+      "format": "date-time"
+    }
+  }
+}

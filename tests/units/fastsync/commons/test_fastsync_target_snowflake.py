@@ -81,6 +81,43 @@ class TestFastSyncTargetSnowflake(TestCase):
             'DROP TABLE IF EXISTS test_schema."TEST TABLE WITH SPACE_TEMP"',
         ])
 
+    def test_merge_tables(self):
+        """Validate if merge tables query is generated correctly"""
+        schema = 'test_schema'
+        source_table = 'source_table'
+        target_table = 'target_table'
+        list_of_columns = ['p1', 'col1', 'p2', 'col2', 'col3']
+        primary_keys = ['p1', 'p2']
+        on_clause = ' AND '.join(
+            [f'"{source_table.upper()}".{p.upper()} = "{target_table.upper()}".{p.upper()}' for p in primary_keys]
+        )
+        update_clause = ', '.join(
+            [f'"{target_table.upper()}".{c.upper()} = "{source_table.upper()}".{c.upper()}' for c in list_of_columns]
+        )
+        columns_for_insert = ', '.join([c.upper() for c in list_of_columns])
+        values = ', '.join([f'"{source_table.upper()}".{c.upper()}' for c in list_of_columns])
+
+        expected_merge_query = f'MERGE INTO {schema}."{target_table.upper()}" USING {schema}."{source_table.upper()}"' \
+                               f' ON {on_clause}' \
+                               f' WHEN MATCHED THEN UPDATE SET {update_clause}' \
+                               f' WHEN NOT MATCHED THEN INSERT ({columns_for_insert})' \
+                               f' VALUES ({values})'
+
+        self.snowflake.merge_tables(schema, source_table, target_table, list_of_columns, primary_keys)
+
+        self.assertListEqual(self.snowflake.executed_queries, [expected_merge_query])
+
+    def test_add_columns(self):
+        """Test add_column method works as expected"""
+        schema = 'test_schema'
+        table = 'test_table'
+        adding_columns = {'col1': 'type1', 'col2': 'type2'}
+        columns_query = ', '.join([f'{col_name} {col_type}' for col_name, col_type in adding_columns.items()])
+        expected_query = f'ALTER TABLE {schema}."{table.upper()}" ADD {columns_query}'
+
+        self.snowflake.add_columns(schema, table, adding_columns)
+        self.assertListEqual(self.snowflake.executed_queries, [expected_query])
+
     def test_create_table(self):
         """Validate if create table queries generated correctly"""
         # Create table with standard table and column names

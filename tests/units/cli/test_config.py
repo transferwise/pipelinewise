@@ -16,6 +16,24 @@ class TestConfig:
     Unit Tests for PipelineWise CLI Config class
     """
 
+    @staticmethod
+    def _get_config(json_config_dir, yaml_path):
+        # Load a full configuration set from YAML files
+        yaml_config_dir = f'{os.path.dirname(__file__)}/resources/{yaml_path}'
+        vault_secret = f'{os.path.dirname(__file__)}/resources/vault-secret.txt'
+        return Config.from_yamls(json_config_dir, yaml_config_dir, vault_secret)
+
+    @staticmethod
+    def _get_json_files_path(tap_id, json_config_dir):
+        return {
+            'main_config_json': f'{json_config_dir}/config.json',
+            'target_config_json': f'{json_config_dir}/test_snowflake_target/config.json',
+            'tap_config_json': f'{json_config_dir}/test_snowflake_target/{tap_id}/config.json',
+            'tap_inheritable_config_json': f'{json_config_dir}/test_snowflake_target/{tap_id}/inheritable_config.json',
+            'tap_selection_json': f'{json_config_dir}/test_snowflake_target/{tap_id}/selection.json',
+            'tap_transformation_json': f'{json_config_dir}/test_snowflake_target/{tap_id}/transformation.json',
+        }
+
     def test_constructor(self):
         """Test Config construction functions"""
         config = Config(PIPELINEWISE_TEST_HOME)
@@ -232,44 +250,16 @@ class TestConfig:
     def test_save_config(self):
         """Test config target and tap JSON save functionalities"""
 
-        # Load a full configuration set from YAML files
-        yaml_config_dir = '{}/resources/test_yaml_config'.format(
-            os.path.dirname(__file__)
-        )
-        vault_secret = '{}/resources/vault-secret.txt'.format(os.path.dirname(__file__))
-
         json_config_dir = './pipelinewise-test-config'
-        config = Config.from_yamls(json_config_dir, yaml_config_dir, vault_secret)
 
+        config = self._get_config(json_config_dir, yaml_path='test_yaml_config')
         # Save the config as singer compatible JSON files
         config.save()
 
-        # Check if every required JSON file created, both for target and tap
-        main_config_json = '{}/config.json'.format(json_config_dir)
-        target_config_json = '{}/test_snowflake_target/config.json'.format(
-            json_config_dir
-        )
-        tap_config_json = '{}/test_snowflake_target/mysql_sample/config.json'.format(
-            json_config_dir
-        )
-        tap_inheritable_config_json = (
-            '{}/test_snowflake_target/mysql_sample/inheritable_config.json'.format(
-                json_config_dir
-            )
-        )
-        tap_selection_json = (
-            '{}/test_snowflake_target/mysql_sample/selection.json'.format(
-                json_config_dir
-            )
-        )
-        tap_transformation_json = (
-            '{}/test_snowflake_target/mysql_sample/transformation.json'.format(
-                json_config_dir
-            )
-        )
+        json_files = self._get_json_files_path('mysql_sample', json_config_dir)
 
         # Check content of the generated JSON files
-        assert cli.utils.load_json(main_config_json) == {
+        assert cli.utils.load_json(json_files['main_config_json']) == {
             'alert_handlers': {
                 'slack': {
                     'token': 'Vault Encrypted Secret Fruit',
@@ -296,7 +286,7 @@ class TestConfig:
                 }
             ],
         }
-        assert cli.utils.load_json(target_config_json) == {
+        assert cli.utils.load_json(json_files['target_config_json']) == {
             'account': 'account',
             'aws_access_key_id': 'access_key_id',
             'aws_secret_access_key': 'secret_access_key',
@@ -310,15 +300,15 @@ class TestConfig:
             'user': 'user',
             'warehouse': 'MY_WAREHOUSE',
         }
-        assert cli.utils.load_json(tap_config_json) == {
+        assert cli.utils.load_json(json_files['tap_config_json']) == {
             'dbname': '<DB_NAME>',
             'host': '<HOST>',
             'port': 3306,
             'user': '<USER>',
             'password': '<PASSWORD>',
-            'server_id': cli.utils.load_json(tap_config_json)['server_id'],
+            'server_id': cli.utils.load_json(json_files['tap_config_json'])['server_id'],
         }
-        assert cli.utils.load_json(tap_selection_json) == {
+        assert cli.utils.load_json(json_files['tap_selection_json']) == {
             'selection': [
                 {
                     'replication_key': 'last_update',
@@ -328,8 +318,8 @@ class TestConfig:
                 {'replication_method': 'LOG_BASED', 'tap_stream_id': 'my_db-table_two'},
             ]
         }
-        assert cli.utils.load_json(tap_transformation_json) == {'transformations': []}
-        assert cli.utils.load_json(tap_inheritable_config_json) == {
+        assert cli.utils.load_json(json_files['tap_transformation_json']) == {'transformations': []}
+        assert cli.utils.load_json(json_files['tap_inheritable_config_json']) == {
             'batch_size_rows': 20000,
             'batch_wait_limit_seconds': 3600,
             'data_flattening_max_level': 0,
@@ -358,6 +348,131 @@ class TestConfig:
 
         # Delete the generated JSON config directory
         shutil.rmtree(json_config_dir)
+
+    def test_save_config_selected_tap(self):
+        """Test config target and tap JSON save functionalities if specific taps are selected"""
+        json_config_dir = './pipelinewise-test-config'
+        config = self._get_config(json_config_dir, yaml_path='test_import_command')
+        json_files = self._get_json_files_path('tap_two', json_config_dir)
+
+        # Save the config as singer compatible JSON files
+        config.save(['tap_two'])
+
+        # Check content of the generated JSON files
+        generated_json_content = cli.utils.load_json(json_files['main_config_json'])
+
+        generated_targets = generated_json_content.get('targets')
+        generated_targets_taps = generated_targets[0].pop('taps')
+
+        assert generated_json_content.get('targets') == [
+            {
+                'id': 'test_snowflake_target',
+                'type': 'target-snowflake',
+                'name': 'Test Target Connector',
+                'status': 'ready'
+            }
+        ]
+
+        expected_generated_taps = [
+            {
+                'id': 'tap_one',
+                'type': 'tap-mysql',
+                'name': 'Sample MySQL Database',
+                'owner': 'somebody@foo.com',
+                'stream_buffer_size': None,
+                'send_alert': True,
+                'enabled': True,
+            },
+            {
+                'id': 'tap_two',
+                'type': 'tap-mysql',
+                'name': 'Sample MySQL Database',
+                'owner': 'somebody@foo.com',
+                'stream_buffer_size': None,
+                'send_alert': True,
+                'enabled': True,
+            },
+            {
+                'id': 'tap_three',
+                'type': 'tap-mysql',
+                'name': 'Sample MySQL Database',
+                'owner': 'somebody@foo.com',
+                'stream_buffer_size': None,
+                'send_alert': True,
+                'enabled': True,
+            }
+        ]
+        assert len(generated_targets_taps) == len(expected_generated_taps)
+        for tap in expected_generated_taps:
+            assert tap in generated_targets_taps
+
+        assert cli.utils.load_json(json_files['target_config_json']) == {
+            'account': 'account',
+            'aws_access_key_id': 'access_key_id',
+            'aws_secret_access_key': 'secret_access_key',
+            'client_side_encryption_master_key': 'master_key',
+            'dbname': 'foo_db',
+            'file_format': 'foo_file_format',
+            'password': 'secret',
+            's3_bucket': 's3_bucket',
+            's3_key_prefix': 's3_prefix/',
+            'stage': 'foo_stage',
+            'user': 'user',
+            'warehouse': 'MY_WAREHOUSE',
+        }
+        assert cli.utils.load_json(json_files['tap_config_json']) == {
+            'dbname': '<DB_NAME>',
+            'host': '<HOST>',
+            'port': 3306,
+            'user': '<USER>',
+            'password': '<PASSWORD>',
+            'server_id': cli.utils.load_json(json_files['tap_config_json'])['server_id'],
+        }
+        assert cli.utils.load_json(json_files['tap_selection_json']) == {
+            'selection': [
+                {
+                    'replication_key': 'last_update',
+                    'replication_method': 'INCREMENTAL',
+                    'tap_stream_id': 'my_db-table_one',
+                },
+                {'replication_method': 'LOG_BASED', 'tap_stream_id': 'my_db-table_two'},
+            ]
+        }
+        assert cli.utils.load_json(json_files['tap_transformation_json']) == {'transformations': []}
+        assert cli.utils.load_json(json_files['tap_inheritable_config_json']) == {
+            'batch_size_rows': 20000,
+            'batch_wait_limit_seconds': 3600,
+            'data_flattening_max_level': 0,
+            'flush_all_streams': False,
+            'hard_delete': True,
+            'parallelism': 0,
+            'parallelism_max': 4,
+            'primary_key_required': True,
+            'schema_mapping': {
+                'my_db': {
+                    'target_schema': 'repl_my_db',
+                    'target_schema_select_permissions': ['grp_stats'],
+                }
+            },
+            'temp_dir': './pipelinewise-test-config/tmp',
+            'tap_id': 'tap_two',
+            'query_tag': '{"ppw_component": "tap-mysql", "tap_id": "tap_two", '
+            '"database": "{{database}}", "schema": "{{schema}}", "table": "{{table}}"}',
+            'validate_records': False,
+            'add_metadata_columns': False,
+            'split_large_files': True,
+            'split_file_chunk_size_mb': 500,
+            'split_file_max_chunks': 25,
+            'archive_load_files': False,
+        }
+
+        tap_one_existence = os.path.exists(f'{json_config_dir}/test_snowflake_target/tap_one')
+
+        # Delete the generated JSON config directory
+        shutil.rmtree(json_config_dir)
+
+        # Assert only tap_two is created
+        assert tap_one_existence is False
 
     def test_save_config_with_optional_slack_channel_for_alerts(self):
         """Test config target and tap JSON save functionalities if there is a optional setting for slack channel"""

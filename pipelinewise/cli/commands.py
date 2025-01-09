@@ -355,6 +355,52 @@ def build_singer_command(
 
 
 # pylint: disable=too-many-arguments
+def build_partialsync_command(
+        tap: TapParams,
+        target: TargetParams,
+        transform: TransformParams,
+        venv_dir: str,
+        temp_dir: str,
+        table: str,
+        column: str,
+        start_value: str,
+        end_value: str = None,
+        drop_target_table: str = None
+):
+    """Builds a command that starts a partial sync"""
+
+    partial_sync_bin = utils.get_partialsync_bin(venv_dir, tap.type, target.type)
+
+    command_args = ' '.join(
+        list(
+            filter(
+                None,
+                [
+                    f'--tap {tap.config}',
+                    f'--properties {tap.properties}',
+                    f'--state {tap.state}',
+                    f'--target {target.config}',
+                    f'--temp_dir {temp_dir}',
+                    f'--transform {transform.config}'
+                    if transform.config and os.path.isfile(transform.config)
+                    else '',
+                    f'--table "{table}"',
+                    f'--column "{column}"',
+                    f'--start_value "{start_value}"',
+                    f'--end_value "{end_value}"' if end_value else None,
+                    f'--drop_target_table {drop_target_table}' if drop_target_table else None
+                ],
+            )
+        )
+    )
+
+    command = f'{partial_sync_bin} {command_args}'
+
+    LOGGER.debug('PartialSync command: %s', command)
+    return command
+
+
+# pylint: disable=too-many-arguments
 def build_fastsync_command(
     tap: TapParams,
     target: TargetParams,
@@ -365,6 +411,7 @@ def build_fastsync_command(
     profiling_mode: bool = False,
     profiling_dir: str = None,
     drop_pg_slot: bool = False,
+    autoresync_size: int = None
 ) -> str:
     """
     Builds a command that starts fastsync from a given tap to a
@@ -403,6 +450,7 @@ def build_fastsync_command(
                     else '',
                     f'--tables {tables}' if tables else '',
                     '--drop_pg_slot' if drop_pg_slot else '',
+                    f'--autoresync_size {autoresync_size}' if autoresync_size else ''
                 ],
             )
         )
@@ -415,7 +463,6 @@ def build_fastsync_command(
         command = f'{ppw_python_bin} -m cProfile -o {dump_file} {command}'
 
     LOGGER.debug('FastSync command: %s', command)
-
     return command
 
 

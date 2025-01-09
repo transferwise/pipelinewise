@@ -1,0 +1,55 @@
+{
+    "targets": [
+        {
+            "id": "target_snowflake",
+            "name": "Target One",
+            "type": "target-snowflake",
+            "status": "ready",
+            "taps": [
+                 {
+                    "enabled": true,
+                    "id": "tap_mysql",
+                    "name": "Source MySQL",
+                    "owner": "somebody@transferwise.com",
+                    "type": "tap-mysql"
+                },
+                {
+                    "enabled": true,
+                    "id": "tap_no_state",
+                    "name": "No State",
+                    "owner": "somebody@transferwise.com",
+                    "type": "tap-mysql"
+                },
+                {
+                    "enabled": true,
+                    "id": "tap_not_support",
+                    "name": "Source Kafka",
+                    "owner": "somebody@transferwise.com",
+                    "type": "tap-kafka"
+                },
+                {
+                    "enabled": false,
+                    "id": "tap_mysql_disabled",
+                    "name": "Source MySQL",
+                    "owner": "somebody@transferwise.com",
+                    "type": "tap-mysql"
+                }
+            ]
+        },
+        {
+            "id": "target_not_supported",
+            "name": "Target Not Supported",
+            "type": "target-s3-csv",
+            "status": "ready",
+            "taps": [
+                {
+                    "enabled": true,
+                    "id": "tap_mysql",
+                    "name": "Source MySQL",
+                    "owner": "somebody@transferwise.com",
+                    "type": "tap-mysql"
+                }
+            ]
+        }
+    ]
+}

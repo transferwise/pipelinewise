@@ -1,0 +1,58 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "usage_record_uri": {
+      "type": ["null", "string"]
+    },
+    "date_updated": {
+      "type": ["null", "string"],
+      "format": "date-time"
+    },
+    "date_fired": {
+      "type": ["null", "string"],
+      "format": "date-time"
+    },
+    "friendly_name": {
+      "type": ["null", "string"]
+    },
+    "uri": {
+      "type": ["null", "string"]
+    },
+    "account_sid": {
+      "type": ["null", "string"]
+    },
+    "callback_method": {
+      "type": ["null", "string"]
+    },
+    "trigger_by": {
+      "type": ["null", "string"]
+    },
+    "sid": {
+      "type": ["null", "string"]
+    },
+    "current_value": {
+      "type": ["null", "integer"]
+    },
+    "date_created": {
+      "type": ["null", "string"],
+      "format": "date-time"
+    },
+    "callback_url": {
+      "type": ["null", "string"]
+    },
+    "recurring": {
+      "type": ["null", "string"]
+    },
+    "usage_category": {
+      "type": ["null", "string"]
+    },
+    "trigger_value": {
+      "type": ["null", "number"],
+      "multipleOf": 1e-8
+    },
+    "api_version": {
+      "type": ["null", "string"]
+    }
+  }
+}

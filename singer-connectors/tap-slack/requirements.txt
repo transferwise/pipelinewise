@@ -1,1 +1,0 @@
-pipelinewise-tap-slack==1.1.0

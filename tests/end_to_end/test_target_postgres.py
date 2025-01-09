@@ -368,15 +368,15 @@ class TestTargetPostgres:
                 ],
             )
 
-        # 1. Run tap first time - both fastsync and a singer should be triggered
+        # 1. Run tap first time - singer should be triggered
         assertions.assert_run_tap_success(
-            TAP_S3_CSV_ID, TARGET_ID, ['fastsync', 'singer']
+            TAP_S3_CSV_ID, TARGET_ID, ['singer']
         )
         assert_columns_exist()
 
-        # 2. Run tap second time - both fastsync and a singer should be triggered
+        # 2. Run tap second time - singer should be triggered
         assertions.assert_run_tap_success(
-            TAP_S3_CSV_ID, TARGET_ID, ['fastsync', 'singer']
+            TAP_S3_CSV_ID, TARGET_ID, ['singer']
         )
         assert_columns_exist()
 
@@ -430,17 +430,17 @@ class TestTargetPostgres:
                 {
                     'age': randint(10, 30),
                     'id': 1001,
-                    'uuid': uuid.uuid4(),
+                    'uuid': bson.Binary.from_uuid(uuid.uuid4()),
                     'ts': Timestamp(12030, 500),
                 },
                 {
                     'date': datetime.utcnow(),
                     'id': 1002,
-                    'uuid': uuid.uuid4(),
+                    'uuid': bson.Binary.from_uuid(uuid.uuid4()),
                     'regex': bson.Regex(r'^[A-Z]\\w\\d{2,6}.*$'),
                 },
                 {
-                    'uuid': uuid.uuid4(),
+                    'uuid': bson.Binary.from_uuid(uuid.uuid4()),
                     'id': 1003,
                     'decimal': bson.Decimal128(
                         decimal.Decimal('5.64547548425446546546644')

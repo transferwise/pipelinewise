@@ -145,6 +145,7 @@ def assert_main_impl_exit_normally_on_success(
                                 'transform': None,
                                 'drop_pg_slot': False,
                                 'tap': {},
+                                'autoresync_size': None
                             }
                         )
 
@@ -201,6 +202,7 @@ def assert_main_impl_should_exit_with_error_on_failure(
                                 'tap': {
                                     'fastsync_parallelism': 4,
                                 },
+                                'autoresync_size': None
                             }
                         )
 

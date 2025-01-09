@@ -1,0 +1,108 @@
+{
+    "type": [
+      "null",
+      "object"
+    ],
+    "properties": {
+      "_sdc_repository": {
+        "type": [
+          "null",
+          "string"
+        ]
+      },
+      "cards_url": {
+        "type": [
+          "null",
+          "string"
+        ]
+      },
+      "name": {
+        "type": [
+          "null",
+          "string"
+        ]
+      },
+      "url": {
+        "type": [
+          "null",
+          "string"
+        ]
+      },
+      "id": {
+        "type": [
+          "null",
+          "number"
+        ]
+      },
+      "node_id": {
+        "type": [
+          "null",
+          "string"
+        ]
+      },
+      "note": {
+        "type": [
+          "null",
+          "string"
+        ]
+      },
+      "creator": {
+        "type": [
+          "null",
+          "object"
+        ],
+        "properties": {
+          "login": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "id": {
+            "type": [
+              "null",
+              "number"
+            ]
+          }
+        }
+      },
+      "created_at": {
+        "type": [
+          "null",
+          "string"
+        ],
+        "format": "date-time"
+      },
+      "updated_at": {
+        "type": [
+          "null",
+          "string"
+        ],
+        "format": "date-time"
+      },
+      "archived": {
+        "type": [
+          "null",
+          "boolean"
+        ]
+      },
+      "column_url": {
+        "type": [
+          "null",
+          "string"
+        ]
+      },
+      "content_url": {
+        "type": [
+          "null",
+          "string"
+        ]
+      },
+      "project_url": {
+        "type": [
+          "null",
+          "string"
+        ]
+      }
+    }
+  }

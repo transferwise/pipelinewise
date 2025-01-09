@@ -1,4 +1,4 @@
-FROM python:3.8-slim-buster
+FROM python:3.10-slim-buster
 
 ARG connectors=all
 
@@ -10,6 +10,7 @@ RUN apt-get -qq update \
         libaio1 \
         mbuffer \
         wget \
+        tzdata \
     && rm -rf /var/lib/apt/lists/* \
     && pip install -U --no-cache-dir pip
 

@@ -1,0 +1,22 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "mp_reserved_insert_id": {
+      "type": ["null", "string"]
+    },
+    "event": {
+      "type": ["null", "string"]
+    },
+    "distinct_id": {
+      "type": ["null", "string"]
+    },
+    "time": {
+      "type": ["null", "string"],
+      "format": "date-time"
+    },
+    "properties": {
+      "type": ["null", "object"]
+    }
+  }
+}

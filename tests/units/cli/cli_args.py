@@ -11,6 +11,7 @@ class CliArgs:
         self,
         target='*',
         tap='*',
+        taps='*',
         tables=None,
         dir='*',
         name='*',
@@ -20,9 +21,12 @@ class CliArgs:
         extra_log=False,
         debug=False,
         profiler=False,
+        force=False,
+        replication_method_only='*'
     ):
         self.target = target
         self.tap = tap
+        self.taps = taps
         self.tables = tables
         self.dir = dir
         self.name = name
@@ -32,6 +36,8 @@ class CliArgs:
         self.extra_log = extra_log
         self.debug = debug
         self.profiler = profiler
+        self.force = force
+        self.replication_method_only = replication_method_only
 
     # "log" Getters and setters
     @property

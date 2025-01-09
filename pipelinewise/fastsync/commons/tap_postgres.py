@@ -1,11 +1,14 @@
 import datetime
 import decimal
+import glob
 import logging
+import os
 import re
 import sys
 import psycopg2
 import psycopg2.extras
 
+from argparse import Namespace
 from typing import Dict
 
 
@@ -334,7 +337,7 @@ class FastSyncTapPostgres:
         )
         if not result:
             raise Exception(
-                'Cannot get replication key value for table: {}'.format(table)
+                f'Cannot get replication key value for table: {table}'
             )
 
         postgres_key_value = result[0].get('key_value')
@@ -463,7 +466,7 @@ class FastSyncTapPostgres:
             'primary_key': self.get_primary_keys(table_name),
         }
 
-    # pylint: disable=too-many-arguments
+    # pylint: disable=too-many-arguments, too-many-locals
     def copy_table(
         self,
         table_name,
@@ -474,6 +477,7 @@ class FastSyncTapPostgres:
         split_file_chunk_size_mb=1000,
         split_file_max_chunks=20,
         compress=True,
+        where_clause_sql='',
     ):
         """
         Export data from table to a zipped csv
@@ -490,18 +494,20 @@ class FastSyncTapPostgres:
 
         # If self.get_table_columns returns zero row then table not exist
         if len(column_safe_sql_values) == 0:
-            raise Exception('{} table not found.'.format(table_name))
+            raise Exception(f'{table_name} table not found.')
 
         schema_name, table_name = table_name.split('.')
 
-        sql = """COPY (SELECT {}
-        ,now() AT TIME ZONE 'UTC'
-        ,now() AT TIME ZONE 'UTC'
-        ,null
-        FROM {}."{}") TO STDOUT with CSV DELIMITER ','
-        """.format(
-            ','.join(column_safe_sql_values), schema_name, table_name
-        )
+        column_safe_sql_values = column_safe_sql_values + [
+            "now() AT TIME ZONE 'UTC' AS _SDC_EXTRACTED_AT",
+            "now() AT TIME ZONE 'UTC' AS _SDC_BATCHED_AT",
+            'null _SDC_DELETED_AT'
+        ]
+
+        sql = f"""COPY (SELECT {','.join(column_safe_sql_values)}
+        FROM {schema_name}."{table_name}"{where_clause_sql}) TO STDOUT with CSV DELIMITER ','
+        """
+
         LOGGER.info('Exporting data: %s', sql)
 
         gzip_splitter = split_gzip.open(
@@ -514,3 +520,20 @@ class FastSyncTapPostgres:
 
         with gzip_splitter as split_gzip_files:
             self.curr.copy_expert(sql, split_gzip_files, size=131072)
+
+    def export_source_table_data(
+            self, args: Namespace, tap_id: str, where_clause_sql: str = '') -> list:
+        """Exporting data from the source table"""
+        filename = utils.gen_export_filename(tap_id=tap_id, table=args.table, sync_type='partialsync')
+        filepath = os.path.join(args.temp_dir, filename)
+
+        self.copy_table(
+            args.table,
+            filepath,
+            split_large_files=args.target.get('split_large_files'),
+            split_file_chunk_size_mb=args.target.get('split_file_chunk_size_mb'),
+            split_file_max_chunks=args.target.get('split_file_max_chunks'),
+            where_clause_sql=where_clause_sql
+        )
+        file_parts = glob.glob(f'{filepath}*')
+        return file_parts

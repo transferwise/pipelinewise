@@ -1,55 +1,15 @@
-version: '3'
 services:
   ### Primary container with PipelineWise CLI
   pipelinewise:
-    image: python:3.8-buster
+    platform: linux/amd64
+    image: ubuntu:20.04
     container_name: pipelinewise_dev
     working_dir: /opt/pipelinewise
     entrypoint: /opt/pipelinewise/dev-project/entrypoint.sh
+    env_file:
+      - .env
     environment:
-      PIPELINEWISE_HOME: /opt/pipelinewise/dev-project
-
-      TAP_MYSQL_HOST: db_mysql_source
-      TAP_MYSQL_PORT: ${TAP_MYSQL_PORT}
-      TAP_MYSQL_PORT_ON_HOST: ${TAP_MYSQL_PORT_ON_HOST}
-      TAP_MYSQL_ROOT_PASSWORD: ${TAP_MYSQL_ROOT_PASSWORD}
-      TAP_MYSQL_USER: ${TAP_MYSQL_USER}
-      TAP_MYSQL_PASSWORD: ${TAP_MYSQL_PASSWORD}
-      TAP_MYSQL_DB: ${TAP_MYSQL_DB}
-
-      TAP_MYSQL_REPLICA_HOST: db_mysql_source_replica
-      TAP_MYSQL_REPLICA_PORT: ${TAP_MYSQL_REPLICA_PORT}
-      TAP_MYSQL_REPLICA_PORT_ON_HOST: ${TAP_MYSQL_REPLICA_PORT_ON_HOST}
-      TAP_MYSQL_REPLICA_ROOT_PASSWORD: ${TAP_MYSQL_REPLICA_ROOT_PASSWORD}
-      TAP_MYSQL_REPLICA_USER: ${TAP_MYSQL_REPLICA_USER}
-      TAP_MYSQL_REPLICA_PASSWORD: ${TAP_MYSQL_REPLICA_PASSWORD}
-      TAP_MYSQL_REPLICA_DB: ${TAP_MYSQL_REPLICA_DB}
-
-      TAP_POSTGRES_HOST: db_postgres_source
-      TAP_POSTGRES_PORT: ${TAP_POSTGRES_PORT}
-      TAP_POSTGRES_PORT_ON_HOST: ${TAP_POSTGRES_PORT_ON_HOST}
-      TAP_POSTGRES_USER: ${TAP_POSTGRES_USER}
-      TAP_POSTGRES_PASSWORD: ${TAP_POSTGRES_PASSWORD}
-      TAP_POSTGRES_DB: ${TAP_POSTGRES_DB}
-
-      TARGET_POSTGRES_HOST: db_postgres_dwh
-      TARGET_POSTGRES_PORT: ${TARGET_POSTGRES_PORT}
-      TARGET_POSTGRES_PORT_ON_HOST: ${TARGET_POSTGRES_PORT_ON_HOST}
-      TARGET_POSTGRES_USER: ${TARGET_POSTGRES_USER}
-      TARGET_POSTGRES_PASSWORD: ${TARGET_POSTGRES_PASSWORD}
-      TARGET_POSTGRES_DB: ${TARGET_POSTGRES_DB}
-
-      TAP_MONGODB_HOST: db_mongo_source
-      TAP_MONGODB_PORT: ${TAP_MONGODB_PORT}
-      TAP_MONGODB_PORT_ON_HOST: ${TAP_MONGODB_PORT_ON_HOST}
-      TAP_MONGODB_USER: ${TAP_MONGODB_USER}
-      TAP_MONGODB_PASSWORD: ${TAP_MONGODB_PASSWORD}
-      TAP_MONGODB_DB: ${TAP_MONGODB_DB}
-      TAP_MONGODB_ROOT_USER: ${TAP_MONGODB_ROOT_USER}
-      TAP_MONGODB_ROOT_PASSWORD: ${TAP_MONGODB_ROOT_PASSWORD}
-
-      PATH: /opt/pipelinewise/dev-project/.virtualenvs/pipelinewise/bin:${PATH}
-
+      PATH: ${PIPELINEWISE_HOME}/.virtualenvs/pipelinewise/bin:${PATH}
     volumes:
       - ../:/opt/pipelinewise
       # don't create container specific .virtualenvs files on host
@@ -70,10 +30,21 @@ services:
   # PostgreSQL service container used as test source database
   # Using Debezium image with wal2json plugin for logical decoding
   db_postgres_source:
-    image: debezium/postgres:12-alpine
+    build:
+      context: ./pg
+      dockerfile: Dockerfile
     container_name: pipelinewise_dev_postgres_source
-    # Making some logical decoding adjustments
-    command: -c "wal_level=logical" -c "max_replication_slots=5" -c "max_wal_senders=5"
+    volumes:
+      - ./pg/pg_hba.conf:/var/lib/postgresql/pg_hba.conf
+    # Making some logical decoding and ssl adjustments
+    command: >
+      -c "wal_level=logical"
+      -c "max_replication_slots=5"
+      -c "max_wal_senders=5"
+      -c "ssl=on"
+      -c "ssl_cert_file=/var/lib/postgresql/server.crt"
+      -c "ssl_key_file=/var/lib/postgresql/server.key"
+      -c "hba_file=/var/lib/postgresql/pg_hba.conf"
     ports:
       - ${TAP_POSTGRES_PORT_ON_HOST}:${TAP_POSTGRES_PORT}
     environment:
@@ -85,11 +56,27 @@ services:
 
   # MySQL service container used as test source database
   db_mysql_source:
-    image: mariadb:10.2.26
+    image: mariadb:10.6.18
     container_name: pipelinewise_dev_mysql_source
     ports:
       - ${TAP_MYSQL_PORT_ON_HOST}:${TAP_MYSQL_PORT}
-    command: --default-authentication-plugin=mysql_native_password --server-id=1 --log-bin=mysql-bin --binlog-format=ROW --binlog-do-db=${TAP_MYSQL_DB} --binlog-do-db=${TAP_MYSQL_REPLICA_DB}
+    volumes:
+      - ./my/server-cert.pem:/etc/my.cnf.d/certificates/server-cert.pem
+      - ./my/server-key.pem:/etc/my.cnf.d/certificates/server-key.pem
+      - ./my/ca-cert.pem:/etc/my.cnf.d/certificates/ca-cert.pem
+    command: >
+      --default-authentication-plugin=mysql_native_password
+      --performance_schema=ON
+      --server-id=1
+      --log-bin=mysql-bin
+      --binlog-format=ROW
+      --binlog-do-db=${TAP_MYSQL_DB}
+      --binlog-do-db=${TAP_MYSQL_REPLICA_DB}
+      --tls_version=TLSv1.2
+      --require_secure_transport=ON
+      --ssl_cert=/etc/my.cnf.d/certificates/server-cert.pem
+      --ssl_key=/etc/my.cnf.d/certificates/server-key.pem
+      --ssl_ca=/etc/my.cnf.d/certificates/ca-cert.pem
     environment:
       MYSQL_ROOT_PASSWORD: ${TAP_MYSQL_ROOT_PASSWORD}
       MYSQL_USER: ${TAP_MYSQL_USER}
@@ -99,7 +86,7 @@ services:
       - pipelinewise_network
 
   db_mysql_source_replica:
-    image: mariadb:10.2.26
+    image: mariadb:10.6.18
     container_name: pipelinewise_dev_mysql_source_replica
     ports:
       - ${TAP_MYSQL_REPLICA_PORT_ON_HOST}:${TAP_MYSQL_REPLICA_PORT}
@@ -114,7 +101,9 @@ services:
 
   db_mongo_source:
     container_name: "pipelinewise_dev_mongodb_source"
-    image: "mongo:4.2-bionic"
+    build:
+      context: ./mongo
+      dockerfile: Dockerfile
     ports:
       - ${TAP_MONGODB_PORT_ON_HOST}:${TAP_MONGODB_PORT}
     environment:
@@ -124,9 +113,17 @@ services:
       MONGO_USERNAME: ${TAP_MONGODB_USER}
       MONGO_PASSWORD: ${TAP_MONGODB_PASSWORD}
       MONGO_REPLICA_HOST: db_mongo_source
-    volumes:
-      - ./mongo/create_user.sh:/docker-entrypoint-initdb.d/create_user.sh
-    command: [mongod, --replSet, rs0]
+    command: >
+      mongod
+      --bind_ip_all
+      --replSet rs0
+      --keyFile /etc/ssl/replica.key
+      --tlsMode requireTLS
+      --tlsAllowConnectionsWithoutCertificates
+      --tlsCertificateKeyFile /etc/ssl/mongodb.pem
+      --tlsAllowInvalidHostnames
+      --tlsCAFile /etc/ssl/rootCA.pem
+      --quiet
     networks:
       - pipelinewise_network
 

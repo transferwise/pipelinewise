@@ -13,6 +13,9 @@ from ..logger import Logger
 from .commons import utils
 from .commons.tap_mysql import FastSyncTapMySql
 from .commons.target_snowflake import FastSyncTargetSnowflake
+from pipelinewise.utils import (get_tables_size,
+                                filter_out_selected_tables,
+                                get_maximum_value_from_list_of_dicts, get_schemas_of_tables_set)
 
 LOGGER = Logger().get_logger(__name__)
 
@@ -91,7 +94,7 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
         filepath = os.path.join(args.temp_dir, filename)
         target_schema = utils.get_target_schema(args.target, table)
 
-        # Open connection and get binlog file position
+        # Open connections
         mysql.open_connections()
 
         # Get bookmark - Binlog position or Incremental Key value
@@ -105,12 +108,18 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
             split_file_chunk_size_mb=args.target.get('split_file_chunk_size_mb'),
             split_file_max_chunks=args.target.get('split_file_max_chunks'),
         )
-        file_parts = glob.glob(f'{filepath}*')
-        size_bytes = sum([os.path.getsize(file_part) for file_part in file_parts])
         snowflake_types = mysql.map_column_types_to_target(table)
+
+        mysql.close_connections()
+
+        file_exist = os.path.exists(filepath)
+        file_parts = glob.glob(f'{filepath}*')
+        if len(file_parts) == 0 and file_exist:
+            LOGGER.warning('DATA LOSS! -> %s', filepath)
+
+        size_bytes = sum([os.path.getsize(file_part) for file_part in file_parts])
         snowflake_columns = snowflake_types.get('columns', [])
         primary_key = snowflake_types.get('primary_key')
-        mysql.close_connections()
 
         # Uploading to S3
         s3_keys = []
@@ -170,6 +179,10 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
         LOGGER.exception(exc)
         return '{}: {}'.format(table, exc)
 
+    finally:
+        # try closing connections again just in case, silence errors
+        mysql.close_connections(silent=True)
+
 
 def main_impl():
     """Main sync logic"""
@@ -194,14 +207,30 @@ def main_impl():
         pool_size,
     )
 
+    can_run_sync = True
+    if args.autoresync_size:
+        schemas = get_schemas_of_tables_set(args.tables)
+        tap_obj = FastSyncTapMySql(args.tap, tap_type_to_target_type)
+        for schema in schemas:
+            all_tables_in_this_schema = get_tables_size(schema, tap_obj)
+            only_selected_tables = filter_out_selected_tables(all_tables_in_this_schema, args.tables)
+            table_with_maximum_size = get_maximum_value_from_list_of_dicts(only_selected_tables, 'table_size')
+            if table_with_maximum_size.get('table_size') > float(args.autoresync_size):
+                can_run_sync = False
+                table_sync_excs.append(
+                    f're-sync can not be done because size of table '
+                    f'`{table_with_maximum_size["table_name"]}` is greater than `{args.autoresync_size}`!'
+                    f' Use --force argument to force sync_tables!')
+
     # Start loading tables in parallel in spawning processes
-    with multiprocessing.Pool(pool_size) as proc:
-        table_sync_excs = list(
-            filter(
-                lambda x: not isinstance(x, bool),
-                proc.map(partial(sync_table, args=args), args.tables),
+    if can_run_sync:
+        with multiprocessing.Pool(pool_size) as proc:
+            table_sync_excs = list(
+                filter(
+                    lambda x: not isinstance(x, bool),
+                    proc.map(partial(sync_table, args=args), args.tables),
+                )
             )
-        )
 
     # Log summary
     end_time = datetime.now()

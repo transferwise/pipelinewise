@@ -1,3 +1,236 @@
+0.67.0 (2024-11-19)
+-------------------
+- Fix map date column to correct Postgres type
+- New argument for sync tables to select replication method
+
+0.66.1 (2024-10-31)
+-------------------
+- Bug fix for partial sync multiprocessing
+
+
+0.66.0 (2024-10-11)
+-------------------
+- Bump programming language to Python 3.10
+- Bump `ansible-core` from `2.11.8` to `2.17.5`
+- Bump `tzlocal` from `2.1.*` to `4.0.2` in `tap-mongodb`
+- Bump `tzlocal` from `2.1` to `4.0.2` in `tap-mysql`
+- Bump `pipelinewise-singer-python` from `1.*` to `2.*` in `target-postgres`
+- Bump `pipelinewise-singer-python` from `1.*` to `2.*` in `target-snowflake`
+
+
+0.65.3 (2024-09-13)
+-------------------
+- Bump `zenpy` in `tap-zendesk` from `2.0.0` to `2.0.52`
+
+0.65.2 (2024-09-05)
+-------------------
+- Pin tap-zendesk to v1.2.1
+
+0.65.0 (2024-08-27)
+-------------------
+- Remove FastSync for target Redshift
+- Remove FastSync for target Bigquery
+- Incorporate used singer connectors into main codebase
+- Reduce testing codebase
+- Simplify Makefile
+
+0.64.1 (2024-07-25)
+-------------------
+- Remove row count check in `sync_tables` for `tap_mysql` and `tap_postgres`
+
+0.64.0 (2024-07-19)
+-------------------
+- Update `sync_tables` and `import_config` commands
+  - new optional config setting for source tables size checking
+  - checking the size of source tables in `tap_mysql` and `tap_postgres` to `target_snowflake` and failing fast sync
+    if the size is not allowed
+  - added `--force` argument for `sync_tables` command to ignore size checking
+
+0.63.0 (2024-07-08)
+---------------------
+- Bump `pipelinewise-tap-jira`from `2.0.1` to `2.2.0`
+- Bump `jinja2`from `3.0.2` to `3.1.2`
+- Update Github Actions
+
+0.60.2b1 (2024-06-12)
+---------------------
+- Bump `pymongo`from `4.7.3` to `3.13.0`
+
+0.60.1 (2024-06-12)
+-------------------
+- Bump `pymongo`from `3.12.3` to `4.7.3`
+
+0.60.0 (2024-05-10)
+-------------------
+- Bump `pipelinewise-tap-mysql`from `1.5.6` to `1.6.0`
+- Attempt SSL for MariaDB and PG sources as Preferred connection method
+
+0.58.3 (2023-11-28)
+-------------------
+- Bump `pipelinewise-tap-kafka`from `8.2.0` to `8.2.1`
+
+0.58.2 (2023-11-20)
+-------------------
+- Bump `pipelinewise-tap-kafka`from `8.1.0` to `8.2.0`
+
+0.58.1 (2023-10-09)
+-------------------
+- Bump `pipelinewise-tap-github`from `1.1.0` to `1.1.1`
+
+0.58.0 (2023-10-04)
+-------------------
+- Bump `pipelinewise-tap-github`from `1.0.3` to `1.1.0`
+- Bump `joblib`from `1.2.0` to `1.3.2`
+
+0.57.0 (2023-08-09)
+-------------------
+
+- Bump `pipelinewise-tap-kafka`from `8.0.0` to `8.1.0`
+- Update dependencies
+
+0.56.0 (2023-08-09)
+-------------------
+
+- Bump `pipelinewise-target-snowflake`from `2.2.0` to `2.3.0`
+- Update dependencies
+
+0.55.0 (2023-07-25)
+-------------------
+
+- Bump `pipelinewise-tap-mysql`from `1.5.4` to `1.5.5`
+- Support for dynamic values in defined partial sync
+
+0.54.0 (2023-07-04)
+-------------------
+
+- Add support for the new limit config in `tap-postgres`
+- Bump pipelinewise_tap_s3_csv from `3.0.0` to `3.0.1`
+- Bump pipelinewise-tap-postgres from `1.8.4` to `2.1.0`
+- Bugfix replication slot creation in partial sync
+
+0.53.4 (2023-06-22)
+-------------------
+
+- Bugfix for trigger unwanted tables syncing trigger
+- Bugfix for building `wal2json` in PostgreSQL Docker image
+- Bump `pipelinewise-tap-mysql` from `1.5.3` to `1.5.4`
+
+0.53.3 (2023-05-16)
+-------------------
+
+- Bugfix for removing pid file in stop_tap command
+
+0.53.2 (2023-04-25)
+-------------------
+
+- Bump `pipelinewise-tap-mysql` from `1.5.2` to `1.5.3` to mitigate bug in MariaDB 10.6.12
+
+0.53.1 (2023-04-21)
+-------------------
+
+- Rollback `snowflake-connector-python` from `2.8.2` to `2.7.6`
+
+0.53.0 (2023-04-13)
+-------------------
+
+- Bugfix for renaming log files when stopping the tap
+- Bump `snowflake-connector-python` from `2.7.6` to `2.8.2`
+- Remove `tap-adwords`
+
+0.52.2 (2023-03-20)
+-------------------
+
+- Bump `pipelinewise-tap-slack` from `1.1.0` to `1.1.1`
+
+0.52.1 (2023-02-22)
+-------------------
+
+- Extend silentremove to support deleting folders
+- Bugfix for selected fastsync tables
+- Bugfix for graceful exit
+
+0.52.0 (2023-02-02)
+-------------------
+
+- Bump `tap-s3-csv` from `2.0.0` to `3.0.0`
+- Implement Defined Partial Sync for `MariaDB` and `Postgres` to `SnowFlake`
+
+0.51.0 (2022-12-10)
+-------------------
+
+- Drop `pipelinewise-tap-postgres` from `2.0.0` to `1.8.4`:
+  - wal2json format version 2 causing issues on older Postgres servers
+
+- Bump `pipelinewise-tap-kafka` from `7.1.2` to `8.0.0`
+  - Switch from `subscribe` to `assign` for better initial offset control
+  - Implement specifying partitions in configuration
+
+0.50.0 (2022-12-05)
+-------------------
+
+- Bump `pipelinewise-tap-postgres` from `1.8.4` to `2.0.0`:
+  - Use wal2json format version 2
+
+- Bump `psycopg2-binary` from `2.8.6` to `2.9.5`
+
+0.49.0 (2022-10-27)
+-------------------
+- Added `taps` option for `import` command to make it possible for importing specific taps.
+
+0.48.7 (2022-10-19)
+-------------------
+
+- Bump `pipelinewise-tap-kafka` from `7.1.0` to `7.1.2`
+  - Introducing the use of the seek method to reset the source partition offsets at the start of a run
+
+0.48.6 (2022-10-06)
+-------------------
+
+- Bump `joblib` from `1.1.0` to `1.2.0`
+- Bugfix for closing `MySQL`/`MariaDB` conenctions in `FastSync`
+- Removing `FastSync` from `s3-csv` and using only `singer`
+
+0.48.5 (2022-09-22)
+-------------------
+
+- Partial sync will now create table in target if it doesn't exist. [#1014](https://github.com/transferwise/pipelinewise/pull/1014)
+
+0.48.4 (2022-09-09)
+-------------------
+
+- Bump `pipelinewise-tap-postgres` from `1.8.3` to `1.8.4`.
+
+0.48.3 (2022-09-08)
+-------------------
+
+- Refactor partialsync to use merge (#1010)
+
+0.48.2 (2022-09-01)
+-------------------
+
+- Bump `pipelinewise-tap-mysql` from `1.5.1` to `1.5.2`.
+
+0.48.1 (2022-07-21)
+-------------------
+
+- Partial sync bug fixes for selected tables and space in the name of table and values
+
+0.48.0 (2022-07-14)
+-------------------
+
+- Bump `pipelinewise-tap-kakfa` from `7.0.0` to `7.1.0`.
+
+0.47.1 (2022-07-08)
+-------------------
+
+- Partial sync bug fix for `start` and `end` values
+
+0.47.0 (2022-07-07)
+-------------------
+
+- Bump `ujson` from  `5.3.0` to `5.4.0`
+- Partial sync for `MariaDB` and `Postgres`
+
 0.46.0 (2022-06-14)
 -------------------
 

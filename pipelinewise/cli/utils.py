@@ -320,13 +320,15 @@ def delete_keys_from_dict(dic, keys):
 
 def silentremove(path):
     """
-    Deleting file with no error message if the file not exists
+    Deleting file/folder with no error message if it doesn't exist
     """
-    LOGGER.debug('Removing file at %s', path)
+    LOGGER.debug('Removing folder/file at %s', path)
     try:
-        os.remove(path)
+        if os.path.isdir(path):
+            shutil.rmtree(path)
+        else:
+            os.remove(path)
     except OSError as exc:
-
         # errno.ENOENT = no such file or directory
         if exc.errno != errno.ENOENT:
             raise
@@ -470,6 +472,15 @@ def get_fastsync_bin(venv_dir, tap_type, target_type):
     fastsync_name = f'{source}-to-{target}'
 
     return os.path.join(venv_dir, 'pipelinewise', 'bin', fastsync_name)
+
+
+def get_partialsync_bin(venv_dir, tap_type, target_type):
+    """Get the absolute path of partial sync table executable"""
+    source = tap_type.replace('tap-', '')
+    target = target_type.replace('target-', '')
+    partialsync_name = f'partial-{source}-to-{target}'
+
+    return os.path.join(venv_dir, 'pipelinewise', 'bin', partialsync_name)
 
 
 def get_pipelinewise_python_bin(venv_dir: str) -> str:

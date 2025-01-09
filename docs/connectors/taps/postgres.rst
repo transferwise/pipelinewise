@@ -4,11 +4,10 @@
 Tap PostgreSQL
 --------------
 
+The Singer tap is at `pipelinewise-tap-postgres <https://github.com/transferwise/pipelinewise-tap-postgres>`_
 
 PostgreSQL setup requirements
 '''''''''''''''''''''''''''''
-
-*(Section based on Stitch documentation)*
 
 **Step 1: Check if you have all the required credentials for replicating data from PostgreSQL**
 
@@ -59,7 +58,9 @@ In order for pipelinewise user to automatically be able to access any tables cre
 
 **Step 3.1: Install the wal2json plugin**
 
-To use :ref:`log_based` for your PostgreSQL integration, you must install the `wal2json <https://github.com/eulerto/wal2json>`_ plugin. The wal2json plugin outputs JSON objects for logical decoding, which Stitch then uses to perform Log-based Replication.
+To use :ref:`log_based` for your PostgreSQL integration, you must install the `wal2json <https://github
+.com/eulerto/wal2json>`_ plugin that has support for format-version=2 (wal2json >= 2.3). The wal2json plugin outputs
+JSON objects for logical decoding, which the tap then uses to perform Log-based Replication.
 
 Steps for installing the plugin vary depending on your operating system. Instructions for each operating system type are in the wal2json’s GitHub repository:
 
@@ -151,6 +152,7 @@ Example YAML for ``tap-postgres``:
       fastsync_parallelism: <int>          # Optional: size of multiprocessing pool used by FastSync
                                            #           Min: 1
                                            #           Default: number of CPU cores
+      #limit: 50000                        # Optional: limit to add to incremental queries, this is useful to avoid long running transactions on the DB
 
     # ------------------------------------------------------------------------------
     # Destination (Target) - Target properties
@@ -198,7 +200,23 @@ Example YAML for ``tap-postgres``:
           - table_name: "table_two"
             replication_method: "LOG_BASED"     # Important! Log based must be enabled in MySQL
 
+          - table_name: "table_three"
+            replication_method: "LOG_BASED"
+            sync_start_from:                   # Optional, applies for then first sync and fast sync
+              column: "column_name"            # column name to be picked for partial sync with inremental or timestamp value
+              static_value: "start_value"      # A static value which the first sync always starts from column >= static_value
+              drop_target_table: true          # Optional, drops target table before syncing. default value is false
+
+          - table_name: "table_four"
+            replication_method: "LOG_BASED"
+            sync_start_from:                   # Optional, applies for then first sync and fast sync
+              column: "column_name"            # Column name to be picked for partial sync with incremental or timestamp value
+              dynamic_value: "A SELECT query   # It can be a valid PG SELECT query which returns only one row with one column and first sync always starts from column >= dynamic_value
+              drop_target_table: true          # Optional, drops target table before syncing. default value is false
+
       # You can add as many schemas as you need...
       # Uncomment this if you want replicate tables from multiple schemas
       #- source_schema: "another_schema_in_postgres" 
       #  target_schema: "another
+      # static and dynamic values can not be defined together for a table and only one of them can be used.
+

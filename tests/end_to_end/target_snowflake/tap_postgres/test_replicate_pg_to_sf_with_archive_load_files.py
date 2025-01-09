@@ -19,7 +19,7 @@ class TestReplicatePGToSFWithArchiveLoadFiles(TapPostgres):
         super().setUp(tap_id=TAP_ID, target_id=TARGET_ID)
 
         # pylint: disable=protected-access
-        self.s3_bucket = self.e2e_env._get_conn_env_var('TARGET_SNOWFLAKE', 'S3_BUCKET')
+        self.s3_bucket = self.e2e_env.get_conn_env_var('TARGET_SNOWFLAKE', 'S3_BUCKET')
         self.s3_client = self.e2e_env.get_aws_session().client('s3')
 
     def delete_dangling_files_from_archive(self):

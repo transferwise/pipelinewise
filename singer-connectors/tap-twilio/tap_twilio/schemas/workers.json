@@ -1,0 +1,144 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "account_sid": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "activity_name": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "activity_sid": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "attributes": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "available": {
+      "type": [
+        "null",
+        "boolean"
+      ]
+    },
+    "date_created": {
+      "type": [
+        "null",
+        "string"
+      ],
+      "format": "date-time"
+    },
+    "date_status_changed": {
+      "type": [
+        "null",
+        "string"
+      ],
+      "format": "date-time"
+    },
+    "date_updated": {
+      "type": [
+        "null",
+        "string"
+      ],
+      "format": "date-time"
+    },
+    "friendly_name": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "sid": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "workspace_sid": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "url": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "links": {
+      "type": [
+        "null",
+        "object"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "activity": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "channels": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "cumulative_statistics": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "real_time_statistics": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "reservations": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "statistics": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "worker_channels": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "worker_statistics": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "workspace": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      }
+    }
+  }
+}

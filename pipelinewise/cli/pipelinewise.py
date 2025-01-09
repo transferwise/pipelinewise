@@ -8,12 +8,13 @@ import signal
 import sys
 import json
 import copy
+
 import psutil
 import pidfile
 
 from datetime import datetime
 from time import time
-from typing import Dict, Optional, List, Any
+from typing import Dict, Optional, List, Any, NoReturn
 from joblib import Parallel, delayed, parallel_backend
 from tabulate import tabulate
 
@@ -24,7 +25,14 @@ from .commands import TapParams, TargetParams, TransformParams
 from .config import Config
 from .alert_sender import AlertSender
 from .alert_handlers.base_alert_handler import BaseAlertHandler
-from .errors import InvalidTransformationException, DuplicateConfigException, InvalidConfigException
+from .errors import (
+    InvalidTransformationException, DuplicateConfigException,
+    InvalidConfigException, PartialSyncNotSupportedTypeException,
+    PreRunChecksException
+)
+
+from pipelinewise.fastsync.commons.tap_postgres import FastSyncTapPostgres
+from pipelinewise.cli.multiprocess import Process
 
 FASTSYNC_PAIRS = {
     ConnectorType.TAP_MYSQL: {
@@ -39,17 +47,21 @@ FASTSYNC_PAIRS = {
         ConnectorType.TARGET_POSTGRES,
         ConnectorType.TARGET_BIGQUERY,
     },
-    ConnectorType.TAP_S3_CSV: {
-        ConnectorType.TARGET_SNOWFLAKE,
-        ConnectorType.TARGET_REDSHIFT,
-        ConnectorType.TARGET_POSTGRES,
-        ConnectorType.TARGET_BIGQUERY,
-    },
     ConnectorType.TAP_MONGODB: {
         ConnectorType.TARGET_SNOWFLAKE,
         ConnectorType.TARGET_POSTGRES,
         ConnectorType.TARGET_BIGQUERY,
     },
+}
+
+PARTIAL_SYNC_PAIRS = {
+    ConnectorType.TAP_MYSQL: {
+        ConnectorType.TARGET_SNOWFLAKE
+    },
+    ConnectorType.TAP_POSTGRES: {
+        ConnectorType.TARGET_SNOWFLAKE
+    }
+
 }
 
 
@@ -78,6 +90,7 @@ class PipelineWise:
             self.venv_dir, 'cli', 'bin', 'pipelinewise'
         )
         self.config_path = os.path.join(self.config_dir, 'config.json')
+        self.config = {}
         self.load_config()
         self.alert_sender = AlertSender(self.config.get('alert_handlers'))
 
@@ -98,6 +111,7 @@ class PipelineWise:
             self.TRANSFORM_FIELD_CONNECTOR_NAME
         )
         self.tap_run_log_file = None
+        self.force_fast_sync = True
 
         # Catch SIGINT and SIGTERM to exit gracefully
         for sig in [signal.SIGINT, signal.SIGTERM]:
@@ -346,7 +360,6 @@ class PipelineWise:
                 dir=self.get_temp_dir(), prefix='properties_', suffix='.json'
             )[1]
             utils.save_json(properties, temp_properties_path)
-
             return temp_properties_path, filtered_tap_stream_ids
 
         except Exception as exc:
@@ -354,15 +367,13 @@ class PipelineWise:
 
     def load_config(self):
         """
-        Load configuration
+        Load ppw main configuration at ~/.pipelinewise/config.json
         """
-        self.logger.debug('Loading config at %s', self.config_path)
+        self.logger.debug('Loading main config at %s', self.config_path)
         config = utils.load_json(self.config_path)
 
         if config:
             self.config = config
-        else:
-            self.config = {}
 
     def get_temp_dir(self):
         """
@@ -1015,19 +1026,6 @@ class PipelineWise:
             profiling_dir=self.profiling_dir,
         )
 
-        # Do not run if another instance is already running
-        log_dir = os.path.dirname(self.tap_run_log_file)
-        if (
-            os.path.isdir(log_dir)
-            and len(utils.search_files(log_dir, patterns=['*.log.running'])) > 0
-        ):
-            self.logger.info(
-                'Failed to run. Another instance of the same tap is already running. '
-                'Log file detected in running status at %s',
-                log_dir,
-            )
-            sys.exit(1)
-
         start = None
         state = None
 
@@ -1072,6 +1070,40 @@ class PipelineWise:
             with open(tap.state, 'w', encoding='utf-8') as statefile:
                 statefile.write(state)
 
+    def run_tap_partialsync(self, tap: TapParams, target: TargetParams, transform: TransformParams):
+        """Running the tap for partial sync table"""
+
+        # Build the partial sync executable command
+        command = commands.build_partialsync_command(
+            tap=tap,
+            target=target,
+            transform=transform,
+            venv_dir=self.venv_dir,
+            temp_dir=self.get_temp_dir(),
+            table=self.args.table,
+            column=self.args.column,
+            # all quote characters inside the value strings will be changed into a tag and then later they will be
+            # changed back to the original value in the destination.
+            # because shlex which is used to run the command, will split it and this causes it not be the correct
+            # in the destination.
+            start_value=self._quote_char_to_tag(self.args.start_value),
+            end_value=self._quote_char_to_tag(self.args.end_value),
+            drop_target_table=self.args.drop_target_table
+        )
+
+        def add_partialsync_output_to_main_logger(line: str) -> str:
+            sys.stdout.write(line)
+            return line
+
+        if self.extra_log:
+            # Run command and copy partialsync output to main logger
+            commands.run_command(
+                command, self.tap_run_log_file, add_partialsync_output_to_main_logger
+            )
+        else:
+            # Run command
+            commands.run_command(command, self.tap_run_log_file)
+
     def run_tap_fastsync(
         self, tap: TapParams, target: TargetParams, transform: TransformParams
     ):
@@ -1079,6 +1111,10 @@ class PipelineWise:
         Generating and running shell command to sync tables using the native fastsync components
         """
         # Build the fastsync executable command
+        max_autoresync_table_size = None
+        if tap.type in ('tap-mysql', 'tap-postgres') and target.type == 'target-snowflake' and not self.force_fast_sync:
+            max_autoresync_table_size = self.config.get('allowed_resync_max_size', {}).get('table_mb')
+
         command = commands.build_fastsync_command(
             tap=tap,
             target=target,
@@ -1089,20 +1125,8 @@ class PipelineWise:
             profiling_mode=self.profiling_mode,
             profiling_dir=self.profiling_dir,
             drop_pg_slot=self.drop_pg_slot,
+            autoresync_size=max_autoresync_table_size
         )
-
-        # Do not run if another instance is already running
-        log_dir = os.path.dirname(self.tap_run_log_file)
-        if (
-            os.path.isdir(log_dir)
-            and len(utils.search_files(log_dir, patterns=['*.log.running'])) > 0
-        ):
-            self.logger.info(
-                'Failed to run. Another instance of the same tap is already running. '
-                'Log file detected in running status at %s',
-                log_dir,
-            )
-            sys.exit(1)
 
         # Fastsync is running in subprocess.
         # Collect the formatted logs and log it in the main PipelineWise process as well
@@ -1148,6 +1172,10 @@ class PipelineWise:
             'stream_buffer_size', commands.DEFAULT_STREAM_BUFFER_SIZE
         )
 
+        not_partial_syned_tables = set()
+
+        self.force_fast_sync = True
+
         self.logger.info('Running %s tap in %s target', tap_id, target_id)
 
         # Run only if tap enabled
@@ -1174,7 +1202,7 @@ class PipelineWise:
         current_time = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
 
         # Create fastsync and singer specific filtered tap properties that contains only
-        # the the tables that needs to be synced by the specific command
+        # the tables that needs to be synced by the specific command
         (
             tap_properties_fastsync,
             fastsync_stream_ids,
@@ -1197,6 +1225,7 @@ class PipelineWise:
         start_time = datetime.now()
         try:
             with pidfile.PIDFile(self.tap['files']['pidfile']):
+
                 target_params = TargetParams(
                     target_id=target_id,
                     type=target_type,
@@ -1216,24 +1245,20 @@ class PipelineWise:
                 # Run fastsync for FULL_TABLE replication method
                 if len(fastsync_stream_ids) > 0:
                     self.logger.info(
-                        'Table(s) selected to sync by fastsync: %s', fastsync_stream_ids
+                        'Table(s) selected to sync by fastsync/partialsync: %s', fastsync_stream_ids
                     )
-                    self.tap_run_log_file = os.path.join(
-                        log_dir, f'{target_id}-{tap_id}-{current_time}.fastsync.log'
-                    )
-                    tap_params = TapParams(
-                        tap_id=tap_id,
-                        type=tap_type,
-                        bin=self.tap_bin,
-                        python_bin=self.tap_python_bin,
-                        config=tap_config,
-                        properties=tap_properties_fastsync,
-                        state=tap_state,
-                    )
+                    self.do_sync_tables(fastsync_stream_ids)
 
-                    self.run_tap_fastsync(
-                        tap=tap_params, target=target_params, transform=transform_params
-                    )
+                    # Finding out which partial syn tables are not synced yet for not running singer for them
+                    try:
+                        with open(tap_state, 'r', encoding='utf8') as state_file:
+                            state_dict = json.load(state_file)
+                    except Exception:
+                        state_dict = {}
+                    stored_bookmarks = state_dict.get('bookmarks', {})
+                    stored_bookmarks_keys = set(stored_bookmarks.keys())
+                    not_partial_syned_tables = set(singer_stream_ids).difference(stored_bookmarks_keys)
+
                 else:
                     self.logger.info(
                         'No table available that needs to be sync by fastsync'
@@ -1256,6 +1281,8 @@ class PipelineWise:
                         properties=tap_properties_singer,
                         state=tap_state,
                     )
+
+                    self._remove_not_partial_synced_tables_from_properties(tap_params, not_partial_syned_tables)
 
                     self.run_tap_singer(
                         tap=tap_params,
@@ -1296,30 +1323,37 @@ class PipelineWise:
         a SIGTERM to the process.
         """
         self.logger.info('Trying to stop tap gracefully...')
+
+        pid = os.getpid()
+        pid_from_file = None
         pidfile_path = self.tap['files']['pidfile']
         try:
-            with open(pidfile_path, encoding='utf-8') as pidf:
-                pid = int(pidf.read())
-                pgid = os.getpgid(pid)
-                parent = psutil.Process(pid)
+            with open(pidfile_path, encoding='utf-8') as pid_file:
+                pid_from_file = int(pid_file.read())
 
-                # Terminate all the processes in the current process' process group.
-                for child in parent.children(recursive=True):
-                    if os.getpgid(child.pid) == pgid:
-                        self.logger.info('Sending SIGTERM to child pid %s...', child.pid)
+            pgid = os.getpgid(pid)
+            parent = psutil.Process(pid)
+
+            for child in parent.children(recursive=True):
+                if os.getpgid(child.pid) == pgid:
+                    self.logger.info('Sending SIGTERM to child pid %s...', child.pid)
+                    try:
                         child.terminate()
                         try:
                             child.wait(timeout=5)
                         except psutil.TimeoutExpired:
                             child.kill()
+                    except psutil.NoSuchProcess:
+                        pass
 
         except ProcessLookupError:
-            self.logger.error(
-                'Pid %s not found. Is the tap running on this machine? '
-                'Stopping taps remotely is not supported.',
-                pid,
-            )
-            sys.exit(1)
+            if os.getpgid(pid) != pid_from_file:
+                self.logger.error(
+                    'Pid %s not found. Is the tap running on this machine? '
+                    'Stopping taps remotely is not supported.',
+                    pid,
+                )
+                sys.exit(1)
 
         except FileNotFoundError:
             self.logger.error(
@@ -1327,10 +1361,6 @@ class PipelineWise:
             )
             sys.exit(1)
 
-        # Remove pidfile.
-        os.remove(pidfile_path)
-
-        # Rename log files from running to terminated status
         if self.tap_run_log_file:
             tap_run_log_file_running = f'{self.tap_run_log_file}.running'
             tap_run_log_file_terminated = f'{self.tap_run_log_file}.terminated'
@@ -1338,10 +1368,62 @@ class PipelineWise:
             if os.path.isfile(tap_run_log_file_running):
                 os.rename(tap_run_log_file_running, tap_run_log_file_terminated)
 
+        # Remove pidfile.
+        try:
+            os.remove(pidfile_path)
+        except Exception:
+            pass
+
         sys.exit(1)
 
     # pylint: disable=too-many-locals
     def sync_tables(self):
+        """
+        This method calls do_sync_tables if sync_tables command is chosen
+        """
+        self.force_fast_sync = self.args.force
+        try:
+            with pidfile.PIDFile(self.tap['files']['pidfile']):
+                self.do_sync_tables()
+        except pidfile.AlreadyRunningError as exc:
+            self.logger.error('Another instance of the tap is already running.')
+            raise SystemExit(1) from exc
+
+    def do_sync_tables(self, fastsync_stream_ids=None):
+        """
+        syncing tables by using fast sync
+        """
+        if fastsync_stream_ids:
+            tables_to_sync = ','.join(fastsync_stream_ids).replace('-', '.')
+        else:
+            tables_to_sync = self.args.tables
+
+        selected_tables = self._get_sync_tables_setting_from_selection_file(
+            tables_to_sync, self.args.replication_method_only)
+
+        processes_list = []
+        if selected_tables['partial_sync']:
+            self._reset_state_file_for_partial_sync(selected_tables)
+            partial_sync_process = Process(
+                target=self.sync_tables_partial_sync, args=(selected_tables['partial_sync'],))
+            partial_sync_process.start()
+            processes_list.append(partial_sync_process)
+
+        if selected_tables['full_sync']:
+            fast_sync_process = Process(
+                target=self.sync_tables_fast_sync, args=(selected_tables['full_sync'], ))
+            fast_sync_process.start()
+            processes_list.append(fast_sync_process)
+
+        for process in processes_list:
+            process.join()
+            if process.exception:
+                error, _ = process.exception
+                raise Exception(error)
+            if process.exitcode != 0:
+                raise SystemExit(process.exitcode)
+
+    def sync_tables_fast_sync(self, selected_tables):
         """
         Sync every or a list of selected tables from a specific tap.
         It performs an initial sync and resets the table bookmarks to their new location.
@@ -1350,6 +1432,7 @@ class PipelineWise:
         available for taps and targets where the native and optimised
         fastsync component is implemented.
         """
+        self.args.tables = ','.join(f'"{x}"' for x in selected_tables)
         tap_id = self.tap['id']
         tap_type = self.tap['type']
         target_id = self.target['id']
@@ -1364,95 +1447,84 @@ class PipelineWise:
             target_type,
         )
 
-        # Run only if tap enabled
-        if not self.tap.get('enabled', False):
-            self.logger.info('Tap %s is not enabled.', self.tap['name'])
-            sys.exit(1)
-
-        # Tap exists but configuration not completed
-        if not os.path.isfile(fastsync_bin):
-            self.logger.error(
-                'Table sync function is not implemented from %s datasources to %s type of targets',
-                tap_type,
-                target_type,
-            )
-            sys.exit(1)
-
-        self._cleanup_tap_state_file()
-
-        # Generate and run the command to run the tap directly
-        tap_config = self.tap['files']['config']
-        tap_inheritable_config = self.tap['files']['inheritable_config']
-        tap_properties = self.tap['files']['properties']
-        tap_state = self.tap['files']['state']
-        tap_transformation = self.tap['files']['transformation']
-        target_config = self.target['files']['config']
-
-        # Set drop_pg_slot to True if we want to sync the whole tap
-        # This flag will be used by FastSync PG to (PG/SF/Redshift)
-        self.drop_pg_slot = bool(not self.args.tables)
-
-        # Some target attributes can be passed and override by tap (aka. inheritable config)
-        # We merge the two configs and use that with the target
-        cons_target_config = self.create_consumable_target_config(
-            target_config, tap_inheritable_config
-        )
-
-        # Output will be redirected into target and tap specific log directory
-        log_dir = self.get_tap_log_dir(target_id, tap_id)
-        current_time = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
-
-        # sync_tables command always using fastsync
+        cons_target_config = None
         try:
-            with pidfile.PIDFile(self.tap['files']['pidfile']):
-                self.tap_run_log_file = os.path.join(
-                    log_dir, f'{target_id}-{tap_id}-{current_time}.fastsync.log'
-                )
+            self._check_if_tap_is_enabled()
 
-                # Create parameters as NamedTuples
-                tap_params = TapParams(
-                    tap_id=tap_id,
-                    type=tap_type,
-                    bin=self.tap_bin,
-                    python_bin=self.tap_python_bin,
-                    config=tap_config,
-                    properties=tap_properties,
-                    state=tap_state,
-                )
+            self._check_if_complete_tap_configuration(fastsync_bin, tap_type, target_type)
 
-                target_params = TargetParams(
-                    target_id=target_id,
-                    type=target_type,
-                    bin=self.target_bin,
-                    python_bin=self.target_python_bin,
-                    config=cons_target_config,
-                )
+            self._cleanup_tap_state_file()
 
-                transform_params = TransformParams(
-                    bin=self.transform_field_bin,
-                    config=tap_transformation,
-                    python_bin=self.transform_field_python_bin,
-                    tap_id=tap_id,
-                    target_id=target_id,
-                )
+            # Generate and run the command to run the tap directly
+            tap_config = self.tap['files']['config']
+            tap_inheritable_config = self.tap['files']['inheritable_config']
+            tap_properties = self.tap['files']['properties']
+            tap_state = self.tap['files']['state']
+            tap_transformation = self.tap['files']['transformation']
+            target_config = self.target['files']['config']
 
-                self.run_tap_fastsync(
-                    tap=tap_params, target=target_params, transform=transform_params
-                )
+            # Set drop_pg_slot to True if we want to sync the whole tap
+            # This flag will be used by FastSync PG to (PG/SF/Redshift)
+            self.drop_pg_slot = bool(not self.args.tables)
 
-        except pidfile.AlreadyRunningError:
-            self.logger.error('Another instance of the tap is already running.')
-            sys.exit(1)
-        # Delete temp file if there is any
+            # Some target attributes can be passed and override by tap (aka. inheritable config)
+            # We merge the two configs and use that with the target
+            cons_target_config = self.create_consumable_target_config(
+                target_config, tap_inheritable_config
+            )
+
+            # Output will be redirected into target and tap specific log directory
+            log_dir = self.get_tap_log_dir(target_id, tap_id)
+            current_time = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
+
+            # sync_tables command always using fastsync
+            self.tap_run_log_file = os.path.join(
+                log_dir, f'{target_id}-{tap_id}-{current_time}.fastsync.log'
+            )
+
+            # Create parameters as NamedTuples
+            tap_params = TapParams(
+                tap_id=tap_id,
+                type=tap_type,
+                bin=self.tap_bin,
+                python_bin=self.tap_python_bin,
+                config=tap_config,
+                properties=tap_properties,
+                state=tap_state,
+            )
+
+            target_params = TargetParams(
+                target_id=target_id,
+                type=target_type,
+                bin=self.target_bin,
+                python_bin=self.target_python_bin,
+                config=cons_target_config,
+            )
+
+            transform_params = TransformParams(
+                bin=self.transform_field_bin,
+                config=tap_transformation,
+                python_bin=self.transform_field_python_bin,
+                tap_id=tap_id,
+                target_id=target_id,
+            )
+
+            self.run_tap_fastsync(
+                tap=tap_params, target=target_params, transform=transform_params
+            )
+
         except commands.RunCommandException as exc:
             self.logger.exception(exc)
             self.send_alert(message=f'Failed to sync tables in {tap_id} tap', exc=exc)
-            sys.exit(1)
+            raise SystemExit(1) from exc
+        except PreRunChecksException as exc:
+            raise exc
         except Exception as exc:
             self.send_alert(message=f'Failed to sync tables in {tap_id} tap', exc=exc)
             raise exc
         finally:
-            utils.silentremove(cons_target_config)
+            if cons_target_config:
+                utils.silentremove(cons_target_config)
 
     def validate(self):
         """
@@ -1547,10 +1619,13 @@ class PipelineWise:
         Take a list of YAML files from a directory and use it as the source to build
         singer compatible json files and organise them into pipeline directory structure
         """
+        old_config = self.config.copy()
+
         # Read the YAML config files and transform/save into singer compatible
         # JSON files in a common directory structure
         config = Config.from_yamls(self.config_dir, self.args.dir, self.args.secret)
-        config.save()
+        selected_taps_id = self.args.taps.split(',')
+        config.save(selected_taps_id)
 
         # Activating tap stream selections
         #
@@ -1566,12 +1641,22 @@ class PipelineWise:
         total_targets = 0
         total_taps = 0
         discover_excs = []
+        found_selected_taps = set()
 
         # Import every tap from every target
         start_time = datetime.now()
         for target in config.targets.values():
             total_targets += 1
-            total_taps += len(target.get('taps'))
+            selected_taps = []
+
+            if selected_taps_id == ['*']:
+                total_taps += len(target.get('taps'))
+                selected_taps = target.get('taps')
+            else:
+                for tap in target.get('taps'):
+                    if tap['id'] in selected_taps_id:
+                        selected_taps.append(tap)
+                        found_selected_taps.add(tap['id'])
 
             with parallel_backend('threading', n_jobs=-1):
                 # Discover taps in parallel and return the list of exception of the failed ones
@@ -1581,14 +1666,25 @@ class PipelineWise:
                             None,
                             Parallel(verbose=100)(
                                 delayed(self.discover_tap)(tap=tap, target=target)
-                                for tap in target.get('taps')
+                                for tap in selected_taps
                             ),
                         )
                     )
                 )
 
-        # Log summary
+        if selected_taps_id != ['*']:
+            total_taps = len(selected_taps_id)
+            not_found_taps = set(selected_taps_id) - found_selected_taps
+            for tap in not_found_taps:
+                discover_excs.append(f'tap "{tap}" not found!')
+
+        # reloading the new config
+        self.load_config()
+        deleted_taps_count = self.cleanup_after_deleted_config(old_config)
+
         end_time = datetime.now()
+
+        # Log summary
         # pylint: disable=logging-too-many-args
         self.logger.info(
             """
@@ -1598,6 +1694,7 @@ class PipelineWise:
                 Total targets to import        : %s
                 Total taps to import           : %s
                 Taps imported successfully     : %s
+                Taps deleted                   : %s
                 Taps failed to import          : %s
                 Runtime                        : %s
             -------------------------------------------------------
@@ -1605,6 +1702,7 @@ class PipelineWise:
             total_targets,
             total_taps,
             total_taps - len(discover_excs),
+            deleted_taps_count,
             str(discover_excs),
             end_time - start_time,
         )
@@ -1620,6 +1718,266 @@ class PipelineWise:
 
         print(yaml_text)
         print('Encryption successful')
+
+    def partial_sync_table(self):
+        """
+        This method calls partial sync if partial_sync_table command is chosen
+        """
+        try:
+            with pidfile.PIDFile(self.tap['files']['pidfile']):
+
+                # this command allows only static values!
+                if self.args.start_value:
+                    self.args.start_value = f'<S>{self.args.start_value}'
+                if self.args.end_value:
+                    self.args.end_value = f'<S>{self.args.end_value}'
+
+                self.sync_tables_partial_sync()
+        except pidfile.AlreadyRunningError as exc:
+            self.logger.error('Another instance of the tap is already running.')
+            raise SystemExit(1) from exc
+
+    def sync_tables_partial_sync(self, defined_tables=None):
+        """
+        Partial Sync Tables
+        """
+
+        cons_target_config = None
+
+        # Continue only if tap and target is supported by partial sync
+        try:
+            self._check_supporting_tap_and_target_for_partial_sync()
+
+            tap_id = self.tap['id']
+            tap_type = self.tap['type']
+            target_id = self.target['id']
+            target_type = self.target['type']
+            sync_bin = utils.get_partialsync_bin(self.venv_dir, tap_type, target_type)
+
+            self.logger.info(
+                'Partial syncing table from %s (%s) to %s (%s)...',
+                tap_id,
+                tap_type,
+                target_id,
+                target_type,
+            )
+
+            self._check_if_tap_is_enabled()
+
+            self._check_if_complete_tap_configuration(sync_bin, tap_type, target_type)
+
+            if self.args.table != '*':
+                self._validate_selected_table_and_column()
+                self._check_if_state_exists()
+                self.args.drop_target_table = None
+            else:
+                table_names = []
+                table_columns = []
+                table_values = []
+                table_drop_targets = []
+                for table, sync_settings in defined_tables.items():
+                    table_names.append(table)
+                    table_columns.append(sync_settings['column'])
+                    static_value = sync_settings.get('static_value')
+                    dynamic_value = sync_settings.get('dynamic_value')
+                    if static_value and dynamic_value:
+                        raise Exception('It is not allowed to have both dynamic and static values!')
+                    if static_value:
+                        table_values.append(f'<S>{str(static_value)}')
+
+                    if dynamic_value:
+                        table_values.append(f'<D>{str(dynamic_value)}')
+
+                    table_drop_targets.append(sync_settings.get('drop_target_table'))
+
+                self.args.table = ','.join(table_names)
+                self.args.column = ','.join(table_columns)
+                self.args.start_value = ','.join(table_values)
+                self.args.drop_target_table = ','.join(map(str, table_drop_targets))
+
+            # Generate and run the command to run the tap directly
+            tap_config = self.tap['files']['config']
+            tap_inheritable_config = self.tap['files']['inheritable_config']
+            tap_properties = self.tap['files']['properties']
+            tap_state = self.tap['files']['state']
+            tap_transformation = self.tap['files']['transformation']
+            target_config = self.target['files']['config']
+
+            self.drop_pg_slot = False
+
+            cons_target_config = self.create_consumable_target_config(
+                target_config, tap_inheritable_config
+            )
+
+            # Output will be redirected into target and tap specific log directory
+            log_dir = self.get_tap_log_dir(target_id, tap_id)
+            current_time = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
+
+            self.tap_run_log_file = os.path.join(
+                log_dir, f'{target_id}-{tap_id}-{current_time}.partialsync.log'
+            )
+
+            # Create parameters as NamedTuples
+            tap_params = TapParams(
+                tap_id=tap_id,
+                type=tap_type,
+                bin=self.tap_bin,
+                python_bin=self.tap_python_bin,
+                config=tap_config,
+                properties=tap_properties,
+                state=tap_state,
+            )
+
+            target_params = TargetParams(
+                target_id=target_id,
+                type=target_type,
+                bin=self.target_bin,
+                python_bin=self.target_python_bin,
+                config=cons_target_config,
+            )
+
+            transform_params = TransformParams(
+                bin=self.transform_field_bin,
+                config=tap_transformation,
+                python_bin=self.transform_field_python_bin,
+                tap_id=tap_id,
+                target_id=target_id,
+            )
+
+            self.run_tap_partialsync(tap=tap_params, target=target_params, transform=transform_params)
+
+        # Delete temp file if there is any
+        except commands.RunCommandException as exc:
+            self.logger.exception(exc)
+            self.send_alert(message=f'Failed to sync tables in {tap_id} tap', exc=exc)
+            raise SystemExit(1) from exc
+        except PartialSyncNotSupportedTypeException as exc:
+            self.logger.error(exc)
+            raise SystemExit(1) from exc
+        except PreRunChecksException as exp:
+            raise SystemExit(1) from exp
+        except Exception as exc:
+            self.send_alert(message=f'Failed to sync tables in {tap_id} tap', exc=exc)
+            self.logger.exception(exc)
+            raise exc
+        finally:
+            if cons_target_config:
+                utils.silentremove(cons_target_config)
+
+    def reset_state(self):
+        """Reset state file"""
+
+        if self.tap.get('type') == 'tap-postgres':
+            self._update_state_file('lsn', 1)
+            self.logger.info('state file is reset for log based tables!')
+        else:
+            self.logger.error('state reset is available only for PostgreSQL taps!')
+            raise SystemExit(1)
+
+    def _update_state_file(self, table_property, new_value):
+        tap_state = self.tap['files']['state']
+        try:
+            with open(tap_state, 'r', encoding='utf8') as state_file:
+                state_content = json.load(state_file)
+                bookmarks = state_content.get('bookmarks')
+                for table, properties in bookmarks.items():
+                    if table_property in properties:
+                        bookmarks[table][table_property] = new_value
+                state_content['bookmarks'] = bookmarks
+
+            with open(tap_state, 'w', encoding='utf8') as state_file:
+                json.dump(state_content, state_file, indent=4)
+
+        except Exception as exp:
+            self.logger.error(exp)
+            raise SystemExit(1) from exp
+
+    @staticmethod
+    def _remove_not_partial_synced_tables_from_properties(tap_params, not_synced_tables):
+        """" Remove partial sync table which are not synced yet from properties """
+        with open(tap_params.properties, 'r', encoding='utf8') as properties_temp_file:
+            properties_temp = json.load(properties_temp_file)
+            streams = properties_temp.get('streams')
+            filtered_streams = list(filter(lambda d: d['tap_stream_id'] not in not_synced_tables, streams))
+            properties_temp['streams'] = filtered_streams
+        with open(tap_params.properties, 'w', encoding='utf8') as properties_temp_file:
+            json.dump(properties_temp, properties_temp_file)
+
+    def _reset_state_file_for_partial_sync(self, selected_tables):
+        tap_state = self.tap['files']['state']
+        try:
+            with open(tap_state, 'r', encoding='utf8') as state_file:
+                state_content = json.load(state_file)
+                bookmarks = state_content.get('bookmarks')
+        except Exception:
+            bookmarks = None
+        if bookmarks:
+            selected_partial_sync_tables = set(selected_tables['partial_sync'].keys())
+            selected_partial_sync_tables = {sub.replace('.', '-') for sub in selected_partial_sync_tables}
+            filtered_bookmarks = dict(filter(lambda k: k[0] not in selected_partial_sync_tables, bookmarks.items()))
+            state_content['bookmarks'] = filtered_bookmarks
+            with open(tap_state, 'w', encoding='utf8') as state_file:
+                json.dump(state_content, state_file, indent=4)
+
+    def _check_supporting_tap_and_target_for_partial_sync(self):
+        tap_type = self.tap['type']
+        tap_id = self.tap['id']
+        target_type = self.target['type']
+        target_id = self.target['id']
+
+        if ConnectorType(target_type) not in PARTIAL_SYNC_PAIRS.get(ConnectorType(tap_type), {}):
+            raise PartialSyncNotSupportedTypeException(
+                f'Error! {tap_id}({tap_type})-{target_id}({target_type}) pair is not supported for the partial sync!'
+            )
+
+    def _check_if_complete_tap_configuration(self, fastsync_bin, tap_type, target_type):
+        # Tap exists but configuration not completed
+        if not os.path.isfile(fastsync_bin):
+            self.logger.error(
+                'Table sync function is not implemented from %s datasources to %s type of targets',
+                tap_type,
+                target_type
+            )
+            raise SystemExit(1)
+
+    def _check_if_tap_is_enabled(self):
+        # Run only if tap enabled
+        if not self.tap.get('enabled', False):
+            self.logger.info('Tap %s is not enabled.', self.tap['name'])
+            raise PreRunChecksException()
+
+    def _check_if_state_exists(self):
+        state_file = self.tap['files']['state']
+        if os.path.exists(state_file):
+            return
+        self.logger.error('Could not find state file in "%s"!', state_file)
+        raise PreRunChecksException()
+
+    def _validate_selected_table_and_column(self):
+        properties = utils.load_json(self.tap['files']['properties'])
+
+        # because self.args.table is in this format <database>.<table_name>
+        table_name = self.args.table.split('.')[-1]
+
+        streams = properties['streams']
+
+        table_in_properties = next(
+            (item for item in streams if item['table_name'] == table_name), None
+        )
+        if table_in_properties is None:
+            self.logger.error('Not found table "%s" in properties!', self.args.table)
+            raise PreRunChecksException()
+
+        self.__check_if_table_is_selected(table_in_properties)
+
+        try:
+            column_type = table_in_properties['schema']['properties'][self.args.column]['type']
+            if 'boolean' in column_type:
+                self.logger.error('column "%s" has invalid type for partial sync!', self.args.column)
+                raise PreRunChecksException('Invalid type for partial sync!')
+        except KeyError as exp:
+            self.logger.error('Not found column "%s" in properties!', self.args.column)
+            raise PreRunChecksException() from exp
 
     def _is_initial_sync_required(
         self, replication_method: str, stream_bookmark: Dict
@@ -1746,8 +2104,6 @@ TAP RUN SUMMARY
         state_file = self.tap['files']['state']
         if tables:
             self._clean_tables_from_bookmarks_in_state_file(state_file, tables)
-        else:
-            utils.silentremove(state_file)
 
     @staticmethod
     def _clean_tables_from_bookmarks_in_state_file(state_file_to_clean: str, tables: str) -> None:
@@ -1758,16 +2114,50 @@ TAP RUN SUMMARY
                 list_of_tables = tables.split(',')
                 if bookmarks:
                     for table_name in list_of_tables:
-                        bookmarks.pop(table_name, None)
+                        bookmarks.pop(table_name.replace('"', ''), None)
 
                 state_file.seek(0)
-                json.dump(state_data, state_file)
+                json.dump(state_data, state_file, indent=4)
                 state_file.truncate()
 
         except FileNotFoundError:
             pass
         except json.JSONDecodeError:
             pass
+
+    @staticmethod
+    def _get_fixed_name_of_table(stream_id):
+        return stream_id.replace('-', '.', 1)
+
+    def _get_sync_tables_setting_from_selection_file(self, tables, replication_method_only='*'):
+        replication_method = replication_method_only.upper()
+        selection = utils.load_json(self.tap['files']['selection'])
+        selection = selection.get('selection')
+        all_tables = {'full_sync': [], 'partial_sync': {}}
+        tables_list = tables.split(',') if tables else tables
+        if selection:
+            for table in selection:
+                table_name = self._get_fixed_name_of_table(table['tap_stream_id'])
+                if tables_list is None or table_name in tables_list:
+                    if replication_method in ['*', table.get('replication_method')]:
+                        if table.get('sync_start_from'):
+                            all_tables['partial_sync'][table_name] = table['sync_start_from']
+                        else:
+                            all_tables['full_sync'].append(table_name)
+            return all_tables
+
+    def __check_if_table_is_selected(self, table_in_properties):
+        table_metadata = table_in_properties.get('metadata', [])
+        for metadata in table_metadata:
+            metadata_properties = metadata.get('metadata', {})
+            selected = metadata_properties.get('selected')
+            if selected is True:   # pylint: disable=no-else-return
+                return
+            elif selected is False:
+                break
+
+        self.logger.error('table "%s" is not selected in properties!', self.args.table)
+        raise PreRunChecksException()
 
     def __validate_transformations(
         self, transformation_file: str, catalog: Dict, tap_id: str, target_id: str
@@ -1824,3 +2214,95 @@ TAP RUN SUMMARY
             Boolean, True if FastSync exists, False otherwise.
         """
         return ConnectorType(target_type) in FASTSYNC_PAIRS.get(ConnectorType(tap_type), {})
+
+    def cleanup_after_deleted_config(self, old_config: Dict) -> int:
+        """
+        Running cleanup of all files/folders...etc after yaml config of a target or tap is deleted
+
+        Args:
+            old_config: old config dictionary representing targets and their taps
+
+        Returns: Number of deleted taps
+        """
+        if not old_config:
+            return 0
+
+        old_config_dict = {}
+        new_config_dict = {}
+
+        for target in old_config.get('targets', []):
+            if target['id'] not in old_config_dict:
+                old_config_dict[target['id']] = {
+                    tap['id']: tap['type']
+                    for tap in target['taps']
+                }
+
+        for target in self.config.get('targets', []):
+            if target['id'] not in new_config_dict:
+                new_config_dict[target['id']] = {
+                    tap['id']
+                    for tap in target['taps']
+                }
+
+        deleted_taps_count = 0
+        for target_id, taps in old_config_dict.items():
+            if target_id not in new_config_dict:
+                # target is no longer configured, thus we need to remove all its config and taps tied to it
+                self._remove_target_config(target_id, taps)
+                deleted_taps_count += len(taps)
+
+            else:
+                deleted_tap_ids = set(taps.keys()) - new_config_dict[target_id]
+
+                for deleted_tap_id in deleted_tap_ids:
+                    # we have taps whose config was deleted, thus need to clean up their files
+                    self._remove_tap_config(deleted_tap_id, target_id, taps[deleted_tap_id])
+
+                deleted_taps_count += len(deleted_tap_ids)
+
+        return deleted_taps_count
+
+    def _remove_tap_config(self, tap_id: str, target_id: str, tap_type: str) -> NoReturn:
+        """
+        Remove the tap config and do any necessary cleanup.
+        Args:
+            tap_id: ID of the tap to remove, also matches the name of the folder where the tap config lives.
+            target_id:  ID of the target used by this tap.
+            tap_type: the type of the tap, e.g: tap-postgres, tap-kafka..etc
+        """
+        self.logger.info('Deleting tap "%s" config', tap_id)
+
+        if tap_type == 'tap-postgres':
+            # drop the slot if it exists
+            self.logger.info('Dropping tap "%s" slot on the DB', tap_id)
+            tap_config = utils.load_json(Config.get_connector_config_file(
+                self.get_tap_dir(target_id, tap_id)
+            ))
+            if tap_config:
+                FastSyncTapPostgres.drop_slot(tap_config)
+
+        utils.silentremove(self.get_tap_dir(target_id, tap_id))
+
+    def _remove_target_config(self, target_id: str, taps: Dict[str, str]) -> NoReturn:
+        """
+        Remove all files and config and taps that are tied to the given target.
+
+        Args:
+            target_id: ID of the target whose config to remove, also matches the name of the folder where
+                said config lives.
+            taps: Dictionary of taps using this target, it's a dictionary of tap_id: tap_type
+        """
+        self.logger.info('Deleting target "%s" config and all its taps', target_id)
+
+        for tap_id, tap_type in taps.items():
+            self._remove_tap_config(tap_id, target_id, tap_type)
+
+        utils.silentremove(self.get_target_dir(target_id))
+
+    @staticmethod
+    def _quote_char_to_tag(value_string: str) -> str:
+        """converting all quote characters to quote tag"""
+        if value_string:
+            return value_string.replace("'", '<<quote>>')
+
+        return value_string

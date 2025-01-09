@@ -2,7 +2,11 @@
     "selection": [
         {
             "replication_method": "LOG_BASED",
-            "tap_stream_id": "db_test_mysql-table_one"
+            "tap_stream_id": "db_test_mysql-table_one",
+            "sync_start_from": {
+                "column": "id",
+                "value": "5"
+            }
         },
         {
             "replication_method": "INCREMENTAL",

@@ -1,0 +1,123 @@
+---
+
+# ------------------------------------------------------------------------------
+# General Properties
+# ------------------------------------------------------------------------------
+id: "postgres_to_sf_soft_delete"
+name: "PostgreSQL source test database"
+type: "tap-postgres"
+owner: "test-runner"
+
+
+# ------------------------------------------------------------------------------
+# Source (Tap) - PostgreSQL connection details
+# ------------------------------------------------------------------------------
+db_conn:
+  host: "${TAP_POSTGRES_HOST}"          # PostgreSQL host
+  logical_poll_total_seconds: 3         # Time out if no LOG_BASED changes received for 3 seconds
+  port: ${TAP_POSTGRES_PORT}            # PostgreSQL port
+  user: "${TAP_POSTGRES_USER}"          # PostgreSQL user
+  password: "${TAP_POSTGRES_PASSWORD}"  # Plain string or vault encrypted
+  dbname: "${TAP_POSTGRES_DB}"          # PostgreSQL database name
+
+
+# ------------------------------------------------------------------------------
+# Destination (Target) - Target properties
+# Connection details should be in the relevant target YAML file
+# ------------------------------------------------------------------------------
+target: "snowflake"                    # ID of the target connector where the data will be loaded
+batch_size_rows: 1000                  # Batch size for the stream to optimise load performance
+stream_buffer_size: 0                  # In-memory buffer size (MB) between taps and targets for asynchronous data pipes
+hard_delete: false
+
+
+# ------------------------------------------------------------------------------
+# Source to target Schema mapping
+# ------------------------------------------------------------------------------
+schemas:
+
+  ### SOURCE SCHEMA 1: public
+  - source_schema: "public"
+    target_schema: "ppw_e2e_tap_postgres${TARGET_SNOWFLAKE_SCHEMA_POSTFIX}"
+
+    tables:
+
+      ### Table with INCREMENTAL replication
+      - table_name: "city"
+        replication_method: "INCREMENTAL"
+        replication_key: "id"
+
+      ### Table with FULL_TABLE replication
+      - table_name: "country"
+        replication_method: "FULL_TABLE"
+
+      ### Table with no primary key
+      - table_name: "no_pk_table"
+        replication_method: "FULL_TABLE"
+
+      ### Table with reserved words and columns and special characters
+      - table_name: "edgydata"
+        replication_method: "INCREMENTAL"
+        replication_key: "cid"
+        transformations:
+          - column: "cvarchar"
+            type: "HASH-SKIP-FIRST-3"
+
+      ### Table with reserved word
+      - table_name: "order"
+        replication_method: "INCREMENTAL"
+        replication_key: "id"
+
+      ### Table with space and mixed upper and lowercase characters
+      - table_name: "table_with_space and UPPERCase"
+        replication_method: "LOG_BASED"
+
+      ### Table with space and mixed upper and lowercase characters
+      - table_name: "table_with_reserved_words"
+        replication_method: "FULL_TABLE"
+
+      ### Table with INCREMENTAL replication
+      - table_name: "customers"
+        replication_method: "INCREMENTAL"
+        replication_key: "id"
+        transformations:
+          - column: "phone"
+            type: "MASK-STRING-SKIP-ENDS-2"
+
+          - column: "email"
+            type: "MASK-STRING-SKIP-ENDS-6"
+
+      ### Empty table
+      - table_name: "empty_table"
+        replication_method: "INCREMENTAL"
+        replication_key: "id"
+
+  ### SOURCE SCHEMA 2: public2
+  - source_schema: "public2"
+    target_schema: "ppw_e2e_tap_postgres_public2${TARGET_SNOWFLAKE_SCHEMA_POSTFIX}"
+
+    tables:
+      ### Table with FULL_TABLE replication
+      - table_name: "wearehere"
+        replication_method: "FULL_TABLE"
+
+      ### Table with reserved words and columns and special characters
+      - table_name: "public2_edgydata"
+        replication_method: "INCREMENTAL"
+        replication_key: "cid"
+
+  ### SOURCE SCHEMA 3: logical 1
+  #- source_schema: "logical1"
+  #  target_schema: "ppw_e2e_tap_postgres_logical1${TARGET_SNOWFLAKE_SCHEMA_POSTFIX}"
+  #
+  #  tables:
+  #    - table_name: "logical1_table1"
+  #      replication_method: "LOG_BASED"
+  #    - table_name: "logical1_table2"
+  #    - table_name: "logical1_edgydata"
+
+  ### SOURCE SCHEMA 4: logical2
+  #- source_schema: "logical2"
+  #  target_schema: "ppw_e2e_tap_postgres_logical2${TARGET_SNOWFLAKE_SCHEMA_POSTFIX}"
+  #  tables:
+  #    - table_name: "logical2_table1"

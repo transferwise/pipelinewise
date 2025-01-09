@@ -1,10 +1,13 @@
 import csv
 import datetime
 import decimal
+import glob
 import logging
+import os
 import pymysql
 import pymysql.cursors
 
+from argparse import Namespace
 from typing import Tuple, Dict, Callable
 from pymysql import InterfaceError, OperationalError, Connection
 
@@ -119,10 +122,12 @@ class FastSyncTapMySql:
         self.conn: Connection = pymysql.connect(
             **conn_params,
             cursorclass=pymysql.cursors.DictCursor,
+            ssl={'': True}
         )
         self.conn_unbuffered: Connection = pymysql.connect(
             **conn_params,
             cursorclass=pymysql.cursors.SSCursor,
+            ssl={'': True}
         )
 
         # Set session variables by running a list of SQLs which is defined
@@ -277,11 +282,11 @@ class FastSyncTapMySql:
         Get the actual incremental key position in the table
         """
         result = self.query(
-            'SELECT MAX({}) AS key_value FROM {}'.format(replication_key, table)
+            f'SELECT MAX({replication_key}) AS key_value FROM {table}'
         )
         if not result:
             raise Exception(
-                'Cannot get replication key value for table: {}'.format(table)
+                f'Cannot get replication key value for table: {table}'
             )
 
         mysql_key_value = result[0].get('key_value')
@@ -308,9 +313,8 @@ class FastSyncTapMySql:
         Get the primary key of a table
         """
         table_dict = utils.tablename_to_dict(table_name)
-        sql = "SHOW KEYS FROM `{}`.`{}` WHERE Key_name = 'PRIMARY'".format(
-            table_dict['schema_name'], table_dict['table_name']
-        )
+        sql = f"SHOW KEYS FROM `{table_dict['schema_name']}`.`{table_dict['table_name']}` WHERE Key_name = 'PRIMARY'"
+
         pk_specs = self.query(sql)
         if len(pk_specs) > 0:
             return [
@@ -355,7 +359,7 @@ class FastSyncTapMySql:
                             WHEN data_type IN ('blob', 'tinyblob', 'mediumblob', 'longblob')
                                     THEN CONCAT('REPLACE(hex(`', column_name, '`)', ", '\n', ' ')")
                             WHEN data_type IN ('binary', 'varbinary')
-                                    THEN concat('REPLACE(REPLACE(hex(trim(trailing CHAR(0x00) from `',COLUMN_NAME,'`))', ", '\n', ' '), '\r', '')")
+                                    THEN concat('REPLACE(REPLACE(hex(`',COLUMN_NAME,'`)', ", '\n', ' '), '\r', '')")
                             WHEN data_type IN ('bit')
                                     THEN concat('cast(`', column_name, '` AS unsigned)')
                             WHEN data_type IN ('date')
@@ -414,6 +418,7 @@ class FastSyncTapMySql:
             split_file_chunk_size_mb=1000,
             split_file_max_chunks=20,
             compress=True,
+            where_clause_sql='',
     ):
         """
         Export data from table to a zipped csv
@@ -433,15 +438,20 @@ class FastSyncTapMySql:
             raise Exception('{} table not found.'.format(table_name))
 
         table_dict = utils.tablename_to_dict(table_name)
+
+        column_safe_sql_values = column_safe_sql_values + [
+            "CONVERT_TZ( NOW(),@@session.time_zone,'+00:00') AS `_SDC_EXTRACTED_AT`",
+            "CONVERT_TZ( NOW(),@@session.time_zone,'+00:00') AS `_SDC_BATCHED_AT`",
+            'null AS `_SDC_DELETED_AT`'
+        ]
+
         sql = """SELECT {}
-        ,CONVERT_TZ( NOW(),@@session.time_zone,'+00:00') AS _SDC_EXTRACTED_AT
-        ,CONVERT_TZ( NOW(),@@session.time_zone,'+00:00') AS _SDC_BATCHED_AT
-        ,null AS _SDC_DELETED_AT
-        FROM `{}`.`{}`
+        FROM `{}`.`{}` {}
         """.format(
             ','.join(column_safe_sql_values),
             table_dict['schema_name'],
             table_dict['table_name'],
+            where_clause_sql
         )
         export_batch_rows = self.connection_config['export_batch_rows']
         exported_rows = 0
@@ -488,14 +498,36 @@ class FastSyncTapMySql:
                     'Exported total of %s rows from %s...', exported_rows, table_name
                 )
 
+    def export_source_table_data(
+            self, args: Namespace, tap_id: str, where_clause_sql: str = '') -> list:
+        """Export source table data"""
+        filename = utils.gen_export_filename(tap_id=tap_id, table=args.table, sync_type='partialsync')
+        filepath = os.path.join(args.temp_dir, filename)
+
+        # Exporting table data
+
+        self.copy_table(
+            args.table,
+            filepath,
+            split_large_files=args.target.get('split_large_files'),
+            split_file_chunk_size_mb=args.target.get('split_file_chunk_size_mb'),
+            split_file_max_chunks=args.target.get('split_file_max_chunks'),
+            where_clause_sql=where_clause_sql,
+        )
+        file_parts = glob.glob(f'{filepath}*')
+        return file_parts
+
     def __get_primary_server_uuid(self) -> str:
         """
         Fetches the primary server's UUID
 
         Returns: server uuid
         """
-        conn = pymysql.connect(**self.get_connection_parameters(prioritize_primary=True)[0],
-                               cursorclass=pymysql.cursors.DictCursor) if self.is_replica else None
+        conn = pymysql.connect(
+            **self.get_connection_parameters(prioritize_primary=True)[0],
+            cursorclass=pymysql.cursors.DictCursor,
+            ssl={'': True}
+        ) if self.is_replica else None
 
         result = self.query('select @@server_uuid as server_uuid;', conn)
 
@@ -510,8 +542,11 @@ class FastSyncTapMySql:
 
         Returns: server uuid
         """
-        conn = pymysql.connect(**self.get_connection_parameters(prioritize_primary=True)[0],
-                               cursorclass=pymysql.cursors.DictCursor) if self.is_replica else None
+        conn = pymysql.connect(
+            **self.get_connection_parameters(prioritize_primary=True)[0],
+            cursorclass=pymysql.cursors.DictCursor,
+            ssl={'': True}
+        ) if self.is_replica else None
 
         result = self.query('select @@server_id as server_id;', conn)
 

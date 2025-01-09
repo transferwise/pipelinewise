@@ -1,0 +1,43 @@
+{
+  "type": ["null", "object"],
+  "additionalProperties": false,
+  "properties": {
+    "_sdc_repository": {
+      "type": ["string"]
+    },
+    "id": {
+      "type": ["null", "integer"]
+    },
+    "user": {
+      "type": ["null", "object"],
+      "additionalProperties": false,
+      "properties": {
+        "login": {
+          "type": ["null", "string"]
+        },
+        "id": {
+          "type": ["null", "integer"]
+        }
+      }
+    },
+    "body": {
+      "type": ["null", "string"]
+    },
+    "state": {
+      "type": ["null", "string"]
+    },
+    "commit_id": {
+      "type": ["null", "string"]
+    },
+    "html_url": {
+      "type": ["null", "string"]
+    },
+    "pull_request_url": {
+      "type": ["null", "string"]
+    },
+    "submitted_at": {
+      "type": ["null", "string"],
+      "format": "date-time"
+    }
+  }
+}
