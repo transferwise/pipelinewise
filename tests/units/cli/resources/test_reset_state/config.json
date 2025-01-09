@@ -1,0 +1,18 @@
+{
+    "targets": [
+        {
+            "id": "target_foo",
+            "type": "target-snowflake",
+            "taps": [
+                {
+                    "id": "tap_pg",
+                    "type": "tap-postgres"
+                },
+                {
+                    "id": "tap_bar",
+                    "type": "tap-bar"
+                }
+            ]
+        }
+    ]
+}
