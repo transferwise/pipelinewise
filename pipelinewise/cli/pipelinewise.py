@@ -1871,8 +1871,7 @@ class PipelineWise:
             self._update_state_file('lsn', 1)
             self.logger.info('state file is reset for log based tables!')
         else:
-            self.logger.error('state reset is not supported for %s (%s)!',
-                              self.tap.get('id'), self.tap.get('type'))
+            self.logger.error('state reset is available only for PostgreSQL taps!')
             raise SystemExit(1)
 
     def _update_state_file(self, table_property, new_value):
