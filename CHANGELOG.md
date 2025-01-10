@@ -1,3 +1,8 @@
+0.68.0 (2025-01-10)
+-------------------
+- Bump `requests` from `2.20.0` to `2.32.2` in `/singer-connectors/tap-github`
+- Add `reset_state` command for PG taps
+
 0.67.0 (2024-11-19)
 -------------------
 - Fix map date column to correct Postgres type
