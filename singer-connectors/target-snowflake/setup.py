@@ -23,7 +23,7 @@ setup(name="pipelinewise-target-snowflake",
       py_modules=["target_snowflake"],
       python_requires='>=3.7',
       install_requires=[
-          'pipelinewise-singer-python==2.*',
+          'pipelinewise-singer-python<2.0.0',
           'numpy==1.26.4',         #  numpy 2.X is not compatible with our used pandas
           'snowflake-connector-python[pandas]==3.13.2',
           'inflection==0.5.1',
