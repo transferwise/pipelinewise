@@ -29,7 +29,7 @@ env:
 
 jobs:
   e2e_tests_target_pg:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     environment: ci_tests
 
     steps:
@@ -70,7 +70,7 @@ jobs:
           pipelinewise_dev pytest tests/end_to_end/test_target_postgres.py -vx --timer-top-n 10
 
   e2e_tests_mariadb_to_sf:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     environment: ci_tests
 
     steps:
@@ -120,7 +120,7 @@ jobs:
           pipelinewise_dev pytest tests/end_to_end/target_snowflake/tap_mariadb -vx --timer-top-n 10
 
   e2e_tests_pg_to_sf:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     environment: ci_tests
 
     steps:
@@ -170,7 +170,7 @@ jobs:
           pipelinewise_dev pytest tests/end_to_end/target_snowflake/tap_postgres -vx --timer-top-n 10
 
   e2e_tests_mg_to_sf:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     environment: ci_tests
 
     steps:
@@ -220,7 +220,7 @@ jobs:
           pipelinewise_dev pytest tests/end_to_end/target_snowflake/tap_mongodb -vx --timer-top-n 10
 
   e2e_tests_s3_to_sf:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     environment: ci_tests
 
     steps:
