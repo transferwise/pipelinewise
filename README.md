@@ -1,4 +1,5 @@
 # Notice
+
 To better serve Wise business and customer needs, the PipelineWise codebase needs to shrink.
 We have made the difficult decision that, going forward many components of PipelineWise will be removed or incorporated in the main repo.
 The last version before this decision is [v0.64.1](https://github.com/transferwise/pipelinewise/tree/v0.64.1)
