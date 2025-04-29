@@ -1867,7 +1867,7 @@ class PipelineWise:
     def reset_state(self):
         """Reset state file"""
         if self.tap.get('type') == 'tap-postgres':
-            state_items_to_update = [('lsn', 1),]
+            state_items_to_update = [('lsn', 1), ]
         elif self.tap.get('type') == 'tap-mysql':
             state_items_to_update = self._get_data_from_switchover_file()
         else:
