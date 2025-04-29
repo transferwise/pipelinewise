@@ -172,7 +172,7 @@ for MySQL, it needs a json file contains of switchover data same as below format
 
    .. code-block:: yaml
 
-       "switch_over_data_file": "<switch over data json file>",
+       "switch_over_data_file": "switch_over_data_json_file"
 
 
 
