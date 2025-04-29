@@ -100,7 +100,7 @@ class TestResetState(TestCase):
         with open(f'{self.test_cli.CONFIG_DIR}/target_foo/tap_mysql/state.json', 'w', encoding='utf-8') as state_file:
             json.dump(state_content, state_file)
 
-        with open(f'/tmp/switch_over_test.json', 'w', encoding='utf-8') as switchover_file:
+        with open('/tmp/switch_over_test.json', 'w', encoding='utf-8') as switchover_file:
             json.dump(switchover_data, switchover_file)
 
         arguments = {
@@ -127,6 +127,7 @@ class TestResetState(TestCase):
         self.assertDictEqual(expected_state, actual_state)
 
     def test_exit_with_error_1_if_tap_is_mysql_but_no_record_in_switchover(self):
+        """Test reset_state command returns error 1 if there is no record in json file for the tap"""
         switchover_data = {
             'bar_new_database_url': {
                 'old_identifier': '',
@@ -158,7 +159,7 @@ class TestResetState(TestCase):
         with open(f'{self.test_cli.CONFIG_DIR}/target_foo/tap_mysql/state.json', 'w', encoding='utf-8') as state_file:
             json.dump(state_content, state_file)
 
-        with open(f'/tmp/switch_over_test.json', 'w', encoding='utf-8') as switchover_file:
+        with open('/tmp/switch_over_test.json', 'w', encoding='utf-8') as switchover_file:
             json.dump(switchover_data, switchover_file)
 
         arguments = {
