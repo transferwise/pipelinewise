@@ -71,10 +71,10 @@ class TestResetState(TestCase):
         new_bin = ''.join(random.choice(string.ascii_letters) for _ in range(10))
         state_content = {
             'bookmarks': {
-                "foo_table": {
-                    "log_file": "mysql-bin.000001",
-                    "log_pos": old_pos,
-                    "version": 1
+                'foo_table': {
+                    'log_fil': 'mysql-bin.000001',
+                    'log_pos': old_pos,
+                    'version': 1
                 },
                 'bar_table': {
                     'foo': 'bar'
@@ -115,9 +115,9 @@ class TestResetState(TestCase):
         expected_state = {
             'bookmarks': {
                 'foo_table': {
-                    "log_file": new_bin,
-                    "log_pos": new_pos,
-                    "version": 1
+                    'log_file': new_bin,
+                    'log_pos': new_pos,
+                    'version': 1
                 },
                 'bar_table': {
                     'foo': 'bar'
@@ -145,10 +145,10 @@ class TestResetState(TestCase):
 
         state_content = {
             'bookmarks': {
-                "foo_table": {
-                    "log_file": "mysql-bin.000001",
-                    "log_pos": 1,
-                    "version": 1
+                'foo_table': {
+                    'log_file': 'mysql-bin.000001',
+                    'log_pos': 1,
+                    'version': 1
                 },
                 'bar_table': {
                     'foo': 'bar'

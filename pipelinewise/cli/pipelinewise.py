@@ -1898,7 +1898,7 @@ class PipelineWise:
         if new_log_file and new_log_pos:
             return [('log_file', new_log_file), ('log_pos', int(new_log_pos))]
 
-        self.logger.error('There is no data for switchover %s!', self.tap["id"])
+        self.logger.error('There is no data for switchover %s!', self.tap['id'])
         raise SystemExit(1)
 
     def _update_state_file(self, table_property, new_value):
