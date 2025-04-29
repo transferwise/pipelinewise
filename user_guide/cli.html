@@ -78,9 +78,6 @@
 <li class="toctree-l3"><a class="reference internal" href="#import">import</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#validate">validate</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#reset-state">reset_state</a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="#environment-variables">Environment variables</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#pipelinewise-home"><cite>PIPELINEWISE_HOME</cite></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#pipelinewise-config-directory"><cite>PIPELINEWISE_CONFIG_DIRECTORY</cite></a></li>
 </ul>
@@ -262,7 +259,7 @@ the tap and target connectors into <code class="docutils literal notranslate"><s
 </section>
 <section id="reset-state">
 <h3>reset_state<a class="headerlink" href="#reset-state" title="Link to this heading"></a></h3>
-<p>Reset state file for log based tables. It works only for PostgresSQL databases!</p>
+<p>Reset state file for log based tables. It works only for PostgresSQL and MySQL databases!</p>
 <dl class="field-list simple">
 <dt class="field-odd">–target<span class="colon">:</span></dt>
 <dd class="field-odd"><p>Target connector id</p>
@@ -271,10 +268,31 @@ the tap and target connectors into <code class="docutils literal notranslate"><s
 <dd class="field-even"><p>Tap connector id</p>
 </dd>
 </dl>
+<p id="cli-reset-state">for MySQL, it needs a json file contains of switchover data same as below format:</p>
+<div class="highlight-JSON notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;new_url_of_the_source_database&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;old_identifier&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;old_identifier_of_source_db&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;new_identifier&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;new_identifier_of_source_db&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;old_host&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;old_url_of_the_source_database&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;new_host&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;new_url_of_the_source_database&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;engine&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;mariadb&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;switchover_utc_timestamp&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2025-04-03 12:13:14+00:00&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;old_binlog_filename&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;old_mysql-bin.000001&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;old_binlog_position&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;new_binlog_filename&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;new_mysql-bin.000002&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;new_binlog_position&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">500</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<div class="admonition attention">
+<p class="admonition-title">Attention</p>
+<p>The filename for switchover data can be added in the <cite>config.yml</cite>:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="s">&quot;switch_over_data_file&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="s">&quot;switch_over_data_json_file&quot;</span>
+</pre></div>
+</div>
+</div>
 </section>
-</section>
-<section id="environment-variables">
-<span id="cli-reset-state"></span><h2>Environment variables<a class="headerlink" href="#environment-variables" title="Link to this heading"></a></h2>
 <section id="pipelinewise-home">
 <h3><cite>PIPELINEWISE_HOME</cite><a class="headerlink" href="#pipelinewise-home" title="Link to this heading"></a></h3>
 <p>Configures the directory at which PipelineWise expects to find installed tap and targets.</p>
