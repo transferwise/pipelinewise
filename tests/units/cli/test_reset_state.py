@@ -72,7 +72,7 @@ class TestResetState(TestCase):
         state_content = {
             'bookmarks': {
                 'foo_table': {
-                    'log_fil': 'mysql-bin.000001',
+                    'log_file': 'mysql-bin.000001',
                     'log_pos': old_pos,
                     'version': 1
                 },
