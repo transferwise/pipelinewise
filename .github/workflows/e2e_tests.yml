@@ -29,7 +29,7 @@ env:
 
 jobs:
   e2e_tests_target_pg:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     environment: ci_tests
 
     steps:
