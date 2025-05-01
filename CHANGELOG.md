@@ -1,3 +1,7 @@
+0.69.0 (2025-04-29)
+-------------------
+- Add `reset_state` command for MySQL taps
+
 0.68.0 (2025-01-10)
 -------------------
 - Bump `requests` from `2.20.0` to `2.32.2` in `/singer-connectors/tap-github`
