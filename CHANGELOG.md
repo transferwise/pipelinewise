@@ -1,3 +1,7 @@
+0.69.1 (2025-05-01)
+-------------------
+- Fix typo in config schema
+
 0.69.0 (2025-04-29)
 -------------------
 - Add `reset_state` command for MySQL taps
