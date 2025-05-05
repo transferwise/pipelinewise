@@ -1,3 +1,9 @@
+0.69.1.post1 (2025-05-05)
+-------------------
+- Add support for "ltree" type
+- Add support for "interval" type
+- Boost snowflake-connector-python to 3.15.0 to fix certifi issue
+
 0.69.1 (2025-05-01)
 -------------------
 - Fix typo in config schema
