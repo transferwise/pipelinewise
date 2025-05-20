@@ -1,3 +1,7 @@
+0.69.2 (2025-05-20)
+-------------------
+- Upgrade tap-snowflake Python library
+
 0.69.1 (2025-05-01)
 -------------------
 - Fix typo in config schema
