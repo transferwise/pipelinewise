@@ -1,0 +1,191 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "call_sid": {
+      "type": ["null", "string"]
+    },
+    "account_sid": {
+      "type": ["null", "string"]
+    },
+    "timestamp": {
+      "type": ["null", "string"],
+      "format": "date-time"
+    },
+    "edge": {
+      "type": ["null", "string"],
+      "enum" : ["unknown_edge", "carrier_edge", "sip_edge", "sdk_edge", "client_edge"]
+    },
+    "direction": {
+      "type": ["null", "string"],
+      "enum": ["unknown", "inbound", "outbound", "both"]
+    },
+    "carrier_edge": {
+      "type": ["object", "null"],
+      "description": "Contains metrics and properties for the Twilio media gateway of a PSTN call. Null if not applicable.",
+      "properties": {
+        "codec": { "type": ["integer", "null"], "description": "RTP profile number of the detected codec." },
+        "codec_name": { "type": ["string", "null"], "description": "Name of the detected codec." },
+        "cumulative": {
+          "type": ["object", "null"],
+          "description": "Cumulative jitter (max/avg), packets lost, and packet count for the stream received at this edge.",
+          "properties": {
+            "bytes_received": { "type": ["integer", "null"] },
+            "bytes_sent": { "type": ["integer", "null"] },
+            "packets_received": { "type": ["integer", "null"] },
+            "packets_lost": { "type": ["integer", "null"] },
+            "packets_sent": { "type": ["integer", "null"] }
+          }
+        },
+        "interval": {
+          "type": ["object", "null"],
+          "description": "Packets received, packets lost, and packet loss percentage for the sampling interval.",
+          "properties": {
+            "packets_received": { "type": ["integer", "null"] },
+            "packets_lost": { "type": ["integer", "null"] },
+            "packet_loss_percentage": { "type": ["number", "null"] }
+          }
+        },
+        "metadata": {
+          "type": ["object", "null"],
+          "description": "Twilio media region of the selected edge, Twilio and endpoint IP media IP addresses.",
+          "properties": {
+            "region": { "type": ["string", "null"] },
+            "twilio_ip": { "type": ["string", "null"] },
+            "endpoint_ip": { "type": ["string", "null"] }
+          }
+        }
+      }
+    },
+    "client_edge": {
+      "type": ["object", "null"],
+      "description": "Contains metrics and properties for the Twilio media gateway of a Client call. Null if not applicable.",
+      "properties": {
+        "codec": { "type": ["integer", "null"], "description": "RTP profile number of the detected codec." },
+        "codec_name": { "type": ["string", "null"], "description": "Name of the detected codec." },
+        "cumulative": {
+          "type": ["object", "null"],
+          "description": "Cumulative jitter (max/avg), packets lost, and packet count for the stream received at this edge.",
+          "properties": {
+            "bytes_received": { "type": ["integer", "null"] },
+            "bytes_sent": { "type": ["integer", "null"] },
+            "packets_received": { "type": ["integer", "null"] },
+            "packets_lost": { "type": ["integer", "null"] },
+            "packets_sent": { "type": ["integer", "null"] }
+          }
+        },
+        "interval": {
+          "type": ["object", "null"],
+          "description": "Packets received, packets lost, and packet loss percentage for the sampling interval.",
+          "properties": {
+            "packets_received": { "type": ["integer", "null"] },
+            "packets_lost": { "type": ["integer", "null"] },
+            "packet_loss_percentage": { "type": ["number", "null"] }
+          }
+        },
+        "metadata": {
+          "type": ["object", "null"],
+          "description": "Twilio media region of the selected edge, Twilio and endpoint IP media IP addresses.",
+          "properties": {
+            "region": { "type": ["string", "null"] },
+            "twilio_ip": { "type": ["string", "null"] },
+            "endpoint_ip": { "type": ["string", "null"] }
+          }
+        }
+      }
+    },
+    "sdk_edge": {
+      "type": ["object", "null"],
+      "description": "Contains metrics and properties for the SDK sensor library for Client calls. Null if not applicable.",
+      "properties": {
+        "codec": { "type": ["integer", "null"], "description": "RTP profile number of the detected codec." },
+        "codec_name": { "type": ["string", "null"], "description": "Name of the detected codec." },
+        "cumulative": {
+          "type": ["object", "null"],
+          "description": "Cumulative jitter (max/avg), packets lost, and packet count for the stream received at this edge.",
+          "properties": {
+            "bytes_received": { "type": ["integer", "null"] },
+            "bytes_sent": { "type": ["integer", "null"] },
+            "packets_received": { "type": ["integer", "null"] },
+            "packets_lost": { "type": ["integer", "null"] },
+            "packets_sent": { "type": ["integer", "null"] }
+          }
+        },
+        "interval": {
+          "type": ["object", "null"],
+          "description": "Audio in/out, jitter, packet loss, rtt, and packet loss percentage for the sampling interval.",
+          "properties": {
+            "packets_received": { "type": ["integer", "null"] },
+            "packets_lost": { "type": ["integer", "null"] },
+            "audio_in": {
+              "type": ["object", "null"],
+              "properties": { "value": { "type": ["number", "null"] } }
+            },
+            "audio_out": {
+              "type": ["object", "null"],
+              "properties": { "value": { "type": ["number", "null"] } }
+            },
+            "jitter": {
+              "type": ["object", "null"],
+              "properties": { "value": { "type": ["number", "null"] } }
+            },
+            "mos": {
+              "type": ["object", "null"],
+              "properties": { "value": { "type": ["number", "null"] } }
+            },
+            "rtt": {
+              "type": ["object", "null"],
+              "properties": { "value": { "type": ["number", "null"] } }
+            }
+          }
+        },
+        "metadata": {
+          "type": ["object", "null"],
+          "description": "Twilio media region of the selected edge, Twilio and endpoint IP media IP addresses.",
+          "properties": {
+            "region": { "type": ["string", "null"] },
+            "twilio_ip": { "type": ["string", "null"] },
+            "endpoint_ip": { "type": ["string", "null"] }
+          }
+        }
+      }
+    },
+    "sip_edge": {
+      "type": ["object", "null"],
+      "description": "Contains metrics and properties for the Twilio media gateway of a SIP Interface or Trunking call. Null if not applicable.",
+      "properties": {
+        "codec": { "type": ["integer", "null"], "description": "RTP profile number of the detected codec." },
+        "codec_name": { "type": ["string", "null"], "description": "Name of the detected codec." },
+        "cumulative": {
+          "type": ["object", "null"],
+          "description": "Cumulative jitter (max/avg), packets lost, and packet count for the stream received at this edge.",
+          "properties": {
+            "bytes_received": { "type": ["integer", "null"] },
+            "bytes_sent": { "type": ["integer", "null"] },
+            "packets_received": { "type": ["integer", "null"] },
+            "packets_lost": { "type": ["integer", "null"] },
+            "packets_sent": { "type": ["integer", "null"] }
+          }
+        },
+        "interval": {
+          "type": ["object", "null"],
+          "description": "Packets received, packets lost, and packet loss percentage for the sampling interval.",
+          "properties": {
+            "packets_received": { "type": ["integer", "null"] },
+            "packets_lost": { "type": ["integer", "null"] },
+            "packet_loss_percentage": { "type": ["number", "null"] }
+          }
+        },
+        "metadata": {
+          "type": ["object", "null"],
+          "description": "Twilio media region of the selected edge, Twilio and endpoint IP media IP addresses.",
+          "properties": {
+            "region": { "type": ["string", "null"] },
+            "twilio_ip": { "type": ["string", "null"] },
+            "endpoint_ip": { "type": ["string", "null"] }
+          }
+        }
+      }
+    }
+  }
+}
