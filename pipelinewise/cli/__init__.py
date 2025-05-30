@@ -11,14 +11,14 @@ import logging
 from cProfile import Profile
 from datetime import datetime
 from typing import Optional, Tuple
-from pkg_resources import get_distribution
+from importlib.metadata import version
 
 from pipelinewise.cli.utils import generate_random_string
 from pipelinewise.cli.pipelinewise import PipelineWise
 from pipelinewise.logger import Logger
 from pipelinewise.cli.errors import CommandSpecificArgumentsException
 
-__version__ = get_distribution('pipelinewise').version
+__version__ = version('pipelinewise')
 USER_HOME = os.path.expanduser('~')
 DEFAULT_CONFIG_DIR = os.path.join(USER_HOME, '.pipelinewise')
 CONFIG_DIR = os.environ.get('PIPELINEWISE_CONFIG_DIRECTORY', DEFAULT_CONFIG_DIR)

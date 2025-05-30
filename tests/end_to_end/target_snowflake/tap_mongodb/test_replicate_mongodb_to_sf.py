@@ -16,9 +16,8 @@ class TestReplicateMongoDBToSF(TapMongoDB):
     Test replicate MongoDB to Snowflake
     """
 
-    # pylint: disable=arguments-differ
-    def setUp(self):
-        super().setUp(tap_id=TAP_ID, target_id=TARGET_ID)
+    def setUp(self, tap_id=TAP_ID, target_id=TARGET_ID, tap_type: str = 'TAP_MONGODB'):
+        super().setUp(tap_id=TAP_ID, target_id=TARGET_ID, tap_type=tap_type)
         self.mongodb_con = self.e2e_env.get_tap_mongodb_connection()
 
     def assert_row_counts_equal(self, target_schema, table, count_in_source):
