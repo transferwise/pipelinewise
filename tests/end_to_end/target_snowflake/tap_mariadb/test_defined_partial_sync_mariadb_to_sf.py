@@ -11,7 +11,7 @@ class TestDefinedPartialSyncMariaDBToSF(TapMariaDB):
     """
 
     # pylint: disable=arguments-differ
-    def setUp(self):
+    def setUp(self, tap_id: str = TAP_ID, target_id: str = TARGET_ID):
         super().setUp(tap_id=TAP_ID, target_id=TARGET_ID)
 
     def _manipulate_target_tables(self):
