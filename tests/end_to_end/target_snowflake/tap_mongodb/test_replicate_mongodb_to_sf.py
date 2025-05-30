@@ -16,7 +16,6 @@ class TestReplicateMongoDBToSF(TapMongoDB):
     Test replicate MongoDB to Snowflake
     """
 
-    # pylint: disable=arguments-differ
     def setUp(self, tap_id: str = TAP_ID, target_id: str = TARGET_ID):
         super().setUp(tap_id=TAP_ID, target_id=TARGET_ID)
         self.mongodb_con = self.e2e_env.get_tap_mongodb_connection()
