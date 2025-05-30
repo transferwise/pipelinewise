@@ -5,7 +5,6 @@ import psycopg2.extras
 import pymongo
 import pymysql
 import snowflake.connector
-from snowflake.connector.vendored.urllib3.contrib.pyopenssl import _openssl
 
 from pymongo.database import Database
 
@@ -47,17 +46,13 @@ def run_query_mysql(query, host, port, user, password, database):
 def run_query_snowflake(query, account, database, warehouse, user, password):
     """Run and SQL query in a snowflake database"""
     result_rows = []
-    ctx = _openssl.SSL.Context(_openssl.SSL.TLSv1_2_METHOD)
-    ctx.set_options(_openssl.SSL.OP_NO_SSLv3)
-    ctx.set_verify(_openssl.SSL.VERIFY_PEER, callback=None)
     with snowflake.connector.connect(
         account=account,
         database=database,
         warehouse=warehouse,
         user=user,
         password=password,
-        autocommit=True,
-        ssl_ctx=ctx
+        autocommit=True
     ) as conn:
         with conn.cursor() as cur:
             cur.execute(query)
