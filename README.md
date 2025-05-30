@@ -16,6 +16,8 @@ Documentation is available at https://transferwise.github.io/pipelinewise/
 ![Logo](docs/img/pipelinewise-diagram-circle-bold.png)
 
 
+
+
 ## Table of Contents
 
 - [PipelineWise](#pipelinewise)
