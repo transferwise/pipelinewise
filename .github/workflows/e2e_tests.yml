@@ -51,7 +51,7 @@ jobs:
           docker compose -f dev-project/docker-compose.yml up -d
 
       - name: Wait for test containers to be ready
-        timeout-minutes: 5
+        timeout-minutes: 8
         if: steps.check.outcome == 'failure'
         run: |
           until docker logs pipelinewise_dev | grep "PipelineWise Dev environment is ready"
