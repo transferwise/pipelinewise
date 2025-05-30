@@ -27,7 +27,7 @@ fi
 URI="mongodb://${TAP_MONGODB_USER}:${TAP_MONGODB_PASSWORD}@${TAP_MONGODB_HOST}:${TAP_MONGODB_PORT}/${TAP_MONGODB_DB}?authSource=admin"
 
 mongoimport --uri ${URI} \
-  --ssl --sslAllowInvalidCertificates \
+  --ssl --tlsInsecure \
   --collection listings \
   --type csv \
   --headerline \
@@ -36,12 +36,11 @@ mongoimport --uri ${URI} \
 mongorestore \
   --host ${TAP_MONGODB_HOST} \
   --port ${TAP_MONGODB_PORT} \
-  --db ${TAP_MONGODB_DB} \
+  --nsInclude ${TAP_MONGODB_DB}.my_collection \
   --authenticationDatabase admin \
   --username ${TAP_MONGODB_USER} \
   --password ${TAP_MONGODB_PASSWORD} \
-  --ssl --sslAllowInvalidCertificates \
-  --collection my_collection \
+  --ssl --tlsInsecure \
   --drop \
   --gzip \
   ${TEST_DB_DATA_2}
@@ -49,12 +48,11 @@ mongorestore \
 mongorestore \
   --host ${TAP_MONGODB_HOST} \
   --port ${TAP_MONGODB_PORT} \
-  --db ${TAP_MONGODB_DB} \
+  --nsInclude ${TAP_MONGODB_DB}.all_datatypes \
   --authenticationDatabase admin \
   --username ${TAP_MONGODB_USER} \
   --password ${TAP_MONGODB_PASSWORD} \
-  --ssl --sslAllowInvalidCertificates \
-  --collection all_datatypes \
+  --ssl --tlsInsecure \
   --drop \
   --gzip \
   ${TEST_DB_DATA_3}
