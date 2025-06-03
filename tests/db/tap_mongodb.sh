@@ -36,7 +36,7 @@ mongoimport --uri ${URI} \
 mongorestore \
   --host ${TAP_MONGODB_HOST} \
   --port ${TAP_MONGODB_PORT} \
-  --db ${TAP_MONGODB_DB}.my_collection \
+  --db ${TAP_MONGODB_DB} \
   --authenticationDatabase admin \
   --username ${TAP_MONGODB_USER} \
   --password ${TAP_MONGODB_PASSWORD} \
@@ -49,7 +49,7 @@ mongorestore \
 mongorestore \
   --host ${TAP_MONGODB_HOST} \
   --port ${TAP_MONGODB_PORT} \
-  --db ${TAP_MONGODB_DB}.all_datatypes \
+  --db ${TAP_MONGODB_DB} \
   --authenticationDatabase admin \
   --username ${TAP_MONGODB_USER} \
   --password ${TAP_MONGODB_PASSWORD} \
