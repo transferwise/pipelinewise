@@ -325,6 +325,7 @@ class FastSyncTargetSnowflake:
             f' FILE_FORMAT = (type=CSV escape=\'\\x1e\' escape_unenclosed_field=\'\\x1e\''
             f' field_optionally_enclosed_by=\'\"\' skip_header={int(skip_csv_header)}'
             f' compression=GZIP binary_format=HEX)'
+            f' ON_ERROR = \'CONTINUE\''
         )
 
         # Get number of inserted records - COPY does insert only

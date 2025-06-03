@@ -11,6 +11,8 @@ def discover():
         schema = Schema.from_dict(schema_dict)
         mdata = field_metadata[stream_name]
 
+
+
         catalog.streams.append(CatalogEntry(
             stream=stream_name,
             tap_stream_id=stream_name,

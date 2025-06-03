@@ -36,7 +36,7 @@ def run_query_mysql(query, host, port, user, password, database):
         charset='utf8mb4',
         cursorclass=pymysql.cursors.Cursor,
         ssl={'': True}
-    ) as cur:
+    ).cursor() as cur:
         cur.execute(query)
         if cur.rowcount > 0:
             result_rows = cur.fetchall()
@@ -52,7 +52,7 @@ def run_query_snowflake(query, account, database, warehouse, user, password):
         warehouse=warehouse,
         user=user,
         password=password,
-        autocommit=True,
+        autocommit=True
     ) as conn:
         with conn.cursor() as cur:
             cur.execute(query)

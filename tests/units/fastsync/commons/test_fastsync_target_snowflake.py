@@ -230,6 +230,7 @@ class TestFastSyncTargetSnowflake(TestCase):
             ' FILE_FORMAT = (type=CSV escape=\'\\x1e\' escape_unenclosed_field=\'\\x1e\''
             ' field_optionally_enclosed_by=\'\"\' skip_header=0'
             ' compression=GZIP binary_format=HEX)'
+            'ON_ERROR = CONTINUE'
         ]
 
         # COPY table with reserved word in table and column names in temp table
@@ -247,6 +248,7 @@ class TestFastSyncTargetSnowflake(TestCase):
             ' FILE_FORMAT = (type=CSV escape=\'\\x1e\' escape_unenclosed_field=\'\\x1e\''
             ' field_optionally_enclosed_by=\'\"\' skip_header=0'
             ' compression=GZIP binary_format=HEX)'
+            'ON_ERROR = CONTINUE'
         ]
 
         # COPY table with space and uppercase in table name and s3 key
@@ -264,6 +266,7 @@ class TestFastSyncTargetSnowflake(TestCase):
             ' FILE_FORMAT = (type=CSV escape=\'\\x1e\' escape_unenclosed_field=\'\\x1e\''
             ' field_optionally_enclosed_by=\'\"\' skip_header=0'
             ' compression=GZIP binary_format=HEX)'
+            'ON_ERROR = CONTINUE'
         ]
 
     def test_grant_select_on_table(self):
