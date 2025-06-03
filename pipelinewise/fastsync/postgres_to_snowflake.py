@@ -21,6 +21,7 @@ from pipelinewise.utils import (get_tables_size,
 
 LOGGER = Logger().get_logger(__name__)
 
+
 REQUIRED_CONFIG_KEYS = {
     'tap': [
         'host',
