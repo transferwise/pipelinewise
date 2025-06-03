@@ -18,7 +18,7 @@ from pipelinewise.cli.pipelinewise import PipelineWise
 from pipelinewise.logger import Logger
 from pipelinewise.cli.errors import CommandSpecificArgumentsException
 
-__version__ =  version('pipelinewise')
+__version__ = version('pipelinewise')
 USER_HOME = os.path.expanduser('~')
 DEFAULT_CONFIG_DIR = os.path.join(USER_HOME, '.pipelinewise')
 CONFIG_DIR = os.environ.get('PIPELINEWISE_CONFIG_DIRECTORY', DEFAULT_CONFIG_DIR)
