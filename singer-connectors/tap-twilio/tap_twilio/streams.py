@@ -578,7 +578,7 @@ STREAMS = {
         'pagination_key': 'next_page_url',
     },
     # pylint: disable=line-too-long
-    # Reference: https://www.twilio.com/docs/voice/voice-insights/api/call/call-metrics-resource
+    # Reference: https://www.twilio.com/docs/voice/voice-insights/api/call/call-summary-resource
     'call_summary': {
         'api_url': 'https://insights.twilio.com',
         'api_version': 'v1',
