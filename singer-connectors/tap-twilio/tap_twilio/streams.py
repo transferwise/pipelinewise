@@ -579,11 +579,11 @@ STREAMS = {
     },
     # pylint: disable=line-too-long
     # Reference: https://www.twilio.com/docs/voice/voice-insights/api/call/call-metrics-resource
-    'call_summaries': {
+    'call_summary': {
         'api_url': 'https://insights.twilio.com',
         'api_version': 'v1',
-        'path': 'Voice/Summaries',
-        'data_key': 'call_metrics',
+        'path': 'Voice/{CallSid}/Summary',
+        'data_key': 'call_summary',
         'key_properties': ['call_sid'],
         'replication_method': 'INCREMENTAL',
         'replication_keys': ['created_time'],
@@ -592,7 +592,6 @@ STREAMS = {
         'pagination_key': 'next_page_url',
     }
 }
-
 
 
 # De-nest children nodes for Discovery mode
