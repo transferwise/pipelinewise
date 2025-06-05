@@ -350,6 +350,17 @@ This tap:
 - Replication strategy: INCREMENTAL
 - Transformations: none
 
+[call_metrics](https://www.twilio.com/docs/voice/voice-insights/api/call/call-metrics-resource#read-multiple-call-metrics-resources)
+- Endpoint: https://insights.twilio.com/v1/Voice/{CallSid}/Metrics
+- Primary key fields: call_sid
+- Replication strategy: INCREMENTAL
+- Transformations: none
+
+[call_summary] (https://www.twilio.com/docs/voice/voice-insights/api/call/call-summary-resource)
+- Endpoint: https://insights.twilio.com/v1/Voice/{CallSid}/Summary
+- Primary key fields: call_sid
+- Replication strategy: INCREMENTAL
+- Transformations: none
 
 ## Authentication
 This tap authenticates to the Twilio API using Basic Auth.
