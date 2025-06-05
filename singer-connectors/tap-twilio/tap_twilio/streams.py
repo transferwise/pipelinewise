@@ -556,6 +556,38 @@ STREAMS = {
                 'replication_keys': ['date_updated'],
                 'params': {},
                 'pagination': 'meta'
+            },
+            # pylint: disable=line-too-long
+            # Reference: https://www.twilio.com/docs/voice/voice-insights/api/call/call-metrics-resource
+            'call_metrics': {
+                'api_url': 'https://insights.twilio.com',
+                'api_version': 'v1',
+                'path': 'Voice/{CallSid}/Metrics',
+                'data_key': 'call_metrics',
+                'key_properties': ['call_sid', "timestamp", "edge",
+                                   "direction"],
+                'replication_method': 'INCREMENTAL',
+                'replication_keys': ['timestamp'],
+                'params': {
+                    "edge" : "null",
+                    "direction" : "null"
+                },
+                'pagination': 'meta',
+                'pagination_key': 'next_page_url',
+            },
+            # pylint: disable=line-too-long
+            # Reference: https://www.twilio.com/docs/voice/voice-insights/api/call/call-summary-resource
+            'call_summary': {
+                'api_url': 'https://insights.twilio.com',
+                'api_version': 'v1',
+                'path': 'Voice/{CallSid}/Summary',
+                'data_key': 'call_summary',
+                'key_properties': ['call_sid'],
+                'replication_method': 'INCREMENTAL',
+                'replication_keys': ['created_time'],
+                'params': {},
+                'pagination': 'meta',
+                'pagination_key': 'next_page_url'
             }
         }
     }

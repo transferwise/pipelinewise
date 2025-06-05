@@ -1,0 +1,176 @@
+{
+  "type": "object",
+  "properties": {
+    "account_sid": {
+      "type": ["string", "null"],
+      "description": "The unique SID identifier of the Account. Pattern: ^AC[0-9a-fA-F]{32}$",
+      "pattern": "^AC[0-9a-fA-F]{32}$",
+      "minLength": 34,
+      "maxLength": 34
+    },
+    "call_sid": {
+      "type": ["string", "null"],
+      "description": "The unique SID identifier of the Call. Pattern: ^CA[0-9a-fA-F]{32}$",
+      "pattern": "^CA[0-9a-fA-F]{32}$",
+      "minLength": 34,
+      "maxLength": 34
+    },
+    "call_type": {
+      "type": ["string", "null"],
+      "description": "The Call Type of the summarized Call.",
+      "enum": ["carrier", "sip", "trunking", "client", "whatsapp"]
+    },
+    "call_state": {
+      "type": ["string", "null"],
+      "description": "The Call State of the summarized Call.",
+      "enum": ["ringing", "completed", "busy", "fail", "noanswer", "canceled", "answered", "undialed"]
+    },
+    "answered_by": {
+      "type": ["string", "null"],
+      "description": "The Answered By value based on Answering Machine Detection (AMD).",
+      "enum": ["unknown", "machine_start", "human"]
+    },
+    "processing_state": {
+      "type": ["string", "null"],
+      "description": "The Processing State of the Call Summary ('partial' or 'complete').",
+      "enum": ["partial", "complete"]
+    },
+    "created_time": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "The time the Call was created in ISO 8601 format."
+    },
+    "start_time": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "The time the Call was started in ISO 8601 format."
+    },
+    "end_time": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "The time the Call was ended in ISO 8601 format."
+    },
+    "duration": {
+      "type": ["integer", "null"],
+      "description": "Duration between call initiation and end."
+    },
+    "connect_duration": {
+      "type": ["integer", "null"],
+      "description": "Duration between call answer and end."
+    },
+    "from": {
+      "type": ["object", "null"],
+      "description": "The calling party. (Structure not fully detailed in available information, assume flexible object)",
+      "properties": {},
+      "additionalProperties": true
+    },
+    "to": {
+      "type": ["object", "null"],
+      "description": "The called party. (Structure not fully detailed in available information, assume flexible object)",
+      "properties": {},
+      "additionalProperties": true
+    },
+    "carrier_edge": {
+      "type": ["object", "null"],
+      "description": "Contains metrics and properties for the Twilio media gateway of a PSTN call. (Summarized object, specific details not provided for summary)",
+      "properties": {},
+      "additionalProperties": true
+    },
+    "client_edge": {
+      "type": ["object", "null"],
+      "description": "Contains metrics and properties for the Twilio media gateway of a Client call. (Summarized object, specific details not provided for summary)",
+      "properties": {},
+      "additionalProperties": true
+    },
+    "sdk_edge": {
+      "type": ["object", "null"],
+      "description": "Contains metrics and properties for the SDK sensor library for Client calls. (Summarized object, specific details not provided for summary)",
+      "properties": {},
+      "additionalProperties": true
+    },
+    "sip_edge": {
+      "type": ["object", "null"],
+      "description": "Contains metrics and properties for the Twilio media gateway of a SIP Interface or Trunking call. (Summarized object, specific details not provided for summary)",
+      "properties": {},
+      "additionalProperties": true
+    },
+    "tags": {
+      "type": ["array", "null"],
+      "description": "Tags applied to calls by Voice Insights analysis indicating potential subjective degradation of call quality.",
+      "items": { "type": "string" }
+    },
+    "attributes": {
+      "type": ["object", "null"],
+      "description": "Attributes capturing call-flow-specific details. (Structure not fully detailed in available information)",
+      "properties": {},
+      "additionalProperties": true
+    },
+    "properties": {
+      "type": ["object", "null"],
+      "description": "Contains edge-agnostic call-level details. (Structure not fully detailed in available information)",
+      "properties": {},
+      "additionalProperties": true
+    },
+    "trust": {
+      "type": ["object", "null"],
+      "description": "Contains trusted communications details including Branded Call and verified caller ID.",
+      "properties": {
+        "verified_caller": {
+          "type": ["object", "null"],
+          "properties": {
+            "verified": { "type": ["boolean", "null"] }
+          }
+        },
+        "branded": {
+          "type": ["object", "null"],
+          "properties": {
+            "enabled": { "type": ["boolean", "null"] },
+            "display_name": { "type": ["string", "null"] },
+            "long_display_name": { "type": ["string", "null"] },
+            "bundle_sid": { "type": ["string", "null"] }
+          }
+        },
+        "business_profile": {
+          "type": ["object", "null"],
+          "properties": {
+            "bundle_sid": { "type": ["string", "null"] },
+            "identity": { "type": ["string", "null"] },
+            "industry": { "type": ["string", "null"] },
+            "type": { "type": ["string", "null"] }
+          }
+        },
+        "voice_integrity": {
+          "type": ["object", "null"],
+          "properties": {
+            "enabled": { "type": ["boolean", "null"] },
+            "bundle_sid": { "type": ["string", "null"] },
+            "use_case": { "type": ["string", "null"] }
+          }
+        }
+      }
+    },
+    "annotation": {
+      "type": ["object", "null"],
+      "description": "Programmatically labeled annotations for the Call.",
+      "properties": {
+        "account_sid": { "type": ["string", "null"] },
+        "call_sid": { "type": ["string", "null"] },
+        "answered_by": { "type": ["string", "null"] },
+        "connectivity_issue": { "type": ["string", "null"] },
+        "quality_issues": {
+          "type": ["array", "null"],
+          "items": { "type": "string" }
+        },
+        "spam": { "type": ["boolean", "null"] },
+        "call_score": { "type": ["integer", "null"] },
+        "comment": { "type": ["string", "null"] },
+        "incident": { "type": ["string", "null"] }
+      }
+    },
+    "url": {
+      "type": ["string", "null"],
+      "format": "uri",
+      "description": "The URL of this resource."
+    }
+  }
+}
