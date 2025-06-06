@@ -26,7 +26,7 @@ setup(name='pipelinewise',
           'Jinja2==3.1.2',
           'joblib==1.3.2',
           'PyMySQL==0.7.11',
-          'psycopg2-binary==2.9.5',
+          'psycopg2-binary==2.9.10',
           'numpy==1.26.4',          #  numpy 2.X is not compatible with our used pandas
           'snowflake-connector-python[pandas]==3.0.4',
           'pipelinewise-singer-python==1.*',
