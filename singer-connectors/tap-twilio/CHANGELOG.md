@@ -1,7 +1,3 @@
-1.1.3 (2025-06-06)
--------------------
-- Add Twilio Voice Insights Call Summaries stream
-
 1.1.2 (2021-03-16)
 -------------------
 - Fix missing elements for streams without ordered response
