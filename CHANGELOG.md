@@ -1,3 +1,9 @@
+0.70.0 (2025-06-10)
+-------------------
+- Replace pkg_resource with importlib.metadata
+- Increase timeout to 6 minutes for e2e tests
+- bump psycopg2-binary from 2.9.5 to 2.9.10
+
 0.69.2 (2025-05-20)
 -------------------
 - Upgrade tap-snowflake Python library
