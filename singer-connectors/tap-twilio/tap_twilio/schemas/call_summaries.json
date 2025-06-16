@@ -1,283 +1,2315 @@
 {
   "type": "object",
+  "additionalProperties": false,
   "properties": {
     "account_sid": {
-      "type": ["string", "null"]
+      "type": [
+        "null",
+        "string"
+      ],
+      "description": "The unique SID identifier of the Account. It follows the pattern ^AC[0-9a-fA-F]{32}$ and has a length of 34 characters.",
+      "pattern": "^AC[0-9a-fA-F]{32}$"
     },
     "call_sid": {
-      "type": ["string", "null"]
-    },
-    "call_type": {
-      "type": ["string", "null"],
-      "enum": ["carrier", "sip", "trunking", "client", "whatsapp"]
-    },
-    "call_state": {
-      "type": ["string", "null"],
-      "description": "The Call State of the summarized Call.",
-      "enum": ["ringing", "completed", "busy", "fail", "noanswer", "canceled", "answered", "undialed"]
+      "type": [
+        "null",
+        "string"
+      ],
+      "description": "The unique SID identifier of the Call. It follows the pattern ^CA[0-9a-fA-F]{32}$ and has a length of 34 characters.",
+      "pattern": "^CA[0-9a-fA-F]{32}$"
     },
     "answered_by": {
-      "type": ["string", "null"],
-      "enum": ["unknown",
+      "type": [
+        "null",
+        "string"
+      ],
+      "enum": [
+        "unknown",
         "machine_start",
         "machine_end_beep",
         "machine_end_silence",
         "machine_end_other",
         "human",
-        "fax"]
+        "fax"
+      ],
+      "description": "The Answered By value for the summarized call, determined by Answering Machine Detection (AMD). Possible values are: unknown, machine_start, machine_end_beep, machine_end_silence, machine_end_other, human, or fax."
+    },
+    "call_type": {
+      "type": [
+        "null",
+        "string"
+      ],
+      "enum": [
+        "carrier",
+        "sip",
+        "trunking",
+        "client",
+        "whatsapp"
+      ],
+      "description": "The Call Type of the summarised Call. Possible values include: carrier, sip, trunking, or client. WhatsApp is also listed as a possible value."
+    },
+    "call_state": {
+      "type": [
+        "null",
+        "string"
+      ],
+      "enum": [
+        "ringing",
+        "completed",
+        "busy",
+        "fail",
+        "noanswer",
+        "canceled",
+        "answered",
+        "undialed"
+      ],
+      "description": "The Call State of the summarised Call. Possible values are: ringing, completed, busy, fail, noanswer, canceled, answered, or undialed."
     },
     "processing_state": {
-      "type": ["string", "null"],
-     "enum": ["partial", "complete"]
+      "type": [
+        "null",
+        "string"
+      ],
+      "enum": [
+        "complete",
+        "partial"
+      ],
+      "description": "The Processing State of the Call Summary. It will be 'partial' until the assembly of the Call Summary finishes, approximately 30 minutes after the call ends, then it changes to 'complete'."
     },
     "created_time": {
-      "type": ["string", "null"],
+      "type": [
+        "null",
+        "string"
+      ],
       "format": "date-time",
-      "description": "The time the Call was created in ISO 8601 format."
+      "description": "The time at which the Call was created, given in ISO 8601 format. This can differ from 'start_time' if there was queueing due to CPS."
     },
     "start_time": {
-      "type": ["string", "null"],
+      "type": [
+        "null",
+        "string"
+      ],
       "format": "date-time",
-      "description": "The time the Call was started in ISO 8601 format."
+      "description": "The time at which the Call was started, given in ISO 8601 format."
     },
     "end_time": {
-      "type": ["string", "null"],
+      "type": [
+        "null",
+        "string"
+      ],
       "format": "date-time",
-      "description": "The time the Call was ended in ISO 8601 format."
+      "description": "The time at which the Call was ended, given in ISO 8601 format."
     },
     "duration": {
-      "type": ["integer", "null"],
-      "description": "Duration between call initiation and end."
+      "type": [
+        "null",
+        "integer"
+      ],
+      "description": "The duration between when the call was initiated and when it ended."
     },
     "connect_duration": {
-      "type": ["integer", "null"],
-      "description": "Duration between call answer and end."
+      "type": [
+        "null",
+        "integer"
+      ],
+      "description": "The duration between when the call was answered and when it ended."
     },
     "from": {
-      "type": ["object", "null"],
-      "description": "The calling party. (Structure not fully detailed in available information, assume flexible object)",
-      "properties": {},
-      "additionalProperties": true
+      "type": [
+        "null",
+        "object"
+      ],
+      "description": "Details about the calling party. This object contains metadata and can include SDK details for Client calls.",
+      "additionalProperties": false,
+      "properties": {
+        "caller": {
+          "type": [
+            "null",
+            "string"
+          ],
+          "description": "The caller ID of the calling party."
+        },
+        "carrier": {
+          "type": [
+            "null",
+            "string"
+          ],
+          "description": "The serving carrier of the destination."
+        },
+        "connection": {
+          "type": [
+            "null",
+            "string"
+          ],
+          "enum": [
+            "landline",
+            "mobile",
+            "voip",
+            "twilio_sdk",
+            "sip_interface",
+            "pstn"
+          ],
+          "description": "The connection type. Possible values include landline, mobile, or voip, or twilio_sdk, sip_interface, or pstn."
+        },
+        "country_code": {
+          "type": [
+            "null",
+            "string"
+          ],
+          "description": "A two-letter ISO country code."
+        },
+        "country_subdivision": {
+          "type": [
+            "null",
+            "string"
+          ],
+          "description": "Additional location details, e.g., 'California'."
+        },
+        "city": {
+          "type": [
+            "null",
+            "string"
+          ],
+          "description": "The city name, based on lat/long or IP address."
+        },
+        "location": {
+          "type": [
+            "null",
+            "object"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "lat": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "lon": {
+              "type": [
+                "null",
+                "number"
+              ]
+            }
+          },
+          "description": "The latitude/longitude for the number prefix."
+        },
+        "ip_address": {
+          "type": [
+            "null",
+            "string"
+          ],
+          "description": "The public IP address of the Client user."
+        },
+        "number_prefix": {
+          "type": [
+            "null",
+            "string"
+          ],
+          "description": "The E.164 country code plus three digits."
+        },
+        "sdk": {
+          "type": [
+            "null",
+            "object"
+          ],
+          "description": "Additional metadata specific to Voice SDK calls, when the 'from' party is an SDK client.",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "type": [
+                "null",
+                "string"
+              ],
+              "description": "The version of the Twilio SDK, e.g., 'twilio-js-sdk'."
+            },
+            "version": {
+              "type": [
+                "null",
+                "string"
+              ],
+              "description": "The Twilio SDK version."
+            },
+            "platform": {
+              "type": [
+                "null",
+                "string"
+              ],
+              "description": "The platform, such as WebRTC, Android, or iOS."
+            },
+            "region": {
+              "type": [
+                "null",
+                "string"
+              ],
+              "description": "The Twilio region the device registered to."
+            },
+            "selected_region": {
+              "type": [
+                "null",
+                "string"
+              ],
+              "description": "The region specified in the device setup."
+            },
+            "edge_location": {
+              "type": [
+                "null",
+                "string"
+              ],
+              "description": "The edge location specified."
+            },
+            "browser": {
+              "type": [
+                "null",
+                "object"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "type": [
+                    "null",
+                    "string"
+                  ],
+                  "description": "The name of the browser for calls using the JavaScript SDK."
+                },
+                "major": {
+                  "type": [
+                    "null",
+                    "string"
+                  ],
+                  "description": "The major version of the browser."
+                },
+                "version": {
+                  "type": [
+                    "null",
+                    "string"
+                  ],
+                  "description": "The full version of the browser."
+                }
+              }
+            },
+            "os": {
+              "type": [
+                "null",
+                "object"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "type": [
+                    "null",
+                    "string"
+                  ],
+                  "description": "The operating system name as reported to the SDK."
+                },
+                "version": {
+                  "type": [
+                    "null",
+                    "string"
+                  ],
+                  "description": "The operating system version as reported to the SDK."
+                }
+              }
+            },
+            "device": {
+              "type": [
+                "null",
+                "object"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "arch": {
+                  "type": [
+                    "null",
+                    "string"
+                  ],
+                  "description": "The processor architecture of the machine running the Client app, e.g., 'amd64'."
+                },
+                "model": {
+                  "type": [
+                    "null",
+                    "string"
+                  ],
+                  "description": "Mobile SDKs only: model name/number reported to the SDK."
+                },
+                "type": {
+                  "type": [
+                    "null",
+                    "string"
+                  ],
+                  "description": "Mobile SDKs only: device type reported to the SDK."
+                },
+                "vendor": {
+                  "type": [
+                    "null",
+                    "string"
+                  ],
+                  "description": "Mobile SDKs only: hardware manufacturer reported to the SDK."
+                }
+              }
+            },
+            "engine": {
+              "type": [
+                "null",
+                "object"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "type": [
+                    "null",
+                    "string"
+                  ],
+                  "description": "JavaScript SDK only: browser engine as detected by the SDK."
+                },
+                "version": {
+                  "type": [
+                    "null",
+                    "string"
+                  ],
+                  "description": "JavaScript SDK only: browser engine version detected by the SDK."
+                }
+              }
+            }
+          }
+        }
+      }
     },
     "to": {
-      "type": ["object", "null"],
-      "description": "The called party. (Structure not fully detailed in available information, assume flexible object)",
-      "properties": {},
-      "additionalProperties": true
+      "type": [
+        "null",
+        "object"
+      ],
+      "description": "Details about the called party. This object contains metadata and can include SDK details for Client calls.",
+      "additionalProperties": false,
+      "properties": {
+        "callee": {
+          "type": [
+            "null",
+            "string"
+          ],
+          "description": "The dialed destination."
+        },
+        "carrier": {
+          "type": [
+            "null",
+            "string"
+          ],
+          "description": "The serving carrier of the destination."
+        },
+        "connection": {
+          "type": [
+            "null",
+            "string"
+          ],
+          "enum": [
+            "landline",
+            "mobile",
+            "voip",
+            "twilio_sdk",
+            "sip_interface",
+            "pstn"
+          ],
+          "description": "The connection type. Possible values include landline, mobile, or voip, or twilio_sdk, sip_interface, or pstn."
+        },
+        "country_code": {
+          "type": [
+            "null",
+            "string"
+          ],
+          "description": "A two-letter ISO country code."
+        },
+        "country_subdivision": {
+          "type": [
+            "null",
+            "string"
+          ],
+          "description": "Additional location details, e.g., 'Csongrad megye'."
+        },
+        "city": {
+          "type": [
+            "null",
+            "string"
+          ],
+          "description": "The city name, based on lat/long or IP address."
+        },
+        "location": {
+          "type": [
+            "null",
+            "object"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "lat": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "lon": {
+              "type": [
+                "null",
+                "number"
+              ]
+            }
+          },
+          "description": "The latitude/longitude for the number prefix."
+        },
+        "ip_address": {
+          "type": [
+            "null",
+            "string"
+          ],
+          "description": "The public IP address of the Client user."
+        },
+        "number_prefix": {
+          "type": [
+            "null",
+            "string"
+          ],
+          "description": "The E.164 country code plus three digits."
+        },
+        "sdk": {
+          "type": [
+            "null",
+            "object"
+          ],
+          "description": "Additional metadata specific to Voice SDK calls, when the 'to' party is an SDK client.",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "version": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "platform": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "region": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "selected_region": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "edge_location": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "browser": {
+              "type": [
+                "null",
+                "object"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "major": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "version": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                }
+              }
+            },
+            "os": {
+              "type": [
+                "null",
+                "object"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "version": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                }
+              }
+            },
+            "device": {
+              "type": [
+                "null",
+                "object"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "arch": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "model": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "type": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "vendor": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                }
+              }
+            },
+            "engine": {
+              "type": [
+                "null",
+                "object"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "version": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
     },
     "carrier_edge": {
-      "type": ["object", "null"],
-      "description": "Contains metrics and properties for the Twilio media gateway of a PSTN call. (Summarized object, specific details not provided for summary)",
-      "properties": {},
-      "additionalProperties": true
+      "type": [
+        "null",
+        "object"
+      ],
+      "description": "Contains metrics and properties for the Twilio media gateway of a PSTN call. This edge represents the connection between Twilio and its immediate carrier partners. It will be present for SIP trunking calls and PSTN calls.",
+      "additionalProperties": false,
+      "properties": {
+        "properties": {
+          "type": [
+            "null",
+            "object"
+          ],
+          "additionalProperties": false,
+          "description": "Edge-specific properties.",
+          "properties": {
+            "q850_cause": {
+              "type": [
+                "null",
+                "integer"
+              ],
+              "description": "The ITU-T Q.850 standard definition of telephony disconnect cause. Note that this is not available for all edge types or all calls."
+            },
+            "direction": {
+              "type": [
+                "null",
+                "string"
+              ],
+              "enum": [
+                "inbound",
+                "outbound"
+              ],
+              "description": "The direction of media flow from the perspective of this edge."
+            },
+            "media_region": {
+              "type": [
+                "null",
+                "string"
+              ],
+              "description": "The Twilio region where media was handled."
+            },
+            "signaling_region": {
+              "type": [
+                "null",
+                "string"
+              ],
+              "description": "The Twilio region where signaling was handled."
+            },
+            "edge_location": {
+              "type": [
+                "null",
+                "string"
+              ],
+              "description": "The Twilio edge location where media was handled."
+            }
+          }
+        },
+        "metrics": {
+          "type": [
+            "null",
+            "object"
+          ],
+          "additionalProperties": false,
+          "description": "Media stream metadata for inbound and outbound directions.",
+          "properties": {
+            "inbound": {
+              "type": [
+                "null",
+                "object"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "codec": {
+                  "type": [
+                    "null",
+                    "integer"
+                  ],
+                  "description": "RTP profile number for the media codec."
+                },
+                "codec_name": {
+                  "type": [
+                    "null",
+                    "string"
+                  ],
+                  "description": "Name of the media codec."
+                },
+                "packets_received": {
+                  "type": [
+                    "null",
+                    "integer"
+                  ],
+                  "description": "Count of packets received (inbound container only)."
+                },
+                "packets_lost": {
+                  "type": [
+                    "null",
+                    "integer"
+                  ],
+                  "description": "Count of packets lost."
+                },
+                "packets_loss_percentage": {
+                  "type": [
+                    "null",
+                    "number"
+                  ],
+                  "description": "Percentage of packets lost."
+                },
+                "jitter": {
+                  "type": [
+                    "null",
+                    "object"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "max": {
+                      "type": [
+                        "null",
+                        "number"
+                      ]
+                    },
+                    "avg": {
+                      "type": [
+                        "null",
+                        "number"
+                      ]
+                    }
+                  },
+                  "description": "Average and maximum jitter detected."
+                },
+                "latency": {
+                  "type": [
+                    "null",
+                    "object"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "max": {
+                      "type": [
+                        "null",
+                        "number"
+                      ]
+                    },
+                    "avg": {
+                      "type": [
+                        "null",
+                        "number"
+                      ]
+                    }
+                  },
+                  "description": "Twilio internal RTP traversal time from ingress to egress (average and max detected). Note: May not be present in all inbound metrics for carrier_edge."
+                },
+                "packet_delay_variation": {
+                  "type": [
+                    "null",
+                    "object"
+                  ],
+                  "additionalProperties": false,
+                  "patternProperties": {
+                    "^d\\d+$": {
+                      "type": [
+                        "null",
+                        "integer"
+                      ]
+                    }
+                  },
+                  "description": "Distribution of packets delayed by a certain value (e.g., 'd50': 24 indicates 24 packets delayed by more than 50 ms). Note: Not typically present in carrier_edge metrics in examples."
+                }
+              }
+            },
+            "outbound": {
+              "type": [
+                "null",
+                "object"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "codec": {
+                  "type": [
+                    "null",
+                    "integer"
+                  ],
+                  "description": "RTP profile number for the media codec."
+                },
+                "codec_name": {
+                  "type": [
+                    "null",
+                    "string"
+                  ],
+                  "description": "Name of the media codec."
+                },
+                "packets_sent": {
+                  "type": [
+                    "null",
+                    "integer"
+                  ],
+                  "description": "Count of packets sent (outbound container only)."
+                },
+                "packets_lost": {
+                  "type": [
+                    "null",
+                    "integer"
+                  ],
+                  "description": "Count of packets lost."
+                },
+                "packets_loss_percentage": {
+                  "type": [
+                    "null",
+                    "number"
+                  ],
+                  "description": "Percentage of packets lost."
+                },
+                "jitter": {
+                  "type": [
+                    "null",
+                    "object"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "max": {
+                      "type": [
+                        "null",
+                        "number"
+                      ]
+                    },
+                    "avg": {
+                      "type": [
+                        "null",
+                        "number"
+                      ]
+                    }
+                  },
+                  "description": "Average and maximum jitter detected."
+                },
+                "latency": {
+                  "type": [
+                    "null",
+                    "object"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "max": {
+                      "type": [
+                        "null",
+                        "number"
+                      ]
+                    },
+                    "avg": {
+                      "type": [
+                        "null",
+                        "number"
+                      ]
+                    }
+                  },
+                  "description": "Twilio internal RTP traversal time from ingress to egress (average and max detected)."
+                },
+                "packet_delay_variation": {
+                  "type": [
+                    "null",
+                    "object"
+                  ],
+                  "additionalProperties": false,
+                  "patternProperties": {
+                    "^d\\d+$": {
+                      "type": [
+                        "null",
+                        "integer"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     },
     "client_edge": {
-      "type": ["object", "null"],
-      "description": "Contains metrics and properties for the Twilio media gateway of a Client call. Null if not applicable.",
+      "type": [
+        "null",
+        "object"
+      ],
+      "description": "Contains metrics and properties for the Twilio media gateway for Client calls. This edge describes the media stream metadata received from/sent to the Client SDK application. It will be present for Voice SDK calls.",
+      "additionalProperties": false,
       "properties": {
-        "codec": { "type": ["integer", "null"], "description": "RTP profile number of the detected codec." },
-        "codec_name": { "type": ["string", "null"], "description": "Name of the detected codec." },
-        "cumulative": {
-          "type": ["object", "null"],
-          "description": "Cumulative jitter (max/avg), packets lost, and packet count for the stream received at this edge.",
+        "properties": {
+          "type": [
+            "null",
+            "object"
+          ],
+          "additionalProperties": false,
+          "description": "Edge-specific properties.",
           "properties": {
-            "bytes_received": { "type": ["integer", "null"] },
-            "bytes_sent": { "type": ["integer", "null"] },
-            "packets_received": { "type": ["integer", "null"] },
-            "packets_lost": { "type": ["integer", "null"] },
-            "packets_sent": { "type": ["integer", "null"] }
+            "q850_cause": {
+              "type": [
+                "null",
+                "integer"
+              ],
+              "description": "ITU-T Q.850 standard definition of telephony disconnect cause."
+            },
+            "direction": {
+              "type": [
+                "null",
+                "string"
+              ],
+              "enum": [
+                "inbound",
+                "outbound"
+              ],
+              "description": "Direction of media flow from the perspective of the edge."
+            },
+            "media_region": {
+              "type": [
+                "null",
+                "string"
+              ],
+              "description": "The Twilio region where media was handled."
+            },
+            "signaling_region": {
+              "type": [
+                "null",
+                "string"
+              ],
+              "description": "The Twilio region where signaling was handled."
+            },
+            "edge_location": {
+              "type": [
+                "null",
+                "string"
+              ],
+              "description": "The Twilio edge location where media was handled."
+            },
+            "twilio_media_ip": {
+              "type": [
+                "null",
+                "string"
+              ],
+              "description": "The IP address for Twilio's media gateway."
+            },
+            "external_media_ip": {
+              "type": [
+                "null",
+                "string"
+              ],
+              "description": "The IP address Twilio received media from."
+            },
+            "selected_region": {
+              "type": [
+                "null",
+                "string"
+              ],
+              "description": "Client calls only: The region specified in the device setup."
+            },
+            "region": {
+              "type": [
+                "null",
+                "string"
+              ],
+              "description": "Client calls only: The Twilio region the device registered to."
+            },
+            "disconnected_by": {
+              "type": [
+                "null",
+                "string"
+              ],
+              "description": "Client calls only: Identifies if Twilio.Device.disconnect() was called in the local application or if the call was ended by the remote party."
+            }
           }
         },
-        "interval": {
-          "type": ["object", "null"],
-          "description": "Packets received, packets lost, and packet loss percentage for the sampling interval.",
+        "metrics": {
+          "type": [
+            "null",
+            "object"
+          ],
+          "additionalProperties": false,
+          "description": "Media stream metadata for inbound and outbound directions.",
           "properties": {
-            "packets_received": { "type": ["integer", "null"] },
-            "packets_lost": { "type": ["integer", "null"] },
-            "packet_loss_percentage": { "type": ["number", "null"] }
-          }
-        },
-        "metadata": {
-          "type": ["object", "null"],
-          "description": "Twilio media region of the selected edge, Twilio and endpoint IP media IP addresses.",
-          "properties": {
-            "region": { "type": ["string", "null"] },
-            "twilio_ip": { "type": ["string", "null"] },
-            "endpoint_ip": { "type": ["string", "null"] }
+            "inbound": {
+              "type": [
+                "null",
+                "object"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "codec": {
+                  "type": [
+                    "null",
+                    "integer"
+                  ]
+                },
+                "codec_name": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "packets_received": {
+                  "type": [
+                    "null",
+                    "integer"
+                  ]
+                },
+                "packets_lost": {
+                  "type": [
+                    "null",
+                    "integer"
+                  ]
+                },
+                "packets_loss_percentage": {
+                  "type": [
+                    "null",
+                    "number"
+                  ]
+                },
+                "jitter": {
+                  "type": [
+                    "null",
+                    "object"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "max": {
+                      "type": [
+                        "null",
+                        "number"
+                      ]
+                    },
+                    "avg": {
+                      "type": [
+                        "null",
+                        "number"
+                      ]
+                    }
+                  }
+                },
+                "latency": {
+                  "type": [
+                    "null",
+                    "object"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "max": {
+                      "type": [
+                        "null",
+                        "number"
+                      ]
+                    },
+                    "avg": {
+                      "type": [
+                        "null",
+                        "number"
+                      ]
+                    }
+                  }
+                },
+                "packet_delay_variation": {
+                  "type": [
+                    "null",
+                    "object"
+                  ],
+                  "additionalProperties": false,
+                  "patternProperties": {
+                    "^d\\d+$": {
+                      "type": [
+                        "null",
+                        "integer"
+                      ]
+                    }
+                  }
+                }
+              }
+            },
+            "outbound": {
+              "type": [
+                "null",
+                "object"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "codec": {
+                  "type": [
+                    "null",
+                    "integer"
+                  ]
+                },
+                "codec_name": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "packets_sent": {
+                  "type": [
+                    "null",
+                    "integer"
+                  ]
+                },
+                "packets_lost": {
+                  "type": [
+                    "null",
+                    "integer"
+                  ]
+                },
+                "packets_loss_percentage": {
+                  "type": [
+                    "null",
+                    "number"
+                  ]
+                },
+                "jitter": {
+                  "type": [
+                    "null",
+                    "object"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "max": {
+                      "type": [
+                        "null",
+                        "number"
+                      ]
+                    },
+                    "avg": {
+                      "type": [
+                        "null",
+                        "number"
+                      ]
+                    }
+                  }
+                },
+                "latency": {
+                  "type": [
+                    "null",
+                    "object"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "max": {
+                      "type": [
+                        "null",
+                        "number"
+                      ]
+                    },
+                    "avg": {
+                      "type": [
+                        "null",
+                        "number"
+                      ]
+                    }
+                  }
+                },
+                "packet_delay_variation": {
+                  "type": [
+                    "null",
+                    "object"
+                  ],
+                  "additionalProperties": false,
+                  "patternProperties": {
+                    "^d\\d+$": {
+                      "type": [
+                        "null",
+                        "integer"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
     },
     "sdk_edge": {
-      "type": ["object", "null"],
-      "description": "Contains metrics and properties for the SDK sensor library for Client calls. Null if not applicable.",
+      "type": [
+        "null",
+        "object"
+      ],
+      "description": "Contains metrics and properties from the SDK sensor library within the Client application itself. It will be present for Voice SDK calls.",
+      "additionalProperties": false,
       "properties": {
-        "codec": { "type": ["integer", "null"], "description": "RTP profile number of the detected codec." },
-        "codec_name": { "type": ["string", "null"], "description": "Name of the detected codec." },
-        "cumulative": {
-          "type": ["object", "null"],
-          "description": "Cumulative jitter (max/avg), packets lost, and packet count for the stream received at this edge.",
+        "properties": {
+          "type": [
+            "null",
+            "object"
+          ],
+          "additionalProperties": false,
+          "description": "SDK-specific properties.",
           "properties": {
-            "bytes_received": { "type": ["integer", "null"] },
-            "bytes_sent": { "type": ["integer", "null"] },
-            "packets_received": { "type": ["integer", "null"] },
-            "packets_lost": { "type": ["integer", "null"] },
-            "packets_sent": { "type": ["integer", "null"] }
-          }
-        },
-        "interval": {
-          "type": ["object", "null"],
-          "description": "Audio in/out, jitter, packet loss, rtt, and packet loss percentage for the sampling interval.",
-          "properties": {
-            "packets_received": { "type": ["integer", "null"] },
-            "packets_lost": { "type": ["integer", "null"] },
-            "audio_in": {
-              "type": ["object", "null"],
-              "properties": { "value": { "type": ["number", "null"] } }
+            "direction": {
+              "type": [
+                "null",
+                "string"
+              ],
+              "description": "The direction of the call from the perspective of the SDK."
             },
-            "audio_out": {
-              "type": ["object", "null"],
-              "properties": { "value": { "type": ["number", "null"] } }
+            "settings": {
+              "type": [
+                "null",
+                "object"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "dscp": {
+                  "type": [
+                    "null",
+                    "boolean"
+                  ],
+                  "description": "Indicates whether DSCP was enabled."
+                },
+                "ice_restart_enabled": {
+                  "type": [
+                    "null",
+                    "boolean"
+                  ],
+                  "description": "Indicates if ICE restart was enabled."
+                },
+                "edge": {
+                  "type": [
+                    "null",
+                    "string"
+                  ],
+                  "description": "The Twilio Edge Location that was used for this call."
+                },
+                "selected_edges": {
+                  "type": [
+                    "null",
+                    "array"
+                  ],
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "A prioritized list of Edge Locations provided during Twilio.Device.setup()."
+                }
+              }
             },
-            "jitter": {
-              "type": ["object", "null"],
-              "properties": { "value": { "type": ["number", "null"] } }
+            "app": {
+              "type": [
+                "null",
+                "object"
+              ],
+              "additionalProperties": false,
+              "description": "Application details, including name and version.",
+              "properties": {
+                "name": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "version": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                }
+              }
             },
-            "mos": {
-              "type": ["object", "null"],
-              "properties": { "value": { "type": ["number", "null"] } }
-            },
-            "rtt": {
-              "type": ["object", "null"],
-              "properties": { "value": { "type": ["number", "null"] } }
+            "disconnected_by": {
+              "type": [
+                "null",
+                "string"
+              ],
+              "description": "Identifies if Twilio.Device.disconnect() was called in the local application or if the call was ended by the remote party."
             }
           }
         },
-        "metadata": {
-          "type": ["object", "null"],
-          "description": "Twilio media region of the selected edge, Twilio and endpoint IP media IP addresses.",
+        "metrics": {
+          "type": [
+            "null",
+            "object"
+          ],
+          "additionalProperties": false,
+          "description": "Metrics describing the media stream received at the SDK from the Twilio media gateway.",
           "properties": {
-            "region": { "type": ["string", "null"] },
-            "twilio_ip": { "type": ["string", "null"] },
-            "endpoint_ip": { "type": ["string", "null"] }
+            "inbound": {
+              "type": [
+                "null",
+                "object"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "mos": {
+                  "type": [
+                    "null",
+                    "object"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "avg": {
+                      "type": [
+                        "null",
+                        "number"
+                      ]
+                    },
+                    "max": {
+                      "type": [
+                        "null",
+                        "number"
+                      ]
+                    },
+                    "min": {
+                      "type": [
+                        "null",
+                        "number"
+                      ]
+                    }
+                  },
+                  "description": "Mean Opinion Score (MOS), a function of jitter, packet loss, and round-trip time. Values above 4 are considered acceptable."
+                },
+                "rtt": {
+                  "type": [
+                    "null",
+                    "object"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "avg": {
+                      "type": [
+                        "null",
+                        "number"
+                      ]
+                    },
+                    "max": {
+                      "type": [
+                        "null",
+                        "number"
+                      ]
+                    },
+                    "min": {
+                      "type": [
+                        "null",
+                        "number"
+                      ]
+                    }
+                  },
+                  "description": "Round-trip time (RTT) in milliseconds for packets sent from Twilio's gateway to arrive at the SDK."
+                },
+                "packets_received": {
+                  "type": [
+                    "null",
+                    "integer"
+                  ],
+                  "description": "Count of packets received (inbound container only)."
+                },
+                "packets_lost": {
+                  "type": [
+                    "null",
+                    "integer"
+                  ],
+                  "description": "Count of packets lost."
+                },
+                "packets_loss_percentage": {
+                  "type": [
+                    "null",
+                    "number"
+                  ],
+                  "description": "Percentage of packets lost."
+                },
+                "jitter": {
+                  "type": [
+                    "null",
+                    "object"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "max": {
+                      "type": [
+                        "null",
+                        "number"
+                      ]
+                    },
+                    "avg": {
+                      "type": [
+                        "null",
+                        "number"
+                      ]
+                    }
+                  },
+                  "description": "Average and maximum jitter detected."
+                },
+                "bytes_received": {
+                  "type": [
+                    "null",
+                    "integer"
+                  ],
+                  "description": "Bytes received at the SDK sensors."
+                },
+                "audio_in": {
+                  "type": [
+                    "null",
+                    "object"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "avg": {
+                      "type": [
+                        "null",
+                        "number"
+                      ]
+                    },
+                    "max": {
+                      "type": [
+                        "null",
+                        "number"
+                      ]
+                    }
+                  },
+                  "description": "Average and maximum level for microphone audio. Used to detect one-way audio."
+                },
+                "audio_out": {
+                  "type": [
+                    "null",
+                    "object"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "avg": {
+                      "type": [
+                        "null",
+                        "number"
+                      ]
+                    },
+                    "max": {
+                      "type": [
+                        "null",
+                        "number"
+                      ]
+                    }
+                  },
+                  "description": "Average and maximum level for speaker audio."
+                }
+              }
+            },
+            "outbound": {
+              "type": [
+                "null",
+                "object"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "packets_sent": {
+                  "type": [
+                    "null",
+                    "integer"
+                  ],
+                  "description": "Count of packets sent (outbound container only)."
+                },
+                "codec": {
+                  "type": [
+                    "null",
+                    "integer"
+                  ],
+                  "description": "RTP profile number of the codec for the call set in Twilio.Device()."
+                },
+                "codec_name": {
+                  "type": [
+                    "null",
+                    "string"
+                  ],
+                  "description": "Friendly name of the RTP codec for the call set in Twilio.Device()."
+                }
+              }
+            }
           }
+        },
+        "events": {
+          "type": [
+            "null",
+            "object"
+          ],
+          "additionalProperties": false,
+          "description": "SDK events, including counts by severity and group.",
+          "properties": {
+            "levels": {
+              "type": [
+                "null",
+                "object"
+              ],
+              "additionalProperties": false,
+              "patternProperties": {
+                "^[A-Z_]+$": {
+                  "type": [
+                    "null",
+                    "integer"
+                  ]
+                }
+              },
+              "description": "Count of events by severity for the call (e.g., DEBUG, INFO, WARNING)."
+            },
+            "groups": {
+              "type": [
+                "null",
+                "object"
+              ],
+              "additionalProperties": false,
+              "patternProperties": {
+                "^[a-zA-Z_]+$": {
+                  "type": [
+                    "null",
+                    "integer"
+                  ]
+                }
+              },
+              "description": "Count of events by the event group (e.g., audio_level_warning_cleared, connection, ice_candidate)."
+            },
+            "errors": {
+              "type": [
+                "null",
+                "object"
+              ],
+              "additionalProperties": false,
+              "patternProperties": {
+                "^[a-zA-Z0-9_]+$": {
+                  "type": [
+                    "null",
+                    "integer"
+                  ]
+                }
+              },
+              "description": "Error code and number of occurrences."
+            },
+            "feedback": {
+              "type": [
+                "null",
+                "object"
+              ],
+              "additionalProperties": false,
+              "description": "User feedback gathered from the SDK."
+            }
+          }
+        },
+        "tags": {
+          "type": [
+            "null",
+            "array"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "description": "Tags applied to calls by Voice Insights analysis indicating a condition that could result in subjective degradation of the call quality."
         }
       }
     },
     "sip_edge": {
-      "type": ["object", "null"],
-      "description": "Contains metrics and properties for the Twilio media gateway of a SIP Interface or Trunking call. Null if not applicable.",
+      "type": [
+        "null",
+        "object"
+      ],
+      "description": "Contains metrics and properties for the Twilio media gateway of a SIP Interface or Trunking call. This edge describes what was received from/delivered to your SIP infrastructure. It will be present for SIP trunking calls, SIP domain, or <Dial><Sip> calls.",
+      "additionalProperties": false,
       "properties": {
-        "codec": { "type": ["integer", "null"], "description": "RTP profile number of the detected codec." },
-        "codec_name": { "type": ["string", "null"], "description": "Name of the detected codec." },
-        "cumulative": {
-          "type": ["object", "null"],
-          "description": "Cumulative jitter (max/avg), packets lost, and packet count for the stream received at this edge.",
+        "properties": {
+          "type": [
+            "null",
+            "object"
+          ],
+          "additionalProperties": false,
+          "description": "Edge-specific properties.",
           "properties": {
-            "bytes_received": { "type": ["integer", "null"] },
-            "bytes_sent": { "type": ["integer", "null"] },
-            "packets_received": { "type": ["integer", "null"] },
-            "packets_lost": { "type": ["integer", "null"] },
-            "packets_sent": { "type": ["integer", "null"] }
+            "q850_cause": {
+              "type": [
+                "null",
+                "integer"
+              ],
+              "description": "ITU-T Q.850 standard definition of telephony disconnect cause."
+            },
+            "direction": {
+              "type": [
+                "null",
+                "string"
+              ],
+              "enum": [
+                "inbound",
+                "outbound"
+              ],
+              "description": "Direction of media flow from the perspective of the edge."
+            },
+            "media_region": {
+              "type": [
+                "null",
+                "string"
+              ],
+              "description": "The Twilio region where media was handled."
+            },
+            "signaling_region": {
+              "type": [
+                "null",
+                "string"
+              ],
+              "description": "The Twilio region where signaling was handled."
+            },
+            "edge_location": {
+              "type": [
+                "null",
+                "string"
+              ],
+              "description": "The Twilio edge location where media was handled."
+            },
+            "twilio_media_ip": {
+              "type": [
+                "null",
+                "string"
+              ],
+              "description": "The IP address for Twilio's media gateway."
+            },
+            "twilio_signaling_ip": {
+              "type": [
+                "null",
+                "string"
+              ],
+              "description": "The IP address for Twilio's signaling gateway."
+            },
+            "external_media_ip": {
+              "type": [
+                "null",
+                "string"
+              ],
+              "description": "The IP address Twilio received media from."
+            },
+            "external_signaling_ip": {
+              "type": [
+                "null",
+                "string"
+              ],
+              "description": "The IP address Twilio received signaling from."
+            },
+            "sip_call_id": {
+              "type": [
+                "null",
+                "string"
+              ],
+              "description": "The SIP call ID for the call between Twilio & your SIP infrastructure (SIP Interface and trunking calls only)."
+            },
+            "user_agent": {
+              "type": [
+                "null",
+                "string"
+              ],
+              "description": "Available for trunking calls only."
+            },
+            "trunk_sid": {
+              "type": [
+                "null",
+                "string"
+              ],
+              "description": "The trunk SID for this call (trunking calls only)."
+            }
           }
         },
-        "interval": {
-          "type": ["object", "null"],
-          "description": "Packets received, packets lost, and packet loss percentage for the sampling interval.",
+        "metrics": {
+          "type": [
+            "null",
+            "object"
+          ],
+          "additionalProperties": false,
+          "description": "Media stream metadata for inbound and outbound directions.",
           "properties": {
-            "packets_received": { "type": ["integer", "null"] },
-            "packets_lost": { "type": ["integer", "null"] },
-            "packet_loss_percentage": { "type": ["number", "null"] }
-          }
-        },
-        "metadata": {
-          "type": ["object", "null"],
-          "description": "Twilio media region of the selected edge, Twilio and endpoint IP media IP addresses.",
-          "properties": {
-            "region": { "type": ["string", "null"] },
-            "twilio_ip": { "type": ["string", "null"] },
-            "endpoint_ip": { "type": ["string", "null"] }
+            "inbound": {
+              "type": [
+                "null",
+                "object"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "codec": {
+                  "type": [
+                    "null",
+                    "integer"
+                  ]
+                },
+                "codec_name": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "packets_received": {
+                  "type": [
+                    "null",
+                    "integer"
+                  ]
+                },
+                "packets_lost": {
+                  "type": [
+                    "null",
+                    "integer"
+                  ]
+                },
+                "packets_loss_percentage": {
+                  "type": [
+                    "null",
+                    "number"
+                  ]
+                },
+                "jitter": {
+                  "type": [
+                    "null",
+                    "object"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "max": {
+                      "type": [
+                        "null",
+                        "number"
+                      ]
+                    },
+                    "avg": {
+                      "type": [
+                        "null",
+                        "number"
+                      ]
+                    }
+                  }
+                },
+                "latency": {
+                  "type": [
+                    "null",
+                    "object"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "max": {
+                      "type": [
+                        "null",
+                        "number"
+                      ]
+                    },
+                    "avg": {
+                      "type": [
+                        "null",
+                        "number"
+                      ]
+                    }
+                  }
+                },
+                "packet_delay_variation": {
+                  "type": [
+                    "null",
+                    "object"
+                  ],
+                  "additionalProperties": false,
+                  "patternProperties": {
+                    "^d\\d+$": {
+                      "type": [
+                        "null",
+                        "integer"
+                      ]
+                    }
+                  }
+                }
+              }
+            },
+            "outbound": {
+              "type": [
+                "null",
+                "object"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "codec": {
+                  "type": [
+                    "null",
+                    "integer"
+                  ]
+                },
+                "codec_name": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "packets_sent": {
+                  "type": [
+                    "null",
+                    "integer"
+                  ]
+                },
+                "packets_lost": {
+                  "type": [
+                    "null",
+                    "integer"
+                  ]
+                },
+                "packets_loss_percentage": {
+                  "type": [
+                    "null",
+                    "number"
+                  ]
+                },
+                "jitter": {
+                  "type": [
+                    "null",
+                    "object"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "max": {
+                      "type": [
+                        "null",
+                        "number"
+                      ]
+                    },
+                    "avg": {
+                      "type": [
+                        "null",
+                        "number"
+                      ]
+                    }
+                  }
+                },
+                "latency": {
+                  "type": [
+                    "null",
+                    "object"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "max": {
+                      "type": [
+                        "null",
+                        "number"
+                      ]
+                    },
+                    "avg": {
+                      "type": [
+                        "null",
+                        "number"
+                      ]
+                    }
+                  }
+                },
+                "packet_delay_variation": {
+                  "type": [
+                    "null",
+                    "object"
+                  ],
+                  "additionalProperties": false,
+                  "patternProperties": {
+                    "^d\\d+$": {
+                      "type": [
+                        "null",
+                        "integer"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
     },
     "tags": {
-      "type": ["array", "null"],
-      "description": "Tags applied to calls by Voice Insights analysis indicating potential subjective degradation of call quality.",
-      "items": { "type": "string" }
+      "type": [
+        "null",
+        "array"
+      ],
+      "items": {
+        "type": "string"
+      },
+      "description": "Tags applied to calls by Voice Insights analysis, indicating a condition that could result in subjective degradation of call quality. Examples include 'high_latency' or 'silence'."
+    },
+    "url": {
+      "type": [
+        "null",
+        "string"
+      ],
+      "format": "uri",
+      "description": "The URL of this resource."
     },
     "attributes": {
-      "type": ["object", "null"],
-      "description": "Attributes capturing call-flow-specific details. (Structure not fully detailed in available information)",
-      "properties": {},
-      "additionalProperties": true
+      "type": [
+        "null",
+        "object"
+      ],
+      "additionalProperties": false,
+      "description": "Attributes capturing call-flow-specific details.",
+      "properties": {
+        "conference_participant": {
+          "type": [
+            "null",
+            "boolean"
+          ],
+          "description": "Boolean value indicating if the primary media source was a Twilio conference mixer."
+        }
+      }
     },
     "properties": {
-      "type": ["object", "null"],
-      "description": "Contains edge-agnostic call-level details. (Structure not fully detailed in available information)",
-      "properties": {},
-      "additionalProperties": true
+      "type": [
+        "null",
+        "object"
+      ],
+      "additionalProperties": false,
+      "description": "Contains edge-agnostic call-level details.",
+      "properties": {
+        "pdd_ms": {
+          "type": [
+            "null",
+            "integer"
+          ],
+          "description": "Post-dial delay in milliseconds."
+        },
+        "last_sip_response_num": {
+          "type": [
+            "null",
+            "integer"
+          ],
+          "description": "The numeric value of the last SIP response received for the call."
+        },
+        "direction": {
+          "type": [
+            "null",
+            "string"
+          ],
+          "enum": [
+            "inbound",
+            "outbound_api",
+            "outbound_dial",
+            "trunking_originating",
+            "trunking_terminating"
+          ],
+          "description": "The direction of the call. Possible values are: inbound, outbound_api, outbound_dial, trunking_originating, or trunking_terminating."
+        },
+        "disconnected_by": {
+          "type": [
+            "null",
+            "string"
+          ],
+          "enum": [
+            "caller",
+            "callee",
+            "local",
+            "remote"
+          ],
+          "description": "Indicates who disconnected the call, based on the direction of the SIP BYE received at the Twilio signaling gateway or local/remote application for client calls."
+        },
+        "queue_time": {
+          "type": [
+            "null",
+            "integer"
+          ],
+          "description": "Estimated time in milliseconds between when a Programmable Voice call is created and when the call actually begins."
+        }
+      }
     },
     "trust": {
-      "type": ["object", "null"],
-      "description": "Contains trusted communications details including Branded Call and verified caller ID.",
+      "type": [
+        "null",
+        "object"
+      ],
+      "additionalProperties": false,
+      "description": "Contains trusted communications details, including Branded Call and verified caller ID information.",
       "properties": {
         "verified_caller": {
-          "type": ["object", "null"],
+          "type": [
+            "null",
+            "object"
+          ],
+          "additionalProperties": false,
           "properties": {
-            "verified": { "type": ["boolean", "null"] }
+            "verified": {
+              "type": [
+                "null",
+                "boolean"
+              ],
+              "description": "Boolean value indicating if the caller ID provided has been verified, for example, using SHAKEN/STIR A attestation."
+            }
           }
         },
         "branded": {
-          "type": ["object", "null"],
+          "type": [
+            "null",
+            "object"
+          ],
+          "additionalProperties": false,
           "properties": {
-            "enabled": { "type": ["boolean", "null"] },
-            "display_name": { "type": ["string", "null"] },
-            "long_display_name": { "type": ["string", "null"] },
-            "bundle_sid": { "type": ["string", "null"] }
+            "enabled": {
+              "type": [
+                "null",
+                "boolean"
+              ],
+              "description": "Indicates if branding details were successfully displayed on the destination device."
+            },
+            "display_name": {
+              "type": [
+                "null",
+                "string"
+              ],
+              "description": "The display name for branded calls."
+            },
+            "long_display_name": {
+              "type": [
+                "null",
+                "string"
+              ],
+              "description": "The long display name for branded calls."
+            },
+            "bundle_sid": {
+              "type": [
+                "null",
+                "string"
+              ],
+              "description": "The unique SID identifier of the Branded Call bundle."
+            },
+            "caller": {
+              "type": [
+                "null",
+                "string"
+              ],
+              "description": "The caller ID provided for branded calls."
+            },
+            "use_case": {
+              "type": [
+                "null",
+                "string"
+              ],
+              "description": "The use case for the branded call."
+            },
+            "branded_channel_sid": {
+              "type": [
+                "null",
+                "string"
+              ],
+              "description": "The branded channel SID."
+            },
+            "business_sid": {
+              "type": [
+                "null",
+                "string"
+              ],
+              "description": "The business SID for branded calls."
+            },
+            "brand_sid": {
+              "type": [
+                "null",
+                "string"
+              ],
+              "description": "The brand SID for branded calls."
+            }
           }
         },
         "business_profile": {
-          "type": ["object", "null"],
+          "type": [
+            "null",
+            "object"
+          ],
+          "additionalProperties": false,
           "properties": {
-            "bundle_sid": { "type": ["string", "null"] },
-            "identity": { "type": ["string", "null"] },
-            "industry": { "type": ["string", "null"] },
-            "type": { "type": ["string", "null"] }
+            "bundle_sid": {
+              "type": [
+                "null",
+                "string"
+              ],
+              "description": "The unique SID identifier of the Business Profile."
+            },
+            "identity": {
+              "type": [
+                "null",
+                "string"
+              ],
+              "enum": [
+                "direct_customer",
+                "isv_reseller_or_partner"
+              ],
+              "description": "The Business Identity of the calls. Possible values: direct_customer or isv_reseller_or_partner."
+            },
+            "industry": {
+              "type": [
+                "null",
+                "string"
+              ],
+              "enum": [
+                "automotive",
+                "agriculture",
+                "banking",
+                "consumer",
+                "construction",
+                "education",
+                "engineering",
+                "energy",
+                "oil_and_gas",
+                "fast_moving_consumer_goods",
+                "financial",
+                "fintech",
+                "food_and_beverage",
+                "government",
+                "healthcare",
+                "hospitality",
+                "insurance",
+                "legal",
+                "manufacturing",
+                "media",
+                "online",
+                "professional_services",
+                "raw_materials",
+                "real_estate",
+                "religion",
+                "retail",
+                "jewelry",
+                "technology",
+                "telecommunications",
+                "transportation",
+                "travel",
+                "electronics",
+                "not_for_profit"
+              ],
+              "description": "The Business Industry of the calls."
+            },
+            "type": {
+              "type": [
+                "null",
+                "string"
+              ],
+              "description": "The Business Profile Type of the calls."
+            }
           }
         },
         "voice_integrity": {
-          "type": ["object", "null"],
+          "type": [
+            "null",
+            "object"
+          ],
+          "additionalProperties": false,
           "properties": {
-            "enabled": { "type": ["boolean", "null"] },
-            "bundle_sid": { "type": ["string", "null"] },
-            "use_case": { "type": ["string", "null"] }
+            "enabled": {
+              "type": [
+                "null",
+                "boolean"
+              ],
+              "description": "Indicates whether or not the phone number had voice integrity enabled."
+            },
+            "bundle_sid": {
+              "type": [
+                "null",
+                "string"
+              ],
+              "description": "The unique SID identifier of the Voice Integrity Profile."
+            },
+            "use_case": {
+              "type": [
+                "null",
+                "string"
+              ],
+              "enum": [
+                "abandoned_cart",
+                "appointment_reminders",
+                "appointment_scheduling",
+                "asset_management",
+                "automated_support",
+                "call_tracking",
+                "click_to_call",
+                "contact_tracing",
+                "contactless_delivery",
+                "customer_support",
+                "dating/social",
+                "delivery_notifications",
+                "distance_learning",
+                "emergency_notifications",
+                "employee_notifications",
+                "exam_proctoring",
+                "field_notifications",
+                "first_responder",
+                "fraud_alerts",
+                "group_messaging",
+                "identify_& *verification",
+                "intelligent_routing",
+                "lead_alerts",
+                "lead_distribution",
+                "lead_generation",
+                "lead_management",
+                "lead_nurturing",
+                "marketing_events",
+                "mass_alerts",
+                "meetings/collaboration",
+                "order_notifications",
+                "outbound_dialer",
+                "pharmacy",
+                "phone_system",
+                "purchase_confirmation",
+                "remote_appointments",
+                "rewards_program",
+                "self-service",
+                "service_alerts",
+                "shift_management",
+                "survey/research",
+                "telehealth",
+                "telemarketing",
+                "therapy* (individual+group)"
+              ],
+              "description": "The Voice Integrity Use Case."
+            }
           }
         }
       }
     },
     "annotation": {
-      "type": ["object", "null"],
-      "description": "Programmatically labeled annotations for the Call.",
+      "type": [
+        "null",
+        "object"
+      ],
+      "additionalProperties": false,
+      "description": "Allows programmatic labelling of Call Summaries with subjective information.",
       "properties": {
-        "account_sid": { "type": ["string", "null"] },
-        "call_sid": { "type": ["string", "null"] },
-        "answered_by": { "type": ["string", "null"] },
-        "connectivity_issue": { "type": ["string", "null"] },
-        "quality_issues": {
-          "type": ["array", "null"],
-          "items": { "type": "string" }
+        "answered_by": {
+          "type": [
+            "null",
+            "string"
+          ],
+          "enum": [
+            "unknown",
+            "machine_start",
+            "machine_end_beep",
+            "machine_end_silence",
+            "machine_end_other",
+            "human",
+            "fax"
+          ],
+          "description": "Which entity answered the call as determined by Answering Machine Detection (AMD); used to provide feedback on AMD accuracy."
         },
-        "spam": { "type": ["boolean", "null"] },
-        "call_score": { "type": ["integer", "null"] },
-        "comment": { "type": ["string", "null"] },
-        "incident": { "type": ["string", "null"] }
+        "connectivity_issue": {
+          "type": [
+            "null",
+            "string"
+          ],
+          "enum": [
+            "no_connectivity_issue",
+            "invalid_number",
+            "caller_id",
+            "dropped_call",
+            "number_reachability"
+          ],
+          "description": "Indicates if the call was labeled for any connectivity issues."
+        },
+        "quality_issues": {
+          "type": [
+            "null",
+            "array"
+          ],
+          "items": {
+            "type": "string",
+            "enum": [
+              "no_quality_issue",
+              "low_volume",
+              "choppy_robotic",
+              "echo",
+              "dtmf",
+              "latency",
+              "owa",
+              "static_noise"
+            ]
+          },
+          "description": "Indicates if the call was labeled for user perceived quality issues, such as low volume, echo, or latency."
+        },
+        "spam": {
+          "type": [
+            "null",
+            "boolean"
+          ],
+          "description": "Indicates if the call was labeled as a spam call."
+        },
+        "call_score": {
+          "type": [
+            "null",
+            "integer"
+          ],
+          "description": "Indicates the labeled call score for that call, using a range of 1-5 where 5 is Excellent and 1 is Bad."
+        },
+        "comment": {
+          "type": [
+            "null",
+            "string"
+          ],
+          "description": "Indicates if any comments were added for the call."
+        },
+        "incident": {
+          "type": [
+            "null",
+            "string"
+          ],
+          "description": "Indicates if any associated incident or support tickets were added for the call."
+        }
       }
     },
-    "url": {
-      "type": ["string", "null"],
-      "format": "uri",
-      "description": "The URL of this resource."
+    "updated_time": {
+      "type": [
+        "null",
+        "string"
+      ],
+      "format": "date-time",
+      "description": "The time at which the Call Summary was last updated. This property is observed in the API response examples, though not explicitly listed in the main Call Summary properties table in the resource documentation."
     }
   }
 }
