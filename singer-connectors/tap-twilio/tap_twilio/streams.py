@@ -568,12 +568,13 @@ STREAMS = {
         'api_version': 'v1',
         'path': 'Voice/Summaries',
         'data_key': 'call_summaries',
-        'key_properties': [],
+        'key_properties': ['call_sid'],
         'replication_method': 'INCREMENTAL',
         'replication_keys': ['created_time'],
+        'bookmark_query_field_from': 'start_time',
+        'bookmark_query_field_to': 'end_time',
         'params': {},
-        'pagination': 'meta',
-        'pagination_key': 'next_page_url'
+        'pagination': 'meta'
     }
 }
 
