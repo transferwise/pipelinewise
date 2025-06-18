@@ -556,8 +556,25 @@ STREAMS = {
                 'replication_keys': ['date_updated'],
                 'params': {},
                 'pagination': 'meta'
-            }
+            },
+            # pylint: disable=line-too-long
+            # Reference: https://www.twilio.com/docs/voice/voice-insights/api/call/call-metrics-resource
         }
+    },
+    # pylint: disable=line-too-long
+    # Reference: https://www.twilio.com/docs/voice/voice-insights/api/call/call-summary-resource
+    'call_summaries': {
+        'api_url': 'https://insights.twilio.com',
+        'api_version': 'v1',
+        'path': 'Voice/Summaries',
+        'data_key': 'call_summaries',
+        'key_properties': ['call_sid'],
+        'replication_method': 'INCREMENTAL',
+        'replication_keys': ['created_time'],
+        'bookmark_query_field_from': 'start_time',
+        'bookmark_query_field_to': 'end_time',
+        'params': {},
+        'pagination': 'meta'
     }
 }
 
