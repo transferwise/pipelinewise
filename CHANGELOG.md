@@ -1,3 +1,7 @@
+0.71.0 (2025-06-10)
+-------------------
+- bump snowflake-connector-python[pandas] from `3.0.4` to `3.15.0` 
+
 0.70.0 (2025-06-10)
 -------------------
 - Replace pkg_resource with importlib.metadata

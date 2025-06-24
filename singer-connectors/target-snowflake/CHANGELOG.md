@@ -1,3 +1,10 @@
+2.4.0 (2025-07-18)
+-------------------
+
+*Changes*
+- Update dependencies:
+    - snowflake-connector-python[pandas]
+
 2.3.0 (2023-08-08)
 -------------------
 
