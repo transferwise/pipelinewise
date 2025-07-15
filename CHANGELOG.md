@@ -1,3 +1,7 @@
+0.72.2 (2025-07-15)
+-------------------
+- Using `python:3.10-slim-bullseye` in Dockerfile and Dockerfile.barebone
+
 0.72.1 (2025-07-15)
 -------------------
 - Bump Python version in barebone docker image from `3.8` to `3.10`
