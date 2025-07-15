@@ -1,3 +1,7 @@
+0.72.1 (2025-07-15)
+-------------------
+- Bump Python version in barebone docker image from `3.8` to `3.10`
+
 0.72.0 (2025-06-27)
 -------------------
 - Add twilio voice insights to twilio-tap
