@@ -2147,3 +2147,29 @@ class TestBinlogSyncStrategy(TestCase):
 
         self.assertEqual("Couldn't find any gtid in state bookmarks to resume logical replication",
                          str(context.exception))
+
+    def test_row_to_singer_record(self):
+        catalog_entry = CatalogEntry(
+            stream='stream',
+            schema=Schema.from_dict({
+                'type': 'object',
+                'properties': {
+                    'time': {
+                        'type': 'string',
+                        'format': 'time',
+                    },
+                },
+            }),
+        )
+        message = binlog.row_to_singer_record(
+            catalog_entry,
+            version=1,
+            row={'time': datetime.timedelta(hours=8, minutes=30)},
+            db_column_map={},
+            time_extracted=datetime.datetime.now(datetime.timezone.utc),
+        )
+
+        assert message.stream == 'stream'
+        assert message.version == 1
+        assert message.record == {'time': '08:30:00'}
+        assert message.time_extracted is not None
