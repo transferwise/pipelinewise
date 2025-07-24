@@ -571,8 +571,9 @@ STREAMS = {
         'key_properties': ['call_sid'],
         'replication_method': 'INCREMENTAL',
         'replication_keys': ['created_time'],
-        'bookmark_query_field_from': 'start_time',
-        'bookmark_query_field_to': 'end_time',
+        'bookmark_query_field_from': 'StartDate',  # Bookmark
+        'bookmark_query_field_to': 'EndDate',  # Current Date
+        'max_days_ago': 30,
         'params': {},
         'pagination': 'meta'
     }
