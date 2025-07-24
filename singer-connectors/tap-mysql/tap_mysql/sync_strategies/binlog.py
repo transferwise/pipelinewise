@@ -224,7 +224,10 @@ def row_to_singer_record(catalog_entry, version, db_column_map, row, time_extrac
         elif isinstance(val, datetime.timedelta):
             if property_format == 'time':
                 # this should convert time column into 'HH:MM:SS' formatted string
-                row_to_persist[column_name] = str(val)
+                _total_seconds = int(val.total_seconds())
+                _hours, _remainder = divmod(_total_seconds, 3600)
+                _minutes, _seconds = divmod(_remainder, 60)
+                row_to_persist[column_name] = f"{_hours:02}:{_minutes:02}:{_seconds:02}"
             else:
                 timedelta_from_epoch = datetime.datetime.utcfromtimestamp(0) + val
                 row_to_persist[column_name] = timedelta_from_epoch.isoformat() + '+00:00'
