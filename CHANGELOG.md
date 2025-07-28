@@ -1,3 +1,7 @@
+0.72.3 (2025-07-28)
+-------------------
+- [HANDL-9246] Fix pagination in tap-twilio call summaries
+
 0.72.2 (2025-07-15)
 -------------------
 - Using `python:3.10-slim-bullseye` in Dockerfile and Dockerfile.barebone
@@ -12,7 +16,7 @@
 
 0.71.0 (2025-06-10)
 -------------------
-- bump snowflake-connector-python[pandas] from `3.0.4` to `3.15.0` 
+- bump snowflake-connector-python[pandas] from `3.0.4` to `3.15.0`
 
 0.70.0 (2025-06-10)
 -------------------
@@ -1118,4 +1122,3 @@ Doc-only changes
 -------------------
 
 - Initial release
-
