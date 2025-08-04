@@ -84,6 +84,7 @@ def get_schemas_of_tables_set(set_of_tables: set) -> set:
         set_of_schemas.add(schema)
     return set_of_schemas
 
+
 def pem2der(pem_file: str, password: str = None) -> bytes:
     """Convert Key PEM format to DER format"""
     with open(pem_file, 'rb') as key_file:
