@@ -190,7 +190,7 @@ class TestUtils(unittest.TestCase):
         actual_output = utils.get_schemas_of_tables_set(input_tables_list)
         self.assertSetEqual(actual_output, expected_output)
 
-    def test_convert_key_pem_format_to_der_format(self):
+    def test_pem2der(self):
         with TemporaryDirectory() as temp_dir:
             with open(f'{temp_dir}/test.pem', 'w', encoding='utf-8') as tmp_file:
                 tmp_file.write('''
