@@ -319,7 +319,6 @@ class E2EEnv:
         templates = glob.glob(f'{project_dir}/*.yml.template')
         for template_path in templates:
             # Replace env vars in template
-            print(f'====={template_path}')
             with open(template_path, 'r', encoding='utf-8') as f_template:
                 yaml = f_template.read()
 
