@@ -3,9 +3,6 @@ from tempfile import TemporaryDirectory
 
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
-from cryptography.exceptions import UnsupportedAlgorithm
-
-
 
 from pipelinewise import utils
 from pipelinewise.fastsync.commons.tap_mysql import FastSyncTapMySql
@@ -191,6 +188,7 @@ class TestUtils(unittest.TestCase):
         self.assertSetEqual(actual_output, expected_output)
 
     def test_pem2der(self):
+        """Test pem2der function to convert PEM to DER format"""
         with TemporaryDirectory() as temp_dir:
             with open(f'{temp_dir}/test.pem', 'w', encoding='utf-8') as tmp_file:
                 tmp_file.write('''
@@ -225,8 +223,8 @@ XXGN8+qde/d1wM7lPXDI9Jk=
             try:
                 der_format = utils.pem2der(f'{temp_dir}/test.pem')
                 serialization.load_der_private_key(der_format, password=None, backend=default_backend())
-            except Exception as e:
-                self.fail(f'Failed to convert pem to der: {e}')
+            except Exception as exp:
+                self.fail(f'Failed to convert pem to der: {exp}')
 
 
 if __name__ == '__main__':
