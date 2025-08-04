@@ -2,6 +2,7 @@
 Pipelinewise common utils between cli and fastsync
 """
 from typing import Optional
+from cryptography.hazmat.primitives import serialization
 
 
 def safe_column_name(
@@ -82,3 +83,17 @@ def get_schemas_of_tables_set(set_of_tables: set) -> set:
         schema = table.split('.')[0]
         set_of_schemas.add(schema)
     return set_of_schemas
+
+def pem2der(pem_file: str, password: str=None) -> bytes:
+    """Convert Key PEM format to DER format"""
+    with open(pem_file, 'rb') as key_file:
+        p_key = serialization.load_pem_private_key(
+            key_file.read(),
+            password=password,
+        )
+    der_key = p_key.private_bytes(
+        encoding=serialization.Encoding.DER,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption())
+
+    return der_key

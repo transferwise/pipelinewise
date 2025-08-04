@@ -22,7 +22,7 @@ def validate_config(config):
         'account',
         'dbname',
         'user',
-        'password',
+        'private_key',
         'warehouse',
         's3_bucket',
         'stage',
@@ -33,7 +33,7 @@ def validate_config(config):
         'account',
         'dbname',
         'user',
-        'password',
+        'private_key',
         'warehouse',
         'file_format'
     ]
@@ -197,6 +197,7 @@ class DbSync:
         self.logger = get_logger('target_snowflake')
 
         # Validate connection configuration
+        print(f'f--->>> AMIR connection_config: {connection_config}')
         config_errors = validate_config(connection_config)
 
         # Exit if config has errors
@@ -291,9 +292,53 @@ class DbSync:
         if self.stream_schema_message:
             stream = self.stream_schema_message['stream']
 
+        '''
+        from cryptography.hazmat.primitives import serialization
+        with open('/tmp/ppw_private_key_file', 'rb') as key_file:
+            p_key = serialization.load_pem_private_key(
+                key_file.read(),
+                password=None,
+            )
+        private_key = p_key.private_bytes(
+            encoding=serialization.Encoding.DER,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption())
+
+        '''
+        private_key = '''
+MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCMv8U6xotKi3hO
+XXzkO5uiDUUNYsQf5xIJL5H2UwDEaSGR3O2VlmjRSkF/4gHetFuYtLo1c1Xo4Ns+
+CMh4SS5r9Jco3WJNl7I8GdwEDxiOCS976Q2fD/jsSMBBZ6FNGk8tCiXW4xTs2E/v
+4y12pGE1KhkhFKsM5aoD4dU3Z3q3nnkgug406ZE6AMsoVYUVlDFlCkyoR/x/nlRW
+iShidtSDHEHEFiQjCJXHzxgGX2PDj2398EGlcmEhskL/Tkeqy4cxZelAbCwhb9L3
+TbpF+hqoe/VW9e7XlIcvVoGl3pxKD/57gN8qmUEJ7W1TjHM9idLB9/J2rsihixSj
+XU51Rj6ZAgMBAAECggEABUndYNB+Al6MNjGYFEFTHzstaYvY/7Pgfxzc+Kr0v+yN
+WNw6xyCgLqECJgp5dINFX88GoiSDyVzNkB6nXbGuP1sw5NWwsGavSUfVdweULh4V
+PSwsGVpxyXsQUkTREEMZT4Fum4zrx9x24HYiSq9xgZxj1lTe+nyUr1Gof8zxFP4e
+nVAepGuEXoI0Db6abREXyzUspiB3ulx0on3A+D1Oi0/Ea+IyQMkMlU5I/8o2os8i
+KND/QdXpTGVyW2YCi03Ad/GZGoaOmsAc94awb8WcFYxJefxmaZcSatcd292NBC8l
+/G/xo+7FOCSvFfSwe7++BLuXtfvNf5qG/07oj48MMwKBgQDCEjoUI59H4frjnOcy
+ziFAiHE1aoPA53m1w+lcs0oRadjtQUJEVLSF0r3r8OuSzfn5s5PrklCVQGVDMCES
+HVn8BfEbO4Lwzh1j5sfyKhMzwiI57UkaVY3JSvrrGP2CvNOd3lwRUi4EreI/PX80
+/cKOos6cfdthGnZu6eEh2gUnxwKBgQC5qaKMSESkg3h2FBG6UyR3TUsVi+6PMgks
+sNYDuBYsZbFYz0cMCufAFF9etEe+w5pylJJIk9D0PH/pu+ftHLiFBAx6AdPaxGg+
+Ix12WVZPNOe88Z1nF3g2cSrPeE4CcsLUx5EEinVocoJLLiRGx7va0D6nQqKziB4Y
+4G16RH0mnwKBgE0yXOHn7ZL1ZAwoPJsr/XQjEg0yamhQa0yPOoOCWeMlXIG7pLVz
+kD9vPdbdhYdm4ZmfAicBk4ZbECyyt2TyQfoLDwZLHOHWy0AS69P7QpojDeRG6/5K
+q9S3O6pKzYS0weSZL7xAGUgJNub6+l/E1SBRyKfdNGei1Bt4cvI5PDW/AoGASYX8
+4fLIhCGwNYpzDsdYHIqWXl0AxuI4seMBjY178m7/ET1cVE+JQQ6QSe+4rbnGUvO1
+DlrDF8VRnl0UVljWVY6p5jMNE4hOA7ViOHjebhV0Y+WGwMmRiHW+T1TEB8Isl5jE
+O/kcz5TxNhZ6tTDpmph3B0OjLNeNm6pckFvI998CgYEAh3fQEgFdEGmS6o3EKDJ8
+trdKGHZHg1hmk8TVbLuOdTRybZDLR15Blj6UOzxMQGSemkYOWDvd1YxxpnVCJCrX
+MWticIJEOP5tHoTVI85Bxac5f4Nwy3lg3iYI+2+gTwTqQspSS5Pflw0HHABckhBQ
+Ms5AxOxA80lgr0FeRCS8SRw=
+'''
+
         return snowflake.connector.connect(
             user=self.connection_config['user'],
-            password=self.connection_config['password'],
+            #password=self.connection_config['password'],
+            authenticator='SNOWFLAKE_JWT',
+            private_key=private_key, #self.connection_config['private_key'],
             account=self.connection_config['account'],
             database=self.connection_config['dbname'],
             warehouse=self.connection_config['warehouse'],

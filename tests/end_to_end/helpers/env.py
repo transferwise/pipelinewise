@@ -168,7 +168,7 @@ class E2EEnv:
                     'ACCOUNT': {'value': os.environ.get('TARGET_SNOWFLAKE_ACCOUNT')},
                     'DBNAME': {'value': os.environ.get('TARGET_SNOWFLAKE_DBNAME')},
                     'USER': {'value': os.environ.get('TARGET_SNOWFLAKE_USER')},
-                    'PASSWORD': {'value': os.environ.get('TARGET_SNOWFLAKE_PASSWORD')},
+                    'PRIVATE_KEY': {'value': os.environ.get('TARGET_SNOWFLAKE_PRIVATE_KEY')},
                     'WAREHOUSE': {
                         'value': os.environ.get('TARGET_SNOWFLAKE_WAREHOUSE')
                     },
@@ -319,6 +319,7 @@ class E2EEnv:
         templates = glob.glob(f'{project_dir}/*.yml.template')
         for template_path in templates:
             # Replace env vars in template
+            print(f'====={template_path}')
             with open(template_path, 'r', encoding='utf-8') as f_template:
                 yaml = f_template.read()
 
@@ -425,7 +426,7 @@ class E2EEnv:
             database=self.get_conn_env_var('TARGET_SNOWFLAKE', 'DBNAME'),
             warehouse=self.get_conn_env_var('TARGET_SNOWFLAKE', 'WAREHOUSE'),
             user=self.get_conn_env_var('TARGET_SNOWFLAKE', 'USER'),
-            password=self.get_conn_env_var('TARGET_SNOWFLAKE', 'PASSWORD'),
+            private_key=self.get_conn_env_var('TARGET_SNOWFLAKE', 'PRIVATE_KEY'),
         )
 
     # -------------------------------------------------------------------------

@@ -8,6 +8,7 @@ import snowflake.connector
 
 from pymongo.database import Database
 
+from pipelinewise.utils import pem2der
 
 # pylint: disable=too-many-arguments
 def run_query_postgres(query, host, port, user, password, database):
@@ -43,7 +44,7 @@ def run_query_mysql(query, host, port, user, password, database):
     return result_rows
 
 
-def run_query_snowflake(query, account, database, warehouse, user, password):
+def run_query_snowflake(query, account, database, warehouse, user, private_key):
     """Run and SQL query in a snowflake database"""
     result_rows = []
     with snowflake.connector.connect(
@@ -51,8 +52,9 @@ def run_query_snowflake(query, account, database, warehouse, user, password):
         database=database,
         warehouse=warehouse,
         user=user,
-        password=password,
+        private_key=pem2der(private_key),
         autocommit=True,
+        authenticator='SNOWFLAKE_JWT'
     ) as conn:
         with conn.cursor() as cur:
             cur.execute(query)

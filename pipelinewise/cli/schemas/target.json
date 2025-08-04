@@ -12,7 +12,7 @@
         "user": {
           "type": "string"
         },
-        "password": {
+        "private_key": {
           "type": "string"
         },
         "warehouse": {
@@ -53,7 +53,7 @@
         "account",
         "dbname",
         "user",
-        "password",
+        "private_key",
         "warehouse",
         "s3_bucket",
         "s3_key_prefix",
