@@ -90,7 +90,7 @@ jobs:
         run: |
           cp dev-project/.env.template dev-project/.env
           echo "$TARGET_SNOWFLAKE_PRIVATE_KEY" > dev-project/snowflake.pem
-          chmod 600 snowflake.pem
+          chmod 600 dev-project/snowflake.pem
           docker compose -f dev-project/docker-compose.yml up -d
 
       - name: Wait for test containers to be ready
