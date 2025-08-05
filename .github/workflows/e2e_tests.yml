@@ -105,7 +105,7 @@ jobs:
         if: steps.check.outcome == 'failure'
         run: |
           echo "$TARGET_SNOWFLAKE_PRIVATE_KEY" > snowflake.pem
-          chmod 600 sf_key.pem
+          chmod 600 snowflake.pem
           docker exec -t \
           -v $PWD/snowflake.pem:/opt/pipelinewise/.ssh/snowflake.pem \
           -e TARGET_SNOWFLAKE_ACCOUNT=$TARGET_SNOWFLAKE_ACCOUNT \
