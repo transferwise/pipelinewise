@@ -16,6 +16,7 @@ services:
       - /opt/pipelinewise/dev-project/.virtualenvs/
       # mount pipelinewise pipe configuration directory to host for ease of troubleshooting
       - .pipelinewise:/root/.pipelinewise
+      - ./snowflake.pem:/opt/pipelinewise/.ssh/snowflake.pem
 
     # Build only when test databases are ready
     depends_on:

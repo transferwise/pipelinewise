@@ -89,6 +89,8 @@ jobs:
         if: steps.check.outcome == 'failure'
         run: |
           cp dev-project/.env.template dev-project/.env
+          echo "$TARGET_SNOWFLAKE_PRIVATE_KEY" > dev-project/snowflake.pem
+          chmod 600 snowflake.pem
           docker compose -f dev-project/docker-compose.yml up -d
 
       - name: Wait for test containers to be ready
@@ -104,10 +106,7 @@ jobs:
       - name: Run target snowflake end-to-end tests
         if: steps.check.outcome == 'failure'
         run: |
-          echo "$TARGET_SNOWFLAKE_PRIVATE_KEY" > snowflake.pem
-          chmod 600 snowflake.pem
           docker exec -t \
-          -v $PWD/snowflake.pem:/opt/pipelinewise/.ssh/snowflake.pem \
           -e TARGET_SNOWFLAKE_ACCOUNT=$TARGET_SNOWFLAKE_ACCOUNT \
           -e TARGET_SNOWFLAKE_AWS_ACCESS_KEY=$TARGET_SNOWFLAKE_AWS_ACCESS_KEY \
           -e TARGET_SNOWFLAKE_AWS_SECRET_ACCESS_KEY=$TARGET_SNOWFLAKE_AWS_SECRET_ACCESS_KEY \
