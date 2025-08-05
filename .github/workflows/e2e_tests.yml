@@ -104,13 +104,16 @@ jobs:
       - name: Run target snowflake end-to-end tests
         if: steps.check.outcome == 'failure'
         run: |
+          echo "$TARGET_SNOWFLAKE_PRIVATE_KEY" > snowflake.pem
+          chmod 600 sf_key.pem
           docker exec -t \
+          -v $PWD/snowflake.pem:/opt/pipelinewise/.ssh/snowflake.pem \
           -e TARGET_SNOWFLAKE_ACCOUNT=$TARGET_SNOWFLAKE_ACCOUNT \
           -e TARGET_SNOWFLAKE_AWS_ACCESS_KEY=$TARGET_SNOWFLAKE_AWS_ACCESS_KEY \
           -e TARGET_SNOWFLAKE_AWS_SECRET_ACCESS_KEY=$TARGET_SNOWFLAKE_AWS_SECRET_ACCESS_KEY \
           -e TARGET_SNOWFLAKE_DBNAME=$TARGET_SNOWFLAKE_DBNAME \
           -e TARGET_SNOWFLAKE_FILE_FORMAT=$TARGET_SNOWFLAKE_FILE_FORMAT \
-          -e TARGET_SNOWFLAKE_PRIVATE_KEY=$TARGET_SNOWFLAKE_PRIVATE_KEY \
+          -e TARGET_SNOWFLAKE_PRIVATE_KEY=/opt/pipelinewise/.ssh/snowflake.pem \
           -e TARGET_SNOWFLAKE_S3_BUCKET=$TARGET_SNOWFLAKE_S3_BUCKET \
           -e TARGET_SNOWFLAKE_S3_KEY_PREFIX=$TARGET_SNOWFLAKE_S3_KEY_PREFIX \
           -e TARGET_SNOWFLAKE_SCHEMA=$TARGET_SNOWFLAKE_SCHEMA \
