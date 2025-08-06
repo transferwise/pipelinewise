@@ -5,6 +5,8 @@ import re
 import time
 
 from typing import List, Dict, Union, Tuple, Set
+from cryptography.hazmat.primitives import serialization
+
 from singer import get_logger
 from target_snowflake import flattening
 from target_snowflake import stream_utils
@@ -13,8 +15,6 @@ from target_snowflake.file_format import FileFormat, FileFormatTypes
 from target_snowflake.exceptions import TooManyRecordsException, PrimaryKeyNotFoundException
 from target_snowflake.upload_clients.s3_upload_client import S3UploadClient
 from target_snowflake.upload_clients.snowflake_upload_client import SnowflakeUploadClient
-
-from pipelinewise.utils import pem2der
 
 
 def validate_config(config):
@@ -296,7 +296,7 @@ class DbSync:
         return snowflake.connector.connect(
             user=self.connection_config['user'],
             authenticator='SNOWFLAKE_JWT',
-            private_key=pem2der(self.connection_config['private_key']),
+            private_key=self._pem2der(self.connection_config['private_key']),
             account=self.connection_config['account'],
             database=self.connection_config['dbname'],
             warehouse=self.connection_config['warehouse'],
@@ -884,3 +884,17 @@ class DbSync:
                 raise exc
 
         return set(col['column_name'] for col in columns)
+
+    def _pem2der(self, pem_file: str, password: str = None) -> bytes:
+        """Convert Key PEM format to DER format"""
+        with open(pem_file, 'rb') as key_file:
+            p_key = serialization.load_pem_private_key(
+                key_file.read(),
+                password=password,
+            )
+        der_key = p_key.private_bytes(
+            encoding=serialization.Encoding.DER,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption())
+
+        return der_key
