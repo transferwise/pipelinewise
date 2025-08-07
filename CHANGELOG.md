@@ -1,3 +1,7 @@
+0.73.0 (2025-08-07)
+-------------------
+- Pair key authentication in target Snowflake
+
 0.72.3 (2025-07-28)
 -------------------
 - [HANDL-9246] Fix pagination in tap-twilio call summaries
