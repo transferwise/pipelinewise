@@ -1,6 +1,6 @@
 0.73.0 (2025-08-07)
 -------------------
-- Pair key authentication in target Snowflake 
+- Pair key authentication in target Snowflake
 
 0.72.3 (2025-07-28)
 -------------------
