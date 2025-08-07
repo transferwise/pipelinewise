@@ -15,7 +15,7 @@ db_conn:
   account: "${TARGET_SNOWFLAKE_ACCOUNT}"        # Snowflake account
   dbname: "${TARGET_SNOWFLAKE_DBNAME}"          # Snowflake database name
   user: "${TARGET_SNOWFLAKE_USER}"              # Snowflake user
-  password: "${TARGET_SNOWFLAKE_PASSWORD}"      # Plain string or vault encrypted
+  private_key: "${TARGET_SNOWFLAKE_PRIVATE_KEY}"      # Plain string or vault encrypted
   warehouse: "${TARGET_SNOWFLAKE_WAREHOUSE}"    # Snowflake virtual warehouse
 
   # We use an intermediate external stage on S3 to load data into Snowflake

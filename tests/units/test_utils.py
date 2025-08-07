@@ -1,4 +1,8 @@
 import unittest
+from tempfile import TemporaryDirectory
+
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.backends import default_backend
 
 from pipelinewise import utils
 from pipelinewise.fastsync.commons.tap_mysql import FastSyncTapMySql
@@ -182,6 +186,45 @@ class TestUtils(unittest.TestCase):
         expected_output = {'foo', 'bar', 'baz'}
         actual_output = utils.get_schemas_of_tables_set(input_tables_list)
         self.assertSetEqual(actual_output, expected_output)
+
+    def test_pem2der(self):
+        """Test pem2der function to convert PEM to DER format"""
+        with TemporaryDirectory() as temp_dir:
+            with open(f'{temp_dir}/test.pem', 'w', encoding='utf-8') as tmp_file:
+                tmp_file.write('''
+-----BEGIN PRIVATE KEY-----
+MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC0p0Ap5cnzAest
+V9NbIqVlO0WgN210Cl02qqLALdEyJT89XEI7aUc9wJjCvMGso/yBBJ4uKvLu4bx4
+2lnkC4EZICWFqSiy3rpizy1NI2tl3dNPLQHzoIe1GIli3NQYcJzgLsYBLQ9+m8Jx
+jV9VThf/PiqdRKUy56IH5Nz8DT3YRzaIIMgJTJ2N9YghcL3jYQWnHsZEGVUI7zNA
+lSp1n3fp5/um3p5zDTLkO4BuTjjFVw//14Y8vQEr7dbFycd3OblEjlHaZgZBEZ8r
+FE3bS/oQbJY/vc9nBSPqBlLNY7v34QA6zPiiKIac9aAijvKRWqXXH3z1PEGxEEV3
+WOzRU24xAgMBAAECggEADG4zuo5OupNnuMuBxhQYuGH/NPqLZAAwkMnl//5HFkG8
+276E6iyg0810VXYCh5wTDFeigL/AzpIm01QG+muWOwHcwxk0LTapMZJa5iNpSO2e
+FCUfLMHfhKUHEw/p4jKhgMWHJ16P4eDa3NBi/m4stYn0CbVG/r00h4GGeSt6FW8X
+YC0sE/Om3/VDI5ouVbci7oRyBoOi+FOa/eA4dtDnCM35y1OIzfe3ZgyN6c3i83QN
+AK92fkYh+GCz+KjvysKeHmyhNOeu2MXz37L6e2xqu0Maprzpw7d+qLVi25whOpfJ
+ufQmFh7XNYB78AgDZnYkoOA6115Fgw3dBOUlFhpAqQKBgQDgzRwfX7YPhOtKik3c
+nZL8lMiCC96dXfGsKcfkCoD/0oR6B9OgCeijbXQwmvMJdPWNUz6irc9fntlkYeIZ
+G3L9D4JHRxkA6yEp41JIzMhlFkORiuZk36Ap7Wuv2+TAzh9F95LQx9ALbIzb3QeV
+w9EpBdYp8SHysIPxIJ4BJ7HpxQKBgQDNuZ/oYPBm1H4SgqcghO8CiNIpmOXZP7iQ
+SWY/k2A3VaKoAiSeGhc6LorpZNaWEzZPy7Vnu0k+EBCJ0LVF3Sh4Tx5I/bE7d6vm
+sjyS5lPGCzqJWzMR0eObXpz9F8JRfwXcVrS/A3qb7OZfIvzSUPR2trn/neI6Q1DN
+je3CHzy1fQKBgQCdriEovIjGb/Reb45Xzcs5Ed9moI7AkRGgMho8kUWUq4Qy2GSP
+YAPnBjI2makZnAlU3OwVTZckuhZAPAxMkh1g9czq1CrsowC7EfE4kTOK/EfewbAD
+V3xPjHI5gyL8PlhfSl2Xxl/ec4CGA457dUOz450qBDJMuZWCv980bjR0BQKBgCSH
+gmpr1CQeNSiqRGzUze/gRZkXSjDyTJ5qOhqt25bXwOMeRkxAi8FMBGR/AE9zp+Ax
+Zsu9iLrZdWZTReza4VXDjrgdO/w4OrDjEzhuZ4+x7Ln5FK9kWor7GNsj/eAksvC2
+ALAuOPY48YsRFl1t/Iqb1Zka+tGnpFBrlD00+L2tAoGATRwSkDF4jbcvm58Ty24j
+wVsBi5Qa76kOlEsKtb7n4IspDw+gpIsPKXHPQsY04+tGIUIFBI71chndZZ5dU7Ro
+nqtNBAQ9eB5EUmA33zYTz93+DWnoG/Sqm/0ULLgJFKzaK1YHSf+lv6v036jp9E9R
+XXGN8+qde/d1wM7lPXDI9Jk=
+-----END PRIVATE KEY-----''')
+            try:
+                der_format = utils.pem2der(f'{temp_dir}/test.pem')
+                serialization.load_der_private_key(der_format, password=None, backend=default_backend())
+            except Exception as exp:
+                self.fail(f'Failed to convert pem to der: {exp}')
 
 
 if __name__ == '__main__':
