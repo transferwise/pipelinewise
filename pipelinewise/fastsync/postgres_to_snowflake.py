@@ -34,7 +34,7 @@ REQUIRED_CONFIG_KEYS = {
         'account',
         'dbname',
         'user',
-        'password',
+        'private_key',
         'warehouse',
         's3_bucket',
         'stage',
