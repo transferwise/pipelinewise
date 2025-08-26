@@ -1312,6 +1312,7 @@ class PipelineWise:
             utils.silentremove(cons_target_config)
             utils.silentremove(tap_properties_fastsync)
             utils.silentremove(tap_properties_singer)
+            utils.backup_state_file_to_s3(tap_state, target_config, self.target['id'])
         self._print_tap_run_summary(self.STATUS_SUCCESS, start_time, datetime.now())
 
     # pylint: disable=unused-argument

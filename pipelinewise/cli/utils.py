@@ -15,7 +15,9 @@ import warnings
 import jsonschema
 import yaml
 import shutil
+import boto3
 
+from botocore.exceptions import ClientError
 from io import StringIO
 from datetime import date, datetime
 from jinja2 import Template
@@ -581,3 +583,48 @@ def create_backup_of_the_file(original_file_path: str) -> None:
     except FileNotFoundError:
         with open(f'{original_file_path}.bak', 'w', encoding='utf-8') as tmp_file:
             tmp_file.write('ORIGINAL FILE DID NOT EXIST!')
+
+
+def backup_state_file_to_s3(state_file_path, target_config_file, target_id):
+    """
+    https://jira.trimble.tools/browse/TTLINFRA-4594
+
+    After a successfull execution, the state.json file will be copied
+    under the S3 bucket defined in the target configuration.
+
+    i.e:
+      S3 Bucket location:
+      ttl-snowflake-development-import/state_file_backup/snowflake_trueta_dev/state.json
+    """
+    try:
+        with open(target_config_file) as config_file:
+            target_config = json.load(config_file)
+
+        s3_client = None
+        use_iam_accesskeys = False
+
+        try :
+            if target_config['aws_access_key_id'] and target_config['aws_secret_access_key']:
+                use_iam_accesskeys = True
+        except:
+            pass
+
+        if use_iam_accesskeys:
+            s3_client = boto3.client(
+                service_name='s3',
+                aws_access_key_id=target_config['aws_access_key_id'],
+                aws_secret_access_key=target_config['aws_secret_access_key']
+            )
+        else:
+            s3_client = boto3.client('s3')
+
+        backup_folder = 'state_file_backup'
+        bucket_name = target_config['s3_bucket']
+        object_key = backup_folder + '/' + target_id + '/' + os.path.basename(state_file_path)
+
+        LOGGER.info(f'Uploading state.json to S3 bucket: {bucket_name}, S3 Object key: {object_key}')
+
+        s3_client.upload_file(state_file_path, bucket_name, object_key)
+
+    except ClientError as e:
+        LOGGER.error(f'Failed to upload state.json. Error:{e}')
