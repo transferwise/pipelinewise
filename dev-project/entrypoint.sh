@@ -8,7 +8,7 @@ apt-get install -y software-properties-common python3-apt apt-utils
 add-apt-repository ppa:deadsnakes/ppa
 apt-get update
 
-DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC apt-get -y install tzdata
+echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections
 
 apt-get install -y --no-install-recommends \
   wget \
