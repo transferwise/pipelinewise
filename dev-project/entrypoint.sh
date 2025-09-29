@@ -3,7 +3,7 @@
 set -e
 
 apt-get update
-apt-get install -y software-properties-common python3-apt
+apt-get install -y software-properties-common python3-apt apt-utils
 
 add-apt-repository ppa:deadsnakes/ppa
 apt-get update
