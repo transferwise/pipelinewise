@@ -34,6 +34,7 @@ services:
     build:
       context: ./pg
       dockerfile: Dockerfile
+      network: host
     container_name: pipelinewise_dev_postgres_source
     volumes:
       - ./pg/pg_hba.conf:/var/lib/postgresql/pg_hba.conf
