@@ -2,19 +2,15 @@
 
 set -e
 
-apt update
+apt-get update
+apt-get install -y software-properties-common python3-apt apt-utils
 
-rm -f /usr/bin/python3
-ln -s /usr/bin/python3.8 /usr/bin/python3
-
-apt install -y software-properties-common python3-apt
 add-apt-repository ppa:deadsnakes/ppa
-apt update
+apt-get update
 
+echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections
 
-DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC apt-get -y install tzdata
-
-apt install -y --no-install-recommends \
+apt-get install -y --no-install-recommends \
   wget \
   gnupg \
   git \
@@ -29,15 +25,14 @@ apt install -y --no-install-recommends \
 rm /usr/bin/python3
 ln -s /usr/bin/python3.10 /usr/bin/python3
 
-apt upgrade -y
-# rm -rf /var/lib/apt/lists/* \
+apt-get upgrade -y
 
 # Do a bunch of Mongo things
-wget -q --no-check-certificate https://downloads.mongodb.com/compass/mongodb-mongosh_2.2.9_amd64.deb
-apt install ./mongodb-mongosh_2.2.9_amd64.deb
+wget -q https://downloads.mongodb.com/compass/mongodb-mongosh_2.2.9_amd64.deb
+apt-get install ./mongodb-mongosh_2.2.9_amd64.deb
 rm -f mongodb-mongosh_2.2.9_amd64.deb
-wget -q --no-check-certificate https://fastdl.mongodb.org/tools/db/mongodb-database-tools-ubuntu2004-x86_64-100.9.5.deb
-apt install ./mongodb-database-tools-ubuntu2004-x86_64-100.9.5.deb
+wget -q https://fastdl.mongodb.org/tools/db/mongodb-database-tools-ubuntu2004-x86_64-100.9.5.deb
+apt-get install ./mongodb-database-tools-ubuntu2004-x86_64-100.9.5.deb
 rm -f mongodb-database-tools-ubuntu2004-x86_64-100.9.5.deb
 
 dev-project/mongo/initiate-replica-set.sh
