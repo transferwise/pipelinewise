@@ -212,7 +212,7 @@ def row_to_singer_record(catalog_entry, version, db_column_map, row, time_extrac
                 # https://github.com/noplay/python-mysql-replication/blob/master/pymysqlreplication/row_event.py#L143
                 # -L145
                 timezone = tzlocal.get_localzone()
-                local_datetime = timezone.localize(val)
+                local_datetime = datetime.datetime.fromtimestamp(val.timestamp(), tz=timezone)
                 utc_datetime = local_datetime.astimezone(pytz.UTC)
                 row_to_persist[column_name] = utc_datetime.isoformat()
             else:

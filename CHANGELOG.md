@@ -1,3 +1,7 @@
+0.73.1 (2025-09-16)
+-------------------
+- Bump tap-jira version 
+
 0.73.0 (2025-08-07)
 -------------------
 - Pair key authentication in target Snowflake
