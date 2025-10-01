@@ -1,4 +1,4 @@
-{
+{   "switch_over_data_file": "/tmp/switch_over_test.json",
     "targets": [
         {
             "id": "target_foo",
@@ -11,6 +11,10 @@
                 {
                     "id": "tap_bar",
                     "type": "tap-bar"
+                },
+                {
+                    "id": "tap_mysql",
+                    "type": "tap-mysql"
                 }
             ]
         }

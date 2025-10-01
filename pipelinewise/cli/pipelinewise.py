@@ -1866,13 +1866,40 @@ class PipelineWise:
 
     def reset_state(self):
         """Reset state file"""
-
         if self.tap.get('type') == 'tap-postgres':
-            self._update_state_file('lsn', 1)
-            self.logger.info('state file is reset for log based tables!')
+            state_items_to_update = [('lsn', 1), ]
+        elif self.tap.get('type') == 'tap-mysql':
+            state_items_to_update = self._get_data_from_switchover_file()
         else:
             self.logger.error('state reset is available only for PostgreSQL taps!')
             raise SystemExit(1)
+
+        for state_item in state_items_to_update:
+            self._update_state_file(state_item[0], state_item[1])
+            self.logger.info('state file is reset for log based tables!')
+
+    def _get_data_from_switchover_file(self):
+        new_log_file = None
+        new_log_pos = None
+        database_url = None
+        try:
+            with open(self.tap['files']['config'], 'r', encoding='utf-8') as tap_config_file:
+                tap_config_content = json.load(tap_config_file)
+                database_url = tap_config_content['host']
+
+            with open(self.config.get('switch_over_data_file'), 'r', encoding='utf-8') as switchover_file:
+                switchover_content = json.load(switchover_file)
+                new_log_file = switchover_content.get(database_url, {}).get('new_binlog_filename')
+                new_log_pos = switchover_content.get(database_url, {}).get('new_binlog_position')
+
+        except Exception as exp:
+            self.logger.error(str(exp))
+
+        if new_log_file and new_log_pos:
+            return [('log_file', new_log_file), ('log_pos', int(new_log_pos))]
+
+        self.logger.error('There is no data for switchover %s!', self.tap['id'])
+        raise SystemExit(1)
 
     def _update_state_file(self, table_property, new_value):
         tap_state = self.tap['files']['state']
