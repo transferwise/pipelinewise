@@ -350,6 +350,10 @@ This tap:
 - Replication strategy: INCREMENTAL
 - Transformations: none
 
+[call_summaries] (https://www.twilio.com/docs/voice/voice-insights/api/call/call-summaries-resource)
+- Endpoint: https://insights.twilio.com/v1/Voice/Summaries
+- Replication strategy: INCREMENTAL
+- Transformations: none
 
 ## Authentication
 This tap authenticates to the Twilio API using Basic Auth.

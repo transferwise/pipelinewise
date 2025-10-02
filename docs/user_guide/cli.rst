@@ -138,7 +138,7 @@ Validates a project directory with YAML tap and target files.
 reset_state
 """""""""""
 
-Reset state file for log based tables. It works only for PostgresSQL databases!
+Reset state file for log based tables. It works only for PostgresSQL and MySQL databases!
 
 :--target: Target connector id
 
@@ -146,9 +146,35 @@ Reset state file for log based tables. It works only for PostgresSQL databases!
 
 .. _cli_reset_state:
 
+for MySQL, it needs a json file contains of switchover data same as below format:
 
-Environment variables
----------------------
+.. code-block:: JSON
+
+   {
+     "new_url_of_the_source_database": {
+       "old_identifier": "old_identifier_of_source_db",
+       "new_identifier": "new_identifier_of_source_db",
+       "old_host": "old_url_of_the_source_database",
+       "new_host": "new_url_of_the_source_database",
+       "engine": "mariadb",
+       "switchover_utc_timestamp": "2025-04-03 12:13:14+00:00",
+       "old_binlog_filename": "old_mysql-bin.000001",
+       "old_binlog_position": 1,
+       "new_binlog_filename": "new_mysql-bin.000002",
+       "new_binlog_position": 500
+     }
+   }
+
+
+.. attention::
+
+   The filename for switchover data can be added in the `config.yml`:
+
+   .. code-block:: yaml
+
+       "switch_over_data_file": "switch_over_data_json_file"
+
+
 
 `PIPELINEWISE_HOME`
 """""""""""""""""""

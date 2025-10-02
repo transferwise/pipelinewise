@@ -97,7 +97,7 @@ Example YAML for target-snowflake:
       account: "rtxxxxx.eu-central-1"               # Snowflake account
       dbname: "<DB_NAME>"                           # Snowflake database name
       user: "<USER>"                                # Snowflake user
-      password: "<PASSWORD>"                        # Plain string or vault encrypted
+      private_key: "<private_key_path>"             # File contains PEM forrmat for connecting to Snowflake
       warehouse: "<WAREHOUSE>"                      # Snowflake virtual warehouse
 
       # We use an external stage on S3 to load data into Snowflake

@@ -2,7 +2,7 @@ services:
   ### Primary container with PipelineWise CLI
   pipelinewise:
     platform: linux/amd64
-    image: ubuntu:20.04
+    image: ubuntu:22.04
     container_name: pipelinewise_dev
     working_dir: /opt/pipelinewise
     entrypoint: /opt/pipelinewise/dev-project/entrypoint.sh
@@ -16,6 +16,7 @@ services:
       - /opt/pipelinewise/dev-project/.virtualenvs/
       # mount pipelinewise pipe configuration directory to host for ease of troubleshooting
       - .pipelinewise:/root/.pipelinewise
+      - ./snowflake.pem:/opt/pipelinewise/.ssh/snowflake.pem
 
     # Build only when test databases are ready
     depends_on:
@@ -33,6 +34,7 @@ services:
     build:
       context: ./pg
       dockerfile: Dockerfile
+      network: host
     container_name: pipelinewise_dev_postgres_source
     volumes:
       - ./pg/pg_hba.conf:/var/lib/postgresql/pg_hba.conf

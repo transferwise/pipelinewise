@@ -17,7 +17,7 @@ def get_db_config():
     config['account'] = os.environ.get('TARGET_SNOWFLAKE_ACCOUNT')
     config['dbname'] = os.environ.get('TARGET_SNOWFLAKE_DBNAME')
     config['user'] = os.environ.get('TARGET_SNOWFLAKE_USER')
-    config['password'] = os.environ.get('TARGET_SNOWFLAKE_PASSWORD')
+    config['private_key'] = os.environ.get('TARGET_SNOWFLAKE_PRIVATE_KEY')
     config['warehouse'] = os.environ.get('TARGET_SNOWFLAKE_WAREHOUSE')
     config['default_target_schema'] = os.environ.get("TARGET_SNOWFLAKE_SCHEMA")
     config['stage'] = os.environ.get("TARGET_SNOWFLAKE_STAGE")
