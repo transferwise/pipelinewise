@@ -71,7 +71,7 @@ def class_to_string(key_value: Any, key_type: str) -> str:
     if key_type == 'datetime':
         if key_value.tzinfo is None:
             timezone = tzlocal.get_localzone()
-            local_datetime = timezone.localize(key_value)
+            local_datetime = datetime.datetime.fromtimestamp(key_value.timestamp(), tz=timezone)
             utc_datetime = local_datetime.astimezone(pytz.UTC)
         else:
             utc_datetime = key_value.astimezone(pytz.UTC)
@@ -133,7 +133,7 @@ def safe_transform_datetime(value: datetime.datetime, path):
     """
     timezone = tzlocal.get_localzone()
     try:
-        local_datetime = timezone.localize(value)
+        local_datetime = datetime.datetime.fromtimestamp(value.timestamp(), tz=timezone)
         utc_datetime = local_datetime.astimezone(pytz.UTC)
     except Exception as ex:
         if str(ex) == "year is out of range" and value.year == 0:

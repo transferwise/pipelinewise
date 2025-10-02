@@ -10,6 +10,7 @@ from snowflake.connector.storage_client import SnowflakeFileEncryptionMaterial
 
 from . import utils
 from .transform_utils import TransformationHelper, SQLFlavor
+from pipelinewise.utils import pem2der
 
 LOGGER = logging.getLogger(__name__)
 
@@ -81,10 +82,11 @@ class FastSyncTargetSnowflake:
     def open_connection(self, query_tag_props=None):
         return snowflake.connector.connect(
             user=self.connection_config['user'],
-            password=self.connection_config['password'],
+            private_key=pem2der(self.connection_config['private_key']),
             account=self.connection_config['account'],
             database=self.connection_config['dbname'],
             warehouse=self.connection_config['warehouse'],
+            authenticator='SNOWFLAKE_JWT',
             autocommit=True,
             session_parameters={
                 # Quoted identifiers should be case sensitive

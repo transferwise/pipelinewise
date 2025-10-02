@@ -157,10 +157,8 @@ ifeq ($(pw_connector),)
 	@echo "use -e pw_connector=connector1,connector2,...."
 	@exit 1
 endif
-	$(eval space:= )
-	$(eval space+= )
-	$(eval comma:=,)
-	$(eval connectors_list:=$(subst $(comma),$(space),$(pw_connector)))
+	$(eval comma := ,)
+	$(eval connectors_list := $(strip $(subst $(comma), ,$(pw_connector))))
 
 	@$(foreach var,$(connectors_list), $(call install_connectors,$(var));)
 	$(call print_execute_time,Connectors)

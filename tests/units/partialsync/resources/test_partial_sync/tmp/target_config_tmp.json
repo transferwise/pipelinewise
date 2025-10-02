@@ -14,7 +14,7 @@
     "hard_delete": true,
     "parallelism": 0,
     "parallelism_max": 4,
-    "password": "FOOPASS",
+    "private_key": "FOOKEY",
     "primary_key_required": true,
     "query_tag": "{\"ppw_component\": \"tap-mysql\", \"tap_id\": \"test_tap\", \"database\": \"{{database}}\", \"schema\": \"{{schema}}\", \"table\": \"{{table}}\"}",
     "s3_bucket": "test-ap-01",
