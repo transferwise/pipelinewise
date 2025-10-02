@@ -7,7 +7,7 @@ db_conn:
   account: "account"
   dbname: "foo_db"
   user: "user"
-  password: "secret"
+  private_key: "private_key_path"
   warehouse: "MY_WAREHOUSE"
   s3_bucket: "s3_bucket"
   s3_key_prefix: "s3_prefix/"

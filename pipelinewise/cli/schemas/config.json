@@ -51,6 +51,9 @@
         }
       },
       "required": ["table_mb"]
+    },
+    "switch_over_data_file": {
+      "type": "string"
     }
   },
   "required": [],
