@@ -265,9 +265,9 @@ class TestTypeMapping(unittest.TestCase):
                 formatted_record = singer.messages.format_message(record_message)
 
                 # Reload the generated JSON to object and assert keys
-                self.assertEquals(json.loads(formatted_record)['type'], 'RECORD')
-                self.assertEquals(json.loads(formatted_record)['stream'], 'TEST_TYPE_MAPPING')
-                self.assertEquals(json.loads(formatted_record)['record'],
+                self.assertEqual(json.loads(formatted_record)['type'], 'RECORD')
+                self.assertEqual(json.loads(formatted_record)['stream'], 'TEST_TYPE_MAPPING')
+                self.assertEqual(json.loads(formatted_record)['record'],
                                   {
                                       'C_PK': 1,
                                       'C_DECIMAL': 12345,
