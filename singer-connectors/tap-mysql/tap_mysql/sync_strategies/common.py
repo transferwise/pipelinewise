@@ -103,7 +103,10 @@ def row_to_singer_record(catalog_entry, version, row, columns, time_extracted):
 
         elif isinstance(elem, datetime.timedelta):
             if property_format == 'time':
-                row_to_persist += (str(elem),) # this should convert time column into 'HH:MM:SS' formatted string
+                _total_seconds = int(elem.total_seconds())
+                _hours, _remainder = divmod(_total_seconds, 3600)
+                _minutes, _seconds = divmod(_remainder, 60)
+                row_to_persist += (f"{_hours:02}:{_minutes:02}:{_seconds:02}",) # this should convert time column into 'HH:MM:SS' formatted string
             else:
                 epoch = datetime.datetime.utcfromtimestamp(0)
                 timedelta_from_epoch = epoch + elem
