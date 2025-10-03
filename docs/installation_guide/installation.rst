@@ -58,7 +58,7 @@ executable Docker image:
 
 
 Building the image may take 5-10 minutes depending on your network connection. The output image will
-contain every supported Singer connector. Alternatively, see [Official Docker Images](https://github.com/transferwise/pipelinewise?tab=readme-ov-file#official-docker-images)
+contain every supported Singer connector. Alternatively, see `Official Docker Images <https://github.com/transferwise/pipelinewise?tab=readme-ov-file#official-docker-images>`_
 to pull a pre-built image. 
 
 Once the image is ready, create an alias to the Docker wrapper script so you can
