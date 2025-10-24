@@ -1,0 +1,89 @@
+---
+# ------------------------------------------------------------------------------
+# Tap: MySQL -> Target: Iceberg on S3
+# Full pipeline configuration example
+# ------------------------------------------------------------------------------
+
+# Connection and output information
+id: 'mysql_to_iceberg'
+name: 'MySQL to Iceberg Data Lake'
+type: 'tap-mysql'
+owner: 'data-engineering@example.com'
+
+# Target connection - must match target ID
+target: 'iceberg_s3'
+
+# MySQL Source Connection
+db_conn:
+  host: 'mysql.example.com'
+  port: 3306
+  user: 'replication_user'
+  password: 'secure_password'
+  dbname: 'production_db'
+
+  # Optional: Configure SSL
+  # ssl: 'true'
+  # ssl_ca: '/path/to/ca.pem'
+
+  # Server ID for binlog replication
+  # Must be unique across all MySQL clients
+  server_id: 12345
+
+  # Filter binlog events
+  log_based_method: 'LOG_BASED'
+
+# Schema and table selection
+schemas:
+  - source_schema: 'public'
+    target_schema: 'mysql_production'
+
+    # Tables to replicate
+    tables:
+      # User events table with partitioning
+      - table_name: 'user_events'
+        replication_method: 'LOG_BASED'  # CDC using MySQL binlog
+
+        # Partition by date columns for better query performance
+        partition_columns:
+          - 'year'
+          - 'month'
+
+        # Optional: Transform/mask sensitive data
+        transformations:
+          - column: 'email'
+            type: 'MASK-HIDDEN'
+          - column: 'ip_address'
+            type: 'MASK-HIDDEN'
+
+      # Orders table with incremental sync
+      - table_name: 'orders'
+        replication_method: 'INCREMENTAL'
+        replication_key: 'updated_at'
+
+        # Select specific columns (optional)
+        # If not specified, all columns are synced
+        # select_columns:
+        #   - 'id'
+        #   - 'customer_id'
+        #   - 'order_date'
+        #   - 'total_amount'
+        #   - 'status'
+
+      # Products table with full table sync
+      - table_name: 'products'
+        replication_method: 'FULL_TABLE'
+
+      # Large fact table - FastSync will be used automatically
+      - table_name: 'transactions'
+        replication_method: 'LOG_BASED'
+        partition_columns:
+          - 'transaction_date'
+
+# Tap-specific settings
+tap_settings:
+  # How often to check for new data (in seconds)
+  # 0 = run once
+  interval: 0
+
+  # Catalog caching for faster discovery
+  use_catalog_cache: true

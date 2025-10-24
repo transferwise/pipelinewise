@@ -1,0 +1,13 @@
+{
+  "aws_region": "us-east-1",
+  "s3_bucket": "my-data-lake-bucket",
+  "s3_key_prefix": "iceberg-warehouse/",
+  "glue_catalog_id": "123456789012",
+  "default_target_schema": "analytics",
+  "compression_method": "snappy",
+  "parquet_row_group_size": 100000,
+  "batch_size_rows": 100000,
+  "add_metadata_columns": true,
+  "hard_delete": false,
+  "_comment": "When aws_access_key_id is not provided, the target will use IAM role or instance profile credentials"
+}

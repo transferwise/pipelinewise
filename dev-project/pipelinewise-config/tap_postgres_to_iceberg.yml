@@ -1,0 +1,158 @@
+---
+# ------------------------------------------------------------------------------
+# General Properties
+# Doc: https://transferwise.github.io/pipelinewise/connectors/taps/postgres.html
+# ------------------------------------------------------------------------------
+id: "postgres_to_iceberg"                    # Unique identifier of the tap
+name: "Postgres to Iceberg Data Lake"        # Name of the tap
+type: "tap-postgres"                         # !! THIS SHOULD NOT CHANGE !!
+owner: "data-engineering@example.com"        # Data owner to contact
+
+
+# ------------------------------------------------------------------------------
+# Source (Tap) - PostgreSQL connection details
+# ------------------------------------------------------------------------------
+db_conn:
+  host: "db_postgres_source"                 # PostgreSQL host
+  port: 5432                                 # PostgreSQL port
+  user: "pipelinewise"                       # PostgreSQL user
+  password: "secret"                         # Plain string or vault encrypted
+  dbname: "postgres_source_db"               # PostgreSQL database name
+  #filter_schemas: "schema1,schema2"         # Optional: Scan only required schemas
+
+
+# ------------------------------------------------------------------------------
+# Destination (Target) - Target properties
+# Connection details should be in the relevant target YAML file
+# ------------------------------------------------------------------------------
+target: "iceberg_s3_snowflake"               # ID of the target connector (must match target_iceberg.yml)
+batch_size_rows: 100000                      # Batch size for the stream to optimize load performance
+stream_buffer_size: 0                        # In-memory buffer size (MB) between taps and targets
+flush_all_streams: false                     # Flush all streams if any stream reaches batch_size_rows
+
+
+# ------------------------------------------------------------------------------
+# Source to target Schema mapping
+# ------------------------------------------------------------------------------
+schemas:
+
+  ### SOURCE SCHEMA 1: public - Analytics Events
+  - source_schema: "public"                  # Source schema in PostgreSQL
+    target_schema: "postgres_analytics"      # Target schema in Iceberg/Snowflake
+
+    # List of tables to replicate to Iceberg Data Lake
+    tables:
+
+      ### City table with INCREMENTAL replication
+      - table_name: "city"
+        replication_method: "INCREMENTAL"
+        replication_key: "id"
+
+        # Optional: Partition by ID ranges for better query performance
+        # Note: Partitioning is configured at the target level
+        # partition_columns:
+        #   - "id"
+
+      ### Country reference data with FULL_TABLE replication
+      - table_name: "country"
+        replication_method: "FULL_TABLE"
+
+        # Reference data typically doesn't need partitioning
+
+      ### Events table with time-based partitioning
+      # This demonstrates partitioning for time-series data
+      # Uncomment if you have a table with date columns
+      # - table_name: "events"
+      #   replication_method: "INCREMENTAL"
+      #   replication_key: "updated_at"
+      #
+      #   # Partition by date for efficient time-based queries
+      #   partition_columns:
+      #     - "year"
+      #     - "month"
+
+      ### Table with no primary key
+      - table_name: "no_pk_table"
+        replication_method: "FULL_TABLE"
+
+      ### Table with reserved words and special characters
+      - table_name: "edgydata"
+        replication_method: "INCREMENTAL"
+        replication_key: "cid"
+
+      ### Orders table with potential PII data masking
+      - table_name: "order"
+        replication_method: "INCREMENTAL"
+        replication_key: "id"
+
+        # Optional: Transform/mask sensitive data before loading to data lake
+        # transformations:
+        #   - column: "customer_email"
+        #     type: "MASK-HIDDEN"
+        #   - column: "customer_phone"
+        #     type: "MASK-HIDDEN"
+
+      ### Table with space and mixed case
+      - table_name: "table_with_space and UPPERCase"
+        replication_method: "FULL_TABLE"
+
+      ### Table with reserved words
+      - table_name: "table_with_reserved_words"
+        replication_method: "FULL_TABLE"
+
+
+  ### SOURCE SCHEMA 2: public2 - Additional tables
+  - source_schema: "public2"
+    target_schema: "postgres_public2"
+
+    tables:
+      ### Simple FULL_TABLE replication
+      - table_name: "wearehere"
+        replication_method: "FULL_TABLE"
+
+      ### Table with INCREMENTAL replication
+      - table_name: "public2_edgydata"
+        replication_method: "INCREMENTAL"
+        replication_key: "cid"
+
+
+# ------------------------------------------------------------------------------
+# Notes on Replication Methods
+# ------------------------------------------------------------------------------
+# INCREMENTAL: Uses replication_key to track changes (e.g., updated_at, id)
+#              Good for tables with timestamp or auto-increment columns
+#
+# FULL_TABLE:  Complete table refresh on each sync
+#              Good for small reference/dimension tables
+#
+# LOG_BASED:   Uses PostgreSQL WAL for CDC (Change Data Capture)
+#              Requires wal2json plugin and PostgreSQL configuration
+#              Best for capturing all changes including deletes
+#              Not included in this example - see tap_postgres_logical.yml
+
+
+# ------------------------------------------------------------------------------
+# Iceberg Table Format
+# ------------------------------------------------------------------------------
+# All tables will be written to Iceberg format on S3 with:
+#   - Copy-on-Write (CoW) format for Snowflake compatibility
+#   - Parquet file format with Snappy compression
+#   - AWS Glue Catalog for metadata management
+#   - Optional partitioning based on partition_columns
+#
+# If Snowflake integration is enabled in target_iceberg.yml, external Iceberg
+# tables will be automatically created in Snowflake for querying.
+
+
+# ------------------------------------------------------------------------------
+# Query Data in Snowflake (if integration enabled)
+# ------------------------------------------------------------------------------
+# Once the pipeline runs, query data directly in Snowflake:
+#
+#   USE DATABASE ANALYTICS_DB;
+#   SELECT * FROM postgres_analytics.city LIMIT 100;
+#   SELECT * FROM postgres_analytics.country;
+#
+# Or query via AWS Athena:
+#
+#   SELECT * FROM analytics.postgres_analytics_city LIMIT 100;

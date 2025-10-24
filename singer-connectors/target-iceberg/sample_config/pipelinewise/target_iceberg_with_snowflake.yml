@@ -1,0 +1,49 @@
+---
+# ------------------------------------------------------------------------------
+# Target: Apache Iceberg on S3 with Snowflake Integration
+# ------------------------------------------------------------------------------
+id: 'iceberg_s3_snowflake'
+name: 'Iceberg Data Lake with Snowflake External Tables'
+type: 'target-iceberg'
+
+# Connection details for Iceberg on S3 with AWS Glue Catalog
+db_conn:
+  # AWS Credentials
+  aws_access_key_id: 'AKIAIOSFODNN7EXAMPLE'
+  aws_secret_access_key: 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY'
+  aws_region: 'us-east-1'
+
+  # S3 Configuration
+  s3_bucket: 'my-data-lake-bucket'
+  s3_key_prefix: 'iceberg-warehouse/'
+
+  # AWS Glue Catalog
+  glue_catalog_id: '123456789012'
+
+  # Default schema/database name
+  default_target_schema: 'analytics'
+
+  # Parquet Configuration
+  compression_method: 'snappy'
+  parquet_row_group_size: 100000
+
+  # Performance tuning
+  batch_size_rows: 100000
+  add_metadata_columns: true
+  hard_delete: false
+
+  # Snowflake Integration
+  # Automatically creates external Iceberg tables in Snowflake
+  snowflake_integration:
+    enabled: true
+    account: 'xy12345.us-east-1'  # Your Snowflake account identifier
+    user: 'ICEBERG_USER'
+    password: 'your_secure_password'
+    database: 'ANALYTICS_DB'
+    warehouse: 'COMPUTE_WH'
+    role: 'ACCOUNTADMIN'
+
+    # Snowflake Iceberg Configuration
+    # These must be pre-configured in Snowflake
+    external_volume: 'iceberg_external_volume'  # External volume pointing to S3
+    catalog_integration: 'glue_catalog_integration'  # Catalog integration for Glue

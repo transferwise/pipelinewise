@@ -1,0 +1,69 @@
+---
+
+# ------------------------------------------------------------------------------
+# General Properties
+# ------------------------------------------------------------------------------
+id: "iceberg_s3_snowflake"                    # Unique identifier of the target
+name: "Iceberg Data Lake with Snowflake"      # Name of the target
+type: "target-iceberg"                        # !! THIS SHOULD NOT CHANGE !!
+
+
+# ------------------------------------------------------------------------------
+# Target - Iceberg on S3 with AWS Glue Catalog connection details
+# ------------------------------------------------------------------------------
+db_conn:
+  # AWS Configuration
+  # Use IAM role credentials (recommended for production)
+  # Or uncomment the lines below to use access keys
+  # aws_access_key_id: "YOUR_AWS_ACCESS_KEY"
+  # aws_secret_access_key: "YOUR_AWS_SECRET_KEY"
+  # aws_session_token: "YOUR_SESSION_TOKEN"  # Optional: for temporary credentials
+
+  aws_region: "us-east-1"                     # AWS region for S3 and Glue
+
+  # S3 Configuration
+  s3_bucket: "my-data-lake-bucket"            # S3 bucket for Iceberg data files
+  s3_key_prefix: "iceberg-warehouse/"         # Prefix for S3 keys (must end with /)
+
+  # AWS Glue Catalog
+  glue_catalog_id: "123456789012"             # AWS Glue Catalog ID (your AWS account ID)
+
+  # Default schema/database name
+  default_target_schema: "analytics"          # Default database/namespace for tables
+
+  # Parquet Configuration
+  compression_method: "snappy"                # Parquet compression: none, snappy, gzip, zstd
+  parquet_row_group_size: 100000              # Number of rows per Parquet row group
+
+  # Performance Tuning
+  batch_size_rows: 100000                     # Batch size for inserts
+  flush_all_streams: false                    # Flush all streams when any stream reaches batch_size
+  parallelism: 0                              # Number of parallel workers (0 = auto-detect)
+  max_parallelism: 16                         # Maximum number of parallel workers
+
+  # Metadata and Data Handling
+  add_metadata_columns: true                  # Add _sdc metadata columns
+  hard_delete: false                          # Perform hard deletes instead of soft deletes
+  data_flattening_max_level: 0                # Max nesting level for JSON flattening (0 = no flattening)
+
+  # Snowflake Integration
+  # Enable automatic creation of Snowflake external Iceberg tables
+  # Requires External Volume and Catalog Integration to be pre-configured in Snowflake
+  snowflake_integration:
+    enabled: true                             # Enable Snowflake integration
+    account: "xy12345.us-east-1"              # Snowflake account identifier (e.g., xy12345.us-east-1)
+    user: "ICEBERG_USER"                      # Snowflake user with CREATE TABLE privileges
+    password: "your_secure_password"          # Snowflake password (use vault encryption in production)
+    database: "ANALYTICS_DB"                  # Snowflake database name
+    warehouse: "COMPUTE_WH"                   # Snowflake warehouse (optional)
+    role: "ACCOUNTADMIN"                      # Snowflake role (optional)
+
+    # Snowflake Iceberg Configuration (must be pre-configured)
+    external_volume: "iceberg_external_volume"      # External volume pointing to S3
+    catalog_integration: "glue_catalog_integration" # Catalog integration for AWS Glue
+
+  # Table Properties (automatically set - Copy-on-Write format for Snowflake)
+  # All Iceberg tables are created with these properties:
+  #   write.format.default=parquet
+  #   write.delete.mode=copy-on-write
+  #   format-version=2

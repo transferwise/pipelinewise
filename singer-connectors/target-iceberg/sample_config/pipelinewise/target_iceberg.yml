@@ -1,0 +1,39 @@
+---
+# ------------------------------------------------------------------------------
+# Target: Apache Iceberg on S3 (Basic Configuration)
+# ------------------------------------------------------------------------------
+id: 'iceberg_s3'
+name: 'Iceberg Data Lake on S3'
+type: 'target-iceberg'
+
+# Connection details for Iceberg on S3 with AWS Glue Catalog
+db_conn:
+  # AWS Credentials (or use IAM role)
+  aws_access_key_id: 'AKIAIOSFODNN7EXAMPLE'
+  aws_secret_access_key: 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY'
+  aws_region: 'us-east-1'
+
+  # S3 Configuration
+  s3_bucket: 'my-data-lake-bucket'
+  s3_key_prefix: 'iceberg-warehouse/'
+
+  # AWS Glue Catalog
+  glue_catalog_id: '123456789012'  # Your AWS Account ID
+
+  # Default schema/database name
+  default_target_schema: 'analytics'
+
+  # Parquet Configuration
+  compression_method: 'snappy'  # Options: none, snappy, gzip, zstd
+  parquet_row_group_size: 100000
+
+  # Performance tuning
+  batch_size_rows: 100000
+  flush_all_streams: false
+  parallelism: 0  # 0 = auto-detect
+  max_parallelism: 16
+
+  # Metadata and data handling
+  add_metadata_columns: true
+  hard_delete: false
+  data_flattening_max_level: 0

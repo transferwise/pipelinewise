@@ -1,0 +1,79 @@
+---
+# ------------------------------------------------------------------------------
+# Tap: PostgreSQL -> Target: Iceberg on S3
+# Full pipeline configuration example
+# ------------------------------------------------------------------------------
+
+id: 'postgres_to_iceberg'
+name: 'PostgreSQL to Iceberg Data Lake'
+type: 'tap-postgres'
+owner: 'data-engineering@example.com'
+
+# Target connection - must match target ID
+target: 'iceberg_s3'
+
+# PostgreSQL Source Connection
+db_conn:
+  host: 'postgres.example.com'
+  port: 5432
+  user: 'replication_user'
+  password: 'secure_password'
+  dbname: 'production_db'
+
+  # Optional: SSL configuration
+  # ssl: 'true'
+  # sslmode: 'require'
+
+  # For LOG_BASED replication
+  # Requires logical replication to be enabled in PostgreSQL
+  logical_poll_total_seconds: 10800  # 3 hours
+  break_at_end_lsn: true
+
+# Schema and table selection
+schemas:
+  - source_schema: 'public'
+    target_schema: 'postgres_production'
+
+    tables:
+      # Analytics events with time-based partitioning
+      - table_name: 'analytics_events'
+        replication_method: 'LOG_BASED'  # CDC using PostgreSQL WAL
+
+        # Partition by date for time-series data
+        partition_columns:
+          - 'event_date'
+
+      # Users table with incremental sync
+      - table_name: 'users'
+        replication_method: 'INCREMENTAL'
+        replication_key: 'updated_at'
+
+        # Data masking for PII
+        transformations:
+          - column: 'email'
+            type: 'MASK-HIDDEN'
+          - column: 'phone_number'
+            type: 'MASK-HIDDEN'
+          - column: 'ssn'
+            type: 'MASK-HIDDEN'
+
+      # Reference data with full refresh
+      - table_name: 'product_categories'
+        replication_method: 'FULL_TABLE'
+
+      # Large dimensional table
+      - table_name: 'customer_interactions'
+        replication_method: 'LOG_BASED'
+        partition_columns:
+          - 'year'
+          - 'month'
+
+# Tap-specific settings
+tap_settings:
+  # Maximum number of rows per stream
+  # Helps manage memory for large tables
+  max_run_seconds: 43200  # 12 hours
+
+  # Use logical replication
+  # Requires wal_level = logical in postgresql.conf
+  use_log_based_replication: true
