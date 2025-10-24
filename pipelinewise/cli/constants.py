@@ -29,5 +29,6 @@ class ConnectorType(enum.Enum):
     TARGET_SNOWFLAKE = 'target-snowflake'
     TARGET_REDSHIFT = 'target-redshift'
     TARGET_S3_CSV = 'target-s3-csv'
+    TARGET_ICEBERG = 'target-iceberg'
 
     TRANSFORM_FIELD = 'transform-field'

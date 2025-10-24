@@ -64,8 +64,12 @@ setup(name='pipelinewise',
               'postgres-to-postgres=pipelinewise.fastsync.postgres_to_postgres:main',
               'mongodb-to-snowflake=pipelinewise.fastsync.mongodb_to_snowflake:main',
               'mongodb-to-postgres=pipelinewise.fastsync.mongodb_to_postgres:main',
+              'mysql-to-iceberg=pipelinewise.fastsync.mysql_to_iceberg:main',
+              'postgres-to-iceberg=pipelinewise.fastsync.postgres_to_iceberg:main',
               'partial-mysql-to-snowflake=pipelinewise.fastsync.partialsync.mysql_to_snowflake:main',
-              'partial-postgres-to-snowflake=pipelinewise.fastsync.partialsync.postgres_to_snowflake:main'
+              'partial-postgres-to-snowflake=pipelinewise.fastsync.partialsync.postgres_to_snowflake:main',
+              'partial-mysql-to-iceberg=pipelinewise.fastsync.partialsync.mysql_to_iceberg:main',
+              'partial-postgres-to-iceberg=pipelinewise.fastsync.partialsync.postgres_to_iceberg:main'
           ]
       },
       packages=find_packages(exclude=['tests*']),

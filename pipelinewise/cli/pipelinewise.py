@@ -40,12 +40,14 @@ FASTSYNC_PAIRS = {
         ConnectorType.TARGET_REDSHIFT,
         ConnectorType.TARGET_POSTGRES,
         ConnectorType.TARGET_BIGQUERY,
+        ConnectorType.TARGET_ICEBERG,
     },
     ConnectorType.TAP_POSTGRES: {
         ConnectorType.TARGET_SNOWFLAKE,
         ConnectorType.TARGET_REDSHIFT,
         ConnectorType.TARGET_POSTGRES,
         ConnectorType.TARGET_BIGQUERY,
+        ConnectorType.TARGET_ICEBERG,
     },
     ConnectorType.TAP_MONGODB: {
         ConnectorType.TARGET_SNOWFLAKE,
@@ -56,10 +58,12 @@ FASTSYNC_PAIRS = {
 
 PARTIAL_SYNC_PAIRS = {
     ConnectorType.TAP_MYSQL: {
-        ConnectorType.TARGET_SNOWFLAKE
+        ConnectorType.TARGET_SNOWFLAKE,
+        ConnectorType.TARGET_ICEBERG
     },
     ConnectorType.TAP_POSTGRES: {
-        ConnectorType.TARGET_SNOWFLAKE
+        ConnectorType.TARGET_SNOWFLAKE,
+        ConnectorType.TARGET_ICEBERG
     }
 
 }

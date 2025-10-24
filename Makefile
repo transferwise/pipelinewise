@@ -33,6 +33,7 @@ tap-zendesk\
 target-s3-csv\
 target-snowflake\
 target-postgres\
+target-iceberg\
 transform-field
 endef
 
