@@ -1,0 +1,13 @@
+services:
+  target-iceberg-dev:
+    image: ubuntu:22.04
+    platform: linux/amd64
+    container_name: target-iceberg-dev
+    working_dir: /workspace
+    volumes:
+      - ../:/workspace
+    # environment:
+    #   - PYTHONUNBUFFERED=1
+    #   - PIP_DISABLE_PIP_VERSION_CHECK=1
+    entrypoint: ["/workspace/local-dev/entrypoint.sh"]
+    tty: true
