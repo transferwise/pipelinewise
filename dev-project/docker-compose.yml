@@ -12,11 +12,11 @@ services:
       PATH: ${PIPELINEWISE_HOME}/.virtualenvs/pipelinewise/bin:${PATH}
     volumes:
       - ../:/opt/pipelinewise
-      - ./snowflake.pem:/root/.ssh/snowflake.pem
       # don't create container specific .virtualenvs files on host
       - /opt/pipelinewise/dev-project/.virtualenvs/
       # mount pipelinewise pipe configuration directory to host for ease of troubleshooting
       - .pipelinewise:/root/.pipelinewise
+      - ./snowflake.pem:/opt/pipelinewise/.ssh/snowflake.pem
 
     # Build only when test databases are ready
     depends_on:
