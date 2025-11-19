@@ -72,7 +72,7 @@ def get_snowflake_statics(config):
     """
     table_cache = []
     if not ('disable_table_cache' in config and config['disable_table_cache']):
-        LOGGER.info('Getting catalog objects from table cache...')
+        LOGGER.info('Getting catalog objects from PipelineWise table cache...')
 
         db = DbSync(config)  # pylint: disable=invalid-name
         table_cache = db.get_table_columns(

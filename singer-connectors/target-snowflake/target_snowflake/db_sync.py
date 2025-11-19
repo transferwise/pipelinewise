@@ -72,13 +72,13 @@ def validate_config(config):
     return errors
 
 
-def column_type(schema_property):
+def column_type(schema_property, is_iceberg_table=False):
     """Take a specific schema property and return the snowflake equivalent column type"""
     property_type = schema_property['type']
     property_format = schema_property['format'] if 'format' in schema_property else None
     col_type = 'text'
     if 'object' in property_type or 'array' in property_type:
-        col_type = 'variant'
+        col_type = 'variant' if not is_iceberg_table else 'string'
 
     # Every date-time JSON value is currently mapped to TIMESTAMP_NTZ
     elif property_format == 'date-time':
@@ -636,9 +636,10 @@ class DbSync:
 
                 # Convert output of SHOW TABLES to table
                 select = """
-                    SELECT "schema_name" AS schema_name
-                          ,"name"        AS table_name
-                      FROM TABLE(RESULT_SCAN(%(LAST_QID)s))
+                    SELECT
+                        "schema_name" AS schema_name
+                        ,"name"       AS table_name
+                    FROM TABLE(RESULT_SCAN(%(LAST_QID)s))
                 """
                 queries.extend([show_tables, select])
 
@@ -656,6 +657,40 @@ class DbSync:
             raise Exception("Cannot get table columns. List of table schemas empty")
 
         return tables
+
+    def iceberg_get_tables(self, table_schemas=None):
+        """Get list of iceberg tables of certain schema(s) from snowflake metadata"""
+        iceberg_tables = []
+        if table_schemas:
+            for schema in table_schemas:
+                queries = []
+
+                # Get tables in schema
+                show_tables = f"SHOW TERSE ICEBERG TABLES IN SCHEMA {self.connection_config['dbname']}.{schema}"
+
+                # Convert output of SHOW ICEBERG TABLES to table
+                select = """
+                    SELECT
+                        "schema_name" AS schema_name
+                        ,"name"       AS table_name
+                    FROM TABLE(RESULT_SCAN(%(LAST_QID)s))
+                """
+                queries.extend([show_tables, select])
+
+                # Run everything in one transaction
+                try:
+                    iceberg_tables.extend(self.query(queries, max_records=99999))
+
+                # Catch exception when schema not exists and SHOW TABLES throws a ProgrammingError
+                # Regexp to extract snowflake error code and message from the exception message
+                # Do nothing if schema not exists
+                except snowflake.connector.errors.ProgrammingError as exc:
+                    if not re.match(r'002043 \(02000\):.*\n.*does not exist.*', str(sys.exc_info()[1])):
+                        raise exc
+        else:
+            raise Exception("Cannot get iceberg tables. List of table schemas empty")
+
+        return iceberg_tables
 
     def get_table_columns(self, table_schemas=None):
         """Get list of columns and tables of certain schema(s) from snowflake metadata"""
@@ -716,7 +751,7 @@ class DbSync:
         """Refreshes the internal table cache"""
         self.table_cache = self.get_table_columns([self.schema_name])
 
-    def update_columns(self):
+    def update_columns(self, is_iceberg_table):
         """Adds required but not existing columns the target table according to the schema"""
         stream_schema_message = self.stream_schema_message
         stream = stream_schema_message['stream']
@@ -744,26 +779,35 @@ class DbSync:
             if name.upper() not in columns_dict
         ]
 
-        for column in columns_to_add:
-            self.add_column(column, stream)
-
         columns_to_replace = [
             (safe_column_name(name), column_clause(
                 name,
                 properties_schema
             ))
             for (name, properties_schema) in self.flatten_schema.items()
-            if name.upper() in columns_dict and
-               columns_dict[name.upper()]['DATA_TYPE'].upper() != column_type(properties_schema).upper() and
-
-               # Don't alter table if TIMESTAMP_NTZ detected as the new required column type
-               #
-               # Target-snowflake maps every data-time JSON types to TIMESTAMP_NTZ but sometimes
-               # a TIMESTAMP_TZ column is already available in the target table (i.e. created by fastsync initial load)
-               # We need to exclude this conversion otherwise we loose the data that is already populated
-               # in the column
-               column_type(properties_schema).upper() != 'TIMESTAMP_NTZ'
+                if (name.upper() in columns_dict and
+                    columns_dict[name.upper()]['DATA_TYPE'].upper() !=
+                        column_type(properties_schema, is_iceberg_table).upper() and
+                    # Don't alter table if TIMESTAMP_NTZ detected as the new required column type
+                    #
+                    # Target-snowflake maps every data-time JSON types to TIMESTAMP_NTZ but sometimes
+                    # a TIMESTAMP_TZ column is already available in the target table
+                    # (i.e. created by fastsync initial load)
+                    # We need to exclude this conversion otherwise we lose the data that is already
+                    # populated in the column
+                    column_type(properties_schema, is_iceberg_table).upper() != 'TIMESTAMP_NTZ')
         ]
+
+        if is_iceberg_table and (columns_to_add or columns_to_replace):
+            self.logger.error('Iceberg table %s will not be automatically altered.', table_name)
+            if columns_to_add:
+                self.logger.error('Columns to manually add to Iceberg table %s: %s', table_name, columns_to_add)
+            if columns_to_replace:
+                self.logger.error('Columns to manually replace in Iceberg table %s: %s', table_name, columns_to_replace)
+            raise Exception('Iceberg table %s will not be automatically altered.', table_name)
+
+        for column in columns_to_add:
+            self.add_column(column, stream)
 
         for (column_name, column) in columns_to_replace:
             # self.drop_column(column_name, stream)
@@ -803,10 +847,16 @@ class DbSync:
         table_name = self.table_name(stream, False, True)
         table_name_with_schema = self.table_name(stream, False)
 
+        # Check if the table is an Iceberg table
+        is_iceberg_table = any(
+            f'"{table["TABLE_NAME"].upper()}"' == table_name
+            for table in self.iceberg_get_tables([self.schema_name.upper()])
+        )
+
         if self.table_cache:
             found_tables = list(filter(lambda x: x['SCHEMA_NAME'] == self.schema_name.upper() and
-                                                 f'"{x["TABLE_NAME"].upper()}"' == table_name,
-                                       self.table_cache))
+                                                f'"{x["TABLE_NAME"].upper()}"' == table_name,
+                                    self.table_cache))
         else:
             found_tables = [table for table in (self.get_tables([self.schema_name.upper()]))
                             if f'"{table["TABLE_NAME"].upper()}"' == table_name]
@@ -822,9 +872,10 @@ class DbSync:
                 self.table_cache = self.get_table_columns(table_schemas=[self.schema_name])
         else:
             self.logger.info('Table %s exists', table_name_with_schema)
-            self.update_columns()
+            self.update_columns(is_iceberg_table)
 
-        self._refresh_table_pks()
+        if not is_iceberg_table:
+            self._refresh_table_pks()
 
     def _refresh_table_pks(self):
         """
@@ -833,6 +884,7 @@ class DbSync:
         The non-nullability of PK column is also dropped.
         """
         table_name = self.table_name(self.stream_schema_message['stream'], False)
+        self.logger.info('Refreshing Table %s PK', table_name)
         current_pks = self._get_current_pks()
         new_pks = set(pk.upper() for pk in self.stream_schema_message.get('key_properties', []))
 
