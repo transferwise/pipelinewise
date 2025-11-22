@@ -26,6 +26,8 @@ from target_snowflake.exceptions import (
     InvalidValidationOperationException
 )
 
+from target_snowflake.convert_table_to_iceberg import ConvertTableToIceberg
+
 LOGGER = get_logger('target_snowflake')
 
 # Tone down snowflake.connector log noise by only outputting warnings and higher level messages
@@ -509,7 +511,7 @@ def flush_records(stream: str,
 def main():
     """Main function"""
     arg_parser = argparse.ArgumentParser()
-    arg_parser.add_argument('-c', '--config', help='Config file')
+    arg_parser.add_argument('-c', '--config', help='target-snowflake config file')
     args = arg_parser.parse_args()
 
     if args.config:
@@ -527,6 +529,30 @@ def main():
 
     LOGGER.debug("Exiting normally")
 
+
+def convert_table_to_iceberg():
+    """Convert existing table to Iceberg table"""
+    arg_parser = argparse.ArgumentParser()
+    arg_parser.add_argument('-c', '--config', help='target-snowflake config file')
+    arg_parser.add_argument('-t', '--fqtn', help='Fully qualified table name (database.schema.table) to be converted')
+    args = arg_parser.parse_args()
+
+    if not args.config:
+        LOGGER.error('Config file is required')
+        sys.exit(1)
+    else:
+        with open(args.config, encoding="utf8") as config_input:
+            config = json.load(config_input)
+
+    if not args.fqtn:
+        LOGGER.error('Fully qualified table name (fqtn) is required')
+        sys.exit(1)
+    else:
+        fqtn = args.fqtn
+
+    ConvertTableToIceberg(config, fqtn)
+
+    LOGGER.debug("Exiting normally")
 
 if __name__ == '__main__':
     main()
