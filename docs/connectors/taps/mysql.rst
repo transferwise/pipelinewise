@@ -123,6 +123,9 @@ Example YAML for ``tap-mysql``:
     dbname: "<DB_NAME>"                  # MySQL/ MariaDB database name
     use_gtid: <boolean>                  # Flag to enable using GTID as the state bookmark for log based tables
     engine: "mariadb/mysql"              # Flavor of the server, used in conjunction with "use_gtid"
+    #replica_host: "<REPLICA_HOST>"      # Optional: MySQL/ MariaDB replica host to offload initial/FastSync
+                                         # to a read replica, switch back to primary for log-based replication. 
+                                         # Used to resync large tables without impacting primary DB performance.
     #filter_dbs: "schema1,schema2"       # Optional: Scan only the required schemas
                                          #           to improve the performance of
                                          #           data extraction
