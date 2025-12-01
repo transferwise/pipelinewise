@@ -2,6 +2,7 @@
 name: Singer connectors
 
 on:
+  merge_group:
   pull_request:
     branches: [master]
 

@@ -1,6 +1,7 @@
 name: End-to-End Tests
 
 on:
+  merge_group:
   pull_request:
     branches: [master]
 

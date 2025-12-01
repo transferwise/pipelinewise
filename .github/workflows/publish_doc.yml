@@ -1,5 +1,6 @@
 name: Publish documentation
 on:
+  merge_group:
   push:
     branches: [master]
   pull_request:
@@ -9,11 +10,15 @@ concurrency:
   group: doc-${{ github.head_ref }}
   cancel-in-progress: true
 
+env:
+  BRANCH_NAME: ${{ github.head_ref || github.ref_name }} 
+
 jobs:
   publish:
     runs-on: ubuntu-latest
     environment: github-pages
-
+    if: github.event_name != 'merge_group'
+    
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4.1.7
