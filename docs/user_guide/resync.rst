@@ -62,6 +62,12 @@ add the ``--tables`` argument:
 
    $ pipelinewise sync_tables --target <target_id> --tap <tap_id> --replication_method_only log_based
 
+.. attention:: 
+
+  It is possible to offload the resync to a read-replica by specifying the ``replica_host`` on MySQL/MariaDB and
+  PostgreSQL taps. This is useful when resyncing large tables without impacting the performance of the primary database.
+
+  See the relevant tap configuration documentation for more details.
 
 
 2. **Partial resync**
