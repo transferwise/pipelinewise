@@ -164,6 +164,12 @@ this setting is optional and even yet you can force the resync by using <code cl
 <div><p>$ pipelinewise sync_tables –target &lt;target_id&gt; –tap &lt;tap_id&gt; –replication_method_only log_based</p>
 </div></blockquote>
 </div>
+<div class="admonition attention">
+<p class="admonition-title">Attention</p>
+<p>It is possible to offload the resync to a read-replica by specifying the <code class="docutils literal notranslate"><span class="pre">replica_host</span></code> on MySQL/MariaDB and
+PostgreSQL taps. This is useful when resyncing large tables without impacting the performance of the primary database.</p>
+<p>See the relevant tap configuration documentation for more details.</p>
+</div>
 <ol class="arabic simple" start="2">
 <li><p><strong>Partial resync</strong></p></li>
 </ol>

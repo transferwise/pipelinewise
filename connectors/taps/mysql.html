@@ -233,6 +233,9 @@ or browse the codebase <a class="reference external" href="https://github.com/tr
 <span class="w">  </span><span class="nt">dbname</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;DB_NAME&gt;&quot;</span><span class="w">                  </span><span class="c1"># MySQL/ MariaDB database name</span>
 <span class="w">  </span><span class="nt">use_gtid</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">&lt;boolean&gt;</span><span class="w">                  </span><span class="c1"># Flag to enable using GTID as the state bookmark for log based tables</span>
 <span class="w">  </span><span class="nt">engine</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;mariadb/mysql&quot;</span><span class="w">              </span><span class="c1"># Flavor of the server, used in conjunction with &quot;use_gtid&quot;</span>
+<span class="w">  </span><span class="c1">#replica_host: &quot;&lt;REPLICA_HOST&gt;&quot;      # Optional: MySQL/ MariaDB replica host to offload initial/FastSync</span>
+<span class="w">                                       </span><span class="c1"># to a read replica, switch back to primary for log-based replication.</span>
+<span class="w">                                       </span><span class="c1"># Used to resync large tables without impacting primary DB performance.</span>
 <span class="w">  </span><span class="c1">#filter_dbs: &quot;schema1,schema2&quot;       # Optional: Scan only the required schemas</span>
 <span class="w">                                       </span><span class="c1">#           to improve the performance of</span>
 <span class="w">                                       </span><span class="c1">#           data extraction</span>
