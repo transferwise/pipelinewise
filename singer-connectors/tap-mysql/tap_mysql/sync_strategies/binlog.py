@@ -98,7 +98,7 @@ def verify_gtid_config(mysql_conn: MySQLConnection):
 def fetch_current_log_file_and_pos(mysql_conn):
     with connect_with_backoff(mysql_conn) as open_conn:
         with open_conn.cursor() as cur:
-            cur.execute("SHOW MASTER STATUS")
+            cur.execute("SHOW BINARY LOG STATUS")
 
             result = cur.fetchone()
 
