@@ -98,7 +98,12 @@ def verify_gtid_config(mysql_conn: MySQLConnection):
 def fetch_current_log_file_and_pos(mysql_conn):
     with connect_with_backoff(mysql_conn) as open_conn:
         with open_conn.cursor() as cur:
-            cur.execute("SHOW BINARY LOG STATUS")
+            try:
+                cur.execute("SHOW BINARY LOG STATUS")
+            except (pymysql.err.ProgrammingError, pymysql.err.InternalError) as ex:
+                # If the new command fails, try the old one for backward compatibility
+                LOGGER.debug("SHOW BINARY LOG STATUS failed, trying SHOW MASTER STATUS: %s", ex)
+                cur.execute("SHOW MASTER STATUS")
 
             result = cur.fetchone()
 
