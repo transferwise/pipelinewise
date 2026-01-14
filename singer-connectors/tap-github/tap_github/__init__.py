@@ -205,7 +205,7 @@ def calculate_seconds(epoch):
 
 def rate_throttling(response):
     if 'Retry-After' in response.headers:
-        retry_after = int(response.headers.get('Retry-After', 0))
+        retry_after = int(response.headers.get('Retry-After'))
         if retry_after > 0:
             seconds_to_sleep = retry_after + RATE_THROTTLING_EXTRA_WAITING_TIME
             if seconds_to_sleep > MAX_RATE_LIMIT_WAIT_SECONDS:
