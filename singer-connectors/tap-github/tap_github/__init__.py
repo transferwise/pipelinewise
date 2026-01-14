@@ -220,19 +220,17 @@ def rate_throttling(response):
         remaining_requests_per_hour = int(response.headers['X-RateLimit-Remaining'])
         if remaining_requests_per_hour == 0:
             rate_limit_reset_timestamp = int(response.headers.get('X-RateLimit-Reset', 0))
+            rate_limit_reset_time = datetime.datetime.fromtimestamp(rate_limit_reset_timestamp)
+            rate_limit_user = response.headers.get('X-RateLimit-Limit', 0)
             seconds_to_sleep = calculate_seconds(rate_limit_reset_timestamp) + RATE_THROTTLING_EXTRA_WAITING_TIME
 
             if seconds_to_sleep > MAX_RATE_LIMIT_WAIT_SECONDS:
-                rate_limit_user = response.headers.get('X-RateLimit-Limit', 0)
-                rate_limit_reset_time = datetime.datetime.fromtimestamp(rate_limit_reset_timestamp)
                 message = f"API rate limit exceeded: " \
                           f"User limit per hour: {rate_limit_user}, " \
                           f"Remaining requests: {remaining_requests_per_hour}, " \
                           f"Time to reset {rate_limit_reset_time.isoformat()}"
                 raise RateLimitExceeded(message) from None
 
-            rate_limit_reset_time = datetime.datetime.fromtimestamp(rate_limit_reset_timestamp)
-            rate_limit_user = response.headers.get('X-RateLimit-Limit', 0)
             logger.warning(f"API rate limit exceeded. User limit per hour: {rate_limit_user}, Remaining requests: {remaining_requests_per_hour}")
             logger.warning(f"Time to reset rate limit: {rate_limit_reset_time.isoformat()}")
             logger.warning(f"Tap will retry data collection after {str(datetime.timedelta(seconds=seconds_to_sleep))}")
