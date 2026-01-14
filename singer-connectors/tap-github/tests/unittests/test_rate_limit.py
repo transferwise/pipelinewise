@@ -88,3 +88,147 @@ class TestRateLimit(unittest.TestCase):
         tap_github.authed_get('verifying repository access', 'https://api.github.com/repos/foo/commits',
                               do_rate_throttling=False)
         self.assertEqual(0, mocked_rate_throttling.call_count)
+
+    def test_retry_after_header_with_valid_value(self, mocked_sleep):
+        mocked_sleep.side_effect = None
+
+        retry_after_seconds = 30
+        resp = api_call()
+        resp.headers["Retry-After"] = str(retry_after_seconds)
+
+        result = tap_github.rate_throttling(resp)
+
+        mocked_sleep.assert_called_with(retry_after_seconds + tap_github.RATE_THROTTLING_EXTRA_WAITING_TIME)
+        self.assertTrue(result)
+        self.assertTrue(mocked_sleep.called)
+
+    def test_retry_after_header_with_zero_value(self, mocked_sleep):
+        mocked_sleep.side_effect = None
+
+        resp = api_call()
+        resp.headers["Retry-After"] = "0"
+
+        result = tap_github.rate_throttling(resp)
+
+        self.assertFalse(result)
+        self.assertFalse(mocked_sleep.called)
+
+    def test_retry_after_header_exceeds_max_wait(self, mocked_sleep):
+        mocked_sleep.side_effect = None
+
+        retry_after_seconds = 700
+        resp = api_call()
+        resp.headers["Retry-After"] = str(retry_after_seconds)
+
+        with self.assertRaises(tap_github.RateLimitExceeded):
+            tap_github.rate_throttling(resp)
+
+        self.assertFalse(mocked_sleep.called)
+
+    def test_retry_after_takes_precedence_over_x_rate_limit(self, mocked_sleep):
+        mocked_sleep.side_effect = None
+
+        retry_after_seconds = 30
+        resp = api_call()
+        resp.headers["Retry-After"] = str(retry_after_seconds)
+        resp.headers["X-RateLimit-Remaining"] = "0"
+        resp.headers["X-RateLimit-Reset"] = str(int(round(time.time(), 0)) + 120)
+
+        result = tap_github.rate_throttling(resp)
+
+        mocked_sleep.assert_called_with(retry_after_seconds + tap_github.RATE_THROTTLING_EXTRA_WAITING_TIME)
+        self.assertTrue(result)
+
+    def test_rate_throttling_returns_true_when_sleeping(self, mocked_sleep):
+        mocked_sleep.side_effect = None
+
+        resp = api_call()
+        resp.headers["X-RateLimit-Reset"] = str(int(round(time.time(), 0)) + 120)
+        resp.headers["X-RateLimit-Remaining"] = "0"
+
+        result = tap_github.rate_throttling(resp)
+
+        self.assertTrue(result)
+
+    def test_rate_throttling_returns_false_when_not_sleeping(self, mocked_sleep):
+        mocked_sleep.side_effect = None
+
+        resp = api_call()
+        resp.headers["X-RateLimit-Remaining"] = "100"
+
+        result = tap_github.rate_throttling(resp)
+
+        self.assertFalse(result)
+
+    @mock.patch.object(requests.Session, 'request')
+    def test_authed_get_retries_on_403_with_rate_limit(self, mocked_request, mocked_sleep):
+        reset_seconds = 10
+        response_403 = requests.Response()
+        response_403.status_code = 403
+        response_403._content = b'{"message": "API rate limit exceeded"}'
+        response_403.headers["X-RateLimit-Remaining"] = "0"
+        response_403.headers["X-RateLimit-Reset"] = str(int(round(time.time(), 0)) + reset_seconds)
+
+        response_200 = requests.Response()
+        response_200.status_code = 200
+        response_200._content = b'{"data": "success"}'
+
+        mocked_request.side_effect = [response_403, response_200]
+
+        result = tap_github.authed_get('test', 'https://api.github.com/repos/foo/commits')
+
+        self.assertEqual(2, mocked_request.call_count)
+        self.assertEqual(200, result.status_code)
+        self.assertTrue(mocked_sleep.called)
+
+    @mock.patch.object(requests.Session, 'request')
+    def test_authed_get_raises_on_403_without_rate_limit(self, mocked_request, mocked_sleep):
+        remaining_requests = 100
+        response_403 = requests.Response()
+        response_403.status_code = 403
+        response_403._content = b'{"message": "Forbidden"}'
+        response_403.headers["X-RateLimit-Remaining"] = str(remaining_requests)
+
+        mocked_request.return_value = response_403
+
+        with self.assertRaises(tap_github.AuthException):
+            tap_github.authed_get('test', 'https://api.github.com/repos/foo/commits')
+
+        self.assertEqual(1, mocked_request.call_count)
+        self.assertFalse(mocked_sleep.called)
+
+    @mock.patch.object(requests.Session, 'request')
+    def test_authed_get_retries_on_403_with_retry_after(self, mocked_request, mocked_sleep):
+        retry_after_seconds = 5
+        response_403 = requests.Response()
+        response_403.status_code = 403
+        response_403._content = b'{"message": "API rate limit exceeded"}'
+        response_403.headers["Retry-After"] = str(retry_after_seconds)
+
+        response_200 = requests.Response()
+        response_200.status_code = 200
+        response_200._content = b'{"data": "success"}'
+
+        mocked_request.side_effect = [response_403, response_200]
+
+        result = tap_github.authed_get('test', 'https://api.github.com/repos/foo/commits')
+
+        self.assertEqual(2, mocked_request.call_count)
+        self.assertEqual(200, result.status_code)
+        mocked_sleep.assert_called_with(retry_after_seconds + tap_github.RATE_THROTTLING_EXTRA_WAITING_TIME)
+
+    @mock.patch.object(requests.Session, 'request')
+    def test_authed_get_stops_after_max_retries(self, mocked_request, mocked_sleep):
+        response_403 = requests.Response()
+        response_403.status_code = 403
+        response_403._content = b'{"message": "API rate limit exceeded"}'
+        response_403.headers["X-RateLimit-Remaining"] = "0"
+        response_403.headers["X-RateLimit-Reset"] = str(int(round(time.time(), 0)) + 10)
+
+        mocked_request.return_value = response_403
+
+        with self.assertRaises(tap_github.AuthException):
+            tap_github.authed_get('test', 'https://api.github.com/repos/foo/commits')
+
+        self.assertEqual(4, mocked_request.call_count)
+        self.assertEqual(3, mocked_sleep.call_count)

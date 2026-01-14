@@ -19,6 +19,7 @@ REQUIRED_CONFIG_KEYS = ['start_date', 'access_token']
 
 MAX_RATE_LIMIT_WAIT_SECONDS = 600
 RATE_THROTTLING_EXTRA_WAITING_TIME = 60
+MAX_RATE_LIMIT_RETRIES_PER_REQUEST = 3
 
 KEY_PROPERTIES = {
     'commits': ['sha'],
@@ -203,31 +204,57 @@ def calculate_seconds(epoch):
     return int(round((epoch - current), 0))
 
 def rate_throttling(response):
-    rate_limit_user = response.headers.get('X-RateLimit-Limit', 0)
-    remaining_requests_per_hour = int(response.headers.get('X-RateLimit-Remaining', 0))
-    rate_limit_reset_timestamp = int(response.headers.get('X-RateLimit-Reset', 0))
-    rate_limit_reset_time = datetime.datetime.fromtimestamp(rate_limit_reset_timestamp)
-    if remaining_requests_per_hour == 0:
-        seconds_to_sleep = calculate_seconds(int(rate_limit_reset_timestamp)) + RATE_THROTTLING_EXTRA_WAITING_TIME
+    if 'Retry-After' in response.headers:
+        retry_after = int(response.headers['Retry-After'])
+        if retry_after > 0:
+            seconds_to_sleep = retry_after + RATE_THROTTLING_EXTRA_WAITING_TIME
+            if seconds_to_sleep > MAX_RATE_LIMIT_WAIT_SECONDS:
+                message = f"API secondary rate limit exceeded. Retry-After: {seconds_to_sleep} seconds exceeds max wait time of {MAX_RATE_LIMIT_WAIT_SECONDS} seconds."
+                raise RateLimitExceeded(message) from None
 
-        if seconds_to_sleep > MAX_RATE_LIMIT_WAIT_SECONDS:
-            message = f"API rate limit exceeded: " \
-                      f"User limit per hour: {rate_limit_user}, " \
-                      f"Remaining requests: {remaining_requests_per_hour}, " \
-                      f"Time to reset {rate_limit_reset_time.isoformat()}"
-            raise RateLimitExceeded(message) from None
+            logger.warning(f"API secondary rate limit exceeded. Tap will retry data collection after {seconds_to_sleep} seconds.")
+            time.sleep(seconds_to_sleep)
+            return True
 
-        logger.warning(f"API user limit rate per hour({rate_limit_user}) exceeded.")
-        logger.warning(f"Time to reset rate limit: {rate_limit_reset_time.isoformat()}")
-        logger.warning(f"Tap will retry data collection after {str(datetime.timedelta(seconds=seconds_to_sleep))}")
-        time.sleep(seconds_to_sleep)
+    if 'X-RateLimit-Remaining' in response.headers:
+        remaining_requests_per_hour = int(response.headers['X-RateLimit-Remaining'])
+        if remaining_requests_per_hour == 0:
+            rate_limit_reset_timestamp = int(response.headers.get('X-RateLimit-Reset', 0))
+            seconds_to_sleep = calculate_seconds(rate_limit_reset_timestamp) + RATE_THROTTLING_EXTRA_WAITING_TIME
+
+            if seconds_to_sleep > MAX_RATE_LIMIT_WAIT_SECONDS:
+                rate_limit_user = response.headers.get('X-RateLimit-Limit', 0)
+                rate_limit_reset_time = datetime.datetime.fromtimestamp(rate_limit_reset_timestamp)
+                message = f"API rate limit exceeded: " \
+                          f"User limit per hour: {rate_limit_user}, " \
+                          f"Remaining requests: {remaining_requests_per_hour}, " \
+                          f"Time to reset {rate_limit_reset_time.isoformat()}"
+                raise RateLimitExceeded(message) from None
+
+            rate_limit_reset_time = datetime.datetime.fromtimestamp(rate_limit_reset_timestamp)
+            rate_limit_user = response.headers.get('X-RateLimit-Limit', 0)
+            logger.warning(f"API rate limit exceeded. User limit per hour: {rate_limit_user}, Remaining requests: {remaining_requests_per_hour}")
+            logger.warning(f"Time to reset rate limit: {rate_limit_reset_time.isoformat()}")
+            logger.warning(f"Tap will retry data collection after {str(datetime.timedelta(seconds=seconds_to_sleep))}")
+            time.sleep(seconds_to_sleep)
+            return True
+
+    return False
 
 # pylint: disable=dangerous-default-value
-def authed_get(source, url, headers={}, do_rate_throttling=True):
+def authed_get(source, url, headers={}, do_rate_throttling=True, rate_limit_retry_count=0):
     with metrics.http_request_timer(source) as timer:
         session.headers.update(headers)
         resp = session.request(method='get', url=url)
         if resp.status_code != 200:
+            if do_rate_throttling and resp.status_code == 403:
+                # Check retry limit before attempting rate throttling to prevent infinite recursion
+                # Each request gets MAX_RATE_LIMIT_RETRIES_PER_REQUEST attempts to handle transient rate limits
+                if rate_limit_retry_count < MAX_RATE_LIMIT_RETRIES_PER_REQUEST:
+                    if rate_throttling(resp):
+                        return authed_get(source, url, headers, do_rate_throttling, rate_limit_retry_count + 1)
+                else:
+                    logger.error(f"Max rate limit retries ({MAX_RATE_LIMIT_RETRIES_PER_REQUEST}) exceeded for {url}")
             raise_for_error(resp, source)
             return None
         else:
