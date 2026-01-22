@@ -37,7 +37,7 @@ LOCK = multiprocessing.Lock()
 
 
 def tap_type_to_target_type(mysql_type, mysql_column_type):
-    """Data type mapping from MySQL to Snowflake"""
+    """Data type mapping from MySQL to Snowflake """
     return {
         'char': 'VARCHAR',
         'varchar': 'VARCHAR',
