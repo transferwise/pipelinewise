@@ -361,7 +361,9 @@ class FastSyncTargetSnowflake:
         s3kl = s3_key[-1]
 
         LOGGER.info(f'--->sql {sql}')
-        LOGGER.info(f'==--==>>  stg: {s1}, {s2}, {s3}, {s4}, {sl}, {len(stage)}')
+        for c in stage[4:]:
+            LOGGER.info(f'  --==>>  stg: {c}')
+
         LOGGER.info(f'==--==>>  s3k: {s3k1}, {s3k2}, {s3k3}, {s3k4}, {s3kl} {len(s3_key)}')
 
 
