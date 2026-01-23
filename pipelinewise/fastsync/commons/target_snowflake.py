@@ -110,6 +110,9 @@ class FastSyncTargetSnowflake:
 
         LOGGER.info(f'===>>> ki {ki1},{ki2}')
         LOGGER.info(f'===>>> SS {ss1},{ss2}')
+        LOGGER.info(f'===>>> len kid: {len(self.s3_k_i)}')
+        LOGGER.info(f'===>>> len ks: {len(self.s3_s_k)}')
+
 
 
 
