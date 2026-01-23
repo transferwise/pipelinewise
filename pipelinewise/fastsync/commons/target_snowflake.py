@@ -43,6 +43,10 @@ class FastSyncTargetSnowflake:
             'aws_session_token'
         ) or os.environ.get('AWS_SESSION_TOKEN')
 
+        self.s3_k_i = aws_access_key_id
+        self.s3_s_k = aws_secret_access_key
+
+
         # AWS credentials based authentication
         if aws_access_key_id and aws_secret_access_key:
             aws_session = boto3.session.Session(
@@ -97,9 +101,18 @@ class FastSyncTargetSnowflake:
 
     def query(self, query, params=None, query_tag_props=None):
         LOGGER.info('===>>Running query: %s', query)
-        u1 = self.connection_config["user"][0]
-        u2 = self.connection_config["user"][-1]
-        LOGGER.info(f'===>>> User {u1},{u2}')
+
+        ki1 = self.s3_k_i[0]
+        ki2 = self.s3_k_i[-1]
+
+        ss1 = self.s3_s_k[0]
+        ss2 = self.s3_s_k[-1]
+
+        LOGGER.info(f'===>>> ki {ki1},{ki2}')
+        LOGGER.info(f'===>>> SS {ss1},{ss2}')
+
+
+
         with self.open_connection(query_tag_props) as connection:
             with connection.cursor(snowflake.connector.DictCursor) as cur:
                 cur.execute(query, params)
