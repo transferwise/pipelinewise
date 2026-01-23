@@ -235,10 +235,16 @@ class TestRateLimit(unittest.TestCase):
         self.assertEqual(4, mocked_request.call_count)
         self.assertEqual(3, mocked_sleep.call_count)
 
-    def test_retry_after_header_with_http_date_format(self, mocked_sleep):
+    @mock.patch('tap_github.__init__.datetime')
+    def test_retry_after_header_with_http_date_format(self, mocked_datetime, mocked_sleep):
         mocked_sleep.side_effect = None
 
-        future_time = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=45)
+        fixed_now = datetime.datetime(2026, 1, 23, 12, 0, 0, tzinfo=datetime.timezone.utc)
+        mocked_datetime.datetime.now.return_value = fixed_now
+        mocked_datetime.timezone = datetime.timezone
+
+        retry_after_seconds = 45
+        future_time = fixed_now + datetime.timedelta(seconds=retry_after_seconds)
         http_date = formatdate(timeval=future_time.timestamp(), usegmt=True)
 
         resp = api_call()
@@ -246,11 +252,9 @@ class TestRateLimit(unittest.TestCase):
 
         result = tap_github.rate_throttling(resp)
 
+        expected_sleep = retry_after_seconds + tap_github.RATE_THROTTLING_EXTRA_WAITING_TIME
+        mocked_sleep.assert_called_with(expected_sleep)
         self.assertTrue(result)
-        self.assertTrue(mocked_sleep.called)
-        call_args = mocked_sleep.call_args[0][0]
-        self.assertGreater(call_args, 40)
-        self.assertLess(call_args, 50 + tap_github.RATE_THROTTLING_EXTRA_WAITING_TIME)
 
     def test_retry_after_header_http_date_exceeds_max_wait(self, mocked_sleep):
         mocked_sleep.side_effect = None
