@@ -350,13 +350,19 @@ class FastSyncTargetSnowflake:
 
         s1 = stage[1]
         s2 = stage[2]
+        s3 = stage[3]
+        s4 = stage[4]
+        sl = stage[-1]
 
         s3k1 = s3_key[1]
         s3k2 = s3_key[2]
+        s3k3 = s3_key[3]
+        s3k4 = s3_key[4]
+        s3kl = s3_key[-1]
 
         LOGGER.info(f'--->sql {sql}')
-        LOGGER.info(f'==--==>>  stg: {s1}, {s2}, {len(stage)}')
-        LOGGER.info(f'==--==>>  s3k: {s3k1}, {s3k2}, {len(s3_key)}')
+        LOGGER.info(f'==--==>>  stg: {s1}, {s2}, {s3}, {s4}, {sl}, {len(stage)}')
+        LOGGER.info(f'==--==>>  s3k: {s3k1}, {s3k2}, {s3k3}, {s3k4}, {s3kl} {len(s3_key)}')
 
 
         # Get number of inserted records - COPY does insert only
