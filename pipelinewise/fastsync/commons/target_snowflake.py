@@ -96,7 +96,8 @@ class FastSyncTargetSnowflake:
         )
 
     def query(self, query, params=None, query_tag_props=None):
-        LOGGER.debug('Running query: %s', query)
+        LOGGER.info('===>>Running query: %s', query)
+        LOGGER.info(f'===>>> User {self.connection_config["user"]}')
         with self.open_connection(query_tag_props) as connection:
             with connection.cursor(snowflake.connector.DictCursor) as cur:
                 cur.execute(query, params)
@@ -328,6 +329,8 @@ class FastSyncTargetSnowflake:
             f' field_optionally_enclosed_by=\'\"\' skip_header={int(skip_csv_header)}'
             f' compression=GZIP binary_format=HEX)'
         )
+
+        LOGGER.info(f'--->sql {sql}')
 
         # Get number of inserted records - COPY does insert only
         results = self.query(
