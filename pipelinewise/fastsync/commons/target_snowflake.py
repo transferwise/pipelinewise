@@ -348,7 +348,16 @@ class FastSyncTargetSnowflake:
             f' compression=GZIP binary_format=HEX)'
         )
 
+        s1 = stage[1]
+        s2 = stage[2]
+
+        s3k1 = s3_key[1]
+        s3k2 = s3_key[2]
+
         LOGGER.info(f'--->sql {sql}')
+        LOGGER.info(f'==--==>>  stg: {s1}, {s2}, {len(stage)}')
+        LOGGER.info(f'==--==>>  s3k: {s3k1}, {s3k2}, {len(s3_key)}')
+
 
         # Get number of inserted records - COPY does insert only
         results = self.query(
