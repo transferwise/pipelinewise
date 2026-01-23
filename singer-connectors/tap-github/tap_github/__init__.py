@@ -4,6 +4,7 @@ import fnmatch
 import json
 import os
 import time
+from email.utils import parsedate_to_datetime
 
 import requests
 import singer
@@ -205,7 +206,16 @@ def calculate_seconds(epoch):
 
 def rate_throttling(response):
     if 'Retry-After' in response.headers:
-        retry_after = int(response.headers.get('Retry-After'))
+        retry_after_header = response.headers.get('Retry-After')
+
+        # Parse Retry-After header which can be either:
+        # - Integer (seconds): "60"
+        # - HTTP-date (RFC 7231): "Wed, 21 Oct 2026 07:28:00 GMT"
+        if retry_after_header.isdigit():
+            retry_after = int(retry_after_header)
+        else:
+            retry_after = int((parsedate_to_datetime(retry_after_header) - datetime.datetime.now(datetime.timezone.utc)).total_seconds())
+
         if retry_after > 0:
             seconds_to_sleep = retry_after + RATE_THROTTLING_EXTRA_WAITING_TIME
             if seconds_to_sleep > MAX_RATE_LIMIT_WAIT_SECONDS:

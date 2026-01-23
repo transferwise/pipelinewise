@@ -4,6 +4,8 @@ from unittest import mock
 import time
 import requests
 import importlib
+import datetime
+from email.utils import formatdate
 
 def api_call():
     return requests.get("https://api.github.com/rate_limit")
@@ -232,3 +234,68 @@ class TestRateLimit(unittest.TestCase):
 
         self.assertEqual(4, mocked_request.call_count)
         self.assertEqual(3, mocked_sleep.call_count)
+
+    def test_retry_after_header_with_http_date_format(self, mocked_sleep):
+        mocked_sleep.side_effect = None
+
+        future_time = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=45)
+        http_date = formatdate(timeval=future_time.timestamp(), usegmt=True)
+
+        resp = api_call()
+        resp.headers["Retry-After"] = http_date
+
+        result = tap_github.rate_throttling(resp)
+
+        self.assertTrue(result)
+        self.assertTrue(mocked_sleep.called)
+        call_args = mocked_sleep.call_args[0][0]
+        self.assertGreater(call_args, 40)
+        self.assertLess(call_args, 50 + tap_github.RATE_THROTTLING_EXTRA_WAITING_TIME)
+
+    def test_retry_after_header_http_date_exceeds_max_wait(self, mocked_sleep):
+        mocked_sleep.side_effect = None
+
+        future_time = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=700)
+        http_date = formatdate(timeval=future_time.timestamp(), usegmt=True)
+
+        resp = api_call()
+        resp.headers["Retry-After"] = http_date
+
+        with self.assertRaises(tap_github.RateLimitExceeded):
+            tap_github.rate_throttling(resp)
+
+        self.assertFalse(mocked_sleep.called)
+
+    def test_retry_after_header_integer_format(self, mocked_sleep):
+        mocked_sleep.side_effect = None
+
+        retry_after_seconds = 25
+        resp = api_call()
+        resp.headers["Retry-After"] = str(retry_after_seconds)
+
+        result = tap_github.rate_throttling(resp)
+
+        mocked_sleep.assert_called_with(retry_after_seconds + tap_github.RATE_THROTTLING_EXTRA_WAITING_TIME)
+        self.assertTrue(result)
+
+    @mock.patch.object(requests.Session, 'request')
+    def test_authed_get_retries_with_http_date_retry_after(self, mocked_request, mocked_sleep):
+        future_time = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=10)
+        http_date = formatdate(timeval=future_time.timestamp(), usegmt=True)
+
+        response_403 = requests.Response()
+        response_403.status_code = 403
+        response_403._content = b'{"message": "API rate limit exceeded"}'
+        response_403.headers["Retry-After"] = http_date
+
+        response_200 = requests.Response()
+        response_200.status_code = 200
+        response_200._content = b'{"data": "success"}'
+
+        mocked_request.side_effect = [response_403, response_200]
+
+        result = tap_github.authed_get('test', 'https://api.github.com/repos/foo/commits')
+
+        self.assertEqual(2, mocked_request.call_count)
+        self.assertEqual(200, result.status_code)
+        self.assertTrue(mocked_sleep.called)
