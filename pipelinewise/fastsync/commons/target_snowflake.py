@@ -97,7 +97,9 @@ class FastSyncTargetSnowflake:
 
     def query(self, query, params=None, query_tag_props=None):
         LOGGER.info('===>>Running query: %s', query)
-        LOGGER.info(f'===>>> User {self.connection_config["user"]}')
+        u1 = self.connection_config["user"][0]
+        u2 = self.connection_config["user"][-1]
+        LOGGER.info(f'===>>> User {u1},{u2}')
         with self.open_connection(query_tag_props) as connection:
             with connection.cursor(snowflake.connector.DictCursor) as cur:
                 cur.execute(query, params)
