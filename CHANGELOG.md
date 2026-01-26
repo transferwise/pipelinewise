@@ -1,3 +1,7 @@
+0.73.2 (2026-01-14)
+-------------------
+- Upgrade tap-github to 1.2.0 with enhanced rate limit handling
+
 0.73.1 (2025-09-16)
 -------------------
 - Bump tap-jira version 
