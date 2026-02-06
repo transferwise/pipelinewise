@@ -1,6 +1,13 @@
+<<<<<<< HEAD
 0.73.2 (2026-01-14)
 -------------------
 - Upgrade tap-github to 1.2.0 with enhanced rate limit handling
+=======
+0.73.2 (2026-02-06)
+-------------------
+- Fix `target-snowflake` crash when schema properties have no `type` (affecting Salesforce history streams like `LeadHistory` and `OpportunityFieldHistory`)
+- Bump `pipelinewise-target-snowflake` from `2.4.0` to `2.4.1`
+>>>>>>> 224bf6e1 (Release 0.73.2: fix target-snowflake missing schema type crash)
 
 0.73.1 (2025-09-16)
 -------------------
