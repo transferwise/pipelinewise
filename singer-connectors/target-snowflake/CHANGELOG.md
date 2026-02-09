@@ -1,3 +1,9 @@
+2.4.1 (2026-02-06)
+-------------------
+
+*Fixes*
+- Guard against schema properties without `type` in timestamp adjustment to prevent crashes on Salesforce history streams (e.g. `LeadHistory`, `OpportunityFieldHistory`).
+
 2.4.0 (2025-07-18)
 -------------------
 
