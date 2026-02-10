@@ -134,6 +134,10 @@ Example YAML for ``tap-postgres``:
       user: "<USER>"                       # PostfreSQL user
       password: "<PASSWORD>"               # Plain string or vault encrypted
       dbname: "<DB_NAME>"                  # PostgreSQL database name
+      #replica_host: "<REPLICA_HOST>"      # Optional: PostgresSQL replica host to offload initial/FastSync
+                                           #           to a read replica, switch back to primary for log-based 
+                                           #           replication. Used to resync large tables without impacting 
+                                           #           primary DB performance.
       #filter_schemas: "schema1,schema2"   # Optional: Scan only the required schemas
                                            #           to improve the performance of
                                            #           data extraction

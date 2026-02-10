@@ -116,6 +116,30 @@ class TestSchemaUtils(unittest.TestCase):
         with self.assertRaises(UnexpectedValueTypeException):
             stream_utils.adjust_timestamps_in_record(record, schema)
 
+    def test_adjust_timestamps_in_record_ignores_properties_without_type(self):
+        """Test that missing schema type does not crash timestamp adjustment."""
+        record = {
+            'anytype_key': '10000-01-22 12:04:22',
+            'key_with_valid_type': '10000-01-22 12:04:22',
+            'anyof_missing_type': '10000-01-22 12:04:22'
+        }
+
+        schema = {
+            'properties': {
+                'anytype_key': {},
+                'key_with_valid_type': {'type': ['null', 'string'], 'format': 'date-time'},
+                'anyof_missing_type': {'anyOf': [{'format': 'date-time'}]}
+            }
+        }
+
+        stream_utils.adjust_timestamps_in_record(record, schema)
+
+        self.assertEqual(record, {
+            'anytype_key': '10000-01-22 12:04:22',
+            'key_with_valid_type': '9999-12-31 23:59:59.999999',
+            'anyof_missing_type': '10000-01-22 12:04:22'
+        })
+
     def test_float_to_decimal(self):
         """Test if float values are converted to singer compatible Decimal types"""
         # Simple numeric value

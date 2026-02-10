@@ -1,3 +1,10 @@
+1.2.0 (2026-01-14)
+------------------
+- Enhanced rate limit handling to automatically retry on 403 errors with rate limit headers
+- Added support for GitHub's secondary rate limits via `Retry-After` header
+- Improved rate limit detection to check headers before raising authentication errors
+- Added comprehensive test coverage for rate limiting scenarios
+
 1.1.0 (2023-09-13)
 ------------------
 - Update GHA

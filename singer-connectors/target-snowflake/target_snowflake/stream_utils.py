@@ -57,18 +57,37 @@ def adjust_timestamps_in_record(record: Dict, schema: Dict) -> None:
                            'acceptable value of %s in Snowflake', _format, record[key], key, _format)
             record[key] = MAX_TIMESTAMP if _format != 'time' else MAX_TIME
 
+    def has_string_type(type_value):
+        if isinstance(type_value, str):
+            return type_value == 'string'
+        if isinstance(type_value, list):
+            return 'string' in type_value
+        return False
+
+    properties = schema.get('properties', {})
+
     # traverse the schema looking for properties of some date type
     for key, value in record.items():
-        if value is not None and key in schema['properties']:
-            if 'anyOf' in schema['properties'][key]:
-                for type_dict in schema['properties'][key]['anyOf']:
-                    if 'string' in type_dict['type'] and type_dict.get('format', None) in {'date-time', 'time', 'date'}:
-                        reset_new_value(record, key, type_dict['format'])
-                        break
-            else:
-                if 'string' in schema['properties'][key]['type'] and \
-                        schema['properties'][key].get('format', None) in {'date-time', 'time', 'date'}:
-                    reset_new_value(record, key, schema['properties'][key]['format'])
+        if value is None:
+            continue
+
+        key_schema = properties.get(key)
+        if not isinstance(key_schema, dict):
+            continue
+
+        if 'anyOf' in key_schema:
+            for type_dict in key_schema.get('anyOf', []):
+                if not isinstance(type_dict, dict):
+                    continue
+
+                if has_string_type(type_dict.get('type')) and \
+                        type_dict.get('format', None) in {'date-time', 'time', 'date'}:
+                    reset_new_value(record, key, type_dict['format'])
+                    break
+        else:
+            if has_string_type(key_schema.get('type')) and \
+                    key_schema.get('format', None) in {'date-time', 'time', 'date'}:
+                reset_new_value(record, key, key_schema['format'])
 
 
 def float_to_decimal(value):
