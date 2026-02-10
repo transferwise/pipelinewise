@@ -123,6 +123,93 @@ class TestFlattening(unittest.TestCase):
             }
         )
 
+    def test_salesforce_history_populated_old_and_new_values_are_preserved(self):
+        """Salesforce history rows with populated OldValue/NewValue should be retained."""
+        flatten_schema = flattening.flatten_schema
+        flatten_record = flattening.flatten_record
+
+        salesforce_history_schema = {
+            "type": "object",
+            "properties": {
+                "Id": {"type": ["null", "string"]},
+                "Field": {"type": ["null", "string"]},
+                "OldValue": {},
+                "NewValue": {}
+            }
+        }
+
+        # Example values observed in Salesforce history discussions:
+        # Account lookup changes can appear either as IDs or labels.
+        id_variant = {
+            "Id": "00kxx0000001234AAA",
+            "Field": "Account",
+            "OldValue": "0016300000fDQRdAAO",
+            "NewValue": "0016300000fDQReAAO"
+        }
+        label_variant = {
+            "Id": "00kxx0000001235AAA",
+            "Field": "Account",
+            "OldValue": "Fred Fubar",
+            "NewValue": "Francis Fubar"
+        }
+
+        flattened_schema = flatten_schema(salesforce_history_schema)
+        self.assertEqual(flattened_schema["OldValue"], {"type": ["null", "string"]})
+        self.assertEqual(flattened_schema["NewValue"], {"type": ["null", "string"]})
+
+        flat_id_variant = flatten_record(id_variant, flattened_schema)
+        flat_label_variant = flatten_record(label_variant, flattened_schema)
+
+        self.assertEqual(flat_id_variant["OldValue"], "0016300000fDQRdAAO")
+        self.assertEqual(flat_id_variant["NewValue"], "0016300000fDQReAAO")
+        self.assertEqual(flat_label_variant["OldValue"], "Fred Fubar")
+        self.assertEqual(flat_label_variant["NewValue"], "Francis Fubar")
+
+    def test_legacy_flatten_schema_dropped_salesforce_anytype_fields(self):
+        """
+        Replicates the previous flatten_schema logic to show why OldValue/NewValue were not exported:
+        when a property was `{}` (no type/no values), it wasn't emitted into the flattened schema.
+        """
+        flatten_schema = flattening.flatten_schema
+
+        salesforce_history_schema = {
+            "type": "object",
+            "properties": {
+                "Id": {"type": ["null", "string"]},
+                "Field": {"type": ["null", "string"]},
+                "OldValue": {},
+                "NewValue": {}
+            }
+        }
+
+        def legacy_flatten_schema_behavior(schema):
+            items = {}
+            for key, value in schema["properties"].items():
+                if "type" in value:
+                    items[key] = value
+                elif len(value.values()) > 0:
+                    first_value = list(value.values())[0]
+                    if isinstance(first_value, list) and first_value and isinstance(first_value[0], dict):
+                        value_type = first_value[0].get("type")
+                        if value_type in ["string", "array", "object"]:
+                            promoted = dict(first_value[0])
+                            promoted["type"] = ["null", value_type]
+                            items[key] = promoted
+            return items
+
+        legacy_schema = legacy_flatten_schema_behavior(salesforce_history_schema)
+        current_schema = flatten_schema(salesforce_history_schema)
+
+        # Legacy behavior dropped these fields entirely, which means downstream loaders never create/load them.
+        self.assertNotIn("OldValue", legacy_schema)
+        self.assertNotIn("NewValue", legacy_schema)
+
+        # Current behavior keeps the fields so they can be materialized into Snowflake columns.
+        self.assertIn("OldValue", current_schema)
+        self.assertIn("NewValue", current_schema)
+        self.assertEqual(current_schema["OldValue"], {"type": ["null", "string"]})
+        self.assertEqual(current_schema["NewValue"], {"type": ["null", "string"]})
+
     def test_flatten_record(self):
         """Test flattening of RECORD messages"""
         flatten_record = flattening.flatten_record
