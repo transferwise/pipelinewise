@@ -4,6 +4,20 @@ import itertools
 import json
 import re
 
+PREFERRED_SCHEMA_TYPES = ('string', 'array', 'object')
+
+
+def preferred_type(type_value):
+    if isinstance(type_value, str):
+        return type_value if type_value in PREFERRED_SCHEMA_TYPES else None
+
+    if isinstance(type_value, list):
+        for schema_type in PREFERRED_SCHEMA_TYPES:
+            if schema_type in type_value:
+                return schema_type
+
+    return None
+
 
 def flatten_key(k, parent_key, sep):
     """
@@ -41,19 +55,6 @@ def flatten_schema(d, parent_key=None, sep='__', level=0, max_level=0):
     if parent_key is None:
         parent_key = []
 
-    def _preferred_type(type_value):
-        preferred_types = ['string', 'array', 'object']
-
-        if isinstance(type_value, str):
-            return type_value if type_value in preferred_types else None
-
-        if isinstance(type_value, list):
-            for preferred_type in preferred_types:
-                if preferred_type in type_value:
-                    return preferred_type
-
-        return None
-
     items = []
     if 'properties' not in d:
         return {}
@@ -61,31 +62,44 @@ def flatten_schema(d, parent_key=None, sep='__', level=0, max_level=0):
     for k, v in d['properties'].items():
         new_key = flatten_key(k, parent_key, sep)
         if 'type' in v.keys():
-            if _preferred_type(v['type']) == 'object' and 'properties' in v and level < max_level:
+            if preferred_type(v['type']) == 'object' and 'properties' in v and level < max_level:
                 items.extend(flatten_schema(v, parent_key + [k], sep=sep, level=level + 1, max_level=max_level).items())
             else:
                 items.append((new_key, v))
         elif 'anyOf' in v:
             selected_schema = None
+            selected_preferred_type = None
             if isinstance(v['anyOf'], list):
                 for schema_candidate in v['anyOf']:
                     if isinstance(schema_candidate, dict):
-                        preferred_type = _preferred_type(schema_candidate.get('type'))
-                        if preferred_type:
+                        selected_preferred_type = preferred_type(schema_candidate.get('type'))
+                        if selected_preferred_type:
                             selected_schema = dict(schema_candidate)
-                            selected_schema['type'] = ['null', preferred_type]
+                            selected_schema['type'] = ['null', selected_preferred_type]
                             break
 
-            items.append((new_key, selected_schema or {'type': ['null', 'string']}))
+            if selected_schema and selected_preferred_type == 'object' and \
+                    'properties' in selected_schema and level < max_level:
+                items.extend(
+                    flatten_schema(
+                        selected_schema,
+                        parent_key + [k],
+                        sep=sep,
+                        level=level + 1,
+                        max_level=max_level
+                    ).items()
+                )
+            else:
+                items.append((new_key, selected_schema or {'type': ['null', 'string']}))
         elif len(v.values()) > 0:
             first_value = list(v.values())[0]
             selected_schema = None
 
             if isinstance(first_value, list) and first_value and isinstance(first_value[0], dict):
-                preferred_type = _preferred_type(first_value[0].get('type'))
-                if preferred_type:
+                selected_preferred_type = preferred_type(first_value[0].get('type'))
+                if selected_preferred_type:
                     selected_schema = dict(first_value[0])
-                    selected_schema['type'] = ['null', preferred_type]
+                    selected_schema['type'] = ['null', selected_preferred_type]
 
             items.append((new_key, selected_schema or {'type': ['null', 'string']}))
         else:

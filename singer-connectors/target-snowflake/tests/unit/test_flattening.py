@@ -123,6 +123,46 @@ class TestFlattening(unittest.TestCase):
             }
         )
 
+    def test_anyof_object_schema_uses_same_flattening_as_object_type_schema(self):
+        """anyOf object schemas should recurse like direct object type schemas."""
+        flatten_schema = flattening.flatten_schema
+
+        object_type_schema = {
+            "type": "object",
+            "properties": {
+                "c_pk": {"type": ["null", "integer"]},
+                "c_obj": {
+                    "type": ["null", "object"],
+                    "properties": {
+                        "nested_prop": {"type": ["null", "string"]}
+                    }
+                }
+            }
+        }
+
+        anyof_object_schema = {
+            "type": "object",
+            "properties": {
+                "c_pk": {"type": ["null", "integer"]},
+                "c_obj": {
+                    "anyOf": [
+                        {
+                            "type": "object",
+                            "properties": {
+                                "nested_prop": {"type": ["null", "string"]}
+                            }
+                        },
+                        {"type": ["null", "string"]}
+                    ]
+                }
+            }
+        }
+
+        self.assertEqual(
+            flatten_schema(anyof_object_schema, max_level=1),
+            flatten_schema(object_type_schema, max_level=1)
+        )
+
     def test_salesforce_history_populated_old_and_new_values_are_preserved(self):
         """Salesforce history rows with populated OldValue/NewValue should be retained."""
         flatten_schema = flattening.flatten_schema
