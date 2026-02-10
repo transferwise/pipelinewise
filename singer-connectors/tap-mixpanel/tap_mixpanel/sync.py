@@ -67,13 +67,13 @@ def sync(client, config, catalog, state, start_date):
     last_stream = Previous currently synced stream, if the load was interrupted
     """
     last_stream = singer.get_currently_syncing(state)
-    LOGGER.info("last/currently syncing stream: %s", last_stream)
+    LOGGER.info("last/currently syncing stream: {}".format(last_stream))
     selected_streams = []
     for stream in catalog.get_selected_streams(state):
         selected_streams.append(stream.stream)
     streams_to_sync = get_streams_to_sync(selected_streams)
-    LOGGER.info("selected_streams: %s", selected_streams)
-    LOGGER.info("streams_to_sync: %s", streams_to_sync)
+    LOGGER.info("selected_streams: {}".format(selected_streams))
+    LOGGER.info("streams_to_sync: {}".format(streams_to_sync))
 
     if not selected_streams:
         return
@@ -87,7 +87,7 @@ def sync(client, config, catalog, state, start_date):
         # Write schema of only selected streams in parent-child stream
         write_schemas_recursive(stream_name, catalog, selected_streams)
 
-        LOGGER.info("START Syncing: %s", stream_name)
+        LOGGER.info("START Syncing: {}".format(stream_name))
         endpoint_total = stream_obj.sync(
             catalog=catalog,
             state=state,
@@ -98,7 +98,7 @@ def sync(client, config, catalog, state, start_date):
 
         update_currently_syncing(state, None)
         LOGGER.info(
-            "FINISHED Syncing: %s, Total endpoint records: %s",
-            stream_name,
-            endpoint_total,
+            "FINISHED Syncing: {}, Total endpoint records: {}".format(
+                stream_name, endpoint_total
+            )
         )

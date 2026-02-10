@@ -155,9 +155,9 @@ def get_schemas(client, properties_flag):
             schema = get_schema(client, properties_flag, stream_name)
         except MixpanelPaymentRequiredError:
             LOGGER.warning(
-                "Mixpanel returned a 402 from the %s API so %s stream will be skipped.",
-                stream_name,
-                stream_name,
+                "Mixpanel returned a 402 from the {} API so {} stream will be skipped.".format(
+                    stream_name, stream_name
+                )
             )
             continue
 

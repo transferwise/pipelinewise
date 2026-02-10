@@ -18,6 +18,7 @@ REQUEST_TIMEOUT = 300
 REQUIRED_CONFIG_KEYS = [
     "project_timezone",
     "api_secret",
+    "date_window_size",
     "attribution_window",
     "start_date",
     "user_agent",
@@ -67,7 +68,7 @@ def main():
         delta_days = 365
         start_date = strftime(now_dttm - timedelta(days=delta_days))
         LOGGER.warning("start_date greater than 1 year maximum for API.")
-        LOGGER.warning("Setting start_date to 1 year ago, %s", start_date)
+        LOGGER.warning("Setting start_date to 1 year ago, {}".format(start_date))
 
     # Check support for EU endpoints
     eu_residency = _is_true(parsed_args.config.get("eu_residency")) or _is_true(

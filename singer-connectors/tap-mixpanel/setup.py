@@ -20,21 +20,15 @@ setup(name='pipelinewise-tap-mixpanel',
       install_requires=[
           'backoff==2.2.1',
           'requests==2.32.3',
-          'singer-python==6.0.0',
+          'pipelinewise-singer-python==1.*',
           'jsonlines==1.2.0'
       ],
       extras_require={
           'test': [
+              'pylint==2.9.*',
               'pytest==6.2.*',
               'requests_mock==1.9.*',
           ]
-      },
-      python_requires='>=3.8',
-      include_package_data=True,
-      zip_safe=False,
-      project_urls={
-          'Source': 'https://github.com/transferwise/pipelinewise',
-          'Issues': 'https://github.com/transferwise/pipelinewise/issues',
       },
       entry_points='''
           [console_scripts]

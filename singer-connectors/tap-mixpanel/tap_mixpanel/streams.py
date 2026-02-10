@@ -75,7 +75,7 @@ class MixPanel:
         try:
             singer.write_schema(stream_name, schema, stream.key_properties)
         except OSError as err:
-            LOGGER.error("OS Error writing schema for: %s", stream_name)
+            LOGGER.error("OS Error writing schema for: {}".format(stream_name))
             raise err
 
     def get_bookmark(self, state, stream, default):
@@ -106,7 +106,7 @@ class MixPanel:
         if "bookmarks" not in state:
             state["bookmarks"] = {}
         state["bookmarks"][stream] = value
-        LOGGER.info("Write state for stream: %s, value: %s", stream, value)
+        LOGGER.info("Write state for stream: {}, value: {}".format(stream, value))
         singer.write_state(state)
 
     def process_records(
@@ -152,10 +152,11 @@ class MixPanel:
                             record, schema, stream_metadata
                         )
                     except Exception as err:
-                        LOGGER.error("Error: %s", str(err))
+                        LOGGER.error("Error: {}".format(err))
                         LOGGER.error(
-                            "For schema: %s",
-                            json.dumps(schema, sort_keys=True, indent=2),
+                            "For schema: {}".format(
+                                json.dumps(schema, sort_keys=True, indent=2)
+                            )
                         )
                         raise err
 
@@ -247,7 +248,7 @@ class MixPanel:
 
         full_url = f"{self.url}/{self.path}{f'?{querystring}' if querystring else ''}"
         if not data:
-            LOGGER.info("No data for URL: %s", full_url)
+            LOGGER.info("No data for URL: {}".format(full_url))
             # No data results
         else:  # Has data
 
@@ -314,7 +315,7 @@ class MixPanel:
                 # End data record loop
 
             if not transformed_data:
-                LOGGER.info("No transformed data for data = %s", data)
+                LOGGER.info("No transformed data for data = {}".format(data))
             # No transformed data results
             else:  # Has transformed data
                 # Process records and get the max_bookmark_value and record_count
@@ -329,9 +330,9 @@ class MixPanel:
                         last_datetime=last_datetime,
                     )
                     LOGGER.info(
-                        "Stream %s, batch processed %s records",
-                        self.tap_stream_id,
-                        record_count,
+                        "Stream {}, batch processed {} records".format(
+                            self.tap_stream_id, record_count
+                        )
                     )
 
                 # Set total_records and pagination fields
@@ -354,12 +355,13 @@ class MixPanel:
                     to_rec = record_count
 
                 LOGGER.info(
-                    "Synced Stream: %s, page: %s, %s to %s of total: %s",
-                    self.tap_stream_id,
-                    page,
-                    offset,
-                    to_rec,
-                    total_records,
+                    "Synced Stream: {}, page: {}, {} to {} of total: {}".format(
+                        self.tap_stream_id,
+                        page,
+                        offset,
+                        to_rec,
+                        total_records,
+                    )
                 )
                 # End has transformed data
             # End has data results
@@ -404,8 +406,9 @@ class MixPanel:
             if delta_days <= attribution_window:
                 delta_days = attribution_window
                 LOGGER.info(
-                    "Start bookmark less than %s day attribution window.",
-                    attribution_window,
+                    "Start bookmark less than {} day attribution window.".format(
+                        attribution_window
+                    )
                 )
             elif delta_days >= 365:
                 delta_days = 365
@@ -495,9 +498,11 @@ class MixPanel:
                 #   and when to_date > today (in project timezone)
                 from_date = str(start_window.astimezone(tzone).date())
                 to_date = str(end_window.astimezone(tzone).date())
-                LOGGER.info("START Sync for Stream: %s", self.tap_stream_id)
+                LOGGER.info("START Sync for Stream: {}".format(self.tap_stream_id))
                 if self.bookmark_query_field_from:
-                    LOGGER.info("Date window from: %s to %s", from_date, to_date)
+                    LOGGER.info(
+                        "Date window from: {} to {}".format(from_date, to_date)
+                    )
                 params[self.bookmark_query_field_from] = from_date
                 params[self.bookmark_query_field_to] = to_date
 
@@ -507,10 +512,9 @@ class MixPanel:
                 if self.parent_path and self.parent_id_field:
                     # API request data
                     LOGGER.info(
-                        "URL for Parent Stream %s: %s/%s",
-                        self.tap_stream_id,
-                        self.url,
-                        self.parent_path,
+                        "URL for Parent Stream {}: {}/{}".format(
+                            self.tap_stream_id, self.url, self.parent_path
+                        )
                     )
                     parent_data = self.client.request(
                         method="GET",
@@ -526,7 +530,9 @@ class MixPanel:
             for parent_record in parent_data:
                 parent_id = parent_record.get(self.parent_id_field)
                 LOGGER.info(
-                    "START: Stream: %s, parent_id: %s", self.tap_stream_id, parent_id
+                    "START: Stream: {}, parent_id: {}".format(
+                        self.tap_stream_id, parent_id
+                    )
                 )
 
                 # Pagination: loop thru all pages of data using next (if not None)
@@ -565,7 +571,9 @@ class MixPanel:
 
                     full_url = f"{self.url}/{self.path}{f'?{querystring}' if querystring else ''}"
 
-                    LOGGER.info("URL for Stream %s: %s", self.tap_stream_id, full_url)
+                    LOGGER.info(
+                        "URL for Stream {}: {}".format(self.tap_stream_id, full_url)
+                    )
 
                     (
                         parent_total,
@@ -597,14 +605,16 @@ class MixPanel:
                     )
                 # End stream != 'export'
                 LOGGER.info(
-                    "FINISHED: Stream: %s, parent_id: %s", self.tap_stream_id, parent_id
+                    "FINISHED: Stream: {}, parent_id: {}".format(
+                        self.tap_stream_id, parent_id
+                    )
                 )
-                LOGGER.info("Total records for parent: %s", parent_total)
+                LOGGER.info("Total records for parent: {}".format(parent_total))
                 # End parent record loop
-            LOGGER.info("FINISHED Sync for Stream: %s", self.tap_stream_id)
+            LOGGER.info("FINISHED Sync for Stream: {}".format(self.tap_stream_id))
             if self.bookmark_query_field_from:
-                LOGGER.info("Date window from: %s to %s", from_date, to_date)
-            LOGGER.info("Total records for date window: %s", date_total)
+                LOGGER.info("Date window from: {} to {}".format(from_date, to_date))
+            LOGGER.info("Total records for date window: {}".format(date_total))
             # Increment date window
             # Start after the day of end_window
             start_window = end_window + timedelta(days=1)
@@ -812,9 +822,9 @@ class Export(MixPanel):
                         last_datetime=last_datetime,
                     )
                     LOGGER.info(
-                        "Stream %s, batch processed %s records",
-                        self.tap_stream_id,
-                        record_count,
+                        "Stream {}, batch processed {} records".format(
+                            self.tap_stream_id, record_count
+                        )
                     )
 
                     total_records = total_records + record_count
@@ -838,9 +848,9 @@ class Export(MixPanel):
                 last_datetime=last_datetime,
             )
             LOGGER.info(
-                "Stream %s, batch processed %s records",
-                self.tap_stream_id,
-                record_count,
+                "Stream {}, batch processed {} records".format(
+                    self.tap_stream_id, record_count
+                )
             )
 
             total_records = total_records + record_count

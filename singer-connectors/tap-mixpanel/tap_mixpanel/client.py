@@ -98,7 +98,9 @@ def raise_for_error(response):
         exc: Custom exception prepared according to status code.
     """
     LOGGER.error(
-        "ERROR %s: %s, REASON: %s", response.status_code, response.text, response.reason
+        "ERROR {}: {}, REASON: {}".format(
+            response.status_code, response.text, response.reason
+        )
     )
     try:
         response_json = response.json()
@@ -187,7 +189,7 @@ class MixpanelClient:
                 headers=headers,
             )
         except requests.exceptions.Timeout as err:
-            LOGGER.error("TIMEOUT ERROR: %s", str(err))
+            LOGGER.error("TIMEOUT ERROR: {}".format(err))
             raise ReadTimeoutError from None
 
         if response.status_code == 402:
@@ -198,7 +200,7 @@ class MixpanelClient:
             )
             return True
         elif response.status_code != 200:
-            LOGGER.error("Error status_code = %s", response.status_code)
+            LOGGER.error("Error status_code = {}".format(response.status_code))
             raise_for_error(response)
         return True
 
@@ -248,7 +250,7 @@ class MixpanelClient:
                 raise_for_error(response)
             return response
         except requests.exceptions.Timeout as err:
-            LOGGER.error("TIMEOUT ERROR: %s", str(err))
+            LOGGER.error("TIMEOUT ERROR: {}".format(err))
             raise ReadTimeoutError(err) from None
 
     def request(self, method, url=None, path=None, params=None, json=None, **kwargs):
