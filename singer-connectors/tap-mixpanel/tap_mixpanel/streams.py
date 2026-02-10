@@ -270,31 +270,32 @@ class MixPanel:
             # Transform data with transform_json from transform.py
             # The data_key identifies the array/list of records below the <root> element
             transformed_data = []  # initialize the record list
+            data_key = self.data_key
 
             # Endpoints: funnels, revenue return results as dictionary for each date
             # Standardize results to a list/array
-            if self.date_dictionary and self.data_key in data:
+            if self.date_dictionary and data_key in data:
                 results = {}
                 results_list = []
-                for key, val in data[self.data_key].items():
+                for key, val in data[data_key].items():
                     # Skip $overall summary
                     if key != "$overall":
                         val["date"] = key
                         val["datetime"] = f"{key}T00:00:00Z"
                         results_list.append(val)
-                results[self.data_key] = results_list
+                results[data_key] = results_list
                 data = results
 
             # Cohorts endpoint returns results as a list/array (no data_key)
             # All other endpoints have a data_key
-            if not self.data_key:
-                self.data_key = "results"
+            if not data_key:
+                data_key = "results"
                 new_data = {"results": data}
                 data = new_data
 
             transformed_data = []
             # Loop through result records
-            for record in data[self.data_key]:
+            for record in data[data_key]:
                 # Transform record and append to transformed_data array
                 transformed_record = transform_record(
                     record,

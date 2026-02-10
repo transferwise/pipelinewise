@@ -11,7 +11,7 @@ This fork is maintained to be PipelineWise compatible.
 This tap:
 
 - Pulls raw data from the [Mixpanel Event Export API](https://developer.mixpanel.com/docs/exporting-raw-data) and the [Mixpanel Query API](https://developer.mixpanel.com/docs/data-export-api).
-- Supports following two server
+- Supports the following two servers
   - Standard Server
   - EU Residency Server
 - Extracts the following resources:
@@ -49,9 +49,9 @@ This tap:
 - Transformations: De-nest `$properties` to root-level, re-name properties with leading `$...` to `mp_reserved_...`.
 
 **[funnels](https://developer.mixpanel.com/docs/data-export-api#section-funnels)**
-- Standard Server endpoint 1 (name, id): https://data.mixpanel.com/api/2.0/export
+- Standard Server endpoint 1 (name, id): https://mixpanel.com/api/2.0/funnels/list
 - Standard Server endpoint 2 (date, measures): https://mixpanel.com/api/2.0/funnels
-- EU Residency Server endpoint 1 (name, id): https://data-eu.mixpanel.com/api/2.0/export
+- EU Residency Server endpoint 1 (name, id): https://eu.mixpanel.com/api/2.0/funnels/list
 - EU Residency Server endpoint 2 (date, measures): https://eu.mixpanel.com/api/2.0/funnels
 - Primary key fields: `funnel_id`, `date`
 - Parameters:

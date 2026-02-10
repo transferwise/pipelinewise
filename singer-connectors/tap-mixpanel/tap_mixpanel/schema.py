@@ -57,7 +57,7 @@ def get_schema(client, properties_flag, stream_name):
     if stream_name == "engage":
         properties = client.request(
             method="GET",
-            url=f"https://{client.__api_domain}/api/2.0",
+            url=f"https://{client.api_domain}/api/2.0",
             path="engage/properties",
             params={"limit": 2000},
             endpoint="engage_properties",
@@ -110,7 +110,7 @@ def get_schema(client, properties_flag, stream_name):
         #  https://developer.mixpanel.com/docs/data-export-api#section-hr-span-style-font-family-courier-top-span
         results = client.request(
             method="GET",
-            url=f"https://{client.__api_domain}/api/2.0",
+            url=f"https://{client.api_domain}/api/2.0",
             path="events/properties/top",
             params={"limit": 2000},
             endpoint="event_properties",

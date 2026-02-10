@@ -5,8 +5,8 @@ import jsonlines
 import requests
 import singer
 from requests.exceptions import ChunkedEncodingError, ConnectionError, Timeout
-from requests.models import ProtocolError
 from singer import metrics
+from urllib3.exceptions import ProtocolError
 
 LOGGER = singer.get_logger()
 
@@ -145,6 +145,10 @@ class MixpanelClient:
         self.__session = requests.Session()
         self.__verified = False
         self.disable_engage_endpoint = False
+
+    @property
+    def api_domain(self):
+        return self.__api_domain
 
     def __enter__(self):
         self.__verified = self.check_access()
