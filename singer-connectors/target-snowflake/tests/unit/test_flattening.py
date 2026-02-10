@@ -101,6 +101,28 @@ class TestFlattening(unittest.TestCase):
                               'c_obj__nested_prop3__multi_nested_prop2': {'type': ['null', 'string']}
                           })
 
+        salesforce_history_schema = {
+            "type": "object",
+            "properties": {
+                "Id": {"type": ["null", "string"]},
+                "Field": {"type": ["null", "string"]},
+                "OldValue": {},
+                "NewValue": {}
+            }
+        }
+
+        # Salesforce history fields OldValue/NewValue are anyType (no explicit type in schema).
+        # We must keep them so they are created and loaded in Snowflake.
+        self.assertEqual(
+            flatten_schema(salesforce_history_schema),
+            {
+                "Id": {"type": ["null", "string"]},
+                "Field": {"type": ["null", "string"]},
+                "OldValue": {"type": ["null", "string"]},
+                "NewValue": {"type": ["null", "string"]}
+            }
+        )
+
     def test_flatten_record(self):
         """Test flattening of RECORD messages"""
         flatten_record = flattening.flatten_record
