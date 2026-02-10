@@ -4,13 +4,16 @@
 [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/pipelinewise-tap-mixpanel.svg)](https://pypi.org/project/pipelinewise-tap-mixpanel/)
 [![License: AGPL](https://img.shields.io/badge/License-AGPLv3-yellow.svg)](https://opensource.org/licenses/AGPL-3.0)
 
-[Singer](https://www.singer.io/) tap that extracts data from a [Mixpanel API](https://developer.mixpanel.com/reference/overview) and produces JSON-formatted data following the [Singer spec](https://github.com/singer-io/getting-started/blob/master/docs/SPEC.md).
-
-This is a [PipelineWise](https://transferwise.github.io/pipelinewise) compatible tap connector.
+This is a [Singer](https://singer.io) tap that produces JSON-formatted data
+following the [Singer spec](https://github.com/singer-io/getting-started/blob/master/SPEC.md).
+This fork is maintained to be PipelineWise compatible.
 
 This tap:
 
 - Pulls raw data from the [Mixpanel Event Export API](https://developer.mixpanel.com/docs/exporting-raw-data) and the [Mixpanel Query API](https://developer.mixpanel.com/docs/data-export-api).
+- Supports following two server
+  - Standard Server
+  - EU Residency Server
 - Extracts the following resources:
   - Export (Events)
   - Engage (People/Users)
@@ -28,7 +31,8 @@ This tap:
 ## Streams
 
 **[export](https://developer.mixpanel.com/docs/exporting-raw-data#section-export-api-reference)**
-- Endpoint: https://data.mixpanel.com/api/2.0/export
+- Standard Server endpoint: https://data.mixpanel.com/api/2.0/export
+- EU Residency Server endpoint: https://data-eu.mixpanel.com/api/2.0/export
 - Primary key fields: `event`, `time`, `distinct_id`
 - Replication strategy: INCREMENTAL (query filtered)
   - Bookmark: `time`
@@ -38,14 +42,17 @@ This tap:
   - `export_events` to export only certain events
 
 **[engage](https://developer.mixpanel.com/docs/data-export-api#section-engage)**
-- Endpoint: https://mixpanel.com/api/2.0/engage
+  - Standard Server endpoint: https://mixpanel.com/api/2.0/engage
+  - EU Residency Server endpoint: https://eu.mixpanel.com/api/2.0/engage
 - Primary key fields:  `distinct_id`
 - Replication strategy: FULL_TABLE (all records, every load)
 - Transformations: De-nest `$properties` to root-level, re-name properties with leading `$...` to `mp_reserved_...`.
 
 **[funnels](https://developer.mixpanel.com/docs/data-export-api#section-funnels)**
-- Endpoint 1 (name, id): https://data.mixpanel.com/api/2.0/export
-- Endpoint 2 (date, measures): https://mixpanel.com/api/2.0/funnels
+- Standard Server endpoint 1 (name, id): https://data.mixpanel.com/api/2.0/export
+- Standard Server endpoint 2 (date, measures): https://mixpanel.com/api/2.0/funnels
+- EU Residency Server endpoint 1 (name, id): https://data-eu.mixpanel.com/api/2.0/export
+- EU Residency Server endpoint 2 (date, measures): https://eu.mixpanel.com/api/2.0/funnels
 - Primary key fields: `funnel_id`, `date`
 - Parameters:
   - `funnel_id`: {funnel_id} (from Endpoint 1)
@@ -56,7 +63,8 @@ This tap:
 - Transformations: Combine Endpoint 1 & 2 results, convert `date` keys to list to `results` list-array.
 
 **[revenue](https://developer.mixpanel.com/docs/data-export-api#section-hr-span-style-font-family-courier-revenue-span)**
-- Endpoint: https://mixpanel.com/api/2.0/engage/revenue
+- Standard Server endpoint: https://mixpanel.com/api/2.0/engage/revenue
+- EU Residency Server endpoint: https://eu.mixpanel.com/api/2.0/engage/revenue
 - Primary key fields: `date`
 - Parameters:
   - `unit`: day
@@ -66,19 +74,22 @@ This tap:
 - Transformations: Convert `date` keys to list to `results` list-array.
 
 **[annotations](https://developer.mixpanel.com/docs/data-export-api#section-annotations)**
-- Endpoint: https://mixpanel.com/api/2.0/annotations
+- Standard Server endpoint: https://mixpanel.com/api/2.0/annotations
+- EU Residency Server endpoint: https://eu.mixpanel.com/api/2.0/annotations
 - Primary key fields: `date`
 - Replication strategy: FULL_TABLE
 - Transformations: None.
 
 **[cohorts](https://developer.mixpanel.com/docs/cohorts#section-list-cohorts)**
-- Endpoint: https://mixpanel.com/api/2.0/cohorts/list
+- Standard Server endpoint: https://mixpanel.com/api/2.0/cohorts/list
+- EU Residency Server endpoint: https://eu.mixpanel.com/api/2.0/cohorts/list
 - Primary key fields: `id`
 - Replication strategy: FULL_TABLE
 - Transformations: None.
 
 **[cohort_members (engage)](https://developer.mixpanel.com/docs/data-export-api#section-engage)**
-- Endpoint: https://mixpanel.com/api/2.0/cohorts/list
+- Standard Server endpoint: https://mixpanel.com/api/2.0/cohorts/list
+- EU Residency Server endpoint: https://eu.mixpanel.com/api/2.0/cohorts/list
 - Primary key fields: `distinct_id`, `cohort_id`
 - Parameters:
   - `filter_by_cohort`: {cohort_id} (from `cohorts` endpoint)
@@ -91,6 +102,9 @@ The Mixpanel API uses Basic Authorization with the `api_secret` from the tap con
 
 - Authorization: `Basic <base-64 encoded api_secret>`
 
+### Note 
+- If you selected eu_residency_server then please make sure you enter api_secret of that project only.
+
 More details may be found in the [Mixpanel API Authentication](https://developer.mixpanel.com/docs/data-export-api#section-authentication) instructions. 
 
 
@@ -98,11 +112,30 @@ More details may be found in the [Mixpanel API Authentication](https://developer
 
 1. Install
 
+    Clone this repository, and then install using setup.py. We recommend using a virtualenv:
+
     ```bash
-    make venv
+    > virtualenv -p python3 venv
+    > source venv/bin/activate
+    > python setup.py install
+    OR
+    > cd .../tap-mixpanel
+    > pip install .
     ```
- 
-2. Create your tap's `config.json` file.  The tap config file for this tap should include these entries:
+2. Dependent libraries. The following dependent libraries were installed.
+    ```bash
+    > pip install singer-python
+    > pip install jsonlines
+    > pip install singer-tools
+    > pip install target-stitch
+    > pip install target-json
+    
+    ```
+    - [singer-tools](https://github.com/singer-io/singer-tools)
+    - [target-stitch](https://github.com/singer-io/target-stitch)
+    - [jsonlines](https://jsonlines.readthedocs.io/en/latest/) needed for `export` endpoint json-lines formatted data
+
+3. Create your tap's `config.json` file.  The tap config file for this tap should include these entries:
    - `start_date` - the default value to use if no bookmark exists for an endpoint (rfc3339 date string)
    - `user_agent` (string, optional): Process and email for API logging purposes. Example: `tap-mixpanel <api_user_email@your_company.com>`
    - `api_secret` (string, `ABCdef123`): an API secret for each project in Mixpanel. This can be found in the Mixpanel Console, upper-right Settings (gear icon), Organization Settings > Projects and in the Access Keys section. For this tap, only the api_secret is needed (the api_key is legacy and the token is used only for uploading data). Each Mixpanel project has a different api_secret; therefore each Singer tap pipeline instance is for a single project.
@@ -110,8 +143,9 @@ More details may be found in the [Mixpanel API Authentication](https://developer
    - `attribution_window` (integer, `5`): Latency minimum number of days to look-back to account for delays in attributing accurate results. [Default attribution window is 5 days](https://help.mixpanel.com/hc/en-us/articles/115004616486-Tracking-If-Users-Are-Offline).
    - `project_timezone` (string like `US/Pacific`): Time zone in which integer date times are stored. The project timezone may be found in the project settings in the Mixpanel console. [More info about timezones](https://help.mixpanel.com/hc/en-us/articles/115004547203-Manage-Timezones-for-Projects-in-Mixpanel). 
    - `select_properties_by_default` (`true` or `false`): Mixpanel properties are not fixed and depend on the date being uploaded. During Discovery mode and catalog.json setup, all current/existing properties will be captured. Setting this config parameter to true ensures that new properties on events and engage records are captured. Otherwise new properties will be ignored.
-   - `denest_properties` (`true` or `false`): To denest large and nested JSON Mixpanel responses in the `extract` and `engage` streams. To avoid very wide schema you can disable the denesting feature and the original JSON response will be sent in the RECORD message as plain object. Default `denest_properties` is `true`.
-
+   - `eu_residency_server` (`true` or `false`): Data Residency refers to the physical/geographical storage location of an organization's data or information. Setting this config parameter to true ensures that it uses eu_residency_server endpoint to capture the records. As a Mixpanel customer in the EU, you have the option to send your data to Mixpanel's EU data center, and have your data stored exclusively in the EU when creating a new project. [More info about eu_residency_server](https://help.mixpanel.com/hc/en-us/articles/360039135652-Data-Residency-in-EU).
+   - `request_timeout` (integer, `300`): Max time for which request should wait to get a response. Default request_timeout is 300 seconds.
+   
     ```json
     {
         "api_secret": "YOUR_API_SECRET",
@@ -119,19 +153,19 @@ More details may be found in the [Mixpanel API Authentication](https://developer
         "attribution_window": "5",
         "project_timezone": "US/Pacific",
         "select_properties_by_default": "true",
-        "denest_properties": "true",
         "start_date": "2019-01-01T00:00:00Z",
-        "user_agent": "tap-mixpanel <api_user_email@your_company.com>"
+        "user_agent": "tap-mixpanel <api_user_email@your_company.com>",
+        "eu_residency_server": "true",
+        "request_timeout": 300
     }
     ```
     
-    If you want to export only certain events from the [Raw export API](https://developer.mixpanel.com/reference/export)
-    then add `export_events` option to the `config.json` and list the required event names:
-    
+      If you want to export only certain events from the [Raw export API](https://developer.mixpanel.com/reference/export)then provide the value of `export_events`
+
     ```bash
-   "export_events": ["event_one", "event_two"]
+   "export_events": "event_one,event_two"
    ```
-    
+
     Optionally, also create a `state.json` file. `currently_syncing` is an optional attribute used for identifying the last object to be synced in case the job is interrupted mid-stream. The next run would begin where the last job left off.
 
     ```json
@@ -145,7 +179,7 @@ More details may be found in the [Mixpanel API Authentication](https://developer
     }
     ```
 
-3. Run the Tap in Discovery Mode
+4. Run the Tap in Discovery Mode
     This creates a catalog.json for selecting objects/fields to integrate:
     ```bash
     tap-mixpanel --config config.json --discover > catalog.json
@@ -153,15 +187,13 @@ More details may be found in the [Mixpanel API Authentication](https://developer
    See the Singer docs on discovery mode
    [here](https://github.com/singer-io/getting-started/blob/master/docs/DISCOVERY_MODE.md#discovery-mode).
 
-4. Run the Tap in Sync Mode (with catalog) and [write out to state file](https://github.com/singer-io/getting-started/blob/master/docs/RUNNING_AND_DEVELOPING.md#running-a-singer-tap-with-a-singer-target)
+5. Run the Tap in Sync Mode (with catalog) and [write out to state file](https://github.com/singer-io/getting-started/blob/master/docs/RUNNING_AND_DEVELOPING.md#running-a-singer-tap-with-a-singer-target)
 
     For Sync mode:
     ```bash
-    > tap-mixpanel --config tap_config.json --catalog catalog.json
+    > tap-mixpanel --config tap_config.json --catalog catalog.json > state.json
+    > tail -1 state.json > state.json.tmp && mv state.json.tmp state.json
     ```
-   
-    Messages are written to standard output following the Singer specification.
-    The resultant stream of JSON data can be consumed by a Singer target.
     To load to json files to verify outputs:
     ```bash
     > tap-mixpanel --config tap_config.json --catalog catalog.json | target-json > state.json
@@ -173,34 +205,60 @@ More details may be found in the [Mixpanel API Authentication](https://developer
     > tail -1 state.json > state.json.tmp && mv state.json.tmp state.json
     ```
 
-# Test
-
-1. Install python test dependencies in a virtual env
-
+6. Test the Tap
+    
+    While developing the mixpanel tap, the following utilities were run in accordance with Singer.io best practices:
+    Pylint to improve [code quality](https://github.com/singer-io/getting-started/blob/master/docs/BEST_PRACTICES.md#code-quality):
     ```bash
-    make venv
+    > pylint tap_mixpanel -d missing-docstring -d logging-format-interpolation -d too-many-locals -d too-many-arguments
     ```
-
-2. Run unit tests
-
-    ```
-    make unit_test
-    ```
-
-# Linting
-
-1. Install python test dependencies in a virtual env
-
+    Pylint test resulted in the following score:
     ```bash
-    make venv
+    Your code has been rated at 9.67/10
     ```
 
-2. Run linter
+    To [check the tap](https://github.com/singer-io/singer-tools#singer-check-tap) and verify working:
+    ```bash
+    > tap-mixpanel --config tap_config.json --catalog catalog.json | singer-check-tap > state.json
+    > tail -1 state.json > state.json.tmp && mv state.json.tmp state.json
+    ```
+    Check tap resulted in the following:
+    ```bash
+    The output is valid.
+    It contained 15697 messages for 7 streams.
+
+          7 schema messages
+      15661 record messages
+        29 state messages
+
+    Details by stream:
+    +----------------+---------+---------+
+    | stream         | records | schemas |
+    +----------------+---------+---------+
+    | revenue        | 134     | 1       |
+    | export         | 2811    | 1       |
+    | funnels        | 132     | 1       |
+    | cohort_members | 454     | 1       |
+    | engage         | 12119   | 1       |
+    | cohorts        | 5       | 1       |
+    | annotations    | 6       | 1       |
+    +----------------+---------+---------+
 
     ```
-    make pylint
+
+    #### Unit Tests
+
+    Unit tests may be run with the following.
+
+    ```
+    python -m pytest --verbose
     ```
 
-# Licence
+    Note, you may need to install test dependencies.
 
-GNU AFFERO GENERAL PUBLIC [LICENSE](./LICENSE)
+    ```
+    pip install -e .'[dev]'
+    ```
+---
+
+Copyright &copy; 2019 Stitch. PipelineWise compatibility updates maintained by Wise.
