@@ -6,7 +6,7 @@ with open('README.md') as f:
     long_description = f.read()
 
 setup(name="pipelinewise-target-snowflake",
-      version="2.4.1",
+      version="2.5.0",
       description="Singer.io target for loading data to Snowflake - PipelineWise compatible",
       long_description=long_description,
       long_description_content_type='text/markdown',
@@ -41,6 +41,7 @@ setup(name="pipelinewise-target-snowflake",
       entry_points="""
           [console_scripts]
           target-snowflake=target_snowflake:main
+          copy-native-to-iceberg=target_snowflake:copy_native_to_iceberg
       """,
       packages=find_packages(exclude=['tests*']),
       )
