@@ -82,6 +82,10 @@
 <li class="toctree-l2 current"><a class="current reference internal" href="#">Target Snowflake</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#snowflake-setup-requirements">Snowflake setup requirements</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#configuring-where-to-replicate-data">Configuring where to replicate data</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#snowflake-iceberg-tables">Snowflake Iceberg tables</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#limitations">Limitations</a></li>
+</ul>
+</li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="redshift.html">Target Redshift</a></li>
@@ -249,6 +253,36 @@ following the steps in the <a class="reference internal" href="../../installatio
 <span class="w">  </span><span class="c1">#client_side_encryption_master_key: &quot;&lt;MASTER_KEY&quot;&gt; # Plain string or vault encrypted</span>
 </pre></div>
 </div>
+</section>
+<section id="snowflake-iceberg-tables">
+<h2>Snowflake Iceberg tables<a class="headerlink" href="#snowflake-iceberg-tables" title="Link to this heading"></a></h2>
+<p>Iceberg support needs to be setup in Snowflake
+Useful tutorial : <a class="reference external" href="https://docs.snowflake.com/en/user-guide/tutorials/create-your-first-iceberg-table">https://docs.snowflake.com/en/user-guide/tutorials/create-your-first-iceberg-table</a></p>
+<p>PipelineWise expects the target database to have already have default Iceberg settings</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>CREATE OR EXTERNAL VOLUME ACCOUNT_ICEBERG_VOLUME ... ;
+ALTER DATABASE {target-database} SET CATALOG=&#39;snowflake&#39;;
+ALTER DATABASE {target-database} SET EXTERNAL_VOLUME = ACCOUNT_ICEBERG_VOLUME;
+</pre></div>
+</div>
+<p>target-snowflake has a utility that can be used to convert an <em>existing</em> Native table into an Iceberg table in a PipelineWise compatible manner</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>usage:<span class="w"> </span>copy-native-to-iceberg<span class="w"> </span><span class="o">[</span>-h<span class="o">]</span><span class="w"> </span><span class="o">[</span>-c<span class="w"> </span>CONFIG<span class="o">]</span><span class="w"> </span><span class="o">[</span>-t<span class="w"> </span>FQTN<span class="o">]</span><span class="w"> </span><span class="o">[</span>-e<span class="w"> </span>EVENTUAL<span class="o">]</span>
+
+options:
+-h,<span class="w"> </span>--help<span class="w">            </span>show<span class="w"> </span>this<span class="w"> </span><span class="nb">help</span><span class="w"> </span>message<span class="w"> </span>and<span class="w"> </span><span class="nb">exit</span>
+-c<span class="w"> </span>CONFIG,<span class="w"> </span>--config<span class="w"> </span>CONFIG
+<span class="w">                        </span>target-snowflake<span class="w"> </span>config<span class="w"> </span>file
+-t<span class="w"> </span>FQTN,<span class="w"> </span>--fqtn<span class="w"> </span>FQTN<span class="w">  </span>Snowflake<span class="w"> </span>fully<span class="w"> </span>qualified<span class="w"> </span>table<span class="w"> </span>name<span class="w"> </span><span class="o">(</span>fqtn<span class="o">)</span><span class="w"> </span><span class="k">in</span><span class="w"> </span>format<span class="w"> </span>database.schema.table
+-e<span class="w"> </span>EVENTUAL,<span class="w"> </span>--eventual<span class="w"> </span>EVENTUAL
+<span class="w">                        </span>EVENTUAL<span class="w"> </span><span class="nb">type</span><span class="w"> </span>of<span class="w"> </span>fqtn<span class="w"> </span>:<span class="w"> </span>NATIVE<span class="w"> </span><span class="o">(</span>Default<span class="o">)</span><span class="w"> </span>or<span class="w"> </span>ICEBERG.<span class="w"> </span>The<span class="w"> </span>other<span class="w"> </span>table<span class="w"> </span><span class="nb">type</span><span class="w"> </span>will<span class="w"> </span>still<span class="w"> </span>exist<span class="w"> </span>as<span class="w"> </span>a<span class="w"> </span>copy
+</pre></div>
+</div>
+<section id="limitations">
+<h3>Limitations<a class="headerlink" href="#limitations" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>Neither PipelineWise not target-snowflake is able to create a new Iceberg table</p></li>
+<li><p>PipelineWise <cite>sync_tables</cite> and <cite>partial_sync_table</cite> command will fail with <cite>(42710): SQL compilation error: table already exists as ICEBERG_TABLE</cite></p></li>
+</ul>
+</section>
 </section>
 </section>
 
