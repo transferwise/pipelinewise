@@ -48,7 +48,7 @@ your host system. First you need to install docker on your computer:
 * `Install Docker on MacOS <https://runnable.com/docker/install-docker-on-macos>`_
 
 Once Docker is installed you need to clone the PipelineWise git repository and build the
-executable docker image:
+executable Docker image:
 
 .. code-block:: bash
 
@@ -58,8 +58,10 @@ executable docker image:
 
 
 Building the image may take 5-10 minutes depending on your network connection. The output image will
-contain every supporter singer connectors. At the moment there is no official, pre-built image available
-to download on DockerHub. Once the image is ready, create an alias to the docker wrapper script so you can
+contain every supported Singer connector. Alternatively, see `Official Docker Images <https://github.com/transferwise/pipelinewise?tab=readme-ov-file#official-docker-images>`_
+to pull a pre-built image. 
+
+Once the image is ready, create an alias to the Docker wrapper script so you can
 use the ``pipelinewise`` executable commands everywhere on your system:
 
 .. code-block:: bash
