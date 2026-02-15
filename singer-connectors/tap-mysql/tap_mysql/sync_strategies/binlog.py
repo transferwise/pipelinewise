@@ -42,6 +42,23 @@ MYSQL_TIMESTAMP_TYPES = {
 }
 
 
+def binlog_filename_key(filename: str) -> Tuple[str, int]:
+    """
+    Key function for sorting binlog filenames numerically by their suffix.
+
+    Args:
+        filename: Binlog filename
+
+    Returns:
+        Tuple of (prefix, numeric_suffix)
+    """
+    if filename and '.' in filename:
+        prefix, suffix = filename.rsplit('.', 1)
+        if suffix.isdigit():
+            return prefix, int(suffix)
+    return filename, 0
+
+
 def add_automatic_properties(catalog_entry, columns):
     catalog_entry.schema.properties[SDC_DELETED_AT] = Schema(
         type=["null", "string"],
@@ -423,7 +440,7 @@ def calculate_bookmark(mysql_conn, binlog_streams_map, state) -> Tuple[str, int]
                     raise Exception('Unable to replicate binlog stream because the following binary log(s) no longer '
                                     f'exist: {", ".join(expired_logs)}')
 
-                for log_file in sorted(server_logs_set):
+                for log_file in sorted(server_logs_set, key=binlog_filename_key):
                     if min_log_pos_per_file.get(log_file):
                         return log_file, min_log_pos_per_file[log_file]['log_pos']
 
@@ -623,7 +640,8 @@ def _run_binlog_sync(
         # The iterator across python-mysql-replication's fetchone method should ultimately terminate
         # upon receiving an EOF packet. There seem to be some cases when a MySQL server will not send
         # one causing binlog replication to hang.
-        if (log_file > end_log_file) or (end_log_file == log_file and log_pos >= end_log_pos):
+        if (binlog_filename_key(log_file) > binlog_filename_key(end_log_file)) or (
+                end_log_file == log_file and log_pos >= end_log_pos):
             LOGGER.info('BinLog reader (file: %s, pos:%s) has reached or exceeded end position, exiting!',
                         log_file,
                         log_pos)
