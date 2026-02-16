@@ -157,15 +157,16 @@ your host system. First you need to install docker on your computer:</p>
 <li><p><a class="reference external" href="https://runnable.com/docker/install-docker-on-macos">Install Docker on MacOS</a></p></li>
 </ul>
 <p>Once Docker is installed you need to clone the PipelineWise git repository and build the
-executable docker image:</p>
+executable Docker image:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/transferwise/pipelinewise.git
 $<span class="w"> </span><span class="nb">cd</span><span class="w"> </span>./pipelinewise
 $<span class="w"> </span>docker<span class="w"> </span>build<span class="w"> </span>-t<span class="w"> </span>pipelinewise:latest<span class="w"> </span>.
 </pre></div>
 </div>
 <p>Building the image may take 5-10 minutes depending on your network connection. The output image will
-contain every supporter singer connectors. At the moment there is no official, pre-built image available
-to download on DockerHub. Once the image is ready, create an alias to the docker wrapper script so you can
+contain every supported Singer connector. Alternatively, see <a class="reference external" href="https://github.com/transferwise/pipelinewise?tab=readme-ov-file#official-docker-images">Official Docker Images</a>
+to pull a pre-built image.</p>
+<p>Once the image is ready, create an alias to the Docker wrapper script so you can
 use the <code class="docutils literal notranslate"><span class="pre">pipelinewise</span></code> executable commands everywhere on your system:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span><span class="nb">alias</span><span class="w"> </span><span class="nv">pipelinewise</span><span class="o">=</span><span class="s2">&quot;</span><span class="k">$(</span><span class="nb">pwd</span><span class="k">)</span><span class="s2">/bin/pipelinewise-docker&quot;</span>
 </pre></div>
