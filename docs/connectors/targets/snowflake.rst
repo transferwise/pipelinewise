@@ -124,7 +124,40 @@ Example YAML for target-snowflake:
       #               snowflake tables.
       stage: "<SCHEMA>.<STAGE_OBJECT_NAME>"
       file_format: "<SCHEMA>.<FILE_FORMAT_OBJECT_NAME>"
-      
+
       # Optional: Client Side Encryption
       # The same master key has to be added to the external stage object created in snowflake
       #client_side_encryption_master_key: "<MASTER_KEY"> # Plain string or vault encrypted
+
+
+Snowflake Iceberg tables
+''''''''''''''''''''''''
+Iceberg support needs to be setup in Snowflake
+Useful tutorial : https://docs.snowflake.com/en/user-guide/tutorials/create-your-first-iceberg-table
+
+PipelineWise expects the target database to have already have default Iceberg settings
+
+.. code-block:: text
+
+    CREATE OR EXTERNAL VOLUME ACCOUNT_ICEBERG_VOLUME ... ;
+    ALTER DATABASE {target-database} SET CATALOG='snowflake';
+    ALTER DATABASE {target-database} SET EXTERNAL_VOLUME = ACCOUNT_ICEBERG_VOLUME;
+
+target-snowflake has a utility that can be used to convert an *existing* Native table into an Iceberg table in a PipelineWise compatible manner
+
+.. code-block:: bash
+
+    usage: copy-native-to-iceberg [-h] [-c CONFIG] [-t FQTN] [-e EVENTUAL]
+
+    options:
+    -h, --help            show this help message and exit
+    -c CONFIG, --config CONFIG
+                            target-snowflake config file
+    -t FQTN, --fqtn FQTN  Snowflake fully qualified table name (fqtn) in format database.schema.table
+    -e EVENTUAL, --eventual EVENTUAL
+                            EVENTUAL type of fqtn : NATIVE (Default) or ICEBERG. The other table type will still exist as a copy
+
+Limitations
+^^^^^^^^^^^
+* Neither PipelineWise not target-snowflake is able to create a new Iceberg table
+* PipelineWise `sync_tables` and `partial_sync_table` command will fail with `(42710): SQL compilation error: table already exists as ICEBERG_TABLE`
