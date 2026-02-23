@@ -97,7 +97,7 @@ def sql_get_columns_postgres(schemas: list) -> str:
     sql_schemas = ', '.join(f"'{schema}'" for schema in schemas)
 
     return f"""
-    SELECT table_name, STRING_AGG(CONCAT(column_name, ':', data_type, ':'), ';' ORDER BY column_name)
+    SELECT table_name, STRING_AGG(CONCAT(column_name, ':', data_type, ':', udt_name), ';' ORDER BY column_name)
      FROM information_schema.columns
     WHERE table_schema IN ({sql_schemas})
     GROUP BY table_name
