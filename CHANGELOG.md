@@ -1,3 +1,10 @@
+0.74.0 (2026-02-10)
+-------------------
+- `pipelinewise-target-snowflake` from `2.4.1` to `2.5.0`
+    - Add utility to migrate Native tables to Iceberg tables.
+    - Support updating data in Iceberg tables
+    - Support minor schema changes on Iceberg Tables
+
 0.73.2 (2026-02-06)
 -------------------
 - Upgrade tap-github to 1.2.0 with enhanced rate limit handling
@@ -6,7 +13,7 @@
 
 0.73.1 (2025-09-16)
 -------------------
-- Bump tap-jira version 
+- Bump tap-jira version
 
 0.73.0 (2025-08-07)
 -------------------

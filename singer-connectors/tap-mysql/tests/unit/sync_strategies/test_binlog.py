@@ -62,6 +62,18 @@ class TestBinlogSyncStrategy(TestCase):
 
         self.assertListEqual(['x', binlog.SDC_DELETED_AT], columns)
 
+    def test_binlog_filename_key(self):
+        self.assertEqual(binlog.binlog_filename_key('mysql-bin.000001'), ('mysql-bin', 1))
+        self.assertEqual(binlog.binlog_filename_key('mysql-bin.999999'), ('mysql-bin', 999999))
+        self.assertEqual(binlog.binlog_filename_key('mysql-bin.1000000'), ('mysql-bin', 1000000))
+        self.assertEqual(binlog.binlog_filename_key('mysql-bin.invalid'), ('mysql-bin.invalid', 0))
+        self.assertEqual(binlog.binlog_filename_key('plain_filename'), ('plain_filename', 0))
+        self.assertEqual(binlog.binlog_filename_key(None), (None, 0))
+
+        # Comparison tests
+        self.assertTrue(binlog.binlog_filename_key('mysql-bin.1000000') > binlog.binlog_filename_key('mysql-bin.999999'))
+        self.assertTrue(binlog.binlog_filename_key('mysql-bin.2') > binlog.binlog_filename_key('mysql-bin.1'))
+
     @patch('tap_mysql.sync_strategies.binlog.calculate_bookmark',
            return_value=('binlog0001', 50))
     @patch('tap_mysql.sync_strategies.binlog.fetch_current_log_file_and_pos',
