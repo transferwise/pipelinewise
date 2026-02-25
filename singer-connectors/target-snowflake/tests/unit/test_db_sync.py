@@ -41,7 +41,7 @@ class TestDBSync(unittest.TestCase):
             'account': "dummy-value",
             'dbname': "dummy-value",
             'user': "dummy-value",
-            'password': "dummy-value",
+            'private_key': "dummy-key",
             'warehouse': "dummy-value",
             'default_target_schema': "dummy-value",
             'file_format': "dummy-value"
@@ -207,7 +207,7 @@ class TestDBSync(unittest.TestCase):
             'account': "dummy-value",
             'dbname': "dummy-value",
             'user': "dummy-value",
-            'password': "dummy-value",
+            'private_key': "dummy-key",
             'warehouse': "dummy-value",
             'default_target_schema': "dummy-value",
             'file_format': "dummy-value"
@@ -238,7 +238,7 @@ class TestDBSync(unittest.TestCase):
             'account': "dummy-value",
             'dbname': "dummy-value",
             'user': "dummy-value",
-            'password': "dummy-value",
+            'private_key': "dummy-key",
             'warehouse': "dummy-value",
             'default_target_schema': "dummy-value",
             'file_format': "dummy-value",
@@ -280,7 +280,7 @@ class TestDBSync(unittest.TestCase):
             'account': "dummy-value",
             'dbname': "dummy-value",
             'user': "dummy-value",
-            'password': "dummy-value",
+            'private_key': "dummy-key",
             'warehouse': "dummy-value",
             'default_target_schema': "dummy-value",
             'file_format': "dummy-value"
@@ -339,7 +339,7 @@ class TestDBSync(unittest.TestCase):
             'account': "dummy_account",
             'dbname': "dummy_dbname",
             'user': "dummy_user",
-            'password': "dummy_password",
+            'private_key': "dummy_key",
             'warehouse': "dummy_warehouse",
             'default_target_schema': "dummy_default_target_schema",
             'file_format': "dummy_file_format",
@@ -377,7 +377,7 @@ class TestDBSync(unittest.TestCase):
             'account': "dummy_account",
             'dbname': "dummy_dbname",
             'user': "dummy_user",
-            'password': "dummy_password",
+            'private_key': "dummy_key",
             'warehouse': "dummy_warehouse",
             'default_target_schema': "dummy_default_target_schema",
             'file_format': "dummy_file_format",
@@ -412,7 +412,7 @@ class TestDBSync(unittest.TestCase):
             'account': "dummy-account",
             'dbname': "dummy-db",
             'user': "dummy-user",
-            'password': "dummy-passwd",
+            'private_key': "dummy-key",
             'warehouse': "dummy-wh",
             'default_target_schema': "dummy-schema",
             'file_format': "dummy-file-format"
@@ -440,9 +440,10 @@ class TestDBSync(unittest.TestCase):
             }
         ]
         query_patch.side_effect = [
-            [{'type': 'CSV'}],
-            [{'column_name': 'ID'}],
-            None
+            [{'type': 'CSV'}],           # SHOW FILE FORMATS
+            [],                           # SHOW TERSE ICEBERG TABLES (not Iceberg)
+            [{'column_name': 'ID'}],     # show primary keys
+            None                          # ALTER TABLE
         ]
 
         dbsync = db_sync.DbSync(minimal_config, stream_schema_message, table_cache)
@@ -450,6 +451,7 @@ class TestDBSync(unittest.TestCase):
 
         query_patch.assert_has_calls([
             call('SHOW FILE FORMATS LIKE \'dummy-file-format\''),
+            call("SHOW TERSE ICEBERG TABLES LIKE 'TABLE1' IN SCHEMA DUMMY-DB.dummy-schema"),
             call('show primary keys in table dummy-db.dummy-schema."TABLE1";'),
             call(['alter table dummy-schema."TABLE1" alter column "ID" drop not null;'])
         ])
@@ -460,7 +462,7 @@ class TestDBSync(unittest.TestCase):
             'account': "dummy-account",
             'dbname': "dummy-db",
             'user': "dummy-user",
-            'password': "dummy-passwd",
+            'private_key': "dummy-key",
             'warehouse': "dummy-wh",
             'default_target_schema': "dummy-schema",
             'file_format': "dummy-file-format"
@@ -497,9 +499,10 @@ class TestDBSync(unittest.TestCase):
             }
         ]
         query_patch.side_effect = [
-            [{'type': 'CSV'}],
-            [{'column_name': 'ID'}],
-            None
+            [{'type': 'CSV'}],           # SHOW FILE FORMATS
+            [],                           # SHOW TERSE ICEBERG TABLES (not Iceberg)
+            [{'column_name': 'ID'}],     # show primary keys
+            None                          # ALTER TABLE
         ]
 
         dbsync = db_sync.DbSync(minimal_config, stream_schema_message, table_cache)
@@ -508,17 +511,18 @@ class TestDBSync(unittest.TestCase):
         # due to usage of sets in the code, order of columns in queries in not guaranteed
         # so have to break assertions to account for this.
         calls = query_patch.call_args_list
-        self.assertEqual(3, len(calls))
+        self.assertEqual(4, len(calls))
 
         self.assertEqual('SHOW FILE FORMATS LIKE \'dummy-file-format\'', calls[0][0][0])
-        self.assertEqual('show primary keys in table dummy-db.dummy-schema."TABLE1";', calls[1][0][0])
+        self.assertEqual("SHOW TERSE ICEBERG TABLES LIKE 'TABLE1' IN SCHEMA DUMMY-DB.dummy-schema", calls[1][0][0])
+        self.assertEqual('show primary keys in table dummy-db.dummy-schema."TABLE1";', calls[2][0][0])
 
-        self.assertEqual('alter table dummy-schema."TABLE1" drop primary key;', calls[2][0][0][0])
+        self.assertEqual('alter table dummy-schema."TABLE1" drop primary key;', calls[3][0][0][0])
 
-        self.assertIn(calls[2][0][0][1], {'alter table dummy-schema."TABLE1" add primary key("ID", "NAME");',
+        self.assertIn(calls[3][0][0][1], {'alter table dummy-schema."TABLE1" add primary key("ID", "NAME");',
                                           'alter table dummy-schema."TABLE1" add primary key("NAME", "ID");'})
 
-        self.assertListEqual(sorted(calls[2][0][0][2:]),
+        self.assertListEqual(sorted(calls[3][0][0][2:]),
                              [
                                  'alter table dummy-schema."TABLE1" alter column "ID" drop not null;',
                                  'alter table dummy-schema."TABLE1" alter column "NAME" drop not null;',
@@ -531,7 +535,7 @@ class TestDBSync(unittest.TestCase):
             'account': "dummy-account",
             'dbname': "dummy-db",
             'user': "dummy-user",
-            'password': "dummy-passwd",
+            'private_key': "dummy-key",
             'warehouse': "dummy-wh",
             'default_target_schema': "dummy-schema",
             'file_format': "dummy-file-format"
@@ -559,9 +563,10 @@ class TestDBSync(unittest.TestCase):
             }
         ]
         query_patch.side_effect = [
-            [{'type': 'CSV'}],
-            [{'column_name': 'ID'}],
-            None
+            [{'type': 'CSV'}],           # SHOW FILE FORMATS
+            [],                           # SHOW TERSE ICEBERG TABLES (not Iceberg)
+            [{'column_name': 'ID'}],     # show primary keys
+            None                          # ALTER TABLE
         ]
 
         dbsync = db_sync.DbSync(minimal_config, stream_schema_message, table_cache)
@@ -569,6 +574,7 @@ class TestDBSync(unittest.TestCase):
 
         query_patch.assert_has_calls([
             call('SHOW FILE FORMATS LIKE \'dummy-file-format\''),
+            call("SHOW TERSE ICEBERG TABLES LIKE 'TABLE1' IN SCHEMA DUMMY-DB.dummy-schema"),
             call('show primary keys in table dummy-db.dummy-schema."TABLE1";'),
             call(['alter table dummy-schema."TABLE1" drop primary key;',
                   'alter table dummy-schema."TABLE1" alter column "ID" drop not null;'])
@@ -580,7 +586,7 @@ class TestDBSync(unittest.TestCase):
             'account': "dummy-account",
             'dbname': "dummy-db",
             'user': "dummy-user",
-            'password': "dummy-passwd",
+            'private_key': "dummy-key",
             'warehouse': "dummy-wh",
             'default_target_schema': "dummy-schema",
             'file_format': "dummy-file-format"
@@ -608,9 +614,10 @@ class TestDBSync(unittest.TestCase):
             }
         ]
         query_patch.side_effect = [
-            [{'type': 'CSV'}],
-            [],
-            None
+            [{'type': 'CSV'}],           # SHOW FILE FORMATS
+            [],                           # SHOW TERSE ICEBERG TABLES (not Iceberg)
+            [],                           # show primary keys (no existing PK)
+            None                          # ALTER TABLE add PK
         ]
 
         dbsync = db_sync.DbSync(minimal_config, stream_schema_message, table_cache)
@@ -618,7 +625,268 @@ class TestDBSync(unittest.TestCase):
 
         query_patch.assert_has_calls([
             call('SHOW FILE FORMATS LIKE \'dummy-file-format\''),
+            call("SHOW TERSE ICEBERG TABLES LIKE 'TABLE1' IN SCHEMA DUMMY-DB.dummy-schema"),
             call('show primary keys in table dummy-db.dummy-schema."TABLE1";'),
             call(['alter table dummy-schema."TABLE1" add primary key("ID");',
                   'alter table dummy-schema."TABLE1" alter column "ID" drop not null;'])
         ])
+
+    # -----------------------------------------------------------------------
+    # Tests for WDL-155: Iceberg column type handling
+    # -----------------------------------------------------------------------
+
+    def test_column_type_mapping_iceberg(self):
+        """With is_iceberg_table=True, variant → text and integer → number(19,0); others unchanged"""
+        mapper = db_sync.column_type
+
+        # variant types (object/array) map to 'text' for Iceberg
+        self.assertEqual(mapper(self.json_types['obj'], is_iceberg_table=True), 'text')
+        self.assertEqual(mapper(self.json_types['arr'], is_iceberg_table=True), 'text')
+
+        # integer maps to 'number(19,0)' for Iceberg
+        self.assertEqual(mapper(self.json_types['int'], is_iceberg_table=True), 'number(19,0)')
+
+        # All other types should be unchanged
+        unchanged = {
+            'str': 'text',
+            'str_or_null': 'text',
+            'dt': 'timestamp_ntz',
+            'dt_or_null': 'timestamp_ntz',
+            'd': 'date',
+            'd_or_null': 'date',
+            'time': 'time',
+            'time_or_null': 'time',
+            'binary': 'binary',
+            'num': 'float',
+            'int_or_str': 'text',
+            'bool': 'boolean',
+        }
+        for key, expected in unchanged.items():
+            self.assertEqual(mapper(self.json_types[key], is_iceberg_table=True), expected,
+                             msg=f"column_type mismatch for '{key}' with is_iceberg_table=True")
+
+    def test_column_clause_iceberg(self):
+        """column_clause should emit Iceberg-compatible types when is_iceberg_table=True"""
+        # variant → text
+        self.assertEqual(
+            db_sync.column_clause('my_obj', self.json_types['obj'], is_iceberg_table=True),
+            '"MY_OBJ" text'
+        )
+        # integer → number(19,0)
+        self.assertEqual(
+            db_sync.column_clause('my_int', self.json_types['int'], is_iceberg_table=True),
+            '"MY_INT" number(19,0)'
+        )
+        # Standard (non-iceberg) path is unchanged
+        self.assertEqual(
+            db_sync.column_clause('my_obj', self.json_types['obj']),
+            '"MY_OBJ" variant'
+        )
+        self.assertEqual(
+            db_sync.column_clause('my_int', self.json_types['int']),
+            '"MY_INT" number'
+        )
+
+    @patch('target_snowflake.db_sync.DbSync.query')
+    def test_version_column_sql(self, query_patch):
+        """version_column uses ALTER ICEBERG TABLE when is_iceberg_table=True, ALTER TABLE otherwise"""
+        query_patch.return_value = [{'type': 'CSV'}]
+        minimal_config = {
+            'account': "dummy-account",
+            'dbname': "dummy-db",
+            'user': "dummy-user",
+            'private_key': "dummy-key",
+            'warehouse': "dummy-wh",
+            'default_target_schema': "dummy-schema",
+            'file_format': "dummy-file-format"
+        }
+        stream_schema_message = {
+            "stream": "public-table1",
+            "schema": {"properties": {"id": {"type": ["integer"]}}},
+            "key_properties": ["id"]
+        }
+        dbsync = db_sync.DbSync(minimal_config, stream_schema_message)
+
+        dbsync.version_column('"ID"', 'public-table1', is_iceberg_table=False)
+        sql = query_patch.call_args[0][0]
+        self.assertIn('ALTER TABLE', sql)
+        self.assertNotIn('ICEBERG', sql)
+        self.assertIn('RENAME COLUMN', sql)
+
+        dbsync.version_column('"ID"', 'public-table1', is_iceberg_table=True)
+        sql = query_patch.call_args[0][0]
+        self.assertIn('ALTER ICEBERG TABLE', sql)
+        self.assertIn('RENAME COLUMN', sql)
+
+    @patch('target_snowflake.db_sync.DbSync.query')
+    def test_add_column_sql(self, query_patch):
+        """add_column uses ALTER ICEBERG TABLE when is_iceberg_table=True, ALTER TABLE otherwise"""
+        query_patch.return_value = [{'type': 'CSV'}]
+        minimal_config = {
+            'account': "dummy-account",
+            'dbname': "dummy-db",
+            'user': "dummy-user",
+            'private_key': "dummy-key",
+            'warehouse': "dummy-wh",
+            'default_target_schema': "dummy-schema",
+            'file_format': "dummy-file-format"
+        }
+        stream_schema_message = {
+            "stream": "public-table1",
+            "schema": {"properties": {"id": {"type": ["integer"]}}},
+            "key_properties": ["id"]
+        }
+        dbsync = db_sync.DbSync(minimal_config, stream_schema_message)
+
+        dbsync.add_column('"NEW_COL" text', 'public-table1', is_iceberg_table=False)
+        sql = query_patch.call_args[0][0]
+        self.assertIn('ALTER TABLE', sql)
+        self.assertNotIn('ICEBERG', sql)
+        self.assertIn('ADD COLUMN', sql)
+
+        dbsync.add_column('"NEW_COL" text', 'public-table1', is_iceberg_table=True)
+        sql = query_patch.call_args[0][0]
+        self.assertIn('ALTER ICEBERG TABLE', sql)
+        self.assertIn('ADD COLUMN', sql)
+
+    @patch('target_snowflake.db_sync.DbSync.query')
+    def test_update_columns_iceberg_adds_new_column(self, query_patch):
+        """update_columns with is_iceberg_table=True should issue ALTER ICEBERG TABLE ADD COLUMN"""
+        query_patch.return_value = [{'type': 'CSV'}]
+        minimal_config = {
+            'account': "dummy-account",
+            'dbname': "dummy-db",
+            'user': "dummy-user",
+            'private_key': "dummy-key",
+            'warehouse': "dummy-wh",
+            'default_target_schema': "dummy-schema",
+            'file_format': "dummy-file-format"
+        }
+        stream_schema_message = {
+            "stream": "public-table1",
+            "schema": {
+                "properties": {
+                    "id": {"type": ["integer"]},
+                    "new_col": {"type": ["null", "string"]}
+                }
+            },
+            "key_properties": ["id"]
+        }
+        # table_cache only has 'id' — 'new_col' is missing and should be added
+        table_cache = [
+            {'SCHEMA_NAME': 'DUMMY-SCHEMA', 'TABLE_NAME': 'TABLE1', 'COLUMN_NAME': 'ID', 'DATA_TYPE': 'NUMBER'}
+        ]
+        dbsync = db_sync.DbSync(minimal_config, stream_schema_message, table_cache)
+        dbsync.update_columns(is_iceberg_table=True)
+
+        add_calls = [str(c) for c in query_patch.call_args_list if 'ADD COLUMN' in str(c)]
+        self.assertEqual(len(add_calls), 1)
+        self.assertIn('ALTER ICEBERG TABLE', add_calls[0])
+
+    @patch('target_snowflake.db_sync.DbSync.query')
+    def test_update_columns_iceberg_number_no_spurious_alter(self, query_patch):
+        """Existing NUMBER column in Iceberg table should not be re-altered: number(19,0) base matches NUMBER"""
+        query_patch.return_value = [{'type': 'CSV'}]
+        minimal_config = {
+            'account': "dummy-account",
+            'dbname': "dummy-db",
+            'user': "dummy-user",
+            'private_key': "dummy-key",
+            'warehouse': "dummy-wh",
+            'default_target_schema': "dummy-schema",
+            'file_format': "dummy-file-format"
+        }
+        stream_schema_message = {
+            "stream": "public-table1",
+            "schema": {
+                "properties": {
+                    "id": {"type": ["integer"]},
+                }
+            },
+            "key_properties": ["id"]
+        }
+        table_cache = [
+            {'SCHEMA_NAME': 'DUMMY-SCHEMA', 'TABLE_NAME': 'TABLE1', 'COLUMN_NAME': 'ID', 'DATA_TYPE': 'NUMBER'}
+        ]
+        dbsync = db_sync.DbSync(minimal_config, stream_schema_message, table_cache)
+        dbsync.update_columns(is_iceberg_table=True)
+
+        alter_calls = [str(c) for c in query_patch.call_args_list
+                       if 'ADD COLUMN' in str(c) or 'RENAME COLUMN' in str(c)]
+        self.assertEqual(len(alter_calls), 0,
+                         msg="NUMBER should not be re-altered for number(19,0) on Iceberg table")
+
+    @patch('target_snowflake.db_sync.DbSync.query')
+    def test_update_columns_iceberg_text_not_altered_for_variant_schema(self, query_patch):
+        """Existing TEXT column in Iceberg table is not re-altered when schema type is variant (object/array)"""
+        query_patch.return_value = [{'type': 'CSV'}]
+        minimal_config = {
+            'account': "dummy-account",
+            'dbname': "dummy-db",
+            'user': "dummy-user",
+            'private_key': "dummy-key",
+            'warehouse': "dummy-wh",
+            'default_target_schema': "dummy-schema",
+            'file_format': "dummy-file-format"
+        }
+        stream_schema_message = {
+            "stream": "public-table1",
+            "schema": {
+                "properties": {
+                    "id": {"type": ["integer"]},
+                    "payload": {"type": ["object"]},
+                }
+            },
+            "key_properties": ["id"]
+        }
+        # 'payload' was previously migrated variant → text; schema still says object/variant
+        table_cache = [
+            {'SCHEMA_NAME': 'DUMMY-SCHEMA', 'TABLE_NAME': 'TABLE1', 'COLUMN_NAME': 'ID', 'DATA_TYPE': 'NUMBER'},
+            {'SCHEMA_NAME': 'DUMMY-SCHEMA', 'TABLE_NAME': 'TABLE1', 'COLUMN_NAME': 'PAYLOAD', 'DATA_TYPE': 'TEXT'},
+        ]
+        dbsync = db_sync.DbSync(minimal_config, stream_schema_message, table_cache)
+        dbsync.update_columns(is_iceberg_table=True)
+
+        alter_calls = [str(c) for c in query_patch.call_args_list
+                       if 'ADD COLUMN' in str(c) or 'RENAME COLUMN' in str(c)]
+        self.assertEqual(len(alter_calls), 0,
+                         msg="TEXT should not be re-altered when schema is variant on an Iceberg table")
+
+    @patch('target_snowflake.db_sync.DbSync.query')
+    def test_update_columns_iceberg_type_change_versions_and_re_adds(self, query_patch):
+        """A type mismatch on Iceberg renames the old column then adds the new one via ICEBERG DDL"""
+        query_patch.return_value = [{'type': 'CSV'}]
+        minimal_config = {
+            'account': "dummy-account",
+            'dbname': "dummy-db",
+            'user': "dummy-user",
+            'private_key': "dummy-key",
+            'warehouse': "dummy-wh",
+            'default_target_schema': "dummy-schema",
+            'file_format': "dummy-file-format"
+        }
+        stream_schema_message = {
+            "stream": "public-table1",
+            "schema": {
+                "properties": {
+                    "id": {"type": ["integer"]},
+                    "amount": {"type": ["number"]},  # schema says float; table has TEXT — mismatch
+                }
+            },
+            "key_properties": ["id"]
+        }
+        table_cache = [
+            {'SCHEMA_NAME': 'DUMMY-SCHEMA', 'TABLE_NAME': 'TABLE1', 'COLUMN_NAME': 'ID', 'DATA_TYPE': 'NUMBER'},
+            {'SCHEMA_NAME': 'DUMMY-SCHEMA', 'TABLE_NAME': 'TABLE1', 'COLUMN_NAME': 'AMOUNT', 'DATA_TYPE': 'TEXT'},
+        ]
+        dbsync = db_sync.DbSync(minimal_config, stream_schema_message, table_cache)
+        dbsync.update_columns(is_iceberg_table=True)
+
+        all_calls = [str(c) for c in query_patch.call_args_list]
+        rename_calls = [s for s in all_calls if 'RENAME COLUMN' in s]
+        add_calls = [s for s in all_calls if 'ADD COLUMN' in s]
+
+        self.assertEqual(len(rename_calls), 1, msg="Expected exactly one RENAME COLUMN for type change")
+        self.assertIn('ALTER ICEBERG TABLE', rename_calls[0])
+        self.assertEqual(len(add_calls), 1, msg="Expected exactly one ADD COLUMN after versioning")
+        self.assertIn('ALTER ICEBERG TABLE', add_calls[0])
