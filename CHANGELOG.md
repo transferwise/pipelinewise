@@ -1,9 +1,13 @@
+0.75.1 (2026-02-25)
+-------------------
+- `pipelinewise-target-snowflake` from `2.5.0` to `2.5.1`
+    - Support schema changes on existing Iceberg tables
+
 0.74.0 (2026-02-10)
 -------------------
 - `pipelinewise-target-snowflake` from `2.4.1` to `2.5.0`
     - Add utility to migrate Native tables to Iceberg tables.
     - Support updating data in Iceberg tables
-    - Support minor schema changes on Iceberg Tables
 
 0.73.2 (2026-02-06)
 -------------------
