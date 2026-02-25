@@ -13,7 +13,7 @@ from urllib3 import Timeout
 import pytest
 from pytest import raises
 from tap_mixpanel import MixpanelClient, client
-from tap_mixpanel.client import ReadTimeoutError, Server5xxError
+from tap_mixpanel.client import ReadTimeoutError, Server429Error, Server5xxError
 from tests.configuration.fixtures import mixpanel_client
 
 
@@ -40,6 +40,21 @@ def test_request_export_backoff_on_remote_timeout(mock_sleep, mixpanel_client):
                 pass
         # Assert backoff retry count as expected    
         assert mock_sleep.call_count == client.BACKOFF_MAX_TRIES_REQUEST - 1
+
+
+@mock.patch('time.sleep', return_value=None)
+def test_request_export_backoff_on_rate_limit(mock_sleep, mixpanel_client):
+    with requests_mock.Mocker() as m:
+        m.request('GET', 'http://test.com', text='rate limit reached', status_code=429)
+        result = mixpanel_client.request_export('GET', url='http://test.com')
+
+        with raises(Server429Error):
+            for record in result:
+                pass
+
+        # Assert backoff retry count as expected
+        assert mock_sleep.call_count == client.BACKOFF_MAX_TRIES_REQUEST - 1
+
 
 @mock.patch('time.sleep', return_value=None)
 def test_request_backoff_on_timeout(mock_sleep, mixpanel_client):
