@@ -72,7 +72,7 @@ def validate_config(config):
     return errors
 
 
-def column_type(schema_property):
+def column_type(schema_property, is_iceberg_table=False):
     """Take a specific schema property and return the snowflake equivalent column type"""
     property_type = schema_property['type']
     property_format = schema_property['format'] if 'format' in schema_property else None
@@ -97,6 +97,13 @@ def column_type(schema_property):
         col_type = 'number'
     elif 'boolean' in property_type:
         col_type = 'boolean'
+
+    # Adjust for Iceberg column type compatibility if required
+    if is_iceberg_table:
+        if col_type == 'variant':
+            col_type = 'text'
+        elif col_type == 'number':
+            col_type = 'number(19,0)'
 
     return col_type
 
@@ -123,9 +130,9 @@ def json_element_name(name):
     return f'"{name}"'
 
 
-def column_clause(name, schema_property):
+def column_clause(name, schema_property, is_iceberg_table=False):
     """Generate DDL column name with column type string"""
-    return f'{safe_column_name(name)} {column_type(schema_property)}'
+    return f'{safe_column_name(name)} {column_type(schema_property, is_iceberg_table)}'
 
 
 def primary_column_names(stream_schema_message):
@@ -555,7 +562,8 @@ class DbSync:
         columns = [
             column_clause(
                 name,
-                schema
+                schema,
+                is_iceberg_table=False
             )
             for (name, schema) in self.flatten_schema.items()
         ]
@@ -751,7 +759,8 @@ class DbSync:
         columns_to_add = [
             column_clause(
                 name,
-                properties_schema
+                properties_schema,
+                is_iceberg_table
             )
             for (name, properties_schema) in self.flatten_schema.items()
             if name.upper() not in columns_dict
@@ -766,12 +775,11 @@ class DbSync:
                 continue
 
             current_type = columns_dict[name_upper]['DATA_TYPE'].upper()
-            new_type = column_type(properties_schema).upper()
-
-            # self.logger.error('Column %s : %s -> %s', name, current_type, new_type)
+            new_type = column_type(properties_schema, is_iceberg_table).upper()
+            base_new_type = re.sub(r'\(.*\)', '', new_type).strip()
 
             # Skip if types match
-            if current_type == new_type:
+            if current_type == base_new_type:
                 continue
 
             # Don't alter table if TIMESTAMP_NTZ detected as the new required column type
@@ -783,31 +791,23 @@ class DbSync:
             if new_type == 'TIMESTAMP_NTZ':
                 continue
 
-            # if is_iceberg_table and current_type == 'TEXT' and new_type == 'VARIANT':
-            if is_iceberg_table and current_type == 'TEXT' and new_type == 'VARIANT':
-                continue
-
-            self.logger.error('Column |%s| : |%s| -> |%s|', name, current_type, new_type)
             columns_to_replace.append((
                 safe_column_name(name),
-                column_clause(name, properties_schema)
+                column_clause(name, properties_schema, is_iceberg_table)
             ))
 
-        if is_iceberg_table and (columns_to_add or columns_to_replace):
-            self.logger.error('Iceberg table %s will NOT be automatically altered.', table_name)
-            if columns_to_add:
-                self.logger.error('Columns to manually add to Iceberg table %s: %s', table_name, columns_to_add)
-            if columns_to_replace:
-                self.logger.error('Columns to manually replace in Iceberg table %s: %s', table_name, columns_to_replace)
-            raise Exception('Iceberg table %s will NOT be automatically altered.', table_name)
+        # Note: Iceberg tables may still have column type changes automatically applied via
+        # versioning (self.version_column) and re-adding the column. The previous logic that
+        # blocked all automatic type changes for Iceberg tables has been intentionally removed.
+        # If stricter handling is required in the future, it should be reintroduced explicitly.
 
         for column in columns_to_add:
-            self.add_column(column, stream)
+            self.add_column(column, stream, is_iceberg_table)
 
         for (column_name, column) in columns_to_replace:
             # self.drop_column(column_name, stream)
-            self.version_column(column_name, stream)
-            self.add_column(column, stream)
+            self.version_column(column_name, stream, is_iceberg_table)
+            self.add_column(column, stream, is_iceberg_table)
 
         # Refresh table cache if required
         if self.table_cache and (columns_to_add or columns_to_replace):
@@ -819,20 +819,27 @@ class DbSync:
         self.logger.info('Dropping column: %s', drop_column)
         self.query(drop_column)
 
-    def version_column(self, column_name, stream):
+    def version_column(self, column_name, stream, is_iceberg_table=False):
         """Versions a column in an existing table"""
         p_table_name = self.table_name(stream, False)
         p_column_name = column_name.replace("\"", "")
         p_ver_time = time.strftime("%Y%m%d_%H%M")
 
-        version_column = f"ALTER TABLE {p_table_name} RENAME COLUMN {column_name} TO \"{p_column_name}_{p_ver_time}\""
-        self.logger.info('Versioning column: %s', version_column)
+        if is_iceberg_table:
+            version_column = f"ALTER ICEBERG TABLE {p_table_name} RENAME COLUMN {column_name} TO \"{p_column_name}_{p_ver_time}\""
+        else:
+            version_column = f"ALTER TABLE {p_table_name} RENAME COLUMN {column_name} TO \"{p_column_name}_{p_ver_time}\""
+        self.logger.warning('Column "%s" in table "%s" has been renamed to "%s_%s"', column_name, p_table_name, p_column_name, p_ver_time)
         self.query(version_column)
 
-    def add_column(self, column, stream):
+    def add_column(self, column, stream, is_iceberg_table=False):
         """Adds a new column to an existing table"""
-        add_column = f"ALTER TABLE {self.table_name(stream, False)} ADD COLUMN {column}"
-        self.logger.info('Adding column: %s', add_column)
+
+        if is_iceberg_table:
+            add_column = f"ALTER ICEBERG TABLE {self.table_name(stream, False)} ADD COLUMN {column}"
+        else:
+            add_column = f"ALTER TABLE {self.table_name(stream, False)} ADD COLUMN {column}"
+        self.logger.warning('Column "%s" added to table "%s"', column, self.table_name(stream, False))
         self.query(add_column)
 
     def sync_table(self):
@@ -857,6 +864,7 @@ class DbSync:
                             if f'"{table["TABLE_NAME"].upper()}"' == table_name]
 
         if len(found_tables) == 0:
+            # Stub implementation to create Iceberg tables if defined in target, currently creates regular tables for all streams
             query = self.create_table_query()
             self.logger.info('Table %s does not exist. Creating...', table_name_with_schema)
             self.query(query)

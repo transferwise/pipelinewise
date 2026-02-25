@@ -129,7 +129,7 @@ class CopyNativeToIceberg:
             if col['DATA_TYPE'] == 'TIMESTAMP_TZ':
                 col['DATA_TYPE'] = 'TIMESTAMP_LTZ'
             if col['DATA_TYPE'] == 'VARIANT':
-                col['DATA_TYPE'] = 'VARCHAR'
+                col['DATA_TYPE'] = 'TEXT'
 
         return native_columns, iceberg_columns
 
