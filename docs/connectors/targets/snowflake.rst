@@ -99,6 +99,7 @@ Example YAML for target-snowflake:
       user: "<USER>"                                # Snowflake user
       private_key: "<private_key_path>"             # File contains PEM forrmat for connecting to Snowflake
       warehouse: "<WAREHOUSE>"                      # Snowflake virtual warehouse
+      iceberg_create: false                         # Create new tables as Iceberg tables (only available for pure Singer replications)
 
       # We use an external stage on S3 to load data into Snowflake
       # S3 Profile based authentication
@@ -143,6 +144,18 @@ PipelineWise expects the target database to have already have default Iceberg se
     ALTER DATABASE {target-database} SET CATALOG='snowflake';
     ALTER DATABASE {target-database} SET EXTERNAL_VOLUME = ACCOUNT_ICEBERG_VOLUME;
 
+To create "**new**" tables as Iceberg tables, update target-snowflake yaml to include ``iceberg_create: true``
+
+.. code-block:: yaml
+
+    db_conn:
+      account: "rtxxxxx.eu-central-1"               # Snowflake account
+      dbname: "<DB_NAME>"                           # Snowflake database name
+      user: "<USER>"                                # Snowflake user
+      private_key: "<private_key_path>"             # File contains PEM forrmat for connecting to Snowflake
+      warehouse: "<WAREHOUSE>"                      # Snowflake virtual warehouse
+      iceberg_create: true                          # Create new tables as Iceberg tables (only available for pure Singer replications)
+
 target-snowflake has a utility that can be used to convert an *existing* Native table into an Iceberg table in a PipelineWise compatible manner
 
 .. code-block:: bash
@@ -159,5 +172,5 @@ target-snowflake has a utility that can be used to convert an *existing* Native 
 
 Limitations
 ^^^^^^^^^^^
-* Neither PipelineWise not target-snowflake is able to create a new Iceberg table
+* Only target-snowflake (using Pure Singer replication) is able to create a new Iceberg table
 * PipelineWise `sync_tables` and `partial_sync_table` command will fail with `(42710): SQL compilation error: table already exists as ICEBERG_TABLE`
