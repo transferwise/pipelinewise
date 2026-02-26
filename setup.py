@@ -44,7 +44,7 @@ setup(name='pipelinewise',
       ],
       extras_require={
           'test': [
-              'pre-commit==2.21.0',
+              'pre-commit==4.3.0',
               'flake8==4.0.1',
               'pytest==7.1.1',
               'pytest-dependency==0.4.0',
