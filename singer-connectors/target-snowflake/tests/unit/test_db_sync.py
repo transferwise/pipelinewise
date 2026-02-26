@@ -890,3 +890,156 @@ class TestDBSync(unittest.TestCase):
         self.assertIn('ALTER ICEBERG TABLE', rename_calls[0])
         self.assertEqual(len(add_calls), 1, msg="Expected exactly one ADD COLUMN after versioning")
         self.assertIn('ALTER ICEBERG TABLE', add_calls[0])
+
+    # -----------------------------------------------------------------------
+    # Tests for iceberg_create config option
+    # -----------------------------------------------------------------------
+
+    def test_config_validation_iceberg_create_requires_external_volume(self):
+        """iceberg_create=True is valid without iceberg_external_volume; config is self-contained"""
+        base = {
+            'account': "dummy-value",
+            'dbname': "dummy-value",
+            'user': "dummy-value",
+            'private_key': "dummy-key",
+            'warehouse': "dummy-value",
+            'default_target_schema': "dummy-value",
+            'file_format': "dummy-value",
+        }
+
+        # iceberg_create=False → no error
+        self.assertEqual(len(db_sync.validate_config({**base, 'iceberg_create': False})), 0)
+
+        # iceberg_create=True → also no error (external volume is not required in config)
+        self.assertEqual(len(db_sync.validate_config({**base, 'iceberg_create': True})), 0)
+
+    def test_create_iceberg_table_query_ddl(self):
+        """create_iceberg_table_query generates correct Iceberg DDL with Iceberg column types"""
+        minimal_config = {
+            'account': "dummy-account",
+            'dbname': "dummy-db",
+            'user': "dummy-user",
+            'private_key': "dummy-key",
+            'warehouse': "dummy-wh",
+            'default_target_schema': "dummy-schema",
+            'file_format': "dummy-file-format",
+            'iceberg_create': True,
+        }
+        stream_schema_message = {
+            "stream": "public-table1",
+            "schema": {
+                "properties": {
+                    "id": {"type": ["integer"]},
+                    "payload": {"type": ["object"]},
+                    "name": {"type": ["null", "string"]},
+                }
+            },
+            "key_properties": ["id"]
+        }
+
+        with patch('target_snowflake.db_sync.DbSync.query', return_value=[{'type': 'CSV'}]):
+            dbsync = db_sync.DbSync(minimal_config, stream_schema_message)
+
+        ddl = dbsync.create_iceberg_table_query()
+
+        self.assertIn('CREATE ICEBERG TABLE IF NOT EXISTS', ddl)
+        self.assertIn('DATA_RETENTION_TIME_IN_DAYS', ddl)
+        self.assertIn('TARGET_FILE_SIZE', ddl)
+        self.assertIn('ENABLE_DATA_COMPACTION', ddl)
+        # Iceberg column types: integer → number(19,0), object → text
+        self.assertIn('number(19,0)', ddl)
+        self.assertIn('"PAYLOAD" text', ddl)
+        # PRIMARY KEY is included
+        self.assertIn('PRIMARY KEY', ddl)
+
+    def test_create_iceberg_table_query_no_pk_when_no_key_properties(self):
+        """create_iceberg_table_query omits PRIMARY KEY when stream has no key_properties"""
+        minimal_config = {
+            'account': "dummy-account",
+            'dbname': "dummy-db",
+            'user': "dummy-user",
+            'private_key': "dummy-key",
+            'warehouse': "dummy-wh",
+            'default_target_schema': "dummy-schema",
+            'file_format': "dummy-file-format",
+            'iceberg_create': True,
+        }
+        stream_schema_message = {
+            "stream": "public-table1",
+            "schema": {"properties": {"id": {"type": ["integer"]}}},
+            "key_properties": []
+        }
+        with patch('target_snowflake.db_sync.DbSync.query', return_value=[{'type': 'CSV'}]):
+            dbsync = db_sync.DbSync(minimal_config, stream_schema_message)
+
+        ddl = dbsync.create_iceberg_table_query()
+        self.assertNotIn('PRIMARY KEY', ddl)
+
+    @patch('target_snowflake.db_sync.DbSync.grant_privilege')
+    @patch('target_snowflake.db_sync.DbSync.get_tables')
+    @patch('target_snowflake.db_sync.DbSync.query')
+    def test_sync_table_creates_iceberg_when_iceberg_create_true(self, query_patch, get_tables_patch, grant_patch):
+        """sync_table issues CREATE ICEBERG TABLE DDL when iceberg_create=True and table does not exist"""
+        minimal_config = {
+            'account': "dummy-account",
+            'dbname': "dummy-db",
+            'user': "dummy-user",
+            'private_key': "dummy-key",
+            'warehouse': "dummy-wh",
+            'default_target_schema': "dummy-schema",
+            'file_format': "dummy-file-format",
+            'iceberg_create': True,
+            'iceberg_external_volume': 'my_iceberg_vol',
+        }
+        stream_schema_message = {
+            "stream": "public-table1",
+            "schema": {"properties": {"id": {"type": ["integer"]}}},
+            "key_properties": ["id"]
+        }
+        # get_tables returns [] so found_tables is empty (table doesn't exist yet)
+        get_tables_patch.return_value = []
+        query_patch.side_effect = [
+            [{'type': 'CSV'}],    # SHOW FILE FORMATS (during __init__)
+            [],                    # SHOW TERSE ICEBERG TABLES (not Iceberg yet)
+            None,                  # CREATE ICEBERG TABLE
+        ]
+        dbsync = db_sync.DbSync(minimal_config, stream_schema_message)
+        dbsync.sync_table()
+
+        create_calls = [str(c) for c in query_patch.call_args_list if 'CREATE ICEBERG TABLE' in str(c)]
+        self.assertEqual(len(create_calls), 1, msg="Expected exactly one CREATE ICEBERG TABLE call")
+
+    @patch('target_snowflake.db_sync.DbSync.grant_privilege')
+    @patch('target_snowflake.db_sync.DbSync.get_tables')
+    @patch('target_snowflake.db_sync.DbSync.query')
+    def test_sync_table_creates_regular_table_when_iceberg_create_false(self, query_patch, get_tables_patch, grant_patch):
+        """sync_table issues a regular CREATE TABLE when iceberg_create is False and table does not exist"""
+        minimal_config = {
+            'account': "dummy-account",
+            'dbname': "dummy-db",
+            'user': "dummy-user",
+            'private_key': "dummy-key",
+            'warehouse': "dummy-wh",
+            'default_target_schema': "dummy-schema",
+            'file_format': "dummy-file-format",
+            'iceberg_create': False,
+        }
+        stream_schema_message = {
+            "stream": "public-table1",
+            "schema": {"properties": {"id": {"type": ["integer"]}}},
+            "key_properties": ["id"]
+        }
+        get_tables_patch.return_value = []
+        query_patch.side_effect = [
+            [{'type': 'CSV'}],    # SHOW FILE FORMATS (during __init__)
+            [],     # SHOW TERSE ICEBERG TABLES
+            None,   # CREATE TABLE
+            [],     # show primary keys
+            None,   # ALTER TABLE
+        ]
+        dbsync = db_sync.DbSync(minimal_config, stream_schema_message)
+        dbsync.sync_table()
+
+        create_calls = [str(c) for c in query_patch.call_args_list if 'CREATE' in str(c)]
+        self.assertEqual(len(create_calls), 1)
+        self.assertNotIn('ICEBERG', create_calls[0])
