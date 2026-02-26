@@ -222,6 +222,7 @@ following the steps in the <a class="reference internal" href="../../installatio
 <span class="w">  </span><span class="nt">user</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;USER&gt;&quot;</span><span class="w">                                </span><span class="c1"># Snowflake user</span>
 <span class="w">  </span><span class="nt">private_key</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;private_key_path&gt;&quot;</span><span class="w">             </span><span class="c1"># File contains PEM forrmat for connecting to Snowflake</span>
 <span class="w">  </span><span class="nt">warehouse</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;WAREHOUSE&gt;&quot;</span><span class="w">                      </span><span class="c1"># Snowflake virtual warehouse</span>
+<span class="w">  </span><span class="nt">iceberg_create</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span><span class="w">                         </span><span class="c1"># Create new tables as Iceberg tables (only available for pure Singer replications)</span>
 
 <span class="w">  </span><span class="c1"># We use an external stage on S3 to load data into Snowflake</span>
 <span class="w">  </span><span class="c1"># S3 Profile based authentication</span>
@@ -264,6 +265,16 @@ ALTER DATABASE {target-database} SET CATALOG=&#39;snowflake&#39;;
 ALTER DATABASE {target-database} SET EXTERNAL_VOLUME = ACCOUNT_ICEBERG_VOLUME;
 </pre></div>
 </div>
+<p>To create “<strong>new</strong>” tables as Iceberg tables, update target-snowflake yaml to include <code class="docutils literal notranslate"><span class="pre">iceberg_create:</span> <span class="pre">true</span></code></p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">db_conn</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">account</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;rtxxxxx.eu-central-1&quot;</span><span class="w">               </span><span class="c1"># Snowflake account</span>
+<span class="w">  </span><span class="nt">dbname</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;DB_NAME&gt;&quot;</span><span class="w">                           </span><span class="c1"># Snowflake database name</span>
+<span class="w">  </span><span class="nt">user</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;USER&gt;&quot;</span><span class="w">                                </span><span class="c1"># Snowflake user</span>
+<span class="w">  </span><span class="nt">private_key</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;private_key_path&gt;&quot;</span><span class="w">             </span><span class="c1"># File contains PEM forrmat for connecting to Snowflake</span>
+<span class="w">  </span><span class="nt">warehouse</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;WAREHOUSE&gt;&quot;</span><span class="w">                      </span><span class="c1"># Snowflake virtual warehouse</span>
+<span class="w">  </span><span class="nt">iceberg_create</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">                          </span><span class="c1"># Create new tables as Iceberg tables (only available for pure Singer replications)</span>
+</pre></div>
+</div>
 <p>target-snowflake has a utility that can be used to convert an <em>existing</em> Native table into an Iceberg table in a PipelineWise compatible manner</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>usage:<span class="w"> </span>copy-native-to-iceberg<span class="w"> </span><span class="o">[</span>-h<span class="o">]</span><span class="w"> </span><span class="o">[</span>-c<span class="w"> </span>CONFIG<span class="o">]</span><span class="w"> </span><span class="o">[</span>-t<span class="w"> </span>FQTN<span class="o">]</span><span class="w"> </span><span class="o">[</span>-e<span class="w"> </span>EVENTUAL<span class="o">]</span>
 
@@ -279,7 +290,7 @@ options:
 <section id="limitations">
 <h3>Limitations<a class="headerlink" href="#limitations" title="Link to this heading"></a></h3>
 <ul class="simple">
-<li><p>Neither PipelineWise not target-snowflake is able to create a new Iceberg table</p></li>
+<li><p>Only target-snowflake (using Pure Singer replication) is able to create a new Iceberg table</p></li>
 <li><p>PipelineWise <cite>sync_tables</cite> and <cite>partial_sync_table</cite> command will fail with <cite>(42710): SQL compilation error: table already exists as ICEBERG_TABLE</cite></p></li>
 </ul>
 </section>
