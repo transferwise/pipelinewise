@@ -895,8 +895,8 @@ class TestDBSync(unittest.TestCase):
     # Tests for iceberg_create config option
     # -----------------------------------------------------------------------
 
-    def test_config_validation_iceberg_create_requires_external_volume(self):
-        """iceberg_create=True is valid without iceberg_external_volume; config is self-contained"""
+    def test_config_validation_iceberg_create(self):
+        """iceberg_create=True; config is self-contained"""
         base = {
             'account': "dummy-value",
             'dbname': "dummy-value",
@@ -951,6 +951,10 @@ class TestDBSync(unittest.TestCase):
         self.assertIn('"PAYLOAD" text', ddl)
         # PRIMARY KEY is included
         self.assertIn('PRIMARY KEY', ddl)
+        # Snowflake-external managed keywords must NOT appear — external volume is configured in Snowflake directly
+        self.assertNotIn('EXTERNAL_VOLUME', ddl)
+        self.assertNotIn('CATALOG', ddl)
+        self.assertNotIn('BASE_LOCATION', ddl)
 
     def test_create_iceberg_table_query_no_pk_when_no_key_properties(self):
         """create_iceberg_table_query omits PRIMARY KEY when stream has no key_properties"""
@@ -989,7 +993,6 @@ class TestDBSync(unittest.TestCase):
             'default_target_schema': "dummy-schema",
             'file_format': "dummy-file-format",
             'iceberg_create': True,
-            'iceberg_external_volume': 'my_iceberg_vol',
         }
         stream_schema_message = {
             "stream": "public-table1",
@@ -1008,6 +1011,38 @@ class TestDBSync(unittest.TestCase):
 
         create_calls = [str(c) for c in query_patch.call_args_list if 'CREATE ICEBERG TABLE' in str(c)]
         self.assertEqual(len(create_calls), 1, msg="Expected exactly one CREATE ICEBERG TABLE call")
+
+    def test_sync_table_does_not_recreate_existing_iceberg_table(self):
+        """sync_table skips CREATE when table already exists as Iceberg; goes to update_columns path"""
+        minimal_config = {
+            'account': "dummy-account",
+            'dbname': "dummy-db",
+            'user': "dummy-user",
+            'private_key': "dummy-key",
+            'warehouse': "dummy-wh",
+            'default_target_schema': "dummy-schema",
+            'file_format': "dummy-file-format",
+            'iceberg_create': True,
+        }
+        stream_schema_message = {
+            "stream": "public-table1",
+            "schema": {"properties": {"id": {"type": ["integer"]}}},
+            "key_properties": ["id"]
+        }
+        # table_cache provides the existing table so found_tables is non-empty
+        table_cache = [
+            {'SCHEMA_NAME': 'DUMMY-SCHEMA', 'TABLE_NAME': 'TABLE1', 'COLUMN_NAME': 'ID', 'DATA_TYPE': 'NUMBER'}
+        ]
+        with patch('target_snowflake.db_sync.DbSync.query') as query_patch:
+            query_patch.side_effect = [
+                [{'type': 'CSV'}],               # SHOW FILE FORMATS (__init__)
+                [{'table_name': 'TABLE1'}],       # SHOW TERSE ICEBERG TABLES → is_iceberg_table=True
+            ]
+            dbsync = db_sync.DbSync(minimal_config, stream_schema_message, table_cache)
+            dbsync.sync_table()
+
+        create_calls = [str(c) for c in query_patch.call_args_list if 'CREATE' in str(c)]
+        self.assertEqual(len(create_calls), 0, msg="CREATE must not be issued for an already-existing Iceberg table")
 
     @patch('target_snowflake.db_sync.DbSync.grant_privilege')
     @patch('target_snowflake.db_sync.DbSync.get_tables')
