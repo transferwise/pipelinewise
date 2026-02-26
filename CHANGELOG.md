@@ -1,4 +1,8 @@
-0.75.1 (2026-02-25)
+0.74.3 (2026-02-26)
+- `pipelinewise-target-snowflake` from `2.5.1` to `2.5.2`
+    - Support creating new Iceberg tables for pure Singer replications
+
+0.74.2 (2026-02-25)
 -------------------
 - `pipelinewise-target-snowflake` from `2.5.0` to `2.5.1`
     - Support schema changes on existing Iceberg tables
