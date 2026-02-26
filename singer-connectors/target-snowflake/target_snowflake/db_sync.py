@@ -579,6 +579,33 @@ class DbSync:
         p_extra = 'data_retention_time_in_days = 0 ' if is_temporary else 'data_retention_time_in_days = 1 '
         return f'CREATE {p_temp}TABLE IF NOT EXISTS {p_table_name} ({p_columns}) {p_extra}'
 
+    def create_iceberg_table_query(self):
+        """Generate CREATE ICEBERG TABLE SQL (Snowflake-managed Iceberg)"""
+        stream_schema_message = self.stream_schema_message
+        columns = [
+            column_clause(
+                name,
+                schema,
+                is_iceberg_table=True
+            )
+            for (name, schema) in self.flatten_schema.items()
+        ]
+
+        primary_key = []
+        if len(stream_schema_message.get('key_properties', [])) > 0:
+            pk_list = ', '.join(primary_column_names(stream_schema_message))
+            primary_key = [f"PRIMARY KEY({pk_list})"]
+
+        p_table_name = self.table_name(stream_schema_message['stream'], is_temporary=False)
+        p_columns = ', '.join(columns + primary_key)
+
+        return (
+            f"CREATE ICEBERG TABLE IF NOT EXISTS {p_table_name} ({p_columns}) "
+            f" DATA_RETENTION_TIME_IN_DAYS=1"
+            f" TARGET_FILE_SIZE='16MB'"
+            f" ENABLE_DATA_COMPACTION=TRUE"
+        )
+
     def grant_usage_on_schema(self, schema_name, grantee):
         """Grant usage on schema"""
         query = f"GRANT USAGE ON SCHEMA {schema_name} TO ROLE {grantee}"
@@ -864,9 +891,14 @@ class DbSync:
                             if f'"{table["TABLE_NAME"].upper()}"' == table_name]
 
         if len(found_tables) == 0:
-            # Stub implementation to create Iceberg tables if defined in target, currently creates regular tables for all streams
-            query = self.create_table_query()
-            self.logger.info('Table %s does not exist. Creating...', table_name_with_schema)
+            iceberg_create = self.connection_config.get('iceberg_create', False)
+            if iceberg_create:
+                query = self.create_iceberg_table_query()
+                is_iceberg_table = True
+                self.logger.info('Table %s does not exist. Creating as Iceberg table...', table_name_with_schema)
+            else:
+                query = self.create_table_query()
+                self.logger.info('Table %s does not exist. Creating...', table_name_with_schema)
             self.query(query)
             self.grant_privilege(self.schema_name, self.grantees, self.grant_select_on_all_tables_in_schema)
 
