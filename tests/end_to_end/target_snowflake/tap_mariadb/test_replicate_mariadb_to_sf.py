@@ -36,6 +36,14 @@ class TestReplicateMariaDBToSF(TapMariaDB):
             schema_postfix=self.e2e_env.sf_schema_postfix,
         )
 
+        # Verify UTF-8 special characters (including \u00ef) survive full_sync via CSV
+        result = self.e2e_env.run_query_target_snowflake(
+            f'SELECT "C_VARCHAR" FROM ppw_e2e_tap_mysql{self.e2e_env.sf_schema_postfix}.edgydata'
+            f' WHERE "ORDER" = 11'
+        )
+        self.assertEqual(len(result), 1)
+        self.assertIn('\u00ef', result[0][0])
+
         # 2. Make changes in MariaDB source database
         #  LOG_BASED
         self.e2e_env.run_query_tap_mysql(
