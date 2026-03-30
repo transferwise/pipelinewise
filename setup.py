@@ -6,16 +6,6 @@ with open('README.md') as f:
     LONG_DESCRIPTION = f.read()
 
 setup(name='pipelinewise',
-
-
-
-
-
-
-
-
-
-sdsdds
       python_requires='==3.10.*',
       version='0.74.4',
       description='PipelineWise',
