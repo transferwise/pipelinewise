@@ -227,7 +227,7 @@ class TestFastSyncTargetSnowflake(TestCase):
         )
         assert self.snowflake.executed_queries == [
             'COPY INTO test_schema."TEST_TABLE" FROM \'@dummy_stage/s3_key\''
-            ' FILE_FORMAT = (type=CSV escape=\'\\x1e\' escape_unenclosed_field=\'\\x1e\''
+            ' FILE_FORMAT = (type=CSV escape=NONE escape_unenclosed_field=\'\\x1e\''
             ' field_optionally_enclosed_by=\'\"\' skip_header=0'
             ' compression=GZIP binary_format=HEX)'
         ]
@@ -244,7 +244,7 @@ class TestFastSyncTargetSnowflake(TestCase):
         )
         assert self.snowflake.executed_queries == [
             'COPY INTO test_schema."FULL_TEMP" FROM \'@dummy_stage/s3_key\''
-            ' FILE_FORMAT = (type=CSV escape=\'\\x1e\' escape_unenclosed_field=\'\\x1e\''
+            ' FILE_FORMAT = (type=CSV escape=NONE escape_unenclosed_field=\'\\x1e\''
             ' field_optionally_enclosed_by=\'\"\' skip_header=0'
             ' compression=GZIP binary_format=HEX)'
         ]
@@ -261,7 +261,7 @@ class TestFastSyncTargetSnowflake(TestCase):
         )
         assert self.snowflake.executed_queries == [
             'COPY INTO test_schema."TABLE WITH SPACE AND UPPERCASE_TEMP" FROM \'@dummy_stage/s3 key with space\''
-            ' FILE_FORMAT = (type=CSV escape=\'\\x1e\' escape_unenclosed_field=\'\\x1e\''
+            ' FILE_FORMAT = (type=CSV escape=NONE escape_unenclosed_field=\'\\x1e\''
             ' field_optionally_enclosed_by=\'\"\' skip_header=0'
             ' compression=GZIP binary_format=HEX)'
         ]
