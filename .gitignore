@@ -35,6 +35,7 @@ dev-project/pipelinewise-config/*_test.yml*
 *.db
 .DS_Store
 venv
+.venv
 env
 blog_old.md
 node_modules
