@@ -1,8 +1,14 @@
+0.75.0 (2026-04-07)
+-------------------
+- `pipelinewise-tap-postgres` from `2.1.0` to `2.2.0`
+    - Use wal2json non-row messages to detect that wal has moved on.
+
 0.74.4 (2026-03-30)
 -------------------
 - Better handling of CSV bulk upload to Snowflake during Full and Partial sync
 
 0.74.3 (2026-02-26)
+-------------------
 - `pipelinewise-target-snowflake` from `2.5.1` to `2.5.2`
     - Support creating new Iceberg tables for pure Singer replications
 

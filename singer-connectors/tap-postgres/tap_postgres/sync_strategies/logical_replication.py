@@ -385,6 +385,23 @@ def consume_message(streams, state, msg, time_extracted, conn_info):
 
     lsn = msg.data_start
 
+    action = payload.get('action')
+    # Action Types:
+    # I = Insert
+    # U = Update
+    # D = Delete
+    # B = Begin Transaction
+    # C = Commit Transaction
+    # M = Message
+    # T = Truncate
+
+    # Advance the slot LSN for non-row actions without doing any processing
+    # This avoids the slot growing when the source has very busy tables that are NOT selected for replication
+    if action not in {'I', 'U', 'D'}:
+        LOGGER.debug('Skipping non-row wal2json message: action=%s, lsn=%s', action,
+                     int_to_lsn(lsn) if isinstance(lsn, int) else lsn)
+        return state
+
     streams_lookup = {s['tap_stream_id']: s for s in streams}
 
     tap_stream_id = post_db.compute_tap_stream_id(payload['schema'], payload['table'])
@@ -414,19 +431,6 @@ def consume_message(streams, state, msg, time_extracted, conn_info):
     #       {"name":"c","type":"timestamp without time zone","value":"2019-12-29 04:58:34.806671"}
     #   ]
     # }
-
-    # Action Types:
-    # I = Insert
-    # U = Update
-    # D = Delete
-    # B = Begin Transaction
-    # C = Commit Transaction
-    # M = Message
-    # T = Truncate
-    action = payload['action']
-
-    if action not in {'I', 'U', 'D'}:
-        raise UnsupportedPayloadKindError(f"unrecognized replication operation: {action}")
 
     # Get the additional fields in payload that are not in schema properties:
     # only inserts and updates have the list of columns that can be used to detect any different in columns
@@ -613,7 +617,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
                               status_interval=poll_interval,
                               options={
                                   'format-version': 2,
-                                  'include-transaction': False,
+                                  'include-transaction': True,
                                   'include-timestamp': True,
                                   'include-types': False,
                                   'actions': 'insert,update,delete',
