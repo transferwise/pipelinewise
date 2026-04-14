@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   test_install_connectors:
-    runs-on: ubuntu-22.04
+    runs-on: gha-production-medium
 
     steps:
       - name: Checking out repo

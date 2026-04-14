@@ -11,7 +11,7 @@ concurrency:
 
 jobs:
   publish:
-    runs-on: ubuntu-latest
+    runs-on: gha-production-medium
     environment: github-pages
 
     steps:
