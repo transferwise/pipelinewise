@@ -17,6 +17,7 @@ from plpygis import Geometry
 from pymysqlreplication import BinLogStreamReader
 from pymysqlreplication.constants import FIELD_TYPE
 from pymysqlreplication.event import RotateEvent, MariadbGtidEvent, GtidEvent
+from pymysqlreplication.gtid import Gtid, GtidSet
 from pymysqlreplication.row_event import (
     DeleteRowsEvent,
     UpdateRowsEvent,
@@ -132,16 +133,16 @@ def fetch_current_gtid_pos(
         engine: str
 ) -> str:
     """
-    Find the given server's current GTID position.
+    Find the current GTID position for the given server.
 
-    The sever we're connected to can have a comma separated list of gtids (e.g from past server migrations),
-    the right gtid is the one with the same server ID as the given server ID.
+    For MySQL, returns the full @@GLOBAL.gtid_executed set covering all source UUIDs (whitespace-stripped).
+    For MariaDB, returns the single-domain GTID matching the connected server's domain-server ID.
 
     Args:
         mysql_conn: Mysql connection instance
         engine: DB engine (mariadb/mysql)
 
-    Returns: Gtid position if found, otherwise raises exception
+    Returns: Full GTID set string (MySQL) or single-domain GTID (MariaDB), raises exception if not found
     """
 
     if engine == connection.MARIADB_ENGINE:
@@ -165,6 +166,17 @@ def fetch_current_gtid_pos(
             gtids = result[0]
             LOGGER.debug('Found GTID(s): %s in server %s', gtids, server)
 
+            if engine != connection.MARIADB_ENGINE:
+                # Return the full GTID set (all sources), whitespace-stripped
+                full_set = re.sub(r'\s+', '', gtids)
+                if not full_set:
+                    raise Exception(f'No suitable GTID was found for server {server}.')
+                LOGGER.info('Using full GTID set for state bookmark: %d source(s), length=%d chars',
+                            len(full_set.split(',')), len(full_set))
+                LOGGER.debug('Full GTID set: %s', full_set)
+                return full_set
+
+            # MariaDB: find the entry matching this server's domain-serverid
             gtid_to_use = None
 
             for gtid in gtids.split(','):
@@ -173,28 +185,51 @@ def fetch_current_gtid_pos(
                 if not gtid:
                     continue
 
-                if engine != connection.MARIADB_ENGINE:
-                    gtid_parts = gtid.split(':')
+                gtid_parts = gtid.split('-')
 
-                    if len(gtid_parts) != 2:
-                        continue
+                if len(gtid_parts) != 3:
+                    continue
 
-                    if gtid_parts[0] == server:
-                        gtid_to_use = gtid
-                else:
-                    gtid_parts = gtid.split('-')
-
-                    if len(gtid_parts) != 3:
-                        continue
-
-                    if gtid_parts[1] == server:
-                        gtid_to_use = gtid
+                if gtid_parts[1] == server:
+                    gtid_to_use = gtid
 
             if gtid_to_use:
                 LOGGER.info('Using GTID %s for state bookmark', gtid_to_use)
                 return gtid_to_use
 
     raise Exception(f'No suitable GTID was found for server {server}.')
+
+
+def normalize_gtid_state(gtid_value: str, engine: str) -> str:
+    """
+    Upgrades a legacy single-GTID state value (e.g. uuid:100) to canonical GtidSet
+    range format (e.g. uuid:1-100). Also strips embedded whitespace (e.g. newlines
+    from @@GLOBAL.gtid_executed). No-op for MariaDB or empty values.
+    Falls back to the original string if parsing fails.
+    """
+    if engine == connection.MARIADB_ENGINE or not gtid_value:
+        return gtid_value
+    try:
+        cleaned = re.sub(r'\s+', '', gtid_value)
+        return str(GtidSet(cleaned))
+    except Exception:  # pylint: disable=broad-except
+        return gtid_value
+
+
+def merge_gtid_into_set(current_gtid_set: str, new_gtid: str, engine: str) -> str:
+    """
+    Merges a single GTID received from a GtidEvent into the accumulated GTID set
+    stored in state. For MariaDB, returns the raw new GTID (existing behaviour).
+    Falls back to current_gtid_set on merge failure to preserve the last known.
+    """
+    if engine == connection.MARIADB_ENGINE:
+        return new_gtid
+    try:
+        gtid_set = GtidSet(current_gtid_set) if current_gtid_set else GtidSet('')
+        gtid_set.merge_gtid(Gtid(new_gtid))
+        return str(gtid_set)
+    except Exception:  # pylint: disable=broad-except
+        return current_gtid_set
 
 
 def json_bytes_to_string(data):
@@ -292,14 +327,16 @@ def calculate_gtid_bookmark(
         engine: str
 ) -> str:
     """
-    Finds the earliest bookmarked gtid in the state
+    Finds the bookmarked GTID in the state to resume replication from.
+    For MySQL, returns the first GTID set found (all streams share the same value).
+    For MariaDB, returns the GTID with the lowest sequence number across streams.
     Args:
         mysql_conn: instance of MySqlConnection
         binlog_streams_map: dictionary of selected streams
         state: state dict with bookmarks
         engine: the DB flavor mysql/mariadb
 
-    Returns: Min Gtid
+    Returns: GTID string to use as auto_position for the binlog reader
     """
     min_gtid = None
     min_seq_no = None
@@ -315,17 +352,14 @@ def calculate_gtid_bookmark(
         if gtid:
             if engine == connection.MARIADB_ENGINE:
                 gtid_seq_no = int(gtid.split('-')[2])
+
+                if min_seq_no is None or gtid_seq_no < min_seq_no:
+                    min_seq_no = gtid_seq_no
+                    min_gtid = gtid
             else:
-                gtid_interval = gtid.split(':')[1]
-
-                if '-' in gtid_interval:
-                    gtid_seq_no = int(gtid_interval.split('-')[1])
-                else:
-                    gtid_seq_no = int(gtid_interval)
-
-            if min_seq_no is None or gtid_seq_no < min_seq_no:
-                min_seq_no = gtid_seq_no
+                # All MySQL streams share the same GTID set — use the first one found
                 min_gtid = gtid
+                break
 
     if not min_gtid:
 
@@ -351,7 +385,7 @@ def calculate_gtid_bookmark(
         LOGGER.info('The inferred GTID is "%s", it will be used to resume replication',
                     min_gtid)
     else:
-        LOGGER.info('The earliest bookmarked GTID found in the state is "%s", and will be used to resume replication',
+        LOGGER.info('The bookmarked GTID found in the state is "%s", and will be used to resume replication',
                     min_gtid)
 
     return min_gtid
@@ -667,12 +701,10 @@ def _run_binlog_sync(
                                      gtid_pos
                                      )
 
-        elif isinstance(binlog_event, (MariadbGtidEvent, GtidEvent)):
-            gtid_pos = binlog_event.gtid
+        elif isinstance(binlog_event, GtidEvent):
+            gtid_pos = merge_gtid_into_set(gtid_pos, binlog_event.gtid, config['engine'])
 
-            LOGGER.debug('%s: gtid=%s',
-                         binlog_event.__class__.__name__,
-                         gtid_pos)
+            LOGGER.debug('GtidEvent: gtid_set=%s', gtid_pos)
 
             state = update_bookmarks(state,
                                      binlog_streams_map,
@@ -685,6 +717,20 @@ def _run_binlog_sync(
             # explained here: https://github.com/noplay/python-mysql-replication/issues/367
             # Fix: Updating the reader's auto-position to the newly encountered gtid means we won't have to restart
             # consuming binlog from old GTID pos when connection to server is lost.
+            reader.auto_position = gtid_pos
+
+        elif isinstance(binlog_event, MariadbGtidEvent):
+            gtid_pos = binlog_event.gtid
+
+            LOGGER.debug('MariadbGtidEvent: gtid=%s', gtid_pos)
+
+            state = update_bookmarks(state,
+                                     binlog_streams_map,
+                                     log_file,
+                                     log_pos,
+                                     gtid_pos
+                                     )
+
             reader.auto_position = gtid_pos
 
         else:
@@ -895,6 +941,14 @@ def sync_binlog_stream(
     log_file = log_pos = gtid = None
 
     if config['use_gtid']:
+        # Upgrade any legacy single-GTID or whitespace-contaminated state values
+        for tap_stream_id in binlog_streams_map:
+            existing_gtid = state.get('bookmarks', {}).get(tap_stream_id, {}).get('gtid')
+            if existing_gtid:
+                normalized = normalize_gtid_state(existing_gtid, config['engine'])
+                if normalized != existing_gtid:
+                    state = singer.write_bookmark(state, tap_stream_id, 'gtid', normalized)
+
         gtid = calculate_gtid_bookmark(mysql_conn, binlog_streams_map, state, config['engine'])
     else:
         log_file, log_pos = calculate_bookmark(mysql_conn, binlog_streams_map, state)

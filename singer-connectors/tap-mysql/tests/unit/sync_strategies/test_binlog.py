@@ -1856,13 +1856,14 @@ class TestBinlogSyncStrategy(TestCase):
 
     @patch('tap_mysql.sync_strategies.binlog.connection.fetch_server_uuid')
     @patch('tap_mysql.sync_strategies.binlog.connect_with_backoff')
-    def test_fetch_current_gtid_pos_for_mysql_not_found_expect_exception(
+    def test_fetch_current_gtid_pos_for_mysql_returns_full_set_regardless_of_server_uuid(
             self, connect_with_backoff, fetch_server_uuid):
         mysql_con = MagicMock(spec_set=MySQLConnection).return_value
         cur_mock = MagicMock(spec_set=Cursor).return_value
+        # MySQL returns @@GLOBAL.gtid_executed with \n between entries — mimics real server output
         cur_mock.__enter__.return_value.fetchone.side_effect = [
-            ['3E11FA47-71CA-11E1-9E21-C80AA9429562:1,3E11FA47-71BB-11E1-9E33-C80AA9429562:2:143,0-3-1123,,'
-             '3E11FA47-71CA-11E1-9E33-C80AA9429562:2:332'],
+            ['3E11FA47-71CA-11E1-9E21-C80AA9429562:1,\n3E11FA47-71BB-11E1-9E33-C80AA9429562:2:143,\n'
+             '0-3-1123,,3E11FA47-71CA-11E1-9E33-C80AA9429562:2:332'],
         ]
 
         mysql_con.__enter__.return_value.cursor.return_value = cur_mock
@@ -1870,8 +1871,44 @@ class TestBinlogSyncStrategy(TestCase):
         connect_with_backoff.return_value = mysql_con
         fetch_server_uuid.return_value = '3E11FA47-71CA-11E1-9E33-C80AA9429562'
 
-        with self.assertRaises(Exception):
+        result = binlog.fetch_current_gtid_pos(mysql_con, connection.MYSQL_ENGINE)
+
+        # Embedded \n must be stripped from the result
+        self.assertNotIn('\n', result)
+
+        # All UUIDs must be present — no filtering by server UUID
+        self.assertIn('3E11FA47-71CA-11E1-9E21-C80AA9429562', result)
+        self.assertIn('3E11FA47-71BB-11E1-9E33-C80AA9429562', result)
+        self.assertIn('3E11FA47-71CA-11E1-9E33-C80AA9429562', result)
+
+        connect_with_backoff.assert_called_with(mysql_con)
+        fetch_server_uuid.assert_called_with(mysql_con)
+        cur_mock.__enter__.return_value.execute.assert_has_calls(
+            [
+                call('select @@GLOBAL.gtid_executed;'),
+            ]
+        )
+
+    @patch('tap_mysql.sync_strategies.binlog.connection.fetch_server_uuid')
+    @patch('tap_mysql.sync_strategies.binlog.connect_with_backoff')
+    def test_fetch_current_gtid_pos_for_mysql_empty_gtid_executed_expect_exception(
+            self, connect_with_backoff, fetch_server_uuid):
+        mysql_con = MagicMock(spec_set=MySQLConnection).return_value
+        cur_mock = MagicMock(spec_set=Cursor).return_value
+        # @@GLOBAL.gtid_executed returns empty string — fresh server with no committed transactions
+        cur_mock.__enter__.return_value.fetchone.side_effect = [
+            ['']
+        ]
+
+        mysql_con.__enter__.return_value.cursor.return_value = cur_mock
+
+        connect_with_backoff.return_value = mysql_con
+        fetch_server_uuid.return_value = '3E11FA47-71CA-11E1-9E33-C80AA9429562'
+
+        with self.assertRaises(Exception) as context:
             binlog.fetch_current_gtid_pos(mysql_con, connection.MYSQL_ENGINE)
+
+        self.assertIn('No suitable GTID was found for server', str(context.exception))
 
         connect_with_backoff.assert_called_with(mysql_con)
         fetch_server_uuid.assert_called_with(mysql_con)
@@ -1900,7 +1937,11 @@ class TestBinlogSyncStrategy(TestCase):
 
         result = binlog.fetch_current_gtid_pos(mysql_con, connection.MYSQL_ENGINE)
 
-        self.assertEqual('3E11FA47-71CA-11E1-9E33-C80AA9429562:1', result)
+        self.assertEqual(
+            '3E11FA47-71CA-11E1-9E33-C80AA9429562:1,3E11FA47-71BB-11E1-9E33-C80AA9429562:2:143,0-3-1123,,'
+            '3E11FA47-71CA-11E1-9E33-C80AA9429562:2:332',
+            result
+        )
 
         connect_with_backoff.assert_called_with(mysql_con)
         fetch_server_uuid.assert_called_with(mysql_con)
@@ -1969,6 +2010,80 @@ class TestBinlogSyncStrategy(TestCase):
                 call('select @@gtid_current_pos;'),
             ]
         )
+
+    def test_normalize_gtid_state(self):
+        # MariaDB — no-op, returned as-is regardless of content
+        self.assertEqual('0-123-556', binlog.normalize_gtid_state('0-123-556', connection.MARIADB_ENGINE))
+
+        # empty value — no-op
+        self.assertEqual('', binlog.normalize_gtid_state('', connection.MYSQL_ENGINE))
+
+        # strips embedded newlines left by @@GLOBAL.gtid_executed
+        contaminated = '3E11FA47-71CA-11E1-9E33-C80AA9429562:1-5291,\n3E11FA47-71BB-11E1-9E33-C80AA9429562:1-81'
+        result = binlog.normalize_gtid_state(contaminated, connection.MYSQL_ENGINE)
+        self.assertNotIn('\n', result)
+        self.assertIn('3E11FA47-71CA-11E1-9E33-C80AA9429562', result)
+        self.assertIn('3E11FA47-71BB-11E1-9E33-C80AA9429562', result)
+
+        # unparseable value — original string returned unchanged (fallback guard)
+        self.assertEqual('not-a-valid-gtid', binlog.normalize_gtid_state('not-a-valid-gtid', connection.MYSQL_ENGINE))
+
+    def test_merge_gtid_into_set(self):
+        # MariaDB — accumulated set is ignored, raw incoming GTID is returned
+        self.assertEqual('0-123-556', binlog.merge_gtid_into_set('0-123-550', '0-123-556', connection.MARIADB_ENGINE))
+
+        # MySQL — second source UUID is added to the set rather than dropped
+        result = binlog.merge_gtid_into_set(
+            '3E11FA47-71CA-11E1-9E33-C80AA9429562:1-100',
+            '3E11FA47-71BB-11E1-9E33-C80AA9429562:1',
+            connection.MYSQL_ENGINE
+        )
+        self.assertIn('3E11FA47-71CA-11E1-9E33-C80AA9429562', result)
+        self.assertIn('3E11FA47-71BB-11E1-9E33-C80AA9429562', result)
+
+        # MySQL — parse failure preserves the accumulated set, NOT new_gtid
+        current = '3E11FA47-71CA-11E1-9E33-C80AA9429562:1-5291,3E11FA47-71BB-11E1-9E33-C80AA9429562:1-81'
+        self.assertEqual(current, binlog.merge_gtid_into_set(current, 'not-valid', connection.MYSQL_ENGINE))
+
+    @patch('tap_mysql.sync_strategies.binlog.fetch_current_log_file_and_pos',
+           return_value=('binlog0001', 100))
+    @patch('tap_mysql.sync_strategies.binlog.BinLogStreamReader', autospec=True)
+    @patch('tap_mysql.sync_strategies.binlog.make_connection_wrapper')
+    @patch('tap_mysql.sync_strategies.binlog.calculate_gtid_bookmark',
+           return_value='3E11FA47-71CA-11E1-9E33-C80AA9429562:1-5291,'
+                        '3E11FA47-71BB-11E1-9E33-C80AA9429562:1-81')
+    def test_sync_binlog_stream_normalizes_gtid_state_before_bookmark_lookup(
+            self, calculate_gtid_bookmark_mock, make_connection_wrapper_mock, reader_mock, *args):
+
+        uuid_a = '3E11FA47-71CA-11E1-9E33-C80AA9429562'
+        uuid_b = '3E11FA47-71BB-11E1-9E33-C80AA9429562'
+
+        config = {'server_id': '123', 'use_gtid': True, 'engine': 'mysql'}
+        mysql_con = Mock(spec_set=MySQLConnection)
+        binlog_streams_map = {'my_db-stream1': {}}
+
+        reader_mock.return_value.__iter__ = lambda _: iter([])
+        reader_mock.return_value.auto_position = f'{uuid_a}:1-5291,{uuid_b}:1-81'
+
+        # Scenario A: contaminated state — \n must be stripped before calculate_gtid_bookmark reads it
+        state = {'bookmarks': {'my_db-stream1': {'gtid': f'{uuid_a}:1-5291,\n{uuid_b}:1-81'}}}
+
+        binlog.sync_binlog_stream(mysql_con, config, binlog_streams_map, state)
+
+        state_passed = calculate_gtid_bookmark_mock.call_args[0][2]
+        self.assertNotIn('\n', state_passed['bookmarks']['my_db-stream1']['gtid'])
+        self.assertIn(uuid_a, state_passed['bookmarks']['my_db-stream1']['gtid'])
+        self.assertIn(uuid_b, state_passed['bookmarks']['my_db-stream1']['gtid'])
+
+        # Scenario B: clean state — must reach calculate_gtid_bookmark unchanged
+        calculate_gtid_bookmark_mock.reset_mock()
+        clean_gtid = f'{uuid_a}:1-5291,{uuid_b}:1-81'
+        state = {'bookmarks': {'my_db-stream1': {'gtid': clean_gtid}}}
+
+        binlog.sync_binlog_stream(mysql_con, config, binlog_streams_map, state)
+
+        state_passed = calculate_gtid_bookmark_mock.call_args[0][2]
+        self.assertEqual(clean_gtid, state_passed['bookmarks']['my_db-stream1']['gtid'])
 
     def test_calculate_gtid_bookmark_for_mariadb_returns_earliest(self):
 
@@ -2117,7 +2232,7 @@ class TestBinlogSyncStrategy(TestCase):
         self.assertEqual("No binlog coordinates in state to infer gtid position! Cannot resume logical replication",
                          str(context.exception))
 
-    def test_calculate_gtid_bookmark_for_mysql_returns_earliest(self):
+    def test_calculate_gtid_bookmark_for_mysql_returns_first_found(self):
 
         binlog_streams = {
             'stream1': {'schema': {}},
@@ -2139,7 +2254,8 @@ class TestBinlogSyncStrategy(TestCase):
         mysql_conn = Mock(spec_set=MySQLConnection)
         result = binlog.calculate_gtid_bookmark(mysql_conn, binlog_streams, state, connection.MYSQL_ENGINE)
 
-        self.assertEqual(result, '3E11FA47-71CA-11E1-9E33-C80AA9429562:1-2')
+        # MySQL streams all share the same GTID set — first bookmark found is returned immediately
+        self.assertEqual(result, '3E11FA47-71CA-11E1-9E33-C80AA9429562:1-165')
 
     def test_calculate_gtid_bookmark_for_mysql_no_gtid_found_expect_exception(self):
 
