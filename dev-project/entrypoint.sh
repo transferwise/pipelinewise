@@ -20,7 +20,7 @@ apt_retry() {
 }
 
 apt-get update
-apt_retry apt-get install -y software-properties-common python3-apt apt-utils
+apt_retry apt-get install -y software-properties-common apt-utils
 
 add-apt-repository ppa:deadsnakes/ppa
 apt-get update
@@ -37,10 +37,7 @@ apt_retry apt-get install -y --no-install-recommends \
   mariadb-client \
   mbuffer \
   postgresql-client \
-  python3.10 python3-pip python3.10-venv python3.10-dev
-
-rm /usr/bin/python3
-ln -s /usr/bin/python3.10 /usr/bin/python3
+  python3.12-dev
 
 apt-get upgrade -y
 
