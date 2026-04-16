@@ -1,10 +1,15 @@
+2.2.0 (2026-04-07)
+-------------------
+**Changes**
+- LOG_BASED: Use wal2json non-row messages to detect that wal has moved on.
+
 2.1.0 (2023-03-30)
 -------------------
 **Changes**
-- INCREMENTAL: An optional config `limit` to be appended to incremental queries to limit their runtime.  
+- INCREMENTAL: An optional config `limit` to be appended to incremental queries to limit their runtime.
 
 **Fixes**
-- INCREMENTAL: `ORDER BY` added back to query in case replication key value is None. 
+- INCREMENTAL: `ORDER BY` added back to query in case replication key value is None.
 
 2.0.0 (2022-11-02)
 -------------------

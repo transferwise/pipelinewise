@@ -206,3 +206,100 @@ class TestLogicalReplication(unittest.TestCase):
         })
         self.assertEqual(messages[4]['type'], 'STATE')
         self.assertDictEqual(state, messages[4]['value'])
+
+
+class TestUnselectedTableSlotAdvancement(unittest.TestCase):
+    """Test that WAL slot LSN advances even when only non-selected tables have activity.
+
+    This verifies the include-transaction: true fix — B/C markers from transactions
+    on unselected tables cause the slot to advance, preventing unbounded slot growth.
+    """
+    selected_table = None
+    unselected_table = None
+    maxDiff = None
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.selected_table = 'selected_table'
+        cls.unselected_table = 'unselected_table'
+
+        selected_spec = {
+            "columns": [
+                {"name": "id", "type": "serial", "primary_key": True},
+                {"name": "val", "type": "character varying"},
+            ],
+            "name": cls.selected_table,
+        }
+        unselected_spec = {
+            "columns": [
+                {"name": "id", "type": "serial", "primary_key": True},
+                {"name": "val", "type": "character varying"},
+            ],
+            "name": cls.unselected_table,
+        }
+
+        ensure_test_table(selected_spec)
+        ensure_test_table(unselected_spec)
+        create_replication_slot()
+
+        cls.config = get_test_connection_config()
+        tap_postgres.dump_catalog = lambda catalog: True
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        drop_replication_slot()
+        drop_table(cls.selected_table)
+        drop_table(cls.unselected_table)
+
+    def test_slot_advances_with_only_unselected_table_activity(self):
+        """Slot LSN must advance when only the unselected table receives writes."""
+
+        # Discover streams, select only `selected_table` for LOG_BASED
+        streams = tap_postgres.do_discovery(self.config)
+        selected_stream = [s for s in streams if s['tap_stream_id'] == f'public-{self.selected_table}'][0]
+        selected_stream = set_replication_method_for_stream(selected_stream, 'LOG_BASED')
+
+        # Insert a row into the selected table so initial sync has something to process
+        conn = get_test_connection()
+        try:
+            with conn.cursor() as cur:
+                insert_record(cur, self.selected_table, {'val': 'seed'})
+        finally:
+            conn.close()
+
+        # Initial sync to establish bookmarks
+        state = {}
+        my_stdout = io.StringIO()
+        with contextlib.redirect_stdout(my_stdout):
+            state = tap_postgres.do_sync(self.config, {'streams': [selected_stream]}, 'LOG_BASED', state, None)
+
+        # Capture LSN after initial sync
+        initial_lsn = state['bookmarks'][f'public-{self.selected_table}']['lsn']
+        self.assertIsNotNone(initial_lsn, "Initial sync should set an LSN bookmark")
+
+        # Now insert rows ONLY into the unselected table
+        conn = get_test_connection()
+        try:
+            with conn.cursor() as cur:
+                for i in range(5):
+                    insert_record(cur, self.unselected_table, {'val': f'noise_{i}'})
+        finally:
+            conn.close()
+
+        # Run sync again — no rows from selected table, but B/C markers should advance the slot
+        my_stdout.seek(0)
+        my_stdout.truncate()
+        with contextlib.redirect_stdout(my_stdout):
+            state = tap_postgres.do_sync(self.config, {'streams': [selected_stream]}, 'LOG_BASED', state, None)
+
+        # Assert that the LSN bookmark has advanced past the unselected-table activity
+        new_lsn = state['bookmarks'][f'public-{self.selected_table}']['lsn']
+        self.assertGreater(new_lsn, initial_lsn,
+                           "LSN bookmark should advance when unselected tables have WAL activity "
+                           "(B/C markers from include-transaction: true)")
+
+        # Verify no RECORD messages were emitted (only the unselected table had activity)
+        messages = [json.loads(msg) for msg in my_stdout.getvalue().splitlines()]
+        record_messages = [m for m in messages if m['type'] == 'RECORD']
+        self.assertEqual(len(record_messages), 0,
+                         "No RECORD messages should be emitted for unselected table activity")
