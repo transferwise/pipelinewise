@@ -9,7 +9,8 @@ from typing import Dict
 from unittest import TestCase
 from unittest.mock import patch, Mock, call, MagicMock
 
-from pymysql import InternalError
+from pymysql import InternalError, ProgrammingError
+from pymysql.err import NotSupportedError
 from pymysql.cursors import Cursor
 from pymysqlreplication.constants import FIELD_TYPE
 from pymysqlreplication.event import RotateEvent, MariadbGtidEvent, GtidEvent
@@ -1824,8 +1825,34 @@ class TestBinlogSyncStrategy(TestCase):
         self.assertEqual(result, ('binlog.000033', 345))
 
         connect_with_backoff.assert_called_with(mysql_con)
+        cur_mock.__enter__.return_value.execute.assert_called_once_with('SHOW BINARY LOG STATUS')
+
+    @patch('tap_mysql.sync_strategies.binlog.connect_with_backoff')
+    def test_fetch_current_log_file_and_pos_success_fallback(self, connect_with_backoff):
+        mysql_con = MagicMock(spec_set=MySQLConnection).return_value
+        cur_mock = MagicMock(spec_set=Cursor).return_value
+
+        def execute_side_effect(query):
+            if query == 'SHOW BINARY LOG STATUS':
+                raise ProgrammingError(1064, "You have an error in your SQL syntax...")
+
+        cur_mock.__enter__.return_value.execute.side_effect = execute_side_effect
+        cur_mock.__enter__.return_value.fetchone.side_effect = [
+            ['binlog.000033', 345, ''],
+        ]
+
+        mysql_con.__enter__.return_value.cursor.return_value = cur_mock
+
+        connect_with_backoff.return_value = mysql_con
+
+        result = binlog.fetch_current_log_file_and_pos(mysql_con)
+
+        self.assertEqual(result, ('binlog.000033', 345))
+
+        connect_with_backoff.assert_called_with(mysql_con)
         cur_mock.__enter__.return_value.execute.assert_has_calls(
             [
+                call('SHOW BINARY LOG STATUS'),
                 call('SHOW MASTER STATUS'),
             ]
         )
@@ -1848,8 +1875,77 @@ class TestBinlogSyncStrategy(TestCase):
         self.assertEqual('MySQL binary logging is not enabled.', str(context.exception))
 
         connect_with_backoff.assert_called_with(mysql_con)
+        cur_mock.__enter__.return_value.execute.assert_called_once_with('SHOW BINARY LOG STATUS')
+
+    @patch('tap_mysql.sync_strategies.binlog.connect_with_backoff')
+    def test_fetch_current_log_file_and_pos_fail_if_no_result_fallback(self, connect_with_backoff):
+        mysql_con = MagicMock(spec_set=MySQLConnection).return_value
+        cur_mock = MagicMock(spec_set=Cursor).return_value
+
+        def execute_side_effect(query):
+            if query == 'SHOW BINARY LOG STATUS':
+                raise ProgrammingError(1064, "You have an error in your SQL syntax...")
+
+        cur_mock.__enter__.return_value.execute.side_effect = execute_side_effect
+        cur_mock.__enter__.return_value.fetchone.side_effect = [
+            None
+        ]
+
+        mysql_con.__enter__.return_value.cursor.return_value = cur_mock
+
+        connect_with_backoff.return_value = mysql_con
+
+        with self.assertRaises(Exception) as context:
+            binlog.fetch_current_log_file_and_pos(mysql_con)
+
+        self.assertEqual('MySQL binary logging is not enabled.', str(context.exception))
+
+        connect_with_backoff.assert_called_with(mysql_con)
         cur_mock.__enter__.return_value.execute.assert_has_calls(
             [
+                call('SHOW BINARY LOG STATUS'),
+                call('SHOW MASTER STATUS'),
+            ]
+        )
+
+    @patch('tap_mysql.sync_strategies.binlog.connect_with_backoff')
+    def test_fetch_current_log_file_and_pos_reraises_unrelated_programming_error(self, connect_with_backoff):
+        mysql_con = MagicMock(spec_set=MySQLConnection).return_value
+        cur_mock = MagicMock(spec_set=Cursor).return_value
+
+        cur_mock.__enter__.return_value.execute.side_effect = ProgrammingError(1045, "Access denied for user")
+
+        mysql_con.__enter__.return_value.cursor.return_value = cur_mock
+        connect_with_backoff.return_value = mysql_con
+
+        with self.assertRaises(ProgrammingError) as context:
+            binlog.fetch_current_log_file_and_pos(mysql_con)
+
+        self.assertEqual(1045, context.exception.args[0])
+
+    @patch('tap_mysql.sync_strategies.binlog.connect_with_backoff')
+    def test_fetch_current_log_file_and_pos_success_fallback_not_supported_error(self, connect_with_backoff):
+        mysql_con = MagicMock(spec_set=MySQLConnection).return_value
+        cur_mock = MagicMock(spec_set=Cursor).return_value
+
+        def execute_side_effect(query):
+            if query == 'SHOW BINARY LOG STATUS':
+                raise NotSupportedError(1235, "This version of MySQL doesn't yet support")
+
+        cur_mock.__enter__.return_value.execute.side_effect = execute_side_effect
+        cur_mock.__enter__.return_value.fetchone.side_effect = [
+            ['binlog.000033', 345, ''],
+        ]
+
+        mysql_con.__enter__.return_value.cursor.return_value = cur_mock
+        connect_with_backoff.return_value = mysql_con
+
+        result = binlog.fetch_current_log_file_and_pos(mysql_con)
+
+        self.assertEqual(result, ('binlog.000033', 345))
+        cur_mock.__enter__.return_value.execute.assert_has_calls(
+            [
+                call('SHOW BINARY LOG STATUS'),
                 call('SHOW MASTER STATUS'),
             ]
         )
