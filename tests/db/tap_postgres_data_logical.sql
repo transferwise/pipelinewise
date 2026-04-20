@@ -19,6 +19,13 @@ CREATE TABLE logical1.logical1_table2(
     PRIMARY KEY (cid)
 );
 
+CREATE TABLE logical1.logical1_not_selected(
+    cid serial NOT NULL,
+    cvarchar varchar,
+    PRIMARY KEY (cid)
+);
+
+
 CREATE TABLE logical1.logical1_edgydata (LIKE public.edgydata INCLUDING INDEXES);
 
 
@@ -105,6 +112,10 @@ INSERT INTO logical2.logical2_table1 (cvarchar) VALUES ('inserted row');
 INSERT INTO logical2.logical2_table1 (cvarchar) VALUES ('inserted row');
 
 UPDATE logical2.logical2_table1 SET cvarchar = 'updated row';
+
+INSERT INTO logical1.logical1_not_selected (cvarchar) VALUES ('inserted row');
+INSERT INTO logical1.logical1_not_selected (cvarchar) VALUES ('inserted row');
+INSERT INTO logical1.logical1_not_selected (cvarchar) VALUES ('inserted row');
 
 INSERT INTO logical3.logical3_table1 (cvarchar) VALUES ('inserted row');
 INSERT INTO logical3.logical3_table1 (cvarchar) VALUES ('inserted row');

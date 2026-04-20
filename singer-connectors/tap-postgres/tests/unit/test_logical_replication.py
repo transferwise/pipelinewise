@@ -11,7 +11,6 @@ from unittest.mock import patch
 from dateutil.tz import tzoffset
 
 from tap_postgres.sync_strategies import logical_replication
-from tap_postgres.sync_strategies.logical_replication import UnsupportedPayloadKindError
 
 
 class PostgresCurReplicationSlotMock:
@@ -177,16 +176,44 @@ class TestLogicalReplication(unittest.TestCase):
 
         self.assertDictEqual({}, output)
 
-    def test_consume_with_payload_kind_is_not_supported_expect_exception(self):
-        with self.assertRaises(UnsupportedPayloadKindError):
-            logical_replication.consume_message(
-                [{'tap_stream_id': 'myschema-mytable'}],
-                {},
-                self.WalMessage(payload='{"action":"truncate", "schema": "myschema", "table": "mytable"}',
-                                data_start='some lsn'),
-                None,
-                {}
-            )
+    def test_consume_with_truncate_action_returns_state_unchanged(self):
+        """Truncate (T) actions with schema/table keys are silently skipped"""
+        output = logical_replication.consume_message(
+            [{'tap_stream_id': 'myschema-mytable'}],
+            {},
+            self.WalMessage(payload='{"action":"T", "schema": "myschema", "table": "mytable"}',
+                            data_start='some lsn'),
+            None,
+            {}
+        )
+
+        self.assertDictEqual({}, output)
+
+    def test_consume_with_begin_action_without_schema_table_returns_state_unchanged(self):
+        """Begin (B) messages from wal2json don't include schema/table keys — must not KeyError"""
+        output = logical_replication.consume_message(
+            [{'tap_stream_id': 'myschema-mytable'}],
+            {},
+            self.WalMessage(payload='{"action":"B","xid":12345,"timestamp":"2026-04-06 12:00:00.000000+00"}',
+                            data_start='some lsn'),
+            None,
+            {}
+        )
+
+        self.assertDictEqual({}, output)
+
+    def test_consume_with_commit_action_without_schema_table_returns_state_unchanged(self):
+        """Commit (C) messages from wal2json don't include schema/table keys — must not KeyError"""
+        output = logical_replication.consume_message(
+            [{'tap_stream_id': 'myschema-mytable'}],
+            {},
+            self.WalMessage(payload='{"action":"C","xid":12345,"timestamp":"2026-04-06 12:00:00.000000+00"}',
+                            data_start='some lsn'),
+            None,
+            {}
+        )
+
+        self.assertDictEqual({}, output)
 
     @patch('tap_postgres.logical_replication.singer.write_message')
     @patch('tap_postgres.logical_replication.sync_common.send_schema_message')
@@ -1104,7 +1131,7 @@ class TestLogicalReplication(unittest.TestCase):
             status_interval=10,
             options={
                 'format-version': 2,
-                'include-transaction': False,
+                'include-transaction': True,
                 'include-timestamp': True,
                 'include-types': False,
                 'actions': 'insert,update,delete',
@@ -1145,7 +1172,7 @@ class TestLogicalReplication(unittest.TestCase):
             status_interval=10,
             options={
                 'format-version': 2,
-                'include-transaction': False,
+                'include-transaction': True,
                 'include-timestamp': True,
                 'include-types': False,
                 'actions': 'insert,update,delete',

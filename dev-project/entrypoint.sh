@@ -2,15 +2,32 @@
 
 set -e
 
+# Retry wrapper for apt-get to handle transient mirror errors
+apt_retry() {
+  local max_attempts=3
+  local attempt=1
+  while [ $attempt -le $max_attempts ]; do
+    if "$@"; then
+      return 0
+    fi
+    echo "apt command failed (attempt $attempt/$max_attempts), retrying in 5s..."
+    attempt=$((attempt + 1))
+    sleep 5
+    apt-get update
+  done
+  echo "apt command failed after $max_attempts attempts"
+  return 1
+}
+
 apt-get update
-apt-get install -y software-properties-common python3-apt apt-utils
+apt_retry apt-get install -y software-properties-common python3-apt apt-utils
 
 add-apt-repository ppa:deadsnakes/ppa
 apt-get update
 
 echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections
 
-apt-get install -y --no-install-recommends \
+apt_retry apt-get install -y --no-install-recommends \
   wget \
   gnupg \
   git \
