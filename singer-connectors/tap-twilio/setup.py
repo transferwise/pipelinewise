@@ -27,7 +27,7 @@ setup(name='pipelinewise-tap-twilio',
               'pytest==9.0.3'
           ]
       },
-      python_requires='>=3.12',
+      python_requires='>=3.12.0, <3.13',
       entry_points='''
           [console_scripts]
           tap-twilio=tap_twilio:main

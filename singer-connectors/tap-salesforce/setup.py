@@ -27,7 +27,7 @@ setup(name='pipelinewise-tap-salesforce',
               'pylint==2.9.*',
           ]
       },
-      python_requires='>=3.6',
+      python_requires='>=3.12.0, <3.13',
       entry_points='''
           [console_scripts]
           tap-salesforce=tap_salesforce:main

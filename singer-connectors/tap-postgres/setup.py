@@ -16,7 +16,7 @@ setup(name='pipelinewise-tap-postgres',
           'License :: OSI Approved :: GNU Affero General Public License v3',
           'Programming Language :: Python :: 3 :: Only'
       ],
-      python_requires=">=3.12",
+      python_requires=">=3.12.0, <3.13",
       install_requires=[
           'pipelinewise-singer-python==3.0.1',
           'psycopg2-binary==2.9.12',
