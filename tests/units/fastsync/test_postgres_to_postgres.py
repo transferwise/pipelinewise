@@ -12,7 +12,7 @@ TAP = 'FastSyncTapPostgres'
 TARGET = 'FastSyncTargetPostgres'
 
 
-# pylint: disable=missing-function-docstring,invalid-name,no-self-use
+# pylint: disable=missing-function-docstring,invalid-name
 class PostgresToPostgres(unittest.TestCase):
     """
     Unit tests for postgres postgres to postgres

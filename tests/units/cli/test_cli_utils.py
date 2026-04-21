@@ -10,7 +10,7 @@ from pipelinewise.cli.errors import InvalidConfigException
 VIRTUALENVS_DIR = './virtualenvs-dummy'
 
 
-# pylint: disable=no-self-use,too-many-public-methods,fixme
+# pylint: disable=too-many-public-methods,fixme
 class TestUtils:
     """
     Unit Tests for PipelineWise CLI utility functions
@@ -31,9 +31,9 @@ class TestUtils:
         assert cli.utils.is_json('{"prop-str":"dummy-string","prop-int":123,"prop-bool":true}') is True
 
         assert cli.utils.is_json_file('./dummy-json') is False
-        assert cli.utils.is_json_file('{}/resources/example.json'.format(os.path.dirname(__file__))) is True
-        assert cli.utils.is_json_file('{}/resources/invalid.json'.format(os.path.dirname(__file__))) is False
-        assert cli.utils.is_json_file('{}/resources'.format(os.path.dirname(__file__))) is False
+        assert cli.utils.is_json_file(f'{os.path.dirname(__file__)}/resources/example.json') is True
+        assert cli.utils.is_json_file(f'{os.path.dirname(__file__)}/resources/invalid.json') is False
+        assert cli.utils.is_json_file(f'{os.path.dirname(__file__)}/resources') is False
 
     def test_json_loader(self):
         """Testing JSON loader functions"""
@@ -42,11 +42,11 @@ class TestUtils:
 
         # Loading JSON file with invalid JSON syntax should raise exception
         with pytest.raises(Exception):
-            cli.utils.load_json('{}/resources/invalid.json'.format(os.path.dirname(__file__)))
+            cli.utils.load_json(f'{os.path.dirname(__file__)}/resources/invalid.json')
 
         # Loading JSON should return python dict
         assert \
-            cli.utils.load_json('{}/resources/example.json'.format(os.path.dirname(__file__))) == \
+            cli.utils.load_json(f'{os.path.dirname(__file__)}/resources/example.json') == \
             {
                 'glossary': {
                     'title': 'example glossary',
@@ -99,9 +99,9 @@ class TestUtils:
             """) is True
 
         assert cli.utils.is_yaml_file('./dummy-yaml') is False
-        assert cli.utils.is_yaml_file('{}/resources/example.yml'.format(os.path.dirname(__file__))) is True
-        assert cli.utils.is_yaml_file('{}/resources/invalid.yml'.format(os.path.dirname(__file__))) is False
-        assert cli.utils.is_yaml_file('{}/resources'.format(os.path.dirname(__file__))) is False
+        assert cli.utils.is_yaml_file(f'{os.path.dirname(__file__)}/resources/example.yml') is True
+        assert cli.utils.is_yaml_file(f'{os.path.dirname(__file__)}/resources/invalid.yml') is False
+        assert cli.utils.is_yaml_file(f'{os.path.dirname(__file__)}/resources') is False
 
     def test_yaml_loader(self):
         """Testing YAML loader functions"""

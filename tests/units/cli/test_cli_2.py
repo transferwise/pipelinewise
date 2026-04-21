@@ -7,15 +7,15 @@ from unittest.mock import patch, call
 from pipelinewise.cli import PipelineWise
 from .cli_args import CliArgs
 
-RESOURCES_DIR = '{}/resources'.format(os.path.dirname(__file__))
-CONFIG_DIR = '{}/sample_json_config'.format(RESOURCES_DIR)
+RESOURCES_DIR = f'{os.path.dirname(__file__)}/resources'
+CONFIG_DIR = f'{RESOURCES_DIR}/sample_json_config'
 VIRTUALENVS_DIR = './virtualenvs-dummy'
 TEST_PROJECT_NAME = 'test-project'
-TEST_PROJECT_DIR = '{}/{}'.format(os.getcwd(), TEST_PROJECT_NAME)
+TEST_PROJECT_DIR = f'{os.getcwd()}/{TEST_PROJECT_NAME}'
 PROFILING_DIR = './profiling'
 
 
-# pylint: disable=no-self-use,attribute-defined-outside-init,fixme
+# pylint: disable=attribute-defined-outside-init,fixme
 class TestCli2:
     """
     Continuation of pipelinewise unit tests

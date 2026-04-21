@@ -6,7 +6,6 @@ from pipelinewise.logger import Logger
 from tests.units.cli.cli_args import CliArgs
 
 
-# pylint: disable=no-self-use
 class TestLogging:
     """
     Unit Tests for PipelineWise Logging functions

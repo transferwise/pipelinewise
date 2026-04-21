@@ -54,6 +54,7 @@ class VictoropsAlertHandler(BaseAlertHandler):
             Initialised alert handler object
         """
         # Send alert to VictorOps REST Endpoint as a HTTP post request
+        # pylint: disable=missing-timeout
         response = requests.post(
             f'{self.base_url}/{self.routing_key}',
             data=json.dumps(

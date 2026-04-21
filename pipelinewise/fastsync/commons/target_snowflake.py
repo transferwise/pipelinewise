@@ -18,7 +18,7 @@ LOGGER = logging.getLogger(__name__)
 logging.getLogger('snowflake.connector').setLevel(logging.WARNING)
 
 
-# pylint: disable=missing-function-docstring,no-self-use,too-many-arguments
+# pylint: disable=missing-function-docstring,too-many-arguments
 class FastSyncTargetSnowflake:
     """
     Common functions for fastsync to Snowflake
@@ -214,6 +214,7 @@ class FastSyncTargetSnowflake:
         sql = 'DROP TABLE IF EXISTS {}."{}"'.format(target_schema, target_table.upper())
         self.query(sql, query_tag_props={'schema': target_schema, 'table': table_name})
 
+    # pylint: disable=too-many-positional-arguments
     def create_table(
         self,
         target_schema: str,

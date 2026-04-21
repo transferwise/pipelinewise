@@ -149,7 +149,7 @@ def exists_and_executable(bin_path: str) -> bool:
 
         try:
             paths = f"{os.environ['PATH']}".split(':')
-            (p for p in paths if os.access(f'{p}/{bin_path}', os.X_OK)).__next__()
+            next(p for p in paths if os.access(f'{p}/{bin_path}', os.X_OK))
         except StopIteration:
             return False
     return True
@@ -295,7 +295,7 @@ def build_stream_buffer_command(
 
     return buffer_command
 
-
+# pylint: disable=too-many-positional-arguments
 def build_singer_command(
     tap: TapParams,
     target: TargetParams,
@@ -353,7 +353,7 @@ def build_singer_command(
 
     return command
 
-
+# pylint: disable=too-many-positional-arguments
 # pylint: disable=too-many-arguments
 def build_partialsync_command(
         tap: TapParams,
@@ -400,6 +400,7 @@ def build_partialsync_command(
     return command
 
 
+# pylint: disable=too-many-positional-arguments
 # pylint: disable=too-many-arguments
 def build_fastsync_command(
     tap: TapParams,

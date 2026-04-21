@@ -42,7 +42,6 @@ class TargetSnowflake(unittest.TestCase):
         self.drop_sf_schema_if_exists(f'ppw_e2e_{self.tap_type}_public2{self.e2e_env.sf_schema_postfix}'.upper())
         super().tearDown()
 
-    # pylint: disable=no-self-use
     def get_e2e_env(self) -> E2EEnv:
         """
         get validated end-to-end environment
@@ -59,7 +58,6 @@ class TargetSnowflake(unittest.TestCase):
         if self.e2e_env.env['TARGET_SNOWFLAKE']['is_configured'] is False:
             self.skipTest('TARGET SNOWFLAKE credentials are not configured')
 
-    # pylint: disable=no-self-use
     def check_validate_taps(self):
         """
         run `pipelinewise validate`
@@ -69,7 +67,6 @@ class TargetSnowflake(unittest.TestCase):
         )
         assertions.assert_command_success(return_code, stdout, stderr)
 
-    # pylint: disable=no-self-use
     def check_import_config(self):
         """
         run `pipelinewise import_config`
@@ -87,7 +84,6 @@ class TargetSnowflake(unittest.TestCase):
             f'DROP SCHEMA IF EXISTS {schema} CASCADE'
         )
 
-    # pylint: disable=no-self-use
     def remove_dir_from_config_dir(self, dir_path: str):
         """
         remove directory from config directory

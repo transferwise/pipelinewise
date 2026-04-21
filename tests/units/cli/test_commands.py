@@ -10,7 +10,6 @@ from pipelinewise.cli import commands
 from pipelinewise.cli.errors import StreamBufferTooLargeException
 
 
-# pylint: disable=no-self-use,fixme
 class TestCommands:
     """
     Unit tests for PipelineWise CLI commands functions

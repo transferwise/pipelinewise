@@ -12,7 +12,7 @@ TAP = 'FastSyncTapMySql'
 TARGET = 'FastSyncTargetPostgres'
 
 
-# pylint: disable=missing-function-docstring,invalid-name,no-self-use
+# pylint: disable=missing-function-docstring,invalid-name
 class S3CsvToPostgres(unittest.TestCase):
     """
     Unit tests for fastsync mysql to postgres
