@@ -40,7 +40,7 @@ jobs:
         if: steps.check.outcome == 'failure'
         run: |
           . .virtualenvs/pipelinewise/bin/activate
-          find pipelinewise tests -type f -name '*.py' | xargs unify --check-only
+          ruff check pipelinewise tests
 
       - name: Pylinting
         if: steps.check.outcome == 'failure'
