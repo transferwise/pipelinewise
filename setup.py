@@ -29,7 +29,7 @@ setup(name='pipelinewise',
           'psycopg2-binary==2.9.10',
           'numpy==1.26.4',          #  numpy 2.X is not compatible with our used pandas
           'snowflake-connector-python[pandas]==3.15.0',
-          'pipelinewise-singer-python==1.*',
+          'pipelinewise-singer-python==3.0.1',
           'python-pidfile==3.0.0',
           'pymongo>=4.7,<4.12',
           'tzlocal>=2.0,<4.1',
