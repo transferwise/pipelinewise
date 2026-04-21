@@ -33,11 +33,11 @@ apt_retry apt-get install -y --no-install-recommends \
   git \
   alien \
   gettext-base \
-  libaio1 \
+  libaio1t64 \
   mariadb-client \
   mbuffer \
   postgresql-client \
-  python3.12-dev
+  python3.12-dev python3.12-venv
 
 apt-get upgrade -y
 

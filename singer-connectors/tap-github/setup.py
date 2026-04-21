@@ -23,8 +23,8 @@ setup(name='pipelinewise-tap-github',
       ],
       extras_require={
           'test': [
-              'pylint==2.10.2',
-              'pytest==6.2.4'
+              'pylint==4.0.5',
+              'pytest==9.0.3'
           ]
       },
       entry_points='''

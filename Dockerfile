@@ -7,7 +7,7 @@ RUN apt-get -qq update \
         apt-utils \
         alien \
         gnupg \
-        libaio1 \
+        libaio1t64 \
         mbuffer \
         wget \
         tzdata \

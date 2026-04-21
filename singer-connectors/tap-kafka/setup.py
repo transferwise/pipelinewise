@@ -24,9 +24,9 @@ setup(name='pipelinewise-tap-kafka',
       ],
       extras_require={
           'test': [
-              'pytest==7.4.*',
-              'pylint==2.17.*',
-              'pytest-cov==4.0.*'
+              'pytest==9.0.3',
+              'pylint==4.0.5',
+              'pytest-cov==7.1.0'
           ]
       },
       entry_points='''
