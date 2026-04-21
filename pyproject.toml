@@ -1,0 +1,20 @@
+[tool.ruff]
+# Set the maximum line length to 120
+line-length = 130
+
+[tool.ruff.lint]
+# Select the rules you want to check (E=Error, F=Pyflakes, Q=Quotes)
+select = ["E", "F", "Q"]
+
+# Add Q000, Q001, or any other rules you want to skip entirely
+# Q000: Single quotes found but double quotes preferred
+# Q001: Multiline string quote preference
+# Q003: Avoidable escaped quotes
+# Q004: Unnecessary escape on inner quote character
+ignore = ["Q000", "Q001", "Q003", "Q004", "E721"]
+
+[tool.ruff.lint.flake8-quotes]
+# This sets your preference, but the 'ignore' above will
+# stop Ruff from complaining even if you break these rules.
+inline-quotes = "single"
+multiline-quotes = "single"
