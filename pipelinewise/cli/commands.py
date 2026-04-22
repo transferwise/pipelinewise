@@ -295,6 +295,7 @@ def build_stream_buffer_command(
 
     return buffer_command
 
+
 # pylint: disable=too-many-positional-arguments
 def build_singer_command(
     tap: TapParams,
@@ -352,6 +353,7 @@ def build_singer_command(
     command = ' | '.join(list(filter(None, sub_commands)))
 
     return command
+
 
 # pylint: disable=too-many-positional-arguments
 # pylint: disable=too-many-arguments
