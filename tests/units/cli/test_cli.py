@@ -855,7 +855,7 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
             f'{test_files_dir}/tap_config_pk_not_defined.json'
         )
         tap_with_pk = cli.utils.load_json(
-            '{test_files_dir}//tap_properties_with_pk.json'
+            f'{test_files_dir}//tap_properties_with_pk.json'
         )
         tap_with_no_pk_full_table = cli.utils.load_json(
             f'{test_files_dir}//tap_properties_with_no_pk_full_table.json'
