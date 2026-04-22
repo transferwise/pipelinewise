@@ -18,7 +18,7 @@ setup(name='pipelinewise-tap-snowflake',
       ],
       py_modules=['tap_snowflake'],
       install_requires=[
-            'pipelinewise-singer-python==3.0.1',
+            'pipelinewise-singer-python==3.0.2',
             'snowflake-connector-python[pandas]==3.15.*',
             'pendulum==1.2.0'
       ],
