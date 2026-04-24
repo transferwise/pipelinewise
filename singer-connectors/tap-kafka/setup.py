@@ -17,16 +17,16 @@ setup(name='pipelinewise-tap-kafka',
           'Programming Language :: Python :: 3 :: Only'
       ],
       install_requires=[
-          'pipelinewise-singer-python==2.*',
+          'pipelinewise-singer-python==3.0.2',
           'dpath==2.1.*',
           'confluent-kafka[protobuf]==2.3.*',
-          'grpcio-tools==1.57.*'
+          'grpcio-tools==1.80.*'
       ],
       extras_require={
           'test': [
-              'pytest==7.4.*',
-              'pylint==2.17.*',
-              'pytest-cov==4.0.*'
+              'pytest==9.0.3',
+              'pylint==4.0.5',
+              'pytest-cov==7.1.0'
           ]
       },
       entry_points='''

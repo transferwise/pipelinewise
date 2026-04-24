@@ -16,17 +16,18 @@ setup(name='pipelinewise-tap-postgres',
           'License :: OSI Approved :: GNU Affero General Public License v3',
           'Programming Language :: Python :: 3 :: Only'
       ],
-      python_requires=">=3.10",
+      python_requires=">=3.12.0, <3.13",
       install_requires=[
-          'pipelinewise-singer-python==1.*',
-          'psycopg2-binary==2.9.5',
+          'pipelinewise-singer-python==3.0.2',
+          'psycopg2-binary==2.9.12',
           'strict-rfc3339==0.7',
+          'simplejson==4.0.1'
       ],
       extras_require={
           "test": [
-              'pytest==7.2.2',
-              'pylint==2.12.*',
-              'pytest-cov==4.0.0'
+              'pytest==9.0.3',
+              'pylint==4.0.5',
+              'pytest-cov==7.1.0'
           ]
       },
       entry_points='''

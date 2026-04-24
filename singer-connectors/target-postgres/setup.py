@@ -18,16 +18,16 @@ setup(name="pipelinewise-target-postgres",
       ],
       py_modules=["target_postgres"],
       install_requires=[
-          'pipelinewise-singer-python==2.*',
+          'pipelinewise-singer-python==3.0.2',
           'psycopg2-binary==2.9.10',
           'inflection==0.3.1',
           'joblib==1.2.0',
       ],
       extras_require={
           "test": [
-              'pytest==6.2.5',
-              'pylint==2.6.0',
-              'pytest-cov==2.10.1',
+              'pytest==9.0.3',
+              'pylint==4.0.5',
+              'pytest-cov==7.1.0',
           ]
       },
       entry_points="""

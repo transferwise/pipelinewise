@@ -22,14 +22,14 @@ setup(name='pipelinewise-transform-field',
       ],
       py_modules=['transform_field'],
       install_requires=[
-          'pipelinewise-singer-python==1.*',
+          'pipelinewise-singer-python==3.0.2',
           'dpath==2.0.*',
       ],
       extras_require={
           'test': [
-              'pytest==6.2.*',
-              'pytest-cov==3.0.*',
-              'pylint==2.12.*',
+              'pytest==9.0.3',
+              'pytest-cov==7.1.0',
+              'pylint==4.0.5',
           ]
       },
       entry_points='''

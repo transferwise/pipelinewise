@@ -12,7 +12,7 @@ TAP = 'FastSyncTapMongoDB'
 TARGET = 'FastSyncTargetSnowflake'
 
 
-# pylint: disable=missing-function-docstring,invalid-name,no-self-use
+# pylint: disable=missing-function-docstring,invalid-name
 class MongoDBToSnowflake(unittest.TestCase):
     """
     Unit tests for fastsync MongoDB to postgres

@@ -216,7 +216,6 @@ def json_bytes_to_string(data):
 # pylint: disable=too-many-locals
 def row_to_singer_record(catalog_entry, version, db_column_map, row, time_extracted):
     row_to_persist = {}
-
     for column_name, val in row.items():
         property_type = catalog_entry.schema.properties[column_name].type
         property_format = catalog_entry.schema.properties[column_name].format
@@ -254,8 +253,7 @@ def row_to_singer_record(catalog_entry, version, db_column_map, row, time_extrac
 
         elif property_format == 'spatial':
             if val:
-                srid = int.from_bytes(val[:4], byteorder='little')
-                geom = Geometry(val[4:], srid=srid)
+                geom = Geometry(val)
                 row_to_persist[column_name] = json.dumps(geom.geojson)
             else:
                 row_to_persist[column_name] = None
@@ -520,8 +518,7 @@ def handle_update_rows_event(event, catalog_entry, state, columns, rows_saved, t
     db_column_types = get_db_column_types(event)
 
     for row in event.rows:
-        filtered_vals = {k: v for k, v in row['after_values'].items()
-                         if k in columns}
+        filtered_vals = {k: v for k, v in row['after_values'].items() if k in columns}
 
         record_message = row_to_singer_record(catalog_entry,
                                               stream_version,
@@ -600,10 +597,20 @@ def __get_diff_in_columns_list(
     # if a column no longer exists, the event will have something like __dropped_col_XY__
     # to refer to this column, we don't want these columns to be included in the difference
     # we also will ignore any column using the given ignore_columns argument.
-    binlog_columns_filtered = filter(
-        lambda col_name, ignored_cols=ignore_columns:
-        not bool(re.match(r'__dropped_col_\d+__', col_name) or col_name in ignored_cols),
-        [col.name for col in binlog_event.columns])
+
+    # binlog_columns_filtered = filter(
+    #     lambda col_name, ignored_cols=ignore_columns:
+    #     not bool(re.match(r'__dropped_col_\d+__', col_name) or col_name in ignored_cols),
+    #     [col.name for col in binlog_event.columns])
+
+    binlog_columns_filtered = [
+        col.name for col in binlog_event.columns
+        if col.name and not (
+                re.match(r'__dropped_col_\d+__', str(col.name)) or
+                col.name in ignore_columns
+        )
+    ]
+
 
     return set(binlog_columns_filtered).difference(schema_properties)
 
@@ -628,7 +635,6 @@ def _run_binlog_sync(
     # A set to hold all columns that are detected as we sync but should be ignored cuz they are unsupported types.
     # Saving them here to avoid doing the check if we should ignore a column over and over again
     ignored_columns = set()
-
     # Exit from the loop when the reader either runs out of streams to return or we reach
     # the end position (which is Master's)
     for binlog_event in reader:
@@ -906,7 +912,6 @@ def sync_binlog_stream(
 
         end_log_file, end_log_pos = fetch_current_log_file_and_pos(mysql_conn)
         LOGGER.info('Current Master binlog file and pos: %s %s', end_log_file, end_log_pos)
-
         _run_binlog_sync(mysql_conn, reader, binlog_streams_map, state, config, end_log_file, end_log_pos)
 
     finally:

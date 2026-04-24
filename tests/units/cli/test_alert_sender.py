@@ -11,7 +11,7 @@ from pipelinewise.cli.alert_handlers.victorops_alert_handler import (
 )
 
 
-# pylint: disable=no-self-use,too-few-public-methods
+# pylint: disable=too-few-public-methods
 class TestAlertSender:
     """
     Unit tests for PipelineWise CLI alert sender classes

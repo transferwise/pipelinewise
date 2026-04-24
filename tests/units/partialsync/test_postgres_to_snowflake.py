@@ -168,6 +168,7 @@ class PartialSyncTestCase(TestCase):
                         for message in log_messages:
                             self.assertIn(message, actual_logs.output[log_index])
 
+    # pylint: disable=too-many-positional-arguments
     @mock.patch('pipelinewise.fastsync.partialsync.utils.load_into_snowflake')
     @mock.patch('pipelinewise.fastsync.partialsync.utils.upload_to_s3')
     @mock.patch('pipelinewise.fastsync.commons.utils.save_state_file')

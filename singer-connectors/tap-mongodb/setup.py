@@ -20,7 +20,7 @@ setup(name='pipelinewise-tap-mongodb',
       ],
       py_modules=['tap_mongodb'],
       install_requires=[
-          'pipelinewise-singer-python==1.*',
+          'pipelinewise-singer-python==3.0.2',
           'pymongo==4.7.*',
           'tzlocal==4.0.2',
           'terminaltables==3.1.*',
@@ -32,8 +32,8 @@ setup(name='pipelinewise-tap-mongodb',
               'ipdb==0.13.*'
           ],
           'test': [
-              'pytest==6.2.5',
-              'pytest-cov==3.0.0'
+              'pytest==9.0.3',
+              'pytest-cov==7.1.0'
           ]
       },
       entry_points='''

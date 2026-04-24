@@ -30,7 +30,6 @@ class PartialSyncUtilsTestCase(TestCase):
             self.assertTupleEqual(([test_s3_key], test_s3_key), actual_return)
             mocked_upload_to_s3.assert_called_with(test_file_part, tmp_dir=temp_test_dir)
 
-    # pylint: disable=no-self-use
     def test_load_into_snowflake_hard_delete(self):
         """Test load_into_snowflake method with hard delete"""
         snowflake = mock.MagicMock()
@@ -65,7 +64,6 @@ class PartialSyncUtilsTestCase(TestCase):
             mock.call.drop_table(target['schema'], target['temp'])
         ])
 
-    # pylint: disable=no-self-use
     def test_load_into_snowflake_soft_delete(self):
         """Test load_into_snowflake method with soft delete"""
         snowflake = mock.MagicMock()
@@ -129,7 +127,6 @@ class PartialSyncUtilsTestCase(TestCase):
             mock.call.swap_tables(target['schema'], target['table']),
         ])
 
-    # pylint: disable=no-self-use
     def test_update_state_file(self):
         """Test state file updating with and without end value"""
         bookmark = {'foo': 2}

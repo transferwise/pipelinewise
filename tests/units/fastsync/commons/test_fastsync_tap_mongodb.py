@@ -78,7 +78,7 @@ def generate_all_datatypes_doc():
     }
 
 
-# pylint: disable=invalid-name,no-self-use
+# pylint: disable=invalid-name
 class TestFastSyncTapMongoDB(TestCase):
     """
     Unit tests for fastsync tap mongo
