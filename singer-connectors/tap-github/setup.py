@@ -19,7 +19,7 @@ setup(name='pipelinewise-tap-github',
       py_modules=['tap_github'],
       install_requires=[
           'pipelinewise-singer-python==3.0.2',
-          'requests==2.32.4'
+          'requests==2.33.1'
       ],
       extras_require={
           'test': [
