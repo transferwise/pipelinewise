@@ -1,3 +1,8 @@
+0.76.1 (2026-04-30)
+-------------------
+- Bump `requests` to `2.33.1`
+- Update `tap-salesforce` for Python 3.12
+
 0.76.0 (2026-04-16)
 -------------------
 - Updates for Python 3.12 
