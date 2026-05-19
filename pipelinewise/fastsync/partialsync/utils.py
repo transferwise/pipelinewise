@@ -158,7 +158,7 @@ def _validate_dynamic_boundary_value(query_object, string_to_check: str) -> str:
         else:
             boundary_value = return_value[0][0]
     except Exception:
-        raise(InvalidConfigException(f'Invalid query for boundary value: {string_to_check}')) from Exception
+        raise (InvalidConfigException(f'Invalid query for boundary value: {string_to_check}')) from Exception
     return boundary_value
 
 

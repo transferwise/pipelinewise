@@ -8,7 +8,7 @@ from pipelinewise.cli.errors import InvalidConfigException
 TAP_GITHUB_YAML = '{}/resources/tap-github.yml'.format(os.path.dirname(__file__))
 
 
-# pylint: disable=no-self-use,too-many-public-methods,fixme
+# pylint: disable=too-many-public-methods,fixme
 # pylint: disable=E1136,E1137  # False positive when loading vault encrypted YAML
 class TestUtils(TestCase):
     """

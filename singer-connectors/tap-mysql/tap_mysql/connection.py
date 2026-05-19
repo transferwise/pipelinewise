@@ -12,8 +12,6 @@ LOGGER = singer.get_logger('tap_mysql')
 
 CONNECT_TIMEOUT_SECONDS = 30
 
-# We need to hold onto this for self-signed SSL
-MATCH_HOSTNAME = ssl.match_hostname
 MARIADB_ENGINE = 'mariadb'
 MYSQL_ENGINE = 'mysql'
 
@@ -118,26 +116,35 @@ class MySQLConnection(pymysql.connections.Connection):
             with open("key.pem", "wb") as key_file:
                 key_file.write(config["ssl_key"].encode('utf-8'))
 
-            ssl_arg = {
-                "ca": "./ca.pem",
-                "cert": "./cert.pem",
-                "key": "./key.pem",
-            }
+            ctx = ssl.create_default_context(cafile="./ca.pem")
+            ctx.load_cert_chain(certfile="./cert.pem", keyfile="./key.pem")
 
-            # override match hostname for google cloud
             if config.get("internal_hostname"):
                 parsed_hostname = parse_internal_hostname(config["internal_hostname"])
-                ssl.match_hostname = lambda cert, hostname: MATCH_HOSTNAME(cert, parsed_hostname)# pylint: disable=W1505
+                # This tells Python to verify the cert against THIS name,
+                # even if we are connecting to an IP address.
+                ctx.check_hostname = True
+                server_hostname = parsed_hostname
+            else:
+                ctx.check_hostname = False
+                ctx.verify_mode = ssl.CERT_REQUIRED  # Or ssl.CERT_NONE if preferred
+                server_hostname = None
+
+
+
+            ssl_arg = ctx
+
+            args["server_hostname"] = server_hostname
 
         super().__init__(defer_connect=True, ssl=ssl_arg, **args)
 
         # Attempt SSL
         if config.get("ssl") == 'true' and not use_self_signed_ssl:
             LOGGER.info("Attempting SSL connection")
-            self.ssl = True
-            self.ctx = ssl.create_default_context()
-            self.ctx.check_hostname = False
-            self.ctx.verify_mode = ssl.CERT_NONE
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            ssl_arg = ctx  # Assign the context to ssl_arg
             self.client_flag |= CLIENT.SSL
 
         self.session_sqls = config.get("session_sqls", DEFAULT_SESSION_SQLS)

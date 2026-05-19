@@ -12,7 +12,7 @@ TAP = 'FastSyncTapMongoDB'
 TARGET = 'FastSyncTargetPostgres'
 
 
-# pylint: disable=missing-function-docstring,invalid-name,no-self-use
+# pylint: disable=missing-function-docstring,invalid-name
 class MongoDBToPostgres(unittest.TestCase):
     """
     Unit tests for fastsync MongoDB to postgres

@@ -12,7 +12,7 @@ TAP = 'FastSyncTapPostgres'
 TARGET = 'FastSyncTargetSnowflake'
 
 
-# pylint: disable=missing-function-docstring,invalid-name,no-self-use
+# pylint: disable=missing-function-docstring,invalid-name
 class PostgresToSnowflake(unittest.TestCase):
     """
     Unit tests for fastsync postgres to snowflake

@@ -31,7 +31,7 @@ class TestResyncPGToSF(TapPostgres):
             pass
         super().tearDown()
 
-    def test_resync_pg_to_sf_if_table_size_greater_than_limit(self):   # pylint: disable = no-self-use
+    def test_resync_pg_to_sf_if_table_size_greater_than_limit(self):
         """test resync pg to SF returns error 1 if table size is greater than the limit"""
 
         a_small_number = 0.001   # Mb
@@ -43,7 +43,7 @@ class TestResyncPGToSF(TapPostgres):
 
         assert return_code == 1
 
-    def test_resync_pg_to_sf_if_table_size_less_than_limit(self):   # pylint: disable = no-self-use
+    def test_resync_pg_to_sf_if_table_size_less_than_limit(self):
         """test resync pg to SF returns error if table size is less than the limit"""
         a_big_number = 1000 # Mb
         _create_ppw_config_file(table_mb=a_big_number)
@@ -53,8 +53,7 @@ class TestResyncPGToSF(TapPostgres):
 
         assert return_code == 0
 
-    def test_resync_pg_to_sf_if_table_size_greater_than_limit_and_force(self):   # pylint: disable = no-self-use
-
+    def test_resync_pg_to_sf_if_table_size_greater_than_limit_and_force(self):
         """test resync pg to SF returns error if table size is greater than the limit and --force is used"""
         a_small_number = 0.001  # Mb
         _create_ppw_config_file(table_mb=a_small_number)
@@ -65,7 +64,7 @@ class TestResyncPGToSF(TapPostgres):
 
         assert return_code == 0
 
-    def test_run_tap_pg_to_sf_if_size_greater_than_limit(self):   # pylint: disable = no-self-use
+    def test_run_tap_pg_to_sf_if_size_greater_than_limit(self):
         """test run_tap postgres to sf if table size is greater than the limit"""
         a_small_number = 0.001 # Mb
         _create_ppw_config_file(table_mb=a_small_number)

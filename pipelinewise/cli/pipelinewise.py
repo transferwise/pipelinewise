@@ -166,6 +166,7 @@ class PipelineWise:
                 f'Cannot merge JSON files {dict_a} {dict_b} - {exc}'
             ) from exc
 
+    # pylint: disable=too-many-positional-arguments
     # pylint: disable=too-many-statements,too-many-branches,too-many-nested-blocks,too-many-locals,too-many-arguments
     def create_filtered_tap_properties(
         self,
@@ -2273,6 +2274,7 @@ TAP RUN SUMMARY
 
         deleted_taps_count = 0
         for target_id, taps in old_config_dict.items():
+            # pylint: disable=unreachable
             if target_id not in new_config_dict:
                 # target is no longer configured, thus we need to remove all its config and taps tied to it
                 self._remove_target_config(target_id, taps)

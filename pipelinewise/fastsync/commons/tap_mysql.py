@@ -347,6 +347,7 @@ class FastSyncTapMySql:
         schema_name = table_dict.get('schema_name')
         table_name = table_dict.get('table_name')
 
+        # pylint: disable=line-too-long
         sql = f"""
                 SELECT column_name AS column_name,
                     data_type AS data_type,
@@ -385,6 +386,7 @@ class FastSyncTapMySql:
                 ORDER BY
                         ordinal_position
             """  # noqa: E501
+        # pylint: enable=line-too-long
         return self.query(sql)
 
     def map_column_types_to_target(self, table_name):
@@ -407,7 +409,7 @@ class FastSyncTapMySql:
             'primary_key': self.get_primary_keys(table_name),
         }
 
-    # pylint: disable=too-many-locals
+    # pylint: disable=too-many-locals, too-many-positional-arguments
     def copy_table(
             self,
             table_name,

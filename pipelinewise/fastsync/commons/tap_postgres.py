@@ -271,9 +271,11 @@ class FastSyncTapPostgres:
         self.primary_host_curr = self.primary_host_conn.cursor()
 
         # Make sure PostgreSQL version is 9.4 or higher
+        # pylint: disable=assignment-from-no-return
         result = self.primary_host_query(
             "SELECT setting::int AS version FROM pg_settings WHERE name='server_version_num'"
         )
+        # pylint: disable=unsubscriptable-object
         version = result[0].get('version')
 
         # Do not allow minor versions with PostgreSQL BUG #15114
@@ -395,9 +397,10 @@ class FastSyncTapPostgres:
 
         if max_num:
             decimals = len(max_num.split('.')[1]) if '.' in max_num else 0
+
             decimal_format = f"""
               'CASE WHEN "' || column_name || '" IS NULL THEN NULL ELSE GREATEST(LEAST({max_num}, ROUND("' || column_name || '"::numeric , {decimals})), -{max_num}) END'
-            """ # noqa E501
+            """ # noqa E501 pylint: disable=line-too-long
             integer_format = """
               '"' || column_name || '"'
             """
@@ -410,6 +413,7 @@ class FastSyncTapPostgres:
         schema_name = table_dict.get('schema_name')
         table_name = table_dict.get('table_name')
 
+        # pylint: disable = line-too-long
         sql = f"""
                 SELECT
                     column_name
@@ -442,6 +446,8 @@ class FastSyncTapPostgres:
                 ORDER BY ordinal_position
                 ) AS x
             """  # noqa: E501
+        # pylint: enable = line-too-long
+
         return self.query(sql)
 
     def map_column_types_to_target(self, table_name):
@@ -466,7 +472,7 @@ class FastSyncTapPostgres:
             'primary_key': self.get_primary_keys(table_name),
         }
 
-    # pylint: disable=too-many-arguments, too-many-locals
+    # pylint: disable=too-many-arguments, too-many-locals, too-many-positional-arguments
     def copy_table(
         self,
         table_name,

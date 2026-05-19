@@ -19,6 +19,7 @@ class FastSyncTapMySqlMock(FastSyncTapMySql):
         self.executed_queries = []
 
     # pylint: disable=too-many-arguments
+    # pylint: disable=too-many-positional-arguments
     def query(self, query, conn=None, params=None, return_as_cursor=False, n_retry=1):
         if query.startswith('INVALID-SQL'):
             raise pymysql.err.InternalError
@@ -31,7 +32,7 @@ class FastSyncTapMySqlMock(FastSyncTapMySql):
         return []
 
 
-# pylint: disable=invalid-name,no-self-use
+# pylint: disable=invalid-name
 class TestFastSyncTapMySql(TestCase):
     """
     Unit tests for fastsync tap mysql

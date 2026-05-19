@@ -11,7 +11,7 @@ from pipelinewise.fastsync.commons.utils import NotSelectedTableException
 RESOURCES_DIR = '{}/resources'.format(os.path.dirname(__file__))
 
 
-# pylint: disable=missing-function-docstring,no-self-use,invalid-name,too-few-public-methods
+# pylint: disable=missing-function-docstring,invalid-name,too-few-public-methods
 class MySqlMock:
     """
     MySQL mock

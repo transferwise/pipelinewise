@@ -12,7 +12,7 @@ from .transform_utils import SQLFlavor, TransformationHelper
 LOGGER = logging.getLogger(__name__)
 
 
-# pylint: disable=missing-function-docstring,no-self-use,too-many-arguments
+# pylint: disable=missing-function-docstring,too-many-arguments
 class FastSyncTargetPostgres:
     """
     Common functions for fastsync to Postgres

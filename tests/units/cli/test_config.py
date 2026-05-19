@@ -10,7 +10,6 @@ PIPELINEWISE_TEST_HOME = '/tmp/.pipelinewise'
 
 
 # Todo: Inherit from unittest.TestCase
-# pylint: disable=no-self-use,fixme
 class TestConfig:
     """
     Unit Tests for PipelineWise CLI Config class

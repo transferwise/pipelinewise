@@ -18,15 +18,15 @@ setup(name='pipelinewise-tap-mixpanel',
       ],
       py_modules=['tap_mixpanel'],
       install_requires=[
-          'backoff>=1.8.0,<2.0.0',
-          'requests==2.32.3',
-          'pipelinewise-singer-python==1.*',
+          'backoff==2.1.2',
+          'requests==2.33.1',
+          'pipelinewise-singer-python==3.0.2',
           'jsonlines==1.2.0'
       ],
       extras_require={
           'test': [
-              'pylint==2.9.*',
-              'pytest==6.2.*',
+              'pylint==4.0.5',
+              'pytest==9.0.3',
               'requests_mock==1.9.*',
           ]
       },
