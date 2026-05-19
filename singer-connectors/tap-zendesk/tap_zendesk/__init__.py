@@ -192,7 +192,7 @@ def get_session(config):
     )
 
 
-    adapter = HTTPAdapter(max_retries=retry_strategy, **Zenpy.http_adapter_kwargs())
+    adapter = HTTPAdapter(max_retries=retry_strategy)
 
     session = requests.Session()
 
