@@ -183,10 +183,6 @@ def add_session_hooks(session):
 
 def get_session(config):
     """ Add partner information to requests Session object if specified in the config. """
-    if not all(k in config for k in ["marketplace_name",
-                                     "marketplace_organization_id",
-                                     "marketplace_app_id"]):
-        return None
 
     retry_strategy = Retry(
         total=5,  # Total number of retries
@@ -194,6 +190,7 @@ def get_session(config):
         status_forcelist=[502,],  # Status codes to retry on
         raise_on_status=False  # Let Zenpy handle the final exception if all retries fail
     )
+
 
     adapter = HTTPAdapter(max_retries=retry_strategy, **Zenpy.http_adapter_kwargs())
 
@@ -203,9 +200,13 @@ def get_session(config):
     # https://github.com/facetoe/zenpy/blob/master/docs/zenpy.rst#usage
     session.mount("https://", adapter)
     session.mount("http://", adapter)
-    session.headers["X-Zendesk-Marketplace-Name"] = config.get("marketplace_name", "")
-    session.headers["X-Zendesk-Marketplace-Organization-Id"] = str(config.get("marketplace_organization_id", ""))
-    session.headers["X-Zendesk-Marketplace-App-Id"] = str(config.get("marketplace_app_id", ""))
+    if all(k in config for k in ["marketplace_name",
+                                     "marketplace_organization_id",
+                                     "marketplace_app_id"]):
+        LOGGER.info("Adding Marketplace headers to the Zendesk Session.")
+        session.headers["X-Zendesk-Marketplace-Name"] = config.get("marketplace_name", "")
+        session.headers["X-Zendesk-Marketplace-Organization-Id"] = str(config.get("marketplace_organization_id", ""))
+        session.headers["X-Zendesk-Marketplace-App-Id"] = str(config.get("marketplace_app_id", ""))
 
     return session
 

@@ -1,3 +1,7 @@
+0.76.3 (2026-05-19)
+-------------------
+- Fix session creation in tap-zendesk
+
 0.76.2 (2026-05-19)
 -------------------
 - Add retry for tap-zendesk if it fails by http error 502
