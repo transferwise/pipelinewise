@@ -188,7 +188,7 @@ def get_session(config):
         total=7,  # Total number of retries
         backoff_factor=2,  # Waits: 2s, 4s, 8s, 16s...
         status_forcelist=[413, 502, 503],  # Status codes to retry on
-        raise_on_status=False # Let Zenpy handle the final exception if all retries fail
+        raise_on_status=False  # Let Zenpy handle the final exception if all retries fail
     )
 
 
