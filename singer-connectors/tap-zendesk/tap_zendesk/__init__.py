@@ -225,9 +225,6 @@ def get_internal_config(user_config, default_config):
 
 @singer.utils.handle_top_exception(LOGGER)
 def main():
-
-
-
     default_config = get_default_config()
     parsed_args = singer.utils.parse_args(REQUIRED_CONFIG_KEYS)
     internal_config = get_internal_config(parsed_args.config, default_config)
