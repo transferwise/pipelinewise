@@ -4,6 +4,7 @@ import json
 import os
 import sys
 
+from urllib3 import Retry
 from zenpy import Zenpy
 import requests
 from requests import Session
@@ -186,14 +187,26 @@ def get_session(config):
                                      "marketplace_organization_id",
                                      "marketplace_app_id"]):
         return None
+
+    retry_strategy = Retry(
+        total=5,  # Total number of retries
+        backoff_factor=2,  # Waits: 2s, 4s, 8s, 16s...
+        status_forcelist=[502,],  # Status codes to retry on
+        raise_on_status=False  # Let Zenpy handle the final exception if all retries fail
+    )
+
+    adapter = HTTPAdapter(max_retries=retry_strategy, **Zenpy.http_adapter_kwargs())
+
     session = requests.Session()
 
     # Using Zenpy's default adapter args, following the method outlined here:
     # https://github.com/facetoe/zenpy/blob/master/docs/zenpy.rst#usage
-    session.mount("https://", HTTPAdapter(**Zenpy.http_adapter_kwargs()))
+    session.mount("https://", adapter)
+    session.mount("http://", adapter)
     session.headers["X-Zendesk-Marketplace-Name"] = config.get("marketplace_name", "")
     session.headers["X-Zendesk-Marketplace-Organization-Id"] = str(config.get("marketplace_organization_id", ""))
     session.headers["X-Zendesk-Marketplace-App-Id"] = str(config.get("marketplace_app_id", ""))
+
     return session
 
 

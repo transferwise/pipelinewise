@@ -1,3 +1,7 @@
+0.76.2 (2026-05-19)
+-------------------
+- Add retry for tap-zendesk if it fails by http error 502
+
 0.76.1 (2026-04-30)
 -------------------
 - Bump `requests` to `2.33.1`
