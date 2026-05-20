@@ -1,3 +1,7 @@
+0.76.4 (2026-05-19)
+-------------------
+- Fix session http_adapter_kwargs in tap-zendesk
+
 0.76.3 (2026-05-19)
 -------------------
 - Fix session creation in tap-zendesk

@@ -185,14 +185,14 @@ def get_session(config):
     """ Add partner information to requests Session object if specified in the config. """
 
     retry_strategy = Retry(
-        total=5,  # Total number of retries
+        total=7,  # Total number of retries
         backoff_factor=2,  # Waits: 2s, 4s, 8s, 16s...
-        status_forcelist=[502,],  # Status codes to retry on
+        status_forcelist=[413, 502, 503],  # Status codes to retry on
         raise_on_status=False  # Let Zenpy handle the final exception if all retries fail
     )
 
 
-    adapter = HTTPAdapter(max_retries=retry_strategy, **Zenpy.http_adapter_kwargs())
+    adapter = HTTPAdapter(max_retries=retry_strategy)
 
     session = requests.Session()
 
