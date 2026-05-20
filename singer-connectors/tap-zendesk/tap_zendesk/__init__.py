@@ -186,8 +186,8 @@ def get_session(config):
 
     retry_strategy = Retry(
         total=12,  # Total number of retries
-        read=7,  # Retry 5 times on mid-stream read timeouts/drops
-        connect=5,  # Retry 3 times on connection setup failures
+        read=7,  # Retry 7 times on mid-stream read timeouts/drops
+        connect=5,  # Retry 5 times on connection setup failures
         backoff_factor=3,
         status_forcelist=[413, 502, 503],  # Status codes to retry on
         raise_on_status=False  # Let Zenpy handle the final exception if all retries fail
