@@ -1,3 +1,7 @@
+0.76.5 (2026-05-20)
+-------------------
+- Update zendesk retry strategy
+
 0.76.4 (2026-05-19)
 -------------------
 - Fix session http_adapter_kwargs in tap-zendesk
