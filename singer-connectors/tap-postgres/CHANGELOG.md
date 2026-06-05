@@ -1,3 +1,8 @@
+2.3.0 (unreleased)
+-------------------
+**Changes**
+- DISCOVERY: Map `ltree` and `interval` columns to a string schema instead of leaving them untyped.
+
 2.2.0 (2026-04-07)
 -------------------
 **Changes**
