@@ -1,3 +1,7 @@
+0.76.6 (2026-06-08)
+-------------------
+- Revert `zenpy` in `tap-zendesk` to `2.0.0`
+
 0.76.5 (2026-05-20)
 -------------------
 - Update zendesk retry strategy
