@@ -171,8 +171,11 @@ def api_token_auth(args):
     }
 
 def convert_x_rate_limit_remaining_to_int(response, *args, **kwargs):
-    if 'X-Rate-Limit-Remaining' in response.headers and isinstance(response.headers['X-Rate-Limit-Remaining'], str):
-        response.headers['X-Rate-Limit-Remaining'] = int(response.headers['X-Rate-Limit-Remaining'])
+    try:
+        if 'X-Rate-Limit-Remaining' in response.headers and isinstance(response.headers['X-Rate-Limit-Remaining'], str):
+            response.headers['X-Rate-Limit-Remaining'] = int(response.headers['X-Rate-Limit-Remaining'])
+    except (TypeError, ValueError):
+        pass
 
     return response
 

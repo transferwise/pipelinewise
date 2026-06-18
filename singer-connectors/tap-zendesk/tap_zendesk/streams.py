@@ -48,7 +48,7 @@ def process_custom_field(field):
     if zendesk_type == 'date':
         field_schema['format'] = 'datetime'
     if zendesk_type == 'dropdown':
-        field_schema['enum'] = [o['value'] for o in field.custom_field_options]
+        field_schema['enum'] = [o.value for o in field.custom_field_options]
 
     return field_schema
 
