@@ -171,11 +171,8 @@ def api_token_auth(args):
     }
 
 def convert_x_rate_limit_remaining_to_int(response, *args, **kwargs):
-    try:
-        if 'X-Rate-Limit-Remaining' in response.headers and isinstance(response.headers['X-Rate-Limit-Remaining'], str):
-            response.headers['X-Rate-Limit-Remaining'] = int(response.headers['X-Rate-Limit-Remaining'])
-    except (TypeError, ValueError):
-        pass
+    if 'X-Rate-Limit-Remaining' in response.headers and isinstance(response.headers['X-Rate-Limit-Remaining'], str):
+        response.headers['X-Rate-Limit-Remaining'] = int(response.headers['X-Rate-Limit-Remaining'])
 
     return response
 
@@ -237,7 +234,7 @@ def main():
     # OAuth has precedence
     creds = oauth_auth(parsed_args) or api_token_auth(parsed_args)
     session = get_session(parsed_args.config)
-    client = Zenpy(session=session, ratelimit=internal_config['rate_limit'], **creds)
+    client = Zenpy(session=session, proactive_ratelimit=internal_config['rate_limit'], **creds)
     client.internal_config = internal_config
 
     add_session_hooks(client.tickets.session)
