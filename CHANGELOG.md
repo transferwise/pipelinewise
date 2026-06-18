@@ -1,3 +1,10 @@
+0.76.7 (2026-06-18)
+-------------------
+- Bump `zenpy` from `2.0.0` to `2.0.57` to restore Python 3.12 compatibility
+- Fix `'CustomFieldOption' object is not subscriptable` by accessing `o.value` instead of `o['value']` for custom field options
+- Fix `Zenpy.__init__() got an unexpected keyword argument 'ratelimit'` by renaming to `proactive_ratelimit`
+- Fix test suite: replace deprecated `failUnlessRaises` with `assertRaises`, update `get_session` assertions, fix stdout capture to use `BytesIO`
+
 0.76.6 (2026-06-08)
 -------------------
 - Revert `zenpy` in `tap-zendesk` to `2.0.0`
