@@ -8,6 +8,7 @@ import re
 import socket
 import pymysql.connections
 import pymysql.err
+from pymysql.constants import ER
 import pytz
 import singer
 import tzlocal
@@ -115,7 +116,13 @@ def verify_gtid_config(mysql_conn: MySQLConnection):
 def fetch_current_log_file_and_pos(mysql_conn):
     with connect_with_backoff(mysql_conn) as open_conn:
         with open_conn.cursor() as cur:
-            cur.execute("SHOW MASTER STATUS")
+            try:
+                cur.execute("SHOW BINARY LOG STATUS")
+            except (pymysql.err.ProgrammingError, pymysql.err.NotSupportedError) as ex:
+                if ex.args[0] not in (ER.PARSE_ERROR, ER.NOT_SUPPORTED_YET):
+                    raise
+                LOGGER.warning("SHOW BINARY LOG STATUS not supported, falling back to SHOW MASTER STATUS")
+                cur.execute("SHOW MASTER STATUS")
 
             result = cur.fetchone()
 
