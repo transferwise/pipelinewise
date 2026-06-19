@@ -303,8 +303,19 @@ The tap support two ways of consuming log events: using binlog coordinates or GT
 binlog coordinates, when turning the `use_gtid` flag, you have to specify the engine flavor (mariadb/mysql) due to 
 how different are the GTID implementations in these two engines.
 
-When enabling the `use_gtid` flag and the engine is MariaDB, the tap will dynamically infer the GTID pos from 
-existing binlog coordinate in the state, if the engine is mysql, it will fail.
+**MySQL (`engine: mysql`):**
+The tap tracks the full GTID set from `@@GLOBAL.gtid_executed`. All streams share a
+single accumulated GTID set value in state. The set contains one entry per source UUID
+seen during replication — a single UUID for standard single-source setups, or multiple
+entries in multi-source or post-migration topologies. GTID mode requires at least one
+prior full-table sync so that an initial GTID position exists in state — switching
+directly from binlog coordinates to GTID is not supported for MySQL.
+
+**MariaDB (`engine: mariadb`):**
+The tap tracks a single-domain GTID per stream (format: `domain-serverid-sequence`).
+MariaDB supports migration from existing binlog coordinates: if no GTID exists in state,
+the tap will infer the starting GTID position from the stored binlog file and position
+using `BINLOG_GTID_POS()`.
 
 #### State when using binlog coordinates
 ```json
@@ -317,7 +328,30 @@ existing binlog coordinate in the state, if the engine is mysql, it will fail.
 }
 ```
 
-#### State when using GTID
+#### State when using GTID (MySQL)
+
+All streams hold the same GTID set value. The set contains one entry per source UUID
+seen during replication and grows incrementally as events are consumed. A single-source
+setup will have one UUID entry; a multi-source or post-migration setup will have more.
+
+```json
+{
+  "bookmarks": {
+    "example_db-table1": {"log_file": "mysql-binlog.0003", "log_pos": 3244,
+                          "gtid": "3E11FA47-71CA-11E1-9E33-C80AA9429562:1-599,3E11FA47-71BB-11E1-9E33-C80AA9429562:1-81"},
+    "example_db-table2": {"log_file": "mysql-binlog.0001", "log_pos": 42,
+                          "gtid": "3E11FA47-71CA-11E1-9E33-C80AA9429562:1-599,3E11FA47-71BB-11E1-9E33-C80AA9429562:1-81"},
+    "example_db-table3": {"log_file": "mysql-binlog.0003", "log_pos": 100,
+                          "gtid": "3E11FA47-71CA-11E1-9E33-C80AA9429562:1-599,3E11FA47-71BB-11E1-9E33-C80AA9429562:1-81"}
+  }
+}
+```
+
+#### State when using GTID (MariaDB)
+
+Each stream holds an independent single-domain GTID. Streams may hold different values
+as they advance at their own pace.
+
 ```json
 {
   "bookmarks": {

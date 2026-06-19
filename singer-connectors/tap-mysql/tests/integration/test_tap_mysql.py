@@ -1018,6 +1018,10 @@ class TestBinlogReplication(unittest.TestCase):
         config['use_gtid'] = True
         config['engine'] = engine
 
+        # For MySQL, fetch_current_gtid_pos now returns the full GTID set
+        if engine == MYSQL_ENGINE:
+            self.assertIn(':', gtid)
+
         self.state = singer.write_bookmark(self.state,
                                            'tap_mysql_test-binlog_1',
                                            'gtid',
@@ -1064,11 +1068,21 @@ class TestBinlogReplication(unittest.TestCase):
 
         self.assertIsNotNone(singer.get_bookmark(self.state, 'tap_mysql_test-binlog_1', 'log_file'))
         self.assertIsNotNone(singer.get_bookmark(self.state, 'tap_mysql_test-binlog_1', 'log_pos'))
-        self.assertIsNotNone(singer.get_bookmark(self.state, 'tap_mysql_test-binlog_1', 'gtid'))
-
         self.assertIsNotNone(singer.get_bookmark(self.state, 'tap_mysql_test-binlog_2', 'log_file'))
         self.assertIsNotNone(singer.get_bookmark(self.state, 'tap_mysql_test-binlog_2', 'log_pos'))
-        self.assertIsNotNone(singer.get_bookmark(self.state, 'tap_mysql_test-binlog_2', 'gtid'))
+
+        if engine == MYSQL_ENGINE:
+            gtid_1 = singer.get_bookmark(self.state, 'tap_mysql_test-binlog_1', 'gtid')
+            gtid_2 = singer.get_bookmark(self.state, 'tap_mysql_test-binlog_2', 'gtid')
+
+            # All MySQL streams share the same accumulated GTID set after sync
+            self.assertEqual(gtid_1, gtid_2)
+
+            # Value must be a valid GTID set format (uuid:interval)
+            self.assertIn(':', gtid_1)
+        else:
+            self.assertIsNotNone(singer.get_bookmark(self.state, 'tap_mysql_test-binlog_1', 'gtid'))
+            self.assertIsNotNone(singer.get_bookmark(self.state, 'tap_mysql_test-binlog_2', 'gtid'))
 
     def test_binlog_stream_switching_from_binlog_to_gtid_with_mysql_fails(self):
         global SINGER_MESSAGES
