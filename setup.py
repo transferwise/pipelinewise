@@ -25,7 +25,7 @@ setup(name='pipelinewise',
           'ansible-core==2.17.8',
           'Jinja2==3.1.6',
           'joblib==1.3.2',
-          'PyMySQL==0.7.11',
+          'PyMySQL==1.1.1',
           'psycopg2-binary==2.9.10',
           'numpy==1.26.4',          #  numpy 2.X is not compatible with our used pandas
           'snowflake-connector-python[pandas]==3.15.0',
