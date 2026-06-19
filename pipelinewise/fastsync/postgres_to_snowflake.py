@@ -45,8 +45,13 @@ REQUIRED_CONFIG_KEYS = {
 LOCK = multiprocessing.Lock()
 
 
-def tap_type_to_target_type(pg_type, *_):
+def tap_type_to_target_type(pg_type, extra=None):
     """Data type mapping from Postgres to Snowflake"""
+
+    # Needed for call from assertion test helper
+    if pg_type == 'user-defined' and extra == 'hstore':
+        pg_type = 'hstore'
+
     return {
         'char': 'VARCHAR',
         'character': 'VARCHAR',
@@ -79,6 +84,7 @@ def tap_type_to_target_type(pg_type, *_):
         'ARRAY': 'VARIANT',
         'json': 'VARIANT',
         'jsonb': 'VARIANT',
+        'hstore': 'VARIANT'
     }.get(pg_type, 'VARCHAR')
 
 
