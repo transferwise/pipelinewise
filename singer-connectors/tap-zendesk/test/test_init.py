@@ -1,18 +1,23 @@
 import unittest
 from tap_zendesk import get_session
+import requests
 
 class TestGetSession(unittest.TestCase):
     """
     Confirm that partner information is added to session headers when
     present in config.
     """
-    def test_no_partner_info_returns_none(self):
+    def test_no_partner_info_returns_session_without_headers(self):
         test_session = get_session({})
-        self.assertEqual(test_session, None)
+        self.assertIsInstance(test_session, requests.Session)
+        self.assertNotIn("X-Zendesk-Marketplace-Name", test_session.headers)
 
-    def test_incomplete_partner_info_returns_none(self):
+
+    def test_incomplete_partner_info_returns_session_without_headers(self):
         test_session = get_session({"marketplace_name": "Hithere"})
-        self.assertEqual(test_session, None)
+        self.assertIsInstance(test_session, requests.Session)
+        self.assertNotIn("X-Zendesk-Marketplace-Name", test_session.headers)
+
 
     def test_adds_headers_when_all_present_in_config(self):
         test_session = get_session({"marketplace_name": "Hithere",

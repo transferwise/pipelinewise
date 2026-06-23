@@ -4,7 +4,7 @@ import sys
 import unittest
 
 import json
-from io import StringIO
+from io import BytesIO
 
 import pytz
 from singer import Catalog
@@ -26,25 +26,25 @@ class DoSync(unittest.TestCase):
     def test_network_failure(self):
         client = ZenpyMock(n_tickets=10000, p_sleep=0.01, p_failure=0.1, subdomain='xyz', oauth_token=123)
 
-        self.failUnlessRaises(RuntimeError, do_sync, client, self.catalog, self.state, self.start_date)
+        self.assertRaises(RuntimeError, do_sync, client, self.catalog, self.state, self.start_date)
 
     def test_data_consistency(self):
         client = ZenpyMock(n_tickets=1000, p_sleep=0.01, subdomain='xyz', oauth_token=123)
 
+        bytes_io = BytesIO()
+
+        class BinaryStdout:
+            buffer = bytes_io
+
         saved_stdout = sys.stdout
+        sys.stdout = BinaryStdout()
 
-        string_io = StringIO()
-        sys.stdout = string_io
-
-        # Run do_sync
         do_sync(client, self.catalog, self.state, self.start_date)
         sys.stdout = saved_stdout
 
-        # Checks that every message got delivered on time
-        self._check_everything_delivered(string_io.getvalue(), client)
-
-        # Checks that STATE messages are not corrupted
-        self._check_state_consistency(string_io.getvalue())
+        output = bytes_io.getvalue().decode('utf-8')
+        self._check_everything_delivered(output, client)
+        self._check_state_consistency(output)
 
     def _parse_stdout(self, stdout):
         stdout_messages = []
