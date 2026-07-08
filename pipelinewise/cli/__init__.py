@@ -207,7 +207,7 @@ def main():
         add_help=True,
     )
     parser.add_argument('command', type=str, choices=COMMANDS)
-    parser.add_argument('--target', type=str, default='*', help='"Name of the target')
+    parser.add_argument('--target', type=str, default='*', help='Name of the target')
     parser.add_argument('--tap', type=str, default='*', help='Name of the tap')
     parser.add_argument('--taps', type=str, default='*', help='Comma separated list of tap IDs to import')
     parser.add_argument('--tables', type=str, help='List of tables to sync')
@@ -249,8 +249,8 @@ def main():
     )
     parser.add_argument('--table', type=str, default='*', help='Name of the table to partial sync')
     parser.add_argument('--column', type=str, default='*', help='Name of the column to use as sync key in partial sync')
-    parser.add_argument('--start_value', type=str, default='*', help='start value of the column to partial sync')
-    parser.add_argument('--end_value', type=str, default=None, help='end value of the column to partial sync')
+    parser.add_argument('--start_value', type=str, default='*', help='Start value of the column to partial sync')
+    parser.add_argument('--end_value', type=str, default=None, help='End value of the column to partial sync')
     parser.add_argument('--force', default=False, required=False,
                         help='Force sync_tables for full sync', action='store_true'
                         )
