@@ -36,7 +36,7 @@ class TestResyncMariaDBToSF(TapMariaDB):
         a_small_number = 0.001   # Mb
         _create_ppw_config_file(table_mb=a_small_number)
 
-        command = f'pipelinewise sync_tables --tap {TAP_ID} --target {TARGET_ID}'
+        command = f'pipelinewise fast_sync --tap {TAP_ID} --target {TARGET_ID}'
 
         [return_code, _, _] = tasks.run_command(command)
 
@@ -47,7 +47,7 @@ class TestResyncMariaDBToSF(TapMariaDB):
         a_big_number = 10000 #Mb
         _create_ppw_config_file(table_mb=a_big_number)
 
-        command = f'pipelinewise sync_tables --tap {TAP_ID} --target {TARGET_ID}'
+        command = f'pipelinewise fast_sync --tap {TAP_ID} --target {TARGET_ID}'
         [return_code, _, _] = tasks.run_command(command)
 
         assert return_code == 0
@@ -57,7 +57,7 @@ class TestResyncMariaDBToSF(TapMariaDB):
         a_small_number = 0.001  # Mb
         _create_ppw_config_file(table_mb=a_small_number)
 
-        command = f'pipelinewise sync_tables --tap {TAP_ID} --target {TARGET_ID} --force'
+        command = f'pipelinewise fast_sync --tap {TAP_ID} --target {TARGET_ID} --force'
 
         [return_code, _, _] = tasks.run_command(command)
 

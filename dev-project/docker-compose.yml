@@ -3,7 +3,7 @@ services:
   pipelinewise:
     platform: linux/amd64
     image: ubuntu:24.04
-    container_name: pipelinewise_dev
+    container_name: pipelinewise
     working_dir: /opt/pipelinewise
     entrypoint: /opt/pipelinewise/dev-project/entrypoint.sh
     env_file:
@@ -20,22 +20,22 @@ services:
 
     # Build only when test databases are ready
     depends_on:
-      - db_postgres_source
-      - db_mysql_source
-      - db_postgres_dwh
-      - db_mongo_source
+      - pipelinewise-postgres-source
+      - pipelinewise-mysql-source
+      - pipelinewise-postgres-target
+      - pipelinewise-mongodb-source
     networks:
       - pipelinewise_network
 
   ### TAP (Data source) containers
   # PostgreSQL service container used as test source database
   # Using Debezium image with wal2json plugin for logical decoding
-  db_postgres_source:
+  pipelinewise-postgres-source:
     build:
       context: ./pg
       dockerfile: Dockerfile
       network: host
-    container_name: pipelinewise_dev_postgres_source
+    container_name: pipelinewise-postgres-source
     volumes:
       - ./pg/pg_hba.conf:/var/lib/postgresql/pg_hba.conf
     # Making some logical decoding and ssl adjustments
@@ -57,9 +57,9 @@ services:
       - pipelinewise_network
 
   # MySQL service container used as test source database
-  db_mysql_source:
+  pipelinewise-mysql-source:
     image: mariadb:10.6.18
-    container_name: pipelinewise_dev_mysql_source
+    container_name: pipelinewise-mysql-source
     ports:
       - ${TAP_MYSQL_PORT_ON_HOST}:${TAP_MYSQL_PORT}
     volumes:
@@ -87,9 +87,9 @@ services:
     networks:
       - pipelinewise_network
 
-  db_mysql_source_replica:
+  pipelinewise-mysql-source-replica:
     image: mariadb:10.6.18
-    container_name: pipelinewise_dev_mysql_source_replica
+    container_name: pipelinewise-mysql-source-replica
     ports:
       - ${TAP_MYSQL_REPLICA_PORT_ON_HOST}:${TAP_MYSQL_REPLICA_PORT}
     command: --default-authentication-plugin=mysql_native_password --server-id=2 --log-bin=mysql-bin --relay-log=mysql-relay-log --replicate-do-db=${TAP_MYSQL_REPLICA_DB}
@@ -101,8 +101,8 @@ services:
     networks:
       - pipelinewise_network
 
-  db_mongo_source:
-    container_name: "pipelinewise_dev_mongodb_source"
+  pipelinewise-mongodb-source:
+    container_name: pipelinewise-mongodb-source
     build:
       context: ./mongo
       dockerfile: Dockerfile
@@ -114,7 +114,7 @@ services:
       MONGO_INITDB_DATABASE: ${TAP_MONGODB_DB}
       MONGO_USERNAME: ${TAP_MONGODB_USER}
       MONGO_PASSWORD: ${TAP_MONGODB_PASSWORD}
-      MONGO_REPLICA_HOST: db_mongo_source
+      MONGO_REPLICA_HOST: pipelinewise-mongodb-source
     command: >
       mongod
       --bind_ip_all
@@ -131,9 +131,9 @@ services:
 
   ### Target containers
   # PostgreSQL service container used as test target database
-  db_postgres_dwh:
+  pipelinewise-postgres-target:
     image: postgres:11.4
-    container_name: pipelinewise_dev_postgres_dwh
+    container_name: pipelinewise-postgres-target
     ports:
       - ${TARGET_POSTGRES_PORT_ON_HOST}:${TARGET_POSTGRES_PORT}
     environment:

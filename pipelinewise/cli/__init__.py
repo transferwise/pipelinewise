@@ -35,9 +35,10 @@ COMMANDS = [
     'discover_tap',
     'status',
     'test_tap_connection',
-    'sync_tables',
-    'import',
-    'import_config',  # This is for backward compatibility; use 'import' instead
+    'fast_sync',
+    'sync_tables',  # backward-compatible alias for fast_sync
+    'import_config',
+    'import',  # Backward-compatible alias; use 'import_config' instead
     'validate',
     'encrypt_string',
     'partial_sync_table',
@@ -151,7 +152,7 @@ def _validate_command_specific_arguments(args):
     if args.command == 'init' and args.name == '*':
         raise CommandSpecificArgumentsException('You must specify a project name using the argument --name')
 
-    if args.command in ['discover_tap', 'test_tap_connection', 'run_tap', 'stop_tap', 'sync_tables', 'reset_state']:
+    if args.command in ['discover_tap', 'test_tap_connection', 'run_tap', 'stop_tap', 'fast_sync', 'sync_tables', 'reset_state']:
         if args.tap == '*':
             raise CommandSpecificArgumentsException('You must specify a source name using the argument --tap')
         if args.target == '*':
@@ -207,7 +208,7 @@ def main():
         add_help=True,
     )
     parser.add_argument('command', type=str, choices=COMMANDS)
-    parser.add_argument('--target', type=str, default='*', help='"Name of the target')
+    parser.add_argument('--target', type=str, default='*', help='Name of the target')
     parser.add_argument('--tap', type=str, default='*', help='Name of the tap')
     parser.add_argument('--taps', type=str, default='*', help='Comma separated list of tap IDs to import')
     parser.add_argument('--tables', type=str, help='List of tables to sync')
@@ -249,24 +250,28 @@ def main():
     )
     parser.add_argument('--table', type=str, default='*', help='Name of the table to partial sync')
     parser.add_argument('--column', type=str, default='*', help='Name of the column to use as sync key in partial sync')
-    parser.add_argument('--start_value', type=str, default='*', help='start value of the column to partial sync')
-    parser.add_argument('--end_value', type=str, default=None, help='end value of the column to partial sync')
+    parser.add_argument('--start_value', type=str, default='*', help='Start value of the column to partial sync')
+    parser.add_argument('--end_value', type=str, default=None, help='End value of the column to partial sync')
     parser.add_argument('--force', default=False, required=False,
-                        help='Force sync_tables for full sync', action='store_true'
+                        help='Force fast_sync to proceed regardless of table size limits', action='store_true'
                         )
     parser.add_argument('--replication_method_only', default='*', type=str,
                         help='Sync only tables which their replication method is as entered value')
 
     args = parser.parse_args()
 
-    # import and import_config commands are synonyms
+    # import_config and import commands are synonyms
     #
-    # import        : short CLI command name to import project
-    # import_config : this is for backward compatibility; use 'import' instead from CLI
-    # Every command argument is mapped to a python function with the same name, but 'import' is a
-    # python keyword and can't be used as function name
-    if args.command in ['import', 'import_config']:
+    # import_config : canonical CLI command for importing a project
+    # import        : deprecated alias retained for backward compatibility
+    # Both command names map to import_project because 'import' is a Python keyword.
+    if args.command in ['import_config', 'import']:
         args.command = 'import_project'
+
+    # fast_sync and sync_tables are synonyms
+    # sync_tables is kept for backward compatibility; use 'fast_sync' instead
+    if args.command in ['fast_sync', 'sync_tables']:
+        args.command = 'fast_sync'
     try:
         _validate_command_specific_arguments(args)
     except CommandSpecificArgumentsException as exp:

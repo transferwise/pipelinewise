@@ -10,19 +10,21 @@ then be distributed or placed in source control.
 PipelineWise is using the `Ansible Vault <https://docs.ansible.com/ansible/latest/user_guide/vault.html>`_
 python libraries to encrypt and decrypt strings. The default cipher is AES (which is shared-secret based).
 
-1. To encrypt data, first you need to create a file with a secret password. In this example we will create
-a ``vault-password.txt`` file from the command that you will keep in a safe place:
+1. To encrypt data, first create a file containing the vault password. Restrict
+its permissions before writing the secret, keep it outside source control, and
+store a recoverable copy in an approved secret manager:
 
 .. code-block:: bash
 
-    $ echo "M@st3rP@ssw0rd" > vault-password.txt
+    $ umask 077
+    $ printf '%s\n' 'M@st3rP@ssw0rd' > vault-password.txt
 
 
 2. Now you can encrypt the sensitive strings in your PipelineWise project. These are usually database passwords
 or other data source or destination credentials that you don't want to place in source control as
 plain texts. To encrypt a string run:
 
-.. code-block:: bash
+.. code-block:: yaml
 
     $ pipelinewise encrypt_string --secret vault-password.txt --string "This is a string to encrypt"
     !vault |
@@ -60,7 +62,7 @@ the path to the file with the password (the one that you created in the first st
 
 .. code-block:: bash
 
-    $ pipelinewise import --dir pipelinewise_samples --secret vault-password.txt
+    $ pipelinewise import_config --dir pipelinewise_samples --secret vault-password.txt
 
 
 ------------
@@ -69,4 +71,3 @@ the path to the file with the password (the one that you created in the first st
 **Tip:**
 For further details about creating and importing projects, please check the :ref:`creating_pipelines`
 section.
-

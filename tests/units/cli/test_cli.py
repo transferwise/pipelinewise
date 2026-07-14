@@ -89,7 +89,7 @@ class TestCli:
         with patch('pipelinewise.cli.pipelinewise.Process') as mocked_process:
             mocked_process.return_value.exception = None
             mocked_process.return_value.exitcode = 0
-            pipelinewise.sync_tables()
+            pipelinewise.fast_sync()
 
         assert mocked_process.call_args_list == [
             call(target=pipelinewise.sync_tables_partial_sync, args=(
@@ -339,7 +339,7 @@ class TestCli:
             filters={
                 'selected': True,
                 'tap_target_pairs': {
-                    ConnectorType.TAP_MYSQL: {ConnectorType.TARGET_REDSHIFT},
+                    ConnectorType.TAP_MYSQL: {ConnectorType.TARGET_S3_CSV},
                     ConnectorType.TAP_POSTGRES: {ConnectorType.TARGET_SNOWFLAKE},
                 },
                 'initial_sync_required': True,
@@ -578,12 +578,12 @@ class TestCli:
         assert pytest_wrapped_e.value.code == 1
 
     def test_command_import_all_taps(self):
-        """Test import command for all taps"""
+        """Test import_config command for all taps"""
         args = CliArgs(dir=f'{os.path.dirname(__file__)}/resources/test_import_command')
         self._assert_import_command(args)
 
     def test_command_import_selected_taps(self):
-        """Test import command for selected taps"""
+        """Test import_config command for selected taps"""
         args = CliArgs(dir=f'{os.path.dirname(__file__)}/resources/test_import_command', taps='tap_one,tap_three')
         self._assert_import_command(args)
 
@@ -684,17 +684,17 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
             mocked_partial_sync.side_effect = Exception('FOO')
             self._assert_run_command_exit_with_error_1('run_tap')
 
-    def test_command_sync_tables_exit_with_error_1_if_fast_sync_exception(self):
-        """Test if sync_tables command returns error 1 if exception in fastsync"""
+    def test_command_fast_sync_exit_with_error_1_if_fast_sync_exception(self):
+        """Test if fast_sync command returns error 1 if exception in fastsync"""
         with patch('pipelinewise.cli.pipelinewise.PipelineWise.run_tap_fastsync') as mocked_fastsync:
             mocked_fastsync.side_effect = Exception('FOO')
-            self._assert_run_command_exit_with_error_1('sync_tables')
+            self._assert_run_command_exit_with_error_1('fast_sync')
 
-    def test_command_sync_tables_exit_with_error_1_if_partial_sync_exception(self):
-        """Test if sync_tables command returns error 1 if exception in partial sync"""
+    def test_command_fast_sync_exit_with_error_1_if_partial_sync_exception(self):
+        """Test if fast_sync command returns error 1 if exception in partial sync"""
         with patch('pipelinewise.cli.pipelinewise.PipelineWise.run_tap_partialsync') as mocked_partial_sync:
             mocked_partial_sync.side_effect = Exception('FOO')
-            self._assert_run_command_exit_with_error_1('sync_tables')
+            self._assert_run_command_exit_with_error_1('fast_sync')
 
     def test_command_sync_tables(self):
         """Test run tap command"""

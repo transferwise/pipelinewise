@@ -4,29 +4,24 @@
 Replication Methods
 -------------------
 
-Replication Methods define the approach PipelineWise takes (more precisley the `Singer.io <https://www.singer.io/>`_  taps)
-when extracting data from a source during a replication job. Additionally, Replication Methods can also impact
-how data is loaded into your destination and your overall row usage.
+Replication Methods define the approach Singer.io taps take when extracting data from a
+source during a replication job. They also impact how data is loaded into your destination
+and your overall row usage.
 
-PipelineWise supports the following replication strategies to extract
-data from data sources.
+PipelineWise supports the following replication methods:
 
-* :ref:`log_based`: It's replicating newly inserted, updated and also deleted records.
+* :ref:`log_based`: Replicates newly inserted, updated, and deleted records using the database's change log.
 
-* :ref:`incremental`: The Tap saves it's progress via bookmarks. Only new or updated records are replicated during each sync.
+* :ref:`incremental`: The tap saves its progress via bookmarks. Only new or updated records are replicated during each sync.
 
-* :ref:`full_table`: The Tap replicates all available records dating back to a start_date, defined in the tap config YAML, during every sync
-
-* :ref:`fast_sync`: Same functionality as Full Table but optimised for data transfers between specific sources
-  and targets and bypassing the Singer specification. Useful when initial syncing large tables with
-  hundreds of millions of rows where singer components would usually be running for long hours or sometimes for days.
+* :ref:`full_table`: The tap replicates all available records during every sync.
 
 
 .. warning::
 
   **Important**: Replication Methods are one of the most important settings in PipelineWise.
   Defining a table’s Replication Method incorrectly can cause data discrepancies and latency.
-  Before configuring the replication settings for a data pipeline, read through this  guide
+  Before configuring the replication settings for a data pipeline, read through this guide
   so you understand how PipelineWise will replicate your data.
 
 
@@ -35,12 +30,12 @@ data from data sources.
 Log Based
 '''''''''
 
-Log-based Replication is a replication method in which the we identify modifications
+Log-based Replication is a replication method in which we identify modifications
 to records - including inserts, updates, and deletes - using a database’s binary log files.
 
 .. warning::
 
-  **Log Based** replication method is available **only for MySQL, PostgreSQL and MongoDB backend** databases
+  **Log Based** replication method is available **only for MySQL, PostgreSQL and MongoDB** source databases
   that support log replication.
 
 .. note::
@@ -97,24 +92,9 @@ If a table doesn't have a column suitable for :ref:`incremental` or if :ref:`log
 this method will be used to replicate data. 
 
 
-.. _fast_sync:
+.. seealso::
 
-Fast Sync
-'''''''''
-
-Fast Sync Replication is functionally identical to :ref:`full_table` replication but Fast Sync
-bypassing the `Singer Specification <https://github.com/singer-io/getting-started/blob/master/docs/SPEC.md>`_
-for optimised performance. Primary use case of Fast Sync is initial sync or to resync large tables
-with hundreds of millions of rows where singer components would usually run for long hours or
-sometimes for days.
-
-**Important**: Fast Sync is not a selectable replication method in the :ref:`yaml_configuration`.
-PipelineWise detects automatically when Fast Sync gives better performance than the singer
-components and uses it whenever it's possible. 
-
-.. warning::
-
-  **Fast Sync** is not a generic component and is **available only from some specific data sources to some specific targets**.
-  Check :ref:`fast_sync` section for the supported components.
-
+   PipelineWise also includes :ref:`fast_sync_main`, a performance optimization
+   that bypasses Singer for bulk data transfers. FastSync is not a replication
+   method — it is used automatically when conditions are met.
 

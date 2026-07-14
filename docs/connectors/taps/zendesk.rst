@@ -22,7 +22,7 @@ Example YAML for tap-zendesk:
     # General Properties
     # ------------------------------------------------------------------------------
     id: "zendesk"                          # Unique identifier of the tap
-    name: "Sampe data on Zendesk"          # Name of the tap
+    name: "Sample data on Zendesk"          # Name of the tap
     type: "tap-zendesk"                    # !! THIS SHOULD NOT CHANGE !!
     owner: "somebody@foo.com"              # Data owner to contact
     #send_alert: False                     # Optional: Disable all configured alerts on this tap

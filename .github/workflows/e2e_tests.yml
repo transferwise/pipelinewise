@@ -54,7 +54,7 @@ jobs:
         timeout-minutes: 6
         if: steps.check.outcome == 'failure'
         run: |
-          until docker logs pipelinewise_dev | grep "PipelineWise Dev environment is ready"
+          until docker logs pipelinewise | grep "PipelineWise Dev environment is ready"
           do
             echo 'Sleeping for 10s';
             sleep 10;
@@ -67,7 +67,7 @@ jobs:
           -e TAP_S3_CSV_AWS_KEY=$TAP_S3_CSV_AWS_KEY \
           -e TAP_S3_CSV_AWS_SECRET_ACCESS_KEY=$TAP_S3_CSV_AWS_SECRET_ACCESS_KEY \
           -e TAP_S3_CSV_BUCKET=$TAP_S3_CSV_BUCKET \
-          pipelinewise_dev pytest tests/end_to_end/test_target_postgres.py -vx --timer-top-n 10
+          pipelinewise pytest tests/end_to_end/test_target_postgres.py -vx --timer-top-n 10
 
   e2e_tests_mariadb_to_sf:
     runs-on: ubuntu-24.04
@@ -97,7 +97,7 @@ jobs:
         if: steps.check.outcome == 'failure'
         timeout-minutes: 6
         run: |
-          until docker logs pipelinewise_dev | grep "PipelineWise Dev environment is ready"
+          until docker logs pipelinewise | grep "PipelineWise Dev environment is ready"
           do
             echo 'Sleeping for 10s';
             sleep 10;
@@ -119,7 +119,7 @@ jobs:
           -e TARGET_SNOWFLAKE_STAGE=$TARGET_SNOWFLAKE_STAGE \
           -e TARGET_SNOWFLAKE_USER=$TARGET_SNOWFLAKE_USER \
           -e TARGET_SNOWFLAKE_WAREHOUSE=$TARGET_SNOWFLAKE_WAREHOUSE \
-          pipelinewise_dev pytest tests/end_to_end/target_snowflake/tap_mariadb -vx --timer-top-n 10
+          pipelinewise pytest tests/end_to_end/target_snowflake/tap_mariadb -vx --timer-top-n 10
 
   e2e_tests_pg_to_sf:
     runs-on: ubuntu-24.04
@@ -149,7 +149,7 @@ jobs:
         if: steps.check.outcome == 'failure'
         timeout-minutes: 6
         run: |
-          until docker logs pipelinewise_dev | grep "PipelineWise Dev environment is ready"
+          until docker logs pipelinewise | grep "PipelineWise Dev environment is ready"
           do
             echo 'Sleeping for 10s';
             sleep 10;
@@ -171,7 +171,7 @@ jobs:
           -e TARGET_SNOWFLAKE_STAGE=$TARGET_SNOWFLAKE_STAGE \
           -e TARGET_SNOWFLAKE_USER=$TARGET_SNOWFLAKE_USER \
           -e TARGET_SNOWFLAKE_WAREHOUSE=$TARGET_SNOWFLAKE_WAREHOUSE \
-          pipelinewise_dev pytest tests/end_to_end/target_snowflake/tap_postgres -vx --timer-top-n 10
+          pipelinewise pytest tests/end_to_end/target_snowflake/tap_postgres -vx --timer-top-n 10
 
   e2e_tests_mg_to_sf:
     runs-on: ubuntu-24.04
@@ -201,7 +201,7 @@ jobs:
         if: steps.check.outcome == 'failure'
         timeout-minutes: 6
         run: |
-          until docker logs pipelinewise_dev | grep "PipelineWise Dev environment is ready"
+          until docker logs pipelinewise | grep "PipelineWise Dev environment is ready"
           do
             echo 'Sleeping for 10s';
             sleep 10;
@@ -223,7 +223,7 @@ jobs:
           -e TARGET_SNOWFLAKE_STAGE=$TARGET_SNOWFLAKE_STAGE \
           -e TARGET_SNOWFLAKE_USER=$TARGET_SNOWFLAKE_USER \
           -e TARGET_SNOWFLAKE_WAREHOUSE=$TARGET_SNOWFLAKE_WAREHOUSE \
-          pipelinewise_dev pytest tests/end_to_end/target_snowflake/tap_mongodb -vx --timer-top-n 10
+          pipelinewise pytest tests/end_to_end/target_snowflake/tap_mongodb -vx --timer-top-n 10
 
   e2e_tests_s3_to_sf:
     runs-on: ubuntu-24.04
@@ -253,7 +253,7 @@ jobs:
         if: steps.check.outcome == 'failure'
         timeout-minutes: 6
         run: |
-          until docker logs pipelinewise_dev | grep "PipelineWise Dev environment is ready"
+          until docker logs pipelinewise | grep "PipelineWise Dev environment is ready"
           do
             echo 'Sleeping for 10s';
             sleep 10;
@@ -278,4 +278,4 @@ jobs:
           -e TAP_S3_CSV_AWS_KEY=$TAP_S3_CSV_AWS_KEY \
           -e TAP_S3_CSV_AWS_SECRET_ACCESS_KEY=$TAP_S3_CSV_AWS_SECRET_ACCESS_KEY \
           -e TAP_S3_CSV_BUCKET=$TAP_S3_CSV_BUCKET \
-          pipelinewise_dev pytest tests/end_to_end/target_snowflake/tap_mongodb -vx --timer-top-n 10
+          pipelinewise pytest tests/end_to_end/target_snowflake/tap_s3 -vx --timer-top-n 10

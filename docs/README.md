@@ -1,19 +1,22 @@
 # PipelineWise Documentation
 
-The documentation is using [Sphinx](http://www.sphinx-doc.org) and the the popular
+The documentation uses [Sphinx](https://www.sphinx-doc.org/) and the
 [Read the Docs Theme](https://sphinx-rtd-theme.readthedocs.io).
 
 ## To build the documentation
 
-1. Install python dependencies and generate the HTML documentation
+1. Install the Python dependencies and generate the HTML documentation:
+
 ```
-  pip install sphinx sphinx-rtd-theme
-  make html
+pip install sphinx sphinx-rtd-theme
+make html
 ```
 
-The document generating into `_build/html`. Open `index.html` in your web browser.
+The generated documentation is written to `_build/html`. Open
+`_build/html/index.html` in your browser.
 
- ## Auto Deployment
+## Automatic deployment
 
-CircleCI automatically generating and publishing the documentation on every merged
-commit to the PipelineWise GitHub Pages at http://transferwise.github.io/pipelinewise.
+The `publish_doc` GitHub Actions workflow builds and publishes the documentation
+to [PipelineWise GitHub Pages](https://transferwise.github.io/pipelinewise/) after
+changes are merged.

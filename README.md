@@ -1,9 +1,10 @@
-# Notice
-To better serve Wise business and customer needs, the PipelineWise codebase needs to shrink.
-We have made the difficult decision that, going forward many components of PipelineWise will be removed or incorporated in the main repo.
-The last version before this decision is [v0.64.1](https://github.com/transferwise/pipelinewise/tree/v0.64.1)
+# Project scope notice
 
-We thank all in the open-source community, that over the past 6 years, have helped to make PipelineWise a robust product for heterogeneous replication of many many Terabytes, daily
+After `v0.64.1`, PipelineWise began reducing the number of connectors it packages so development could focus on Wise's current requirements. [v0.64.1](https://github.com/transferwise/pipelinewise/tree/v0.64.1) is the last release from before that reduction; it is a historical reference, not a recommendation to use an older release.
+
+The connectors included by current builds are listed in the [installation documentation](https://transferwise.github.io/pipelinewise/installation_guide/installation.html#selecting-singer-connectors). `pipelinewise init` may still generate configuration templates for legacy connectors, but the presence of a template does not mean that its connector is packaged or maintained by the current release.
+
+We thank everyone in the open-source community who helped make PipelineWise a robust framework for heterogeneous replication over the years.
 
 ## PipelineWise
 
@@ -75,12 +76,11 @@ consumes data from taps and do something with it, like load it into a file, API 
 | Tap       | **[Mixpanel](https://github.com/transferwise/pipelinewise-tap-mixpanel)** |       | [![PyPI version](https://badge.fury.io/py/pipelinewise-tap-mixpanel.svg)](https://badge.fury.io/py/pipelinewise-tap-mixpanel) | Extracts data from the Mixpanel API. |
 | Tap       | **[Twilio](https://github.com/transferwise/pipelinewise-tap-twilio)** |       | [![PyPI version](https://badge.fury.io/py/pipelinewise-tap-twilio.svg)](https://badge.fury.io/py/pipelinewise-tap-twilio) | Extracts data from the Twilio API using OAuth and Key-Based incremental replications. |
 | Target    | **[Postgres](https://github.com/transferwise/pipelinewise-target-postgres)** | | [![PyPI version](https://badge.fury.io/py/pipelinewise-target-postgres.svg)](https://badge.fury.io/py/pipelinewise-target-postgres) | Loads data from any tap into PostgreSQL database |
-| Target    | **[Redshift](https://github.com/transferwise/pipelinewise-target-redshift)** | | [![PyPI version](https://badge.fury.io/py/pipelinewise-target-redshift.svg)](https://badge.fury.io/py/pipelinewise-target-redshift) | Loads data from any tap into Amazon Redshift Data Warehouse |
 | Target    | **[Snowflake](https://github.com/transferwise/pipelinewise-target-snowflake)** | | [![PyPI version](https://badge.fury.io/py/pipelinewise-target-snowflake.svg)](https://badge.fury.io/py/pipelinewise-target-snowflake) | Loads data from any tap into Snowflake Data Warehouse |
 | Target    | **[S3 CSV](https://github.com/transferwise/pipelinewise-target-s3-csv)** | | [![PyPI version](https://badge.fury.io/py/pipelinewise-target-s3-csv.svg)](https://badge.fury.io/py/pipelinewise-target-s3-csv) | Uploads data from any tap to S3 in CSV format |
 | Transform | **[Field](https://github.com/transferwise/pipelinewise-transform-field)** | | [![PyPI version](https://badge.fury.io/py/pipelinewise-transform-field.svg)](https://badge.fury.io/py/pipelinewise-transform-field) | Transforms fields from any tap and sends the results to any target. Recommended for data masking/ obfuscation |
 
-**Note**: Extra connectors are experimental connectors and written by community contributors. These connectors are not maintained regularly and not installed by default. To install the extra packages use the `--connectors=all` option when installing PipelineWise.
+**Note**: Rows marked **Extra** describe legacy, community-contributed connectors. They are not packaged by the current `all_connectors` build. A generated sample configuration does not guarantee that a connector is included; check the [current connector list](https://transferwise.github.io/pipelinewise/installation_guide/installation.html#selecting-singer-connectors).
 
 ### Running from docker
 
@@ -130,7 +130,7 @@ You can run any pipelinewise command at this point. Tutorials to create and run 
 ### Building from source
 
 1. Make sure that all dependencies are installed on your system:
-    * Python 3.x
+    * Python 3.12
     * python3-dev
     * python3-venv
     * mongo-tools
@@ -139,7 +139,7 @@ You can run any pipelinewise command at this point. Tutorials to create and run 
 2. Run the Makefile that installs the PipelineWise CLI and all supported singer connectors into separate virtual environments:
 
     ```shell
-    $ make pipelinewise  all_connectors
+    $ make pipelinewise all_connectors
     ```
     Press `Y` to accept the license agreement of the required singer components. To automate the installation and accept every license agreement run:
     ```shell
@@ -147,7 +147,7 @@ You can run any pipelinewise command at this point. Tutorials to create and run 
     ```
     And to install only a specific list of singer connectors:
     ```shell
-    $ make connectors -e pw_connector=<connector_1>,<connector_2>
+    $ make pipelinewise connectors -e pw_connector=<connector_1>,<connector_2>
     ```
 
    Run `make` or `make -h` to see the help for Makefile and all options.
@@ -234,4 +234,3 @@ use different licenses and may overwrite the terms and conditions detailed in Ap
 You can customise which connectors you want to include into the final PipelineWise build and the final license of
 your build depends on the included connectors. For further details please check the
 [Licenses](https://transferwise.github.io/pipelinewise/project/licenses.html) section in the documentation.
-

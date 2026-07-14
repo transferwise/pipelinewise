@@ -218,7 +218,7 @@ def main_impl():
                 table_sync_excs.append(
                     f're-sync can not be done because size of table '
                     f'`{table_with_maximum_size["table_name"]}` is greater than `{args.autoresync_size}`!'
-                    f' Use --force argument to force sync_tables!')
+                    f' Use --force argument to force fast_sync!')
 
     # if internal arg drop_pg_slot is set to True, then we drop the slot before starting resync
     if args.drop_pg_slot:

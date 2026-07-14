@@ -3,7 +3,7 @@
 # ------------------------------------------------------------------------------
 # General Properties
 # ------------------------------------------------------------------------------
-id: "postgres_dwh"                     # Unique identifier of the target
+id: "target_postgres"                  # Unique identifier of the target
 name: "Postgres Data Warehouse"        # Name of the target
 type: "target-postgres"                # !! THIS SHOULD NOT CHANGE !!
 
@@ -12,7 +12,7 @@ type: "target-postgres"                # !! THIS SHOULD NOT CHANGE !!
 # Target - Data Warehouse connection details
 # ------------------------------------------------------------------------------
 db_conn:
-  host: "db_postgres_dwh"
+  host: "pipelinewise-postgres-target"
   port: 5432                              # Postgres port
   user: "pipelinewise"                    # Postgres user
   password: "secret"                      # Plain string or vault encrypted

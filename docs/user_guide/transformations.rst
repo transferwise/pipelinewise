@@ -4,7 +4,7 @@
 Transformations
 ---------------
 
-PipelineWise can perform row level load time transformations between tap and target components and makes and ideal
+PipelineWise can perform row level load time transformations between tap and target components and makes an ideal
 place to obfuscate, mask or filter sensitive data that should never be replicated into the data warehouse.
 
 
@@ -32,7 +32,9 @@ The following transformations can be added optionally into the :ref:`yaml_config
 
 * **HASH**: Transforms string columns to hash.
 
-* **HASH-SKIP-FIRST-n**: Transforms string columns to hash skipping first n characters, e.g. HASH-SKIP-FIRST-2.
+* **HASH-SKIP-FIRST-n**: Keeps the first ``n`` characters and appends the SHA-256
+  hash of the remaining characters. For example, ``HASH-SKIP-FIRST-2`` preserves
+  the first two characters in plain text.
 
 * **MASK-DATE**: Replaces the months and day parts of date columns to be always 1st of Jan.
 
@@ -40,7 +42,10 @@ The following transformations can be added optionally into the :ref:`yaml_config
 
 * **MASK-HIDDEN**: Transforms any string column value to 'hidden'.
 
-* **MASK-STRING-SKIP-ENDS-n**: Transforms string columns to masked version skipping first and last n characters, e.g. MASK-STRING-SKIP-ENDS-3
+* **MASK-STRING-SKIP-ENDS-n**: Keeps the first and last ``n`` characters and
+  replaces the characters between them with ``*``. For example,
+  ``MASK-STRING-SKIP-ENDS-2`` transforms ``nomask`` to ``no**sk``. If the value
+  has at most ``2 * n`` characters, the entire value is masked.
 
 
 .. _transformation_validation:
@@ -48,9 +53,9 @@ The following transformations can be added optionally into the :ref:`yaml_config
 Transformation validation
 '''''''''''''''''''''''''
 
-PipelineWise will run a transformation validation as part of the `import` logic, the validation consists of making sure
-that the transformation type is compatible with the column/field it's being applied to, e.g `HASH` can only be
-applied to string type fields.
+PipelineWise runs transformation validation as part of ``import_config``. It checks
+that each transformation type is compatible with the field to which it is applied;
+for example, ``HASH`` can only be applied to string fields.
 
 The validation will also take place at runtime, ie `run_tap`, to make sure any changes to a stream schema are still
 compatible with the configured transformation.
@@ -64,7 +69,8 @@ Conditional Transformations
 Using the optional ``when`` keyword, you can specify conditions how
 the transformation should be applied. If the condition matches
 PipelineWise performs the transformation, otherwise it keeps
-the original value.
+the original value. When a transformation contains multiple ``when`` entries,
+**all** entries must match (logical AND).
 
 
 .. _transformations_example:
@@ -72,13 +78,11 @@ the original value.
 Example
 '''''''
 
-Load Time transformations needs to be defined in the tables section
+Load-time transformations need to be defined in the tables section
 in the :ref:`yaml_configuration`: 
 
-.. code-block:: bash
+.. code-block:: yaml
 
-    ...
-    ...
     tables:
       - table_name: "audit_log"
         replication_method: "INCREMENTAL"
@@ -119,6 +123,3 @@ in the :ref:`yaml_configuration`:
               - "user/info/phone"
               - "user/info/addresses/0"
             type: "SET-NULL"
-    ...
-    ...
-

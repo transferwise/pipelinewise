@@ -353,7 +353,6 @@ class FastSyncTargetSnowflake:
 
     # grant_... functions are common functions called by utils.py: grant_privilege function
     # "to_group" is not used here but exists for compatibility reasons with other database types
-    # "to_group" is for databases that can grant to users and groups separately like Amazon Redshift
     # pylint: disable=unused-argument
     def grant_select_on_table(
         self, target_schema, table_name, role, is_temporary, to_group=False

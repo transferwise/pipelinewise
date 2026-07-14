@@ -30,6 +30,7 @@ class TargetSnowflake(unittest.TestCase):
         self.remove_dir_from_config_dir(f'{self.target_id}/{self.tap_id}')
 
         self.check_snowflake_credentials_provided()
+        self._cleanup_stale_sf_schemas(tap_type)
         self.drop_sf_schema_if_exists(f'{self.tap_id}{self.e2e_env.sf_schema_postfix}')
 
         self.check_validate_taps()
@@ -83,6 +84,25 @@ class TargetSnowflake(unittest.TestCase):
         self.e2e_env.run_query_target_snowflake(
             f'DROP SCHEMA IF EXISTS {schema} CASCADE'
         )
+
+    def _cleanup_stale_sf_schemas(self, tap_type):
+        """Drop leftover PPW_E2E_* schemas for this tap type from previous test
+        runs that crashed or timed out before tearDown could clean up.
+        Only drops schemas matching the current tap type to avoid interfering
+        with other tap suites running in the same session."""
+        pattern = f'PPW_E2E_TAP_{tap_type.upper()}_%'
+        try:
+            rows = self.e2e_env.run_query_target_snowflake(
+                f"SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA"
+                f" WHERE SCHEMA_NAME LIKE '{pattern}'"
+            )
+            for row in rows:
+                schema_name = row[0]
+                self.e2e_env.run_query_target_snowflake(
+                    f'DROP SCHEMA IF EXISTS {schema_name} CASCADE'
+                )
+        except Exception:
+            pass
 
     def remove_dir_from_config_dir(self, dir_path: str):
         """

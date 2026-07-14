@@ -37,10 +37,11 @@ def run_query_mysql(query, host, port, user, password, database):
         charset='utf8mb4',
         cursorclass=pymysql.cursors.Cursor,
         ssl={'': True}
-    ) as cur:
-        cur.execute(query)
-        if cur.rowcount > 0:
-            result_rows = cur.fetchall()
+    ) as conn:
+        with conn.cursor() as cur:
+            cur.execute(query)
+            if cur.rowcount > 0:
+                result_rows = cur.fetchall()
     return result_rows
 
 
@@ -174,25 +175,6 @@ def sql_dynamic_row_count_snowflake(schemas: list) -> str:
            ' ORDER BY tbl')
       FROM table_list
     """
-
-
-def sql_dynamic_row_count_redshift(schemas: list) -> str:
-    """Generates an SQL statement that counts the number of rows in
-    every table in a specific schema(s) in a Redshift database"""
-    sql_schemas = ', '.join(f"'{schema}'" for schema in schemas)
-
-    return f"""
-    WITH table_list AS (
-        SELECT schemaname, tablename
-          FROM pg_tables
-              ,(SELECT top 1 1 FROM ppw_e2e_helper.dual)
-         WHERE schemaname IN ({sql_schemas}))
-    SELECT LISTAGG(
-             'SELECT ''' || LOWER(tablename) || ''' tbl, COUNT(*) row_count FROM ' || schemaname || '."' || tablename || '"',
-             ' UNION ') WITHIN GROUP ( ORDER BY tablename )
-           || 'ORDER BY tbl'
-      FROM table_list
-    """  # noqa: E501
 
 
 def get_mongodb_connection(

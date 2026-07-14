@@ -37,7 +37,7 @@ def assert_resync_tables_success(tap, target, profiling=False):
     """Resync a specific tap and make sure that it's using the correct sync engine,
     finished successfully and state file created with the right content"""
 
-    command = f'pipelinewise sync_tables --tap {tap} --target {target}'
+    command = f'pipelinewise fast_sync --tap {tap} --target {target}'
 
     if profiling:
         command = f'{command} --profiler'
@@ -287,7 +287,7 @@ def assert_row_counts_equal(
     row_counts_in_source = _run_sql(tap_query_runner_fn, source_sql_row_count)
     row_counts_in_target = _run_sql(target_query_runner_fn, target_sql_row_count)
 
-    # Some sources and targets can't be compared directly (e.g. BigQuery doesn't accept spaces in table names)
+    # Some sources and targets can't be compared directly (e.g. some targets don't accept spaces in table names)
     # we fix that by renaming the source tables to names that the target would accept
     if 'target_sql_safe_name_fn' in funcs:
         row_counts_in_source = [
@@ -369,7 +369,7 @@ def assert_all_columns_exist(
 
     for source_table_name, source_table_columns in source_table_columns_map.items():
 
-        # Some sources and targets can't be compared directly (e.g. BigQuery doesn't accept spaces in table names)
+        # Some sources and targets can't be compared directly (e.g. some targets don't accept spaces in table names)
         # we fix that by renaming the source tables to names that the target would accept
         if 'target_sql_safe_name_fn' in funcs:
             source_table_name = funcs['target_sql_safe_name_fn'](source_table_name)
@@ -441,9 +441,9 @@ def assert_profiling_stats_files_created(
     Args:
         stdout: ppw command stdout
         command: ppw command name
-        sync_engines: in case of run_tap or sync_tables, sync engines should be fastsync and/or singer
-        tap: in case of run_tap or sync_tables, tap is the tap ID
-        target: in case of run_tap or sync_tables, it is the target ID
+        sync_engines: in case of run_tap or fast_sync, sync engines should be fastsync and/or singer
+        tap: in case of run_tap or fast_sync, tap is the tap ID
+        target: in case of run_tap or fast_sync, it is the target ID
     """
     # find profiling directory from output
     profiler_dir = tasks.find_profiling_folder(stdout)

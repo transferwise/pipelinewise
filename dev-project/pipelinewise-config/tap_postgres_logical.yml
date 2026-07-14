@@ -1,9 +1,10 @@
 ---
+
 # ------------------------------------------------------------------------------
 # General Properties
 # Doc: https://transferwise.github.io/pipelinewise/connectors/taps/postgres.html
 # ------------------------------------------------------------------------------
-id: "postgres_db_logical"              # Unique identifier of the tap
+id: "tap_postgres_logical"             # Unique identifier of the tap
 name: "Sample Postgres Database"       # Name of the tap
 type: "tap-postgres"                   # !! THIS SHOULD NOT CHANGE !!
 owner: "somebody@foo.com"              # Data owner to contact
@@ -13,7 +14,7 @@ owner: "somebody@foo.com"              # Data owner to contact
 # Source (Tap) - PostgreSQL connection details
 # ------------------------------------------------------------------------------
 db_conn:
-  host: "db_postgres_source"
+  host: "pipelinewise-postgres-source"
   logical_poll_total_seconds: 3        # seconds before exiting if no changes received from source
                                        #    Warning: this can cause a tap to exit before receiving any
                                        #    data, because PostgreSQL can take a long time to find the
@@ -31,7 +32,7 @@ db_conn:
 # Destination (Target) - Target properties
 # Connection details should be in the relevant target YAML file
 # ------------------------------------------------------------------------------
-target: "postgres_dwh"                 # ID of the target connector where the data will be loaded
+target: "target_postgres"              # ID of the target connector where the data will be loaded
 batch_size_rows: 20000                 # Batch size for the stream to optimise load performance
 stream_buffer_size: 0                  # In-memory buffer size (MB) between taps and targets for asynchronous data pipes
 flush_all_streams: true                # Target to flush all streams if any stream reaches batch_size_rows. Default false
