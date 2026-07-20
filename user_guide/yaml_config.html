@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>YAML configuration &mdash; PipelineWise  documentation</title>
+  <title>YAML Configuration &mdash; PipelineWise  documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../_static/css/custom.css?v=1c6dfede" />
@@ -55,23 +55,30 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../concept/singer.html">Singer.io</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../concept/replication_methods.html">Replication Methods</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../concept/fastsync.html">Fast Sync</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concept/fastsync.html">FastSync</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../concept/linux_pipes.html">Linux Pipes in PipelineWise</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Using PipelineWise</span></p>
 <ul class="current">
-<li class="toctree-l1 current"><a class="current reference internal" href="#">YAML configuration</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">YAML Configuration</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#global-configuration-config-yml">Global Configuration (config.yml)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#tap-configuration-tap-yml">Tap Configuration (tap_*.yml)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#target-configuration-target-yml">Target Configuration (target_*.yml)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#environment-variables">Environment Variables</a></li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="encrypting_passwords.html">Encrypting Passwords</a></li>
 <li class="toctree-l1"><a class="reference internal" href="cli.html">Command Line Interface</a></li>
 <li class="toctree-l1"><a class="reference internal" href="scheduling.html">Scheduling</a></li>
-<li class="toctree-l1"><a class="reference internal" href="scheduling.html#multi-server-cluster">Multi-Server Cluster</a></li>
-<li class="toctree-l1"><a class="reference internal" href="metadata_columns.html">Metadata Columns</a></li>
-<li class="toctree-l1"><a class="reference internal" href="schema_changes.html">Schema Changes</a></li>
-<li class="toctree-l1"><a class="reference internal" href="transformations.html">Transformations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="multi_server_cluster.html">Multi-Server Cluster</a></li>
 <li class="toctree-l1"><a class="reference internal" href="logging.html">Logging</a></li>
 <li class="toctree-l1"><a class="reference internal" href="alerts.html">Alerts</a></li>
 <li class="toctree-l1"><a class="reference internal" href="resync.html">Resync Tables</a></li>
 <li class="toctree-l1"><a class="reference internal" href="partial_sync.html">Different cases of partial resync</a></li>
+<li class="toctree-l1"><a class="reference internal" href="schema_changes.html">Schema Changes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="transformations.html">Transformations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="metadata_columns.html">Metadata Columns</a></li>
+<li class="toctree-l1"><a class="reference internal" href="troubleshooting.html">Troubleshooting</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Connectors</span></p>
 <ul>
@@ -101,7 +108,7 @@
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
       <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
-      <li class="breadcrumb-item active">YAML configuration</li>
+      <li class="breadcrumb-item active">YAML Configuration</li>
       <li class="wy-breadcrumbs-aside">
             <a href="../_sources/user_guide/yaml_config.rst.txt" rel="nofollow"> View page source</a>
       </li>
@@ -112,31 +119,156 @@
            <div itemprop="articleBody">
              
   <section id="yaml-configuration">
-<span id="id1"></span><h1>YAML configuration<a class="headerlink" href="#yaml-configuration" title="Link to this heading"></a></h1>
-<div class="admonition warning">
-<p class="admonition-title">Warning</p>
-<p>This section of the documentation is work in progress.</p>
-<p>Pipelines using YAML format for configurations. You can find some information
-and usage of these YAML files in the following sections:</p>
+<span id="id1"></span><h1>YAML Configuration<a class="headerlink" href="#yaml-configuration" title="Link to this heading"></a></h1>
+<p>PipelineWise uses YAML files to define pipelines and global settings. These files are the
+main input for generating the JSON configuration that the underlying Singer.io components
+require. You never need to edit the JSON files directly.</p>
+<p>A sample project with YAML templates for every supported connector can be generated with
+the <a class="reference internal" href="cli.html#cli-init"><span class="std std-ref">init</span></a> command. See <a class="reference internal" href="../installation_guide/creating_pipelines.html#creating-pipelines"><span class="std std-ref">Creating Pipelines</span></a> for a walkthrough.</p>
+<section id="global-configuration-config-yml">
+<h2>Global Configuration (config.yml)<a class="headerlink" href="#global-configuration-config-yml" title="Link to this heading"></a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">config.yml</span></code> file contains settings that apply to the entire PipelineWise installation.
+It is created automatically when you run <code class="docutils literal notranslate"><span class="pre">pipelinewise</span> <span class="pre">init</span></code>.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nn">---</span>
+
+<span class="c1"># Optional: Alert handlers for pipeline failure notifications</span>
+<span class="nt">alert_handlers</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">slack</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">token</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;slack-bot-token&quot;</span>
+<span class="w">    </span><span class="nt">channel</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;#alerts-channel&quot;</span>
+
+<span class="c1"># Optional: Refuse large MySQL/PostgreSQL to Snowflake resyncs unless</span>
+<span class="c1"># pipelinewise fast_sync is run with --force</span>
+<span class="nt">allowed_resync_max_size</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">table_mb</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">50000</span>
+
+<span class="c1"># Optional: Path to a JSON file containing database switchover data for reset_state</span>
+<span class="nt">switch_over_data_file</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;switch_over_data.json&quot;</span>
+</pre></div>
+</div>
+<p><strong>Top-level keys:</strong></p>
+<p><code class="docutils literal notranslate"><span class="pre">alert_handlers</span></code>: Configure alert destinations for pipeline failures. See <a class="reference internal" href="alerts.html#alerts"><span class="std std-ref">Alerts</span></a> for details.</p>
+<p><code class="docutils literal notranslate"><span class="pre">allowed_resync_max_size</span></code>: For MySQL or PostgreSQL taps targeting Snowflake,
+prevent <code class="docutils literal notranslate"><span class="pre">fast_sync</span></code> from resyncing a non-partial table larger than <code class="docutils literal notranslate"><span class="pre">table_mb</span></code>.
+Use <code class="docutils literal notranslate"><span class="pre">fast_sync</span> <span class="pre">--force</span></code> to override the limit. See <a class="reference internal" href="resync.html#resync"><span class="std std-ref">Resync Tables</span></a>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">switch_over_data_file</span></code>: Path to a JSON file with database switchover data, used by the <code class="docutils literal notranslate"><span class="pre">reset_state</span></code> CLI command.</p>
+</section>
+<section id="tap-configuration-tap-yml">
+<h2>Tap Configuration (tap_*.yml)<a class="headerlink" href="#tap-configuration-tap-yml" title="Link to this heading"></a></h2>
+<p>Each tap YAML file defines a single data source pipeline. The general structure is:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nn">---</span>
+
+<span class="c1"># General Properties</span>
+<span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;my_tap_id&quot;</span><span class="w">                        </span><span class="c1"># Unique identifier of the tap</span>
+<span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;My</span><span class="nv"> </span><span class="s">Data</span><span class="nv"> </span><span class="s">Source&quot;</span><span class="w">                 </span><span class="c1"># Human-readable name</span>
+<span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;tap-mysql&quot;</span><span class="w">                      </span><span class="c1"># Must be a supported tap connector type</span>
+<span class="nt">owner</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;somebody@example.com&quot;</span><span class="w">          </span><span class="c1"># Data owner contact</span>
+<span class="c1">#send_alert: False                     # Optional: Disable alerts for this tap</span>
+<span class="c1">#slack_alert_channel: &quot;#tap-channel&quot;   # Optional: Send tap-specific alerts to this channel</span>
+
+<span class="c1"># Source connection details</span>
+<span class="nt">db_conn</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">host</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;HOST&gt;&quot;</span>
+<span class="w">  </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3306</span>
+<span class="w">  </span><span class="nt">user</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;USER&gt;&quot;</span>
+<span class="w">  </span><span class="nt">password</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;PASSWORD&gt;&quot;</span><span class="w">               </span><span class="c1"># Plain string or vault encrypted</span>
+<span class="w">  </span><span class="nt">dbname</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;DB_NAME&gt;&quot;</span>
+
+<span class="c1"># Destination</span>
+<span class="nt">target</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;snowflake&quot;</span><span class="w">                    </span><span class="c1"># Must match the id in a target YAML file</span>
+<span class="nt">batch_size_rows</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">20000</span><span class="w">                 </span><span class="c1"># Batch size for stream load performance</span>
+<span class="nt">stream_buffer_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span><span class="w">                  </span><span class="c1"># In-memory buffer size (MB) for async pipes</span>
+<span class="c1">#batch_wait_limit_seconds: 3600        # Optional: Max seconds to wait for batch_size_rows</span>
+<span class="c1">#add_metadata_columns: true            # Optional: Add _SDC_ ingestion metadata columns</span>
+<span class="c1">#hard_delete: false                    # Optional: Retain and flag source-deleted rows</span>
+<span class="w">                                       </span><span class="c1"># before flushing a partial batch (Snowflake target only)</span>
+
+<span class="c1"># Schema mapping</span>
+<span class="nt">schemas</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">source_schema</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;my_schema&quot;</span>
+<span class="w">    </span><span class="nt">target_schema</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;my_target_schema&quot;</span>
+<span class="w">    </span><span class="nt">target_schema_select_permissions</span><span class="p">:</span><span class="w">   </span><span class="c1"># Optional: Grant SELECT to these roles</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">grp_analytics</span>
+
+<span class="w">    </span><span class="nt">tables</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;my_table&quot;</span>
+<span class="w">        </span><span class="nt">replication_method</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;INCREMENTAL&quot;</span><span class="w">  </span><span class="c1"># INCREMENTAL, LOG_BASED, or FULL_TABLE</span>
+<span class="w">        </span><span class="nt">replication_key</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;updated_at&quot;</span><span class="w">      </span><span class="c1"># Required for INCREMENTAL</span>
+</pre></div>
+</div>
+<p><strong>Key sections:</strong></p>
+<p><code class="docutils literal notranslate"><span class="pre">id</span></code>: Unique identifier used in CLI commands (<code class="docutils literal notranslate"><span class="pre">--tap</span> <span class="pre">&lt;id&gt;</span></code>).</p>
+<p><code class="docutils literal notranslate"><span class="pre">name</span></code>: Human-readable name shown in status and alert output.</p>
+<p><code class="docutils literal notranslate"><span class="pre">owner</span></code>: Contact responsible for the source data.</p>
+<p><code class="docutils literal notranslate"><span class="pre">type</span></code>: The connector type. Must match a supported tap. See <a class="reference internal" href="../connectors/taps.html#taps-list"><span class="std std-ref">Taps (Data Sources)</span></a>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">db_conn</span></code>: Source database connection details. Fields vary by connector type — see the
+individual connector pages for the full list of supported parameters.</p>
+<p><code class="docutils literal notranslate"><span class="pre">target</span></code>: Must match the <code class="docutils literal notranslate"><span class="pre">id</span></code> field in one of your target YAML files.</p>
+<p><code class="docutils literal notranslate"><span class="pre">send_alert</span></code>: Optional Boolean. Set to <code class="docutils literal notranslate"><span class="pre">false</span></code> to suppress failure alerts for
+this tap. Alerts are enabled by default when a global handler is configured.</p>
+<p><code class="docutils literal notranslate"><span class="pre">slack_alert_channel</span></code>: Optional tap-specific Slack channel. The channel name must
+start with <code class="docutils literal notranslate"><span class="pre">#</span></code>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">batch_size_rows</span></code>: Number of rows per batch sent to the target. Valid values
+are 1,000 to 5,000,000. Higher values can improve throughput but use more memory.</p>
+<p><code class="docutils literal notranslate"><span class="pre">stream_buffer_size</span></code>: Size in MB of the in-memory buffer between the tap and target
+processes. Valid values are 0 to 2,500. Set to <code class="docutils literal notranslate"><span class="pre">0</span></code> to disable asynchronous buffering.</p>
+<p><code class="docutils literal notranslate"><span class="pre">batch_wait_limit_seconds</span></code>: Maximum time in seconds to wait for <code class="docutils literal notranslate"><span class="pre">batch_size_rows</span></code>
+before flushing a partial batch. Currently available only for the Snowflake target.</p>
+<p><code class="docutils literal notranslate"><span class="pre">add_metadata_columns</span></code> and <code class="docutils literal notranslate"><span class="pre">hard_delete</span></code>: Control ingestion metadata and source
+delete handling for this pipeline. <code class="docutils literal notranslate"><span class="pre">hard_delete</span></code> defaults to <code class="docutils literal notranslate"><span class="pre">true</span></code> and enables
+metadata columns automatically. See <a class="reference internal" href="metadata_columns.html#metadata-columns"><span class="std std-ref">Metadata Columns</span></a> for all combinations.</p>
+<p><code class="docutils literal notranslate"><span class="pre">schemas</span></code>: Maps source schemas and tables to target schemas. Each table entry specifies
+a <code class="docutils literal notranslate"><span class="pre">replication_method</span></code> (see <a class="reference internal" href="../concept/replication_methods.html#replication-methods"><span class="std std-ref">Replication Methods</span></a>) and optionally a <code class="docutils literal notranslate"><span class="pre">replication_key</span></code>
+for incremental replication.</p>
+<p>For connector-specific <code class="docutils literal notranslate"><span class="pre">db_conn</span></code> parameters and advanced options, see the individual
+connector documentation:</p>
 <ul class="simple">
-<li><p><a class="reference internal" href="../installation_guide/creating_pipelines.html#creating-pipelines"><span class="std std-ref">Creating Pipelines</span></a></p></li>
-<li><p><a class="reference internal" href="alerts.html#alerts"><span class="std std-ref">Alerts</span></a></p></li>
-<li><p><a class="reference internal" href="../connectors/taps/jira.html#tap-jira"><span class="std std-ref">Tap Jira</span></a></p></li>
-<li><p><a class="reference internal" href="../connectors/taps/kafka.html#tap-kafka"><span class="std std-ref">Tap Kafka</span></a></p></li>
-<li><p><a class="reference internal" href="../connectors/taps/mongodb.html#tap-mongodb"><span class="std std-ref">Tap MongoDB</span></a></p></li>
 <li><p><a class="reference internal" href="../connectors/taps/mysql.html#tap-mysql"><span class="std std-ref">Tap MySQL</span></a></p></li>
 <li><p><a class="reference internal" href="../connectors/taps/postgres.html#tap-postgres"><span class="std std-ref">Tap PostgreSQL</span></a></p></li>
+<li><p><a class="reference internal" href="../connectors/taps/mongodb.html#tap-mongodb"><span class="std std-ref">Tap MongoDB</span></a></p></li>
 <li><p><a class="reference internal" href="../connectors/taps/s3_csv.html#tap-s3-csv"><span class="std std-ref">Tap S3 CSV</span></a></p></li>
+<li><p><a class="reference internal" href="../connectors/taps/kafka.html#tap-kafka"><span class="std std-ref">Tap Kafka</span></a></p></li>
 <li><p><a class="reference internal" href="../connectors/taps/snowflake.html#tap-snowflake"><span class="std std-ref">Tap Snowflake</span></a></p></li>
 <li><p><a class="reference internal" href="../connectors/taps/zendesk.html#tap-zendesk"><span class="std std-ref">Tap Zendesk</span></a></p></li>
+<li><p><a class="reference internal" href="../connectors/taps/jira.html#tap-jira"><span class="std std-ref">Tap Jira</span></a></p></li>
 <li><p><a class="reference internal" href="../connectors/taps/github.html#tap-github"><span class="std std-ref">Tap Github</span></a></p></li>
 <li><p><a class="reference internal" href="../connectors/taps/slack.html#tap-slack"><span class="std std-ref">Tap Slack</span></a></p></li>
 <li><p><a class="reference internal" href="../connectors/taps/mixpanel.html#tap-mixpanel"><span class="std std-ref">Tap Mixpanel</span></a></p></li>
-<li><p><a class="reference internal" href="../connectors/targets/postgres.html#target-postgres"><span class="std std-ref">Target Postgres</span></a></p></li>
+<li><p><a class="reference internal" href="../connectors/taps/salesforce.html#tap-salesforce"><span class="std std-ref">Tap Salesforce</span></a></p></li>
+<li><p><a class="reference internal" href="../connectors/taps/twilio.html#tap-twilio"><span class="std std-ref">Tap Twilio</span></a></p></li>
+</ul>
+</section>
+<section id="target-configuration-target-yml">
+<h2>Target Configuration (target_*.yml)<a class="headerlink" href="#target-configuration-target-yml" title="Link to this heading"></a></h2>
+<p>Each target YAML file defines a single data destination. The general structure is:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nn">---</span>
+
+<span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;snowflake&quot;</span><span class="w">                        </span><span class="c1"># Unique identifier of the target</span>
+<span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;My</span><span class="nv"> </span><span class="s">Snowflake</span><span class="nv"> </span><span class="s">DW&quot;</span><span class="w">               </span><span class="c1"># Human-readable name</span>
+<span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;target-snowflake&quot;</span><span class="w">              </span><span class="c1"># Must be a supported target connector type</span>
+
+<span class="nt">db_conn</span><span class="p">:</span>
+<span class="w">  </span><span class="c1"># Connection details vary by target type</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">id</span></code>: Unique identifier referenced by tap YAML files in their <code class="docutils literal notranslate"><span class="pre">target</span></code> field.</p>
+<p><code class="docutils literal notranslate"><span class="pre">type</span></code>: The connector type. See <a class="reference internal" href="../connectors/targets.html#targets-list"><span class="std std-ref">Targets (Destinations)</span></a>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">db_conn</span></code>: Target database connection details. See the individual target connector pages:</p>
+<ul class="simple">
 <li><p><a class="reference internal" href="../connectors/targets/snowflake.html#target-snowflake"><span class="std std-ref">Target Snowflake</span></a></p></li>
+<li><p><a class="reference internal" href="../connectors/targets/postgres.html#target-postgres"><span class="std std-ref">Target Postgres</span></a></p></li>
 <li><p><a class="reference internal" href="../connectors/targets/s3_csv.html#target-s3-csv"><span class="std std-ref">Target S3 CSV</span></a></p></li>
 </ul>
+</section>
+<section id="environment-variables">
+<h2>Environment Variables<a class="headerlink" href="#environment-variables" title="Link to this heading"></a></h2>
+<p>Sensitive values can be injected into YAML files using Jinja2 syntax:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">password</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;{{</span><span class="nv"> </span><span class="s">env_var[&#39;MY_PASSWORD&#39;]</span><span class="nv"> </span><span class="s">}}&quot;</span>
+</pre></div>
 </div>
+<p>See <a class="reference internal" href="../installation_guide/creating_pipelines.html#passing-environment-variables-via-jinja"><span class="std std-ref">Environment variables in YAML config</span></a> for details.</p>
+<p>Alternatively, credentials can be encrypted using Ansible Vault. See <a class="reference internal" href="encrypting_passwords.html#encrypting-passwords"><span class="std std-ref">Encrypting Passwords</span></a>.</p>
+</section>
 </section>
 
 

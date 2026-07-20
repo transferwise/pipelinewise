@@ -22,7 +22,7 @@
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Metadata Columns" href="metadata_columns.html" />
+    <link rel="next" title="Multi-Server Cluster" href="multi_server_cluster.html" />
     <link rel="prev" title="Command Line Interface" href="cli.html" /> 
 </head>
 
@@ -55,23 +55,24 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../concept/singer.html">Singer.io</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../concept/replication_methods.html">Replication Methods</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../concept/fastsync.html">Fast Sync</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concept/fastsync.html">FastSync</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../concept/linux_pipes.html">Linux Pipes in PipelineWise</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Using PipelineWise</span></p>
 <ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="yaml_config.html">YAML configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="yaml_config.html">YAML Configuration</a></li>
 <li class="toctree-l1"><a class="reference internal" href="encrypting_passwords.html">Encrypting Passwords</a></li>
 <li class="toctree-l1"><a class="reference internal" href="cli.html">Command Line Interface</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Scheduling</a></li>
-<li class="toctree-l1"><a class="reference internal" href="#multi-server-cluster">Multi-Server Cluster</a></li>
-<li class="toctree-l1"><a class="reference internal" href="metadata_columns.html">Metadata Columns</a></li>
-<li class="toctree-l1"><a class="reference internal" href="schema_changes.html">Schema Changes</a></li>
-<li class="toctree-l1"><a class="reference internal" href="transformations.html">Transformations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="multi_server_cluster.html">Multi-Server Cluster</a></li>
 <li class="toctree-l1"><a class="reference internal" href="logging.html">Logging</a></li>
 <li class="toctree-l1"><a class="reference internal" href="alerts.html">Alerts</a></li>
 <li class="toctree-l1"><a class="reference internal" href="resync.html">Resync Tables</a></li>
 <li class="toctree-l1"><a class="reference internal" href="partial_sync.html">Different cases of partial resync</a></li>
+<li class="toctree-l1"><a class="reference internal" href="schema_changes.html">Schema Changes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="transformations.html">Transformations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="metadata_columns.html">Metadata Columns</a></li>
+<li class="toctree-l1"><a class="reference internal" href="troubleshooting.html">Troubleshooting</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Connectors</span></p>
 <ul>
@@ -115,35 +116,35 @@
 <span id="id1"></span><h1>Scheduling<a class="headerlink" href="#scheduling" title="Link to this heading"></a></h1>
 <p>Scheduling and running PipelineWise tasks automatically is not part of the PipelineWise
 package but any task scheduler that can run Unix CLI commands can trigger PipelineWise
-jobs to run. Both Single Server and <a class="reference internal" href="#multi-server-cluster"><span class="std std-ref">Multi-Server Cluster</span></a> installations are achievable.</p>
-<p>Let’s say you have 5 microservice databases that you want to replicate to Amazon Redshift
+jobs to run. Both Single Server and <a class="reference internal" href="multi_server_cluster.html#multi-server-cluster"><span class="std std-ref">Multi-Server Cluster</span></a> installations are achievable.</p>
+<p>Let’s say you have 5 microservice databases that you want to replicate to Snowflake
 and <code class="docutils literal notranslate"><span class="pre">pipelinewise</span> <span class="pre">status</span></code> output looks like this:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>pipelinewise<span class="w"> </span>status
 
-Tap<span class="w"> </span>ID<span class="w">        </span>Tap<span class="w"> </span>Type<span class="w">     </span>Target<span class="w"> </span>ID<span class="w">   </span>Target<span class="w"> </span>Type<span class="w">       </span>Enabled<span class="w">    </span>Status<span class="w">    </span>Last<span class="w"> </span>Sync<span class="w">    </span>Last<span class="w"> </span>Sync<span class="w"> </span>Result
-------------<span class="w">  </span>----------<span class="w">   </span>----------<span class="w">  </span>----------------<span class="w">  </span>---------<span class="w">  </span>--------<span class="w">  </span>-----------<span class="w">  </span>------------------
-microserv_1<span class="w">   </span>tap-mysql<span class="w">    </span>redshift<span class="w">    </span>target-redshift<span class="w">   </span>True<span class="w">       </span>ready<span class="w">                  </span>unknown
-microserv_2<span class="w">   </span>tap-mysql<span class="w">    </span>redshift<span class="w">    </span>target-redshift<span class="w">   </span>True<span class="w">       </span>ready<span class="w">                  </span>unknown
-microserv_3<span class="w">   </span>tap-postgres<span class="w"> </span>redshift<span class="w">    </span>target-redshift<span class="w">   </span>True<span class="w">       </span>ready<span class="w">                  </span>unknown
-microserv_4<span class="w">   </span>tap-postgres<span class="w"> </span>redshift<span class="w">    </span>target-redshift<span class="w">   </span>True<span class="w">       </span>ready<span class="w">                  </span>unknown
-microserv_5<span class="w">   </span>tap-postgres<span class="w"> </span>redshift<span class="w">    </span>target-redshift<span class="w">   </span>True<span class="w">       </span>ready<span class="w">                  </span>unknown
+Tap<span class="w"> </span>ID<span class="w">        </span>Tap<span class="w"> </span>Type<span class="w">     </span>Target<span class="w"> </span>ID<span class="w">   </span>Target<span class="w"> </span>Type<span class="w">        </span>Enabled<span class="w">    </span>Status<span class="w">    </span>Last<span class="w"> </span>Sync<span class="w">    </span>Last<span class="w"> </span>Sync<span class="w"> </span>Result
+------------<span class="w">  </span>----------<span class="w">   </span>----------<span class="w">  </span>-----------------<span class="w">  </span>---------<span class="w">  </span>--------<span class="w">  </span>-----------<span class="w">  </span>------------------
+microserv_1<span class="w">   </span>tap-mysql<span class="w">    </span>snowflake<span class="w">   </span>target-snowflake<span class="w">   </span>True<span class="w">       </span>ready<span class="w">                  </span>unknown
+microserv_2<span class="w">   </span>tap-mysql<span class="w">    </span>snowflake<span class="w">   </span>target-snowflake<span class="w">   </span>True<span class="w">       </span>ready<span class="w">                  </span>unknown
+microserv_3<span class="w">   </span>tap-postgres<span class="w"> </span>snowflake<span class="w">   </span>target-snowflake<span class="w">   </span>True<span class="w">       </span>ready<span class="w">                  </span>unknown
+microserv_4<span class="w">   </span>tap-postgres<span class="w"> </span>snowflake<span class="w">   </span>target-snowflake<span class="w">   </span>True<span class="w">       </span>ready<span class="w">                  </span>unknown
+microserv_5<span class="w">   </span>tap-postgres<span class="w"> </span>snowflake<span class="w">   </span>target-snowflake<span class="w">   </span>True<span class="w">       </span>ready<span class="w">                  </span>unknown
 <span class="m">5</span><span class="w"> </span>pipeline<span class="o">(</span>s<span class="o">)</span>
 </pre></div>
 </div>
 <p>Since every pipeline runs, logs and manages state files independently, you’ll need to run
 5 commands independently. For example if using
-<a class="reference external" href="https://en.wikipedia.org/wiki/Cron/">Unix Cron</a> you can create the following crontab:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>*/5<span class="w"> </span>*<span class="w">   </span>*<span class="w"> </span>*<span class="w"> </span>*<span class="w"> </span>pipelinewise<span class="w"> </span>run_tap<span class="w"> </span>--tap<span class="w"> </span>microserv_1<span class="w"> </span>--target<span class="w"> </span>redshift<span class="w"> </span><span class="c1"># Sync every 5 minutes</span>
-<span class="w">  </span><span class="m">0</span><span class="w"> </span>*<span class="w">   </span>*<span class="w"> </span>*<span class="w"> </span>*<span class="w"> </span>pipelinewise<span class="w"> </span>run_tap<span class="w"> </span>--tap<span class="w"> </span>microserv_2<span class="w"> </span>--target<span class="w"> </span>redshift<span class="w"> </span><span class="c1"># Sync ever hour</span>
-<span class="w">  </span><span class="m">0</span><span class="w"> </span>*/3<span class="w"> </span>*<span class="w"> </span>*<span class="w"> </span>*<span class="w"> </span>pipelinewise<span class="w"> </span>run_tap<span class="w"> </span>--tap<span class="w"> </span>microserv_3<span class="w"> </span>--target<span class="w"> </span>redshift<span class="w"> </span><span class="c1"># Sync every three hours</span>
-<span class="w">  </span><span class="m">0</span><span class="w"> </span><span class="m">0</span><span class="w">   </span>*<span class="w"> </span>*<span class="w"> </span>*<span class="w"> </span>pipelinewise<span class="w"> </span>run_tap<span class="w"> </span>--tap<span class="w"> </span>microserv_4<span class="w"> </span>--target<span class="w"> </span>redshift<span class="w"> </span><span class="c1"># Sync every midnight</span>
-<span class="w">  </span><span class="m">0</span><span class="w"> </span><span class="m">0</span><span class="w">   </span>*<span class="w"> </span>*<span class="w"> </span><span class="m">6</span><span class="w"> </span>pipelinewise<span class="w"> </span>run_tap<span class="w"> </span>--tap<span class="w"> </span>microserv_5<span class="w"> </span>--target<span class="w"> </span>redshift<span class="w"> </span><span class="c1"># Sync every Saturday</span>
+<a class="reference external" href="https://en.wikipedia.org/wiki/Cron">Unix Cron</a> you can create the following crontab:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>*/5<span class="w"> </span>*<span class="w">   </span>*<span class="w"> </span>*<span class="w"> </span>*<span class="w"> </span>pipelinewise<span class="w"> </span>run_tap<span class="w"> </span>--tap<span class="w"> </span>microserv_1<span class="w"> </span>--target<span class="w"> </span>snowflake<span class="w"> </span><span class="c1"># Sync every 5 minutes</span>
+<span class="w">  </span><span class="m">0</span><span class="w"> </span>*<span class="w">   </span>*<span class="w"> </span>*<span class="w"> </span>*<span class="w"> </span>pipelinewise<span class="w"> </span>run_tap<span class="w"> </span>--tap<span class="w"> </span>microserv_2<span class="w"> </span>--target<span class="w"> </span>snowflake<span class="w"> </span><span class="c1"># Sync every hour</span>
+<span class="w">  </span><span class="m">0</span><span class="w"> </span>*/3<span class="w"> </span>*<span class="w"> </span>*<span class="w"> </span>*<span class="w"> </span>pipelinewise<span class="w"> </span>run_tap<span class="w"> </span>--tap<span class="w"> </span>microserv_3<span class="w"> </span>--target<span class="w"> </span>snowflake<span class="w"> </span><span class="c1"># Sync every three hours</span>
+<span class="w">  </span><span class="m">0</span><span class="w"> </span><span class="m">0</span><span class="w">   </span>*<span class="w"> </span>*<span class="w"> </span>*<span class="w"> </span>pipelinewise<span class="w"> </span>run_tap<span class="w"> </span>--tap<span class="w"> </span>microserv_4<span class="w"> </span>--target<span class="w"> </span>snowflake<span class="w"> </span><span class="c1"># Sync every midnight</span>
+<span class="w">  </span><span class="m">0</span><span class="w"> </span><span class="m">0</span><span class="w">   </span>*<span class="w"> </span>*<span class="w"> </span><span class="m">6</span><span class="w"> </span>pipelinewise<span class="w"> </span>run_tap<span class="w"> </span>--tap<span class="w"> </span>microserv_5<span class="w"> </span>--target<span class="w"> </span>snowflake<span class="w"> </span><span class="c1"># Sync every Saturday</span>
 </pre></div>
 </div>
 <p>PipelineWise is tested and can run with at least the following
 schedulers:</p>
 <ul class="simple">
-<li><p><a class="reference external" href="https://en.wikipedia.org/wiki/Cron/">Unix Cron</a> Unix Cron - This is the simplest option
+<li><p><a class="reference external" href="https://en.wikipedia.org/wiki/Cron">Unix Cron</a> Unix Cron - This is the simplest option
 for a single server installation.</p></li>
 <li><p><a class="reference external" href="https://github.com/transferwise/cicada/">Cicada</a> Cicada Scheduler - A lightweight multi-server
 CRON manager</p></li>
@@ -154,25 +155,13 @@ cluster installations.</p></li>
 schedule and monitor workflows.</p></li>
 </ul>
 </section>
-<section id="multi-server-cluster">
-<span id="id3"></span><h1>Multi-Server Cluster<a class="headerlink" href="#multi-server-cluster" title="Link to this heading"></a></h1>
-<p>Running Multi-Server Cluster requires a <a class="reference external" href="https://en.wikipedia.org/wiki/Network_File_System">Network File System</a>
-that is accessible from every host in the PipelineWise cluster.
-(<a class="reference external" href="https://aws.amazon.com/efs/">Amazon EFS</a>, <a class="reference external" href="https://cloud.google.com/filestore/">Google FileStore</a> or similar)</p>
-<p>Network File System is required because PipelineWise keeps runtime configuration files in
-a common place on the host machine at <code class="docutils literal notranslate"><span class="pre">${HOME}/.pipelinewise</span></code> directory. If you run
-PipelineWise commands on multiple nodes that operate on the same project, then
-every node has to read/write into the same directory, doesn’t matter where the nodes are
-located. This is typically done by mounting <code class="docutils literal notranslate"><span class="pre">${HOME}/.pipelinewise</span></code> on every node to
-a shared directory on NFS/EFS.</p>
-</section>
 
 
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="cli.html" class="btn btn-neutral float-left" title="Command Line Interface" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="metadata_columns.html" class="btn btn-neutral float-right" title="Metadata Columns" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="multi_server_cluster.html" class="btn btn-neutral float-right" title="Multi-Server Cluster" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

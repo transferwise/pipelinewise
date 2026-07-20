@@ -23,7 +23,7 @@
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="Creating Pipelines" href="creating_pipelines.html" />
-    <link rel="prev" title="Notice" href="../index.html" /> 
+    <link rel="prev" title="Project scope notice" href="../index.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -64,23 +64,24 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../concept/singer.html">Singer.io</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../concept/replication_methods.html">Replication Methods</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../concept/fastsync.html">Fast Sync</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concept/fastsync.html">FastSync</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../concept/linux_pipes.html">Linux Pipes in PipelineWise</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Using PipelineWise</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/yaml_config.html">YAML configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/yaml_config.html">YAML Configuration</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/encrypting_passwords.html">Encrypting Passwords</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/cli.html">Command Line Interface</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/scheduling.html">Scheduling</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/scheduling.html#multi-server-cluster">Multi-Server Cluster</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/metadata_columns.html">Metadata Columns</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/schema_changes.html">Schema Changes</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/transformations.html">Transformations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/multi_server_cluster.html">Multi-Server Cluster</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/logging.html">Logging</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/alerts.html">Alerts</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/resync.html">Resync Tables</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/partial_sync.html">Different cases of partial resync</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/schema_changes.html">Schema Changes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/transformations.html">Transformations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/metadata_columns.html">Metadata Columns</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/troubleshooting.html">Troubleshooting</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Connectors</span></p>
 <ul>
@@ -150,11 +151,11 @@ at runtime.</p>
 <section id="running-in-docker">
 <span id="id1"></span><h2>Running in Docker<a class="headerlink" href="#running-in-docker" title="Link to this heading"></a></h2>
 <p>Running PipelineWise from docker is usually the easiest and the recommended method. We will
-build an executable docker images that has every required dependency and it’s isolated from
+build an executable docker image that has every required dependency and is isolated from
 your host system. First you need to install docker on your computer:</p>
 <ul class="simple">
-<li><p><a class="reference external" href="https://runnable.com/docker/install-docker-on-linux">Install Docker on Linux</a></p></li>
-<li><p><a class="reference external" href="https://runnable.com/docker/install-docker-on-macos">Install Docker on MacOS</a></p></li>
+<li><p><a class="reference external" href="https://docs.docker.com/engine/install/">Install Docker on Linux</a></p></li>
+<li><p><a class="reference external" href="https://docs.docker.com/desktop/setup/install/mac-install/">Install Docker on MacOS</a></p></li>
 </ul>
 <p>Once Docker is installed you need to clone the PipelineWise git repository and build the
 executable Docker image:</p>
@@ -171,7 +172,7 @@ use the <code class="docutils literal notranslate"><span class="pre">pipelinewis
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span><span class="nb">alias</span><span class="w"> </span><span class="nv">pipelinewise</span><span class="o">=</span><span class="s2">&quot;</span><span class="k">$(</span><span class="nb">pwd</span><span class="k">)</span><span class="s2">/bin/pipelinewise-docker&quot;</span>
 </pre></div>
 </div>
-<p>Check if the installation was successfully by running the <code class="docutils literal notranslate"><span class="pre">pipelinewise</span> <span class="pre">status</span></code> command:</p>
+<p>Check if the installation was successful by running the <code class="docutils literal notranslate"><span class="pre">pipelinewise</span> <span class="pre">status</span></code> command:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>pipelinewise<span class="w"> </span>status
 
 Tap<span class="w"> </span>ID<span class="w">    </span>Tap<span class="w"> </span>Type<span class="w">      </span>Target<span class="w"> </span>ID<span class="w">     </span>Target<span class="w"> </span>Type<span class="w">      </span>Enabled<span class="w">    </span>Status<span class="w">    </span>Last<span class="w"> </span>Sync<span class="w">    </span>Last<span class="w"> </span>Sync<span class="w"> </span>Result
@@ -183,10 +184,11 @@ Tap<span class="w"> </span>ID<span class="w">    </span>Tap<span class="w"> </sp
 </section>
 <section id="installing-from-source">
 <span id="building-from-source"></span><h2>Installing from source<a class="headerlink" href="#installing-from-source" title="Link to this heading"></a></h2>
-<p>When building PipelineWise from source make sure that every OS dependencies are installed:</p>
+<p>PipelineWise requires Python 3.12. Before building from source, install Python 3.12
+and the operating-system dependencies used by the connectors you select. For example:</p>
 <ul class="simple">
-<li><p>Ubuntu: <code class="docutils literal notranslate"><span class="pre">apt-get</span> <span class="pre">install</span> <span class="pre">python3-dev</span> <span class="pre">python3-pip</span> <span class="pre">python3-venv</span></code></p></li>
-<li><p>MacOS: <code class="docutils literal notranslate"><span class="pre">brew</span> <span class="pre">install</span> <span class="pre">python</span></code></p></li>
+<li><p>Ubuntu: <code class="docutils literal notranslate"><span class="pre">apt-get</span> <span class="pre">install</span> <span class="pre">python3.12-dev</span> <span class="pre">python3-pip</span> <span class="pre">python3.12-venv</span></code></p></li>
+<li><p>macOS: <code class="docutils literal notranslate"><span class="pre">brew</span> <span class="pre">install</span> <span class="pre">python&#64;3.12</span></code></p></li>
 </ul>
 <p>Clone the PipelineWise git repository and run the install script that installs the
 PipelineWise CLI and every supported singer connectors into separated virtual environments:</p>
@@ -195,8 +197,7 @@ $<span class="w"> </span><span class="nb">cd</span><span class="w"> </span>./pip
 $<span class="w"> </span>make<span class="w"> </span>pipelinewise<span class="w"> </span>all_connectors
 </pre></div>
 </div>
-<p>Press <code class="docutils literal notranslate"><span class="pre">Y</span></code> to accept the license agreement of the required singer components. To automate
-the installation and accept every license agreement run <code class="docutils literal notranslate"><span class="pre">./install</span> <span class="pre">--acceptlicenses</span></code>.</p>
+<p>Press <code class="docutils literal notranslate"><span class="pre">Y</span></code> to accept the license agreement of the required singer components.</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>make<span class="w"> </span>pipelinewise<span class="w"> </span>all_connectors
 
 <span class="o">(</span>...installation<span class="w"> </span>usually<span class="w"> </span>takes<span class="w"> </span><span class="m">5</span>-10<span class="w"> </span>minutes...<span class="o">)</span>
@@ -206,8 +207,8 @@ PipelineWise<span class="w"> </span>installed<span class="w"> </span>successfull
 --------------------------------------------------------------------------
 
 To<span class="w"> </span>start<span class="w"> </span>CLI:
-<span class="w">  </span>$<span class="w"> </span><span class="nb">source</span><span class="w"> </span>/Users/jack/pipelinewise/.virtualenvs/cli/bin/activate
-<span class="w">  </span>$<span class="w"> </span><span class="nb">export</span><span class="w"> </span><span class="nv">PIPELINEWISE_HOME</span><span class="o">=</span>/Users/jack/pipelinewise/.virtualenvs
+<span class="w">  </span>$<span class="w"> </span><span class="nb">source</span><span class="w"> </span>/Users/jack/pipelinewise/.virtualenvs/pipelinewise/bin/activate
+<span class="w">  </span>$<span class="w"> </span><span class="nb">export</span><span class="w"> </span><span class="nv">PIPELINEWISE_HOME</span><span class="o">=</span>/Users/jack/pipelinewise
 <span class="w">  </span>$<span class="w"> </span>pipelinewise<span class="w"> </span>status
 
 --------------------------------------------------------------------------
@@ -215,9 +216,9 @@ To<span class="w"> </span>start<span class="w"> </span>CLI:
 </div>
 <section id="selecting-singer-connectors">
 <span id="id2"></span><h3>Selecting singer connectors<a class="headerlink" href="#selecting-singer-connectors" title="Link to this heading"></a></h3>
-<p>You can install PipelineWise only with required connectors by using the <code class="docutils literal notranslate"><span class="pre">--connectors=</span></code> argument. For example if you
-need to replicate data only from MySQL and PostgreSQL into a Snowflake database you can install PipelineWise by
-running:</p>
+<p>You can install only the connectors you need by setting the <code class="docutils literal notranslate"><span class="pre">pw_connector</span></code>
+Make variable. For example, to replicate data from MySQL and PostgreSQL into
+Snowflake, run:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>make<span class="w"> </span>pipelinewise<span class="w"> </span>connectors<span class="w"> </span>-e<span class="w"> </span><span class="nv">pw_connector</span><span class="o">=</span>tap-mysql,tap-postgres,target-snowflake
 </pre></div>
 </div>
@@ -227,110 +228,63 @@ running:</p>
 Please always double check license compatibilities and terms of the installed components.
 More info in the <a class="reference internal" href="../project/licenses.html#licenses"><span class="std std-ref">Licenses</span></a> section.</p>
 </div>
-<p>Here’s the list of the singer connectors and if they are installed by default or not:</p>
-<table class="docutils align-default">
+<p>The current <code class="docutils literal notranslate"><span class="pre">all_connectors</span></code> set is listed below. Install one connector with
+<code class="docutils literal notranslate"><span class="pre">make</span> <span class="pre">pipelinewise</span> <span class="pre">connectors</span> <span class="pre">-e</span> <span class="pre">pw_connector=&lt;connector&gt;</span></code> or pass a
+comma-separated list as shown above.</p>
+<table class="docutils align-default" id="id3">
+<caption><span class="caption-text">Connectors installed by <code class="docutils literal notranslate"><span class="pre">all_connectors</span></code></span><a class="headerlink" href="#id3" title="Link to this table"></a></caption>
+<thead>
+<tr class="row-odd"><th class="head"><p>Sources (taps)</p></th>
+<th class="head"><p>Destinations and transformations</p></th>
+</tr>
+</thead>
 <tbody>
-<tr class="row-odd"><td><p><strong>Connector</strong></p></td>
-<td><p><strong>Install Command</strong></p></td>
-<td><p><strong>Included in default install?</strong></p></td>
-<td><p><strong>Note</strong></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">tap-github</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">target-postgres</span></code></p></td>
 </tr>
-<tr class="row-even"><td><p>all</p></td>
-<td><p>./install –connectors=all</p></td>
-<td></td>
-<td><p>Installs every supported connector</p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">tap-jira</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">target-s3-csv</span></code></p></td>
 </tr>
-<tr class="row-odd"><td><p>tap-github</p></td>
-<td><p>./install –connectors=tap-github</p></td>
-<td><p>YES</p></td>
-<td></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">tap-kafka</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">target-snowflake</span></code></p></td>
 </tr>
-<tr class="row-even"><td><p>tap-jira</p></td>
-<td><p>./install –connectors=tap-jira</p></td>
-<td><p>YES</p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">tap-mixpanel</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">transform-field</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">tap-mongodb</span></code></p></td>
 <td></td>
 </tr>
-<tr class="row-odd"><td><p>tap-kafka</p></td>
-<td><p>./install –connectors=tap-kafka</p></td>
-<td><p>YES</p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">tap-mysql</span></code></p></td>
 <td></td>
 </tr>
-<tr class="row-even"><td><p>tap-mongodb</p></td>
-<td><p>./install –connectors=tap-mongodb</p></td>
-<td><p>YES</p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">tap-postgres</span></code></p></td>
 <td></td>
 </tr>
-<tr class="row-odd"><td><p>tap-mysql</p></td>
-<td><p>./install –connectors=tap-mysql</p></td>
-<td><p>YES</p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">tap-s3-csv</span></code></p></td>
 <td></td>
 </tr>
-<tr class="row-even"><td><p>tap-postgres</p></td>
-<td><p>./install –connectors=tap-postgres</p></td>
-<td><p>YES</p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">tap-salesforce</span></code></p></td>
 <td></td>
 </tr>
-<tr class="row-odd"><td><p>tap-s3-csv</p></td>
-<td><p>./install –connectors=tap-s3-csv</p></td>
-<td><p>YES</p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">tap-slack</span></code></p></td>
 <td></td>
 </tr>
-<tr class="row-even"><td><p>tap-snowflake</p></td>
-<td><p>./install –connectors=tap-snowflake</p></td>
-<td><p>YES</p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">tap-snowflake</span></code></p></td>
 <td></td>
 </tr>
-<tr class="row-odd"><td><p>tap-zendesk</p></td>
-<td><p>./install –connectors=tap-zendesk</p></td>
-<td><p>YES</p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">tap-twilio</span></code></p></td>
 <td></td>
 </tr>
-<tr class="row-even"><td><p>tap-github</p></td>
-<td><p>./install –connectors=tap-github</p></td>
-<td><p>YES</p></td>
-<td></td>
-</tr>
-<tr class="row-odd"><td><p>tap-slack</p></td>
-<td><p>./install –connectors=tap-slack</p></td>
-<td><p>YES</p></td>
-<td></td>
-</tr>
-<tr class="row-even"><td><p>tap-mixpanel</p></td>
-<td><p>./install –connectors=tap-mixpanel</p></td>
-<td><p>YES</p></td>
-<td></td>
-</tr>
-<tr class="row-odd"><td><p>target-postgres</p></td>
-<td><p>./install –connectors=target-postgres</p></td>
-<td><p>YES</p></td>
-<td></td>
-</tr>
-<tr class="row-even"><td><p>target-s3-csv</p></td>
-<td><p>./install –connectors=target-s3-csv</p></td>
-<td><p>YES</p></td>
-<td></td>
-</tr>
-<tr class="row-odd"><td><p>target-snowflake</p></td>
-<td><p>./install –connectors=target-snowflake</p></td>
-<td><p>YES</p></td>
-<td></td>
-</tr>
-<tr class="row-even"><td><p>transform-field</p></td>
-<td><p>./install –connectors=transform-field</p></td>
-<td><p>YES</p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">tap-zendesk</span></code></p></td>
 <td></td>
 </tr>
 </tbody>
 </table>
-<div class="admonition warning">
-<p class="admonition-title">Warning</p>
-<p>When <cite>–connectors=</cite> argument is not specified then only the default connectors will be installed.</p>
-</div>
 <p>Once the install script finished, you will need to activate the virtual environment
 with the Command Line Tools and set the <code class="docutils literal notranslate"><span class="pre">PIPELINEWISE_HOME</span></code> environment variable
 as it is displayed above at the end of the install script:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span><span class="nb">source</span><span class="w"> </span>/Users/jack/pipelinewise/.virtualenvs/cli/bin/activate
-$<span class="w"> </span><span class="nb">export</span><span class="w"> </span><span class="nv">PIPELINEWISE_HOME</span><span class="o">=</span>/Users/jack/pipelinewise/.virtualenvs
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span><span class="nb">source</span><span class="w"> </span>/Users/jack/pipelinewise/.virtualenvs/pipelinewise/bin/activate
+$<span class="w"> </span><span class="nb">export</span><span class="w"> </span><span class="nv">PIPELINEWISE_HOME</span><span class="o">=</span>/Users/jack/pipelinewise
 $<span class="w"> </span>pipelinewise<span class="w"> </span>status
 
 Tap<span class="w"> </span>ID<span class="w">    </span>Tap<span class="w"> </span>Type<span class="w">    </span>Target<span class="w"> </span>ID<span class="w">    </span>Target<span class="w"> </span>Type<span class="w">    </span>Enabled<span class="w">    </span>Status<span class="w">    </span>Last<span class="w"> </span>Sync<span class="w">    </span>Last<span class="w"> </span>Sync<span class="w"> </span>Result
@@ -352,7 +306,7 @@ was successful.</p>
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="../index.html" class="btn btn-neutral float-left" title="Notice" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../index.html" class="btn btn-neutral float-left" title="Project scope notice" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
         <a href="creating_pipelines.html" class="btn btn-neutral float-right" title="Creating Pipelines" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 

@@ -1,31 +1,29 @@
+
+
 <!DOCTYPE html>
-<html class="writer-html5" lang="en">
+<html class="writer-html5" lang="en" data-content_root="../../">
 <head>
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Tap Salesforce &mdash; PipelineWise  documentation</title>
-      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
-      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=19f00094" />
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/custom.css?v=1c6dfede" />
 
   
     <link rel="shortcut icon" href="../../_static/pipelinewise.png"/>
     <link rel="canonical" href="https://docs.ansible.com/ansible/latest/connectors/taps/salesforce.html"/>
-  <!--[if lt IE 9]>
-    <script src="../../_static/js/html5shiv.min.js"></script>
-  <![endif]-->
-  
-        <script src="../../_static/jquery.js?v=5d32c60e"></script>
-        <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-        <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js?v=b3ba4146"></script>
-        <script src="../../_static/doctools.js?v=888ff710"></script>
-        <script src="../../_static/sphinx_highlight.js?v=4825356b"></script>
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
-    <link rel="next" title="Tap Zendesk" href="zendesk.html" />
-    <link rel="prev" title="Tap MongoDB" href="mongodb.html" /> 
+    <link rel="next" title="Tap Twilio" href="twilio.html" />
+    <link rel="prev" title="Tap Mixpanel" href="mixpanel.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -39,9 +37,6 @@
           <a href="../../index.html" class="icon icon-home">
             PipelineWise
           </a>
-              <div class="version">
-                0.65.1
-              </div>
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
     <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
@@ -60,23 +55,24 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../concept/singer.html">Singer.io</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../concept/replication_methods.html">Replication Methods</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../concept/fastsync.html">Fast Sync</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../concept/fastsync.html">FastSync</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../concept/linux_pipes.html">Linux Pipes in PipelineWise</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Using PipelineWise</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/yaml_config.html">YAML configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/yaml_config.html">YAML Configuration</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/encrypting_passwords.html">Encrypting Passwords</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/cli.html">Command Line Interface</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/scheduling.html">Scheduling</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/scheduling.html#multi-server-cluster">Multi-Server Cluster</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/metadata_columns.html">Metadata Columns</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/schema_changes.html">Schema Changes</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/transformations.html">Transformations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/multi_server_cluster.html">Multi-Server Cluster</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/logging.html">Logging</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/alerts.html">Alerts</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/resync.html">Resync Tables</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/partial_sync.html">Different cases of partial resync</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/schema_changes.html">Schema Changes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/transformations.html">Transformations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/metadata_columns.html">Metadata Columns</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/troubleshooting.html">Troubleshooting</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Connectors</span></p>
 <ul class="current">
@@ -84,24 +80,16 @@
 <li class="toctree-l1 current"><a class="reference internal" href="../taps.html#configuring-taps">Configuring taps</a><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="mysql.html">Tap MySQL</a></li>
 <li class="toctree-l2"><a class="reference internal" href="postgres.html">Tap PostgreSQL</a></li>
-<li class="toctree-l2"><a class="reference internal" href="oracle.html">Tap Oracle</a></li>
 <li class="toctree-l2"><a class="reference internal" href="s3_csv.html">Tap S3 CSV</a></li>
 <li class="toctree-l2"><a class="reference internal" href="kafka.html">Tap Kafka</a></li>
 <li class="toctree-l2"><a class="reference internal" href="snowflake.html">Tap Snowflake</a></li>
 <li class="toctree-l2"><a class="reference internal" href="mongodb.html">Tap MongoDB</a></li>
-<li class="toctree-l2 current"><a class="current reference internal" href="#">Tap Salesforce</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#connecting-to-salesforce">Connecting to Salesforce</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#configuring-what-to-replicate">Configuring what to replicate</a></li>
-</ul>
-</li>
 <li class="toctree-l2"><a class="reference internal" href="zendesk.html">Tap Zendesk</a></li>
 <li class="toctree-l2"><a class="reference internal" href="jira.html">Tap Jira</a></li>
-<li class="toctree-l2"><a class="reference internal" href="zuora.html">Tap Zuora</a></li>
-<li class="toctree-l2"><a class="reference internal" href="google_analytics.html">Tap Google Analytics</a></li>
 <li class="toctree-l2"><a class="reference internal" href="github.html">Tap Github</a></li>
-<li class="toctree-l2"><a class="reference internal" href="shopify.html">Tap Shopify</a></li>
 <li class="toctree-l2"><a class="reference internal" href="slack.html">Tap Slack</a></li>
 <li class="toctree-l2"><a class="reference internal" href="mixpanel.html">Tap Mixpanel</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Tap Salesforce</a></li>
 <li class="toctree-l2"><a class="reference internal" href="twilio.html">Tap Twilio</a></li>
 </ul>
 </li>
@@ -141,116 +129,57 @@
            <div itemprop="articleBody">
              
   <section id="tap-salesforce">
-<span id="id1"></span><h1>Tap Salesforce<a class="headerlink" href="#tap-salesforce" title="Permalink to this heading"></a></h1>
-<section id="connecting-to-salesforce">
-<h2>Connecting to Salesforce<a class="headerlink" href="#connecting-to-salesforce" title="Permalink to this heading"></a></h2>
-<div class="admonition warning">
-<p class="admonition-title">Warning</p>
-<p>This section of the documentation is work in progress.</p>
-</div>
-</section>
-<section id="configuring-what-to-replicate">
-<h2>Configuring what to replicate<a class="headerlink" href="#configuring-what-to-replicate" title="Permalink to this heading"></a></h2>
-<p>PipelineWise configures every tap with a common structured YAML file format.
-A sample YAML for Salesforce replication can be generated into a project directory by
-following the steps in the <a class="reference internal" href="../../installation_guide/creating_pipelines.html#generating-pipelines"><span class="std std-ref">Generating Sample Pipelines</span></a> section.</p>
-<p>Example YAML for tap-salesforce:</p>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nn">---</span>
+<span id="id1"></span><h1>Tap Salesforce<a class="headerlink" href="#tap-salesforce" title="Link to this heading"></a></h1>
+<p>The Salesforce tap extracts Salesforce objects through either the Bulk API or
+the REST API. Create a Salesforce connected app and complete its OAuth flow to
+obtain a client ID, client secret, and refresh token.</p>
+<p>Generate a starting configuration with <code class="docutils literal notranslate"><span class="pre">pipelinewise</span> <span class="pre">init</span></code> (see
+<a class="reference internal" href="../../installation_guide/creating_pipelines.html#generating-pipelines"><span class="std std-ref">Generating Sample Pipelines</span></a>), then edit <code class="docutils literal notranslate"><span class="pre">tap_salesforce.yml</span></code>. The
+<code class="docutils literal notranslate"><span class="pre">start_date</span></code> must be an RFC 3339 timestamp and limits how far back the tap
+queries records. Set <code class="docutils literal notranslate"><span class="pre">api_type</span></code> to either <code class="docutils literal notranslate"><span class="pre">BULK</span></code> or <code class="docutils literal notranslate"><span class="pre">REST</span></code>.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;salesforce&quot;</span>
+<span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Salesforce&quot;</span>
+<span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;tap-salesforce&quot;</span>
+<span class="nt">owner</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;data-team@example.com&quot;</span>
 
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="c1"># General Properties</span>
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;salesforce&quot;</span><span class="w">                       </span><span class="c1"># Unique identifier of the tap</span>
-<span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Sample</span><span class="nv"> </span><span class="s">data</span><span class="nv"> </span><span class="s">on</span><span class="nv"> </span><span class="s">Salesforce&quot;</span><span class="w">      </span><span class="c1"># Name of the tap</span>
-<span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;tap-salesforce&quot;</span><span class="w">                 </span><span class="c1"># !! THIS SHOULD NOT CHANGE !!</span>
-<span class="nt">owner</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;somebody@foo.com&quot;</span><span class="w">              </span><span class="c1"># Data owner to contact</span>
-<span class="c1">#send_alert: False                     # Optional: Disable all configured alerts on this tap</span>
-<span class="c1">#slack_alert_channel: &quot;#tap-channel&quot;   # Optional: Sending a copy of specific tap alerts to this slack channel</span>
-
-
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="c1"># Source (Tap) - Salesforce connection details</span>
-<span class="c1">#</span>
-<span class="c1"># The client_id and client_secret keys are your OAuth Salesforce App secrets.</span>
-<span class="c1"># The refresh_token is a secret created during the OAuth flow. For more info on</span>
-<span class="c1"># the Salesforce OAuth flow, visit the Salesforce documentation at</span>
-<span class="c1"># https://developer.salesforce.com/docs/atlas.en-us.api_rest.meta/api_rest/intro_understanding_web_server_oauth_flow.htm</span>
-<span class="c1">#</span>
-<span class="c1"># api_type to use extracting data from Snowflake. This can be BULK or REST.</span>
-<span class="c1"># Further details about API types at https://www.stitchdata.com/docs/integrations/saas/salesforce#bulk-vs-rest-api</span>
-<span class="c1"># ------------------------------------------------------------------------------</span>
 <span class="nt">db_conn</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">client_id</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;ACCESS_TOKEN&gt;&quot;</span><span class="w">             </span><span class="c1"># Salesforce Client ID</span>
-<span class="w">  </span><span class="nt">client_secret</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;CLIENT_SECRET&gt;&quot;</span><span class="w">        </span><span class="c1"># Salesforce Client Secret</span>
-<span class="w">  </span><span class="nt">refresh_token</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;REFRESH_TOKEN&quot;</span><span class="w">         </span><span class="c1"># Salesforce Refresh Token</span>
-<span class="w">  </span><span class="nt">start_date</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;2019-01-01T00:00:00Z&quot;</span><span class="w">      </span><span class="c1"># Bound on SOQL queries when searching for records</span>
-<span class="w">  </span><span class="nt">api_type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;BULK&quot;</span><span class="w">                        </span><span class="c1"># Salesforce API Type: BULK or REST</span>
+<span class="w">  </span><span class="nt">client_id</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;CLIENT_ID&gt;&quot;</span>
+<span class="w">  </span><span class="nt">client_secret</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;CLIENT_SECRET&gt;&quot;</span>
+<span class="w">  </span><span class="nt">refresh_token</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;REFRESH_TOKEN&gt;&quot;</span>
+<span class="w">  </span><span class="nt">start_date</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;2024-01-01T00:00:00Z&quot;</span>
+<span class="w">  </span><span class="nt">api_type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;BULK&quot;</span>
 
+<span class="nt">target</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;snowflake&quot;</span>
+<span class="nt">batch_size_rows</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">20000</span>
+<span class="nt">stream_buffer_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span>
+<span class="nt">default_target_schema</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;salesforce&quot;</span>
 
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="c1"># Destination (Target) - Target properties</span>
-<span class="c1"># Connection details should be in the relevant target YAML file</span>
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="nt">target</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;snowflake&quot;</span><span class="w">                       </span><span class="c1"># ID of the target connector where the data will be loaded</span>
-<span class="nt">batch_size_rows</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">20000</span><span class="w">                    </span><span class="c1"># Batch size for the stream to optimise load performance</span>
-<span class="nt">stream_buffer_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span><span class="w">                     </span><span class="c1"># In-memory buffer size (MB) between taps and targets for asynchronous data pipes</span>
-<span class="nt">default_target_schema</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;salesforce&quot;</span><span class="w">       </span><span class="c1"># Target schema where the data will be loaded</span>
-<span class="nt">default_target_schema_select_permission</span><span class="p">:</span><span class="w">  </span><span class="c1"># Optional: Grant SELECT on schema and tables that created</span>
-<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">grp_power</span>
-<span class="c1">#batch_wait_limit_seconds: 3600           # Optional: Maximum time to wait for `batch_size_rows`. Available only for snowflake target.</span>
-
-<span class="c1"># Options only for Snowflake target</span>
-<span class="c1">#archive_load_files: False                      # Optional: when enabled, the files loaded to Snowflake will also be stored in `archive_load_files_s3_bucket`</span>
-<span class="c1">#archive_load_files_s3_prefix: &quot;archive&quot;        # Optional: When `archive_load_files` is enabled, the archived files will be placed in the archive S3 bucket under this prefix.</span>
-<span class="c1">#archive_load_files_s3_bucket: &quot;&lt;BUCKET_NAME&gt;&quot;  # Optional: When `archive_load_files` is enabled, the archived files will be placed in this bucket. (Default: the value of `s3_bucket` in target snowflake YAML)</span>
-
-
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="c1"># Source to target Schema mapping</span>
-<span class="c1"># ------------------------------------------------------------------------------</span>
 <span class="nt">schemas</span><span class="p">:</span>
-<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">source_schema</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;salesforce&quot;</span><span class="w">           </span><span class="c1"># This is mandatory, but can be anything in this tap type</span>
-<span class="w">    </span><span class="nt">target_schema</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;salesforce&quot;</span><span class="w">           </span><span class="c1"># Target schema in the destination Data Warehouse</span>
-
-<span class="w">    </span><span class="c1"># List of Salesforce tables to replicate into destination Data Warehouse</span>
-<span class="w">    </span><span class="c1"># Tap-Salesforce will use the best incremental strategies automatically to replicate data</span>
-<span class="w">    </span><span class="c1">#</span>
-<span class="w">    </span><span class="c1"># Tap-Salesforce currently supports the replication of the majority of Salesforce objects,</span>
-<span class="w">    </span><span class="c1"># with the exception of those listed in the Unsupported Objects row of this table at</span>
-<span class="w">    </span><span class="c1"># https://www.stitchdata.com/docs/integrations/saas/salesforce#bulk-vs-rest-api</span>
-<span class="w">    </span><span class="c1">#</span>
-<span class="w">    </span><span class="c1">#</span>
-<span class="w">    </span><span class="c1"># This section will only cover a few of the most popular tables Salesforce integration offers.</span>
-<span class="w">    </span><span class="c1"># See the Salesforce Object Reference guide for info on objects not listed here, including the</span>
-<span class="w">    </span><span class="c1"># fields available in each object at https://resources.docs.salesforce.com/sfdc/pdf/object_reference.pdf</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">source_schema</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;salesforce&quot;</span>
+<span class="w">    </span><span class="nt">target_schema</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;salesforce&quot;</span>
 <span class="w">    </span><span class="nt">tables</span><span class="p">:</span>
 <span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Account&quot;</span>
 <span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Contact&quot;</span>
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Lead&quot;</span>
 <span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Opportunity&quot;</span>
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;User&quot;</span>
-
-<span class="w">        </span><span class="c1"># OPTIONAL: Load time transformations</span>
-<span class="w">        </span><span class="c1">#transformations:</span>
-<span class="w">        </span><span class="c1">#  - column: &quot;last_name&quot;            # Column to transform</span>
-<span class="w">        </span><span class="c1">#    type: &quot;SET-NULL&quot;               # Transformation type</span>
 </pre></div>
 </div>
-</section>
+<p>The tap discovers most Salesforce objects. Use
+<code class="docutils literal notranslate"><span class="pre">pipelinewise</span> <span class="pre">discover_tap</span> <span class="pre">--tap</span> <span class="pre">salesforce</span> <span class="pre">--target</span> <span class="pre">snowflake</span></code> to inspect the objects available
+to the connected user before finalising the <code class="docutils literal notranslate"><span class="pre">tables</span></code> list.</p>
 </section>
 
 
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="mongodb.html" class="btn btn-neutral float-left" title="Tap MongoDB" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="zendesk.html" class="btn btn-neutral float-right" title="Tap Zendesk" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="mixpanel.html" class="btn btn-neutral float-left" title="Tap Mixpanel" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="twilio.html" class="btn btn-neutral float-right" title="Tap Twilio" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>
 
   <div role="contentinfo">
-    <p>&#169; Copyright 2024, Wise Ltd..</p>
+    <p>&#169; Copyright 2026, Wise Ltd..</p>
   </div>
 
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a

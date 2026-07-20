@@ -97,7 +97,7 @@ Example YAML for target-snowflake:
       account: "rtxxxxx.eu-central-1"               # Snowflake account
       dbname: "<DB_NAME>"                           # Snowflake database name
       user: "<USER>"                                # Snowflake user
-      private_key: "<private_key_path>"             # File contains PEM forrmat for connecting to Snowflake
+      private_key: "<private_key_path>"             # File contains PEM format for connecting to Snowflake
       warehouse: "<WAREHOUSE>"                      # Snowflake virtual warehouse
       iceberg_create: false                         # Create new tables as Iceberg tables (only available for pure Singer replications)
 
@@ -114,7 +114,7 @@ Example YAML for target-snowflake:
 
       #aws_endpoint_url: "<FULL_ENDPOINT_URL>"      # Optional: for non AWS S3, for example https://nyc3.digitaloceanspaces.com
 
-      s3_bucket: "<BUCKET_NAME>"                    # S3 external stbucket name
+      s3_bucket: "<BUCKET_NAME>"                    # S3 external stage bucket name
       s3_key_prefix: "snowflake-imports/"           # Optional: S3 key prefix
       #s3_acl: "<S3_OBJECT_ACL>"                    # Optional: Assign the canned ACL to the uploaded file on S3
 
@@ -128,7 +128,7 @@ Example YAML for target-snowflake:
 
       # Optional: Client Side Encryption
       # The same master key has to be added to the external stage object created in snowflake
-      #client_side_encryption_master_key: "<MASTER_KEY"> # Plain string or vault encrypted
+      #client_side_encryption_master_key: "<MASTER_KEY>" # Plain string or vault encrypted
 
 
 Snowflake Iceberg tables
@@ -136,11 +136,11 @@ Snowflake Iceberg tables
 Iceberg support needs to be setup in Snowflake
 Useful tutorial : https://docs.snowflake.com/en/user-guide/tutorials/create-your-first-iceberg-table
 
-PipelineWise expects the target database to have already have default Iceberg settings
+PipelineWise expects the target database to already have default Iceberg settings
 
 .. code-block:: text
 
-    CREATE OR EXTERNAL VOLUME ACCOUNT_ICEBERG_VOLUME ... ;
+    CREATE OR REPLACE EXTERNAL VOLUME ACCOUNT_ICEBERG_VOLUME ... ;
     ALTER DATABASE {target-database} SET CATALOG='snowflake';
     ALTER DATABASE {target-database} SET EXTERNAL_VOLUME = ACCOUNT_ICEBERG_VOLUME;
 
@@ -152,7 +152,7 @@ To create "**new**" tables as Iceberg tables, update target-snowflake yaml to in
       account: "rtxxxxx.eu-central-1"               # Snowflake account
       dbname: "<DB_NAME>"                           # Snowflake database name
       user: "<USER>"                                # Snowflake user
-      private_key: "<private_key_path>"             # File contains PEM forrmat for connecting to Snowflake
+      private_key: "<private_key_path>"             # File contains PEM format for connecting to Snowflake
       warehouse: "<WAREHOUSE>"                      # Snowflake virtual warehouse
       iceberg_create: true                          # Create new tables as Iceberg tables (only available for pure Singer replications)
 
@@ -172,5 +172,7 @@ target-snowflake has a utility that can be used to convert an *existing* Native 
 
 Limitations
 ^^^^^^^^^^^
-* Only target-snowflake (using Pure Singer replication) is able to create a new Iceberg table
-* PipelineWise `sync_tables` and `partial_sync_table` command will fail with `(42710): SQL compilation error: table already exists as ICEBERG_TABLE`
+* Only target-snowflake using the standard Singer replication path (i.e. not :ref:`fast_sync_main`)
+  is able to create a new Iceberg table. FastSync and PartialSync do not support Iceberg.
+* PipelineWise ``fast_sync`` and ``partial_sync_table`` commands will fail with
+  ``(42710): SQL compilation error: table already exists as ICEBERG_TABLE``

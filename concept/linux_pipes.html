@@ -22,8 +22,8 @@
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="YAML configuration" href="../user_guide/yaml_config.html" />
-    <link rel="prev" title="Fast Sync" href="fastsync.html" /> 
+    <link rel="next" title="YAML Configuration" href="../user_guide/yaml_config.html" />
+    <link rel="prev" title="FastSync" href="fastsync.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -55,7 +55,7 @@
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="singer.html">Singer.io</a></li>
 <li class="toctree-l1"><a class="reference internal" href="replication_methods.html">Replication Methods</a></li>
-<li class="toctree-l1"><a class="reference internal" href="fastsync.html">Fast Sync</a></li>
+<li class="toctree-l1"><a class="reference internal" href="fastsync.html">FastSync</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Linux Pipes in PipelineWise</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#logic">Logic</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#increasing-buffer-size">Increasing buffer size</a></li>
@@ -64,18 +64,19 @@
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Using PipelineWise</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/yaml_config.html">YAML configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/yaml_config.html">YAML Configuration</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/encrypting_passwords.html">Encrypting Passwords</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/cli.html">Command Line Interface</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/scheduling.html">Scheduling</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/scheduling.html#multi-server-cluster">Multi-Server Cluster</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/metadata_columns.html">Metadata Columns</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/schema_changes.html">Schema Changes</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/transformations.html">Transformations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/multi_server_cluster.html">Multi-Server Cluster</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/logging.html">Logging</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/alerts.html">Alerts</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/resync.html">Resync Tables</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/partial_sync.html">Different cases of partial resync</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/schema_changes.html">Schema Changes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/transformations.html">Transformations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/metadata_columns.html">Metadata Columns</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/troubleshooting.html">Troubleshooting</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Connectors</span></p>
 <ul>
@@ -117,11 +118,11 @@
              
   <section id="linux-pipes-in-pipelinewise">
 <span id="linux-pipes"></span><h1>Linux Pipes in PipelineWise<a class="headerlink" href="#linux-pipes-in-pipelinewise" title="Link to this heading"></a></h1>
-<p>A pipe is unidirectional interprocess communication channel. The term was coined by
+<p>A pipe is a unidirectional interprocess communication channel. The term was coined by
 <a class="reference external" href="https://en.wikipedia.org/wiki/Douglas_McIlroy">Douglas McIlroy</a> for Unix shell and
 named by analogy with the pipeline.</p>
 <p>Pipes are most often used in shell-scripts to connect multiple commands by redirecting the output of
-one command (stdout) to the input (stdin) followed by using a pipe symbol ‘<cite>|</cite>’. <a class="reference internal" href="singer.html#singer"><span class="std std-ref">Singer.io</span></a> specification,
+one command (stdout) to the input (stdin) of the next, using the pipe symbol ‘<cite>|</cite>’. The <a class="reference internal" href="singer.html#singer"><span class="std std-ref">Singer.io</span></a> specification,
 hence PipelineWise is also using linux pipes to connect <a class="reference internal" href="../connectors/taps.html#taps-list"><span class="std std-ref">Taps (Data Sources)</span></a> and <a class="reference internal" href="../connectors/targets.html#targets-list"><span class="std std-ref">Targets (Destinations)</span></a> connectors.</p>
 <p>For example in the following command <code class="docutils literal notranslate"><span class="pre">tap-postgres</span></code> Extracts data from a postgres database and the
 extracted data sent to <code class="docutils literal notranslate"><span class="pre">target-snowflake</span></code> to Load it into a Snowflake database:</p>
@@ -137,7 +138,7 @@ in older kernels. When attempting to read from an empty buffer, the read process
 appears. Similarly, if you attempt to write to a full buffer, the recording process will be blocked until
 the necessary amount of space is available.</p>
 <p>It is important to note, that despite the fact that pipes operates using file descriptor I/O streams,
-operations are performed in memory without loading to/from the disc.</p>
+operations are performed in memory without reading from or writing to disk.</p>
 <p>All the information given below is for bash shell 4.2 and kernel 3.10.10. Further details in the
 original <a class="reference external" href="https://blog.dataart.com/linux-pipes-tips-tricks">Linux Pipes Tips &amp; Tricks</a> post.</p>
 </section>
@@ -145,7 +146,7 @@ original <a class="reference external" href="https://blog.dataart.com/linux-pipe
 <h2>Increasing buffer size<a class="headerlink" href="#increasing-buffer-size" title="Link to this heading"></a></h2>
 <p>Sometimes the default 64K buffer size that provided by the Linux kernel is too small. For example in the
 example above when you extracting data from a busy postgres database and loading into a busy Snowflake
-database sometimes you will find that that <code class="docutils literal notranslate"><span class="pre">tap-postgres</span></code> is blocked by <code class="docutils literal notranslate"><span class="pre">target-snowflake</span></code>.</p>
+database sometimes you will find that <code class="docutils literal notranslate"><span class="pre">tap-postgres</span></code> is blocked by <code class="docutils literal notranslate"><span class="pre">target-snowflake</span></code>.</p>
 <p>This happens when the target cannot load the data fast enough. For example if you have lot of concurrent
 queries in the target database the database can queue up new queries (at least in case of a Snowflake database)
 and this is blocking the tap to extract more data. This scenario can cause unexpected timeout in
@@ -154,7 +155,7 @@ between the tap and target.</p>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
 <p>PipelineWise doesn’t modify the kernel buffer size. When you need more buffer than
-the defualt 64K that’s provided by the kernel, PipelineWise will use its own
+the default 64K that’s provided by the kernel, PipelineWise will use its own
 buffering mechanism between taps and targets.</p>
 <p>PipelineWise is using <a class="reference external" href="https://www.maier-komor.de/mbuffer.html">mbuffer</a> to
 create custom sized buffer between taps and targets.</p>
@@ -173,8 +174,8 @@ buffer that’s provided by the Linux kernel:</p>
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="fastsync.html" class="btn btn-neutral float-left" title="Fast Sync" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="../user_guide/yaml_config.html" class="btn btn-neutral float-right" title="YAML configuration" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="fastsync.html" class="btn btn-neutral float-left" title="FastSync" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../user_guide/yaml_config.html" class="btn btn-neutral float-right" title="YAML Configuration" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

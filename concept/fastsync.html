@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Fast Sync &mdash; PipelineWise  documentation</title>
+  <title>FastSync &mdash; PipelineWise  documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../_static/css/custom.css?v=1c6dfede" />
@@ -55,23 +55,30 @@
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="singer.html">Singer.io</a></li>
 <li class="toctree-l1"><a class="reference internal" href="replication_methods.html">Replication Methods</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Fast Sync</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">FastSync</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#supported-tap-target-combinations">Supported tap-target combinations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#components">Components</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#when-does-pipelinewise-use-fastsync">When does PipelineWise use FastSync?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#defined-partialsync-sync-start-from">Defined PartialSync (<code class="docutils literal notranslate"><span class="pre">sync_start_from</span></code>)</a></li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="linux_pipes.html">Linux Pipes in PipelineWise</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Using PipelineWise</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/yaml_config.html">YAML configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/yaml_config.html">YAML Configuration</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/encrypting_passwords.html">Encrypting Passwords</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/cli.html">Command Line Interface</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/scheduling.html">Scheduling</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/scheduling.html#multi-server-cluster">Multi-Server Cluster</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/metadata_columns.html">Metadata Columns</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/schema_changes.html">Schema Changes</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/transformations.html">Transformations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/multi_server_cluster.html">Multi-Server Cluster</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/logging.html">Logging</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/alerts.html">Alerts</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/resync.html">Resync Tables</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/partial_sync.html">Different cases of partial resync</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/schema_changes.html">Schema Changes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/transformations.html">Transformations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/metadata_columns.html">Metadata Columns</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/troubleshooting.html">Troubleshooting</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Connectors</span></p>
 <ul>
@@ -101,7 +108,7 @@
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
       <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
-      <li class="breadcrumb-item active">Fast Sync</li>
+      <li class="breadcrumb-item active">FastSync</li>
       <li class="wy-breadcrumbs-aside">
             <a href="../_sources/concept/fastsync.rst.txt" rel="nofollow"> View page source</a>
       </li>
@@ -111,74 +118,147 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="fast-sync">
-<span id="fast-sync-main"></span><h1>Fast Sync<a class="headerlink" href="#fast-sync" title="Link to this heading"></a></h1>
-<p><strong>Fast Sync</strong> is one of the <a class="reference internal" href="replication_methods.html#replication-methods"><span class="std std-ref">Replication Methods</span></a> that is functionally identical to <a class="reference internal" href="replication_methods.html#full-table"><span class="std std-ref">Full Table</span></a>
-replication but Fast Sync is bypassing the <a class="reference external" href="https://github.com/singer-io/getting-started/blob/master/docs/SPEC.md">Singer Specification</a>
-for optimised performance. Primary use case of Fast Sync is initial sync or to resync large tables
-with hundreds of millions of rows where singer component would usually be running for long hours or
-sometimes for days.</p>
+  <section id="fastsync">
+<span id="fast-sync-main"></span><h1>FastSync<a class="headerlink" href="#fastsync" title="Link to this heading"></a></h1>
+<p><strong>FastSync</strong> is a performance optimization that bypasses the
+<a class="reference external" href="https://github.com/singer-io/getting-started/blob/master/docs/SPEC.md">Singer Specification</a>
+for bulk data operations. Instead of piping JSON between tap and target processes,
+FastSync uses native database tools (<code class="docutils literal notranslate"><span class="pre">COPY</span></code>, staged files) to transfer data
+directly — typically 10–100x faster than the standard Singer path.</p>
+<p>FastSync is available only for specific tap-target combinations (see the table below).</p>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
-<p><strong>Important</strong>: Fast Sync is not a selectable replication method in the <a class="reference internal" href="../user_guide/yaml_config.html#yaml-configuration"><span class="std std-ref">YAML configuration</span></a>.
-PipelineWise detects automatically when Fast Sync gives better performance than the singer
+<p><strong>Important</strong>: FastSync is not a selectable replication method in the <a class="reference internal" href="../user_guide/yaml_config.html#yaml-configuration"><span class="std std-ref">YAML Configuration</span></a>.
+PipelineWise detects automatically when FastSync gives better performance than the Singer
 components and uses it whenever it’s possible.</p>
 </div>
-<p>Fast Sync exists only between the following tap and target components:</p>
+<section id="supported-tap-target-combinations">
+<h2>Supported tap-target combinations<a class="headerlink" href="#supported-tap-target-combinations" title="Link to this heading"></a></h2>
+<p>FullSync and PartialSync support different tap-target combinations:</p>
 <table class="docutils align-default">
 <tbody>
-<tr class="row-odd"><td colspan="2"><p><strong>Fast Sync supported Tap to Target combinations</strong></p></td>
-</tr>
-<tr class="row-even"><td><p><strong>Tap</strong></p></td>
+<tr class="row-odd"><td><p><strong>Tap</strong></p></td>
 <td><p><strong>Target</strong></p></td>
+<td><p><strong>FullSync</strong></p></td>
+<td><p><strong>PartialSync</strong></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="../connectors/taps/mysql.html#tap-mysql"><span class="std std-ref">Tap MySQL</span></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="../connectors/taps/mysql.html#tap-mysql"><span class="std std-ref">Tap MySQL</span></a></p></td>
 <td><p><strong>-&gt;</strong> <a class="reference internal" href="../connectors/targets/snowflake.html#target-snowflake"><span class="std std-ref">Target Snowflake</span></a></p></td>
+<td><p>Yes</p></td>
+<td><p>Yes</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="../connectors/taps/postgres.html#tap-postgres"><span class="std std-ref">Tap PostgreSQL</span></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="../connectors/taps/postgres.html#tap-postgres"><span class="std std-ref">Tap PostgreSQL</span></a></p></td>
 <td><p><strong>-&gt;</strong> <a class="reference internal" href="../connectors/targets/snowflake.html#target-snowflake"><span class="std std-ref">Target Snowflake</span></a></p></td>
-</tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="../connectors/taps/s3_csv.html#tap-s3-csv"><span class="std std-ref">Tap S3 CSV</span></a></p></td>
-<td><p><strong>-&gt;</strong> <a class="reference internal" href="../connectors/targets/snowflake.html#target-snowflake"><span class="std std-ref">Target Snowflake</span></a></p></td>
+<td><p>Yes</p></td>
+<td><p>Yes</p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="../connectors/taps/mongodb.html#tap-mongodb"><span class="std std-ref">Tap MongoDB</span></a></p></td>
 <td><p><strong>-&gt;</strong> <a class="reference internal" href="../connectors/targets/snowflake.html#target-snowflake"><span class="std std-ref">Target Snowflake</span></a></p></td>
+<td><p>Yes</p></td>
+<td><p>No</p></td>
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="../connectors/taps/mysql.html#tap-mysql"><span class="std std-ref">Tap MySQL</span></a></p></td>
-<td><p><strong>-&gt;</strong> <a class="reference internal" href="../connectors/targets/redshift.html#target-redshift"><span class="std std-ref">Target Redshift</span></a></p></td>
+<td><p><strong>-&gt;</strong> <a class="reference internal" href="../connectors/targets/postgres.html#target-postgres"><span class="std std-ref">Target Postgres</span></a></p></td>
+<td><p>Yes</p></td>
+<td><p>No</p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="../connectors/taps/postgres.html#tap-postgres"><span class="std std-ref">Tap PostgreSQL</span></a></p></td>
-<td><p><strong>-&gt;</strong> <a class="reference internal" href="../connectors/targets/redshift.html#target-redshift"><span class="std std-ref">Target Redshift</span></a></p></td>
-</tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="../connectors/taps/s3_csv.html#tap-s3-csv"><span class="std std-ref">Tap S3 CSV</span></a></p></td>
-<td><p><strong>-&gt;</strong> <a class="reference internal" href="../connectors/targets/redshift.html#target-redshift"><span class="std std-ref">Target Redshift</span></a></p></td>
-</tr>
-<tr class="row-even"><td><p><a class="reference internal" href="../connectors/taps/mysql.html#tap-mysql"><span class="std std-ref">Tap MySQL</span></a></p></td>
 <td><p><strong>-&gt;</strong> <a class="reference internal" href="../connectors/targets/postgres.html#target-postgres"><span class="std std-ref">Target Postgres</span></a></p></td>
-</tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="../connectors/taps/postgres.html#tap-postgres"><span class="std std-ref">Tap PostgreSQL</span></a></p></td>
-<td><p><strong>-&gt;</strong> <a class="reference internal" href="../connectors/targets/postgres.html#target-postgres"><span class="std std-ref">Target Postgres</span></a></p></td>
-</tr>
-<tr class="row-even"><td><p><a class="reference internal" href="../connectors/taps/s3_csv.html#tap-s3-csv"><span class="std std-ref">Tap S3 CSV</span></a></p></td>
-<td><p><strong>-&gt;</strong> <a class="reference internal" href="../connectors/targets/postgres.html#target-postgres"><span class="std std-ref">Target Postgres</span></a></p></td>
+<td><p>Yes</p></td>
+<td><p>No</p></td>
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="../connectors/taps/mongodb.html#tap-mongodb"><span class="std std-ref">Tap MongoDB</span></a></p></td>
 <td><p><strong>-&gt;</strong> <a class="reference internal" href="../connectors/targets/postgres.html#target-postgres"><span class="std std-ref">Target Postgres</span></a></p></td>
-</tr>
-<tr class="row-even"><td><p><a class="reference internal" href="../connectors/taps/mysql.html#tap-mysql"><span class="std std-ref">Tap MySQL</span></a></p></td>
-<td><p><strong>-&gt;</strong> <a class="reference internal" href="../connectors/targets/bigquery.html#target-bigquery"><span class="std std-ref">Target Bigquery</span></a></p></td>
-</tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="../connectors/taps/postgres.html#tap-postgres"><span class="std std-ref">Tap PostgreSQL</span></a></p></td>
-<td><p><strong>-&gt;</strong> <a class="reference internal" href="../connectors/targets/bigquery.html#target-bigquery"><span class="std std-ref">Target Bigquery</span></a></p></td>
-</tr>
-<tr class="row-even"><td><p><a class="reference internal" href="../connectors/taps/s3_csv.html#tap-s3-csv"><span class="std std-ref">Tap S3 CSV</span></a></p></td>
-<td><p><strong>-&gt;</strong> <a class="reference internal" href="../connectors/targets/bigquery.html#target-bigquery"><span class="std std-ref">Target Bigquery</span></a></p></td>
-</tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="../connectors/taps/mongodb.html#tap-mongodb"><span class="std std-ref">Tap MongoDB</span></a></p></td>
-<td><p><strong>-&gt;</strong> <a class="reference internal" href="../connectors/targets/bigquery.html#target-bigquery"><span class="std std-ref">Target Bigquery</span></a></p></td>
+<td><p>Yes</p></td>
+<td><p>No</p></td>
 </tr>
 </tbody>
 </table>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>During a normal <a class="reference internal" href="../user_guide/cli.html#cli-run-tap"><span class="std std-ref">run_tap</span></a> run, PipelineWise uses the standard
+Singer-based sync when FullSync is not supported for the tap-target combination.</p>
+<p>The explicit <a class="reference internal" href="../user_guide/cli.html#cli-fast-sync"><span class="std std-ref">fast_sync</span></a> command behaves differently: it requires a
+supported FullSync combination and fails if one is not available. It never falls
+back to Singer.</p>
+</div>
+</section>
+<section id="components">
+<h2>Components<a class="headerlink" href="#components" title="Link to this heading"></a></h2>
+<p>FastSync has two components that share the same underlying infrastructure:</p>
+<p><strong>FullSync</strong></p>
+<p>Exports the entire source table, stages the data, and replaces the target table.
+This is the component used during initial syncs and when you explicitly run the
+<a class="reference internal" href="../user_guide/cli.html#cli-fast-sync"><span class="std std-ref">fast_sync</span></a> command.</p>
+<p><strong>PartialSync</strong></p>
+<p>Exports a filtered range of rows from the source table, stages the data, and
+merges it with the existing target table (updating existing rows and inserting
+new ones). This is the component used when you run the <a class="reference internal" href="../user_guide/cli.html#cli-partial-sync-table"><span class="std std-ref">partial_sync_table</span></a>
+command. See <a class="reference internal" href="../user_guide/partial_sync.html#partial-sync-cases"><span class="std std-ref">Different cases of partial resync</span></a> for details on how different scenarios are
+handled.</p>
+</section>
+<section id="when-does-pipelinewise-use-fastsync">
+<h2>When does PipelineWise use FastSync?<a class="headerlink" href="#when-does-pipelinewise-use-fastsync" title="Link to this heading"></a></h2>
+<p>PipelineWise automatically selects the <strong>FastSync</strong> component for a table when one of the
+following conditions are met:</p>
+<ul class="simple">
+<li><p>The replication method is <code class="docutils literal notranslate"><span class="pre">FULL_TABLE</span></code> (always treated as initial sync), <strong>or</strong></p></li>
+<li><p>The replication method is <code class="docutils literal notranslate"><span class="pre">INCREMENTAL</span></code> but no replication key value has been
+recorded yet, <strong>or</strong></p></li>
+<li><p>The replication method is <code class="docutils literal notranslate"><span class="pre">LOG_BASED</span></code> but no LSN, binlog position, GTID, or
+change stream token has been recorded yet.</p></li>
+</ul>
+<p>For <code class="docutils literal notranslate"><span class="pre">INCREMENTAL</span></code> and <code class="docutils literal notranslate"><span class="pre">LOG_BASED</span></code> tables, FastSync handles only the initial load.
+Once the initial sync completes, PipelineWise switches to the standard Singer path
+for ongoing incremental or log-based replication.</p>
+<p>When you run <a class="reference internal" href="../user_guide/cli.html#cli-fast-sync"><span class="std std-ref">fast_sync</span></a> explicitly, FullSync is used unconditionally for all
+supported tap-target combinations, regardless of bookmark state — unless a table has
+<code class="docutils literal notranslate"><span class="pre">sync_start_from</span></code> defined in its tap configuration (see <a class="reference internal" href="#defined-partial-sync"><span class="std std-ref">Defined PartialSync (sync_start_from)</span></a> below).</p>
+<p>The <strong>PartialSync</strong> component is also used when you run <a class="reference internal" href="../user_guide/cli.html#cli-partial-sync-table"><span class="std std-ref">partial_sync_table</span></a>
+explicitly.</p>
+</section>
+<section id="defined-partialsync-sync-start-from">
+<span id="defined-partial-sync"></span><h2>Defined PartialSync (<code class="docutils literal notranslate"><span class="pre">sync_start_from</span></code>)<a class="headerlink" href="#defined-partialsync-sync-start-from" title="Link to this heading"></a></h2>
+<p>You can configure individual tables to always use PartialSync instead of FullSync
+when <a class="reference internal" href="../user_guide/cli.html#cli-fast-sync"><span class="std std-ref">fast_sync</span></a> is run. This is done by adding a <code class="docutils literal notranslate"><span class="pre">sync_start_from</span></code> block
+to the table entry in your tap YAML configuration:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">tables</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;my_table&quot;</span>
+<span class="w">    </span><span class="nt">replication_method</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;LOG_BASED&quot;</span>
+<span class="w">    </span><span class="nt">sync_start_from</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">column</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;updated_at&quot;</span>
+<span class="w">      </span><span class="nt">static_value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;2024-01-01&quot;</span><span class="w">      </span><span class="c1"># or use dynamic_value instead</span>
+<span class="w">      </span><span class="nt">drop_target_table</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+</pre></div>
+</div>
+<p>When <code class="docutils literal notranslate"><span class="pre">fast_sync</span></code> encounters a table with <code class="docutils literal notranslate"><span class="pre">sync_start_from</span></code>, it routes that table
+through PartialSync automatically — applying a <code class="docutils literal notranslate"><span class="pre">WHERE</span> <span class="pre">column</span> <span class="pre">&gt;=</span> <span class="pre">value</span></code> filter during
+export and merging the result into the target rather than replacing it.</p>
+<p><strong>Configuration keys:</strong></p>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">column</span></code> <em>(required)</em></dt><dd><p>The column to use for the range filter (<code class="docutils literal notranslate"><span class="pre">WHERE</span> <span class="pre">column</span> <span class="pre">&gt;=</span> <span class="pre">value</span></code>).</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">static_value</span></code> <em>(one of static/dynamic required)</em></dt><dd><p>A fixed literal value that the sync always starts from.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">dynamic_value</span></code> <em>(one of static/dynamic required)</em></dt><dd><p>A <code class="docutils literal notranslate"><span class="pre">SELECT</span></code> query that returns a single row with a single column. The query is
+evaluated at sync time against the source database, allowing the start value to
+be computed dynamically (e.g. <code class="docutils literal notranslate"><span class="pre">SELECT</span> <span class="pre">MAX(updated_at)</span> <span class="pre">-</span> <span class="pre">INTERVAL</span> <span class="pre">'7</span> <span class="pre">days'</span> <span class="pre">FROM</span> <span class="pre">my_table</span></code>).</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">drop_target_table</span></code> <em>(optional, default: false)</em></dt><dd><p>When <code class="docutils literal notranslate"><span class="pre">true</span></code>, the target table is dropped and recreated before merging. This
+effectively converts the partial sync into a filtered full replacement.</p>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Exactly one of <code class="docutils literal notranslate"><span class="pre">static_value</span></code> or <code class="docutils literal notranslate"><span class="pre">dynamic_value</span></code> must be provided, not both.</p>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Defined PartialSync via <code class="docutils literal notranslate"><span class="pre">sync_start_from</span></code> is currently supported only for
+<a class="reference internal" href="../connectors/taps/mysql.html#tap-mysql"><span class="std std-ref">Tap MySQL</span></a> and <a class="reference internal" href="../connectors/taps/postgres.html#tap-postgres"><span class="std std-ref">Tap PostgreSQL</span></a> to <a class="reference internal" href="../connectors/targets/snowflake.html#target-snowflake"><span class="std std-ref">Target Snowflake</span></a>.</p>
+</div>
+<p>See the <a class="reference internal" href="../connectors/taps/mysql.html#tap-mysql"><span class="std std-ref">Tap MySQL</span></a> and <a class="reference internal" href="../connectors/taps/postgres.html#tap-postgres"><span class="std std-ref">Tap PostgreSQL</span></a> connector pages for full YAML examples.</p>
+</section>
 </section>
 
 

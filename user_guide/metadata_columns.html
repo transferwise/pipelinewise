@@ -22,8 +22,8 @@
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Schema Changes" href="schema_changes.html" />
-    <link rel="prev" title="Scheduling" href="scheduling.html" /> 
+    <link rel="next" title="Troubleshooting" href="troubleshooting.html" />
+    <link rel="prev" title="Transformations" href="transformations.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -55,23 +55,24 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../concept/singer.html">Singer.io</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../concept/replication_methods.html">Replication Methods</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../concept/fastsync.html">Fast Sync</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concept/fastsync.html">FastSync</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../concept/linux_pipes.html">Linux Pipes in PipelineWise</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Using PipelineWise</span></p>
 <ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="yaml_config.html">YAML configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="yaml_config.html">YAML Configuration</a></li>
 <li class="toctree-l1"><a class="reference internal" href="encrypting_passwords.html">Encrypting Passwords</a></li>
 <li class="toctree-l1"><a class="reference internal" href="cli.html">Command Line Interface</a></li>
 <li class="toctree-l1"><a class="reference internal" href="scheduling.html">Scheduling</a></li>
-<li class="toctree-l1"><a class="reference internal" href="scheduling.html#multi-server-cluster">Multi-Server Cluster</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Metadata Columns</a></li>
-<li class="toctree-l1"><a class="reference internal" href="schema_changes.html">Schema Changes</a></li>
-<li class="toctree-l1"><a class="reference internal" href="transformations.html">Transformations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="multi_server_cluster.html">Multi-Server Cluster</a></li>
 <li class="toctree-l1"><a class="reference internal" href="logging.html">Logging</a></li>
 <li class="toctree-l1"><a class="reference internal" href="alerts.html">Alerts</a></li>
 <li class="toctree-l1"><a class="reference internal" href="resync.html">Resync Tables</a></li>
 <li class="toctree-l1"><a class="reference internal" href="partial_sync.html">Different cases of partial resync</a></li>
+<li class="toctree-l1"><a class="reference internal" href="schema_changes.html">Schema Changes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="transformations.html">Transformations</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Metadata Columns</a></li>
+<li class="toctree-l1"><a class="reference internal" href="troubleshooting.html">Troubleshooting</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Connectors</span></p>
 <ul>
@@ -115,8 +116,10 @@
 <span id="id1"></span><h1>Metadata Columns<a class="headerlink" href="#metadata-columns" title="Link to this heading"></a></h1>
 <p>Metadata columns add extra row level information about data ingestion in target connectors.
 (i.e. when a row was read in source, when it was inserted or deleted in snowflake etc.)</p>
-<p>Metadata columns are created automatically by adding extra columns to the tables with a
-column prefix <code class="docutils literal notranslate"><span class="pre">_SDC_</span></code>:</p>
+<p>Metadata and delete handling are configured in each tap YAML file because different
+pipelines can load into the same target with different behavior. PipelineWise adds
+columns with the <code class="docutils literal notranslate"><span class="pre">_SDC_</span></code> prefix when <code class="docutils literal notranslate"><span class="pre">add_metadata_columns</span></code> or <code class="docutils literal notranslate"><span class="pre">hard_delete</span></code>
+is enabled:</p>
 <ul class="simple">
 <li><p><code class="docutils literal notranslate"><span class="pre">_SDC_EXTRACTED_AT</span></code>: Timestamp when the record was extracted from the source</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">_SDC_BATCHED_AT</span></code>: Timestamp when the record was batched to load into target</p></li>
@@ -157,20 +160,48 @@ at the end of the table:</p>
 </tr>
 </tbody>
 </table>
-<div class="admonition warning">
-<p class="admonition-title">Warning</p>
-<p>Optionally, you can turn off creating metadata columns by creating
-<code class="docutils literal notranslate"><span class="pre">add_metadata_columns:</span> <span class="pre">False</span></code> to the <a class="reference internal" href="../connectors/targets.html#targets-list"><span class="std std-ref">Targets (Destinations)</span></a> YAML config file.
-Please note, if adding metadata columns option is turned off then deleted rows
-in source do not get deleted in target.</p>
-<p>Please note that <strong>Hard Delete</strong> mode is enabled by default for every target connector,
-which means that every record that was deleted in source will be deleted in the replicated
-target database as well. Please also note that Only <a class="reference internal" href="../concept/replication_methods.html#log-based"><span class="std std-ref">Log Based</span></a> replication method
-detects delete row events.</p>
-<p>To turn off <strong>Hard Delete</strong> mode add <code class="docutils literal notranslate"><span class="pre">hard_delete:</span> <span class="pre">false</span></code> to the target <a class="reference internal" href="../connectors/targets.html#targets-list"><span class="std std-ref">Targets (Destinations)</span></a>
-YAML config file. In this case when a deleted row captured in source then
-<code class="docutils literal notranslate"><span class="pre">_SDC_DELETED_AT</span></code> column will only get flagged and not get deleted in the target.
-Please also note that Only <a class="reference internal" href="../concept/replication_methods.html#log-based"><span class="std std-ref">Log Based</span></a> replication method detects delete row events.</p>
+<p>The two settings combine as follows:</p>
+<table class="docutils align-default" id="id2">
+<caption><span class="caption-text">Tap metadata and delete settings</span><a class="headerlink" href="#id2" title="Link to this table"></a></caption>
+<colgroup>
+<col style="width: 24.0%" />
+<col style="width: 20.0%" />
+<col style="width: 56.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Configuration</p></th>
+<th class="head"><p>Metadata columns</p></th>
+<th class="head"><p>Behaviour</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">hard_delete:</span> <span class="pre">true</span></code> (default)</p></td>
+<td><p>Enabled automatically</p></td>
+<td><p>Physically deletes rows from the target when a source delete event arrives.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">hard_delete:</span> <span class="pre">false</span></code> and <code class="docutils literal notranslate"><span class="pre">add_metadata_columns:</span> <span class="pre">true</span></code></p></td>
+<td><p>Enabled</p></td>
+<td><p>Retains the row and records the deletion time in <code class="docutils literal notranslate"><span class="pre">_SDC_DELETED_AT</span></code>.</p></td>
+</tr>
+<tr class="row-even"><td><p>Both settings <code class="docutils literal notranslate"><span class="pre">false</span></code></p></td>
+<td><p>Disabled</p></td>
+<td><p>Retains the existing target row without marking it as deleted.</p></td>
+</tr>
+</tbody>
+</table>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Only <a class="reference internal" href="../concept/replication_methods.html#log-based"><span class="std std-ref">Log Based</span></a> replication detects source delete events. Incremental and
+full-table Singer runs do not emit individual delete events.</p>
+</div>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;mysql_orders&quot;</span>
+<span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;MySQL</span><span class="nv"> </span><span class="s">orders&quot;</span>
+<span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;tap-mysql&quot;</span>
+<span class="nt">add_metadata_columns</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="nt">hard_delete</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="nt">db_conn</span><span class="p">:</span>
+<span class="w">  </span><span class="c1"># ...</span>
+</pre></div>
 </div>
 </section>
 
@@ -178,8 +209,8 @@ Please also note that Only <a class="reference internal" href="../concept/replic
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="scheduling.html" class="btn btn-neutral float-left" title="Scheduling" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="schema_changes.html" class="btn btn-neutral float-right" title="Schema Changes" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="transformations.html" class="btn btn-neutral float-left" title="Transformations" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="troubleshooting.html" class="btn btn-neutral float-right" title="Troubleshooting" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

@@ -22,7 +22,7 @@
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Taps (Data Sources)" href="../connectors/taps.html" />
+    <link rel="next" title="Schema Changes" href="schema_changes.html" />
     <link rel="prev" title="Resync Tables" href="resync.html" /> 
 </head>
 
@@ -55,23 +55,24 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../concept/singer.html">Singer.io</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../concept/replication_methods.html">Replication Methods</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../concept/fastsync.html">Fast Sync</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concept/fastsync.html">FastSync</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../concept/linux_pipes.html">Linux Pipes in PipelineWise</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Using PipelineWise</span></p>
 <ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="yaml_config.html">YAML configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="yaml_config.html">YAML Configuration</a></li>
 <li class="toctree-l1"><a class="reference internal" href="encrypting_passwords.html">Encrypting Passwords</a></li>
 <li class="toctree-l1"><a class="reference internal" href="cli.html">Command Line Interface</a></li>
 <li class="toctree-l1"><a class="reference internal" href="scheduling.html">Scheduling</a></li>
-<li class="toctree-l1"><a class="reference internal" href="scheduling.html#multi-server-cluster">Multi-Server Cluster</a></li>
-<li class="toctree-l1"><a class="reference internal" href="metadata_columns.html">Metadata Columns</a></li>
-<li class="toctree-l1"><a class="reference internal" href="schema_changes.html">Schema Changes</a></li>
-<li class="toctree-l1"><a class="reference internal" href="transformations.html">Transformations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="multi_server_cluster.html">Multi-Server Cluster</a></li>
 <li class="toctree-l1"><a class="reference internal" href="logging.html">Logging</a></li>
 <li class="toctree-l1"><a class="reference internal" href="alerts.html">Alerts</a></li>
 <li class="toctree-l1"><a class="reference internal" href="resync.html">Resync Tables</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Different cases of partial resync</a></li>
+<li class="toctree-l1"><a class="reference internal" href="schema_changes.html">Schema Changes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="transformations.html">Transformations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="metadata_columns.html">Metadata Columns</a></li>
+<li class="toctree-l1"><a class="reference internal" href="troubleshooting.html">Troubleshooting</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Connectors</span></p>
 <ul>
@@ -113,40 +114,55 @@
              
   <section id="different-cases-of-partial-resync">
 <span id="partial-sync-cases"></span><h1>Different cases of partial resync<a class="headerlink" href="#different-cases-of-partial-resync" title="Link to this heading"></a></h1>
+<p>Partial sync resyncs a specific range of rows from a source table into the target.
+Data is exported from the source into a temporary staging area, loaded into a temp
+table on the target, and then merged with the existing target table. The behaviour
+varies depending on column differences and the <code class="docutils literal notranslate"><span class="pre">hard_delete</span></code> setting.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Partial sync uses the <strong>PartialSync</strong> component of <a class="reference internal" href="../concept/fastsync.html#fast-sync-main"><span class="std std-ref">FastSync</span></a>.
+It shares the same native database connectors as FullSync but applies a
+WHERE clause during export and merges (rather than replaces) the target data.</p>
+</div>
 <ol class="arabic simple">
 <li><p><strong>Normal</strong></p></li>
 </ol>
 <img alt="../_images/partial_sync_case_1.png" src="../_images/partial_sync_case_1.png" />
-<p>This is the normal case which all source columns exist in the target.
-after exporting data from the source into S3, a temp table will be created on Snowflake and then it will be merged
-with the target table.</p>
+<p>All source columns exist in the target. The exported rows are merged into the target
+table, updating existing rows and inserting new ones. This is the standard case.</p>
 <ol class="arabic simple" start="2">
 <li><p><strong>Some columns are deleted from the target</strong></p></li>
 </ol>
 <img alt="../_images/partial_sync_case_2.png" src="../_images/partial_sync_case_2.png" />
-<p><code class="docutils literal notranslate"><span class="pre">Col2</span></code> is deleted from the target. after merging the temp and target tables only rows 2 and 3 in the target will have
-value.</p>
+<p>A column (e.g. <code class="docutils literal notranslate"><span class="pre">Col2</span></code>) has been removed from the target table. After merging,
+only the rows within the synced range will have values for that column — existing
+rows outside the range retain their original data.</p>
 <ol class="arabic simple" start="3">
 <li><p><strong>Some columns are deleted from the source</strong></p></li>
 </ol>
 <img alt="../_images/partial_sync_case_3.png" src="../_images/partial_sync_case_3.png" />
-<p>In this example, <code class="docutils literal notranslate"><span class="pre">Col2</span></code> is removed from the source table and it causes the values for this column not be updated in
-the synced table and row <code class="docutils literal notranslate"><span class="pre">3</span></code> has <code class="docutils literal notranslate"><span class="pre">null</span></code> value.</p>
+<p>A column (e.g. <code class="docutils literal notranslate"><span class="pre">Col2</span></code>) has been removed from the source table. Since the column
+no longer exists in the exported data, merged rows will have <code class="docutils literal notranslate"><span class="pre">NULL</span></code> for that column
+in the target. Rows outside the synced range are not affected.</p>
 <ol class="arabic simple" start="4">
 <li><p><strong>Hard delete is disabled (soft delete)</strong></p></li>
 </ol>
 <img alt="../_images/partial_sync_case_4.png" src="../_images/partial_sync_case_4.png" />
-<p>If <code class="docutils literal notranslate"><span class="pre">hard_delete</span></code> setting  is <code class="docutils literal notranslate"><span class="pre">false</span></code> the records which are deleted from the source, won’t be deleted from the target. they
-just will have a time stamp in meta column.</p>
+<p>When <code class="docutils literal notranslate"><span class="pre">hard_delete</span></code> is <code class="docutils literal notranslate"><span class="pre">false</span></code>, rows that have been deleted from the source are
+<strong>not</strong> removed from the target. Instead, they receive a timestamp in the
+<code class="docutils literal notranslate"><span class="pre">_SDC_DELETED_AT</span></code> metadata column indicating when the delete was detected.</p>
 <ol class="arabic simple" start="5">
 <li><p><strong>Hard delete is enabled</strong></p></li>
 </ol>
 <img alt="../_images/partial_sync_case_5.png" src="../_images/partial_sync_case_5.png" />
-<p>If <code class="docutils literal notranslate"><span class="pre">hard_delete</span></code> setting  is <code class="docutils literal notranslate"><span class="pre">true</span></code> the records which are deleted from the source, will be deleted from the target.</p>
+<p>When <code class="docutils literal notranslate"><span class="pre">hard_delete</span></code> is <code class="docutils literal notranslate"><span class="pre">true</span></code>, rows that have been deleted from the source within
+the synced range are physically removed from the target table.</p>
 <ol class="arabic simple" start="6">
 <li><p><strong>Combination of all cases</strong></p></li>
 </ol>
 <img alt="../_images/partial_sync_case_all.png" src="../_images/partial_sync_case_all.png" />
+<p>This diagram shows the combined effect of column differences and delete handling
+when all of the above scenarios overlap.</p>
 </section>
 
 
@@ -154,7 +170,7 @@ just will have a time stamp in meta column.</p>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="resync.html" class="btn btn-neutral float-left" title="Resync Tables" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="../connectors/taps.html" class="btn btn-neutral float-right" title="Taps (Data Sources)" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="schema_changes.html" class="btn btn-neutral float-right" title="Schema Changes" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

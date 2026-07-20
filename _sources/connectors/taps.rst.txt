@@ -120,6 +120,20 @@ PipelineWise can replicate data from the following data sources:
 
         :ref:`tap-mixpanel`
 
+    .. container:: tile
+
+        .. container:: img-hover-zoom
+
+          .. image:: ../img/snowflake-logo.png
+             :target: taps/snowflake.html
+
+        :ref:`tap-snowflake`
+
+Additional packaged data sources
+''''''''''''''''''''''''''''''''
+
+PipelineWise also packages :ref:`tap-salesforce` and :ref:`tap-twilio`.
+
 
 
 Configuring taps
@@ -138,3 +152,5 @@ Configuring taps
    taps/github
    taps/slack
    taps/mixpanel
+   taps/salesforce
+   taps/twilio

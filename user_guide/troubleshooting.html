@@ -1,0 +1,451 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Troubleshooting &mdash; PipelineWise  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/custom.css?v=1c6dfede" />
+
+  
+    <link rel="shortcut icon" href="../_static/pipelinewise.png"/>
+    <link rel="canonical" href="https://docs.ansible.com/ansible/latest/user_guide/troubleshooting.html"/>
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Taps (Data Sources)" href="../connectors/taps.html" />
+    <link rel="prev" title="Metadata Columns" href="metadata_columns.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            PipelineWise
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Installation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../installation_guide/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../installation_guide/creating_pipelines.html">Creating Pipelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../installation_guide/running_pipelines.html">Running Pipelines</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Concept</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../concept/singer.html">Singer.io</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concept/replication_methods.html">Replication Methods</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concept/fastsync.html">FastSync</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concept/linux_pipes.html">Linux Pipes in PipelineWise</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Using PipelineWise</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="yaml_config.html">YAML Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="encrypting_passwords.html">Encrypting Passwords</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cli.html">Command Line Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="scheduling.html">Scheduling</a></li>
+<li class="toctree-l1"><a class="reference internal" href="multi_server_cluster.html">Multi-Server Cluster</a></li>
+<li class="toctree-l1"><a class="reference internal" href="logging.html">Logging</a></li>
+<li class="toctree-l1"><a class="reference internal" href="alerts.html">Alerts</a></li>
+<li class="toctree-l1"><a class="reference internal" href="resync.html">Resync Tables</a></li>
+<li class="toctree-l1"><a class="reference internal" href="partial_sync.html">Different cases of partial resync</a></li>
+<li class="toctree-l1"><a class="reference internal" href="schema_changes.html">Schema Changes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="transformations.html">Transformations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="metadata_columns.html">Metadata Columns</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Troubleshooting</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#replication-tips">Replication Tips</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mariadb-mysql-errors">MariaDB / MySQL Errors</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#postgresql-errors">PostgreSQL Errors</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#fastsync-errors">FastSync Errors</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#logging-and-diagnostics">Logging and Diagnostics</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Connectors</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../connectors/taps.html">Taps (Data Sources)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../connectors/taps.html#configuring-taps">Configuring taps</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../connectors/targets.html">Targets (Destinations)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../connectors/targets.html#configuring-the-targets">Configuring the targets</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Project</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../project/contribution.html">Contribution</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../project/about.html">Project</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../project/licenses.html">Licenses</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">PipelineWise</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Troubleshooting</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/user_guide/troubleshooting.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="troubleshooting">
+<span id="id1"></span><h1>Troubleshooting<a class="headerlink" href="#troubleshooting" title="Link to this heading"></a></h1>
+<p>This page collects common issues and diagnostic tips for PipelineWise pipelines.
+If you run into a problem not listed here, check the <a class="reference internal" href="logging.html#logging"><span class="std std-ref">Logging</span></a> output and
+the <a class="reference internal" href="alerts.html#alerts"><span class="std std-ref">Alerts</span></a> configuration for more context.</p>
+<section id="replication-tips">
+<h2>Replication Tips<a class="headerlink" href="#replication-tips" title="Link to this heading"></a></h2>
+<p>See <a class="reference internal" href="../concept/replication_methods.html#replication-methods"><span class="std std-ref">Replication Methods</span></a> for a detailed explanation of each replication method.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>MySQL, MariaDB, and PostgreSQL tables using <code class="docutils literal notranslate"><span class="pre">INCREMENTAL</span></code> or <code class="docutils literal notranslate"><span class="pre">LOG_BASED</span></code>
+replication must have a primary key by default. <code class="docutils literal notranslate"><span class="pre">FULL_TABLE</span></code> replication does
+not have this requirement. PipelineWise validates this during import and reports
+the affected stream before a run starts.</p>
+</div>
+<p><strong>When to resync</strong></p>
+<ul class="simple">
+<li><p>For <strong>INCREMENTAL</strong> replication you almost never need to resync, unless there
+was data corruption or a large number of old rows were updated that need to
+be replicated to the target.</p></li>
+<li><p>For <strong>LOG_BASED</strong> MariaDB/MySQL, you need to resync if the source binlog is no
+longer available.</p></li>
+<li><p>For <strong>LOG_BASED</strong> PostgreSQL, you need to resync if the replication slot is no
+longer available.</p></li>
+</ul>
+<p><strong>INCREMENTAL method and missing updates</strong></p>
+<p>When using incremental replication, PipelineWise will miss new or updated records if
+the <code class="docutils literal notranslate"><span class="pre">replication_key</span></code> column is being back-filled (i.e. older rows are receiving
+new values for the replication key). Consider using <code class="docutils literal notranslate"><span class="pre">LOG_BASED</span></code> replication if
+you need to capture all changes.</p>
+<p><strong>Using replica_host for large table resyncs (1 TB+)</strong></p>
+<p>Both MySQL and PostgreSQL taps support setting a <code class="docutils literal notranslate"><span class="pre">replica_host</span></code> key. When set,
+the initial FastSync will be done on the replica, reducing pressure on the primary
+database. Once the resync has completed, the tap will pick up the replication slot
+it created on the primary to continue replication.</p>
+<p>You can use this effectively with a partial sync (<code class="docutils literal notranslate"><span class="pre">sync_start_from</span></code>) to resync
+large tables and/or switch them to log-based replication.</p>
+<p><strong>Changes to transformations</strong></p>
+<p>Changes to transformations will only be applied to newly extracted data. If you need
+the transformation applied to existing data in the target, you will need to resync
+the affected tables.</p>
+<p><strong>Resync table size limit</strong></p>
+<p>For MySQL and PostgreSQL taps, <code class="docutils literal notranslate"><span class="pre">fast_sync</span></code> checks the size of non-partial-sync
+tables and will refuse to proceed if any table exceeds the configured
+<code class="docutils literal notranslate"><span class="pre">allowed_resync_max_size</span></code> limit (see <a class="reference internal" href="resync.html#resync"><span class="std std-ref">Resync Tables</span></a>). Use <code class="docutils literal notranslate"><span class="pre">fast_sync</span> <span class="pre">--force</span></code>
+to override this check.</p>
+</section>
+<section id="mariadb-mysql-errors">
+<h2>MariaDB / MySQL Errors<a class="headerlink" href="#mariadb-mysql-errors" title="Link to this heading"></a></h2>
+<p><strong>Lost connection to MySQL server (Errno 104, Connection reset by peer)</strong></p>
+<p><em>Log message:</em></p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>pymysql.err.OperationalError: (2013, &#39;Lost connection to MySQL server
+during query ([Errno 104] Connection reset by peer)&#39;)
+</pre></div>
+</div>
+<p><em>Why it happens:</em>
+Server session defaults are not conducive to PipelineWise type workloads.</p>
+<p><em>How to fix:</em>
+Add the following <code class="docutils literal notranslate"><span class="pre">session_sqls</span></code> block to your <code class="docutils literal notranslate"><span class="pre">tap.yml</span></code>:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">dbname</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;your_database&quot;</span>
+<span class="nt">session_sqls</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">SET SESSION max_statement_time=0</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">SET SESSION net_write_timeout=3600</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">SET SESSION time_zone=&quot;+0:00&quot;</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">SET SESSION wait_timeout=28800</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">SET SESSION net_read_timeout=3600</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">SET SESSION innodb_lock_wait_timeout=3600</span>
+</pre></div>
+</div>
+<p><strong>Unknown encoding: utf8mb3</strong></p>
+<p><em>How to fix:</em>
+The tap cannot decode <code class="docutils literal notranslate"><span class="pre">utf8mb3</span></code> data. Identify the affected table or column, then
+work with your database administrator to test and convert its character set to a
+supported encoding such as <code class="docutils literal notranslate"><span class="pre">utf8mb4</span></code>. A character-set conversion changes source
+data and should be tested before it is applied in production.</p>
+<p><strong>Bogus data in log event</strong></p>
+<p><em>Why it happens:</em>
+The source server (OS or MySQL service) restarted unexpectedly, corrupting the
+current binlog position stored in PipelineWise state.</p>
+<p><em>How to fix:</em>
+Run a full resync with
+<code class="docutils literal notranslate"><span class="pre">pipelinewise</span> <span class="pre">fast_sync</span> <span class="pre">--tap</span> <span class="pre">&lt;tap_id&gt;</span> <span class="pre">--target</span> <span class="pre">&lt;target_id&gt;</span></code>. See <a class="reference internal" href="resync.html#resync"><span class="std std-ref">Resync Tables</span></a>
+for the impact and available table-selection options.</p>
+<p><strong>Log event exceeded max_allowed_packet</strong></p>
+<p><em>Log message:</em></p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>log event entry exceeded max_allowed_packet; Increase max_allowed_packet on master
+</pre></div>
+</div>
+<p><em>How to fix:</em>
+Increase <code class="docutils literal notranslate"><span class="pre">max_allowed_packet</span></code> on the source server. If the problem persists after
+increasing the value, run a FastSync to rebuild the affected tables.</p>
+<p><strong>Missing binlog</strong></p>
+<p><em>Log message:</em></p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>Exception: Unable to replicate binlog stream because the following
+binary log(s) no longer exist: mysql-bin.000119
+</pre></div>
+</div>
+<p><em>Why it happens:</em>
+The binary log files have been purged from the source server due to the binlog
+retention period.</p>
+<p><em>How to fix:</em></p>
+<ol class="arabic">
+<li><p>Resync the affected tables. If the error recurs, the retention period may be
+too low. You can check the current binlog files by running <code class="docutils literal notranslate"><span class="pre">SHOW</span> <span class="pre">BINARY</span> <span class="pre">LOGS</span></code>
+on the source.</p></li>
+<li><p>Ask your database administrator to increase the binlog retention period. You can
+check the current setting with:</p>
+<div class="highlight-sql notranslate"><div class="highlight"><pre><span></span><span class="k">SHOW</span><span class="w"> </span><span class="k">GLOBAL</span><span class="w"> </span><span class="n">VARIABLES</span><span class="w"> </span><span class="k">LIKE</span><span class="w"> </span><span class="s1">&#39;expire_logs_days&#39;</span><span class="p">;</span>
+</pre></div>
+</div>
+</li>
+<li><p>As a last resort, change the replication method from <code class="docutils literal notranslate"><span class="pre">LOG_BASED</span></code> to another method.</p></li>
+</ol>
+<p><strong>Changing the binlog position in state.json</strong></p>
+<p>When you need to manually update the binlog file name in a tap’s <code class="docutils literal notranslate"><span class="pre">state.json</span></code>
+(for example after a server failover), stop the tap and back up the state first.
+Never edit a state file while its tap is running.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>pipelinewise<span class="w"> </span>stop_tap<span class="w"> </span>--tap<span class="w"> </span>&lt;tap_id&gt;<span class="w"> </span>--target<span class="w"> </span>&lt;target_id&gt;
+$<span class="w"> </span>cp<span class="w"> </span>state.json<span class="w"> </span>state.json.backup
+</pre></div>
+</div>
+<p>The following command previews a binlog filename change without modifying the file:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>sed<span class="w"> </span>-E<span class="w"> </span><span class="s1">&#39;s/(mysql-bin-changelog\.)[0-9]+/\1#####/g&#39;</span><span class="w"> </span>state.json
+</pre></div>
+</div>
+<p>Replace <code class="docutils literal notranslate"><span class="pre">#####</span></code> with the new binlog number. <code class="docutils literal notranslate"><span class="pre">-E</span></code> works with BSD/macOS and
+modern GNU <code class="docutils literal notranslate"><span class="pre">sed</span></code>. To update both the filename and <code class="docutils literal notranslate"><span class="pre">log_pos</span></code>, write the result
+to a new file rather than editing the state in place:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>sed<span class="w"> </span>-E<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-e<span class="w"> </span><span class="s1">&#39;s/(mysql-bin-changelog\.)[0-9]+/\1#####/g&#39;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-e<span class="w"> </span><span class="s1">&#39;s|(&quot;log_pos&quot;: )[0-9]+|\1#####|g&#39;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>state.json<span class="w"> </span>&gt;<span class="w"> </span>state.json.new
+</pre></div>
+</div>
+<p>Replace each <code class="docutils literal notranslate"><span class="pre">#####</span></code> with the intended value. Validate the new JSON before
+replacing the state file:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>python<span class="w"> </span>-m<span class="w"> </span>json.tool<span class="w"> </span>state.json.new<span class="w"> </span>&gt;<span class="w"> </span>/dev/null
+$<span class="w"> </span>mv<span class="w"> </span>state.json.new<span class="w"> </span>state.json
+</pre></div>
+</div>
+<p>Keep <code class="docutils literal notranslate"><span class="pre">state.json.backup</span></code> until the next run succeeds. A wrong binlog filename or
+position can skip or duplicate data; use a full resync instead when the correct
+position is uncertain.</p>
+</section>
+<section id="postgresql-errors">
+<h2>PostgreSQL Errors<a class="headerlink" href="#postgresql-errors" title="Link to this heading"></a></h2>
+<p><strong>requires wal_level &gt;= logical</strong></p>
+<p><em>Log message:</em></p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>{SCHEMA_NAME}.{TABLE_NAME}:logical decoding requires wal_level &gt;= logical
+</pre></div>
+</div>
+<p><em>Why it happens:</em>
+The PostgreSQL source database does not have logical replication enabled.</p>
+<p><em>How to fix:</em>
+Set <code class="docutils literal notranslate"><span class="pre">wal_level</span></code> to <code class="docutils literal notranslate"><span class="pre">logical</span></code> on the source database. Note that changing the WAL
+level requires restarting the database instance. If the tap owner cannot tolerate a
+restart, consider changing the replication method to something other than <code class="docutils literal notranslate"><span class="pre">LOG_BASED</span></code>.</p>
+<p><strong>PGRES_COPY_BOTH and no message from the libpq</strong></p>
+<p><em>Log message:</em></p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>logger_name=tap_postgres log_level=CRITICAL message=error with status
+PGRES_COPY_BOTH and no message from the libpq
+</pre></div>
+</div>
+<p><em>Why it happens:</em>
+PostgreSQL kills the replication connection because it thinks the client has died.
+This usually happens when it takes a long time to load data into the target.</p>
+<p><em>How to fix:</em></p>
+<ul>
+<li><p><strong>Option 1: Upgrade to PostgreSQL 12 or above.</strong> PG12 and above supports session-level
+<code class="docutils literal notranslate"><span class="pre">wal_sender_timeout</span></code> and PipelineWise takes advantage of it.</p></li>
+<li><p><strong>Option 2: Increase the ``wal_sender_timeout`` value on the source.</strong>
+A <code class="docutils literal notranslate"><span class="pre">wal_sender_timeout</span></code> value of less than 5 minutes will often result in this error.
+Check the current value with:</p>
+<div class="highlight-sql notranslate"><div class="highlight"><pre><span></span><span class="k">SELECT</span><span class="w"> </span><span class="n">name</span><span class="p">,</span><span class="w"> </span><span class="n">setting</span><span class="p">,</span><span class="w"> </span><span class="n">unit</span><span class="w"> </span><span class="k">FROM</span><span class="w"> </span><span class="n">pg_settings</span><span class="w"> </span><span class="k">WHERE</span><span class="w"> </span><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">&#39;wal_sender_timeout&#39;</span><span class="p">;</span>
+</pre></div>
+</div>
+</li>
+<li><p><strong>Option 3: Enable or increase the tap ``stream_buffer_size``.</strong>
+The <code class="docutils literal notranslate"><span class="pre">stream_buffer_size</span></code> is a buffer allowing synchronous reading and loading of data.
+Note that a small <code class="docutils literal notranslate"><span class="pre">wal_sender_timeout</span></code> will cause even a very large <code class="docutils literal notranslate"><span class="pre">stream_buffer_size</span></code>
+to run out of space, so fix <code class="docutils literal notranslate"><span class="pre">wal_sender_timeout</span></code> first.</p></li>
+</ul>
+<p><strong>Canceling statement due to conflict with recovery</strong></p>
+<p><em>Log message:</em></p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>logger_name=tap_postgres log_level=CRITICAL message=terminating connection due to
+conflict with recovery
+DETAIL: User query might have needed to see row versions that must be removed.
+HINT: In a moment you should be able to reconnect to the database and repeat your command.
+SSL connection has been closed unexpectedly
+</pre></div>
+</div>
+<p><em>Why it happens:</em>
+The replica has been set up with restrictive replay settings. You can check the current
+values with:</p>
+<div class="highlight-sql notranslate"><div class="highlight"><pre><span></span><span class="k">SELECT</span><span class="w"> </span><span class="n">name</span><span class="p">,</span><span class="w"> </span><span class="n">setting</span><span class="p">,</span><span class="w"> </span><span class="n">unit</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">pg_settings</span>
+<span class="k">WHERE</span><span class="w"> </span><span class="n">name</span><span class="w"> </span><span class="k">IN</span><span class="w"> </span><span class="p">(</span><span class="s1">&#39;max_standby_archive_delay&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;max_standby_streaming_delay&#39;</span><span class="p">);</span>
+</pre></div>
+</div>
+<p><em>How to fix:</em>
+Increase <code class="docutils literal notranslate"><span class="pre">max_standby_streaming_delay</span></code> on the replica.</p>
+<p><strong>Connection already closed</strong></p>
+<p><em>Log message:</em></p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>logger_name=tap_postgres log_level=CRITICAL message=connection already closed
+psycopg2.OperationalError: SSL connection has been closed unexpectedly
+</pre></div>
+</div>
+<p><em>Why it happens:</em>
+The source server is likely configured to kill idle connections.</p>
+<p><em>How to fix:</em>
+Review the idle connection timeout settings on the source PostgreSQL server.</p>
+<p><strong>recovery is in progress</strong></p>
+<p><em>Log message:</em></p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>logger_name=tap_postgres log_level=CRITICAL message=recovery is in progress
+HINT: WAL control functions cannot be executed during recovery.
+</pre></div>
+</div>
+<p><em>Why it happens:</em>
+The tap is configured with a mix of incremental and log-based replication methods,
+and the connection points to a replica. Log-based replication cannot run against a
+replica.</p>
+<p><em>How to fix:</em>
+Point the tap at the primary server, or change the log-based tables to use a different
+replication method.</p>
+<p><strong>Unable to find replication slot</strong></p>
+<p><em>How to fix:</em>
+Run <code class="docutils literal notranslate"><span class="pre">pipelinewise</span> <span class="pre">fast_sync</span> <span class="pre">--tap</span> <span class="pre">&lt;tap_id&gt;</span> <span class="pre">--target</span> <span class="pre">&lt;target_id&gt;</span></code> to resync the
+tap and recreate the replication slot. See <a class="reference internal" href="resync.html#resync"><span class="std std-ref">Resync Tables</span></a> before proceeding.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Triggering a resync of a PostgreSQL tap using <code class="docutils literal notranslate"><span class="pre">fast_sync</span></code> will drop the
+replication slot.</p>
+</div>
+</section>
+<section id="fastsync-errors">
+<h2>FastSync Errors<a class="headerlink" href="#fastsync-errors" title="Link to this heading"></a></h2>
+<p><strong>Table not found</strong></p>
+<p><em>Log message:</em></p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>CRITICAL: {SCHEMA_NAME}.TABLE_NAME table not found.
+</pre></div>
+</div>
+<p><em>Why it happens:</em>
+FastSync cannot find the table in the source database. Common causes:</p>
+<ol class="arabic simple">
+<li><p>Wrong <code class="docutils literal notranslate"><span class="pre">source_schema</span></code> name in the tap definition.</p></li>
+<li><p>The table does not exist in the source database.</p></li>
+<li><p>The replication user does not have <code class="docutils literal notranslate"><span class="pre">SELECT</span></code> privilege on the table.</p></li>
+</ol>
+<p><em>How to fix:</em></p>
+<ol class="arabic">
+<li><p>Check if the given source schema exists and is correct.</p></li>
+<li><p>Verify that the table exists in the source. If it does not exist, remove
+it from the tap YAML file.</p></li>
+<li><p>Verify user privileges by running:</p>
+<div class="highlight-sql notranslate"><div class="highlight"><pre><span></span><span class="k">SELECT</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="k">FROM</span><span class="w"> </span><span class="n">information_schema</span><span class="p">.</span><span class="n">columns</span>
+<span class="k">WHERE</span><span class="w"> </span><span class="n">table_schema</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">&#39;{SCHEMA_NAME}&#39;</span><span class="w"> </span><span class="k">AND</span><span class="w"> </span><span class="k">table_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">&#39;{TABLE_NAME}&#39;</span><span class="p">;</span>
+</pre></div>
+</div>
+<p>If this returns no results, the replication user lacks <code class="docutils literal notranslate"><span class="pre">SELECT</span></code> privilege.</p>
+</li>
+</ol>
+<p><strong>Failure to import tap (0 tables discovered)</strong></p>
+<p><em>Log message:</em></p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>CRITICAL 0 tables were discovered across the entire cluster
+</pre></div>
+</div>
+<p><em>Why it happens:</em></p>
+<ol class="arabic simple">
+<li><p>The source database does not exist.</p></li>
+<li><p>The replication user does not have enough privileges to <code class="docutils literal notranslate"><span class="pre">SELECT</span></code>.</p></li>
+</ol>
+<p><em>How to fix:</em></p>
+<ol class="arabic simple">
+<li><p>Verify that the source database exists and the tap configuration points to
+the correct host and database name.</p></li>
+<li><p>Test that the replication user can run a <code class="docutils literal notranslate"><span class="pre">SELECT</span></code> query on one of the tables
+in the source database.</p></li>
+</ol>
+</section>
+<section id="logging-and-diagnostics">
+<h2>Logging and Diagnostics<a class="headerlink" href="#logging-and-diagnostics" title="Link to this heading"></a></h2>
+<p>Use <code class="docutils literal notranslate"><span class="pre">pipelinewise</span> <span class="pre">status</span></code> to get an overview of all configured pipelines and
+their last run status. Use <code class="docutils literal notranslate"><span class="pre">pipelinewise</span> <span class="pre">test_tap_connection</span></code> to verify
+connectivity to a source before running a full sync.</p>
+<p>Log files are written to <code class="docutils literal notranslate"><span class="pre">~/.pipelinewise/&lt;target_id&gt;/&lt;tap_id&gt;/log/</span></code> with a
+<code class="docutils literal notranslate"><span class="pre">.success</span></code> or <code class="docutils literal notranslate"><span class="pre">.failed</span></code> suffix indicating the outcome of each run.
+See <a class="reference internal" href="logging.html#logging"><span class="std std-ref">Logging</span></a> for details.</p>
+<p>To follow the progress of a running sync:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>tail<span class="w"> </span>-f<span class="w"> </span>~/.pipelinewise/&lt;target_id&gt;/&lt;tap_id&gt;/log/*running
+</pre></div>
+</div>
+<p>You can also check the temporary files being written during a sync:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>ls<span class="w"> </span>-lah<span class="w"> </span>~/.pipelinewise/tmp/*&lt;tap_id&gt;*
+</pre></div>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="metadata_columns.html" class="btn btn-neutral float-left" title="Metadata Columns" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../connectors/taps.html" class="btn btn-neutral float-right" title="Taps (Data Sources)" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Wise Ltd..</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

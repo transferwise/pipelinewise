@@ -55,23 +55,24 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../concept/singer.html">Singer.io</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../concept/replication_methods.html">Replication Methods</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../concept/fastsync.html">Fast Sync</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../concept/fastsync.html">FastSync</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../concept/linux_pipes.html">Linux Pipes in PipelineWise</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Using PipelineWise</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/yaml_config.html">YAML configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/yaml_config.html">YAML Configuration</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/encrypting_passwords.html">Encrypting Passwords</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/cli.html">Command Line Interface</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/scheduling.html">Scheduling</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/scheduling.html#multi-server-cluster">Multi-Server Cluster</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/metadata_columns.html">Metadata Columns</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/schema_changes.html">Schema Changes</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/transformations.html">Transformations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/multi_server_cluster.html">Multi-Server Cluster</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/logging.html">Logging</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/alerts.html">Alerts</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/resync.html">Resync Tables</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/partial_sync.html">Different cases of partial resync</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/schema_changes.html">Schema Changes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/transformations.html">Transformations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/metadata_columns.html">Metadata Columns</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/troubleshooting.html">Troubleshooting</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Connectors</span></p>
 <ul class="current">
@@ -95,6 +96,8 @@
 <li class="toctree-l2"><a class="reference internal" href="github.html">Tap Github</a></li>
 <li class="toctree-l2"><a class="reference internal" href="slack.html">Tap Slack</a></li>
 <li class="toctree-l2"><a class="reference internal" href="mixpanel.html">Tap Mixpanel</a></li>
+<li class="toctree-l2"><a class="reference internal" href="salesforce.html">Tap Salesforce</a></li>
+<li class="toctree-l2"><a class="reference internal" href="twilio.html">Tap Twilio</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../targets.html">Targets (Destinations)</a></li>
@@ -192,83 +195,73 @@
 A sample YAML for MongoDB replication can be generated into a project directory by
 following the steps in the <a class="reference internal" href="../../installation_guide/creating_pipelines.html#generating-pipelines"><span class="std std-ref">Generating Sample Pipelines</span></a> section.</p>
 <p>Example YAML for <code class="docutils literal notranslate"><span class="pre">tap-mongodb</span></code>:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="w">    </span>---
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nn">---</span>
+<span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;tap_mongo&quot;</span><span class="w">                    </span><span class="c1"># Unique identifier of the tap</span>
+<span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;MongoDB</span><span class="nv"> </span><span class="s">tap&quot;</span><span class="w">                 </span><span class="c1"># Human-readable name of the tap</span>
+<span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;tap-mongodb&quot;</span><span class="w">                 </span><span class="c1"># Connector type; do not change</span>
+<span class="nt">owner</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;foo@bar.com&quot;</span><span class="w">                </span><span class="c1"># Data owner to contact</span>
+<span class="c1">#send_alert: false                   # Optional: Disable configured alerts for this tap</span>
+<span class="c1">#slack_alert_channel: &quot;#tap-channel&quot; # Optional: Send a copy of alerts to this Slack channel</span>
 
-<span class="w">    </span><span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="w">    </span><span class="c1"># General Properties</span>
-<span class="w">    </span><span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="w">    </span>id:<span class="w"> </span><span class="s2">&quot;tap_mongo&quot;</span>
-<span class="w">    </span>name:<span class="w"> </span><span class="s2">&quot;MongoDB tap&quot;</span>
-<span class="w">    </span>type:<span class="w"> </span><span class="s2">&quot;tap-mongodb&quot;</span>
-<span class="w">    </span>owner:<span class="w"> </span><span class="s2">&quot;foo@bar.com&quot;</span>
-<span class="w">    </span><span class="c1">#send_alert: False                     # Optional: Disable all configured alerts on this tap</span>
-<span class="c1">#slack_alert_channel: &quot;#tap-channel&quot;   # Optional: Sending a copy of specific tap alerts to this slack channel</span>
+<span class="nt">db_conn</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">host</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;mongodb_host1,mongodb_host2,mongodb_host3&quot;</span><span class="w"> </span><span class="c1"># Comma-separated MongoDB hosts</span>
+<span class="w">  </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">27017</span><span class="w">                       </span><span class="c1"># MongoDB port</span>
+<span class="w">  </span><span class="nt">srv</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;false&quot;</span><span class="w">                       </span><span class="c1"># Use &quot;true&quot; for MongoDB Atlas; port is then ignored</span>
+<span class="w">  </span><span class="nt">user</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;PipelineWiseUser&quot;</span><span class="w">           </span><span class="c1"># User with permission to read the source collections</span>
+<span class="w">  </span><span class="nt">password</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;PASSWORD&gt;&quot;</span><span class="w">             </span><span class="c1"># Plain string or Vault encrypted</span>
+<span class="w">  </span><span class="nt">auth_database</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;admin&quot;</span><span class="w">              </span><span class="c1"># Database against which the user authenticates</span>
+<span class="w">  </span><span class="nt">dbname</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;my_db&quot;</span><span class="w">                     </span><span class="c1"># MongoDB database to replicate</span>
+<span class="w">  </span><span class="nt">replica_set</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;my_replica_set&quot;</span><span class="w">       </span><span class="c1"># Optional: Replica set name; default is null</span>
+<span class="w">  </span><span class="c1">#write_batch_rows: 50000             # Optional: Rows written to a CSV batch; default 50000</span>
+<span class="w">  </span><span class="c1">#update_buffer_size: 1               # Optional, LOG_BASED: Buffered update operations; default 1</span>
+<span class="w">  </span><span class="c1">#await_time_ms: 1000                 # Optional, LOG_BASED: Wait for changes before exit; default 1000 ms</span>
+<span class="w">  </span><span class="c1">#fastsync_parallelism: 4             # Optional: FastSync process pool size; defaults to CPU count</span>
 
+<span class="nt">target</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;my_target&quot;</span><span class="w">                   </span><span class="c1"># ID of the target connector</span>
+<span class="nt">batch_size_rows</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1000</span><span class="w">                 </span><span class="c1"># Rows sent to the target in each batch</span>
+<span class="nt">stream_buffer_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span><span class="w">                 </span><span class="c1"># In-memory tap-to-target buffer size in MB</span>
+<span class="nt">default_target_schema</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;my_db&quot;</span><span class="w">         </span><span class="c1"># Optional: Default destination schema</span>
+<span class="c1">#default_target_schema_select_permissions: # Optional: Groups granted SELECT access</span>
+<span class="c1">#  - grp_power</span>
+<span class="c1">#batch_wait_limit_seconds: 3600        # Optional, Snowflake: Flush a partial batch after this time</span>
 
-<span class="w">    </span><span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="w">    </span><span class="c1"># Source (Tap) - Mongo connection details</span>
-<span class="w">    </span><span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="w">    </span>db_conn:
-<span class="w">            </span>host:<span class="w"> </span><span class="s2">&quot;mongodb_host1,mongodb_host2,mongodb_host3&quot;</span><span class="w">       </span><span class="c1"># Mongodb host(s)</span>
-<span class="w">            </span>port:<span class="w"> </span><span class="m">27017</span><span class="w">                                                     </span><span class="c1"># Mongodb port</span>
-<span class="w">            </span>srv:<span class="w"> </span><span class="s2">&quot;false&quot;</span><span class="w">                                                                            </span><span class="c1"># For MongoDB Atlas `srv` should be &quot;true&quot; and `port` will be ignored</span>
-<span class="w">            </span>user:<span class="w"> </span><span class="s2">&quot;PipelineWiseUser&quot;</span><span class="w">                                        </span><span class="c1"># Mongodb user</span>
-<span class="w">            </span>password:<span class="w"> </span><span class="s2">&quot;mY_VerY_StRonG_PaSSwoRd&quot;</span><span class="w">                 </span><span class="c1"># Mongodb plain string or vault encrypted</span>
-<span class="w">            </span>auth_database:<span class="w"> </span><span class="s2">&quot;admin&quot;</span><span class="w">                                                  </span><span class="c1"># Mongodb database to authenticate on</span>
-<span class="w">            </span>dbname:<span class="w"> </span><span class="s2">&quot;my_db&quot;</span><span class="w">                                                                 </span><span class="c1"># Mongodb database name to sync from</span>
-<span class="w">            </span>replica_set:<span class="w"> </span><span class="s2">&quot;my_replica_set&quot;</span><span class="w">                                   </span><span class="c1"># Optional, Mongodb replica set name, default null</span>
-<span class="w">            </span>write_batch_rows:<span class="w"> </span>&lt;int&gt;<span class="w">                                                         </span><span class="c1"># Optional: Number of rows to write to csv file</span>
-<span class="w">                                                                            </span><span class="c1">#           in one batch. Default is 50000.</span>
-<span class="w">    </span>update_buffer_size:<span class="w"> </span>&lt;int&gt;<span class="w">                                                   </span><span class="c1"># Optional: [LOG_BASED] The size of the buffer that holds detected update</span>
-<span class="w">                                                        </span><span class="c1">#           operations in memory, the buffer is flushed once the size is reached. Default is 1.</span>
-<span class="w">    </span>await_time_ms:<span class="w"> </span>&lt;int&gt;<span class="w">                                                            </span><span class="c1"># Optional: [LOG_BASED] The maximum amount of time in milliseconds</span>
-<span class="w">                                                        </span><span class="c1">#           the loge_base method waits for new data changes before exiting. Default is 1000 ms.</span>
-<span class="w">    </span>fastsync_parallelism:<span class="w"> </span>&lt;int&gt;<span class="w">                         </span><span class="c1"># Optional: size of multiprocessing pool used by FastSync</span>
-<span class="w">                                                        </span><span class="c1">#           Min: 1</span>
-<span class="w">                                                        </span><span class="c1">#           Default: number of CPU cores</span>
-<span class="w">    </span><span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="w">    </span><span class="c1"># Destination (Target) - Target properties</span>
-<span class="w">    </span><span class="c1"># Connection details should be in the relevant target YAML file</span>
-<span class="w">    </span><span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="w">    </span>target:<span class="w"> </span><span class="s2">&quot;my_target&quot;</span><span class="w">                                     </span><span class="c1"># ID of the target connector where the data will be loaded</span>
-<span class="w">    </span>batch_size_rows:<span class="w"> </span><span class="m">1000</span><span class="w">                                   </span><span class="c1"># Batch size for the stream to optimise load performance</span>
-<span class="w">    </span>stream_buffer_size:<span class="w"> </span><span class="m">0</span><span class="w">                           </span><span class="c1"># In-memory buffer size (MB) between taps and targets for asynchronous data pipes</span>
-<span class="w">    </span><span class="c1">#batch_wait_limit_seconds: 3600                 # Optional: Maximum time to wait for `batch_size_rows`. Available only for snowflake target.</span>
+<span class="c1"># Options only for the Snowflake target</span>
+<span class="c1">#split_large_files: false                       # Split large files into multipart ZIP files</span>
+<span class="c1">#split_file_chunk_size_mb: 1000                 # Chunk size when split_large_files is enabled</span>
+<span class="c1">#split_file_max_chunks: 20                      # Maximum chunks when split_large_files is enabled</span>
+<span class="c1">#archive_load_files: false                      # Store loaded files in an archive S3 bucket</span>
+<span class="c1">#archive_load_files_s3_prefix: &quot;archive&quot;        # Prefix within the archive bucket</span>
+<span class="c1">#archive_load_files_s3_bucket: &quot;&lt;BUCKET_NAME&gt;&quot;  # Archive bucket; defaults to the target S3 bucket</span>
 
-<span class="c1"># Options only for Snowflake target</span>
-<span class="c1">#split_large_files: False                       # Optional: split large files to multiple pieces and create multipart zip files. (Default: False)</span>
-<span class="c1">#split_file_chunk_size_mb: 1000                 # Optional: File chunk sizes if `split_large_files` enabled. (Default: 1000)</span>
-<span class="c1">#split_file_max_chunks: 20                      # Optional: Max number of chunks if `split_large_files` enabled. (Default: 20)</span>
-<span class="c1">#archive_load_files: False                      # Optional: when enabled, the files loaded to Snowflake will also be stored in `archive_load_files_s3_bucket`</span>
-<span class="c1">#archive_load_files_s3_prefix: &quot;archive&quot;        # Optional: When `archive_load_files` is enabled, the archived files will be placed in the archive S3 bucket under this prefix.</span>
-<span class="c1">#archive_load_files_s3_bucket: &quot;&lt;BUCKET_NAME&gt;&quot;  # Optional: When `archive_load_files` is enabled, the archived files will be placed in this bucket. (Default: the value of `s3_bucket` in target snowflake YAML)</span>
+<span class="nt">schemas</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">source_schema</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;my_db&quot;</span><span class="w">           </span><span class="c1"># Must match dbname</span>
+<span class="w">    </span><span class="nt">target_schema</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;repl_my_db&quot;</span><span class="w">       </span><span class="c1"># Destination schema</span>
+<span class="w">    </span><span class="nt">target_schema_select_permissions</span><span class="p">:</span><span class="w"> </span><span class="c1"># Optional: Groups granted SELECT access</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">grp_stats</span>
 
+<span class="w">    </span><span class="c1"># MongoDB supports FULL_TABLE and LOG_BASED; LOG_BASED is the default.</span>
+<span class="w">    </span><span class="nt">tables</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;my_collection&quot;</span>
+<span class="w">        </span><span class="nt">replication_method</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;FULL_TABLE&quot;</span>
 
-<span class="w">    </span><span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="w">    </span><span class="c1"># Source to target Schema mapping</span>
-<span class="w">    </span><span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="w">    </span>schemas:
-<span class="w">            </span>-<span class="w"> </span>source_schema:<span class="w"> </span><span class="s2">&quot;my_db&quot;</span><span class="w">                                        </span><span class="c1"># Same name as dbname</span>
-<span class="w">              </span>target_schema:<span class="w"> </span><span class="s2">&quot;ppw_e2e_tap_mongodb&quot;</span><span class="w">          </span><span class="c1"># Name of target schema to load to</span>
+<span class="w">        </span><span class="c1"># Optional load-time transformations</span>
+<span class="w">        </span><span class="c1">#transformations:</span>
+<span class="w">        </span><span class="c1">#  - column: &quot;last_name&quot;</span>
+<span class="w">        </span><span class="c1">#    type: &quot;SET-NULL&quot;</span>
 
-<span class="w">              </span><span class="c1"># List of collections to sync</span>
-<span class="w">              </span>tables:
-<span class="w">                    </span>-<span class="w"> </span>table_name:<span class="w"> </span><span class="s2">&quot;my_collection&quot;</span>
-<span class="w">                      </span>replication_method:<span class="w"> </span><span class="s2">&quot;FULL_TABLE&quot;</span>
-
-<span class="w">                    </span><span class="c1"># default replication method is LOG_BASED</span>
-<span class="w">                    </span>-<span class="w"> </span>table_name:<span class="w"> </span><span class="s2">&quot;my_other_collection&quot;</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;my_other_collection&quot;</span>
+<span class="w">        </span><span class="nt">replication_method</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;LOG_BASED&quot;</span>
 </pre></div>
 </div>
 <section id="example-connection-to-mongodb-atlas">
 <h3>Example connection to MongoDB Atlas<a class="headerlink" href="#example-connection-to-mongodb-atlas" title="Link to this heading"></a></h3>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>db_conn:
-<span class="w">        </span>srv:<span class="w"> </span><span class="s2">&quot;true&quot;</span>
-<span class="w">        </span>host:<span class="w"> </span><span class="s2">&quot;xxxxxxxxx.xxxxx.mongodb.net&quot;</span>
-<span class="w">        </span>auth_database:<span class="w"> </span><span class="s2">&quot;admin&quot;</span><span class="w">                  </span><span class="c1"># the Mongodb database name to authenticate on</span>
-<span class="w">        </span>dbname:<span class="w"> </span><span class="s2">&quot;db-name&quot;</span><span class="w">                               </span><span class="c1"># Mongodb database name to sync from</span>
-<span class="w">        </span>user:<span class="w"> </span><span class="s2">&quot;user-name&quot;</span><span class="w">                               </span><span class="c1"># User with read roles</span>
-<span class="w">        </span>password:<span class="w"> </span><span class="s2">&quot;password&quot;</span><span class="w">                    </span><span class="c1"># Plain string or vault encrypted</span>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">db_conn</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">srv</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;true&quot;</span>
+<span class="w">  </span><span class="nt">host</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;xxxxxxxxx.xxxxx.mongodb.net&quot;</span>
+<span class="w">  </span><span class="nt">auth_database</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;admin&quot;</span><span class="w">             </span><span class="c1"># Database used for authentication</span>
+<span class="w">  </span><span class="nt">dbname</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;db-name&quot;</span><span class="w">                  </span><span class="c1"># Database to replicate</span>
+<span class="w">  </span><span class="nt">user</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;user-name&quot;</span>
+<span class="w">  </span><span class="nt">password</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;PASSWORD&gt;&quot;</span><span class="w">             </span><span class="c1"># Plain string or Vault encrypted</span>
 </pre></div>
 </div>
 </section>

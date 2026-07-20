@@ -32,7 +32,7 @@ Configuring what to extract
 '''''''''''''''''''''''''''
 
 PipelineWise configures every tap with a common structured YAML file format.
-A sample YAML for Jira replication can be generated into a project directory by
+A sample YAML for Slack replication can be generated into a project directory by
 following the steps in the :ref:`generating_pipelines` section.
 
 Example YAML for ``tap-slack``:
@@ -53,7 +53,7 @@ Example YAML for ``tap-slack``:
 
 
     # ------------------------------------------------------------------------------
-    # Source (Tap) - Github connection details
+    # Source (Tap) - Slack connection details
     # ------------------------------------------------------------------------------
     db_conn:
       token: "<SLACK_TOKEN>"                    # Slack API token

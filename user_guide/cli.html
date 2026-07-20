@@ -55,12 +55,12 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../concept/singer.html">Singer.io</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../concept/replication_methods.html">Replication Methods</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../concept/fastsync.html">Fast Sync</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concept/fastsync.html">FastSync</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../concept/linux_pipes.html">Linux Pipes in PipelineWise</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Using PipelineWise</span></p>
 <ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="yaml_config.html">YAML configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="yaml_config.html">YAML Configuration</a></li>
 <li class="toctree-l1"><a class="reference internal" href="encrypting_passwords.html">Encrypting Passwords</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Command Line Interface</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#positional-arguments">Positional Arguments</a></li>
@@ -74,10 +74,16 @@
 <li class="toctree-l3"><a class="reference internal" href="#discover-tap">discover_tap</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#status">status</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#test-tap-connection">test_tap_connection</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#sync-tables">sync_tables</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#import">import</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#fast-sync">fast_sync</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#partial-sync-table">partial_sync_table</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#import-config">import_config</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#validate">validate</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#encrypt-string">encrypt_string</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#reset-state">reset_state</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#common-options">Common options</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#environment-variables">Environment Variables</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#pipelinewise-home"><cite>PIPELINEWISE_HOME</cite></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#pipelinewise-config-directory"><cite>PIPELINEWISE_CONFIG_DIRECTORY</cite></a></li>
 </ul>
@@ -85,14 +91,15 @@
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="scheduling.html">Scheduling</a></li>
-<li class="toctree-l1"><a class="reference internal" href="scheduling.html#multi-server-cluster">Multi-Server Cluster</a></li>
-<li class="toctree-l1"><a class="reference internal" href="metadata_columns.html">Metadata Columns</a></li>
-<li class="toctree-l1"><a class="reference internal" href="schema_changes.html">Schema Changes</a></li>
-<li class="toctree-l1"><a class="reference internal" href="transformations.html">Transformations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="multi_server_cluster.html">Multi-Server Cluster</a></li>
 <li class="toctree-l1"><a class="reference internal" href="logging.html">Logging</a></li>
 <li class="toctree-l1"><a class="reference internal" href="alerts.html">Alerts</a></li>
 <li class="toctree-l1"><a class="reference internal" href="resync.html">Resync Tables</a></li>
 <li class="toctree-l1"><a class="reference internal" href="partial_sync.html">Different cases of partial resync</a></li>
+<li class="toctree-l1"><a class="reference internal" href="schema_changes.html">Schema Changes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="transformations.html">Transformations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="metadata_columns.html">Metadata Columns</a></li>
+<li class="toctree-l1"><a class="reference internal" href="troubleshooting.html">Troubleshooting</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Connectors</span></p>
 <ul>
@@ -136,14 +143,17 @@
 <span id="id1"></span><h1>Command Line Interface<a class="headerlink" href="#command-line-interface" title="Link to this heading"></a></h1>
 <p>PipelineWise’s command line interface allows for a number of operation types on a pipeline.</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>usage:<span class="w"> </span>pipelinewise<span class="w"> </span><span class="o">[</span>-h<span class="o">]</span>
-<span class="w">                    </span><span class="o">{</span>init,run_tap,discover_tap,status,test_tap_connection,sync_tables,import_config,validate<span class="o">}</span>
+<span class="w">                    </span><span class="o">{</span>init,run_tap,stop_tap,discover_tap,status,test_tap_connection,
+<span class="w">                     </span>fast_sync,sync_tables,partial_sync_table,import_config,import,
+<span class="w">                     </span>validate,encrypt_string,reset_state<span class="o">}</span>
 </pre></div>
 </div>
 <section id="positional-arguments">
 <h2>Positional Arguments<a class="headerlink" href="#positional-arguments" title="Link to this heading"></a></h2>
 <dl class="field-list simple">
 <dt class="field-odd">subcommand<span class="colon">:</span></dt>
-<dd class="field-odd"><p>Possible choices: init, run_tap, discover_tap, status, test_tap_connection, sync_tables, import_config, validate</p>
+<dd class="field-odd"><p>The operation to perform. <code class="docutils literal notranslate"><span class="pre">sync_tables</span></code> is a deprecated alias for
+<code class="docutils literal notranslate"><span class="pre">fast_sync</span></code>; <code class="docutils literal notranslate"><span class="pre">import</span></code> is a deprecated alias for <code class="docutils literal notranslate"><span class="pre">import_config</span></code>.</p>
 </dd>
 </dl>
 </section>
@@ -152,7 +162,7 @@
 <section id="init">
 <span id="cli-init"></span><h3>init<a class="headerlink" href="#init" title="Link to this heading"></a></h3>
 <p>Initialise and create a sample project. The project will contain sample YAML
-configuration for every supported tap and target connects.</p>
+configuration for every supported tap and target connectors.</p>
 <section id="id2">
 <h4>Positional Arguments<a class="headerlink" href="#id2" title="Link to this heading"></a></h4>
 <dl class="field-list simple">
@@ -179,7 +189,9 @@ configuration for every supported tap and target connects.</p>
 </section>
 <section id="stop-tap">
 <span id="cli-stop-tap"></span><h3>stop_tap<a class="headerlink" href="#stop-tap" title="Link to this heading"></a></h3>
-<p>Stop running a specific pipeline</p>
+<p>Stop a running pipeline. PipelineWise sends a termination signal to the running tap
+process. The target process will finish processing any remaining data in its buffer
+before exiting. Data that has already been loaded into the target is not affected.</p>
 <dl class="field-list simple">
 <dt class="field-odd">–target<span class="colon">:</span></dt>
 <dd class="field-odd"><p>Target connector id</p>
@@ -191,8 +203,11 @@ configuration for every supported tap and target connects.</p>
 </section>
 <section id="discover-tap">
 <span id="cli-discover-tap"></span><h3>discover_tap<a class="headerlink" href="#discover-tap" title="Link to this heading"></a></h3>
-<p>Run a specific tap in discovery mode. Discovery mode is connecting to the data source
-and collecting information that is required for running the tap.</p>
+<p>Run a specific tap in discovery mode. Discovery mode connects to the data source
+and collects information (schemas, tables, columns, data types) that is required
+for running the tap. Discovery is also run automatically as part of the
+<a class="reference internal" href="#cli-import-config"><span class="std std-ref">import_config</span></a> command, so you typically only need to run this manually when
+debugging connection or schema issues.</p>
 <dl class="field-list simple">
 <dt class="field-odd">–target<span class="colon">:</span></dt>
 <dd class="field-odd"><p>Target connector id</p>
@@ -219,10 +234,18 @@ and will return success if it’s available.</p>
 </dd>
 </dl>
 </section>
-<section id="sync-tables">
-<span id="cli-sync-tables"></span><h3>sync_tables<a class="headerlink" href="#sync-tables" title="Link to this heading"></a></h3>
+<section id="fast-sync">
+<span id="cli-fast-sync"></span><h3>fast_sync<a class="headerlink" href="#fast-sync" title="Link to this heading"></a></h3>
 <p>Sync or resync one or more tables from a specific datasource. It performs an initial
 sync and resets the table bookmarks to their new location.</p>
+<p>This command uses the <strong>FullSync</strong> component of <a class="reference internal" href="../concept/fastsync.html#fast-sync-main"><span class="std std-ref">FastSync</span></a>, bypassing
+Singer for performance. It requires a supported FullSync tap-target combination.
+If the combination is unsupported, the command fails without syncing any data; it
+does not fall back to Singer.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The legacy command name <code class="docutils literal notranslate"><span class="pre">sync_tables</span></code> is accepted as a backward-compatible alias.</p>
+</div>
 <dl class="field-list simple">
 <dt class="field-odd">–target<span class="colon">:</span></dt>
 <dd class="field-odd"><p>Target connector id</p>
@@ -233,33 +256,106 @@ sync and resets the table bookmarks to their new location.</p>
 <dt class="field-odd">–tables<span class="colon">:</span></dt>
 <dd class="field-odd"><p>Optional: Comma separated list of tables to sync from the data source.</p>
 </dd>
+<dt class="field-even">–force<span class="colon">:</span></dt>
+<dd class="field-even"><p>Optional: Ignore the configured table-size limit and perform the sync.</p>
+</dd>
+<dt class="field-odd">–replication_method_only<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Optional: Sync only tables using the specified replication
+method (<code class="docutils literal notranslate"><span class="pre">full_table</span></code>, <code class="docutils literal notranslate"><span class="pre">incremental</span></code> or <code class="docutils literal notranslate"><span class="pre">log_based</span></code>).</p>
+</dd>
 </dl>
 </section>
-<section id="import">
-<span id="cli-import"></span><h3>import<a class="headerlink" href="#import" title="Link to this heading"></a></h3>
+<section id="partial-sync-table">
+<span id="cli-partial-sync-table"></span><h3>partial_sync_table<a class="headerlink" href="#partial-sync-table" title="Link to this heading"></a></h3>
+<p>Partially resync a specific range of rows from a single table. This is useful for
+repairing a specific segment of data without resyncing the entire table.</p>
+<p>This command uses the <strong>PartialSync</strong> component of <a class="reference internal" href="../concept/fastsync.html#fast-sync-main"><span class="std std-ref">FastSync</span></a>. It is
+available only from MySQL or PostgreSQL taps to a Snowflake target. If the
+tap-target combination is unsupported, the command fails; it does not fall back
+to FullSync or Singer.</p>
+<p>See <a class="reference internal" href="partial_sync.html#partial-sync-cases"><span class="std std-ref">Different cases of partial resync</span></a> for details on how partial sync handles different
+scenarios.</p>
+<dl class="field-list simple">
+<dt class="field-odd">–target<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Target connector id</p>
+</dd>
+<dt class="field-even">–tap<span class="colon">:</span></dt>
+<dd class="field-even"><p>Tap connector id</p>
+</dd>
+<dt class="field-odd">–table<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Source schema and table name (e.g. <code class="docutils literal notranslate"><span class="pre">schema_name.table_name</span></code>)</p>
+</dd>
+<dt class="field-even">–column<span class="colon">:</span></dt>
+<dd class="field-even"><p>Column name to use for the range filter</p>
+</dd>
+<dt class="field-odd">–start_value<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Lower boundary of the range (inclusive)</p>
+</dd>
+<dt class="field-even">–end_value<span class="colon">:</span></dt>
+<dd class="field-even"><p>Optional upper boundary of the range (inclusive). When omitted, PipelineWise
+captures the current replication position and updates state after the partial sync.</p>
+</dd>
+</dl>
+</section>
+<section id="import-config">
+<span id="cli-import"></span><span id="cli-import-config"></span><h3>import_config<a class="headerlink" href="#import-config" title="Link to this heading"></a></h3>
 <p>Import a project directory into PipelineWise. It will create every JSON file required for
-the tap and target connectors into <code class="docutils literal notranslate"><span class="pre">~/.pipelinewise</span></code>.</p>
+the tap and target connectors in <code class="docutils literal notranslate"><span class="pre">~/.pipelinewise</span></code>. <code class="docutils literal notranslate"><span class="pre">import</span></code> is retained as a
+deprecated alias.</p>
 <dl class="field-list simple">
 <dt class="field-odd">–dir<span class="colon">:</span></dt>
 <dd class="field-odd"><p>relative path to the project directory to import</p>
 </dd>
 <dt class="field-even">–taps<span class="colon">:</span></dt>
-<dd class="field-even"><p>Optional: Comma seperated list of tap id’s to create.</p>
+<dd class="field-even"><p>Optional: Comma separated list of tap id’s to create.</p>
+</dd>
+<dt class="field-odd">–secret<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Optional: Path to the Ansible Vault password file needed to decrypt values
+in the project YAML files.</p>
 </dd>
 </dl>
 </section>
 <section id="validate">
 <span id="cli-validate"></span><h3>validate<a class="headerlink" href="#validate" title="Link to this heading"></a></h3>
-<p>Validates a project directory with YAML tap and target files.</p>
+<p>Validates a project directory with YAML tap and target files. This checks that:</p>
+<ul class="simple">
+<li><p>All YAML files are syntactically valid</p></li>
+<li><p>Required fields (<code class="docutils literal notranslate"><span class="pre">id</span></code>, <code class="docutils literal notranslate"><span class="pre">type</span></code>, <code class="docutils literal notranslate"><span class="pre">db_conn</span></code>, <code class="docutils literal notranslate"><span class="pre">target</span></code>, <code class="docutils literal notranslate"><span class="pre">schemas</span></code>) are present</p></li>
+<li><p>Tap <code class="docutils literal notranslate"><span class="pre">target</span></code> references match an existing target YAML file</p></li>
+<li><p>Connector types are supported</p></li>
+<li><p>Schema mappings are correctly structured</p></li>
+</ul>
+<p>Validation does <strong>not</strong> test connectivity to data sources or targets.</p>
 <dl class="field-list simple">
 <dt class="field-odd">–dir<span class="colon">:</span></dt>
 <dd class="field-odd"><p>relative path to the project directory with YAML taps and targets.</p>
 </dd>
 </dl>
 </section>
+<section id="encrypt-string">
+<span id="cli-encrypt-string"></span><h3>encrypt_string<a class="headerlink" href="#encrypt-string" title="Link to this heading"></a></h3>
+<p>Encrypt a value for use in a PipelineWise YAML file. The command prints an Ansible
+Vault value that can be copied into the YAML configuration. See
+<a class="reference internal" href="encrypting_passwords.html#encrypting-passwords"><span class="std std-ref">Encrypting Passwords</span></a> for the complete workflow.</p>
+<dl class="field-list simple">
+<dt class="field-odd">–secret<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Path to the file containing the Ansible Vault password.</p>
+</dd>
+<dt class="field-even">–string<span class="colon">:</span></dt>
+<dd class="field-even"><p>The value to encrypt.</p>
+</dd>
+</dl>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>pipelinewise<span class="w"> </span>encrypt_string<span class="w"> </span>--secret<span class="w"> </span>vault-password.txt<span class="w"> </span>--string<span class="w"> </span><span class="s2">&quot;value to encrypt&quot;</span>
+</pre></div>
+</div>
+</section>
 <section id="reset-state">
-<h3>reset_state<a class="headerlink" href="#reset-state" title="Link to this heading"></a></h3>
-<p>Reset state file for log based tables. It works only for PostgresSQL and MySQL databases!</p>
+<span id="cli-reset-state"></span><h3>reset_state<a class="headerlink" href="#reset-state" title="Link to this heading"></a></h3>
+<p>Reset the state file for log-based replication tables after a database switchover
+or failover. This updates the CDC bookmarks (binlog position for MySQL, LSN for
+PostgreSQL) to point to the new primary server. Unlike <code class="docutils literal notranslate"><span class="pre">fast_sync</span></code>, this does
+not resync any data — it only updates the replication position.</p>
+<p>This command works only for PostgreSQL and MySQL databases.</p>
 <dl class="field-list simple">
 <dt class="field-odd">–target<span class="colon">:</span></dt>
 <dd class="field-odd"><p>Target connector id</p>
@@ -268,7 +364,8 @@ the tap and target connectors into <code class="docutils literal notranslate"><s
 <dd class="field-even"><p>Tap connector id</p>
 </dd>
 </dl>
-<p id="cli-reset-state">for MySQL, it needs a json file contains of switchover data same as below format:</p>
+<p>For MySQL, the command requires a JSON file containing the switchover data in the
+following format:</p>
 <div class="highlight-JSON notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
 <span class="w">  </span><span class="nt">&quot;new_url_of_the_source_database&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="nt">&quot;old_identifier&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;old_identifier_of_source_db&quot;</span><span class="p">,</span>
@@ -288,18 +385,47 @@ the tap and target connectors into <code class="docutils literal notranslate"><s
 <div class="admonition attention">
 <p class="admonition-title">Attention</p>
 <p>The filename for switchover data can be added in the <cite>config.yml</cite>:</p>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="s">&quot;switch_over_data_file&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="s">&quot;switch_over_data_json_file&quot;</span>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">switch_over_data_file</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;switch_over_data.json&quot;</span>
 </pre></div>
 </div>
 </div>
 </section>
+</section>
+<section id="common-options">
+<h2>Common options<a class="headerlink" href="#common-options" title="Link to this heading"></a></h2>
+<p>The following options are accepted by all commands, although they are mainly useful
+for commands that run or inspect a pipeline:</p>
+<dl class="field-list simple">
+<dt class="field-odd">–log<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Write PipelineWise CLI logs to the specified file.</p>
+</dd>
+<dt class="field-even">–extra_log<span class="colon">:</span></dt>
+<dd class="field-even"><p>Copy Singer and FastSync subprocess logs to standard output.</p>
+</dd>
+<dt class="field-odd">–debug<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Enable debug-level logging on standard output.</p>
+</dd>
+<dt class="field-even">–profiler, -p<span class="colon">:</span></dt>
+<dd class="field-even"><p>Enable Python profiling. Results are written below
+<code class="docutils literal notranslate"><span class="pre">&lt;config-directory&gt;/profiling</span></code>.</p>
+</dd>
+<dt class="field-odd">–version<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Print the installed PipelineWise version and exit.</p>
+</dd>
+</dl>
+</section>
+<section id="environment-variables">
+<h2>Environment Variables<a class="headerlink" href="#environment-variables" title="Link to this heading"></a></h2>
 <section id="pipelinewise-home">
 <h3><cite>PIPELINEWISE_HOME</cite><a class="headerlink" href="#pipelinewise-home" title="Link to this heading"></a></h3>
-<p>Configures the directory at which PipelineWise expects to find installed tap and targets.</p>
+<p>Configures the PipelineWise installation root. PipelineWise expects connector virtual
+environments below <code class="docutils literal notranslate"><span class="pre">${PIPELINEWISE_HOME}/.virtualenvs</span></code>. The default is
+<code class="docutils literal notranslate"><span class="pre">~/pipelinewise</span></code>.</p>
 </section>
 <section id="pipelinewise-config-directory">
 <h3><cite>PIPELINEWISE_CONFIG_DIRECTORY</cite><a class="headerlink" href="#pipelinewise-config-directory" title="Link to this heading"></a></h3>
-<p>Overrides the default directory at which PipelineWise expects to find configuration files generated by <cite>pipelinewise import</cite>.</p>
+<p>Overrides the default directory (<code class="docutils literal notranslate"><span class="pre">~/.pipelinewise</span></code>) at which PipelineWise stores
+configuration files, state files, and logs generated by <code class="docutils literal notranslate"><span class="pre">pipelinewise</span> <span class="pre">import_config</span></code>.</p>
 </section>
 </section>
 </section>

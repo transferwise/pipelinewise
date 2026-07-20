@@ -22,7 +22,7 @@
     <script src="../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
-    <link rel="next" title="Target Redshift" href="redshift.html" />
+    <link rel="next" title="Target Postgres" href="postgres.html" />
     <link rel="prev" title="Targets (Destinations)" href="../targets.html" /> 
 </head>
 
@@ -55,23 +55,24 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../concept/singer.html">Singer.io</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../concept/replication_methods.html">Replication Methods</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../concept/fastsync.html">Fast Sync</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../concept/fastsync.html">FastSync</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../concept/linux_pipes.html">Linux Pipes in PipelineWise</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Using PipelineWise</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/yaml_config.html">YAML configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/yaml_config.html">YAML Configuration</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/encrypting_passwords.html">Encrypting Passwords</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/cli.html">Command Line Interface</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/scheduling.html">Scheduling</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/scheduling.html#multi-server-cluster">Multi-Server Cluster</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/metadata_columns.html">Metadata Columns</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/schema_changes.html">Schema Changes</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/transformations.html">Transformations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/multi_server_cluster.html">Multi-Server Cluster</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/logging.html">Logging</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/alerts.html">Alerts</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/resync.html">Resync Tables</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/partial_sync.html">Different cases of partial resync</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/schema_changes.html">Schema Changes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/transformations.html">Transformations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/metadata_columns.html">Metadata Columns</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/troubleshooting.html">Troubleshooting</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Connectors</span></p>
 <ul class="current">
@@ -88,10 +89,8 @@
 </li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="redshift.html">Target Redshift</a></li>
 <li class="toctree-l2"><a class="reference internal" href="postgres.html">Target Postgres</a></li>
 <li class="toctree-l2"><a class="reference internal" href="s3_csv.html">Target S3 CSV</a></li>
-<li class="toctree-l2"><a class="reference internal" href="bigquery.html">Target Bigquery</a></li>
 </ul>
 </li>
 </ul>
@@ -220,7 +219,7 @@ following the steps in the <a class="reference internal" href="../../installatio
 <span class="w">  </span><span class="nt">account</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;rtxxxxx.eu-central-1&quot;</span><span class="w">               </span><span class="c1"># Snowflake account</span>
 <span class="w">  </span><span class="nt">dbname</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;DB_NAME&gt;&quot;</span><span class="w">                           </span><span class="c1"># Snowflake database name</span>
 <span class="w">  </span><span class="nt">user</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;USER&gt;&quot;</span><span class="w">                                </span><span class="c1"># Snowflake user</span>
-<span class="w">  </span><span class="nt">private_key</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;private_key_path&gt;&quot;</span><span class="w">             </span><span class="c1"># File contains PEM forrmat for connecting to Snowflake</span>
+<span class="w">  </span><span class="nt">private_key</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;private_key_path&gt;&quot;</span><span class="w">             </span><span class="c1"># File contains PEM format for connecting to Snowflake</span>
 <span class="w">  </span><span class="nt">warehouse</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;WAREHOUSE&gt;&quot;</span><span class="w">                      </span><span class="c1"># Snowflake virtual warehouse</span>
 <span class="w">  </span><span class="nt">iceberg_create</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span><span class="w">                         </span><span class="c1"># Create new tables as Iceberg tables (only available for pure Singer replications)</span>
 
@@ -237,7 +236,7 @@ following the steps in the <a class="reference internal" href="../../installatio
 
 <span class="w">  </span><span class="c1">#aws_endpoint_url: &quot;&lt;FULL_ENDPOINT_URL&gt;&quot;      # Optional: for non AWS S3, for example https://nyc3.digitaloceanspaces.com</span>
 
-<span class="w">  </span><span class="nt">s3_bucket</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;BUCKET_NAME&gt;&quot;</span><span class="w">                    </span><span class="c1"># S3 external stbucket name</span>
+<span class="w">  </span><span class="nt">s3_bucket</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;BUCKET_NAME&gt;&quot;</span><span class="w">                    </span><span class="c1"># S3 external stage bucket name</span>
 <span class="w">  </span><span class="nt">s3_key_prefix</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;snowflake-imports/&quot;</span><span class="w">           </span><span class="c1"># Optional: S3 key prefix</span>
 <span class="w">  </span><span class="c1">#s3_acl: &quot;&lt;S3_OBJECT_ACL&gt;&quot;                    # Optional: Assign the canned ACL to the uploaded file on S3</span>
 
@@ -251,7 +250,7 @@ following the steps in the <a class="reference internal" href="../../installatio
 
 <span class="w">  </span><span class="c1"># Optional: Client Side Encryption</span>
 <span class="w">  </span><span class="c1"># The same master key has to be added to the external stage object created in snowflake</span>
-<span class="w">  </span><span class="c1">#client_side_encryption_master_key: &quot;&lt;MASTER_KEY&quot;&gt; # Plain string or vault encrypted</span>
+<span class="w">  </span><span class="c1">#client_side_encryption_master_key: &quot;&lt;MASTER_KEY&gt;&quot; # Plain string or vault encrypted</span>
 </pre></div>
 </div>
 </section>
@@ -259,8 +258,8 @@ following the steps in the <a class="reference internal" href="../../installatio
 <h2>Snowflake Iceberg tables<a class="headerlink" href="#snowflake-iceberg-tables" title="Link to this heading"></a></h2>
 <p>Iceberg support needs to be setup in Snowflake
 Useful tutorial : <a class="reference external" href="https://docs.snowflake.com/en/user-guide/tutorials/create-your-first-iceberg-table">https://docs.snowflake.com/en/user-guide/tutorials/create-your-first-iceberg-table</a></p>
-<p>PipelineWise expects the target database to have already have default Iceberg settings</p>
-<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>CREATE OR EXTERNAL VOLUME ACCOUNT_ICEBERG_VOLUME ... ;
+<p>PipelineWise expects the target database to already have default Iceberg settings</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>CREATE OR REPLACE EXTERNAL VOLUME ACCOUNT_ICEBERG_VOLUME ... ;
 ALTER DATABASE {target-database} SET CATALOG=&#39;snowflake&#39;;
 ALTER DATABASE {target-database} SET EXTERNAL_VOLUME = ACCOUNT_ICEBERG_VOLUME;
 </pre></div>
@@ -270,7 +269,7 @@ ALTER DATABASE {target-database} SET EXTERNAL_VOLUME = ACCOUNT_ICEBERG_VOLUME;
 <span class="w">  </span><span class="nt">account</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;rtxxxxx.eu-central-1&quot;</span><span class="w">               </span><span class="c1"># Snowflake account</span>
 <span class="w">  </span><span class="nt">dbname</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;DB_NAME&gt;&quot;</span><span class="w">                           </span><span class="c1"># Snowflake database name</span>
 <span class="w">  </span><span class="nt">user</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;USER&gt;&quot;</span><span class="w">                                </span><span class="c1"># Snowflake user</span>
-<span class="w">  </span><span class="nt">private_key</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;private_key_path&gt;&quot;</span><span class="w">             </span><span class="c1"># File contains PEM forrmat for connecting to Snowflake</span>
+<span class="w">  </span><span class="nt">private_key</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;private_key_path&gt;&quot;</span><span class="w">             </span><span class="c1"># File contains PEM format for connecting to Snowflake</span>
 <span class="w">  </span><span class="nt">warehouse</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;WAREHOUSE&gt;&quot;</span><span class="w">                      </span><span class="c1"># Snowflake virtual warehouse</span>
 <span class="w">  </span><span class="nt">iceberg_create</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">                          </span><span class="c1"># Create new tables as Iceberg tables (only available for pure Singer replications)</span>
 </pre></div>
@@ -290,8 +289,10 @@ options:
 <section id="limitations">
 <h3>Limitations<a class="headerlink" href="#limitations" title="Link to this heading"></a></h3>
 <ul class="simple">
-<li><p>Only target-snowflake (using Pure Singer replication) is able to create a new Iceberg table</p></li>
-<li><p>PipelineWise <cite>sync_tables</cite> and <cite>partial_sync_table</cite> command will fail with <cite>(42710): SQL compilation error: table already exists as ICEBERG_TABLE</cite></p></li>
+<li><p>Only target-snowflake using the standard Singer replication path (i.e. not <a class="reference internal" href="../../concept/fastsync.html#fast-sync-main"><span class="std std-ref">FastSync</span></a>)
+is able to create a new Iceberg table. FastSync and PartialSync do not support Iceberg.</p></li>
+<li><p>PipelineWise <code class="docutils literal notranslate"><span class="pre">fast_sync</span></code> and <code class="docutils literal notranslate"><span class="pre">partial_sync_table</span></code> commands will fail with
+<code class="docutils literal notranslate"><span class="pre">(42710):</span> <span class="pre">SQL</span> <span class="pre">compilation</span> <span class="pre">error:</span> <span class="pre">table</span> <span class="pre">already</span> <span class="pre">exists</span> <span class="pre">as</span> <span class="pre">ICEBERG_TABLE</span></code></p></li>
 </ul>
 </section>
 </section>
@@ -302,7 +303,7 @@ options:
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="../targets.html" class="btn btn-neutral float-left" title="Targets (Destinations)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="redshift.html" class="btn btn-neutral float-right" title="Target Redshift" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="postgres.html" class="btn btn-neutral float-right" title="Target Postgres" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

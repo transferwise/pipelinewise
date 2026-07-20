@@ -55,23 +55,24 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../concept/singer.html">Singer.io</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../concept/replication_methods.html">Replication Methods</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../concept/fastsync.html">Fast Sync</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../concept/fastsync.html">FastSync</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../concept/linux_pipes.html">Linux Pipes in PipelineWise</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Using PipelineWise</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/yaml_config.html">YAML configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/yaml_config.html">YAML Configuration</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/encrypting_passwords.html">Encrypting Passwords</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/cli.html">Command Line Interface</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/scheduling.html">Scheduling</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/scheduling.html#multi-server-cluster">Multi-Server Cluster</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/metadata_columns.html">Metadata Columns</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/schema_changes.html">Schema Changes</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/transformations.html">Transformations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/multi_server_cluster.html">Multi-Server Cluster</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/logging.html">Logging</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/alerts.html">Alerts</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/resync.html">Resync Tables</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/partial_sync.html">Different cases of partial resync</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/schema_changes.html">Schema Changes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/transformations.html">Transformations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/metadata_columns.html">Metadata Columns</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/troubleshooting.html">Troubleshooting</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Connectors</span></p>
 <ul class="current">
@@ -91,6 +92,8 @@
 <li class="toctree-l2"><a class="reference internal" href="github.html">Tap Github</a></li>
 <li class="toctree-l2"><a class="reference internal" href="slack.html">Tap Slack</a></li>
 <li class="toctree-l2"><a class="reference internal" href="mixpanel.html">Tap Mixpanel</a></li>
+<li class="toctree-l2"><a class="reference internal" href="salesforce.html">Tap Salesforce</a></li>
+<li class="toctree-l2"><a class="reference internal" href="twilio.html">Tap Twilio</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../targets.html">Targets (Destinations)</a></li>
@@ -181,7 +184,8 @@ following the steps in the <a class="reference internal" href="../../installatio
 <span class="w">  </span><span class="c1"># and custom PKs are used instead.</span>
 <span class="w">  </span><span class="c1"># ! Message key should be a valid utf-8 encoded string.</span>
 <span class="w">  </span><span class="c1"># --------------------------------------------------------------------------</span>
-<span class="w">  </span><span class="nt">use_message_key</span><span class="p">:</span><span class="w">                          </span><span class="c1"># (Default: true)</span>
+<span class="w">  </span><span class="c1">#use_message_key: true                    # Optional. Use the Kafka message key as the primary key.</span>
+<span class="w">                                            </span><span class="c1"># Default: true. Ignored when primary_keys is configured.</span>
 
 <span class="w">  </span><span class="c1">#initial_start_time:                      # (Default: latest) Start time reference of the message consumption if</span>
 <span class="w">                                            </span><span class="c1"># no bookmarked position in state.json. One of: latest, earliest or an</span>
@@ -210,7 +214,7 @@ following the steps in the <a class="reference internal" href="../../installatio
 <span class="w">  </span><span class="c1">#       int32 page_number = 2;</span>
 <span class="w">  </span><span class="c1">#       int32 result_per_page = 3;</span>
 <span class="w">  </span><span class="c1">#     }</span>
-<span class="w">  </span><span class="c1">#proto_classess_dir:                      # (Default: current working dir) Directory where to store runtime compiled proto classes</span>
+<span class="w">  </span><span class="c1">#proto_classes_dir:                       # (Default: current working dir) Directory where runtime compiled proto classes are stored</span>
 <span class="w">  </span><span class="c1">#debug_contexts: &quot;&quot;                       # comma separated list of debug contexts to enable for the consumer [see librkafka](https://github.com/confluentinc/librdkafka/blob/master/INTRODUCTION.md#debug-contexts)</span>
 
 <span class="c1"># ------------------------------------------------------------------------------</span>

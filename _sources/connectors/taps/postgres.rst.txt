@@ -74,7 +74,7 @@ After you’ve installed the plugin, you can move onto the next step.
 
 Locate the database configuration file (usually ``postgresql.conf``) and define the parameters as follows:
 
-.. code-block:: bash
+.. code-block:: ini
 
     wal_level=logical
     max_replication_slots=5
@@ -131,7 +131,7 @@ Example YAML for ``tap-postgres``:
     db_conn:
       host: "<HOST>"                       # PostgreSQL host
       port: 5432                           # PostgreSQL port
-      user: "<USER>"                       # PostfreSQL user
+      user: "<USER>"                       # PostgreSQL user
       password: "<PASSWORD>"               # Plain string or vault encrypted
       dbname: "<DB_NAME>"                  # PostgreSQL database name
       #replica_host: "<REPLICA_HOST>"      # Optional: PostgresSQL replica host to offload initial/FastSync
@@ -153,7 +153,7 @@ Example YAML for ``tap-postgres``:
       #ssl: "true"                         # Optional: Using SSL via postgres sslmode 'require' option.
                                            #           If the server does not accept SSL connections or the client
                                            #           certificate is not recognized the connection will fail
-      fastsync_parallelism: <int>          # Optional: size of multiprocessing pool used by FastSync
+      #fastsync_parallelism: 4             # Optional: size of multiprocessing pool used by FastSync
                                            #           Min: 1
                                            #           Default: number of CPU cores
       #limit: 50000                        # Optional: limit to add to incremental queries, this is useful to avoid long running transactions on the DB
@@ -165,7 +165,8 @@ Example YAML for ``tap-postgres``:
     target: "snowflake"                    # ID of the target connector where the data will be loaded
     batch_size_rows: 20000                 # Batch size for the stream to optimise load performance
     stream_buffer_size: 0                  # In-memory buffer size (MB) between taps and targets for asynchronous data pipes
-    #batch_wait_limit_seconds: 3600        # Optional: Maximum time to wait for `batch_size_rows`. Available only for snowflake target.
+    #batch_wait_limit_seconds: 3600        # Optional: Maximum time (seconds) to wait for `batch_size_rows` before
+                                           #           flushing a partial batch. Available only for Snowflake target.
 
     # Options only for Snowflake target
     #split_large_files: False                       # Optional: split large files to multiple pieces and create multipart zip files. (Default: False)
@@ -189,7 +190,7 @@ Example YAML for ``tap-postgres``:
         # List of tables to replicate from Postgres to destination Data Warehouse
         #
         # Please check the Replication Strategies section in the documentation to understand the differences.
-        # For LOG_BASED replication method you might need to adjust the source mysql/ mariadb configuration.
+        # For LOG_BASED replication method you might need to adjust the source PostgreSQL configuration.
         tables:
           - table_name: "table_one"
             replication_method: "INCREMENTAL"   # One of INCREMENTAL, LOG_BASED and FULL_TABLE
@@ -202,25 +203,25 @@ Example YAML for ``tap-postgres``:
 
           # You can add as many tables as you need...
           - table_name: "table_two"
-            replication_method: "LOG_BASED"     # Important! Log based must be enabled in MySQL
+            replication_method: "LOG_BASED"     # Important! Log based must be enabled in PostgreSQL
 
           - table_name: "table_three"
             replication_method: "LOG_BASED"
-            sync_start_from:                   # Optional, applies for then first sync and fast sync
-              column: "column_name"            # column name to be picked for partial sync with inremental or timestamp value
+            sync_start_from:                   # Optional, applies for the first sync and fast sync
+              column: "column_name"            # column name to be picked for partial sync with incremental or timestamp value
               static_value: "start_value"      # A static value which the first sync always starts from column >= static_value
               drop_target_table: true          # Optional, drops target table before syncing. default value is false
 
           - table_name: "table_four"
             replication_method: "LOG_BASED"
-            sync_start_from:                   # Optional, applies for then first sync and fast sync
+            sync_start_from:                   # Optional, applies for the first sync and fast sync
               column: "column_name"            # Column name to be picked for partial sync with incremental or timestamp value
-              dynamic_value: "A SELECT query   # It can be a valid PG SELECT query which returns only one row with one column and first sync always starts from column >= dynamic_value
+              dynamic_value: "SELECT MAX(updated_at) - INTERVAL '7 days' FROM table_four"
               drop_target_table: true          # Optional, drops target table before syncing. default value is false
 
       # You can add as many schemas as you need...
-      # Uncomment this if you want replicate tables from multiple schemas
-      #- source_schema: "another_schema_in_postgres" 
-      #  target_schema: "another
-      # static and dynamic values can not be defined together for a table and only one of them can be used.
+      # Uncomment this if you want to replicate tables from multiple schemas
+      #- source_schema: "another_schema_in_postgres"
+      #  target_schema: "another_schema_in_target"
 
+      # Note: static and dynamic values cannot be defined together for a table; only one can be used.

@@ -22,7 +22,7 @@
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Logging" href="logging.html" />
+    <link rel="next" title="Metadata Columns" href="metadata_columns.html" />
     <link rel="prev" title="Schema Changes" href="schema_changes.html" /> 
 </head>
 
@@ -55,17 +55,20 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../concept/singer.html">Singer.io</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../concept/replication_methods.html">Replication Methods</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../concept/fastsync.html">Fast Sync</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concept/fastsync.html">FastSync</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../concept/linux_pipes.html">Linux Pipes in PipelineWise</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Using PipelineWise</span></p>
 <ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="yaml_config.html">YAML configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="yaml_config.html">YAML Configuration</a></li>
 <li class="toctree-l1"><a class="reference internal" href="encrypting_passwords.html">Encrypting Passwords</a></li>
 <li class="toctree-l1"><a class="reference internal" href="cli.html">Command Line Interface</a></li>
 <li class="toctree-l1"><a class="reference internal" href="scheduling.html">Scheduling</a></li>
-<li class="toctree-l1"><a class="reference internal" href="scheduling.html#multi-server-cluster">Multi-Server Cluster</a></li>
-<li class="toctree-l1"><a class="reference internal" href="metadata_columns.html">Metadata Columns</a></li>
+<li class="toctree-l1"><a class="reference internal" href="multi_server_cluster.html">Multi-Server Cluster</a></li>
+<li class="toctree-l1"><a class="reference internal" href="logging.html">Logging</a></li>
+<li class="toctree-l1"><a class="reference internal" href="alerts.html">Alerts</a></li>
+<li class="toctree-l1"><a class="reference internal" href="resync.html">Resync Tables</a></li>
+<li class="toctree-l1"><a class="reference internal" href="partial_sync.html">Different cases of partial resync</a></li>
 <li class="toctree-l1"><a class="reference internal" href="schema_changes.html">Schema Changes</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Transformations</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#transformation-methods">Transformation Methods</a></li>
@@ -74,10 +77,8 @@
 <li class="toctree-l2"><a class="reference internal" href="#example">Example</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="logging.html">Logging</a></li>
-<li class="toctree-l1"><a class="reference internal" href="alerts.html">Alerts</a></li>
-<li class="toctree-l1"><a class="reference internal" href="resync.html">Resync Tables</a></li>
-<li class="toctree-l1"><a class="reference internal" href="partial_sync.html">Different cases of partial resync</a></li>
+<li class="toctree-l1"><a class="reference internal" href="metadata_columns.html">Metadata Columns</a></li>
+<li class="toctree-l1"><a class="reference internal" href="troubleshooting.html">Troubleshooting</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Connectors</span></p>
 <ul>
@@ -119,7 +120,7 @@
              
   <section id="transformations">
 <span id="id1"></span><h1>Transformations<a class="headerlink" href="#transformations" title="Link to this heading"></a></h1>
-<p>PipelineWise can perform row level load time transformations between tap and target components and makes and ideal
+<p>PipelineWise can perform row level load time transformations between tap and target components and makes an ideal
 place to obfuscate, mask or filter sensitive data that should never be replicated into the data warehouse.</p>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
@@ -134,22 +135,27 @@ doing traditional ETL. ELT ingests data first into DWH in the original format an
 </div>
 <section id="transformation-methods">
 <span id="id2"></span><h2>Transformation Methods<a class="headerlink" href="#transformation-methods" title="Link to this heading"></a></h2>
-<p>The following transformations can be added optionally into the <a class="reference internal" href="yaml_config.html#yaml-configuration"><span class="std std-ref">YAML configuration</span></a>:</p>
+<p>The following transformations can be added optionally into the <a class="reference internal" href="yaml_config.html#yaml-configuration"><span class="std std-ref">YAML Configuration</span></a>:</p>
 <ul class="simple">
 <li><p><strong>SET-NULL</strong>: Transforms any column to NULL.</p></li>
 <li><p><strong>HASH</strong>: Transforms string columns to hash.</p></li>
-<li><p><strong>HASH-SKIP-FIRST-n</strong>: Transforms string columns to hash skipping first n characters, e.g. HASH-SKIP-FIRST-2.</p></li>
+<li><p><strong>HASH-SKIP-FIRST-n</strong>: Keeps the first <code class="docutils literal notranslate"><span class="pre">n</span></code> characters and appends the SHA-256
+hash of the remaining characters. For example, <code class="docutils literal notranslate"><span class="pre">HASH-SKIP-FIRST-2</span></code> preserves
+the first two characters in plain text.</p></li>
 <li><p><strong>MASK-DATE</strong>: Replaces the months and day parts of date columns to be always 1st of Jan.</p></li>
 <li><p><strong>MASK-NUMBER</strong>: Transforms any numeric column to zero.</p></li>
 <li><p><strong>MASK-HIDDEN</strong>: Transforms any string column value to ‘hidden’.</p></li>
-<li><p><strong>MASK-STRING-SKIP-ENDS-n</strong>: Transforms string columns to masked version skipping first and last n characters, e.g. MASK-STRING-SKIP-ENDS-3</p></li>
+<li><p><strong>MASK-STRING-SKIP-ENDS-n</strong>: Keeps the first and last <code class="docutils literal notranslate"><span class="pre">n</span></code> characters and
+replaces the characters between them with <code class="docutils literal notranslate"><span class="pre">*</span></code>. For example,
+<code class="docutils literal notranslate"><span class="pre">MASK-STRING-SKIP-ENDS-2</span></code> transforms <code class="docutils literal notranslate"><span class="pre">nomask</span></code> to <code class="docutils literal notranslate"><span class="pre">no**sk</span></code>. If the value
+has at most <code class="docutils literal notranslate"><span class="pre">2</span> <span class="pre">*</span> <span class="pre">n</span></code> characters, the entire value is masked.</p></li>
 </ul>
 </section>
 <section id="transformation-validation">
 <span id="id3"></span><h2>Transformation validation<a class="headerlink" href="#transformation-validation" title="Link to this heading"></a></h2>
-<p>PipelineWise will run a transformation validation as part of the <cite>import</cite> logic, the validation consists of making sure
-that the transformation type is compatible with the column/field it’s being applied to, e.g <cite>HASH</cite> can only be
-applied to string type fields.</p>
+<p>PipelineWise runs transformation validation as part of <code class="docutils literal notranslate"><span class="pre">import_config</span></code>. It checks
+that each transformation type is compatible with the field to which it is applied;
+for example, <code class="docutils literal notranslate"><span class="pre">HASH</span></code> can only be applied to string fields.</p>
 <p>The validation will also take place at runtime, ie <cite>run_tap</cite>, to make sure any changes to a stream schema are still
 compatible with the configured transformation.</p>
 </section>
@@ -158,56 +164,53 @@ compatible with the configured transformation.</p>
 <p>Using the optional <code class="docutils literal notranslate"><span class="pre">when</span></code> keyword, you can specify conditions how
 the transformation should be applied. If the condition matches
 PipelineWise performs the transformation, otherwise it keeps
-the original value.</p>
+the original value. When a transformation contains multiple <code class="docutils literal notranslate"><span class="pre">when</span></code> entries,
+<strong>all</strong> entries must match (logical AND).</p>
 </section>
 <section id="example">
 <span id="transformations-example"></span><h2>Example<a class="headerlink" href="#example" title="Link to this heading"></a></h2>
-<p>Load Time transformations needs to be defined in the tables section
-in the <a class="reference internal" href="yaml_config.html#yaml-configuration"><span class="std std-ref">YAML configuration</span></a>:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>...
-...
-tables:
-<span class="w">  </span>-<span class="w"> </span>table_name:<span class="w"> </span><span class="s2">&quot;audit_log&quot;</span>
-<span class="w">    </span>replication_method:<span class="w"> </span><span class="s2">&quot;INCREMENTAL&quot;</span>
-<span class="w">    </span>replication_key:<span class="w"> </span><span class="s2">&quot;id&quot;</span>
-<span class="w">    </span>transformations:
-<span class="w">      </span>-<span class="w"> </span>column:<span class="w"> </span><span class="s2">&quot;column_1&quot;</span>
-<span class="w">        </span>type:<span class="w"> </span><span class="s2">&quot;SET-NULL&quot;</span>
-<span class="w">        </span>when:
-<span class="w">          </span>-<span class="w"> </span>column:<span class="w"> </span><span class="s2">&quot;class_name&quot;</span>
-<span class="w">            </span>equals:<span class="w"> </span><span class="s1">&#39;com.transferwise.fx.user.User&#39;</span>
-<span class="w">          </span>-<span class="w"> </span>column:<span class="w"> </span><span class="s2">&quot;property_name&quot;</span>
-<span class="w">            </span>equals:<span class="w"> </span><span class="s1">&#39;passwordHash&#39;</span>
+<p>Load-time transformations need to be defined in the tables section
+in the <a class="reference internal" href="yaml_config.html#yaml-configuration"><span class="std std-ref">YAML Configuration</span></a>:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">tables</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;audit_log&quot;</span>
+<span class="w">    </span><span class="nt">replication_method</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;INCREMENTAL&quot;</span>
+<span class="w">    </span><span class="nt">replication_key</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;id&quot;</span>
+<span class="w">    </span><span class="nt">transformations</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">column</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;column_1&quot;</span>
+<span class="w">        </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;SET-NULL&quot;</span>
+<span class="w">        </span><span class="nt">when</span><span class="p">:</span>
+<span class="w">          </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">column</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;class_name&quot;</span>
+<span class="w">            </span><span class="nt">equals</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;com.transferwise.fx.user.User&#39;</span>
+<span class="w">          </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">column</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;property_name&quot;</span>
+<span class="w">            </span><span class="nt">equals</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;passwordHash&#39;</span>
 
 <span class="w">            </span><span class="c1"># Tip: Use &#39;regex_match&#39; instead of &#39;equals&#39; if you need</span>
 <span class="w">            </span><span class="c1"># more complex matching criteria. For example:</span>
 <span class="w">            </span><span class="c1"># regex_match: &#39;password|salt|passwordHash&#39;</span>
 
-<span class="w">      </span>-<span class="w"> </span>column:<span class="w"> </span><span class="s2">&quot;column_2&quot;</span>
-<span class="w">        </span>type:<span class="w"> </span><span class="s2">&quot;HASH&quot;</span>
-<span class="w">        </span>when:
-<span class="w">          </span>-<span class="w"> </span>column:<span class="w"> </span><span class="s2">&quot;class_name&quot;</span>
-<span class="w">            </span>equals:<span class="w"> </span><span class="s1">&#39;com.transferwise.fx.user.User&#39;</span>
-<span class="w">          </span>-<span class="w"> </span>column:<span class="w"> </span><span class="s2">&quot;property_name&quot;</span>
-<span class="w">            </span>equals:<span class="w"> </span><span class="s1">&#39;passwordHash&#39;</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">column</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;column_2&quot;</span>
+<span class="w">        </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;HASH&quot;</span>
+<span class="w">        </span><span class="nt">when</span><span class="p">:</span>
+<span class="w">          </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">column</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;class_name&quot;</span>
+<span class="w">            </span><span class="nt">equals</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;com.transferwise.fx.user.User&#39;</span>
+<span class="w">          </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">column</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;property_name&quot;</span>
+<span class="w">            </span><span class="nt">equals</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;passwordHash&#39;</span>
 
-<span class="w">      </span>-<span class="w"> </span>column:<span class="w"> </span><span class="s2">&quot;column_3&quot;</span>
-<span class="w">        </span>type:<span class="w"> </span><span class="s2">&quot;HASH&quot;</span>
-<span class="w">        </span>when:
-<span class="w">          </span>-<span class="w"> </span>column:<span class="w"> </span><span class="s2">&quot;json_column&quot;</span>
-<span class="w">            </span>field_path:<span class="w"> </span><span class="s1">&#39;metadata/property_name&#39;</span>
-<span class="w">            </span>equals:<span class="w"> </span><span class="s1">&#39;passwordHash&#39;</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">column</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;column_3&quot;</span>
+<span class="w">        </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;HASH&quot;</span>
+<span class="w">        </span><span class="nt">when</span><span class="p">:</span>
+<span class="w">          </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">column</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;json_column&quot;</span>
+<span class="w">            </span><span class="nt">field_path</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;metadata/property_name&#39;</span>
+<span class="w">            </span><span class="nt">equals</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;passwordHash&#39;</span>
 
-<span class="w">  </span>-<span class="w"> </span>table_name:<span class="w"> </span><span class="s2">&quot;users&quot;</span>
-<span class="w">    </span>replication_method:<span class="w"> </span><span class="s2">&quot;LOG_BASED&quot;</span>
-<span class="w">    </span>transformations:
-<span class="w">      </span>-<span class="w"> </span>column:<span class="w"> </span><span class="s2">&quot;json_column&quot;</span>
-<span class="w">        </span>field_paths:
-<span class="w">          </span>-<span class="w"> </span><span class="s2">&quot;user/info/phone&quot;</span>
-<span class="w">          </span>-<span class="w"> </span><span class="s2">&quot;user/info/addresses/0&quot;</span>
-<span class="w">        </span>type:<span class="w"> </span><span class="s2">&quot;SET-NULL&quot;</span>
-...
-...
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;users&quot;</span>
+<span class="w">    </span><span class="nt">replication_method</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;LOG_BASED&quot;</span>
+<span class="w">    </span><span class="nt">transformations</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">column</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;json_column&quot;</span>
+<span class="w">        </span><span class="nt">field_paths</span><span class="p">:</span>
+<span class="w">          </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;user/info/phone&quot;</span>
+<span class="w">          </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;user/info/addresses/0&quot;</span>
+<span class="w">        </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;SET-NULL&quot;</span>
 </pre></div>
 </div>
 </section>
@@ -218,7 +221,7 @@ tables:
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="schema_changes.html" class="btn btn-neutral float-left" title="Schema Changes" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="logging.html" class="btn btn-neutral float-right" title="Logging" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="metadata_columns.html" class="btn btn-neutral float-right" title="Metadata Columns" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

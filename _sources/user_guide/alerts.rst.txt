@@ -5,10 +5,9 @@ Alerts
 ------
 
 PipelineWise can send alerts to external systems on run failures by configuring
-alert handlers in the main ``config.yml``. This ``config.yml`` is created
-automatically when :ref:`generating_pipelines`. Alerts triggered on
-:ref:`cli_run_tap` or :ref:`cli_sync_tables` CLI command failures. The triggered
-alert provides the id of the failed tap and a description about the failure
+alert handlers in the main ``config.yml``. This file is created automatically
+when :ref:`generating_pipelines`. Alerts are triggered when :ref:`cli_run_tap`
+or :ref:`cli_fast_sync` fails. The alert provides the ID of the failed tap and a description of the failure
 to the alert handler.
 
 .. warning::
@@ -33,7 +32,7 @@ To send alerts to a Slack channel on failed tap runs:
 
 2. Add the ``chat:write`` OAuth Scope to the app.
 
-3. Invite the bot to the channel by the ``/invite <bot_name>`` slack command.
+3. Invite the bot to the channel with the ``/invite <bot_name>`` Slack command.
 
 4. Configure the main ``config.yml``
 
@@ -53,8 +52,8 @@ To send alerts to a Slack channel on failed tap runs:
         channel: "#slack-channel"
 
 
-To send a copy of alerts to the specific channel for a tap, beside the previous
-settings, you need to add below setting also in the tap config yaml file:
+To send a copy of a tap's alerts to a different channel, add the following setting
+to that tap's YAML file in addition to the handler configuration above:
 
 .. code-block:: yaml
 
@@ -73,7 +72,7 @@ To send alerts and open an incident on VictorOps:
 
 1. Follow the instructions at `Enable the VictorOps REST Endpoint <https://help.victorops.com/knowledge-base/rest-endpoint-integration-guide/>`_ and get the long notify URL.
 
-2. Find your routing key in VictorOps settings page
+2. Find the routing key on the VictorOps settings page.
 
 3. Configure the main ``config.yml``:
 
@@ -83,7 +82,7 @@ To send alerts and open an incident on VictorOps:
 
    ``routing_key``: VictorOps routing key
 
-.. code-block:: bash
+.. code-block:: yaml
 
     ---
 
@@ -95,4 +94,3 @@ To send alerts and open an incident on VictorOps:
 .. warning::
 
   Make sure the VictorOps ``base_url`` **does not include** the ``routing_key``.
-

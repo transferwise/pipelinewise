@@ -41,7 +41,7 @@ Example YAML for tap-snowflake:
     # ------------------------------------------------------------------------------
     db_conn:
       account: "<HOST>"                    # Snowflake host
-      dbname: "<DBNANE>"                   # Snowflake database name
+      dbname: "<DBNAME>"                   # Snowflake database name
       user: "<USER>"                       # Snowflake user
       password: "<PASSWORD>"               # Plain string or vault encrypted
       warehouse: "<WAREHOUSE>"             # Snowflake warehouse

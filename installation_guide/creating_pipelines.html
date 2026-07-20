@@ -61,23 +61,24 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../concept/singer.html">Singer.io</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../concept/replication_methods.html">Replication Methods</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../concept/fastsync.html">Fast Sync</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concept/fastsync.html">FastSync</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../concept/linux_pipes.html">Linux Pipes in PipelineWise</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Using PipelineWise</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/yaml_config.html">YAML configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/yaml_config.html">YAML Configuration</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/encrypting_passwords.html">Encrypting Passwords</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/cli.html">Command Line Interface</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/scheduling.html">Scheduling</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/scheduling.html#multi-server-cluster">Multi-Server Cluster</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/metadata_columns.html">Metadata Columns</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/schema_changes.html">Schema Changes</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/transformations.html">Transformations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/multi_server_cluster.html">Multi-Server Cluster</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/logging.html">Logging</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/alerts.html">Alerts</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/resync.html">Resync Tables</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/partial_sync.html">Different cases of partial resync</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/schema_changes.html">Schema Changes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/transformations.html">Transformations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/metadata_columns.html">Metadata Columns</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/troubleshooting.html">Troubleshooting</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Connectors</span></p>
 <ul>
@@ -145,15 +146,32 @@ project with the PipelineWise  <a class="reference internal" href="../user_guide
 <span class="w">    </span>├──<span class="w"> </span>config.yml
 <span class="w">    </span>├──<span class="w"> </span>tap_jira.yml.sample
 <span class="w">    </span>├──<span class="w"> </span>tap_kafka.yml.sample
+<span class="w">    </span>├──<span class="w"> </span>tap_github.yml.sample
+<span class="w">    </span>├──<span class="w"> </span>tap_google_analytics.yml.sample
+<span class="w">    </span>├──<span class="w"> </span>tap_mixpanel.yml.sample
+<span class="w">    </span>├──<span class="w"> </span>tap_mongodb.yml.sample
 <span class="w">    </span>├──<span class="w"> </span>tap_mysql_mariadb.yml.sample
+<span class="w">    </span>├──<span class="w"> </span>tap_oracle.yml.sample
 <span class="w">    </span>├──<span class="w"> </span>tap_postgres.yml.sample
 <span class="w">    </span>├──<span class="w"> </span>tap_s3_csv.yml.sample
+<span class="w">    </span>├──<span class="w"> </span>tap_salesforce.yml.sample
+<span class="w">    </span>├──<span class="w"> </span>tap_shopify.yml.sample
+<span class="w">    </span>├──<span class="w"> </span>tap_slack.yml.sample
 <span class="w">    </span>├──<span class="w"> </span>tap_snowflake.yml.sample
+<span class="w">    </span>├──<span class="w"> </span>tap_twilio.yml.sample
 <span class="w">    </span>├──<span class="w"> </span>tap_zendesk.yml.sample
+<span class="w">    </span>├──<span class="w"> </span>tap_zuora.yml.sample
 <span class="w">    </span>├──<span class="w"> </span>target_postgres.yml.sample
 <span class="w">    </span>├──<span class="w"> </span>target_s3_csv.yml.sample
 <span class="w">    </span>└──<span class="w"> </span>target_snowflake.yml.sample
 </pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><code class="docutils literal notranslate"><span class="pre">pipelinewise</span> <span class="pre">init</span></code> includes some legacy connector templates for compatibility.
+A generated template does not guarantee that its connector is packaged by the
+current release. See <a class="reference internal" href="installation.html#selecting-singer-connectors"><span class="std std-ref">Selecting singer connectors</span></a> for the packaged connector
+list before configuring Google Analytics, Oracle, Shopify or Zuora.</p>
 </div>
 <p>To create a new pipeline you need to enable at least one tap and target by renaming the
 <code class="docutils literal notranslate"><span class="pre">tap_....yml.sample</span></code> and one <code class="docutils literal notranslate"><span class="pre">target_...yml.sample</span></code> file by removing the <code class="docutils literal notranslate"><span class="pre">.sample</span></code>
@@ -169,15 +187,15 @@ for a real life example.</p>
 <span id="passing-environment-variables-via-jinja"></span><h2>Environment variables in YAML config<a class="headerlink" href="#environment-variables-in-yaml-config" title="Link to this heading"></a></h2>
 <p>It is possible to use environment variables in the YAML config files.
 This feature is implemented using jinja templates and requires the following syntax to work:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>---
-id:<span class="w"> </span><span class="s2">&quot;snowflake_test&quot;</span>
-name:<span class="w"> </span><span class="s2">&quot;Snowflake Test&quot;</span>
-type:<span class="w"> </span><span class="s2">&quot;target-snowflake&quot;</span>
-db_conn:
-<span class="w">  </span>account:<span class="w"> </span><span class="s2">&quot;rtxxxxxx.eu-central-1&quot;</span>
-<span class="w">  </span>dbname:<span class="w"> </span><span class="s2">&quot;analytics_db_test&quot;</span>
-<span class="w">  </span>user:<span class="w"> </span><span class="s2">&quot;snowflake_user&quot;</span>
-<span class="w">  </span>password:<span class="w"> </span><span class="s2">&quot;{{ env_var[&#39;MY_PASSWORD&#39;] }}&quot;</span>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nn">---</span>
+<span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;snowflake&quot;</span>
+<span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Snowflake</span><span class="nv"> </span><span class="s">Test&quot;</span>
+<span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;target-snowflake&quot;</span>
+<span class="nt">db_conn</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">account</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;rtxxxxxx.eu-central-1&quot;</span>
+<span class="w">  </span><span class="nt">dbname</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;analytics_db_test&quot;</span>
+<span class="w">  </span><span class="nt">user</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;snowflake_user&quot;</span>
+<span class="w">  </span><span class="nt">password</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;{{</span><span class="nv"> </span><span class="s">env_var[&#39;MY_PASSWORD&#39;]</span><span class="nv"> </span><span class="s">}}&quot;</span>
 </pre></div>
 </div>
 </section>
@@ -187,35 +205,35 @@ db_conn:
 using a mix of <a class="reference internal" href="../concept/replication_methods.html#full-table"><span class="std std-ref">Full Table</span></a>, <a class="reference internal" href="../concept/replication_methods.html#incremental"><span class="std std-ref">Key Based Incremental</span></a> and <a class="reference internal" href="../concept/replication_methods.html#log-based"><span class="std std-ref">Log Based</span></a> replication methods.
 We will need the <code class="docutils literal notranslate"><span class="pre">tap_mysql_mariadb.yml</span></code> and <code class="docutils literal notranslate"><span class="pre">target_snowflake.yml</span></code>:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span><span class="nb">cd</span><span class="w"> </span>pipelinewise_samples
-$<span class="w"> </span>mv<span class="w"> </span>tap_mysql_mariadb.yml.sample<span class="w"> </span>tap_my_mysql_db_one.yml
+$<span class="w"> </span>mv<span class="w"> </span>tap_mysql_mariadb.yml.sample<span class="w"> </span>tap_mysql_sample.yml
 $<span class="w"> </span>mv<span class="w"> </span>target_snowflake.yml.sample<span class="w">  </span>target_snowflake.yml
 </pre></div>
 </div>
-<p>1.  Edit <code class="docutils literal notranslate"><span class="pre">target_snowflake.yml</span></code>. This will be the destination of one or more sources.
+<p>1. Edit <code class="docutils literal notranslate"><span class="pre">target_snowflake.yml</span></code>. This will be the destination of one or more sources.
 You can edit it with the text editor of your choice:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>---
-id:<span class="w"> </span><span class="s2">&quot;snowflake_test&quot;</span>
-name:<span class="w"> </span><span class="s2">&quot;Snowflake Test&quot;</span>
-type:<span class="w"> </span><span class="s2">&quot;target-snowflake&quot;</span>
-db_conn:
-<span class="w">  </span>account:<span class="w"> </span><span class="s2">&quot;rtxxxxxx.eu-central-1&quot;</span>
-<span class="w">  </span>dbname:<span class="w"> </span><span class="s2">&quot;analytics_db_test&quot;</span>
-<span class="w">  </span>user:<span class="w"> </span><span class="s2">&quot;snowflake_user&quot;</span>
-<span class="w">  </span>password:<span class="w"> </span><span class="s2">&quot;PASSWORD&quot;</span><span class="w">                                   </span><span class="c1"># Plain string or Vault Encrypted password</span>
-<span class="w">  </span>warehouse:<span class="w"> </span><span class="s2">&quot;LOAD_WH&quot;</span>
-<span class="w">  </span>s3_bucket:<span class="w"> </span><span class="s2">&quot;pipelinewise-bucket&quot;</span>
-<span class="w">  </span>s3_key_prefix:<span class="w"> </span><span class="s2">&quot;snowflake-imports-test/&quot;</span>
-<span class="w">  </span>aws_access_key_id:<span class="w"> </span><span class="s2">&quot;ACCESS_KEY_ID&quot;</span><span class="w">                     </span><span class="c1"># Plain string or Vault Encrypted password</span>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nn">---</span>
+<span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;snowflake&quot;</span>
+<span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Snowflake&quot;</span>
+<span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;target-snowflake&quot;</span>
+<span class="nt">db_conn</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">account</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;rtxxxxxx.eu-central-1&quot;</span>
+<span class="w">  </span><span class="nt">dbname</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;analytics_db_test&quot;</span>
+<span class="w">  </span><span class="nt">user</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;snowflake_user&quot;</span>
+<span class="w">  </span><span class="nt">private_key</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/path/to/snowflake_private_key.pem&quot;</span>
+<span class="w">  </span><span class="nt">warehouse</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;LOAD_WH&quot;</span>
+<span class="w">  </span><span class="nt">s3_bucket</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;pipelinewise-bucket&quot;</span>
+<span class="w">  </span><span class="nt">s3_key_prefix</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;snowflake-imports-test/&quot;</span>
+<span class="w">  </span><span class="nt">aws_access_key_id</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;ACCESS_KEY_ID&quot;</span><span class="w">                     </span><span class="c1"># Plain string or Vault Encrypted password</span>
 <span class="w">  </span><span class="c1"># stage and file_format are pre-created objects in Snowflake that requires to load and</span>
 <span class="w">  </span><span class="c1"># merge data correctly from S3 to tables in one step without using temp tables</span>
 <span class="w">  </span><span class="c1">#  stage      : External stage object pointing to an S3 bucket</span>
 <span class="w">  </span><span class="c1">#  file_format: Named file format object used for bulk loading data from S3 into</span>
 <span class="w">  </span><span class="c1">#               snowflake tables.</span>
-<span class="w">  </span>stage:<span class="w"> </span><span class="s2">&quot;pipelinewise.encrypted_etl_stage_test&quot;</span>
-<span class="w">  </span>file_format:<span class="w"> </span><span class="s2">&quot;pipelinewise.etl_stage_file_format&quot;</span>
-<span class="w">  </span>aws_secret_access_key:<span class="w"> </span><span class="s2">&quot;&lt;SECRET_ASCCESS_KEY&gt;&quot;</span><span class="w">          </span><span class="c1"># Plain string or Vault Encrypted password</span>
+<span class="w">  </span><span class="nt">stage</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;pipelinewise.encrypted_etl_stage_test&quot;</span>
+<span class="w">  </span><span class="nt">file_format</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;pipelinewise.etl_stage_file_format&quot;</span>
+<span class="w">  </span><span class="nt">aws_secret_access_key</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;SECRET_ACCESS_KEY&gt;&quot;</span><span class="w">           </span><span class="c1"># Plain string or Vault Encrypted password</span>
 <span class="w">  </span><span class="c1"># The same master key has to be added to the external stage object created in snowflake</span>
-<span class="w">  </span>client_side_encryption_master_key:<span class="w"> </span><span class="s2">&quot;&lt;CSE_MASTER_KEY&gt;&quot;</span><span class="w">  </span><span class="c1"># Plain string or Vault Encrypted password</span>
+<span class="w">  </span><span class="nt">client_side_encryption_master_key</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;CSE_MASTER_KEY&gt;&quot;</span><span class="w">  </span><span class="c1"># Plain string or Vault Encrypted password</span>
 </pre></div>
 </div>
 <div class="admonition note">
@@ -225,45 +243,47 @@ making them safe to distribute or place in source control. For further details, 
 <a class="reference internal" href="../user_guide/encrypting_passwords.html#encrypting-passwords"><span class="std std-ref">Encrypting Passwords</span></a> section.</p>
 </div>
 <ol class="arabic simple" start="2">
-<li><p>Edit <code class="docutils literal notranslate"><span class="pre">tap_mysql_mariadb.yml</span></code>:</p></li>
+<li><p>Edit <code class="docutils literal notranslate"><span class="pre">tap_mysql_sample.yml</span></code>:</p></li>
 </ol>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>---
-id:<span class="w"> </span><span class="s2">&quot;fx&quot;</span>
-name:<span class="w"> </span><span class="s2">&quot;FX (Monolith)&quot;</span>
-type:<span class="w"> </span><span class="s2">&quot;tap-mysql&quot;</span>
-owner:<span class="w"> </span><span class="s2">&quot;somebody@transferwise.com&quot;</span>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nn">---</span>
+<span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;mysql_sample&quot;</span>
+<span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Sample</span><span class="nv"> </span><span class="s">MySQL</span><span class="nv"> </span><span class="s">Database&quot;</span>
+<span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;tap-mysql&quot;</span>
+<span class="nt">owner</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;somebody@transferwise.com&quot;</span>
 
 <span class="c1"># Source connection details</span>
-db_conn:
-<span class="w">  </span>host:<span class="w"> </span><span class="s2">&quot;localhost&quot;</span>
-<span class="w">  </span>port:<span class="w"> </span><span class="m">10602</span>
-<span class="w">  </span>user:<span class="w"> </span><span class="s2">&quot;my_user&quot;</span>
-<span class="w">  </span>password:<span class="w"> </span><span class="s2">&quot;&lt;PASSWORD&gt;&quot;</span><span class="w">                  </span><span class="c1"># Plain string or Vault Encrypted password</span>
+<span class="nt">db_conn</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">host</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;localhost&quot;</span>
+<span class="w">  </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10602</span>
+<span class="w">  </span><span class="nt">user</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;my_user&quot;</span>
+<span class="w">  </span><span class="nt">password</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;PASSWORD&gt;&quot;</span><span class="w">                  </span><span class="c1"># Plain string or Vault Encrypted password</span>
+<span class="w">  </span><span class="nt">dbname</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;sample_db&quot;</span>
 
-target:<span class="w"> </span><span class="s2">&quot;snowflake_test&quot;</span><span class="w">                  </span><span class="c1"># Target ID, should match the id from target_snowflake.yml</span>
-batch_size_rows:<span class="w"> </span><span class="m">100000</span><span class="w">                   </span><span class="c1"># Batch size for the stream to optimise load performance</span>
+<span class="nt">target</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;snowflake&quot;</span><span class="w">                       </span><span class="c1"># Must match the id in target_snowflake.yml</span>
+<span class="nt">batch_size_rows</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">100000</span><span class="w">                   </span><span class="c1"># Batch size for the stream to optimise load performance</span>
 
 <span class="c1"># Source to Destination Schema mapping</span>
-schemas:
-<span class="w">  </span>-<span class="w"> </span>source_schema:<span class="w"> </span><span class="s2">&quot;fx&quot;</span><span class="w">                   </span><span class="c1"># You can replicate from multiple schemas</span>
-<span class="w">      </span>target_schema:<span class="w"> </span><span class="s2">&quot;fx_clear&quot;</span><span class="w">           </span><span class="c1"># Target schema in snowflake</span>
-<span class="w">      </span>target_schema_select_permissions:<span class="w">   </span><span class="c1"># Grant permission once the table created</span>
-<span class="w">        </span>-<span class="w"> </span>grp_power
-<span class="w">      </span>tables:<span class="w">                             </span><span class="c1"># List Tables to replicate</span>
-<span class="w">        </span>-<span class="w"> </span>table_name:<span class="w"> </span><span class="s2">&quot;table_one&quot;</span>
-<span class="w">          </span>replication_method:<span class="w"> </span>FULL_TABLE<span class="w">  </span><span class="c1"># 1) FULL_TABLE replication</span>
-<span class="w">        </span>-<span class="w"> </span>table_name:<span class="w"> </span><span class="s2">&quot;table_two&quot;</span><span class="w">         </span><span class="c1">#</span>
-<span class="w">          </span>replication_method:<span class="w"> </span>LOG_BASED<span class="w">   </span><span class="c1"># 2) LOG_BASED replication</span>
-<span class="w">        </span>-<span class="w"> </span>table_name:<span class="w"> </span><span class="s2">&quot;table_three&quot;</span><span class="w">       </span><span class="c1">#</span>
-<span class="w">          </span>replication_method:<span class="w"> </span>INCREMENTAL<span class="w"> </span><span class="c1"># 3) INCREMENTAL replication</span>
-<span class="w">          </span>replication_key:<span class="w"> </span><span class="s2">&quot;updated_at&quot;</span><span class="w">   </span><span class="c1">#    Incremental load needs replication key</span>
+<span class="nt">schemas</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">source_schema</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;sample_db&quot;</span><span class="w">            </span><span class="c1"># You can replicate from multiple schemas</span>
+<span class="w">    </span><span class="nt">target_schema</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;sample_db&quot;</span><span class="w">            </span><span class="c1"># Target schema in Snowflake</span>
+<span class="w">    </span><span class="nt">target_schema_select_permissions</span><span class="p">:</span><span class="w">   </span><span class="c1"># Grant permission once the table created</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">grp_power</span>
+<span class="w">    </span><span class="nt">tables</span><span class="p">:</span><span class="w">                             </span><span class="c1"># List Tables to replicate</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;table_one&quot;</span>
+<span class="w">        </span><span class="nt">replication_method</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">FULL_TABLE</span><span class="w">  </span><span class="c1"># 1) FULL_TABLE replication</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;table_two&quot;</span><span class="w">         </span><span class="c1">#</span>
+<span class="w">        </span><span class="nt">replication_method</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">LOG_BASED</span><span class="w">   </span><span class="c1"># 2) LOG_BASED replication</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;table_three&quot;</span><span class="w">       </span><span class="c1">#</span>
+<span class="w">        </span><span class="nt">replication_method</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">INCREMENTAL</span><span class="w"> </span><span class="c1"># 3) INCREMENTAL replication</span>
+<span class="w">        </span><span class="nt">replication_key</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;updated_at&quot;</span><span class="w">   </span><span class="c1">#    Incremental load needs replication key</span>
 </pre></div>
 </div>
 </section>
 <section id="activating-the-pipelines-from-the-yaml-files">
 <span id="import-project-from-yaml"></span><h2>Activating the Pipelines from the YAML files<a class="headerlink" href="#activating-the-pipelines-from-the-yaml-files" title="Link to this heading"></a></h2>
-<p>When you are happy with the configuration you need to import it with the <a class="reference internal" href="../user_guide/cli.html#cli-import"><span class="std std-ref">import</span></a> command:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>pipelinewise<span class="w"> </span>import<span class="w"> </span>--dir<span class="w"> </span>pipelinewise_samples
+<p>When you are happy with the configuration, import it with the
+<a class="reference internal" href="../user_guide/cli.html#cli-import-config"><span class="std std-ref">import_config</span></a> command:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>pipelinewise<span class="w"> </span>import_config<span class="w"> </span>--dir<span class="w"> </span>pipelinewise_samples
 
 <span class="w">        </span>...<span class="w"> </span>detailed<span class="w"> </span>messages<span class="w"> </span>about<span class="w"> </span>import<span class="w"> </span>and<span class="w"> </span>discovery...
 
@@ -294,7 +314,7 @@ mysql_sample<span class="w">  </span>tap-mysql<span class="w">   </span>snowflak
 </pre></div>
 </div>
 <p>Congratulations! At this point you have successfully created your first pipeline in PipelineWise and it’s now
-ready to run. You may want you can create a new git repository and push the <code class="docutils literal notranslate"><span class="pre">pipelinewise_samples</span></code>
+ready to run. You may want to create a new git repository and push the <code class="docutils literal notranslate"><span class="pre">pipelinewise_samples</span></code>
 directory to keep everything under version control.</p>
 <p>Now you can head to the <a class="reference internal" href="running_pipelines.html#running-pipelines"><span class="std std-ref">Running Pipelines</span></a> section to run the pipelines and to start replicating data.</p>
 </section>

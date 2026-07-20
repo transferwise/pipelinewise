@@ -1,10 +1,19 @@
-Notice
-======
-To better serve Wise business and customer needs, the PipelineWise codebase needs to shrink.
-We have made the difficult decision that, going forward many components of PipelineWise will be removed or incorporated in the main repo.
-The last version before this decision is `v0.64.1 <https://github.com/transferwise/pipelinewise/tree/v0.64.1>`_
+Project scope notice
+====================
 
-We thank all in the open-source community, that over the past 6 years, have helped to make PipelineWise a robust product for heterogeneous replication of many many Terabytes, daily
+After ``v0.64.1``, PipelineWise began reducing the number of connectors it
+packages so that development could focus on Wise's current requirements.
+`v0.64.1 <https://github.com/transferwise/pipelinewise/tree/v0.64.1>`_ is the
+last release from before that reduction; it is a historical reference, not a
+recommendation to use an older release.
+
+The connectors included by current builds are listed in :ref:`selecting_singer_connectors`.
+``pipelinewise init`` may still generate configuration templates for legacy
+connectors, but the presence of a template does not mean that its connector is
+packaged or maintained by the current release.
+
+We thank everyone in the open-source community who helped make PipelineWise a
+robust framework for heterogeneous replication over the years.
 
 .. image:: img/pipelinewise-with-text.png
     :width: 300
@@ -50,8 +59,8 @@ Taps (Data Source Connectors)
 :ref:`taps_list`
 
 
-Target (Destination Connectors)
--------------------------------
+Targets (Destination Connectors)
+--------------------------------
 
 :ref:`targets_list`
 
@@ -89,13 +98,15 @@ Content
    user_guide/encrypting_passwords
    user_guide/cli
    user_guide/scheduling
-   user_guide/metadata_columns
-   user_guide/schema_changes
-   user_guide/transformations
+   user_guide/multi_server_cluster
    user_guide/logging
    user_guide/alerts
    user_guide/resync
    user_guide/partial_sync
+   user_guide/schema_changes
+   user_guide/transformations
+   user_guide/metadata_columns
+   user_guide/troubleshooting
 
 .. toctree::
    :maxdepth: 2

@@ -55,23 +55,24 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../concept/singer.html">Singer.io</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../concept/replication_methods.html">Replication Methods</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../concept/fastsync.html">Fast Sync</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../concept/fastsync.html">FastSync</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../concept/linux_pipes.html">Linux Pipes in PipelineWise</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Using PipelineWise</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/yaml_config.html">YAML configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/yaml_config.html">YAML Configuration</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/encrypting_passwords.html">Encrypting Passwords</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/cli.html">Command Line Interface</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/scheduling.html">Scheduling</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/scheduling.html#multi-server-cluster">Multi-Server Cluster</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/metadata_columns.html">Metadata Columns</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/schema_changes.html">Schema Changes</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/transformations.html">Transformations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/multi_server_cluster.html">Multi-Server Cluster</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/logging.html">Logging</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/alerts.html">Alerts</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/resync.html">Resync Tables</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/partial_sync.html">Different cases of partial resync</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/schema_changes.html">Schema Changes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/transformations.html">Transformations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/metadata_columns.html">Metadata Columns</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/troubleshooting.html">Troubleshooting</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Connectors</span></p>
 <ul class="current">
@@ -92,6 +93,8 @@
 <li class="toctree-l2"><a class="reference internal" href="github.html">Tap Github</a></li>
 <li class="toctree-l2"><a class="reference internal" href="slack.html">Tap Slack</a></li>
 <li class="toctree-l2"><a class="reference internal" href="mixpanel.html">Tap Mixpanel</a></li>
+<li class="toctree-l2"><a class="reference internal" href="salesforce.html">Tap Salesforce</a></li>
+<li class="toctree-l2"><a class="reference internal" href="twilio.html">Tap Twilio</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../targets.html">Targets (Destinations)</a></li>
@@ -185,9 +188,9 @@ JSON objects for logical decoding, which the tap then uses to perform Log-based 
 <p>After you’ve installed the plugin, you can move onto the next step.</p>
 <p><strong>Step 3.2: Edit the database configuration file</strong></p>
 <p>Locate the database configuration file (usually <code class="docutils literal notranslate"><span class="pre">postgresql.conf</span></code>) and define the parameters as follows:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">wal_level</span><span class="o">=</span>logical
-<span class="nv">max_replication_slots</span><span class="o">=</span><span class="m">5</span>
-<span class="nv">max_wal_senders</span><span class="o">=</span><span class="m">5</span>
+<div class="highlight-ini notranslate"><div class="highlight"><pre><span></span><span class="na">wal_level</span><span class="o">=</span><span class="s">logical</span>
+<span class="na">max_replication_slots</span><span class="o">=</span><span class="s">5</span>
+<span class="na">max_wal_senders</span><span class="o">=</span><span class="s">5</span>
 </pre></div>
 </div>
 <p><strong>Note</strong>: For <code class="docutils literal notranslate"><span class="pre">max_replication_slots</span></code> and <code class="docutils literal notranslate"><span class="pre">max_wal_senders</span></code>, we’re defaulting to a value of 5.
@@ -233,7 +236,7 @@ following the steps in the <a class="reference internal" href="../../installatio
 <span class="nt">db_conn</span><span class="p">:</span>
 <span class="w">  </span><span class="nt">host</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;HOST&gt;&quot;</span><span class="w">                       </span><span class="c1"># PostgreSQL host</span>
 <span class="w">  </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5432</span><span class="w">                           </span><span class="c1"># PostgreSQL port</span>
-<span class="w">  </span><span class="nt">user</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;USER&gt;&quot;</span><span class="w">                       </span><span class="c1"># PostfreSQL user</span>
+<span class="w">  </span><span class="nt">user</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;USER&gt;&quot;</span><span class="w">                       </span><span class="c1"># PostgreSQL user</span>
 <span class="w">  </span><span class="nt">password</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;PASSWORD&gt;&quot;</span><span class="w">               </span><span class="c1"># Plain string or vault encrypted</span>
 <span class="w">  </span><span class="nt">dbname</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;DB_NAME&gt;&quot;</span><span class="w">                  </span><span class="c1"># PostgreSQL database name</span>
 <span class="w">  </span><span class="c1">#replica_host: &quot;&lt;REPLICA_HOST&gt;&quot;      # Optional: PostgresSQL replica host to offload initial/FastSync</span>
@@ -255,7 +258,7 @@ following the steps in the <a class="reference internal" href="../../installatio
 <span class="w">  </span><span class="c1">#ssl: &quot;true&quot;                         # Optional: Using SSL via postgres sslmode &#39;require&#39; option.</span>
 <span class="w">                                       </span><span class="c1">#           If the server does not accept SSL connections or the client</span>
 <span class="w">                                       </span><span class="c1">#           certificate is not recognized the connection will fail</span>
-<span class="w">  </span><span class="nt">fastsync_parallelism</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">&lt;int&gt;</span><span class="w">          </span><span class="c1"># Optional: size of multiprocessing pool used by FastSync</span>
+<span class="w">  </span><span class="c1">#fastsync_parallelism: 4             # Optional: size of multiprocessing pool used by FastSync</span>
 <span class="w">                                       </span><span class="c1">#           Min: 1</span>
 <span class="w">                                       </span><span class="c1">#           Default: number of CPU cores</span>
 <span class="w">  </span><span class="c1">#limit: 50000                        # Optional: limit to add to incremental queries, this is useful to avoid long running transactions on the DB</span>
@@ -267,7 +270,8 @@ following the steps in the <a class="reference internal" href="../../installatio
 <span class="nt">target</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;snowflake&quot;</span><span class="w">                    </span><span class="c1"># ID of the target connector where the data will be loaded</span>
 <span class="nt">batch_size_rows</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">20000</span><span class="w">                 </span><span class="c1"># Batch size for the stream to optimise load performance</span>
 <span class="nt">stream_buffer_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span><span class="w">                  </span><span class="c1"># In-memory buffer size (MB) between taps and targets for asynchronous data pipes</span>
-<span class="c1">#batch_wait_limit_seconds: 3600        # Optional: Maximum time to wait for `batch_size_rows`. Available only for snowflake target.</span>
+<span class="c1">#batch_wait_limit_seconds: 3600        # Optional: Maximum time (seconds) to wait for `batch_size_rows` before</span>
+<span class="w">                                       </span><span class="c1">#           flushing a partial batch. Available only for Snowflake target.</span>
 
 <span class="c1"># Options only for Snowflake target</span>
 <span class="c1">#split_large_files: False                       # Optional: split large files to multiple pieces and create multipart zip files. (Default: False)</span>
@@ -291,7 +295,7 @@ following the steps in the <a class="reference internal" href="../../installatio
 <span class="w">    </span><span class="c1"># List of tables to replicate from Postgres to destination Data Warehouse</span>
 <span class="w">    </span><span class="c1">#</span>
 <span class="w">    </span><span class="c1"># Please check the Replication Strategies section in the documentation to understand the differences.</span>
-<span class="w">    </span><span class="c1"># For LOG_BASED replication method you might need to adjust the source mysql/ mariadb configuration.</span>
+<span class="w">    </span><span class="c1"># For LOG_BASED replication method you might need to adjust the source PostgreSQL configuration.</span>
 <span class="w">    </span><span class="nt">tables</span><span class="p">:</span>
 <span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;table_one&quot;</span>
 <span class="w">        </span><span class="nt">replication_method</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;INCREMENTAL&quot;</span><span class="w">   </span><span class="c1"># One of INCREMENTAL, LOG_BASED and FULL_TABLE</span>
@@ -304,27 +308,28 @@ following the steps in the <a class="reference internal" href="../../installatio
 
 <span class="w">      </span><span class="c1"># You can add as many tables as you need...</span>
 <span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;table_two&quot;</span>
-<span class="w">        </span><span class="nt">replication_method</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;LOG_BASED&quot;</span><span class="w">     </span><span class="c1"># Important! Log based must be enabled in MySQL</span>
+<span class="w">        </span><span class="nt">replication_method</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;LOG_BASED&quot;</span><span class="w">     </span><span class="c1"># Important! Log based must be enabled in PostgreSQL</span>
 
 <span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;table_three&quot;</span>
 <span class="w">        </span><span class="nt">replication_method</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;LOG_BASED&quot;</span>
-<span class="w">        </span><span class="nt">sync_start_from</span><span class="p">:</span><span class="w">                   </span><span class="c1"># Optional, applies for then first sync and fast sync</span>
-<span class="w">          </span><span class="nt">column</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;column_name&quot;</span><span class="w">            </span><span class="c1"># column name to be picked for partial sync with inremental or timestamp value</span>
+<span class="w">        </span><span class="nt">sync_start_from</span><span class="p">:</span><span class="w">                   </span><span class="c1"># Optional, applies for the first sync and fast sync</span>
+<span class="w">          </span><span class="nt">column</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;column_name&quot;</span><span class="w">            </span><span class="c1"># column name to be picked for partial sync with incremental or timestamp value</span>
 <span class="w">          </span><span class="nt">static_value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;start_value&quot;</span><span class="w">      </span><span class="c1"># A static value which the first sync always starts from column &gt;= static_value</span>
 <span class="w">          </span><span class="nt">drop_target_table</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">          </span><span class="c1"># Optional, drops target table before syncing. default value is false</span>
 
 <span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;table_four&quot;</span>
 <span class="w">        </span><span class="nt">replication_method</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;LOG_BASED&quot;</span>
-<span class="w">        </span><span class="nt">sync_start_from</span><span class="p">:</span><span class="w">                   </span><span class="c1"># Optional, applies for then first sync and fast sync</span>
+<span class="w">        </span><span class="nt">sync_start_from</span><span class="p">:</span><span class="w">                   </span><span class="c1"># Optional, applies for the first sync and fast sync</span>
 <span class="w">          </span><span class="nt">column</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;column_name&quot;</span><span class="w">            </span><span class="c1"># Column name to be picked for partial sync with incremental or timestamp value</span>
-<span class="w">          </span><span class="nt">dynamic_value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;A</span><span class="nv"> </span><span class="s">SELECT</span><span class="nv"> </span><span class="s">query</span><span class="nv">   </span><span class="s">#</span><span class="nv"> </span><span class="s">It</span><span class="nv"> </span><span class="s">can</span><span class="nv"> </span><span class="s">be</span><span class="nv"> </span><span class="s">a</span><span class="nv"> </span><span class="s">valid</span><span class="nv"> </span><span class="s">PG</span><span class="nv"> </span><span class="s">SELECT</span><span class="nv"> </span><span class="s">query</span><span class="nv"> </span><span class="s">which</span><span class="nv"> </span><span class="s">returns</span><span class="nv"> </span><span class="s">only</span><span class="nv"> </span><span class="s">one</span><span class="nv"> </span><span class="s">row</span><span class="nv"> </span><span class="s">with</span><span class="nv"> </span><span class="s">one</span><span class="nv"> </span><span class="s">column</span><span class="nv"> </span><span class="s">and</span><span class="nv"> </span><span class="s">first</span><span class="nv"> </span><span class="s">sync</span><span class="nv"> </span><span class="s">always</span><span class="nv"> </span><span class="s">starts</span><span class="nv"> </span><span class="s">from</span><span class="nv"> </span><span class="s">column</span><span class="nv"> </span><span class="s">&gt;=</span><span class="nv"> </span><span class="s">dynamic_value</span>
-<span class="w">          </span><span class="s">drop_target_table:</span><span class="nv"> </span><span class="s">true</span><span class="nv">          </span><span class="s">#</span><span class="nv"> </span><span class="s">Optional,</span><span class="nv"> </span><span class="s">drops</span><span class="nv"> </span><span class="s">target</span><span class="nv"> </span><span class="s">table</span><span class="nv"> </span><span class="s">before</span><span class="nv"> </span><span class="s">syncing.</span><span class="nv"> </span><span class="s">default</span><span class="nv"> </span><span class="s">value</span><span class="nv"> </span><span class="s">is</span><span class="nv"> </span><span class="s">false</span>
+<span class="w">          </span><span class="nt">dynamic_value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;SELECT</span><span class="nv"> </span><span class="s">MAX(updated_at)</span><span class="nv"> </span><span class="s">-</span><span class="nv"> </span><span class="s">INTERVAL</span><span class="nv"> </span><span class="s">&#39;7</span><span class="nv"> </span><span class="s">days&#39;</span><span class="nv"> </span><span class="s">FROM</span><span class="nv"> </span><span class="s">table_four&quot;</span>
+<span class="w">          </span><span class="nt">drop_target_table</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">          </span><span class="c1"># Optional, drops target table before syncing. default value is false</span>
 
-<span class="w">  </span><span class="s">#</span><span class="nv"> </span><span class="s">You</span><span class="nv"> </span><span class="s">can</span><span class="nv"> </span><span class="s">add</span><span class="nv"> </span><span class="s">as</span><span class="nv"> </span><span class="s">many</span><span class="nv"> </span><span class="s">schemas</span><span class="nv"> </span><span class="s">as</span><span class="nv"> </span><span class="s">you</span><span class="nv"> </span><span class="s">need...</span>
-<span class="w">  </span><span class="s">#</span><span class="nv"> </span><span class="s">Uncomment</span><span class="nv"> </span><span class="s">this</span><span class="nv"> </span><span class="s">if</span><span class="nv"> </span><span class="s">you</span><span class="nv"> </span><span class="s">want</span><span class="nv"> </span><span class="s">replicate</span><span class="nv"> </span><span class="s">tables</span><span class="nv"> </span><span class="s">from</span><span class="nv"> </span><span class="s">multiple</span><span class="nv"> </span><span class="s">schemas</span>
-<span class="w">  </span><span class="s">#-</span><span class="nv"> </span><span class="s">source_schema:</span><span class="nv"> </span><span class="s">&quot;</span><span class="l l-Scalar l-Scalar-Plain">another_schema_in_postgres&quot;</span>
-<span class="w">  </span><span class="c1">#  target_schema: &quot;another</span>
-<span class="w">  </span><span class="c1"># static and dynamic values can not be defined together for a table and only one of them can be used.</span>
+<span class="w">  </span><span class="c1"># You can add as many schemas as you need...</span>
+<span class="w">  </span><span class="c1"># Uncomment this if you want to replicate tables from multiple schemas</span>
+<span class="w">  </span><span class="c1">#- source_schema: &quot;another_schema_in_postgres&quot;</span>
+<span class="w">  </span><span class="c1">#  target_schema: &quot;another_schema_in_target&quot;</span>
+
+<span class="w">  </span><span class="c1"># Note: static and dynamic values cannot be defined together for a table; only one can be used.</span>
 </pre></div>
 </div>
 </section>

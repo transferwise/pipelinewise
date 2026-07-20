@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Notice &mdash; PipelineWise  documentation</title>
+  <title>Project scope notice &mdash; PipelineWise  documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="_static/css/custom.css?v=1c6dfede" />
@@ -54,23 +54,24 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="concept/singer.html">Singer.io</a></li>
 <li class="toctree-l1"><a class="reference internal" href="concept/replication_methods.html">Replication Methods</a></li>
-<li class="toctree-l1"><a class="reference internal" href="concept/fastsync.html">Fast Sync</a></li>
+<li class="toctree-l1"><a class="reference internal" href="concept/fastsync.html">FastSync</a></li>
 <li class="toctree-l1"><a class="reference internal" href="concept/linux_pipes.html">Linux Pipes in PipelineWise</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Using PipelineWise</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="user_guide/yaml_config.html">YAML configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/yaml_config.html">YAML Configuration</a></li>
 <li class="toctree-l1"><a class="reference internal" href="user_guide/encrypting_passwords.html">Encrypting Passwords</a></li>
 <li class="toctree-l1"><a class="reference internal" href="user_guide/cli.html">Command Line Interface</a></li>
 <li class="toctree-l1"><a class="reference internal" href="user_guide/scheduling.html">Scheduling</a></li>
-<li class="toctree-l1"><a class="reference internal" href="user_guide/scheduling.html#multi-server-cluster">Multi-Server Cluster</a></li>
-<li class="toctree-l1"><a class="reference internal" href="user_guide/metadata_columns.html">Metadata Columns</a></li>
-<li class="toctree-l1"><a class="reference internal" href="user_guide/schema_changes.html">Schema Changes</a></li>
-<li class="toctree-l1"><a class="reference internal" href="user_guide/transformations.html">Transformations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/multi_server_cluster.html">Multi-Server Cluster</a></li>
 <li class="toctree-l1"><a class="reference internal" href="user_guide/logging.html">Logging</a></li>
 <li class="toctree-l1"><a class="reference internal" href="user_guide/alerts.html">Alerts</a></li>
 <li class="toctree-l1"><a class="reference internal" href="user_guide/resync.html">Resync Tables</a></li>
 <li class="toctree-l1"><a class="reference internal" href="user_guide/partial_sync.html">Different cases of partial resync</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/schema_changes.html">Schema Changes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/transformations.html">Transformations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/metadata_columns.html">Metadata Columns</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/troubleshooting.html">Troubleshooting</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Connectors</span></p>
 <ul>
@@ -100,7 +101,7 @@
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
       <li><a href="#" class="icon icon-home" aria-label="Home"></a></li>
-      <li class="breadcrumb-item active">Notice</li>
+      <li class="breadcrumb-item active">Project scope notice</li>
       <li class="wy-breadcrumbs-aside">
             <a href="_sources/index.rst.txt" rel="nofollow"> View page source</a>
       </li>
@@ -110,12 +111,19 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="notice">
-<h1>Notice<a class="headerlink" href="#notice" title="Link to this heading"></a></h1>
-<p>To better serve Wise business and customer needs, the PipelineWise codebase needs to shrink.
-We have made the difficult decision that, going forward many components of PipelineWise will be removed or incorporated in the main repo.
-The last version before this decision is <a class="reference external" href="https://github.com/transferwise/pipelinewise/tree/v0.64.1">v0.64.1</a></p>
-<p>We thank all in the open-source community, that over the past 6 years, have helped to make PipelineWise a robust product for heterogeneous replication of many many Terabytes, daily</p>
+  <section id="project-scope-notice">
+<h1>Project scope notice<a class="headerlink" href="#project-scope-notice" title="Link to this heading"></a></h1>
+<p>After <code class="docutils literal notranslate"><span class="pre">v0.64.1</span></code>, PipelineWise began reducing the number of connectors it
+packages so that development could focus on Wise’s current requirements.
+<a class="reference external" href="https://github.com/transferwise/pipelinewise/tree/v0.64.1">v0.64.1</a> is the
+last release from before that reduction; it is a historical reference, not a
+recommendation to use an older release.</p>
+<p>The connectors included by current builds are listed in <a class="reference internal" href="installation_guide/installation.html#selecting-singer-connectors"><span class="std std-ref">Selecting singer connectors</span></a>.
+<code class="docutils literal notranslate"><span class="pre">pipelinewise</span> <span class="pre">init</span></code> may still generate configuration templates for legacy
+connectors, but the presence of a template does not mean that its connector is
+packaged or maintained by the current release.</p>
+<p>We thank everyone in the open-source community who helped make PipelineWise a
+robust framework for heterogeneous replication over the years.</p>
 <a class="reference internal image-reference" href="_images/pipelinewise-with-text.png"><img alt="_images/pipelinewise-with-text.png" src="_images/pipelinewise-with-text.png" width="300" />
 </a>
 </section>
@@ -151,8 +159,8 @@ environment without the extra hassle.</p>
 <h2>Taps (Data Source Connectors)<a class="headerlink" href="#taps-data-source-connectors" title="Link to this heading"></a></h2>
 <p><a class="reference internal" href="connectors/taps.html#taps-list"><span class="std std-ref">Taps (Data Sources)</span></a></p>
 </section>
-<section id="target-destination-connectors">
-<h2>Target (Destination Connectors)<a class="headerlink" href="#target-destination-connectors" title="Link to this heading"></a></h2>
+<section id="targets-destination-connectors">
+<h2>Targets (Destination Connectors)<a class="headerlink" href="#targets-destination-connectors" title="Link to this heading"></a></h2>
 <p><a class="reference internal" href="connectors/targets.html#targets-list"><span class="std std-ref">Targets (Destinations)</span></a></p>
 </section>
 <section id="transformation-at-load-time">
@@ -192,10 +200,15 @@ environment without the extra hassle.</p>
 <li class="toctree-l2"><a class="reference internal" href="concept/replication_methods.html#log-based">Log Based</a></li>
 <li class="toctree-l2"><a class="reference internal" href="concept/replication_methods.html#key-based-incremental">Key Based Incremental</a></li>
 <li class="toctree-l2"><a class="reference internal" href="concept/replication_methods.html#full-table">Full Table</a></li>
-<li class="toctree-l2"><a class="reference internal" href="concept/replication_methods.html#fast-sync">Fast Sync</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="concept/fastsync.html">Fast Sync</a></li>
+<li class="toctree-l1"><a class="reference internal" href="concept/fastsync.html">FastSync</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="concept/fastsync.html#supported-tap-target-combinations">Supported tap-target combinations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="concept/fastsync.html#components">Components</a></li>
+<li class="toctree-l2"><a class="reference internal" href="concept/fastsync.html#when-does-pipelinewise-use-fastsync">When does PipelineWise use FastSync?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="concept/fastsync.html#defined-partialsync-sync-start-from">Defined PartialSync (<code class="docutils literal notranslate"><span class="pre">sync_start_from</span></code>)</a></li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="concept/linux_pipes.html">Linux Pipes in PipelineWise</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="concept/linux_pipes.html#logic">Logic</a></li>
 <li class="toctree-l2"><a class="reference internal" href="concept/linux_pipes.html#increasing-buffer-size">Increasing buffer size</a></li>
@@ -206,16 +219,35 @@ environment without the extra hassle.</p>
 <div class="toctree-wrapper compound">
 <p class="caption" role="heading"><span class="caption-text">Using PipelineWise</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="user_guide/yaml_config.html">YAML configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/yaml_config.html">YAML Configuration</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="user_guide/yaml_config.html#global-configuration-config-yml">Global Configuration (config.yml)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="user_guide/yaml_config.html#tap-configuration-tap-yml">Tap Configuration (tap_*.yml)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="user_guide/yaml_config.html#target-configuration-target-yml">Target Configuration (target_*.yml)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="user_guide/yaml_config.html#environment-variables">Environment Variables</a></li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="user_guide/encrypting_passwords.html">Encrypting Passwords</a></li>
 <li class="toctree-l1"><a class="reference internal" href="user_guide/cli.html">Command Line Interface</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="user_guide/cli.html#positional-arguments">Positional Arguments</a></li>
 <li class="toctree-l2"><a class="reference internal" href="user_guide/cli.html#sub-commands">Sub-commands:</a></li>
+<li class="toctree-l2"><a class="reference internal" href="user_guide/cli.html#common-options">Common options</a></li>
+<li class="toctree-l2"><a class="reference internal" href="user_guide/cli.html#environment-variables">Environment Variables</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="user_guide/scheduling.html">Scheduling</a></li>
-<li class="toctree-l1"><a class="reference internal" href="user_guide/scheduling.html#multi-server-cluster">Multi-Server Cluster</a></li>
-<li class="toctree-l1"><a class="reference internal" href="user_guide/metadata_columns.html">Metadata Columns</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/multi_server_cluster.html">Multi-Server Cluster</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/logging.html">Logging</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/alerts.html">Alerts</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="user_guide/alerts.html#slack-alert-handler">Slack Alert Handler</a></li>
+<li class="toctree-l2"><a class="reference internal" href="user_guide/alerts.html#victorops-alert-handler">VictorOps Alert Handler</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/resync.html">Resync Tables</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="user_guide/resync.html#full-resync">Full resync</a></li>
+<li class="toctree-l2"><a class="reference internal" href="user_guide/resync.html#partial-resync">Partial resync</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/partial_sync.html">Different cases of partial resync</a></li>
 <li class="toctree-l1"><a class="reference internal" href="user_guide/schema_changes.html">Schema Changes</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="user_guide/schema_changes.html#versioning-columns">Versioning columns</a></li>
 </ul>
@@ -227,20 +259,24 @@ environment without the extra hassle.</p>
 <li class="toctree-l2"><a class="reference internal" href="user_guide/transformations.html#example">Example</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="user_guide/logging.html">Logging</a></li>
-<li class="toctree-l1"><a class="reference internal" href="user_guide/alerts.html">Alerts</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="user_guide/alerts.html#slack-alert-handler">Slack Alert Handler</a></li>
-<li class="toctree-l2"><a class="reference internal" href="user_guide/alerts.html#victorops-alert-handler">VictorOps Alert Handler</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/metadata_columns.html">Metadata Columns</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user_guide/troubleshooting.html">Troubleshooting</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="user_guide/troubleshooting.html#replication-tips">Replication Tips</a></li>
+<li class="toctree-l2"><a class="reference internal" href="user_guide/troubleshooting.html#mariadb-mysql-errors">MariaDB / MySQL Errors</a></li>
+<li class="toctree-l2"><a class="reference internal" href="user_guide/troubleshooting.html#postgresql-errors">PostgreSQL Errors</a></li>
+<li class="toctree-l2"><a class="reference internal" href="user_guide/troubleshooting.html#fastsync-errors">FastSync Errors</a></li>
+<li class="toctree-l2"><a class="reference internal" href="user_guide/troubleshooting.html#logging-and-diagnostics">Logging and Diagnostics</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="user_guide/resync.html">Resync Tables</a></li>
-<li class="toctree-l1"><a class="reference internal" href="user_guide/partial_sync.html">Different cases of partial resync</a></li>
 </ul>
 </div>
 <div class="toctree-wrapper compound">
 <p class="caption" role="heading"><span class="caption-text">Connectors</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="connectors/taps.html">Taps (Data Sources)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="connectors/taps.html">Taps (Data Sources)</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="connectors/taps.html#additional-packaged-data-sources">Additional packaged data sources</a></li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="connectors/taps.html#configuring-taps">Configuring taps</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="connectors/taps/mysql.html">Tap MySQL</a></li>
 <li class="toctree-l2"><a class="reference internal" href="connectors/taps/postgres.html">Tap PostgreSQL</a></li>
@@ -253,15 +289,15 @@ environment without the extra hassle.</p>
 <li class="toctree-l2"><a class="reference internal" href="connectors/taps/github.html">Tap Github</a></li>
 <li class="toctree-l2"><a class="reference internal" href="connectors/taps/slack.html">Tap Slack</a></li>
 <li class="toctree-l2"><a class="reference internal" href="connectors/taps/mixpanel.html">Tap Mixpanel</a></li>
+<li class="toctree-l2"><a class="reference internal" href="connectors/taps/salesforce.html">Tap Salesforce</a></li>
+<li class="toctree-l2"><a class="reference internal" href="connectors/taps/twilio.html">Tap Twilio</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="connectors/targets.html">Targets (Destinations)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="connectors/targets.html#configuring-the-targets">Configuring the targets</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="connectors/targets/snowflake.html">Target Snowflake</a></li>
-<li class="toctree-l2"><a class="reference internal" href="connectors/targets/redshift.html">Target Redshift</a></li>
 <li class="toctree-l2"><a class="reference internal" href="connectors/targets/postgres.html">Target Postgres</a></li>
 <li class="toctree-l2"><a class="reference internal" href="connectors/targets/s3_csv.html">Target S3 CSV</a></li>
-<li class="toctree-l2"><a class="reference internal" href="connectors/targets/bigquery.html">Target Bigquery</a></li>
 </ul>
 </li>
 </ul>
@@ -276,10 +312,9 @@ environment without the extra hassle.</p>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="project/about.html">Project</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="project/about.html#history">History</a></li>
-<li class="toctree-l2"><a class="reference internal" href="project/about.html#committers">Committers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="project/about.html#early-contributors">Early contributors</a></li>
 <li class="toctree-l2"><a class="reference internal" href="project/about.html#contribution">Contribution</a></li>
-<li class="toctree-l2"><a class="reference internal" href="project/about.html#singer-community">Singer Community</a></li>
-<li class="toctree-l2"><a class="reference internal" href="project/about.html#resources-links">Resources &amp; links</a></li>
+<li class="toctree-l2"><a class="reference internal" href="project/about.html#resources-and-links">Resources and links</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="project/licenses.html">Licenses</a><ul>

@@ -55,23 +55,24 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../concept/singer.html">Singer.io</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../concept/replication_methods.html">Replication Methods</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../concept/fastsync.html">Fast Sync</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../concept/fastsync.html">FastSync</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../concept/linux_pipes.html">Linux Pipes in PipelineWise</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Using PipelineWise</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/yaml_config.html">YAML configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/yaml_config.html">YAML Configuration</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/encrypting_passwords.html">Encrypting Passwords</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/cli.html">Command Line Interface</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/scheduling.html">Scheduling</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/scheduling.html#multi-server-cluster">Multi-Server Cluster</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/metadata_columns.html">Metadata Columns</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/schema_changes.html">Schema Changes</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/transformations.html">Transformations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/multi_server_cluster.html">Multi-Server Cluster</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/logging.html">Logging</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/alerts.html">Alerts</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/resync.html">Resync Tables</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/partial_sync.html">Different cases of partial resync</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/schema_changes.html">Schema Changes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/transformations.html">Transformations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/metadata_columns.html">Metadata Columns</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/troubleshooting.html">Troubleshooting</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Connectors</span></p>
 <ul class="current">
@@ -92,6 +93,8 @@
 <li class="toctree-l2"><a class="reference internal" href="github.html">Tap Github</a></li>
 <li class="toctree-l2"><a class="reference internal" href="slack.html">Tap Slack</a></li>
 <li class="toctree-l2"><a class="reference internal" href="mixpanel.html">Tap Mixpanel</a></li>
+<li class="toctree-l2"><a class="reference internal" href="salesforce.html">Tap Salesforce</a></li>
+<li class="toctree-l2"><a class="reference internal" href="twilio.html">Tap Twilio</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../targets.html">Targets (Destinations)</a></li>
@@ -153,28 +156,25 @@
 <li><p>Log into your MySQL server.</p></li>
 <li><p>Verify that binlog is enabled by running the following statement. The value returned should be 1:</p></li>
 </ol>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>mysql&gt;<span class="w"> </span><span class="k">select</span><span class="w"> </span>@@log_bin<span class="p">;</span>
+<div class="highlight-sql notranslate"><div class="highlight"><pre><span></span><span class="k">SELECT</span><span class="w"> </span><span class="o">@@</span><span class="n">log_bin</span><span class="p">;</span>
 </pre></div>
 </div>
 <ol class="arabic simple" start="3">
 <li><p>Locate the <code class="docutils literal notranslate"><span class="pre">my.cnf</span> <span class="pre">file</span></code>. It’s usually located at <code class="docutils literal notranslate"><span class="pre">/etc/my.cnf</span></code>. Verify that <code class="docutils literal notranslate"><span class="pre">my.cnf</span></code> has the following lines in the mysqld section:</p></li>
 </ol>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>mysql&gt;<span class="w"> </span><span class="k">select</span><span class="w"> </span>@@log_bin<span class="p">;</span>
-
-<span class="o">[</span>mysqld<span class="o">]</span>
-<span class="nv">binlog_format</span><span class="o">=</span>ROW
-<span class="nv">binlog_row_image</span><span class="o">=</span>FULL
-<span class="nv">expire_logs_days</span><span class="o">=</span><span class="m">7</span>
-<span class="nv">binlog_expire_logs_seconds</span><span class="o">=</span><span class="m">604800</span>
-<span class="nv">log_bin</span><span class="o">=</span>mysql-binlog
-<span class="nv">log_slave_updates</span><span class="o">=</span><span class="m">1</span>
+<div class="highlight-ini notranslate"><div class="highlight"><pre><span></span><span class="k">[mysqld]</span>
+<span class="na">binlog_format</span><span class="o">=</span><span class="s">ROW</span>
+<span class="na">binlog_row_image</span><span class="o">=</span><span class="s">FULL</span>
+<span class="na">expire_logs_days</span><span class="o">=</span><span class="s">7</span>
+<span class="na">log_bin</span><span class="o">=</span><span class="s">mysql-binlog</span>
+<span class="na">log_slave_updates</span><span class="o">=</span><span class="s">1</span>
 </pre></div>
 </div>
 <p>A few things to note:</p>
 <blockquote>
 <div><ul class="simple">
 <li><p><code class="docutils literal notranslate"><span class="pre">log_bin</span></code> doesn’t have to be <code class="docutils literal notranslate"><span class="pre">mysql-binlog</span></code> - this value can be anything. Additionally, if <code class="docutils literal notranslate"><span class="pre">log_bin</span></code> already has an entry (which you checked in step one), you don’t need to change it.</p></li>
-<li><p>Use either <code class="docutils literal notranslate"><span class="pre">expire_log_days</span></code> or <code class="docutils literal notranslate"><span class="pre">binlog_expire_logs_seconds</span></code>, not both</p></li>
+<li><p>Use either <code class="docutils literal notranslate"><span class="pre">expire_logs_days</span></code> or <code class="docutils literal notranslate"><span class="pre">binlog_expire_logs_seconds</span></code>, not both.</p></li>
 <li><p>Setting <code class="docutils literal notranslate"><span class="pre">log_slave_updates</span></code> is only required if you are connecting a read replica. This isn’t required for master instances.</p></li>
 </ul>
 </div></blockquote>
@@ -231,15 +231,15 @@ or browse the codebase <a class="reference external" href="https://github.com/tr
 <span class="w">  </span><span class="nt">user</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;USER&gt;&quot;</span><span class="w">                       </span><span class="c1"># MySQL/ MariaDB user</span>
 <span class="w">  </span><span class="nt">password</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;PASSWORD&gt;&quot;</span><span class="w">               </span><span class="c1"># Plain string or vault encrypted</span>
 <span class="w">  </span><span class="nt">dbname</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;DB_NAME&gt;&quot;</span><span class="w">                  </span><span class="c1"># MySQL/ MariaDB database name</span>
-<span class="w">  </span><span class="nt">use_gtid</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">&lt;boolean&gt;</span><span class="w">                  </span><span class="c1"># Flag to enable using GTID as the state bookmark for log based tables</span>
-<span class="w">  </span><span class="nt">engine</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;mariadb/mysql&quot;</span><span class="w">              </span><span class="c1"># Flavor of the server, used in conjunction with &quot;use_gtid&quot;</span>
+<span class="w">  </span><span class="nt">use_gtid</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">                       </span><span class="c1"># Use GTID as the state bookmark for log-based tables</span>
+<span class="w">  </span><span class="nt">engine</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;mysql&quot;</span><span class="w">                      </span><span class="c1"># One of &quot;mysql&quot; or &quot;mariadb&quot;; used with use_gtid</span>
 <span class="w">  </span><span class="c1">#replica_host: &quot;&lt;REPLICA_HOST&gt;&quot;      # Optional: MySQL/ MariaDB replica host to offload initial/FastSync</span>
 <span class="w">                                       </span><span class="c1"># to a read replica, switch back to primary for log-based replication.</span>
 <span class="w">                                       </span><span class="c1"># Used to resync large tables without impacting primary DB performance.</span>
 <span class="w">  </span><span class="c1">#filter_dbs: &quot;schema1,schema2&quot;       # Optional: Scan only the required schemas</span>
 <span class="w">                                       </span><span class="c1">#           to improve the performance of</span>
 <span class="w">                                       </span><span class="c1">#           data extraction</span>
-<span class="w">  </span><span class="c1">#export_batch_rows                   # Optional: Number of rows to export from MySQL</span>
+<span class="w">  </span><span class="c1">#export_batch_rows: 50000            # Optional: Number of rows to export from MySQL</span>
 <span class="w">                                       </span><span class="c1">#           in one batch. Default is 50000.</span>
 <span class="w">  </span><span class="c1">#session_sqls:                       # Optional: Run SQLs to set session variables</span>
 <span class="w">  </span><span class="c1">#  - SET @@session.time_zone=&quot;+0:00&quot;             # when the connection made</span>
@@ -247,7 +247,7 @@ or browse the codebase <a class="reference external" href="https://github.com/tr
 <span class="w">  </span><span class="c1">#  - SET @@session.net_read_timeout=3600</span>
 <span class="w">  </span><span class="c1">#  - SET @@session.innodb_lock_wait_timeout=3600</span>
 
-<span class="w">  </span><span class="nt">fastsync_parallelism</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">&lt;int&gt;</span><span class="w">          </span><span class="c1"># Optional: size of multiprocessing pool used by FastSync</span>
+<span class="w">  </span><span class="c1">#fastsync_parallelism: 4             # Optional: size of multiprocessing pool used by FastSync</span>
 <span class="w">                                       </span><span class="c1">#           Min: 1</span>
 <span class="w">                                       </span><span class="c1">#           Default: number of CPU cores</span>
 
@@ -279,7 +279,7 @@ or browse the codebase <a class="reference external" href="https://github.com/tr
 <span class="w">    </span><span class="nt">target_schema_select_permissions</span><span class="p">:</span><span class="w">  </span><span class="c1"># Optional: Grant SELECT on schema and tables that created</span>
 <span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">grp_stats</span>
 
-<span class="w">    </span><span class="c1"># List of tables to replicate from Postgres to destination Data Warehouse</span>
+<span class="w">    </span><span class="c1"># List of tables to replicate from MySQL to destination Data Warehouse</span>
 <span class="w">    </span><span class="c1">#</span>
 <span class="w">    </span><span class="c1"># Please check the Replication Strategies section in the documentation to understand the differences.</span>
 <span class="w">    </span><span class="c1"># For LOG_BASED replication method you might need to adjust the source mysql/ mariadb configuration.</span>
@@ -299,23 +299,26 @@ or browse the codebase <a class="reference external" href="https://github.com/tr
 
 <span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;table_three&quot;</span>
 <span class="w">        </span><span class="nt">replication_method</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;LOG_BASED&quot;</span>
-<span class="w">        </span><span class="nt">sync_start_from</span><span class="p">:</span><span class="w">                   </span><span class="c1"># Optional, applies for then first sync and fast sync</span>
+<span class="w">        </span><span class="nt">sync_start_from</span><span class="p">:</span><span class="w">                   </span><span class="c1"># Optional, applies for the first sync and fast sync</span>
 <span class="w">          </span><span class="nt">column</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;column_name&quot;</span><span class="w">            </span><span class="c1"># Column name to be picked for partial sync with incremental or timestamp value</span>
 <span class="w">          </span><span class="nt">static_value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;start_value&quot;</span><span class="w">      </span><span class="c1"># A static value which the first sync always starts from column &gt;= static_value</span>
 <span class="w">          </span><span class="nt">drop_target_table</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">          </span><span class="c1"># Optional, drops target table before syncing. default value is false</span>
 
 <span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;table_four&quot;</span>
 <span class="w">        </span><span class="nt">replication_method</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;LOG_BASED&quot;</span>
-<span class="w">        </span><span class="nt">sync_start_from</span><span class="p">:</span><span class="w">                   </span><span class="c1"># Optional, applies for then first sync and fast sync</span>
+<span class="w">        </span><span class="nt">sync_start_from</span><span class="p">:</span><span class="w">                   </span><span class="c1"># Optional, applies for the first sync and fast sync</span>
 <span class="w">          </span><span class="nt">column</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;column_name&quot;</span><span class="w">            </span><span class="c1"># Column name to be picked for partial sync with incremental or timestamp value</span>
-<span class="w">          </span><span class="nt">dynamic_value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;A</span><span class="nv"> </span><span class="s">SELECT</span><span class="nv"> </span><span class="s">query</span><span class="nv">   </span><span class="s">#</span><span class="nv"> </span><span class="s">It</span><span class="nv"> </span><span class="s">can</span><span class="nv"> </span><span class="s">be</span><span class="nv"> </span><span class="s">a</span><span class="nv"> </span><span class="s">valid</span><span class="nv"> </span><span class="s">mysql</span><span class="nv"> </span><span class="s">SELECT</span><span class="nv"> </span><span class="s">query</span><span class="nv"> </span><span class="s">which</span><span class="nv"> </span><span class="s">returns</span><span class="nv"> </span><span class="s">only</span><span class="nv"> </span><span class="s">one</span><span class="nv"> </span><span class="s">row</span><span class="nv"> </span><span class="s">with</span><span class="nv"> </span><span class="s">one</span><span class="nv"> </span><span class="s">column</span><span class="nv"> </span><span class="s">and</span><span class="nv"> </span><span class="s">first</span><span class="nv"> </span><span class="s">sync</span><span class="nv"> </span><span class="s">always</span><span class="nv"> </span><span class="s">starts</span><span class="nv"> </span><span class="s">from</span><span class="nv"> </span><span class="s">column</span><span class="nv"> </span><span class="s">&gt;=</span><span class="nv"> </span><span class="s">dynamic_value</span>
-<span class="w">          </span><span class="s">drop_target_table:</span><span class="nv"> </span><span class="s">true</span><span class="nv">          </span><span class="s">#</span><span class="nv"> </span><span class="s">Optional,</span><span class="nv"> </span><span class="s">drops</span><span class="nv"> </span><span class="s">target</span><span class="nv"> </span><span class="s">table</span><span class="nv"> </span><span class="s">before</span><span class="nv"> </span><span class="s">syncing.</span><span class="nv"> </span><span class="s">default</span><span class="nv"> </span><span class="s">value</span><span class="nv"> </span><span class="s">is</span><span class="nv"> </span><span class="s">false</span>
+<span class="w">          </span><span class="c1"># The query must return exactly one row with one column. The first sync starts</span>
+<span class="w">          </span><span class="c1"># from rows where column &gt;= the returned value.</span>
+<span class="w">          </span><span class="nt">dynamic_value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;SELECT</span><span class="nv"> </span><span class="s">DATE_SUB(MAX(updated_at),</span><span class="nv"> </span><span class="s">INTERVAL</span><span class="nv"> </span><span class="s">7</span><span class="nv"> </span><span class="s">DAY)</span><span class="nv"> </span><span class="s">FROM</span><span class="nv"> </span><span class="s">table_four&quot;</span>
+<span class="w">          </span><span class="nt">drop_target_table</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">          </span><span class="c1"># Optional, drops target table before syncing. default value is false</span>
 
-<span class="w">  </span><span class="s">#</span><span class="nv"> </span><span class="s">You</span><span class="nv"> </span><span class="s">can</span><span class="nv"> </span><span class="s">add</span><span class="nv"> </span><span class="s">as</span><span class="nv"> </span><span class="s">many</span><span class="nv"> </span><span class="s">schemas</span><span class="nv"> </span><span class="s">as</span><span class="nv"> </span><span class="s">you</span><span class="nv"> </span><span class="s">need...</span>
-<span class="w">  </span><span class="s">#</span><span class="nv"> </span><span class="s">Uncomment</span><span class="nv"> </span><span class="s">this</span><span class="nv"> </span><span class="s">if</span><span class="nv"> </span><span class="s">you</span><span class="nv"> </span><span class="s">want</span><span class="nv"> </span><span class="s">replicate</span><span class="nv"> </span><span class="s">tables</span><span class="nv"> </span><span class="s">from</span><span class="nv"> </span><span class="s">multiple</span><span class="nv"> </span><span class="s">schemas</span>
-<span class="w">  </span><span class="s">#-</span><span class="nv"> </span><span class="s">source_schema:</span><span class="nv"> </span><span class="s">&quot;</span><span class="l l-Scalar l-Scalar-Plain">another_schema_in_mysql&quot;</span>
-<span class="w">  </span><span class="c1">#  target_schema: &quot;another</span>
-<span class="w">  </span><span class="c1"># static and dynamic values can not be defined together for a table and only one of them can be used.</span>
+<span class="w">  </span><span class="c1"># You can add as many schemas as you need...</span>
+<span class="w">  </span><span class="c1"># Uncomment this if you want to replicate tables from multiple schemas</span>
+<span class="w">  </span><span class="c1">#- source_schema: &quot;another_schema_in_mysql&quot;</span>
+<span class="w">  </span><span class="c1">#  target_schema: &quot;another_schema_in_target&quot;</span>
+
+<span class="w">  </span><span class="c1"># Note: static and dynamic values cannot be defined together for a table; only one can be used.</span>
 </pre></div>
 </div>
 </section>

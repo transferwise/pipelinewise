@@ -13,7 +13,7 @@ To add new item to the supported :ref:`taps` or :ref:`targets` please follow the
 Adding new tap
 ''''''''''''''
 
-1. Make sure your tap is following the Singer specification by following the following criteria:
+1. Make sure your tap conforms to the Singer specification by meeting these criteria:
 
    * Configuration JSON is mandatory and defined with the ``--config`` CLI argument
 
@@ -26,7 +26,7 @@ Adding new tap
 
 .. note::
 
-  Most of the available Singer Taps meet these criterias but you should always double check when
+  Most of the available Singer Taps meet these criteria but you should always double check when
   adding new connectors.
 
 

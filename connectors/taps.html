@@ -23,7 +23,7 @@
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="Tap MySQL" href="taps/mysql.html" />
-    <link rel="prev" title="Different cases of partial resync" href="../user_guide/partial_sync.html" /> 
+    <link rel="prev" title="Troubleshooting" href="../user_guide/troubleshooting.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -55,27 +55,31 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../concept/singer.html">Singer.io</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../concept/replication_methods.html">Replication Methods</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../concept/fastsync.html">Fast Sync</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concept/fastsync.html">FastSync</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../concept/linux_pipes.html">Linux Pipes in PipelineWise</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Using PipelineWise</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/yaml_config.html">YAML configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/yaml_config.html">YAML Configuration</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/encrypting_passwords.html">Encrypting Passwords</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/cli.html">Command Line Interface</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/scheduling.html">Scheduling</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/scheduling.html#multi-server-cluster">Multi-Server Cluster</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/metadata_columns.html">Metadata Columns</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/schema_changes.html">Schema Changes</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/transformations.html">Transformations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/multi_server_cluster.html">Multi-Server Cluster</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/logging.html">Logging</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/alerts.html">Alerts</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/resync.html">Resync Tables</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/partial_sync.html">Different cases of partial resync</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/schema_changes.html">Schema Changes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/transformations.html">Transformations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/metadata_columns.html">Metadata Columns</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/troubleshooting.html">Troubleshooting</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Connectors</span></p>
 <ul class="current">
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Taps (Data Sources)</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Taps (Data Sources)</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#additional-packaged-data-sources">Additional packaged data sources</a></li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="#configuring-taps">Configuring taps</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="taps/mysql.html">Tap MySQL</a></li>
 <li class="toctree-l2"><a class="reference internal" href="taps/postgres.html">Tap PostgreSQL</a></li>
@@ -88,6 +92,8 @@
 <li class="toctree-l2"><a class="reference internal" href="taps/github.html">Tap Github</a></li>
 <li class="toctree-l2"><a class="reference internal" href="taps/slack.html">Tap Slack</a></li>
 <li class="toctree-l2"><a class="reference internal" href="taps/mixpanel.html">Tap Mixpanel</a></li>
+<li class="toctree-l2"><a class="reference internal" href="taps/salesforce.html">Tap Salesforce</a></li>
+<li class="toctree-l2"><a class="reference internal" href="taps/twilio.html">Tap Twilio</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="targets.html">Targets (Destinations)</a></li>
@@ -215,7 +221,18 @@
 </div>
 <p><a class="reference internal" href="taps/mixpanel.html#tap-mixpanel"><span class="std std-ref">Tap Mixpanel</span></a></p>
 </div>
+<div class="tile docutils container">
+<div class="img-hover-zoom docutils container">
+<a class="reference external image-reference" href="taps/snowflake.html"><img alt="../_images/snowflake-logo.png" src="../_images/snowflake-logo.png" />
+</a>
 </div>
+<p><a class="reference internal" href="taps/snowflake.html#tap-snowflake"><span class="std std-ref">Tap Snowflake</span></a></p>
+</div>
+</div>
+<section id="additional-packaged-data-sources">
+<h2>Additional packaged data sources<a class="headerlink" href="#additional-packaged-data-sources" title="Link to this heading"></a></h2>
+<p>PipelineWise also packages <a class="reference internal" href="taps/salesforce.html#tap-salesforce"><span class="std std-ref">Tap Salesforce</span></a> and <a class="reference internal" href="taps/twilio.html#tap-twilio"><span class="std std-ref">Tap Twilio</span></a>.</p>
+</section>
 </section>
 <section id="configuring-taps">
 <h1>Configuring taps<a class="headerlink" href="#configuring-taps" title="Link to this heading"></a></h1>
@@ -232,6 +249,8 @@
 <li class="toctree-l1"><a class="reference internal" href="taps/github.html">Tap Github</a></li>
 <li class="toctree-l1"><a class="reference internal" href="taps/slack.html">Tap Slack</a></li>
 <li class="toctree-l1"><a class="reference internal" href="taps/mixpanel.html">Tap Mixpanel</a></li>
+<li class="toctree-l1"><a class="reference internal" href="taps/salesforce.html">Tap Salesforce</a></li>
+<li class="toctree-l1"><a class="reference internal" href="taps/twilio.html">Tap Twilio</a></li>
 </ul>
 </div>
 </section>
@@ -240,7 +259,7 @@
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="../user_guide/partial_sync.html" class="btn btn-neutral float-left" title="Different cases of partial resync" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../user_guide/troubleshooting.html" class="btn btn-neutral float-left" title="Troubleshooting" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
         <a href="taps/mysql.html" class="btn btn-neutral float-right" title="Tap MySQL" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 

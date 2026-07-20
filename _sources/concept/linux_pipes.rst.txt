@@ -3,12 +3,12 @@
 Linux Pipes in PipelineWise
 ===========================
 
-A pipe is unidirectional interprocess communication channel. The term was coined by
+A pipe is a unidirectional interprocess communication channel. The term was coined by
 `Douglas McIlroy <https://en.wikipedia.org/wiki/Douglas_McIlroy>`_ for Unix shell and
 named by analogy with the pipeline.
 
 Pipes are most often used in shell-scripts to connect multiple commands by redirecting the output of
-one command (stdout) to the input (stdin) followed by using a pipe symbol '`|`'. :ref:`singer` specification,
+one command (stdout) to the input (stdin) of the next, using the pipe symbol '`|`'. The :ref:`singer` specification,
 hence PipelineWise is also using linux pipes to connect :ref:`taps_list` and :ref:`targets_list` connectors.
 
 For example in the following command ``tap-postgres`` Extracts data from a postgres database and the
@@ -30,7 +30,7 @@ appears. Similarly, if you attempt to write to a full buffer, the recording proc
 the necessary amount of space is available.
 
 It is important to note, that despite the fact that pipes operates using file descriptor I/O streams,
-operations are performed in memory without loading to/from the disc.
+operations are performed in memory without reading from or writing to disk.
 
 All the information given below is for bash shell 4.2 and kernel 3.10.10. Further details in the
 original `Linux Pipes Tips & Tricks <https://blog.dataart.com/linux-pipes-tips-tricks>`_ post.
@@ -40,7 +40,7 @@ Increasing buffer size
 
 Sometimes the default 64K buffer size that provided by the Linux kernel is too small. For example in the
 example above when you extracting data from a busy postgres database and loading into a busy Snowflake
-database sometimes you will find that that ``tap-postgres`` is blocked by ``target-snowflake``.
+database sometimes you will find that ``tap-postgres`` is blocked by ``target-snowflake``.
 
 This happens when the target cannot load the data fast enough. For example if you have lot of concurrent
 queries in the target database the database can queue up new queries (at least in case of a Snowflake database)
@@ -52,7 +52,7 @@ between the tap and target.
 .. warning::
 
   PipelineWise doesn't modify the kernel buffer size. When you need more buffer than
-  the defualt 64K that's provided by the kernel, PipelineWise will use its own
+  the default 64K that's provided by the kernel, PipelineWise will use its own
   buffering mechanism between taps and targets.
 
   PipelineWise is using `mbuffer <https://www.maier-komor.de/mbuffer.html>`_ to

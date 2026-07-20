@@ -68,9 +68,8 @@ Example YAML for ``target-s3-csv``:
 
       s3_key_prefix: "pipelinewise-exports/"         # (Default: None) A static prefix before the generated S3 key names
       delimiter: ","                                 # (Default: ',') A one-character string used to separate fields.
-      quotechar: "\""                                # Default: '\"') A one-character string used to quote fields containing
-                                                       special characters, such as the delimiter or quotechar, or which contain
-                                                       new-line characters.
+      quotechar: "\""                                # Default: '\"'. Quotes fields containing
+                                                       # special characters, delimiters or newlines.
 
       #encryption_type: "KMS"                        # (Default: None) The type of encryption to use. Current supported options are: 'none' and 'KMS'.
       #encryption_key: "<ENCRYPTION_KEY_ID>"        # A reference to the encryption key to use for data encryption.

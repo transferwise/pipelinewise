@@ -62,23 +62,24 @@
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="replication_methods.html">Replication Methods</a></li>
-<li class="toctree-l1"><a class="reference internal" href="fastsync.html">Fast Sync</a></li>
+<li class="toctree-l1"><a class="reference internal" href="fastsync.html">FastSync</a></li>
 <li class="toctree-l1"><a class="reference internal" href="linux_pipes.html">Linux Pipes in PipelineWise</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Using PipelineWise</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/yaml_config.html">YAML configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/yaml_config.html">YAML Configuration</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/encrypting_passwords.html">Encrypting Passwords</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/cli.html">Command Line Interface</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/scheduling.html">Scheduling</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/scheduling.html#multi-server-cluster">Multi-Server Cluster</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/metadata_columns.html">Metadata Columns</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/schema_changes.html">Schema Changes</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/transformations.html">Transformations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/multi_server_cluster.html">Multi-Server Cluster</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/logging.html">Logging</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/alerts.html">Alerts</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/resync.html">Resync Tables</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/partial_sync.html">Different cases of partial resync</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/schema_changes.html">Schema Changes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/transformations.html">Transformations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/metadata_columns.html">Metadata Columns</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/troubleshooting.html">Troubleshooting</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Connectors</span></p>
 <ul>
@@ -141,7 +142,7 @@ A <strong>record</strong> is json-encoded data of any kind. A <strong>state mess
 between invocations of a Tap. A <strong>schema message</strong> describes the datatypes of the records in the stream.</p>
 <p>Using PipelineWise you don’t need to know these singer messages in details, however if you’re
 interested you can find more details in the official <a class="reference external" href="https://github.com/singer-io/getting-started/blob/master/docs/SPEC.md">Singer Specification</a>.
-A number of of taps developed by Singer.io or by other members of the community are open
+A number of taps developed by Singer.io or by other members of the community are open
 sourced and can be added to PipelineWise relatively easily.</p>
 <p>List of the currently supported and built-in taps in PipelineWise is in the <a class="reference internal" href="../connectors/taps.html#taps-list"><span class="std std-ref">Taps (Data Sources)</span></a> section.</p>
 </section>
@@ -151,7 +152,7 @@ sourced and can be added to PipelineWise relatively easily.</p>
 or Snowflake database.</p>
 <p>Following the singer specification every Target can consume messages from every Tap, making it
 possible to replicate data from various sources to various destinations.</p>
-<p>List of the supported targets and built-in taps in PipelineWise can be found in the <a class="reference internal" href="../connectors/targets.html#targets-list"><span class="std std-ref">Targets (Destinations)</span></a> section.</p>
+<p>List of the supported targets in PipelineWise can be found in the <a class="reference internal" href="../connectors/targets.html#targets-list"><span class="std std-ref">Targets (Destinations)</span></a> section.</p>
 </section>
 </section>
 </section>
