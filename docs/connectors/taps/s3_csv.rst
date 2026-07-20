@@ -128,5 +128,5 @@ Example YAML for ``tap-s3-csv``:
           # You can add as many tables as you need...
           - table_name: "feed_file_two"
             s3_csv_mapping:
-              search_pattern: "^feed_file_tow_.csv$"
+              search_pattern: "^feed_file_two_.csv$"
 

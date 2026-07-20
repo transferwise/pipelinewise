@@ -43,6 +43,7 @@ Example YAML for ``tap-github``:
     # ------------------------------------------------------------------------------
     db_conn:
       access_token: "<ACCESS_TOKEN>"            # Github access token with at least the repo scope
+      start_date: "2020-01-01T00:00:00Z"        # Earliest date to replicate (ISO-8601)
       organization: "gnome"                     # The organization you want to extract the data from
                                                 # Required when repos_include/repository isn't present
                                                 # OR

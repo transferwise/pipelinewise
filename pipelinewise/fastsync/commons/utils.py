@@ -166,7 +166,7 @@ def get_target_schema(target_config, table):
                                       Example config.json:
                                             "schema_mapping": {
                                                 "my_tap_stream_id": {
-                                                    "target_schema": "my_redshift_schema",
+                                                    "target_schema": "my_target_schema",
                                                 }
                                             }
     """

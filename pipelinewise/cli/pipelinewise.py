@@ -37,20 +37,15 @@ from pipelinewise.cli.multiprocess import Process
 FASTSYNC_PAIRS = {
     ConnectorType.TAP_MYSQL: {
         ConnectorType.TARGET_SNOWFLAKE,
-        ConnectorType.TARGET_REDSHIFT,
         ConnectorType.TARGET_POSTGRES,
-        ConnectorType.TARGET_BIGQUERY,
     },
     ConnectorType.TAP_POSTGRES: {
         ConnectorType.TARGET_SNOWFLAKE,
-        ConnectorType.TARGET_REDSHIFT,
         ConnectorType.TARGET_POSTGRES,
-        ConnectorType.TARGET_BIGQUERY,
     },
     ConnectorType.TAP_MONGODB: {
         ConnectorType.TARGET_SNOWFLAKE,
         ConnectorType.TARGET_POSTGRES,
-        ConnectorType.TARGET_BIGQUERY,
     },
 }
 
@@ -1378,10 +1373,8 @@ class PipelineWise:
         sys.exit(1)
 
     # pylint: disable=too-many-locals
-    def sync_tables(self):
-        """
-        This method calls do_sync_tables if sync_tables command is chosen
-        """
+    def fast_sync(self):
+        """Entry point for the fast_sync CLI command."""
         self.force_fast_sync = self.args.force
         try:
             with pidfile.PIDFile(self.tap['files']['pidfile']):
@@ -1465,7 +1458,7 @@ class PipelineWise:
             target_config = self.target['files']['config']
 
             # Set drop_pg_slot to True if we want to sync the whole tap
-            # This flag will be used by FastSync PG to (PG/SF/Redshift)
+            # This flag will be used by FastSync PG to (PG/SF)
             self.drop_pg_slot = bool(not self.args.tables)
 
             # Some target attributes can be passed and override by tap (aka. inheritable config)

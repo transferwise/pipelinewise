@@ -3,7 +3,7 @@
 # ------------------------------------------------------------------------------
 # General Properties
 # ------------------------------------------------------------------------------
-id: "mariadb_db"                       # Unique identifier of the tap
+id: "tap_mariadb"                      # Unique identifier of the tap
 name: "Sample MariaDB Database"        # Name of the tap
 type: "tap-mysql"                      # !! THIS SHOULD NOT CHANGE !!
 owner: "somebody@foo.com"              # Data owner to contact
@@ -13,7 +13,7 @@ owner: "somebody@foo.com"              # Data owner to contact
 # Source (Tap) - MySQL/ MariaDB connection details
 # ------------------------------------------------------------------------------
 db_conn:
-  host: "db_mysql_source"
+  host: "pipelinewise-mysql-source"
   port: 3306                            # MySQL/ MariaDB port
   user: "pipelinewise"                  # MySQL/ MariaDB user
   password: "secret"                    # Plain string or vault encrypted
@@ -27,9 +27,9 @@ db_conn:
 # Destination (Target) - Target properties
 # Connection details should be in the relevant target YAML file
 # ------------------------------------------------------------------------------
-target: "postgres_dwh"                 # ID of the target connector where the data will be loaded
+target: "target_postgres"              # ID of the target connector where the data will be loaded
 batch_size_rows: 20000                 # Batch size for the stream to optimise load performance
-stream_buffer_size: 0                 # In-memory buffer size (MB) between taps and targets for asynchronous data pipes
+stream_buffer_size: 0                  # In-memory buffer size (MB) between taps and targets for asynchronous data pipes
 
 
 # ------------------------------------------------------------------------------

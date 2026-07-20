@@ -19,8 +19,8 @@ this means we are extra careful when making changes to/dealing with PRs touching
 at Wise.
 
 
-## We Develop with Github
-We use github to host code, to track public issues and feature requests from the community, as well as accept pull requests.
+## We Develop with GitHub
+We use GitHub to host code, track public issues and feature requests, and accept pull requests.
 
 
 ## We Use [Github Flow](https://guides.github.com/introduction/flow/index.html), So All Code Changes Happen Through Pull Requests
@@ -57,11 +57,11 @@ People *love* thorough bug reports. I'm not even kidding.
 
 ## Use a Consistent Coding Style
 
-* Tabs for indentation 
-* Google docstring format for Python documentation.
-* Single quotes for string literals 
-* We've started using SonarLint PyCharm plugin to detect code complexity among other issues to improve code quality.
-* You can try running `find pipelinewise tests -type f -name '*.py' | xargs unify --check-only` and `pylint pipelinewise tests` for style unification
+* Use Python 3.12 and four spaces for indentation; do not use tabs.
+* Follow PEP 8 and use Google-style docstrings.
+* Prefer single quotes for string literals where the surrounding code does so.
+* Run `pre-commit run --all-files` to apply the repository's formatting and lint checks.
+* Run `pytest --ignore tests/end_to_end` for the unit test suite.
 
 ## Versioning
 We use [Semantic versioning](https://semver.org/).

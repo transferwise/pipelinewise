@@ -58,11 +58,9 @@ tests/db/tap_mongodb.sh
 tests/db/target_postgres.sh
 
 # Install PipelineWise and connectors in the container
-make pipelinewise connectors -e pw_acceptlicenses=y -e pw_connector=target-snowflake,target-postgres,tap-mysql,tap-postgres,tap-mongodb,transform-field,tap-s3-csv
-if [[ $? != 0 ]]; then
+if ! make pipelinewise connectors -e pw_acceptlicenses=y -e pw_connector=target-snowflake,target-postgres,tap-mysql,tap-postgres,tap-mongodb,transform-field,tap-s3-csv; then
     echo
     echo "ERROR: Docker container not started. Failed to install one or more PipelineWise components."
-    ls -lah
     exit 1
 fi
 
@@ -85,7 +83,7 @@ echo "(For database credentials check .env file)"
 echo
 echo
 echo "To login to the PipelineWise container and start using Pipelinewise CLI:"
-echo " $ docker exec -it pipelinewise_dev bash"
+echo " $ docker exec -it pipelinewise bash"
 echo " $ pipelinewise status"
 echo "=========================================================================="
 

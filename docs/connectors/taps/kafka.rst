@@ -62,7 +62,8 @@ Example YAML for ``tap-kafka``:
       # and custom PKs are used instead.
       # ! Message key should be a valid utf-8 encoded string.
       # --------------------------------------------------------------------------      
-      use_message_key:                          # (Default: true)  
+      #use_message_key: true                    # Optional. Use the Kafka message key as the primary key.
+                                                # Default: true. Ignored when primary_keys is configured.
 
       #initial_start_time:                      # (Default: latest) Start time reference of the message consumption if
                                                 # no bookmarked position in state.json. One of: latest, earliest or an
@@ -91,7 +92,7 @@ Example YAML for ``tap-kafka``:
       #       int32 page_number = 2;
       #       int32 result_per_page = 3;
       #     }
-      #proto_classess_dir:                      # (Default: current working dir) Directory where to store runtime compiled proto classes
+      #proto_classes_dir:                       # (Default: current working dir) Directory where runtime compiled proto classes are stored
       #debug_contexts: ""                       # comma separated list of debug contexts to enable for the consumer [see librkafka](https://github.com/confluentinc/librdkafka/blob/master/INTRODUCTION.md#debug-contexts) 
 
     # ------------------------------------------------------------------------------

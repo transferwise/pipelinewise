@@ -43,14 +43,31 @@ This will create a ``pipelinewise_samples`` directory with samples for each supp
         ├── config.yml
         ├── tap_jira.yml.sample
         ├── tap_kafka.yml.sample
+        ├── tap_github.yml.sample
+        ├── tap_google_analytics.yml.sample
+        ├── tap_mixpanel.yml.sample
+        ├── tap_mongodb.yml.sample
         ├── tap_mysql_mariadb.yml.sample
+        ├── tap_oracle.yml.sample
         ├── tap_postgres.yml.sample
         ├── tap_s3_csv.yml.sample
+        ├── tap_salesforce.yml.sample
+        ├── tap_shopify.yml.sample
+        ├── tap_slack.yml.sample
         ├── tap_snowflake.yml.sample
+        ├── tap_twilio.yml.sample
         ├── tap_zendesk.yml.sample
+        ├── tap_zuora.yml.sample
         ├── target_postgres.yml.sample
         ├── target_s3_csv.yml.sample
         └── target_snowflake.yml.sample
+
+.. note::
+
+  ``pipelinewise init`` includes some legacy connector templates for compatibility.
+  A generated template does not guarantee that its connector is packaged by the
+  current release. See :ref:`selecting_singer_connectors` for the packaged connector
+  list before configuring Google Analytics, Oracle, Shopify or Zuora.
 
 To create a new pipeline you need to enable at least one tap and target by renaming the
 ``tap_....yml.sample`` and one ``target_...yml.sample`` file by removing the ``.sample``
@@ -72,10 +89,10 @@ Environment variables in YAML config
 It is possible to use environment variables in the YAML config files.
 This feature is implemented using jinja templates and requires the following syntax to work:
 
-.. code-block:: bash
+.. code-block:: yaml
 
     ---
-    id: "snowflake_test"
+    id: "snowflake"
     name: "Snowflake Test"
     type: "target-snowflake"
     db_conn:
@@ -98,23 +115,23 @@ We will need the ``tap_mysql_mariadb.yml`` and ``target_snowflake.yml``:
 .. code-block:: bash
 
     $ cd pipelinewise_samples
-    $ mv tap_mysql_mariadb.yml.sample tap_my_mysql_db_one.yml
+    $ mv tap_mysql_mariadb.yml.sample tap_mysql_sample.yml
     $ mv target_snowflake.yml.sample  target_snowflake.yml
 
-1.  Edit ``target_snowflake.yml``. This will be the destination of one or more sources.
+1. Edit ``target_snowflake.yml``. This will be the destination of one or more sources.
 You can edit it with the text editor of your choice:
 
-.. code-block:: bash
+.. code-block:: yaml
 
     ---
-    id: "snowflake_test"
-    name: "Snowflake Test"
+    id: "snowflake"
+    name: "Snowflake"
     type: "target-snowflake"
     db_conn:
       account: "rtxxxxxx.eu-central-1"
       dbname: "analytics_db_test"
       user: "snowflake_user"
-      password: "PASSWORD"                                   # Plain string or Vault Encrypted password
+      private_key: "/path/to/snowflake_private_key.pem"
       warehouse: "LOAD_WH"
       s3_bucket: "pipelinewise-bucket"
       s3_key_prefix: "snowflake-imports-test/"
@@ -126,7 +143,7 @@ You can edit it with the text editor of your choice:
       #               snowflake tables.
       stage: "pipelinewise.encrypted_etl_stage_test"
       file_format: "pipelinewise.etl_stage_file_format"
-      aws_secret_access_key: "<SECRET_ASCCESS_KEY>"          # Plain string or Vault Encrypted password
+      aws_secret_access_key: "<SECRET_ACCESS_KEY>"           # Plain string or Vault Encrypted password
       # The same master key has to be added to the external stage object created in snowflake
       client_side_encryption_master_key: "<CSE_MASTER_KEY>"  # Plain string or Vault Encrypted password
 
@@ -138,13 +155,13 @@ You can edit it with the text editor of your choice:
   :ref:`encrypting_passwords` section.
 
 
-2) Edit ``tap_mysql_mariadb.yml``:
+2. Edit ``tap_mysql_sample.yml``:
 
-.. code-block:: bash
+.. code-block:: yaml
 
     ---
-    id: "fx"
-    name: "FX (Monolith)"
+    id: "mysql_sample"
+    name: "Sample MySQL Database"
     type: "tap-mysql"
     owner: "somebody@transferwise.com"
 
@@ -154,24 +171,25 @@ You can edit it with the text editor of your choice:
       port: 10602
       user: "my_user"
       password: "<PASSWORD>"                  # Plain string or Vault Encrypted password
+      dbname: "sample_db"
 
-    target: "snowflake_test"                  # Target ID, should match the id from target_snowflake.yml
+    target: "snowflake"                       # Must match the id in target_snowflake.yml
     batch_size_rows: 100000                   # Batch size for the stream to optimise load performance
 
     # Source to Destination Schema mapping
     schemas:
-      - source_schema: "fx"                   # You can replicate from multiple schemas
-          target_schema: "fx_clear"           # Target schema in snowflake
-          target_schema_select_permissions:   # Grant permission once the table created
-            - grp_power
-          tables:                             # List Tables to replicate
-            - table_name: "table_one"
-              replication_method: FULL_TABLE  # 1) FULL_TABLE replication
-            - table_name: "table_two"         #
-              replication_method: LOG_BASED   # 2) LOG_BASED replication
-            - table_name: "table_three"       #
-              replication_method: INCREMENTAL # 3) INCREMENTAL replication
-              replication_key: "updated_at"   #    Incremental load needs replication key
+      - source_schema: "sample_db"            # You can replicate from multiple schemas
+        target_schema: "sample_db"            # Target schema in Snowflake
+        target_schema_select_permissions:   # Grant permission once the table created
+          - grp_power
+        tables:                             # List Tables to replicate
+          - table_name: "table_one"
+            replication_method: FULL_TABLE  # 1) FULL_TABLE replication
+          - table_name: "table_two"         #
+            replication_method: LOG_BASED   # 2) LOG_BASED replication
+          - table_name: "table_three"       #
+            replication_method: INCREMENTAL # 3) INCREMENTAL replication
+            replication_key: "updated_at"   #    Incremental load needs replication key
 
 
 .. _import_project_from_yaml:
@@ -179,11 +197,12 @@ You can edit it with the text editor of your choice:
 Activating the Pipelines from the YAML files
 --------------------------------------------
 
-When you are happy with the configuration you need to import it with the :ref:`cli_import` command:
+When you are happy with the configuration, import it with the
+:ref:`cli_import_config` command:
 
 .. code-block:: bash
 
-    $ pipelinewise import --dir pipelinewise_samples
+    $ pipelinewise import_config --dir pipelinewise_samples
 
             ... detailed messages about import and discovery...
 
@@ -218,7 +237,7 @@ Once the config YAML files are imported, you can see the new pipelines with the 
 
 
 Congratulations! At this point you have successfully created your first pipeline in PipelineWise and it's now
-ready to run. You may want you can create a new git repository and push the ``pipelinewise_samples``
+ready to run. You may want to create a new git repository and push the ``pipelinewise_samples``
 directory to keep everything under version control.
 
 Now you can head to the :ref:`running_pipelines` section to run the pipelines and to start replicating data.

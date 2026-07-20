@@ -40,12 +40,12 @@ Running in Docker
 -----------------
 
 Running PipelineWise from docker is usually the easiest and the recommended method. We will
-build an executable docker images that has every required dependency and it's isolated from
+build an executable docker image that has every required dependency and is isolated from
 your host system. First you need to install docker on your computer:
 
-* `Install Docker on Linux <https://runnable.com/docker/install-docker-on-linux>`_
+* `Install Docker on Linux <https://docs.docker.com/engine/install/>`_
 
-* `Install Docker on MacOS <https://runnable.com/docker/install-docker-on-macos>`_
+* `Install Docker on MacOS <https://docs.docker.com/desktop/setup/install/mac-install/>`_
 
 Once Docker is installed you need to clone the PipelineWise git repository and build the
 executable Docker image:
@@ -69,7 +69,7 @@ use the ``pipelinewise`` executable commands everywhere on your system:
     $ alias pipelinewise="$(pwd)/bin/pipelinewise-docker"
 
 
-Check if the installation was successfully by running the ``pipelinewise status`` command:
+Check if the installation was successful by running the ``pipelinewise status`` command:
 
 .. code-block:: bash
 
@@ -87,11 +87,12 @@ From this point, you can go to the :ref:`creating_pipelines` section to create p
 Installing from source
 ----------------------
 
-When building PipelineWise from source make sure that every OS dependencies are installed:
+PipelineWise requires Python 3.12. Before building from source, install Python 3.12
+and the operating-system dependencies used by the connectors you select. For example:
 
-* Ubuntu: ``apt-get install python3-dev python3-pip python3-venv``
+* Ubuntu: ``apt-get install python3.12-dev python3-pip python3.12-venv``
 
-* MacOS: ``brew install python``
+* macOS: ``brew install python@3.12``
 
 Clone the PipelineWise git repository and run the install script that installs the
 PipelineWise CLI and every supported singer connectors into separated virtual environments:
@@ -102,8 +103,7 @@ PipelineWise CLI and every supported singer connectors into separated virtual en
     $ cd ./pipelinewise
     $ make pipelinewise all_connectors
 
-Press ``Y`` to accept the license agreement of the required singer components. To automate
-the installation and accept every license agreement run ``./install --acceptlicenses``.
+Press ``Y`` to accept the license agreement of the required singer components.
 
 .. code-block:: bash
 
@@ -116,8 +116,8 @@ the installation and accept every license agreement run ``./install --acceptlice
     --------------------------------------------------------------------------
 
     To start CLI:
-      $ source /Users/jack/pipelinewise/.virtualenvs/cli/bin/activate
-      $ export PIPELINEWISE_HOME=/Users/jack/pipelinewise/.virtualenvs
+      $ source /Users/jack/pipelinewise/.virtualenvs/pipelinewise/bin/activate
+      $ export PIPELINEWISE_HOME=/Users/jack/pipelinewise
       $ pipelinewise status
 
     --------------------------------------------------------------------------
@@ -127,9 +127,9 @@ the installation and accept every license agreement run ``./install --acceptlice
 Selecting singer connectors
 '''''''''''''''''''''''''''
 
-You can install PipelineWise only with required connectors by using the ``--connectors=`` argument. For example if you
-need to replicate data only from MySQL and PostgreSQL into a Snowflake database you can install PipelineWise by
-running:
+You can install only the connectors you need by setting the ``pw_connector``
+Make variable. For example, to replicate data from MySQL and PostgreSQL into
+Snowflake, run:
 
 .. code-block:: bash
 
@@ -142,50 +142,41 @@ running:
     More info in the :ref:`licenses` section.
 
 
-Here’s the list of the singer connectors and if they are installed by default or not:
+The current ``all_connectors`` set is listed below. Install one connector with
+``make pipelinewise connectors -e pw_connector=<connector>`` or pass a
+comma-separated list as shown above.
 
-+----------------------------+---------------------------------------------+----------------------------------+---------------------------------------+
-| **Connector**              | **Install Command**                         | **Included in default install?** | **Note**                              |
-+----------------------------+---------------------------------------------+----------------------------------+---------------------------------------+
-| all                        | ./install --connectors=all                  |                                  | Installs every supported connector    |
-+----------------------------+---------------------------------------------+----------------------------------+---------------------------------------+
-| tap-github                 | ./install --connectors=tap-github           | YES                              |                                       |
-+----------------------------+---------------------------------------------+----------------------------------+---------------------------------------+
-| tap-jira                   | ./install --connectors=tap-jira             | YES                              |                                       |
-+----------------------------+---------------------------------------------+----------------------------------+---------------------------------------+
-| tap-kafka                  | ./install --connectors=tap-kafka            | YES                              |                                       |
-+----------------------------+---------------------------------------------+----------------------------------+---------------------------------------+
-| tap-mongodb                | ./install --connectors=tap-mongodb          | YES                              |                                       |
-+----------------------------+---------------------------------------------+----------------------------------+---------------------------------------+
-| tap-mysql                  | ./install --connectors=tap-mysql            | YES                              |                                       |
-+----------------------------+---------------------------------------------+----------------------------------+---------------------------------------+
-| tap-postgres               | ./install --connectors=tap-postgres         | YES                              |                                       |
-+----------------------------+---------------------------------------------+----------------------------------+---------------------------------------+
-| tap-s3-csv                 | ./install --connectors=tap-s3-csv           | YES                              |                                       |
-+----------------------------+---------------------------------------------+----------------------------------+---------------------------------------+
-| tap-snowflake              | ./install --connectors=tap-snowflake        | YES                              |                                       |
-+----------------------------+---------------------------------------------+----------------------------------+---------------------------------------+
-| tap-zendesk                | ./install --connectors=tap-zendesk          | YES                              |                                       |
-+----------------------------+---------------------------------------------+----------------------------------+---------------------------------------+
-| tap-github                 | ./install --connectors=tap-github           | YES                              |                                       |
-+----------------------------+---------------------------------------------+----------------------------------+---------------------------------------+
-| tap-slack                  | ./install --connectors=tap-slack            | YES                              |                                       |
-+----------------------------+---------------------------------------------+----------------------------------+---------------------------------------+
-| tap-mixpanel               | ./install --connectors=tap-mixpanel         | YES                              |                                       |
-+----------------------------+---------------------------------------------+----------------------------------+---------------------------------------+
-| target-postgres            | ./install --connectors=target-postgres      | YES                              |                                       |
-+----------------------------+---------------------------------------------+----------------------------------+---------------------------------------+
-| target-s3-csv              | ./install --connectors=target-s3-csv        | YES                              |                                       |
-+----------------------------+---------------------------------------------+----------------------------------+---------------------------------------+
-| target-snowflake           | ./install --connectors=target-snowflake     | YES                              |                                       |
-+----------------------------+---------------------------------------------+----------------------------------+---------------------------------------+
-| transform-field            | ./install --connectors=transform-field      | YES                              |                                       |
-+----------------------------+---------------------------------------------+----------------------------------+---------------------------------------+
+.. list-table:: Connectors installed by ``all_connectors``
+   :header-rows: 1
 
-
-.. warning::
-
-    When `--connectors=` argument is not specified then only the default connectors will be installed.
+   * - Sources (taps)
+     - Destinations and transformations
+   * - ``tap-github``
+     - ``target-postgres``
+   * - ``tap-jira``
+     - ``target-s3-csv``
+   * - ``tap-kafka``
+     - ``target-snowflake``
+   * - ``tap-mixpanel``
+     - ``transform-field``
+   * - ``tap-mongodb``
+     -
+   * - ``tap-mysql``
+     -
+   * - ``tap-postgres``
+     -
+   * - ``tap-s3-csv``
+     -
+   * - ``tap-salesforce``
+     -
+   * - ``tap-slack``
+     -
+   * - ``tap-snowflake``
+     -
+   * - ``tap-twilio``
+     -
+   * - ``tap-zendesk``
+     -
 
 Once the install script finished, you will need to activate the virtual environment
 with the Command Line Tools and set the ``PIPELINEWISE_HOME`` environment variable
@@ -193,8 +184,8 @@ as it is displayed above at the end of the install script:
 
 .. code-block:: bash
 
-    $ source /Users/jack/pipelinewise/.virtualenvs/cli/bin/activate
-    $ export PIPELINEWISE_HOME=/Users/jack/pipelinewise/.virtualenvs
+    $ source /Users/jack/pipelinewise/.virtualenvs/pipelinewise/bin/activate
+    $ export PIPELINEWISE_HOME=/Users/jack/pipelinewise
     $ pipelinewise status
 
     Tap ID    Tap Type    Target ID    Target Type    Enabled    Status    Last Sync    Last Sync Result

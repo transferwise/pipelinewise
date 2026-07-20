@@ -7,15 +7,16 @@ The local development environment comes with the following containers and compon
 * PipelineWise CLI with every supported tap and target connectors
 * MariaDB test source database with test data (for tap-mysql)
 * Postgres test source database with test data (for tap-postgres)
+* MongoDB replicaSet test source database with test data (for tap-mongodb)
 * Postgres test target data warehouse (for target-postgres)
-* Test Project that replicates data from MariaDB and Postgres databases into a Postgres Data Warehouse
+* Test Project that replicates data from MariaDB, Postgres, and MongoDB databases into a Postgres Data Warehouse
 * Integration and End to End test cases
 
 ## How to use
 
 Install [Docker](https://www.docker.com/) and [Docker Compose](https://docs.docker.com/compose/).
 
-Go to the main folder of the repository (the parent of this one) and To create local development environment:
+Go to the main folder of the repository (the parent of this one) to create the local development environment:
 
 ```sh
 $ cd dev-project/
@@ -29,13 +30,13 @@ container, virtual environment and environment variables are set configured.
 Open another terminal and shell into the PipelineWise container:
 
 ```sh
-$ docker exec -it pipelinewise_dev bash
+$ docker exec -it pipelinewise bash
 ```
 
 Import the dev project:
 
 ```sh
-$ pipelinewise import --dir /opt/pipelinewise/dev-project/pipelinewise-config
+$ pipelinewise import_config --dir /opt/pipelinewise/dev-project/pipelinewise-config
 ```
 
 Check the status, you should see multiple pipelines. Each of them is replicating data from different taps to Postgres DWH.
@@ -44,36 +45,37 @@ Every source database is filled with some test data.
 ```sh
 $ pipelinewise status
 
-Tap ID    Tap Type      Target ID     Target Type      Enabled    Status    Last Sync    Last Sync Result
---------  ------------  ------------  ---------------  ---------  --------  -----------  ------------------
-postgres  tap-postgres  postgres_dwh  target-postgres  True       ready                  unknown
-mariadb   tap-mysql     postgres_dwh  target-postgres  True       ready                  unknown
-2 pipeline(s)
+Tap ID                  Tap Type      Target ID        Target Type      Enabled    Status    Last Sync    Last Sync Result
+----------------------  ------------  ---------------  ---------------  ---------  --------  -----------  ------------------
+tap_postgres            tap-postgres  target_postgres  target-postgres  True       ready                  unknown
+tap_mariadb             tap-mysql     target_postgres  target-postgres  True       ready                  unknown
+tap_mongodb_to_pg       tap-mongodb   target_postgres  target-postgres  True       ready                  unknown
+3 pipeline(s)
 ```
 
 **Note**: To configure the list of tables to replicate, replication methods, load time transformations, etc.,
 edit the YAML files in the `dev-project` directory. Don't forget to re-import the project with
-`pipelinewise import --dir dev-project` when making changes in the YAML files.
+`pipelinewise import_config --dir dev-project` when making changes in the YAML files.
 
 To start replicating data from source MariaDB to target Postgres DWH:
 
 ```sh
-$ pipelinewise run_tap --tap mariadb_db --target postgres_dwh
+$ pipelinewise run_tap --tap tap_mariadb --target target_postgres
 ```
 
-**Note**: Log files are generated at each run at `~/.pipelinewise/postgres_dwh/mariadb_db/log/`.
-State file with incremental and log based positions generated at `~/.pipelinewise/postgres_dwh/mariadb_db/state.json`.
+**Note**: Log files are generated at each run at `~/.pipelinewise/target_postgres/tap_mariadb/log/`.
+State file with incremental and log based positions generated at `~/.pipelinewise/target_postgres/tap_mariadb/state.json`.
 Next time when running the same command, the incrementally and log based (CDC) replicated tables
 will capture the changes starting from the previously replicated position.
 
 To start replicating data from source Postgres to target Postgres DWH:
 
 ```sh
-$ pipelinewise run_tap --tap postgres_db --target postgres_dwh
+$ pipelinewise run_tap --tap tap_postgres --target target_postgres
 ```
 
-**Note**: Log files are generated at each run at `~/.pipelinewise/postgres_dwh/postgres_db/log/`
-State file with incremental and log based positions generated at `~/.pipelinewise/postgres_dwh/postgres_db/state.json`.
+**Note**: Log files are generated at each run at `~/.pipelinewise/target_postgres/tap_postgres/log/`
+State file with incremental and log based positions generated at `~/.pipelinewise/target_postgres/tap_postgres/state.json`.
 Next time when running the same command, the incrementally and log based (CDC) replicated tables
 will capture the changes starting from the previously replicated position.
 
@@ -116,7 +118,7 @@ and can be opened **only** from the docker host and not inside from the containe
 ###  Configuring end to end tests
 
 You can customise which end to end tests you want to run by editing
-[dev-project/.env](../dev-project/.env) file. By default only the open source taps and targets are selected because only these databases can run in docker containers for free. However end to end test cases are available for commercial databases and data stores as well including S3, Snowflake, Redshift.
+check the [dev-project/.env](../dev-project/.env) file. By default only the open source taps and targets are selected because only these databases can run in docker containers for free. However end to end test cases are available for commercial databases and data stores as well including S3 and Snowflake.
 
 To enable taps and targets to non open source data stores, add valid credentials to [dev-project/.env](../dev-project/.env) and the related tests cases will run automatically.
 
@@ -125,6 +127,6 @@ To enable taps and targets to non open source data stores, add valid credentials
 To refresh the containers with new local code changes stop the running instances with `ctrl+c` and restart as usual:
 
 ```sh
-$ docker-compose up --build
+$ docker compose up --build
 ```
 

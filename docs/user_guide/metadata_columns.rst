@@ -8,8 +8,10 @@ Metadata Columns
 Metadata columns add extra row level information about data ingestion in target connectors.
 (i.e. when a row was read in source, when it was inserted or deleted in snowflake etc.)
 
-Metadata columns are created automatically by adding extra columns to the tables with a
-column prefix ``_SDC_``:
+Metadata and delete handling are configured in each tap YAML file because different
+pipelines can load into the same target with different behavior. PipelineWise adds
+columns with the ``_SDC_`` prefix when ``add_metadata_columns`` or ``hard_delete``
+is enabled:
 
 * ``_SDC_EXTRACTED_AT``: Timestamp when the record was extracted from the source
 
@@ -31,20 +33,36 @@ at the end of the table:
 | text           | text           | 3                | 2019-08-20 17:15:12   | 2019-08-20 17:15:25 |                     |
 +----------------+----------------+------------------+-----------------------+---------------------+---------------------+
 
-.. warning::
+The two settings combine as follows:
 
-  Optionally, you can turn off creating metadata columns by creating
-  ``add_metadata_columns: False`` to the :ref:`targets_list` YAML config file.
-  Please note, if adding metadata columns option is turned off then deleted rows
-  in source do not get deleted in target.
+.. list-table:: Tap metadata and delete settings
+   :header-rows: 1
+   :widths: 24 20 56
 
-  Please note that **Hard Delete** mode is enabled by default for every target connector,
-  which means that every record that was deleted in source will be deleted in the replicated
-  target database as well. Please also note that Only :ref:`log_based` replication method
-  detects delete row events.
+   * - Configuration
+     - Metadata columns
+     - Behaviour
+   * - ``hard_delete: true`` (default)
+     - Enabled automatically
+     - Physically deletes rows from the target when a source delete event arrives.
+   * - ``hard_delete: false`` and ``add_metadata_columns: true``
+     - Enabled
+     - Retains the row and records the deletion time in ``_SDC_DELETED_AT``.
+   * - Both settings ``false``
+     - Disabled
+     - Retains the existing target row without marking it as deleted.
 
-  To turn off **Hard Delete** mode add ``hard_delete: false`` to the target :ref:`targets_list`
-  YAML config file. In this case when a deleted row captured in source then
-  ``_SDC_DELETED_AT`` column will only get flagged and not get deleted in the target.
-  Please also note that Only :ref:`log_based` replication method detects delete row events.
+.. note::
 
+  Only :ref:`log_based` replication detects source delete events. Incremental and
+  full-table Singer runs do not emit individual delete events.
+
+.. code-block:: yaml
+
+    id: "mysql_orders"
+    name: "MySQL orders"
+    type: "tap-mysql"
+    add_metadata_columns: true
+    hard_delete: false
+    db_conn:
+      # ...

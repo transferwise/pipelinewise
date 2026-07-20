@@ -77,85 +77,75 @@ following the steps in the :ref:`generating_pipelines` section.
 
 Example YAML for ``tap-mongodb``:
 
-.. code-block:: bash
+.. code-block:: yaml
 
-	---
+    ---
+    id: "tap_mongo"                    # Unique identifier of the tap
+    name: "MongoDB tap"                 # Human-readable name of the tap
+    type: "tap-mongodb"                 # Connector type; do not change
+    owner: "foo@bar.com"                # Data owner to contact
+    #send_alert: false                   # Optional: Disable configured alerts for this tap
+    #slack_alert_channel: "#tap-channel" # Optional: Send a copy of alerts to this Slack channel
 
-	# ------------------------------------------------------------------------------
-	# General Properties
-	# ------------------------------------------------------------------------------
-	id: "tap_mongo"
-	name: "MongoDB tap"
-	type: "tap-mongodb"
-	owner: "foo@bar.com"
-	#send_alert: False                     # Optional: Disable all configured alerts on this tap
-    #slack_alert_channel: "#tap-channel"   # Optional: Sending a copy of specific tap alerts to this slack channel
+    db_conn:
+      host: "mongodb_host1,mongodb_host2,mongodb_host3" # Comma-separated MongoDB hosts
+      port: 27017                       # MongoDB port
+      srv: "false"                       # Use "true" for MongoDB Atlas; port is then ignored
+      user: "PipelineWiseUser"           # User with permission to read the source collections
+      password: "<PASSWORD>"             # Plain string or Vault encrypted
+      auth_database: "admin"              # Database against which the user authenticates
+      dbname: "my_db"                     # MongoDB database to replicate
+      replica_set: "my_replica_set"       # Optional: Replica set name; default is null
+      #write_batch_rows: 50000             # Optional: Rows written to a CSV batch; default 50000
+      #update_buffer_size: 1               # Optional, LOG_BASED: Buffered update operations; default 1
+      #await_time_ms: 1000                 # Optional, LOG_BASED: Wait for changes before exit; default 1000 ms
+      #fastsync_parallelism: 4             # Optional: FastSync process pool size; defaults to CPU count
 
+    target: "my_target"                   # ID of the target connector
+    batch_size_rows: 1000                 # Rows sent to the target in each batch
+    stream_buffer_size: 0                 # In-memory tap-to-target buffer size in MB
+    default_target_schema: "my_db"         # Optional: Default destination schema
+    #default_target_schema_select_permissions: # Optional: Groups granted SELECT access
+    #  - grp_power
+    #batch_wait_limit_seconds: 3600        # Optional, Snowflake: Flush a partial batch after this time
 
-	# ------------------------------------------------------------------------------
-	# Source (Tap) - Mongo connection details
-	# ------------------------------------------------------------------------------
-	db_conn:
-		host: "mongodb_host1,mongodb_host2,mongodb_host3" 	# Mongodb host(s)
-		port: 27017                           				# Mongodb port
-		srv: "false"										# For MongoDB Atlas `srv` should be "true" and `port` will be ignored
-		user: "PipelineWiseUser"                  			# Mongodb user
-		password: "mY_VerY_StRonG_PaSSwoRd"                 # Mongodb plain string or vault encrypted
-		auth_database: "admin"            					# Mongodb database to authenticate on
-		dbname: "my_db"           							# Mongodb database name to sync from
-		replica_set: "my_replica_set"        				# Optional, Mongodb replica set name, default null
-  		write_batch_rows: <int>								# Optional: Number of rows to write to csv file
-                                       						#           in one batch. Default is 50000.
-        update_buffer_size: <int> 						    # Optional: [LOG_BASED] The size of the buffer that holds detected update
-                                                            #           operations in memory, the buffer is flushed once the size is reached. Default is 1.
-        await_time_ms: <int>								# Optional: [LOG_BASED] The maximum amount of time in milliseconds
-                                                            #           the loge_base method waits for new data changes before exiting. Default is 1000 ms.
-        fastsync_parallelism: <int>                         # Optional: size of multiprocessing pool used by FastSync
-                                                            #           Min: 1
-                                                            #           Default: number of CPU cores
-	# ------------------------------------------------------------------------------
-	# Destination (Target) - Target properties
-	# Connection details should be in the relevant target YAML file
-	# ------------------------------------------------------------------------------
-	target: "my_target"                   			# ID of the target connector where the data will be loaded
-	batch_size_rows: 1000                  			# Batch size for the stream to optimise load performance
-	stream_buffer_size: 0                           # In-memory buffer size (MB) between taps and targets for asynchronous data pipes
-	#batch_wait_limit_seconds: 3600                 # Optional: Maximum time to wait for `batch_size_rows`. Available only for snowflake target.
+    # Options only for the Snowflake target
+    #split_large_files: false                       # Split large files into multipart ZIP files
+    #split_file_chunk_size_mb: 1000                 # Chunk size when split_large_files is enabled
+    #split_file_max_chunks: 20                      # Maximum chunks when split_large_files is enabled
+    #archive_load_files: false                      # Store loaded files in an archive S3 bucket
+    #archive_load_files_s3_prefix: "archive"        # Prefix within the archive bucket
+    #archive_load_files_s3_bucket: "<BUCKET_NAME>"  # Archive bucket; defaults to the target S3 bucket
 
-    # Options only for Snowflake target
-    #split_large_files: False                       # Optional: split large files to multiple pieces and create multipart zip files. (Default: False)
-    #split_file_chunk_size_mb: 1000                 # Optional: File chunk sizes if `split_large_files` enabled. (Default: 1000)
-    #split_file_max_chunks: 20                      # Optional: Max number of chunks if `split_large_files` enabled. (Default: 20)
-    #archive_load_files: False                      # Optional: when enabled, the files loaded to Snowflake will also be stored in `archive_load_files_s3_bucket`
-    #archive_load_files_s3_prefix: "archive"        # Optional: When `archive_load_files` is enabled, the archived files will be placed in the archive S3 bucket under this prefix.
-    #archive_load_files_s3_bucket: "<BUCKET_NAME>"  # Optional: When `archive_load_files` is enabled, the archived files will be placed in this bucket. (Default: the value of `s3_bucket` in target snowflake YAML)
+    schemas:
+      - source_schema: "my_db"           # Must match dbname
+        target_schema: "repl_my_db"       # Destination schema
+        target_schema_select_permissions: # Optional: Groups granted SELECT access
+          - grp_stats
 
+        # MongoDB supports FULL_TABLE and LOG_BASED; LOG_BASED is the default.
+        tables:
+          - table_name: "my_collection"
+            replication_method: "FULL_TABLE"
 
-	# ------------------------------------------------------------------------------
-	# Source to target Schema mapping
-	# ------------------------------------------------------------------------------
-	schemas:
-	  	- source_schema: "my_db"					# Same name as dbname
-		  target_schema: "ppw_e2e_tap_mongodb"		# Name of target schema to load to
+            # Optional load-time transformations
+            #transformations:
+            #  - column: "last_name"
+            #    type: "SET-NULL"
 
-		  # List of collections to sync
-		  tables:
-			- table_name: "my_collection"
-			  replication_method: "FULL_TABLE"
-
-		  	# default replication method is LOG_BASED
-		  	- table_name: "my_other_collection"
+          - table_name: "my_other_collection"
+            replication_method: "LOG_BASED"
 
 
 Example connection to MongoDB Atlas
 """""""""""""""""""""""""""""""""""
 
-.. code-block:: bash
+.. code-block:: yaml
 
-	db_conn:
-		srv: "true"
-		host: "xxxxxxxxx.xxxxx.mongodb.net"
-		auth_database: "admin"			# the Mongodb database name to authenticate on
-		dbname: "db-name"				# Mongodb database name to sync from
-		user: "user-name"				# User with read roles
-		password: "password"			# Plain string or vault encrypted
+    db_conn:
+      srv: "true"
+      host: "xxxxxxxxx.xxxxx.mongodb.net"
+      auth_database: "admin"             # Database used for authentication
+      dbname: "db-name"                  # Database to replicate
+      user: "user-name"
+      password: "<PASSWORD>"             # Plain string or Vault encrypted

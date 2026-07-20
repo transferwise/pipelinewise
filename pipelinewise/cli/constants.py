@@ -24,10 +24,8 @@ class ConnectorType(enum.Enum):
     TAP_ZENDESK = 'tap-zendesk'
     TAP_ZUORA = 'tap-zuora'
 
-    TARGET_BIGQUERY = 'target-bigquery'
     TARGET_POSTGRES = 'target-postgres'
     TARGET_SNOWFLAKE = 'target-snowflake'
-    TARGET_REDSHIFT = 'target-redshift'
     TARGET_S3_CSV = 'target-s3-csv'
 
     TRANSFORM_FIELD = 'transform-field'

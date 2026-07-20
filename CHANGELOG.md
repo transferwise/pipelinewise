@@ -1,3 +1,23 @@
+0.77.0 (2026-07-16)
+-------------------
+- Rename CLI command `sync_tables` to `fast_sync` (`sync_tables` remains as a backward-compatible alias)
+- Remove Redshift and BigQuery target connectors (TARGET_REDSHIFT, TARGET_BIGQUERY)
+- Remove BigQuery SQL flavor from FastSync transform utilities
+- Bump `PyMySQL` from `0.7.11` to `1.1.2`
+- Bump `ujson` from `5.12.0` to `5.12.1`
+- Add `AGENTS.md` with AI coding agent instructions, architecture overview, and documentation maintenance guidelines
+- Add `docs/user_guide/troubleshooting.rst`: comprehensive troubleshooting guide (replication tips, MySQL/PostgreSQL/FastSync errors, diagnostics)
+- Rewrite `docs/concept/fastsync.rst`: reframe FastSync as an optimization engine with FullSync and PartialSync components, document `sync_start_from` (defined PartialSync), auto-selection criteria
+- Rewrite `docs/user_guide/yaml_config.rst`: full YAML configuration reference (config.yml, tap, and target structure)
+- Update `docs/concept/replication_methods.rst`: remove FastSync from replication methods list, add seealso cross-reference
+- Update `docs/user_guide/cli.rst`: add `fast_sync` and `partial_sync_table` command documentation, environment variables section, enhanced descriptions for `stop_tap`, `discover_tap`, `validate`, and `reset_state`
+- Update `docs/user_guide/resync.rst`: add FastSync tip box, clarify `sync_start_from` behavior, update command examples
+- Update `docs/user_guide/partial_sync.rst`: add text descriptions for all cases, add FastSync mechanism note
+- Fix documentation errors: PostgreSQL tap copy-paste issues, Slack tap references, MongoDB YAML code blocks, `sync_start_from` typos in MySQL/PostgreSQL connector docs
+- Update `docs/installation_guide/installation.rst`: standardize connector install commands to `make` syntax
+- Update `docs/project/licenses.rst`: add target-redshift and target-bigquery entries
+- Add tap-snowflake to connector visual gallery in `docs/connectors/taps.rst`
+
 0.76.7 (2026-06-18)
 -------------------
 - Bump `zenpy` from `2.0.0` to `2.0.57` to restore Python 3.12 compatibility

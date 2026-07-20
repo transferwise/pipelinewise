@@ -32,22 +32,19 @@ MySQL setup requirements
 
 2. Verify that binlog is enabled by running the following statement. The value returned should be 1:
 
-.. code-block:: bash
+.. code-block:: sql
 
-    mysql> select @@log_bin;
+    SELECT @@log_bin;
 
 
 3. Locate the ``my.cnf file``. It's usually located at ``/etc/my.cnf``. Verify that ``my.cnf`` has the following lines in the mysqld section:
 
-.. code-block:: bash
-
-    mysql> select @@log_bin;
+.. code-block:: ini
 
     [mysqld]
     binlog_format=ROW
     binlog_row_image=FULL
     expire_logs_days=7
-    binlog_expire_logs_seconds=604800
     log_bin=mysql-binlog
     log_slave_updates=1
 
@@ -55,7 +52,7 @@ A few things to note:
 
   * ``log_bin`` doesn't have to be ``mysql-binlog`` - this value can be anything. Additionally, if ``log_bin`` already has an entry (which you checked in step one), you don’t need to change it.
   
-  * Use either ``expire_log_days`` or ``binlog_expire_logs_seconds``, not both
+  * Use either ``expire_logs_days`` or ``binlog_expire_logs_seconds``, not both.
   
   * Setting ``log_slave_updates`` is only required if you are connecting a read replica. This isn’t required for master instances.
 
@@ -121,15 +118,15 @@ Example YAML for ``tap-mysql``:
     user: "<USER>"                       # MySQL/ MariaDB user
     password: "<PASSWORD>"               # Plain string or vault encrypted
     dbname: "<DB_NAME>"                  # MySQL/ MariaDB database name
-    use_gtid: <boolean>                  # Flag to enable using GTID as the state bookmark for log based tables
-    engine: "mariadb/mysql"              # Flavor of the server, used in conjunction with "use_gtid"
+    use_gtid: true                       # Use GTID as the state bookmark for log-based tables
+    engine: "mysql"                      # One of "mysql" or "mariadb"; used with use_gtid
     #replica_host: "<REPLICA_HOST>"      # Optional: MySQL/ MariaDB replica host to offload initial/FastSync
                                          # to a read replica, switch back to primary for log-based replication. 
                                          # Used to resync large tables without impacting primary DB performance.
     #filter_dbs: "schema1,schema2"       # Optional: Scan only the required schemas
                                          #           to improve the performance of
                                          #           data extraction
-    #export_batch_rows                   # Optional: Number of rows to export from MySQL
+    #export_batch_rows: 50000            # Optional: Number of rows to export from MySQL
                                          #           in one batch. Default is 50000.
     #session_sqls:                       # Optional: Run SQLs to set session variables
     #  - SET @@session.time_zone="+0:00"             # when the connection made
@@ -137,7 +134,7 @@ Example YAML for ``tap-mysql``:
     #  - SET @@session.net_read_timeout=3600
     #  - SET @@session.innodb_lock_wait_timeout=3600
 
-    fastsync_parallelism: <int>          # Optional: size of multiprocessing pool used by FastSync
+    #fastsync_parallelism: 4             # Optional: size of multiprocessing pool used by FastSync
                                          #           Min: 1
                                          #           Default: number of CPU cores
 
@@ -169,7 +166,7 @@ Example YAML for ``tap-mysql``:
       target_schema_select_permissions:  # Optional: Grant SELECT on schema and tables that created
         - grp_stats
 
-      # List of tables to replicate from Postgres to destination Data Warehouse
+      # List of tables to replicate from MySQL to destination Data Warehouse
       #
       # Please check the Replication Strategies section in the documentation to understand the differences.
       # For LOG_BASED replication method you might need to adjust the source mysql/ mariadb configuration.
@@ -189,21 +186,23 @@ Example YAML for ``tap-mysql``:
 
         - table_name: "table_three"
           replication_method: "LOG_BASED"
-          sync_start_from:                   # Optional, applies for then first sync and fast sync
+          sync_start_from:                   # Optional, applies for the first sync and fast sync
             column: "column_name"            # Column name to be picked for partial sync with incremental or timestamp value
             static_value: "start_value"      # A static value which the first sync always starts from column >= static_value
             drop_target_table: true          # Optional, drops target table before syncing. default value is false
 
         - table_name: "table_four"
           replication_method: "LOG_BASED"
-          sync_start_from:                   # Optional, applies for then first sync and fast sync
+          sync_start_from:                   # Optional, applies for the first sync and fast sync
             column: "column_name"            # Column name to be picked for partial sync with incremental or timestamp value
-            dynamic_value: "A SELECT query   # It can be a valid mysql SELECT query which returns only one row with one column and first sync always starts from column >= dynamic_value
+            # The query must return exactly one row with one column. The first sync starts
+            # from rows where column >= the returned value.
+            dynamic_value: "SELECT DATE_SUB(MAX(updated_at), INTERVAL 7 DAY) FROM table_four"
             drop_target_table: true          # Optional, drops target table before syncing. default value is false
 
     # You can add as many schemas as you need...
-    # Uncomment this if you want replicate tables from multiple schemas
-    #- source_schema: "another_schema_in_mysql" 
-    #  target_schema: "another
-    # static and dynamic values can not be defined together for a table and only one of them can be used.
+    # Uncomment this if you want to replicate tables from multiple schemas
+    #- source_schema: "another_schema_in_mysql"
+    #  target_schema: "another_schema_in_target"
 
+    # Note: static and dynamic values cannot be defined together for a table; only one can be used.

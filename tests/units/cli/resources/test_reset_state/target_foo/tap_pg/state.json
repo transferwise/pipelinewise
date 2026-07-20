@@ -1,7 +1,7 @@
 {
     "bookmarks": {
         "foo_table": {
-            "lsn": 456321
+            "lsn": 1
         },
         "bar_table": {
             "foo": "bar"
