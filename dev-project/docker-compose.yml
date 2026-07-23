@@ -1,6 +1,8 @@
 services:
   ### Primary container with PipelineWise CLI
   pipelinewise:
+    # entrypoint.sh installs amd64-only .debs (mongosh, mongodb-database-tools),
+    # so arm64 hosts emulate.
     platform: linux/amd64
     image: ubuntu:24.04
     container_name: pipelinewise
@@ -9,23 +11,66 @@ services:
     env_file:
       - .env
     environment:
-      PATH: ${PIPELINEWISE_HOME}/.virtualenvs/pipelinewise/bin:${PATH}
+      # Literal, not ${PATH}: Compose would interpolate ${PATH} from the host shell,
+      # baking the developer's machine paths into the container.
+      PATH: /opt/pipelinewise/dev-project/.virtualenvs/pipelinewise/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      PIPELINEWISE_BACKEND_HOST: ${PIPELINEWISE_BACKEND_HOST:-pipelinewise-backend-db}
+      PIPELINEWISE_BACKEND_PORT: ${PIPELINEWISE_BACKEND_PORT:-5432}
+      PIPELINEWISE_BACKEND_USER: ${PIPELINEWISE_BACKEND_USER:-pipelinewise_backend}
+      PIPELINEWISE_BACKEND_PASSWORD: ${PIPELINEWISE_BACKEND_PASSWORD:-backend-secret}
+      PIPELINEWISE_BACKEND_DB: ${PIPELINEWISE_BACKEND_DB:-pipelinewise_backend}
     volumes:
       - ../:/opt/pipelinewise
       # don't create container specific .virtualenvs files on host
       - /opt/pipelinewise/dev-project/.virtualenvs/
       # mount pipelinewise pipe configuration directory to host for ease of troubleshooting
       - .pipelinewise:/root/.pipelinewise
+      # Gitignored; Docker creates an empty directory here when the host file is absent.
       - ./snowflake.pem:/opt/pipelinewise/.ssh/snowflake.pem
 
-    # Build only when test databases are ready
     depends_on:
-      - pipelinewise-postgres-source
-      - pipelinewise-mysql-source
-      - pipelinewise-postgres-target
-      - pipelinewise-mongodb-source
+      pipelinewise-postgres-source:
+        condition: service_healthy
+      pipelinewise-mysql-source:
+        condition: service_healthy
+      pipelinewise-postgres-target:
+        condition: service_healthy
+      pipelinewise-backend-db:
+        condition: service_healthy
+      pipelinewise-mongodb-source:
+        condition: service_healthy
     networks:
       - pipelinewise_network
+      - pipelinewise_backend_network
+
+  ### PipelineWise internal services
+  # data-diff operational state. Isolated from the replicated target on purpose:
+  # separate server, role, database, port and volume.
+  pipelinewise-backend-db:
+    image: postgres:16-alpine
+    container_name: pipelinewise-backend-db
+    ports:
+      # 15432 is off limits: occupied on developer machines, compose cannot bind it.
+      - ${PIPELINEWISE_BACKEND_PORT_ON_HOST:-15433}:${PIPELINEWISE_BACKEND_PORT:-5432}
+    environment:
+      # The superuser is the DDL role that owns the schema and runs migrations.
+      POSTGRES_USER: ${PIPELINEWISE_BACKEND_DDL_USER:-pipelinewise_ddl}
+      POSTGRES_PASSWORD: ${PIPELINEWISE_BACKEND_DDL_PASSWORD:-ddl-secret}
+      POSTGRES_DB: ${PIPELINEWISE_BACKEND_DB:-pipelinewise_backend}
+      PIPELINEWISE_BACKEND_APP_USER: ${PIPELINEWISE_BACKEND_USER:-pipelinewise_backend}
+      PIPELINEWISE_BACKEND_APP_PASSWORD: ${PIPELINEWISE_BACKEND_PASSWORD:-backend-secret}
+    volumes:
+      - pipelinewise-backend-data:/var/lib/postgresql/data
+      - ./backend-db/init-application-role.sh:/docker-entrypoint-initdb.d/init-application-role.sh
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U ${PIPELINEWISE_BACKEND_DDL_USER:-pipelinewise_ddl} -d ${PIPELINEWISE_BACKEND_DB:-pipelinewise_backend}
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - pipelinewise_backend_network
 
   ### TAP (Data source) containers
   # PostgreSQL service container used as test source database
@@ -34,6 +79,8 @@ services:
     build:
       context: ./pg
       dockerfile: Dockerfile
+      # The Dockerfile clones wal2json from GitHub, which fails behind some
+      # corporate proxy/DNS setups on the default bridge network.
       network: host
     container_name: pipelinewise-postgres-source
     volumes:
@@ -53,6 +100,14 @@ services:
       POSTGRES_USER: ${TAP_POSTGRES_USER}
       POSTGRES_PASSWORD: ${TAP_POSTGRES_PASSWORD}
       POSTGRES_DB: ${TAP_POSTGRES_DB}
+    healthcheck:
+      # Unix socket, so unaffected by the hostssl-only rules in pg_hba.conf.
+      test:
+        - CMD-SHELL
+        - pg_isready -U ${TAP_POSTGRES_USER} -d ${TAP_POSTGRES_DB}
+      interval: 5s
+      timeout: 5s
+      retries: 15
     networks:
       - pipelinewise_network
 
@@ -84,6 +139,15 @@ services:
       MYSQL_USER: ${TAP_MYSQL_USER}
       MYSQL_PASSWORD: ${TAP_MYSQL_PASSWORD}
       MYSQL_DATABASE: ${TAP_MYSQL_DB}
+    healthcheck:
+      # Over TCP, not the socket, to exercise require_secure_transport=ON.
+      # $$ escapes Compose interpolation so the shell expands it.
+      test:
+        - CMD-SHELL
+        - mariadb-admin ping -h 127.0.0.1 -u root -p"$$MYSQL_ROOT_PASSWORD" --silent
+      interval: 5s
+      timeout: 5s
+      retries: 20
     networks:
       - pipelinewise_network
 
@@ -115,6 +179,15 @@ services:
       MONGO_USERNAME: ${TAP_MONGODB_USER}
       MONGO_PASSWORD: ${TAP_MONGODB_PASSWORD}
       MONGO_REPLICA_HOST: pipelinewise-mongodb-source
+    healthcheck:
+      # Bare ping, not rs.status(): rs0 is initiated from the pipelinewise container,
+      # which waits on this healthcheck, so checking for a replica set would deadlock.
+      test:
+        - CMD-SHELL
+        - mongosh --quiet --tls --tlsAllowInvalidCertificates --eval 'db.adminCommand({ping:1}).ok' | grep -q 1
+      interval: 5s
+      timeout: 10s
+      retries: 20
     command: >
       mongod
       --bind_ip_all
@@ -132,7 +205,7 @@ services:
   ### Target containers
   # PostgreSQL service container used as test target database
   pipelinewise-postgres-target:
-    image: postgres:11.4
+    image: postgres:16-alpine
     container_name: pipelinewise-postgres-target
     ports:
       - ${TARGET_POSTGRES_PORT_ON_HOST}:${TARGET_POSTGRES_PORT}
@@ -140,6 +213,13 @@ services:
       POSTGRES_USER: ${TARGET_POSTGRES_USER}
       POSTGRES_PASSWORD: ${TARGET_POSTGRES_PASSWORD}
       POSTGRES_DB: ${TARGET_POSTGRES_DB}
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U ${TARGET_POSTGRES_USER} -d ${TARGET_POSTGRES_DB}
+      interval: 5s
+      timeout: 5s
+      retries: 15
     networks:
       - pipelinewise_network
 
@@ -149,3 +229,9 @@ networks:
       driver: default
       config:
         - subnet: 192.168.56.0/24
+  pipelinewise_backend_network:
+    driver: bridge
+
+volumes:
+  pipelinewise-backend-data:
+    name: pipelinewise-backend-data

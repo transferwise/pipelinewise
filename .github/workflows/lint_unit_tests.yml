@@ -16,7 +16,7 @@ jobs:
 
     steps:
       - name: Checking out repo
-        uses: actions/checkout@v4.1.7
+        uses: actions/checkout@v7
 
       - name: Check if python changes are present
         id: check
@@ -24,7 +24,7 @@ jobs:
           GITHUB_REPO: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         continue-on-error: true
-        run: ./scripts/ci_check_no_file_changes.sh python
+        run: ./scripts/ci_check_no_file_changes.sh python config
 
       - name: Set up Python 3.12
         if: steps.check.outcome == 'failure'
@@ -65,3 +65,13 @@ jobs:
         run: |
           . .virtualenvs/pipelinewise/bin/activate
           pytest --cov=pipelinewise --cov-fail-under=77 -v tests/units
+
+      # dev-project is the config the docs tell users to copy, and nothing else in
+      # CI parses it. Catches schema violations and stale table references.
+      - name: Validate dev-project configuration
+        if: steps.check.outcome == 'failure'
+        run: |
+          . .virtualenvs/pipelinewise/bin/activate
+          cp dev-project/.env.template dev-project/.env
+          set -a && . dev-project/.env && set +a
+          pipelinewise validate --dir dev-project/pipelinewise-config

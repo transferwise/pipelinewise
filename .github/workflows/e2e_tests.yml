@@ -34,7 +34,7 @@ jobs:
 
     steps:
       - name: Checking out repo
-        uses: actions/checkout@v4.1.7
+        uses: actions/checkout@v7
 
       - name: Check if python changes are present
         id: check
@@ -42,7 +42,7 @@ jobs:
           GITHUB_REPO: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         continue-on-error: true
-        run: ./scripts/ci_check_no_file_changes.sh python
+        run: ./scripts/ci_check_no_file_changes.sh python config
 
       - name: Setup test containers
         if: steps.check.outcome == 'failure'
@@ -51,23 +51,31 @@ jobs:
           docker compose -f dev-project/docker-compose.yml up -d
 
       - name: Wait for test containers to be ready
-        timeout-minutes: 6
+        timeout-minutes: 10
         if: steps.check.outcome == 'failure'
         run: |
-          until docker logs pipelinewise | grep "PipelineWise Dev environment is ready"
+          readiness_started_at=$(date +%s)
+          until docker logs pipelinewise 2>&1 | grep -Fq "PipelineWise Dev environment is ready"
           do
-            echo 'Sleeping for 10s';
-            sleep 10;
+            elapsed_seconds=$(($(date +%s) - readiness_started_at))
+            echo "Waiting for PipelineWise dev environment (${elapsed_seconds}s elapsed)"
+            sleep 30
           done
+          elapsed_seconds=$(($(date +%s) - readiness_started_at))
+          echo "PipelineWise dev environment became ready after ${elapsed_seconds}s"
 
-      - name: Run target postgres end-to-end tests
+      - name: Run target postgres and data-diff end-to-end tests
         if: steps.check.outcome == 'failure'
         run: |
           docker exec -t \
           -e TAP_S3_CSV_AWS_KEY=$TAP_S3_CSV_AWS_KEY \
           -e TAP_S3_CSV_AWS_SECRET_ACCESS_KEY=$TAP_S3_CSV_AWS_SECRET_ACCESS_KEY \
           -e TAP_S3_CSV_BUCKET=$TAP_S3_CSV_BUCKET \
-          pipelinewise pytest tests/end_to_end/test_target_postgres.py -vx --timer-top-n 10
+          pipelinewise pytest \
+          tests/end_to_end/test_target_postgres.py \
+          tests/end_to_end/data_diff/test_postgres_to_postgres.py \
+          tests/end_to_end/data_diff/test_mysql_to_postgres.py \
+          -vx --timer-top-n 10
 
   e2e_tests_mariadb_to_sf:
     runs-on: ubuntu-24.04
@@ -75,7 +83,7 @@ jobs:
 
     steps:
       - name: Checking out repo
-        uses: actions/checkout@v4.1.7
+        uses: actions/checkout@v7
 
       - name: Check if python changes are present
         id: check
@@ -83,7 +91,7 @@ jobs:
           GITHUB_REPO: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         continue-on-error: true
-        run: ./scripts/ci_check_no_file_changes.sh python
+        run: ./scripts/ci_check_no_file_changes.sh python config
 
       - name: Setup test containers
         if: steps.check.outcome == 'failure'
@@ -95,13 +103,17 @@ jobs:
 
       - name: Wait for test containers to be ready
         if: steps.check.outcome == 'failure'
-        timeout-minutes: 6
+        timeout-minutes: 10
         run: |
-          until docker logs pipelinewise | grep "PipelineWise Dev environment is ready"
+          readiness_started_at=$(date +%s)
+          until docker logs pipelinewise 2>&1 | grep -Fq "PipelineWise Dev environment is ready"
           do
-            echo 'Sleeping for 10s';
-            sleep 10;
+            elapsed_seconds=$(($(date +%s) - readiness_started_at))
+            echo "Waiting for PipelineWise dev environment (${elapsed_seconds}s elapsed)"
+            sleep 30
           done
+          elapsed_seconds=$(($(date +%s) - readiness_started_at))
+          echo "PipelineWise dev environment became ready after ${elapsed_seconds}s"
 
       - name: Run target snowflake end-to-end tests
         if: steps.check.outcome == 'failure'
@@ -119,7 +131,10 @@ jobs:
           -e TARGET_SNOWFLAKE_STAGE=$TARGET_SNOWFLAKE_STAGE \
           -e TARGET_SNOWFLAKE_USER=$TARGET_SNOWFLAKE_USER \
           -e TARGET_SNOWFLAKE_WAREHOUSE=$TARGET_SNOWFLAKE_WAREHOUSE \
-          pipelinewise pytest tests/end_to_end/target_snowflake/tap_mariadb -vx --timer-top-n 10
+          pipelinewise pytest \
+          tests/end_to_end/target_snowflake/tap_mariadb \
+          tests/end_to_end/data_diff/test_mysql_to_snowflake.py \
+          -vx --timer-top-n 10
 
   e2e_tests_pg_to_sf:
     runs-on: ubuntu-24.04
@@ -127,7 +142,7 @@ jobs:
 
     steps:
       - name: Checking out repo
-        uses: actions/checkout@v4.1.7
+        uses: actions/checkout@v7
 
       - name: Check if python changes are present
         id: check
@@ -135,7 +150,7 @@ jobs:
           GITHUB_REPO: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         continue-on-error: true
-        run: ./scripts/ci_check_no_file_changes.sh python
+        run: ./scripts/ci_check_no_file_changes.sh python config
 
       - name: Setup test containers
         if: steps.check.outcome == 'failure'
@@ -147,13 +162,17 @@ jobs:
 
       - name: Wait for test containers to be ready
         if: steps.check.outcome == 'failure'
-        timeout-minutes: 6
+        timeout-minutes: 10
         run: |
-          until docker logs pipelinewise | grep "PipelineWise Dev environment is ready"
+          readiness_started_at=$(date +%s)
+          until docker logs pipelinewise 2>&1 | grep -Fq "PipelineWise Dev environment is ready"
           do
-            echo 'Sleeping for 10s';
-            sleep 10;
+            elapsed_seconds=$(($(date +%s) - readiness_started_at))
+            echo "Waiting for PipelineWise dev environment (${elapsed_seconds}s elapsed)"
+            sleep 30
           done
+          elapsed_seconds=$(($(date +%s) - readiness_started_at))
+          echo "PipelineWise dev environment became ready after ${elapsed_seconds}s"
 
       - name: Run target snowflake end-to-end tests
         if: steps.check.outcome == 'failure'
@@ -171,7 +190,10 @@ jobs:
           -e TARGET_SNOWFLAKE_STAGE=$TARGET_SNOWFLAKE_STAGE \
           -e TARGET_SNOWFLAKE_USER=$TARGET_SNOWFLAKE_USER \
           -e TARGET_SNOWFLAKE_WAREHOUSE=$TARGET_SNOWFLAKE_WAREHOUSE \
-          pipelinewise pytest tests/end_to_end/target_snowflake/tap_postgres -vx --timer-top-n 10
+          pipelinewise pytest \
+          tests/end_to_end/target_snowflake/tap_postgres \
+          tests/end_to_end/data_diff/test_postgres_to_snowflake.py \
+          -vx --timer-top-n 10
 
   e2e_tests_mg_to_sf:
     runs-on: ubuntu-24.04
@@ -179,7 +201,7 @@ jobs:
 
     steps:
       - name: Checking out repo
-        uses: actions/checkout@v4.1.7
+        uses: actions/checkout@v7
 
       - name: Check if python changes are present
         id: check
@@ -187,7 +209,7 @@ jobs:
           GITHUB_REPO: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         continue-on-error: true
-        run: ./scripts/ci_check_no_file_changes.sh python
+        run: ./scripts/ci_check_no_file_changes.sh python config
 
       - name: Setup test containers
         if: steps.check.outcome == 'failure'
@@ -199,13 +221,17 @@ jobs:
 
       - name: Wait for test containers to be ready
         if: steps.check.outcome == 'failure'
-        timeout-minutes: 6
+        timeout-minutes: 10
         run: |
-          until docker logs pipelinewise | grep "PipelineWise Dev environment is ready"
+          readiness_started_at=$(date +%s)
+          until docker logs pipelinewise 2>&1 | grep -Fq "PipelineWise Dev environment is ready"
           do
-            echo 'Sleeping for 10s';
-            sleep 10;
+            elapsed_seconds=$(($(date +%s) - readiness_started_at))
+            echo "Waiting for PipelineWise dev environment (${elapsed_seconds}s elapsed)"
+            sleep 30
           done
+          elapsed_seconds=$(($(date +%s) - readiness_started_at))
+          echo "PipelineWise dev environment became ready after ${elapsed_seconds}s"
 
       - name: Run target snowflake end-to-end tests
         if: steps.check.outcome == 'failure'
@@ -231,7 +257,7 @@ jobs:
 
     steps:
       - name: Checking out repo
-        uses: actions/checkout@v4.1.7
+        uses: actions/checkout@v7
 
       - name: Check if python changes are present
         id: check
@@ -239,7 +265,7 @@ jobs:
           GITHUB_REPO: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         continue-on-error: true
-        run: ./scripts/ci_check_no_file_changes.sh python
+        run: ./scripts/ci_check_no_file_changes.sh python config
 
       - name: Setup test containers
         if: steps.check.outcome == 'failure'
@@ -251,13 +277,17 @@ jobs:
 
       - name: Wait for test containers to be ready
         if: steps.check.outcome == 'failure'
-        timeout-minutes: 6
+        timeout-minutes: 10
         run: |
-          until docker logs pipelinewise | grep "PipelineWise Dev environment is ready"
+          readiness_started_at=$(date +%s)
+          until docker logs pipelinewise 2>&1 | grep -Fq "PipelineWise Dev environment is ready"
           do
-            echo 'Sleeping for 10s';
-            sleep 10;
+            elapsed_seconds=$(($(date +%s) - readiness_started_at))
+            echo "Waiting for PipelineWise dev environment (${elapsed_seconds}s elapsed)"
+            sleep 30
           done
+          elapsed_seconds=$(($(date +%s) - readiness_started_at))
+          echo "PipelineWise dev environment became ready after ${elapsed_seconds}s"
 
       - name: Run target snowflake end-to-end tests
         if: steps.check.outcome == 'failure'

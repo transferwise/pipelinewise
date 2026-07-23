@@ -41,6 +41,8 @@ class TargetSnowflake(unittest.TestCase):
         self.remove_dir_from_config_dir(f'{self.target_id}/{self.tap_id}')
         self.drop_sf_schema_if_exists(f'ppw_e2e_{self.tap_type}{self.e2e_env.sf_schema_postfix}'.upper())
         self.drop_sf_schema_if_exists(f'ppw_e2e_{self.tap_type}_public2{self.e2e_env.sf_schema_postfix}'.upper())
+        # The replica taps load into a _2 schema; without this it leaks every run.
+        self.drop_sf_schema_if_exists(f'ppw_e2e_{self.tap_type}_2{self.e2e_env.sf_schema_postfix}'.upper())
         super().tearDown()
 
     def get_e2e_env(self) -> E2EEnv:
@@ -90,7 +92,8 @@ class TargetSnowflake(unittest.TestCase):
         runs that crashed or timed out before tearDown could clean up.
         Only drops schemas matching the current tap type to avoid interfering
         with other tap suites running in the same session."""
-        pattern = f'PPW_E2E_TAP_{tap_type.upper()}_%'
+        # tap_type is already 'TAP_MYSQL'/'TAP_POSTGRES', so no TAP_ prefix here.
+        pattern = f'PPW_E2E_{tap_type.upper()}_%'
         try:
             rows = self.e2e_env.run_query_target_snowflake(
                 f"SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA"

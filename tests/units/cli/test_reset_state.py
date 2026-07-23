@@ -1,7 +1,9 @@
 import json
 import os
 import random
+import shutil
 import string
+import tempfile
 
 from unittest import TestCase, mock
 
@@ -13,8 +15,23 @@ class TestResetState(TestCase):
     def setUp(self):
         resources_dir = f'{os.path.dirname(__file__)}/resources'
         self.test_cli = cli
-        self.test_cli.CONFIG_DIR = f'{resources_dir}/test_reset_state'
+
+        # These tests overwrite the state files, so copy the fixtures rather than
+        # dirtying the tracked ones.
+        self._temp_dir = tempfile.mkdtemp()
+        temp_config_dir = os.path.join(self._temp_dir, 'test_reset_state')
+        shutil.copytree(f'{resources_dir}/test_reset_state', temp_config_dir)
+
+        self._original_config_dir = cli.CONFIG_DIR
+        self._original_venv_dir = cli.VENV_DIR
+        self.test_cli.CONFIG_DIR = temp_config_dir
         self.test_cli.VENV_DIR = './virtualenvs-dummy'
+
+    def tearDown(self):
+        # Module level globals, so restore them to avoid leaking into other tests.
+        cli.CONFIG_DIR = self._original_config_dir
+        cli.VENV_DIR = self._original_venv_dir
+        shutil.rmtree(self._temp_dir, ignore_errors=True)
 
     def _run_cli(self, arguments_dict: dict) -> None:
         """Running the test CLI application"""

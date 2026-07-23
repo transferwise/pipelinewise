@@ -157,6 +157,43 @@ class E2EEnv:
                 },
             },
             # ------------------------------------------------------------------
+            # PipelineWise backend is a REQUIRED operational database for
+            # data-diff definitions, run evidence, and coverage state.
+            # ------------------------------------------------------------------
+            'PIPELINEWISE_BACKEND': {
+                'template_patterns': ['config.yml'],
+                'vars': {
+                    'HOST': {
+                        'value': os.environ.get('PIPELINEWISE_BACKEND_HOST'),
+                        'required': True,
+                    },
+                    'PORT': {
+                        'value': os.environ.get('PIPELINEWISE_BACKEND_PORT'),
+                        'required': True,
+                    },
+                    'USER': {
+                        'value': os.environ.get('PIPELINEWISE_BACKEND_USER'),
+                        'required': True,
+                    },
+                    'PASSWORD': {
+                        'value': os.environ.get('PIPELINEWISE_BACKEND_PASSWORD'),
+                        'required': True,
+                    },
+                    'DB': {
+                        'value': os.environ.get('PIPELINEWISE_BACKEND_DB'),
+                        'required': True,
+                    },
+                    'DDL_USER': {
+                        'value': os.environ.get('PIPELINEWISE_BACKEND_DDL_USER'),
+                        'required': True,
+                    },
+                    'DDL_PASSWORD': {
+                        'value': os.environ.get('PIPELINEWISE_BACKEND_DDL_PASSWORD'),
+                        'required': True,
+                    },
+                },
+            },
+            # ------------------------------------------------------------------
             # Target Snowflake is an OPTIONAL test connector because it's not open sourced and not part of
             # the docker environment.
             # To run the related test cases add real Snowflake credentials to ../../../dev-project/.env
@@ -232,6 +269,9 @@ class E2EEnv:
         self.env['TARGET_POSTGRES'][
             'is_configured'
         ] = self._is_env_connector_configured('TARGET_POSTGRES')
+        self.env['PIPELINEWISE_BACKEND'][
+            'is_configured'
+        ] = self._is_env_connector_configured('PIPELINEWISE_BACKEND')
         self.env['TARGET_SNOWFLAKE'][
             'is_configured'
         ] = self._is_env_connector_configured('TARGET_SNOWFLAKE')
@@ -389,6 +429,32 @@ class E2EEnv:
             database=self.get_conn_env_var('TARGET_POSTGRES', 'DB'),
         )
 
+    def run_query_pipelinewise_backend(self, query: object) -> object:
+        """Run a SQL query in the backend database as the application user.
+
+        Deliberately the application user, not the DDL role: assertions then prove
+        the migration granted it the access it needs.
+        """
+        return db.run_query_postgres(
+            query,
+            host=self.get_conn_env_var('PIPELINEWISE_BACKEND', 'HOST'),
+            port=self.get_conn_env_var('PIPELINEWISE_BACKEND', 'PORT'),
+            user=self.get_conn_env_var('PIPELINEWISE_BACKEND', 'USER'),
+            password=self.get_conn_env_var('PIPELINEWISE_BACKEND', 'PASSWORD'),
+            database=self.get_conn_env_var('PIPELINEWISE_BACKEND', 'DB'),
+        )
+
+    def run_ddl_pipelinewise_backend(self, query: object) -> object:
+        """Run DDL in the backend database as the schema-owning role."""
+        return db.run_query_postgres(
+            query,
+            host=self.get_conn_env_var('PIPELINEWISE_BACKEND', 'HOST'),
+            port=self.get_conn_env_var('PIPELINEWISE_BACKEND', 'PORT'),
+            user=self.get_conn_env_var('PIPELINEWISE_BACKEND', 'DDL_USER'),
+            password=self.get_conn_env_var('PIPELINEWISE_BACKEND', 'DDL_PASSWORD'),
+            database=self.get_conn_env_var('PIPELINEWISE_BACKEND', 'DB'),
+        )
+
     # pylint: disable=unnecessary-pass
     def run_query_tap_s3_csv(self, file):
         """Get file from S3 and read into the file
@@ -504,6 +570,22 @@ class E2EEnv:
         # Clean config directory
         shutil.rmtree(os.path.join(CONFIG_DIR, 'postgres_dwh'), ignore_errors=True)
 
+    def setup_pipelinewise_backend(self):
+        """Remove data-diff control-plane state without touching target data."""
+        # alembic_version is dropped, not emptied: on a fresh backend volume it
+        # does not exist yet, and migrate() recreates it either way. Runs as the
+        # DDL role because the application user has no DROP rights.
+        self.run_ddl_pipelinewise_backend(
+            'DROP TABLE IF EXISTS public.dd_coverage_events CASCADE; '
+            'DROP TABLE IF EXISTS public.dd_coverage_state CASCADE; '
+            'DROP TABLE IF EXISTS public.dd_effective_attempts CASCADE; '
+            'DROP TABLE IF EXISTS public.dd_results CASCADE; '
+            'DROP TABLE IF EXISTS public.dd_runs CASCADE; '
+            'DROP TABLE IF EXISTS public.dd_preflights CASCADE; '
+            'DROP TABLE IF EXISTS public.dd_checks CASCADE; '
+            'DROP TABLE IF EXISTS public.alembic_version CASCADE'
+        )
+
     def setup_target_snowflake(self):
         """Clean snowflake target database and prepare for test run"""
 
@@ -523,7 +605,7 @@ class E2EEnv:
             self.run_query_target_snowflake(
                 f'DROP SCHEMA IF EXISTS ppw_e2e_tap_mysql{self.sf_schema_postfix} CASCADE'
             )
-            self.run_query_target_postgres(
+            self.run_query_target_snowflake(
                 f'DROP SCHEMA IF EXISTS ppw_e2e_tap_mysql_2{self.sf_schema_postfix} CASCADE'
             )
             self.run_query_target_snowflake(

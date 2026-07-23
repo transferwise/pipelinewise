@@ -60,6 +60,15 @@ stream_buffer_size: 0                  # In-memory buffer size (MB) between taps
 #archive_load_files_s3_prefix: "archive"        # Optional: When `archive_load_files` is enabled, the archived files will be placed in the archive S3 bucket under this prefix.
 #archive_load_files_s3_bucket: "<BUCKET_NAME>"  # Optional: When `archive_load_files` is enabled, the archived files will be placed in this bucket. (Default: the value of `s3_bucket` in target snowflake YAML)
 
+# Optional defaults for every table-level data-diff block in this tap.
+# Requires backend_db in config.yml.
+#data_diff_defaults:
+#  frequency: "0 */6 * * *"     # Crontab expression: when the check fires
+#  window_start: "-15h"        # Negative offset from fire time for the window start (e.g. -15h = 15h before fire time)
+#  window_end: "-3h"           # Negative offset for the window end; must be closer to fire time than window_start
+#                              # The window must be at least as wide as the cadence, or coverage leaves gaps
+#  statement_timeout: "20min"
+
 
 # ------------------------------------------------------------------------------
 # Source to target Schema mapping
@@ -74,16 +83,29 @@ schemas:
     # List of tables to replicate from Postgres to destination Data Warehouse
     #
     # Please check the Replication Strategies section in the documentation to understand the differences.
-    # For LOG_BASED replication method you might need to adjust the source mysql/ mariadb configuration.
+    # For LOG_BASED replication method you might need to adjust the source PostgreSQL configuration.
     tables:
       - table_name: "table_one"
-        replication_method: "INCREMENTAL"   # One of INCREMENTAL, LOG_BASED and FULL_TABLE
-        replication_key: "last_update"      # Important: Incremental load always needs replication key
+        replication_method: "LOG_BASED"     # Preferred: replicate changes from the database log
 
         # OPTIONAL: Load time transformations
         #transformations:                    
         #  - column: "last_name"            # Column to transform
         #    type: "SET-NULL"               # Transformation type
+
+        # OPTIONAL: independently compare a settled UTC window with Snowflake.
+        # Requires backend_db in config.yml. key_column and timestamp_column
+        # must not have load-time transformations.
+        #data_diff:
+        #  schema_version: 1
+        #  name: "hourly-table-one-reconciliation"
+        #  checks: ["schema_compatibility", "row_count", "null_key_count", "duplicate_key_count", "row_checksum"]
+        #  key_column: "id"
+        #  timestamp_column: "last_update"
+        #  compare_columns: ["status", "currency"]
+        #  frequency: "0 */12 * * *"       # Optional table override
+        #  window_start: "-27h"           # Optional table override
+        #  window_end: "-3h"              # Optional table override
 
       # You can add as many tables as you need...
       - table_name: "table_tow"

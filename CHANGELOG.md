@@ -1,3 +1,68 @@
+0.78.0 (2026-07-31)
+-------------------
+
+**Connector updates**
+
+- `pipelinewise-tap-mixpanel` from `1.7.1` to `1.7.2`
+    - Restore `mp_reserved_insert_id` as the export stream key property so newly discovered taps pass primary-key validation
+    - Respect `denest_properties=false` during discovery so dynamic Mixpanel properties remain nested
+
+**Data-diff checks**
+
+- Add data-diff: bounded aggregate reconciliation between source tables and their PostgreSQL or Snowflake replicas. Checks are declared per table in the tap YAML and persisted as immutable versioned definitions
+- Add check types `schema_compatibility`, `row_count`, `distinct_key_count`, `null_key_count`, `duplicate_key_count`, `min_key`, `max_key`, and the experimental `row_checksum`
+- Add CLI commands `list_data_diff_checks`, `run_data_diff_checks`, and `rerun_data_diff_check`
+- Add supported routes MySQL/MariaDB and PostgreSQL sources to PostgreSQL and Snowflake targets
+- Add timestamp coverage tracking: `verified_through` advances only over a contiguous union of passing windows, and a failed or missing window blocks it until remediated
+- Add remediation: `rerun_data_diff_check` re-runs an exact failed window, preserving the original run as immutable evidence linked by `rerun_of_run_id`
+- Add source safety: read-only transactions, per-query `statement_timeout`, and a preflight that blocks a check whose source table is large and has no index leading with the timestamp column. No source rows or business values are stored, only aggregate metrics
+- Add monitoring views `dd_current_coverage` and `dd_remediation_history`
+- A check window must be at least as wide as its cadence, or the time between windows is never verified and coverage stays `BLOCKED`. The shipped defaults are a 12-hour window on a 6-hour cadence so consecutive windows overlap
+- An interrupted check is recorded as `ERROR` so its window stays retryable, including on `SIGTERM` and `SIGINT`. An attempt abandoned by a killed worker is retired at the start of the next invocation, before the scheduler reads the latest slot and across every slot and trigger, so a `RUNNING` row cannot hide the slot it belongs to
+- The source preflight validates that a timestamp index is actually usable: a partial, expression, invalid, still-building, hash or BRIN index, or a MySQL `INVISIBLE` / MariaDB `IGNORED` one the planner refuses, is recorded as evidence but does not satisfy the check. Table size counts each partition once and treats absent statistics as unknown rather than empty, so a freshly loaded table cannot pass by reporting zero rows
+- The preflight is persisted before either aggregate query runs, together with the table size, row limit and index verdict it decided from, so a `PASS` remains auditable
+- `frequency` must be a crontab expression, validated at import. One unschedulable check is reported as `ERROR` without aborting the rest of the batch
+- Covered by 114 unit tests across config parsing, the comparison engine and its adapters, coverage arithmetic, the scheduler, the repository, and alerting, plus 8 end-to-end tests spanning all four routes. The engine tests pin the cross-dialect agreement the checksum depends on and the index verdicts the preflight depends on; the runner tests kill a real subprocess with `SIGTERM` to prove an interrupted attempt is recorded as terminal rather than left `RUNNING`
+
+**Backend database**
+
+- Add `backend_db` to `config.yml`: a dedicated PostgreSQL operational database for definitions, schedules, preflights, run evidence, and coverage. It is independent of every source and target connection
+- Add Alembic migrations, applied automatically on `import_config`. `alembic`, `croniter`, and `SQLAlchemy` are pinned like every other dependency, so migration and scheduling behaviour cannot change without a PipelineWise release
+- `backend_db` is what enables data-diff. Without it, `import_config` logs a warning and ignores every `data_diff` block instead of failing, so replication imports and runs unaffected
+- Replication never reads the backend database, so an outage there pauses reconciliation only. `import_config` does still fail while a configured backend is unreachable, because it persists definitions as its final step
+- `backend_db.ddl_user` and `backend_db.ddl_password` are required. Migrations run as this role, which owns the schema and grants the application user DML only, so a compromised pipeline cannot alter the schema. Set them to the same values as `user`/`password` to run migrations as the application user
+- A configured `backend_db.sslmode` applies to both the application and the migration connection, so the schema-altering role is encrypted on the same terms as everything else
+
+**Alerts**
+
+- Add data-diff failure alerts through the existing alert handlers. One alert per failed check per window, carrying the check name, window boundaries, and the run ID needed to remediate it
+- Data-diff alerts honour a tap's `slack_alert_channel` and `send_alert`, so the team owning the replication receives the alerts for its checks
+
+**Development environment**
+
+- Add a `pipelinewise-backend-db` service to the dev environment, with its own database and two distinct roles, so every end-to-end run exercises the DDL/application privilege split rather than assuming it. It is not a replication target
+- Add a CI step validating `dev-project/pipelinewise-config`
+
+**Fixes**
+
+- Fix MySQL/MariaDB FastSync and binlog replication persisting invalid dates instead of NULL. Only the literal `0000-00-00 00:00:00` was filtered, so a zero year, a month outside 1-12, or a day beyond the month's length was replicated as-is and rejected or silently altered by the target
+- Fix the VictorOps alert handler failing to send **any** alert that carried an exception, which includes every tap and fast-sync failure. The exception object was placed in the request body unserialised, so `json.dumps` raised `TypeError` before the request was sent
+- Fix the VictorOps alert handler having no request timeout, so an unresponsive endpoint stalled the run that was trying to report a failure
+- Document that the VictorOps handler has only ever been exercised against a mocked endpoint, and that every alert goes to the single configured `routing_key` with no per-tap equivalent of `slack_alert_channel`
+- Fix `reset_state` unit tests overwriting tracked fixture files with random data, leaving the working tree dirty after every run
+- Fix `assert_resync_tables_success` asserting a profiling file named for the pre-rename `sync_tables` command, so end-to-end resync tests failed whenever profiling was enabled
+- Fix two end-to-end teardown defects that orphaned a Snowflake schema on every run: one schema DROP was sent to PostgreSQL instead of Snowflake, and the replica taps' `_2` schema was never dropped. The stale-schema safety net also built a `PPW_E2E_TAP_TAP_<TYPE>_%` pattern that matched nothing
+- Fix the `hard_delete`/`add_metadata_columns` table in `docs/user_guide/metadata_columns.rst` silently losing its last row. A `.. deprecated::` directive placed between rows ended the `list-table`, so the published table documented three of the four setting combinations with no build warning
+- Fix documented bold text rendering with a synthesized face, by requesting weight 700 of the Comfortaa webfont rather than only the default weight
+- Fix `dev-project` changes skipping every CI test job. `ci_check_no_file_changes.sh` matched only python and docs paths, so a config-only edit reported no relevant changes and every downstream job was skipped
+
+**Tests added for existing behaviour**
+
+- `tests/units/cli/test_alert_sender.py` — the VictorOps handler with an alert that carries an exception, the path that was silently failing for every tap failure, and that its request is time-bounded
+- `tests/units/cli/test_reset_state.py` — reworked onto a temporary copy of its fixtures, with `tearDown` restoring the patched `cli` module globals so they cannot leak into other test modules
+- `tests/units/cli/test_data_diff_extension.py` — the existing tap and config JSON schemas still validate, still reject unknown keys, and `Config.save()` keeps the extension out of every generated connector JSON, so a `data_diff` block cannot reach a singer connector
+- `tests/units/fastsync/commons/test_fastsync_tap_mysql.py` — `get_table_columns` had no coverage, so the invalid-date guard above was untested. Now pins each rejected class (zero year, month outside 1-12, day zero, day past the month's end), that an invalid value is nulled rather than its row dropped, and that `date` columns are cast to the caller's target type
+
 0.77.0 (2026-07-16)
 -------------------
 - Rename CLI command `sync_tables` to `fast_sync` (`sync_tables` remains as a backward-compatible alias)
@@ -52,7 +117,7 @@
 
 0.76.0 (2026-04-16)
 -------------------
-- Updates for Python 3.12 
+- Updates for Python 3.12
 
 0.75.0 (2026-04-07)
 -------------------

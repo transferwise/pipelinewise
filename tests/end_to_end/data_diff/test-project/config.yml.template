@@ -1,0 +1,12 @@
+---
+
+backend_db:
+  host: "${PIPELINEWISE_BACKEND_HOST}"
+  port: ${PIPELINEWISE_BACKEND_PORT}
+  user: "${PIPELINEWISE_BACKEND_USER}"
+  password: "${PIPELINEWISE_BACKEND_PASSWORD}"
+  dbname: "${PIPELINEWISE_BACKEND_DB}"
+  # Deliberately a different role from user/password above: the e2e must exercise
+  # the privilege split, or missing grants pass unnoticed.
+  ddl_user: "${PIPELINEWISE_BACKEND_DDL_USER}"
+  ddl_password: "${PIPELINEWISE_BACKEND_DDL_PASSWORD}"

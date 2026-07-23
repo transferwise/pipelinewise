@@ -12,7 +12,8 @@ PipelineWise's command line interface allows for a number of operation types on 
     usage: pipelinewise [-h]
                         {init,run_tap,stop_tap,discover_tap,status,test_tap_connection,
                          fast_sync,sync_tables,partial_sync_table,import_config,import,
-                         validate,encrypt_string,reset_state}
+                         validate,encrypt_string,reset_state,list_data_diff_checks,
+                         run_data_diff_checks,rerun_data_diff_check}
 
 
 Positional Arguments
@@ -181,6 +182,60 @@ deprecated alias.
 :--secret: Optional: Path to the Ansible Vault password file needed to decrypt values
            in the project YAML files.
 
+Data-diff definitions are versioned in the
+backend database after successful discovery. See :ref:`data_diff`.
+
+
+.. _cli_list_data_diff_checks:
+
+list_data_diff_checks
+"""""""""""""""""""""
+
+List persisted data-diff definition revisions and their PostgreSQL scheduling
+and verified timestamp coverage state. This reads the backend database rather
+than reconstructing output from YAML.
+
+:--target: Optional target id filter.
+
+:--tap: Optional tap id filter. Requires ``--target``.
+
+:--output-format: ``table`` (default) or ``json``.
+
+:--include-versioned: Include superseded definition revisions.
+
+
+.. _cli_run_data_diff_checks:
+
+run_data_diff_checks
+""""""""""""""""""""
+
+Run active data-diff definitions manually. Definitions are versioned and
+persisted by :ref:`cli_import_config`; this command does not synchronize YAML.
+Use it for operator-triggered execution rather than continuous scheduling.
+
+:--target: Optional target id filter.
+
+:--tap: Optional tap id filter. Requires ``--target``.
+
+:--check: Optional data-diff check-name filter.
+
+:--force: Create another attempt for the current UTC frequency slot when a
+          terminal attempt already exists.
+
+
+.. _cli_rerun_data_diff_check:
+
+rerun_data_diff_check
+"""""""""""""""""""""
+
+Re-execute the exact immutable definition and UTC window of a failed or errored
+run. The original attempt remains unchanged and the new attempt is linked to it
+for remediation reporting.
+
+:--run-id: UUID of the failed or errored data-diff run.
+
+:--remediation-ref: Required incident, change, or repair reference.
+
 
 .. _cli_validate:
 
@@ -233,6 +288,7 @@ This command works only for PostgreSQL and MySQL databases.
 :--target: Target connector id
 
 :--tap: Tap connector id
+
 
 For MySQL, the command requires a JSON file containing the switchover data in the
 following format:

@@ -1,3 +1,9 @@
+1.7.2 (2026-08-04)
+-------------------
+
+- Restore `mp_reserved_insert_id` as the export stream key property
+- Respect `denest_properties=false` during discovery so dynamic properties remain nested
+
 1.7.1 (2026-02-09)
 -------------------
 

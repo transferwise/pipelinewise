@@ -26,7 +26,11 @@ def get_abs_path(path):
     return os.path.join(os.path.dirname(os.path.realpath(__file__)), path)
 
 
-def get_schema(client, properties_flag, stream_name):
+def _is_true(value):
+    return str(value).lower() == "true"
+
+
+def get_schema(client, properties_flag, denest_properties_flag, stream_name):
     """Creates schema for a stream by loading schema file and appending dynamic
     fields schema if necessary.
 
@@ -34,6 +38,8 @@ def get_schema(client, properties_flag, stream_name):
         client (MixpanelClient): Client to make http calls.
         properties_flag (str): Setting this argument to `true` ensures that new properties on
                                events and engage records are captured.
+        denest_properties_flag (str): Setting this argument to `true` exposes Mixpanel
+                                      properties as top-level fields.
         stream_name (str): Name of stream whose schema is to create.
 
     Returns:
@@ -49,12 +55,20 @@ def get_schema(client, properties_flag, stream_name):
     #   when the Event or Engage (user/person) was created.
     # Depending on the tap config parameter select_properties_by_default,
     #   the json schema should allow additional properties (additionalProperties = true).
-    if stream_name in ("engage", "export") and str(properties_flag).lower() == "true":
+    denest_properties = _is_true(denest_properties_flag)
+    if (
+        stream_name in ("engage", "export")
+        and denest_properties
+        and _is_true(properties_flag)
+    ):
         schema["additionalProperties"] = True
     else:
         schema["additionalProperties"] = False
 
-    if stream_name == "engage":
+    if denest_properties and stream_name in ("engage", "export"):
+        schema["properties"].pop("properties", None)
+
+    if denest_properties and stream_name == "engage":
         properties = client.request(
             method="GET",
             url=f"https://{client.api_domain}/api/2.0",
@@ -105,7 +119,7 @@ def get_schema(client, properties_flag, stream_name):
 
                 schema["properties"][new_key] = {"anyOf": this_type}
 
-    if stream_name == "export":
+    if denest_properties and stream_name == "export":
         # Event properties endpoint:
         #  https://developer.mixpanel.com/docs/data-export-api#section-hr-span-style-font-family-courier-top-span
         results = client.request(
@@ -128,7 +142,7 @@ def get_schema(client, properties_flag, stream_name):
     return schema
 
 
-def get_schemas(client, properties_flag):
+def get_schemas(client, properties_flag, denest_properties_flag="false"):
     """Load the schema references, prepare metadata for each streams and return
     schema and metadata for the catalog.
 
@@ -136,6 +150,8 @@ def get_schemas(client, properties_flag):
         client (MixpanelClient): Client object to make http calls.
         properties_flag (bool): Setting this argument to true ensures that new properties on
                                    events and engage records are captured.
+        denest_properties_flag (str): Setting this argument to `true` exposes Mixpanel
+                                      properties as top-level fields.
 
     Returns:
         tuple: Returns tuple of Schemas and metadata.
@@ -152,7 +168,9 @@ def get_schemas(client, properties_flag):
             continue
 
         try:
-            schema = get_schema(client, properties_flag, stream_name)
+            schema = get_schema(
+                client, properties_flag, denest_properties_flag, stream_name
+            )
         except MixpanelPaymentRequiredError:
             LOGGER.warning(
                 "Mixpanel returned a 402 from the {} API so {} stream will be skipped.".format(

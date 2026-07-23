@@ -37,6 +37,15 @@ batch_size_rows: 20000                 # Batch size for the stream to optimise l
 stream_buffer_size: 0                  # In-memory buffer size (MB) between taps and targets for asynchronous data pipes
 flush_all_streams: true                # Target to flush all streams if any stream reaches batch_size_rows. Default false
 
+# Default schedule for every table-level data_diff block in this tap.
+# Fires every 6 hours over a 12h window, so consecutive windows overlap and
+# cannot leave a coverage gap. Ends 3h back to let replication settle.
+data_diff_defaults:
+  frequency: "0 */6 * * *"
+  window_start: "-15h"
+  window_end: "-3h"
+  statement_timeout: "20min"
+
 
 # ------------------------------------------------------------------------------
 # Source to target Schema mapping for LOG_BASED replication
@@ -52,6 +61,20 @@ schemas:
     tables:
       - table_name: "logical1_table1"
         replication_method: "LOG_BASED"
+        data_diff:
+          checks:
+            - schema_compatibility
+            - row_count
+            - distinct_key_count
+            - null_key_count
+            - duplicate_key_count
+            - min_key
+            - max_key
+            - row_checksum
+          key_column: "cid"
+          timestamp_column: "updated_at"
+          compare_columns:
+            - "cvarchar"
       - table_name: "logical1_table2"
       - table_name: "logical1_edgydata"
 
@@ -61,8 +84,5 @@ schemas:
     tables:
       - table_name: "logical2_table1"
 
-  ### SOURCE SCHEMA 3: logical3
-  - source_schema: "logical3"
-    target_schema: "ppw_dev_tap_postgres_logical3"
-    tables:
-      - table_name: "logical3_table1"
+  # logical3 is omitted on purpose: the seed script drops it after writing to the
+  # WAL, so selecting it would break fast_sync.

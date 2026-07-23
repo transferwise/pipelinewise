@@ -33,11 +33,11 @@ This tap:
 **[export](https://developer.mixpanel.com/docs/exporting-raw-data#section-export-api-reference)**
 - Standard Server endpoint: https://data.mixpanel.com/api/2.0/export
 - EU Residency Server endpoint: https://data-eu.mixpanel.com/api/2.0/export
-- Primary key fields: `event`, `time`, `distinct_id`
+- Primary key field: `mp_reserved_insert_id`
 - Replication strategy: INCREMENTAL (query filtered)
   - Bookmark: `time`
   - Bookmark query field: `from_date`, `to_date`
-- Transformations: De-nest `properties` to root-level, re-name properties with leading `$...` to `mp_reserved_...`, convert datetimes from project timezone to UTC.
+- Transformations: When `denest_properties` is enabled, de-nest `properties` to root-level and re-name properties with leading `$...` to `mp_reserved_...`. Convert datetimes from project timezone to UTC.
 - Optional parameters
   - `export_events` to export only certain events
 

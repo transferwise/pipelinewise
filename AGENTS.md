@@ -1,99 +1,110 @@
 # AI Coding Agent Instructions
 
-## Purpose
-PipelineWise is an ELT data pipeline framework built on the Singer.io specification. It replicates data from various sources (taps) to analytics data warehouses (targets) with minimal load-time transformations.
+## Purpose and routing
+
+PipelineWise is a Python 3.12 Singer.io ELT framework for replicating taps to analytics warehouses. Write for senior engineers: emphasize operational precision, edge cases, and rationale.
+
+Read every scoped file touched by the task:
+
+- `pipelinewise/AGENTS.md`: orchestration, FastSync, backend migrations, data-diff.
+- `singer-connectors/AGENTS.md`: vendored tap and target source.
+- `tests/AGENTS.md`: unit tests and suite boundaries.
+- `tests/end_to_end/AGENTS.md`: databases, connectors, E2E, `dev-project/`.
+- `docs/AGENTS.md`: documentation.
+
+Scoped files apply even when they were not auto-loaded from the current directory; multi-area changes follow all relevant files. More specific guidance adds to this file. Explicit user instructions win.
 
 ## Architecture
-- **Language:** Python 3.12
-- **Framework:** Singer.io (taps and targets communicate via JSON over stdout/stdin)
-- **Config format:** YAML (tap/target definitions), JSON (runtime configs, state, catalog)
-- **CLI:** argparse-based, entry point at `pipelinewise/cli/__init__.py`. Commands map to methods on `PipelineWise` class via `getattr`. Alias mechanism: command names can be remapped before dispatch (e.g. deprecated `sync_tables` → `fast_sync`; canonical `import_config` and its deprecated `import` alias → `import_project`).
 
-### Key Components
-- `pipelinewise/cli/pipelinewise.py` — Main orchestration engine (~2000 lines). `run_tap()` is the core pipeline execution method. `fast_sync()` is the entry point for the `fast_sync` CLI command (aliased from `sync_tables`).
-- `pipelinewise/cli/commands.py` — Builds shell commands: `tap | transform-field | mbuffer | target` pipeline.
-- `pipelinewise/cli/config.py` — Loads/validates YAML configs, generates runtime JSON files at `~/.pipelinewise/<target_id>/<tap_id>/`.
-- `pipelinewise/cli/constants.py` — Connector type enums and mappings.
-- `pipelinewise/fastsync/` — Optimized native database-to-database sync (10-100x faster than Singer for full loads).
-- `pipelinewise/cli/alert_handlers/` — Slack and VictorOps alerting. Extend by subclassing `BaseAlertHandler`.
-- `pipelinewise/cli/schemas/` — JSON Schema files for validating tap/target configs.
+- **Framework:** Singer JSON messages over stdout/stdin; YAML definitions and generated JSON config, state, and catalogs.
+- **CLI:** argparse in `pipelinewise/cli/__init__.py`, dispatching to `PipelineWise`. Deprecated `sync_tables` maps to `fast_sync`; canonical `import_config` and deprecated `import` map to `import_project`.
+- **Singer path:** `tap | transform | target` for ongoing INCREMENTAL and LOG_BASED replication.
+- **FastSync:** native full or filtered bulk transfer, not a replication method. See `pipelinewise/AGENTS.md` and `docs/concept/fastsync.rst`.
 
-### Sync Paths
-1. **Singer** — Standard replication via `tap | transform | target` piped processes. Used for ongoing INCREMENTAL and LOG_BASED replication.
-2. **FastSync** — Performance optimization that bypasses Singer for bulk data operations using native database tools. Not a replication method — it is an optimization engine with two components:
-   - **FullSync** — Exports entire tables and replaces the target. Used automatically for initial syncs and explicitly via the `fast_sync` CLI command. Used for FULL_TABLE replication.
-   - **PartialSync** — Exports a filtered range of rows and merges with the target. Used explicitly via the `partial_sync_table` CLI command, or automatically when `fast_sync` encounters tables with `sync_start_from` in the tap config.
-   - FastSync infrastructure lives at `pipelinewise/fastsync/`, with shared connectors in `pipelinewise/fastsync/commons/`. PartialSync lives at `pipelinewise/fastsync/partialsync/` and imports from `commons/`.
-   - Supported pairs: MySQL/PG/S3-CSV/MongoDB → Snowflake/PG. Defined PartialSync (`sync_start_from`) only: MySQL/PG → Snowflake.
+## Environment
 
-### Supported Connectors
-- **Taps:** MySQL, PostgreSQL, MongoDB, Kafka, S3 CSV, Snowflake, Salesforce, Zendesk, Jira, Google Analytics, Oracle, GitHub, Slack, Shopify, Twilio, Zuora, Mixpanel
-- **Targets:** Snowflake, PostgreSQL, S3 CSV
+- `make pipelinewise` installs PipelineWise, backend-db, and data-diff into canonical `.virtualenvs/pipelinewise/`; activate it before host validation.
+- A local `.venv/` is non-canonical and may be stale. Connectors use separate environments under `.virtualenvs/`.
+- Run host commands below from the repository root.
 
-## Development Environment
-- **Python:** 3.12 required (`python_requires='==3.12.*'`)
-- **Setup:** `pip install -e ".[test]"` from repo root
-- **Connectors:** Installed separately via `make` targets into `.virtualenvs/` directory
+## Validation
 
-## Build & Test
-- **Unit tests:** `pytest tests/` (use `.venv/bin/pytest` if system Python lacks dependencies)
-- **Lint:** `flake8`, `pylint`, `ruff`
-- **Format check:** `pre-commit run --all-files`
-- **Single test:** `pytest tests/path/to/test.py -v`
-- **Coverage:** `pytest --cov=pipelinewise tests/`
+### Python gates
 
-## Repository Map
-- `pipelinewise/cli/` — CLI and orchestration logic
-- `pipelinewise/fastsync/` — Optimized sync implementations
-- `pipelinewise/fastsync/commons/` — Shared FastSync tap/target connectors (used by both FullSync and PartialSync)
-- `pipelinewise/fastsync/partialsync/` — PartialSync implementations (imports from `commons/`)
-- `singer-connectors/` — Git submodule references to Singer tap/target repos
-- `tests/` — Unit and integration tests
-- `docs/` — Documentation
-- `dev-project/` — Example project for local development
+Run the four CI lint commands verbatim and in order for implementation changes:
 
-## Code Style
-- Follows PEP 8 with `ruff` and `flake8` enforcement.
-- Use `snake_case` for functions/variables, `PascalCase` for classes.
-- JSON configs use `snake_case` keys.
-- Snowflake identifiers are uppercased in FastSync connectors.
+```bash
+. .virtualenvs/pipelinewise/bin/activate
+ruff check pipelinewise tests
+pylint pipelinewise tests
+flake8 pipelinewise --count --select=E9,F63,F7,F82 --show-source --statistics
+flake8 pipelinewise --count --max-complexity=15 --max-line-length=120 --statistics
+```
 
-## Documentation Style
-- Format: reStructuredText (RST) using Sphinx.
-- Heading conventions: `=` for page title (H1), `-` for concept-level pages (H1), `'` for subsections (H3), `"` for sub-subsections (H4). Concept pages (`docs/concept/`) use `-` for titles; user guide pages (`docs/user_guide/`) use `=` for titles.
-- RST labels: use `.. _label_name:` before headings for cross-referencing with `:ref:`label_name``.
-- Code examples: use `.. code-block:: yaml` (or `bash`, `sql`, etc.), never plain `.. code-block::`.
-- Admonitions: `.. warning::`, `.. note::`, `.. tip::`, `.. attention::`, `.. seealso::`.
-- When renaming CLI commands, update both the command reference in `cli.rst` and all cross-references (`:ref:` labels, code examples, inline mentions) across all docs.
-- Use `import_config` in documentation, examples, tests, and comments. `import` is retained only as a deprecated CLI alias.
+Ruff and Pylint inspect `pipelinewise tests`; Flake8 inspects `pipelinewise`. Do not substitute bare Flake8, widen paths, add flags, or format in place of a gate.
 
-## Git & PR Policy
-- Run `pytest` and linting before committing.
-- Do not commit secrets, `.tfvars`, or private keys.
-- **Keep documentation up to date**: When adding or changing features, update the corresponding docs in `docs/` and this `AGENTS.md` file.
+Run the full unit gate from the root:
 
-  **When to update docs:**
-  - Adding/removing a CLI command → update `docs/user_guide/cli.rst`
-  - Adding/removing a connector → update `docs/connectors/taps/` or `docs/connectors/targets/`, the visual gallery in `docs/connectors/taps.rst` or `docs/connectors/targets.rst`, the license table in `docs/project/licenses.rst`, and the connector table in `docs/installation_guide/installation.rst`
-  - Changing YAML config parameters → update `docs/user_guide/yaml_config.rst` and the relevant connector page
-  - Changing replication behavior → update `docs/concept/replication_methods.rst` and/or `docs/concept/fastsync.rst`
-  - Changing FastSync components, auto-selection logic, or supported pairs → update `docs/concept/fastsync.rst`
-  - Changing resync behavior or `sync_start_from` → update `docs/concept/fastsync.rst`, `docs/user_guide/resync.rst`
-  - Changing alert handlers → update `docs/user_guide/alerts.rst`
-  - Adding known errors or operational tips → update `docs/user_guide/troubleshooting.rst`
-  - Adding a new docs page → add it to the appropriate toctree in `docs/index.rst`
-  - Changing architecture or build/test commands → update this `AGENTS.md` file
+```bash
+pytest --cov=pipelinewise --cov-fail-under=77 -v tests/units
+```
 
-  **Key doc files:**
-  - `docs/user_guide/yaml_config.rst` — YAML configuration reference (config.yml, tap, and target YAML structure)
-  - `docs/user_guide/cli.rst` — CLI command reference (all commands, arguments, and environment variables)
-  - `docs/user_guide/resync.rst` — Resync guide: full resync (`fast_sync`) and partial resync (`partial_sync_table`)
-  - `docs/user_guide/partial_sync.rst` — Visual guide to partial sync edge cases (column diffs, hard/soft delete)
-  - `docs/user_guide/troubleshooting.rst` — Troubleshooting guide (common errors, replication tips, diagnostics)
-  - `docs/user_guide/alerts.rst` — Slack and VictorOps alert configuration
-  - `docs/concept/fastsync.rst` — FastSync optimization: components (FullSync/PartialSync), auto-selection criteria, defined PartialSync (`sync_start_from`), supported tap-target combinations
-  - `docs/concept/replication_methods.rst` — Singer replication method definitions (LOG_BASED, INCREMENTAL, FULL_TABLE). FastSync is NOT listed here — it has its own page.
-  - `docs/installation_guide/installation.rst` — Installation guide and connector table
-  - `docs/project/licenses.rst` — Connector license table
-  - `docs/index.rst` — Table of contents (add new pages to the appropriate toctree)
-  - `AGENTS.md` — AI agent instructions (this file)
+- Nested paths below `tests/units/data_diff/` or `tests/units/backend_db/` can break imports; narrow with `-k`, for example `pytest tests/units -k "data_diff"`.
+- Never run bare `pytest tests/`; it collects credentialed E2E tests. CI's coverage threshold is 77, not `.coveragerc`'s lower value.
+- See `tests/AGENTS.md` for suite boundaries and proof requirements.
+
+### Configuration
+
+The dev config references environment variables. Source the existing file before validating:
+
+```bash
+set -a
+. dev-project/.env
+set +a
+.virtualenvs/pipelinewise/bin/pipelinewise validate --dir dev-project/pipelinewise-config
+```
+
+CI creates `.env` from `.env.template`; locally, never overwrite an existing `.env` because it may contain real credentials. Validate after changes to implementation, schemas, example config, or connector config.
+
+### Scoped checks
+
+- Database, connector, migration, FastSync, data-diff, or E2E work: follow `tests/end_to_end/AGENTS.md` and report each relevant group.
+- Connector source: follow `singer-connectors/AGENTS.md`; repository lint and unit gates do not inspect it.
+- Docs: follow `docs/AGENTS.md`; warnings fail the build.
+- Always run `git diff --check`.
+
+## Connector CI boundary
+
+`singer-connectors/` is tracked vendored source, not submodules. CI checks that all connectors install via `make pipelinewise_no_test_extras all_connectors`; it does not run connector tests. Behavioral changes need connector-local tests and an E2E route when one exists. Coordinate non-trivial divergence with upstream. Details are in `singer-connectors/AGENTS.md`.
+
+## Module boundaries
+
+- `pipelinewise.backend_db` must not import data-diff or replication orchestration.
+- `pipelinewise.data_diff` may import backend-db, but not Singer or FastSync execution.
+- Data-diff reads generated connector JSON only through its runtime loader.
+- `import_config` persists and versions data-diff definitions only after connector generation and discovery succeed.
+- Boundary tests enforce these directions.
+
+## Style and safety
+
+- Python: 120 characters, complexity 15, four spaces, Google docstrings, single quotes where consistent; `snake_case` functions/variables/JSON keys and `PascalCase` classes.
+- FastSync uppercases Snowflake identifiers. Scope Pylint disables to a line or function, never a module.
+- Comments explain non-obvious constraints and consequences in at most two lines; do not restate code, narrate edits, argue choices, or write walkthroughs.
+- Never run `pre-commit run --all-files`; it mutates files broadly and is not a CI gate.
+- Do not reformat or lint-fix unrelated files. Preserve user changes in dirty worktrees.
+- Never commit secrets, `.tfvars`, private keys, or populated environment files.
+- Use `import_config` in docs, examples, tests, and comments; `import` is only a deprecated alias.
+
+## Git and completion
+
+- Branch from `master`; use `AP-NNNN-short-description` and `[AP-NNNN]` commit subjects when a ticket exists.
+- Keep diffs task-scoped; incidental cleanup hinders review and rollback.
+
+Before completion:
+
+1. Implementation changes pass all four lint gates and the full unit gate.
+2. Configuration validation passes when applicable.
+3. Relevant E2E groups run per `tests/end_to_end/AGENTS.md`; report pass/skip/fail counts and never call a skipped suite complete.
+4. User-facing behavior/config changes update and validate docs.
+5. `git diff --check` passes and `git status` contains only expected files.
+6. Report failed, skipped, or unavailable checks with output or blocker; never call partial verification complete.

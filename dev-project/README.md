@@ -9,17 +9,28 @@ The local development environment comes with the following containers and compon
 * Postgres test source database with test data (for tap-postgres)
 * MongoDB replicaSet test source database with test data (for tap-mongodb)
 * Postgres test target data warehouse (for target-postgres)
+* Dedicated Postgres operational database for PipelineWise data-diff state
 * Test Project that replicates data from MariaDB, Postgres, and MongoDB databases into a Postgres Data Warehouse
 * Integration and End to End test cases
+
+Two Postgres containers with separate databases, roles, host ports, Docker networks,
+and volumes serve distinct purposes:
+
+* `pipelinewise-postgres-target` — the replication target. Holds replicated table
+  data only.
+* `pipelinewise-backend-db` — **not** a replication target. Holds generic scheduler
+  state, data-diff definitions, preflights, run evidence, and coverage watermarks,
+  and nothing else.
 
 ## How to use
 
 Install [Docker](https://www.docker.com/) and [Docker Compose](https://docs.docker.com/compose/).
 
-Go to the main folder of the repository (the parent of this one) to create the local development environment:
+From this directory, create the `.env` file and start the environment:
 
 ```sh
 $ cd dev-project/
+$ cp .env.template .env
 $ docker compose up --build
 ```
 
@@ -54,61 +65,64 @@ tap_mongodb_to_pg       tap-mongodb   target_postgres  target-postgres  True    
 ```
 
 **Note**: To configure the list of tables to replicate, replication methods, load time transformations, etc.,
-edit the YAML files in the `dev-project` directory. Don't forget to re-import the project with
-`pipelinewise import_config --dir dev-project` when making changes in the YAML files.
+edit the YAML files in `dev-project/pipelinewise-config`. Don't forget to re-run the
+`import_config` command above after changing them.
 
-To start replicating data from source MariaDB to target Postgres DWH:
+### Replicating data
+
+Run any of the taps against the Postgres DWH, for example:
 
 ```sh
 $ pipelinewise run_tap --tap tap_mariadb --target target_postgres
+$ pipelinewise run_tap --tap tap_postgres --target target_postgres
+$ pipelinewise run_tap --tap tap_mongodb_to_pg --target target_postgres
 ```
 
-**Note**: Log files are generated at each run at `~/.pipelinewise/target_postgres/tap_mariadb/log/`.
-State file with incremental and log based positions generated at `~/.pipelinewise/target_postgres/tap_mariadb/state.json`.
-Next time when running the same command, the incrementally and log based (CDC) replicated tables
-will capture the changes starting from the previously replicated position.
+**Note**: Each run writes logs to `~/.pipelinewise/<target>/<tap>/log/` and a state
+file to `~/.pipelinewise/<target>/<tap>/state.json`. The state file holds the
+incremental and log based (CDC) positions, so the next run of the same command
+captures changes starting from the previously replicated position.
 
-To start replicating data from source Postgres to target Postgres DWH:
+### Data-diff checks
+
+The LOG_BASED Postgres example in `tap_postgres_logical.yml` includes a
+table-level data-diff definition for `logical1.logical1_table1`. To replicate the
+table, inspect the persisted definition, and run one scheduler batch:
 
 ```sh
-$ pipelinewise run_tap --tap tap_postgres --target target_postgres
+$ pipelinewise run_tap --tap tap_postgres_logical --target target_postgres
+$ pipelinewise list_data_diff_checks \
+    --tap tap_postgres_logical --target target_postgres
+$ pipelinewise list_scheduled_jobs --job-type data_diff
+$ pipelinewise run_scheduler \
+    --job-type data_diff \
+    --once \
+    --tap tap_postgres_logical --target target_postgres
 ```
 
-**Note**: Log files are generated at each run at `~/.pipelinewise/target_postgres/tap_postgres/log/`
-State file with incremental and log based positions generated at `~/.pipelinewise/target_postgres/tap_postgres/state.json`.
-Next time when running the same command, the incrementally and log based (CDC) replicated tables
-will capture the changes starting from the previously replicated position.
+The check compares the source table with its table in
+`pipelinewise-postgres-target`.
 
-If you want to connect to any of the test databases by a db client (CLI, MySQL Workbench, pgAdmin, intelliJ, DataGrip, etc.),
-check the [dev-project/.env](../dev-project/.env) file for the credentials.
+### Connecting with a database client
+
+To connect to any of the test databases with a db client (CLI, MySQL Workbench, pgAdmin, intelliJ, DataGrip, etc.),
+check the [dev-project/.env](../dev-project/.env) file for the credentials. The
+target PostgreSQL service is exposed on `TARGET_POSTGRES_PORT_ON_HOST`; the
+independent backend is exposed on `PIPELINEWISE_BACKEND_PORT_ON_HOST`.
 
 ###  Running tests
 
-To run tests:
-
-First, create a .env file from the .env.template file. On your local machine run:
-
-```sh
-cd dev-project
-cp .env.template .env
-```
-
-Then, from within the container:
+From within the container:
 
 ```sh
 $ cd /opt/pipelinewise
 $ pytest tests/
 ```
 
-To run tests and report code coverage:
+To report code coverage, or write an HTML report instead:
 
-```
+```sh
 $ coverage run -m pytest tests/ && coverage report
-```
-
-To generate HTML coverage report.
-
-```
 $ coverage run -m pytest tests/ && coverage html -d coverage_html
 ```
 
@@ -129,4 +143,3 @@ To refresh the containers with new local code changes stop the running instances
 ```sh
 $ docker compose up --build
 ```
-

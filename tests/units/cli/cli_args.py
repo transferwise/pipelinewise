@@ -3,7 +3,7 @@ CLI Arguments Class for unit tests
 """
 
 
-# pylint: disable=redefined-builtin,too-many-instance-attributes,too-many-arguments
+# pylint: disable=redefined-builtin,too-many-instance-attributes,too-many-arguments,too-many-locals
 class CliArgs:
     """Class to simulate argparse command line arguments required by PipelineWise class"""
 
@@ -23,7 +23,17 @@ class CliArgs:
         debug=False,
         profiler=False,
         force=False,
-        replication_method_only='*'
+        replication_method_only='*',
+        check=None,
+        output_format='table',
+        include_versioned=False,
+        run_id=None,
+        remediation_ref=None,
+        table='*',
+        column='*',
+        start_value='*',
+        end_value=None,
+        command=None,
     ):
         self.target = target
         self.tap = tap
@@ -39,6 +49,16 @@ class CliArgs:
         self.profiler = profiler
         self.force = force
         self.replication_method_only = replication_method_only
+        self.check = check
+        self.output_format = output_format
+        self.include_versioned = include_versioned
+        self.run_id = run_id
+        self.remediation_ref = remediation_ref
+        self.table = table
+        self.column = column
+        self.start_value = start_value
+        self.end_value = end_value
+        self.command = command
 
     # "log" Getters and setters
     @property
