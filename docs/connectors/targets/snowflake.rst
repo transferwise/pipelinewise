@@ -130,6 +130,11 @@ Example YAML for target-snowflake:
       # The same master key has to be added to the external stage object created in snowflake
       #client_side_encryption_master_key: "<MASTER_KEY>" # Plain string or vault encrypted
 
+      # Optional: Server Side Encryption (SSE-KMS)
+      # When set, uploads to S3 include SSE-KMS headers so objects are encrypted at rest
+      # using the specified KMS key. Ignored when client_side_encryption_master_key is set.
+      #s3_server_side_encryption_kms_key_id: "<KMS_KEY_ID>" # KMS key ID or ARN
+
 
 Snowflake Iceberg tables
 ''''''''''''''''''''''''

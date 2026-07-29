@@ -81,6 +81,7 @@ class TestS3UploadClient(unittest.TestCase):
         assert 'ServerSideEncryption' not in extra_args
         assert 'Metadata' in extra_args
 
+    @patch.dict(os.environ, {}, clear=True)
     @patch('target_snowflake.upload_clients.s3_upload_client.boto3.session.Session')
     def test_instance_profile_auth_when_no_keys(self, mock_session_cls):
         config = self._get_base_config()
