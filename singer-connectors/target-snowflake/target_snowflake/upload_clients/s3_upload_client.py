@@ -83,10 +83,14 @@ class S3UploadClient(BaseUploadClient):
             # Remove the uploaded encrypted file
             os.remove(encrypted_file)
 
-        # Upload to S3 without encrypting
+        # Upload to S3 without client-side encrypting
         else:
-            extra_args = {'ACL': s3_acl} if s3_acl else None
-            self.s3_client.upload_file(file, bucket, s3_key, ExtraArgs=extra_args)
+            extra_args = {'ACL': s3_acl} if s3_acl else {}
+            kms_key_id = self.connection_config.get('s3_server_side_encryption_kms_key_id', '')
+            if kms_key_id:
+                extra_args['ServerSideEncryption'] = 'aws:kms'
+                extra_args['SSEKMSKeyId'] = kms_key_id
+            self.s3_client.upload_file(file, bucket, s3_key, ExtraArgs=extra_args or None)
 
         return s3_key
 
