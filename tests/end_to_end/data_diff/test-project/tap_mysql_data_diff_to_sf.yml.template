@@ -1,0 +1,54 @@
+---
+
+id: "data_diff_mysql_to_sf"
+name: "Data-diff MySQL source to Snowflake"
+type: "tap-mysql"
+owner: "test-runner"
+
+db_conn:
+  host: "${TAP_MYSQL_HOST}"
+  port: ${TAP_MYSQL_PORT}
+  user: "${TAP_MYSQL_USER}"
+  password: "${TAP_MYSQL_PASSWORD}"
+  dbname: "${TAP_MYSQL_DB}"
+  # The dev container runs MariaDB, which has no max_execution_time variable.
+  engine: mariadb
+  fastsync_parallelism: 1
+
+target: "data_diff_snowflake_dwh"
+batch_size_rows: 20000
+stream_buffer_size: 0
+
+data_diff_defaults:
+  frequency: "0 * * * *"
+  window_start: "-1d"
+  window_end: "0s"
+  statement_timeout: "5min"
+
+schemas:
+  - source_schema: "${TAP_MYSQL_DB}"
+    target_schema: "ppw_e2e_data_diff_mysql_sf${TARGET_SNOWFLAKE_SCHEMA_POSTFIX}"
+
+    tables:
+      - table_name: "weight_unit"
+        replication_method: "FULL_TABLE"
+        data_diff:
+          # Neither side of this route is the well-covered PostgreSQL path: MySQL
+          # sums CONV(MD5(...)) while Snowflake uses MD5_NUMBER_LOWER64, so this is
+          # where checksum arithmetic can disagree.
+          checks:
+            - schema_compatibility
+            - row_count
+            - distinct_key_count
+            - null_key_count
+            - duplicate_key_count
+            - min_key
+            - max_key
+            - row_checksum
+          key_column: "weight_unit_id"
+          timestamp_column: "date_updated"
+          # isActive is a nullable tinyint(1), so the boolean NULL-vs-FALSE
+          # normalization is exercised across both dialects.
+          compare_columns:
+            - "weight_unit_name"
+            - "isActive"

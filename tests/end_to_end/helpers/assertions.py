@@ -50,7 +50,7 @@ def assert_resync_tables_success(tap, target, profiling=False):
 
     if profiling:
         assert_profiling_stats_files_created(
-            stdout, 'sync_tables', ['fastsync'], tap, target
+            stdout, 'fast_sync', ['fastsync'], tap, target
         )
 
 

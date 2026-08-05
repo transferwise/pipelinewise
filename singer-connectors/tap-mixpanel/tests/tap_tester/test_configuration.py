@@ -10,7 +10,7 @@ config = {
         "cohort_members": {"cohort_id", "distinct_id"},
         "cohorts": {"id"},
         "engage": {"distinct_id"},
-        "export": {"event", "time", "distinct_id"},
+        "export": {"mp_reserved_insert_id"},
         "revenue": {"date"}
     },
     "exclude_streams": [
@@ -21,4 +21,3 @@ config = {
         "funnels"
     ]
 }
-

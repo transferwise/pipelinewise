@@ -720,6 +720,7 @@ class Export(MixPanel):
     tap_stream_id = "export"
     path = "export"
     data_key = "results"
+    key_properties = ["mp_reserved_insert_id"]
     replication_keys = ["time"]
     url = "https://data.mixpanel.com/api/2.0"
     bookmark_query_field_from = "from_date"

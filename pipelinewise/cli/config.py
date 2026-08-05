@@ -8,6 +8,7 @@ import json
 
 from typing import Dict, List, Union
 
+from pipelinewise.data_diff.config import extract_check_definitions
 from pipelinewise.utils import safe_column_name
 from . import utils
 
@@ -129,6 +130,18 @@ class Config:
         Returns the tap specific temp directory
         """
         return os.path.join(self.config_dir, 'tmp')
+
+    def get_data_diff_definitions(self, selected_taps=None):
+        """Return validated data-diff definitions from the loaded YAML model."""
+        return extract_check_definitions(
+            self.global_config,
+            self.targets,
+            selected_taps,
+        )
+
+    def get_scheduled_job_definitions(self):
+        """Validate scheduled job definitions. Placeholder for future scheduling features."""
+        return []
 
     def get_target_dir(self, target_id):
         """

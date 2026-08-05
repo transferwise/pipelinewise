@@ -1,3 +1,4 @@
+import json
 import pytest
 import collections
 from unittest.mock import patch
@@ -167,3 +168,36 @@ class TestAlertSender:
                 {'base_url': 'some-url', 'routing_key': 'some-routing-key'}
             )
             victorops.send('test message')
+
+    def test_victorops_handler_sends_alerts_that_carry_an_exception(self):
+        """An exception must be stringified: the object is not JSON serializable"""
+        with patch('requests.post') as victorops_post_message_mock:
+            VictorOpsResponseMock = collections.namedtuple(
+                'VictorOpsResponseMock', 'status_code'
+            )
+            victorops_post_message_mock.return_value = VictorOpsResponseMock(
+                status_code=200
+            )
+            victorops = VictoropsAlertHandler(
+                {'base_url': 'some-url', 'routing_key': 'some-routing-key'}
+            )
+            victorops.send('test message', exc=ValueError('some failure'))
+
+            sent = json.loads(victorops_post_message_mock.call_args.kwargs['data'])
+            assert sent['state_message'] == 'some failure'
+
+    def test_victorops_handler_bounds_the_request(self):
+        """An unresponsive endpoint must not stall the run reporting the failure."""
+        with patch('requests.post') as victorops_post_message_mock:
+            VictorOpsResponseMock = collections.namedtuple(
+                'VictorOpsResponseMock', 'status_code'
+            )
+            victorops_post_message_mock.return_value = VictorOpsResponseMock(
+                status_code=200
+            )
+            victorops = VictoropsAlertHandler(
+                {'base_url': 'some-url', 'routing_key': 'some-routing-key'}
+            )
+            victorops.send('test message')
+
+            assert victorops_post_message_mock.call_args.kwargs['timeout'] > 0

@@ -121,6 +121,9 @@ def row_to_singer_record(catalog_entry, version, row, columns, time_extracted):
                 boolean_representation = True
             row_to_persist += (boolean_representation,)
 
+        elif isinstance(elem, str) and property_format == 'date-time':
+            row_to_persist += (None,)
+
         else:
             row_to_persist += (elem,)
     rec = dict(zip(columns, row_to_persist))

@@ -2,28 +2,47 @@
 
 set -e
 
-# Retry wrapper for apt-get to handle transient mirror errors
-apt_retry() {
+MONGOSH_VERSION=2.2.9
+MONGODB_TOOLS_VERSION=100.9.5
+
+# The repo root is bind-mounted here, so downloads go to /tmp to keep the
+# developer's working tree clean.
+DOWNLOAD_DIR=/tmp
+
+# Retry wrapper for transient network and mirror errors. Pass refresh=1 to run
+# apt-get update between attempts.
+retry() {
+  local refresh=$1
+  shift
   local max_attempts=3
   local attempt=1
-  while [ $attempt -le $max_attempts ]; do
+  while true; do
     if "$@"; then
       return 0
     fi
-    echo "apt command failed (attempt $attempt/$max_attempts), retrying in 5s..."
+    if [ $attempt -ge $max_attempts ]; then
+      echo "command failed after $max_attempts attempts: $*"
+      return 1
+    fi
+    echo "command failed (attempt $attempt/$max_attempts), retrying in 5s..."
     attempt=$((attempt + 1))
     sleep 5
-    apt-get update
+    if [ "$refresh" = 1 ]; then
+      apt-get update
+    fi
   done
-  echo "apt command failed after $max_attempts attempts"
-  return 1
+}
+
+apt_retry() {
+  retry 1 "$@"
+}
+
+net_retry() {
+  retry 0 "$@"
 }
 
 apt-get update
 apt_retry apt-get install -y software-properties-common apt-utils
-
-add-apt-repository ppa:deadsnakes/ppa
-apt-get update
 
 echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections
 
@@ -39,15 +58,21 @@ apt_retry apt-get install -y --no-install-recommends \
   postgresql-client \
   python3.12-dev python3.12-venv
 
-apt-get upgrade -y
+apt_retry apt-get upgrade -y
 
 # Do a bunch of Mongo things
-wget -q https://downloads.mongodb.com/compass/mongodb-mongosh_2.2.9_amd64.deb
-apt-get install ./mongodb-mongosh_2.2.9_amd64.deb
-rm -f mongodb-mongosh_2.2.9_amd64.deb
-wget -q https://fastdl.mongodb.org/tools/db/mongodb-database-tools-ubuntu2004-x86_64-100.9.5.deb
-apt-get install ./mongodb-database-tools-ubuntu2004-x86_64-100.9.5.deb
-rm -f mongodb-database-tools-ubuntu2004-x86_64-100.9.5.deb
+MONGOSH_DEB=mongodb-mongosh_${MONGOSH_VERSION}_amd64.deb
+MONGODB_TOOLS_DEB=mongodb-database-tools-ubuntu2004-x86_64-${MONGODB_TOOLS_VERSION}.deb
+
+net_retry wget -q -O "${DOWNLOAD_DIR}/${MONGOSH_DEB}" \
+  "https://downloads.mongodb.com/compass/${MONGOSH_DEB}"
+apt_retry apt-get install -y "${DOWNLOAD_DIR}/${MONGOSH_DEB}"
+rm -f "${DOWNLOAD_DIR}/${MONGOSH_DEB}"
+
+net_retry wget -q -O "${DOWNLOAD_DIR}/${MONGODB_TOOLS_DEB}" \
+  "https://fastdl.mongodb.org/tools/db/${MONGODB_TOOLS_DEB}"
+apt_retry apt-get install -y "${DOWNLOAD_DIR}/${MONGODB_TOOLS_DEB}"
+rm -f "${DOWNLOAD_DIR}/${MONGODB_TOOLS_DEB}"
 
 dev-project/mongo/initiate-replica-set.sh
 
@@ -79,6 +104,7 @@ echo "   - PostgreSQL server with test database  (From host: localhost:${TAP_POS
 echo "   - MariaDB server with test database     (From host: localhost:${TAP_MYSQL_PORT_ON_HOST} - From CLI: ${TAP_MYSQL_HOST}:${TAP_MYSQL_PORT})"
 echo "   - MongoDB replicaSet server with test database (From host: localhost:${TAP_MONGODB_PORT_ON_HOST} - From CLI: ${TAP_MONGODB_HOST}:${TAP_MONGODB_PORT})"
 echo "   - PostgreSQL server with empty database (From host: localhost:${TARGET_POSTGRES_PORT_ON_HOST} - From CLI: ${TARGET_POSTGRES_HOST}:${TARGET_POSTGRES_PORT})"
+echo "   - PipelineWise backend PostgreSQL database (From host: localhost:${PIPELINEWISE_BACKEND_PORT_ON_HOST} - From CLI: ${PIPELINEWISE_BACKEND_HOST}:${PIPELINEWISE_BACKEND_PORT})"
 echo "(For database credentials check .env file)"
 echo
 echo

@@ -31,6 +31,50 @@
         "routing_key"
       ],
       "additionalProperties": false
+    },
+    "backend_db": {
+      "type": "object",
+      "properties": {
+        "host": {
+          "type": "string",
+          "minLength": 1
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "user": {
+          "type": "string",
+          "minLength": 1
+        },
+        "password": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dbname": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sslmode": {
+          "type": "string",
+          "enum": ["disable", "allow", "prefer", "require", "verify-ca", "verify-full"]
+        },
+        "connect_timeout": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "ddl_user": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ddl_password": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": ["host", "user", "password", "dbname", "ddl_user", "ddl_password"],
+      "additionalProperties": false
     }
   },
   "type": ["object", "null"],
@@ -54,6 +98,9 @@
     },
     "switch_over_data_file": {
       "type": "string"
+    },
+    "backend_db": {
+      "$ref": "#/definitions/backend_db"
     }
   },
   "required": [],

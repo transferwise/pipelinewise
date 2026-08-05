@@ -7,6 +7,9 @@ import requests
 from .errors import InvalidAlertHandlerException
 from .base_alert_handler import BaseAlertHandler
 
+# An unresponsive endpoint must not stall the run that is trying to report a failure.
+REQUEST_TIMEOUT_SECONDS = 10
+
 # Map alert levels to victorops compatible message types
 ALERT_LEVEL_MESSAGE_TYPES = {
     BaseAlertHandler.LOG: 'INFO',
@@ -54,7 +57,6 @@ class VictoropsAlertHandler(BaseAlertHandler):
             Initialised alert handler object
         """
         # Send alert to VictorOps REST Endpoint as a HTTP post request
-        # pylint: disable=missing-timeout
         response = requests.post(
             f'{self.base_url}/{self.routing_key}',
             data=json.dumps(
@@ -63,10 +65,12 @@ class VictoropsAlertHandler(BaseAlertHandler):
                         level, BaseAlertHandler.ERROR
                     ),
                     'entity_display_name': message,
-                    'state_message': exc,
+                    # str(): an exception object is not JSON serializable
+                    'state_message': str(exc) if exc is not None else None,
                 }
             ),
             headers={'Content-Type': 'application/json'},
+            timeout=REQUEST_TIMEOUT_SECONDS,
         )
 
         # Success victorops message should return 200
