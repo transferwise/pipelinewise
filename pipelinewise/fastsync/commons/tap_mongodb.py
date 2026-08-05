@@ -56,7 +56,7 @@ def class_to_string(key_value: Any, key_type: str) -> str:
     Returns: string equivalent of key value
     Raises: UnsupportedKeyTypeException if key_type is not supported
     """
-    if key_type == 'datetime':
+    if key_type == "datetime":
         if key_value.tzinfo is None:
             timezone = tzlocal.get_localzone()
             local_datetime = datetime.datetime.fromtimestamp(key_value.timestamp(), tz=timezone)
@@ -66,16 +66,16 @@ def class_to_string(key_value: Any, key_type: str) -> str:
 
         return singer_strftime(utc_datetime)
 
-    if key_type == 'Timestamp':
-        return '{}.{}'.format(key_value.time, key_value.inc)
+    if key_type == "Timestamp":
+        return "{}.{}".format(key_value.time, key_value.inc)
 
-    if key_type == 'bytes':
-        return base64.b64encode(key_value).decode('utf-8')
+    if key_type == "bytes":
+        return base64.b64encode(key_value).decode("utf-8")
 
-    if key_type in ['int', 'Int64', 'float', 'ObjectId', 'str', 'UUID']:
+    if key_type in ["int", "Int64", "float", "ObjectId", "str", "UUID"]:
         return str(key_value)
 
-    raise UnsupportedKeyTypeException('{} is not a supported key type'.format(key_type))
+    raise UnsupportedKeyTypeException("{} is not a supported key type".format(key_type))
 
 
 def safe_transform_datetime(value: datetime.datetime, path) -> str:
@@ -93,12 +93,12 @@ def safe_transform_datetime(value: datetime.datetime, path) -> str:
         local_datetime = datetime.datetime.fromtimestamp(value.timestamp(), tz=timezone)
         utc_datetime = local_datetime.astimezone(pytz.UTC)
     except Exception as ex:
-        if str(ex) == 'year is out of range' and value.year == 0:
+        if str(ex) == "year is out of range" and value.year == 0:
             # NB: Since datetimes are persisted as strings, it doesn't
             # make sense to blow up on invalid Python datetimes (e.g.,
             # year=0). In this case we're formatting it as a string and
             # passing it along down the pipeline.
-            return '{:04d}-{:02d}-{:02d}T{:02d}:{:02d}:{:02d}.{:06d}Z'.format(
+            return "{:04d}-{:02d}-{:02d}T{:02d}:{:02d}:{:02d}.{:06d}Z".format(
                 value.year,
                 value.month,
                 value.day,
@@ -108,7 +108,7 @@ def safe_transform_datetime(value: datetime.datetime, path) -> str:
                 value.microsecond,
             )
         raise MongoDBInvalidDatetimeError(
-            'Found invalid datetime at [{}]: {}'.format('.'.join(map(str, path)), value)
+            "Found invalid datetime at [{}]: {}".format(".".join(map(str, path)), value)
         ) from ex
     return singer_strftime(utc_datetime)
 
@@ -124,28 +124,20 @@ def transform_value(value: Any, path) -> Any:
 
     """
     conversion = {
-        list: lambda val, pat: list(
-            map(lambda v: transform_value(v[1], pat + [v[0]]), enumerate(val))
-        ),
-        dict: lambda val, pat: {
-            k: transform_value(v, pat + [k]) for k, v in val.items()
-        },
-        uuid.UUID: lambda val, _: class_to_string(val, 'UUID'),
-        bson.objectid.ObjectId: lambda val, _: class_to_string(val, 'ObjectId'),
+        list: lambda val, pat: list(map(lambda v: transform_value(v[1], pat + [v[0]]), enumerate(val))),
+        dict: lambda val, pat: {k: transform_value(v, pat + [k]) for k, v in val.items()},
+        uuid.UUID: lambda val, _: class_to_string(val, "UUID"),
+        bson.objectid.ObjectId: lambda val, _: class_to_string(val, "ObjectId"),
         bson.datetime.datetime: safe_transform_datetime,
         bson.timestamp.Timestamp: lambda val, _: singer_strftime(val.as_datetime()),
-        bson.int64.Int64: lambda val, _: class_to_string(val, 'Int64'),
-        bytes: lambda val, _: class_to_string(val, 'bytes'),
-        datetime.datetime: lambda val, _: class_to_string(val, 'datetime'),
+        bson.int64.Int64: lambda val, _: class_to_string(val, "Int64"),
+        bytes: lambda val, _: class_to_string(val, "bytes"),
+        datetime.datetime: lambda val, _: class_to_string(val, "datetime"),
         bson.decimal128.Decimal128: lambda val, _: val.to_decimal(),
         bson.regex.Regex: lambda val, _: dict(pattern=val.pattern, flags=val.flags),
-        bson.binary.Binary: lambda val, _: class_to_string(val, 'bytes'),
-        bson.code.Code: lambda val, _: dict(value=str(val), scope=str(val.scope))
-        if val.scope
-        else str(val),
-        bson.dbref.DBRef: lambda val, _: dict(
-            id=str(val.id), collection=val.collection, database=val.database
-        ),
+        bson.binary.Binary: lambda val, _: class_to_string(val, "bytes"),
+        bson.code.Code: lambda val, _: dict(value=str(val), scope=str(val.scope)) if val.scope else str(val),
+        bson.dbref.DBRef: lambda val, _: dict(id=str(val.id), collection=val.collection, database=val.database),
     }
 
     if isinstance(value, tuple(conversion.keys())):
@@ -162,37 +154,37 @@ def get_connection_string(config: Dict):
 
     Returns: A MongoClient connection string
     """
-    srv = config.get('srv') == 'true'
+    srv = config.get("srv") == "true"
 
     # Default SSL verify mode to true, give option to disable
-    verify_mode = config.get('verify_mode', 'true') == 'true'
-    use_ssl = config.get('ssl') == 'true'
+    verify_mode = config.get("verify_mode", "true") == "true"
+    use_ssl = config.get("ssl") == "true"
 
     connection_query = {
-        'readPreference': 'secondaryPreferred',
-        'authSource': config['auth_database'],
+        "readPreference": "secondaryPreferred",
+        "authSource": config["auth_database"],
     }
 
-    if config.get('replica_set'):
-        connection_query['replicaSet'] = config['replica_set']
+    if config.get("replica_set"):
+        connection_query["replicaSet"] = config["replica_set"]
 
     if use_ssl:
-        connection_query['ssl'] = 'true'
+        connection_query["ssl"] = "true"
 
     # NB: "sslAllowInvalidCertificates" must ONLY be supplied if `SSL` is true.
     if not verify_mode and use_ssl:
-        connection_query['tlsInsecure'] = 'true'
+        connection_query["tlsInsecure"] = "true"
 
     query_string = parse.urlencode(connection_query)
 
-    connection_string = '{protocol}://{user}:{password}@{host}{port}/{database}?{query_string}'.format(
-        protocol='mongodb+srv' if srv else 'mongodb',
-        user=config['user'],
-        password=config['password'],
-        host=config['host'],
-        port='' if srv else ':{port}'.format(port=int(config['port'])),
-        database=config['database'],
-        query_string=query_string
+    connection_string = "{protocol}://{user}:{password}@{host}{port}/{database}?{query_string}".format(
+        protocol="mongodb+srv" if srv else "mongodb",
+        user=config["user"],
+        password=config["password"],
+        host=config["host"],
+        port="" if srv else ":{port}".format(port=int(config["port"])),
+        database=config["database"],
+        query_string=query_string,
     )
 
     return connection_string
@@ -211,11 +203,9 @@ class FastSyncTapMongoDB:
             tap_type_to_target_type: Function that maps tap types to target ones
         """
         self.connection_config = connection_config
-        self.connection_config['write_batch_rows'] = connection_config.get(
-            'write_batch_rows', DEFAULT_WRITE_BATCH_ROWS
-        )
+        self.connection_config["write_batch_rows"] = connection_config.get("write_batch_rows", DEFAULT_WRITE_BATCH_ROWS)
 
-        self.connection_config['connection_string'] = get_connection_string(self.connection_config)
+        self.connection_config["connection_string"] = get_connection_string(self.connection_config)
 
         self.tap_type_to_target_type = tap_type_to_target_type
         self.database: Optional[Database] = None
@@ -225,9 +215,7 @@ class FastSyncTapMongoDB:
         Open connection
         """
 
-        self.database = MongoClient(self.connection_config['connection_string'])[
-            self.connection_config['database']
-        ]
+        self.database = MongoClient(self.connection_config["connection_string"])[self.connection_config["database"]]
 
     def close_connection(self):
         """
@@ -235,7 +223,6 @@ class FastSyncTapMongoDB:
         """
         self.database.client.close()
 
-    # pylint: disable=R0914,R0913,R0917
     def copy_table(
         self,
         table_name: str,
@@ -258,32 +245,30 @@ class FastSyncTapMongoDB:
             split_file_max_chunks: Max number of chunks if `split_large_files` enabled. (Default: 20)
             compress: Flag to indicate whether to compress export files
         """
-        table_dict = utils.tablename_to_dict(table_name, '.')
+        table_dict = utils.tablename_to_dict(table_name, ".")
 
-        if table_dict['table_name'] not in self.database.list_collection_names():
-            raise TableNotFoundError(f'{table_name} table not found!')
+        if table_dict["table_name"] not in self.database.list_collection_names():
+            raise TableNotFoundError(f"{table_name} table not found!")
 
-        export_file_path = self._export_collection(temp_dir, table_dict['table_name'])
-        extracted_at = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f')
+        export_file_path = self._export_collection(temp_dir, table_dict["table_name"])
+        extracted_at = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S.%f")
 
-        write_batch_rows = self.connection_config['write_batch_rows']
+        write_batch_rows = self.connection_config["write_batch_rows"]
         exported_rows = 0
 
         try:
             gzip_splitter = split_gzip.open(
                 filepath,
-                mode='wt',
+                mode="wt",
                 chunk_size_mb=split_file_chunk_size_mb,
                 max_chunks=split_file_max_chunks if split_large_files else 0,
                 compress=compress,
             )
-            with gzip.open(
-                export_file_path, 'rb'
-            ) as export_file, gzip_splitter as gzfile:
+            with gzip.open(export_file_path, "rb") as export_file, gzip_splitter as gzfile:
                 writer = csv.DictWriter(
                     gzfile,
                     fieldnames=[elem[0] for elem in self._get_collection_columns()],
-                    delimiter=',',
+                    delimiter=",",
                     quotechar='"',
                     quoting=csv.QUOTE_MINIMAL,
                 )
@@ -291,26 +276,24 @@ class FastSyncTapMongoDB:
                 writer.writeheader()
                 rows = []
 
-                LOGGER.info('Starting data processing...')
+                LOGGER.info("Starting data processing...")
 
                 # bson.decode_file_iter will generate one document at a time from the exported file
                 for document in bson.decode_file_iter(export_file):
                     try:
                         rows.append(
                             {
-                                '_ID': str(document['_id']),
-                                'DOCUMENT': ujson.dumps(serialize_document(document)),
+                                "_ID": str(document["_id"]),
+                                "DOCUMENT": ujson.dumps(serialize_document(document)),
                                 utils.SDC_EXTRACTED_AT: extracted_at,
-                                utils.SDC_BATCHED_AT: datetime.datetime.utcnow().strftime(
-                                    '%Y-%m-%d %H:%M:%S.%f'
-                                ),
+                                utils.SDC_BATCHED_AT: datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S.%f"),
                                 utils.SDC_DELETED_AT: None,
                             }
                         )
                     except TypeError:
                         LOGGER.error(
-                            'TypeError encountered when processing document ID: %s',
-                            document['_id'],
+                            "TypeError encountered when processing document ID: %s",
+                            document["_id"],
                         )
                         raise
 
@@ -319,7 +302,7 @@ class FastSyncTapMongoDB:
                     # writes batch to csv file and log some nice message on the progress.
                     if exported_rows % write_batch_rows == 0:
                         LOGGER.info(
-                            'Exporting batch from %s to %s rows from %s...',
+                            "Exporting batch from %s to %s rows from %s...",
                             (exported_rows - write_batch_rows),
                             exported_rows,
                             table_name,
@@ -330,7 +313,7 @@ class FastSyncTapMongoDB:
 
                 # write rows one last time
                 if rows:
-                    LOGGER.info('Exporting last batch ...')
+                    LOGGER.info("Exporting last batch ...")
                     writer.writerows(rows)
                     rows.clear()
 
@@ -339,7 +322,7 @@ class FastSyncTapMongoDB:
             # make sure to delete the exported file
             os.remove(export_file_path)
 
-        LOGGER.info('Exported total of %s rows from %s...', exported_rows, table_name)
+        LOGGER.info("Exported total of %s rows from %s...", exported_rows, table_name)
 
     @staticmethod
     def _get_collection_columns() -> Tuple:
@@ -347,11 +330,11 @@ class FastSyncTapMongoDB:
         Get predefined table/collection column details
         """
         return (
-            ('_ID', 'string'),
-            ('DOCUMENT', 'object'),
-            (utils.SDC_EXTRACTED_AT, 'datetime'),
-            (utils.SDC_BATCHED_AT, 'datetime'),
-            (utils.SDC_DELETED_AT, 'string'),
+            ("_ID", "string"),
+            ("DOCUMENT", "object"),
+            (utils.SDC_EXTRACTED_AT, "datetime"),
+            (utils.SDC_BATCHED_AT, "datetime"),
+            (utils.SDC_DELETED_AT, "string"),
         )
 
     def fetch_current_log_pos(self) -> Dict:
@@ -383,19 +366,16 @@ class FastSyncTapMongoDB:
         # token can contain a property '_typeBits' of type bytes which cannot be json
         # serialized when saving the state in the function 'utils.save_state_file'.
         # '_data' is enough to resume LOG_BASED Singer replication after FastSync
-        return {'token': {'_data': token['_data']}}
+        return {"token": {"_data": token["_data"]}}
 
-    # pylint: disable=invalid-name
-    def fetch_current_incremental_key_pos(
-        self, fully_qualified_table_name: str, replication_key: str
-    ):
+    def fetch_current_incremental_key_pos(self, fully_qualified_table_name: str, replication_key: str):
         """
         No Implemented
         Args:
             fully_qualified_table_name:
             replication_key:
         """
-        raise NotImplementedError('INCREMENTAL method is not supported for tap-mongodb')
+        raise NotImplementedError("INCREMENTAL method is not supported for tap-mongodb")
 
     def map_column_types_to_target(self):
         """
@@ -406,11 +386,9 @@ class FastSyncTapMongoDB:
         mapped_columns = []
 
         for column_name, column_type in self._get_collection_columns():
-            mapped_columns.append(
-                f'{column_name} {self.tap_type_to_target_type(column_type)}'
-            )
+            mapped_columns.append(f"{column_name} {self.tap_type_to_target_type(column_type)}")
 
-        return {'columns': mapped_columns, 'primary_key': ['_ID']}
+        return {"columns": mapped_columns, "primary_key": ["_ID"]}
 
     def _export_collection(self, export_dir: str, collection_name) -> str:
         """
@@ -425,33 +403,31 @@ class FastSyncTapMongoDB:
         LOGGER.info('Starting export of table "%s"', collection_name)
 
         cmd = [
-            'mongodump',
-            '--uri',
+            "mongodump",
+            "--uri",
             f'"{self.connection_config["connection_string"]}"',
-            '--forceTableScan',
-            '--gzip',
-            '-c',
+            "--forceTableScan",
+            "--gzip",
+            "-c",
             collection_name,
-            '-o',
+            "-o",
             export_dir,
         ]
 
         return_code = subprocess.call(cmd)
 
-        LOGGER.debug('Export command return code %s', return_code)
+        LOGGER.debug("Export command return code %s", return_code)
 
         if return_code != 0:
-            raise ExportError(f'Export failed with code {return_code}')
+            raise ExportError(f"Export failed with code {return_code}")
 
         # mongodump creates two files "{collection_name}.metadata.json.gz" & "{collection_name}.bson.gz"
         # we are only interested in the latter so we delete the former.
         os.remove(
             os.path.join(
                 export_dir,
-                self.connection_config['database'],
-                f'{collection_name}.metadata.json.gz',
+                self.connection_config["database"],
+                f"{collection_name}.metadata.json.gz",
             )
         )
-        return os.path.join(
-            export_dir, self.connection_config['database'], f'{collection_name}.bson.gz'
-        )
+        return os.path.join(export_dir, self.connection_config["database"], f"{collection_name}.bson.gz")

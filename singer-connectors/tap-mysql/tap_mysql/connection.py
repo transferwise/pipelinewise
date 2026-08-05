@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# pylint: disable=missing-docstring,arguments-differ,missing-function-docstring
+
 
 import backoff
 import pymysql
@@ -8,23 +8,22 @@ import singer
 
 from pymysql.constants import CLIENT
 
-LOGGER = singer.get_logger('tap_mysql')
+LOGGER = singer.get_logger("tap_mysql")
 
 CONNECT_TIMEOUT_SECONDS = 30
 
-MARIADB_ENGINE = 'mariadb'
-MYSQL_ENGINE = 'mysql'
+MARIADB_ENGINE = "mariadb"
+MYSQL_ENGINE = "mysql"
 
-DEFAULT_SESSION_SQLS = ['SET @@session.time_zone="+0:00"',
-                        'SET @@session.wait_timeout=28800',
-                        'SET @@session.net_read_timeout=3600',
-                        'SET @@session.innodb_lock_wait_timeout=3600']
+DEFAULT_SESSION_SQLS = [
+    'SET @@session.time_zone="+0:00"',
+    "SET @@session.wait_timeout=28800",
+    "SET @@session.net_read_timeout=3600",
+    "SET @@session.innodb_lock_wait_timeout=3600",
+]
 
 
-@backoff.on_exception(backoff.expo,
-                      (pymysql.err.OperationalError),
-                      max_tries=5,
-                      factor=2)
+@backoff.on_exception(backoff.expo, (pymysql.err.OperationalError), max_tries=5, factor=2)
 def connect_with_backoff(connection):
     connection.connect()
     run_session_sqls(connection)
@@ -41,10 +40,10 @@ def run_session_sqls(connection):
             try:
                 run_sql(connection, sql)
             except pymysql.err.InternalError as exc:
-                warnings.append(f'Could not set session variable `{sql}`: {exc}')
+                warnings.append(f"Could not set session variable `{sql}`: {exc}")
 
     if warnings:
-        LOGGER.warning('Encountered non-fatal errors when configuring session that could impact performance:')
+        LOGGER.warning("Encountered non-fatal errors when configuring session that could impact performance:")
     for warning in warnings:
         LOGGER.warning(warning)
 
@@ -108,13 +107,13 @@ class MySQLConnection(pymysql.connections.Connection):
             # names were > 99 chars long in some cases. Since the box is ephemeral,
             # we don't need to worry about cleaning them up.
             with open("ca.pem", "wb") as ca_file:
-                ca_file.write(config["ssl_ca"].encode('utf-8'))
+                ca_file.write(config["ssl_ca"].encode("utf-8"))
 
             with open("cert.pem", "wb") as cert_file:
-                cert_file.write(config["ssl_cert"].encode('utf-8'))
+                cert_file.write(config["ssl_cert"].encode("utf-8"))
 
             with open("key.pem", "wb") as key_file:
-                key_file.write(config["ssl_key"].encode('utf-8'))
+                key_file.write(config["ssl_key"].encode("utf-8"))
 
             ctx = ssl.create_default_context(cafile="./ca.pem")
             ctx.load_cert_chain(certfile="./cert.pem", keyfile="./key.pem")
@@ -130,8 +129,6 @@ class MySQLConnection(pymysql.connections.Connection):
                 ctx.verify_mode = ssl.CERT_REQUIRED  # Or ssl.CERT_NONE if preferred
                 server_hostname = None
 
-
-
             ssl_arg = ctx
 
             args["server_hostname"] = server_hostname
@@ -139,7 +136,7 @@ class MySQLConnection(pymysql.connections.Connection):
         super().__init__(defer_connect=True, ssl=ssl_arg, **args)
 
         # Attempt SSL
-        if config.get("ssl") == 'true' and not use_self_signed_ssl:
+        if config.get("ssl") == "true" and not use_self_signed_ssl:
             LOGGER.info("Attempting SSL connection")
             ctx = ssl.create_default_context()
             ctx.check_hostname = False
@@ -159,8 +156,8 @@ class MySQLConnection(pymysql.connections.Connection):
 
 def make_connection_wrapper(config):
     class ConnectionWrapper(MySQLConnection):
-        def __init__(self, *args, **kwargs):  # pylint: disable=unused-argument
-            config["cursorclass"] = kwargs.get('cursorclass')
+        def __init__(self, *args, **kwargs):
+            config["cursorclass"] = kwargs.get("cursorclass")
             super().__init__(config)
 
             connect_with_backoff(self)

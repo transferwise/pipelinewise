@@ -60,9 +60,7 @@ def parse_duration(value: str, *, allow_zero: bool = False) -> int:
     while offset < len(value):
         match = _DURATION_PART.match(value, offset)
         if not match:
-            raise DataDiffConfigError(
-                f"Invalid duration '{value}'. Supported units are s, min, h, d and w"
-            )
+            raise DataDiffConfigError(f"Invalid duration '{value}'. Supported units are s, min, h, d and w")
         count, unit = match.groups()
         if unit in used_units:
             raise DataDiffConfigError(f"Duration unit '{unit}' is specified more than once in '{value}'")
@@ -97,9 +95,7 @@ def _validate_frequency(frequency: str, full_check_name: str) -> str:
 
 def _parse_window_end(raw: dict, window_start_seconds: int, full_check_name: str) -> int:
     """Parse window_end and validate it is closer to fire time than window_start."""
-    window_end_seconds = parse_duration(
-        raw.get("window_end", "0s").lstrip("-"), allow_zero=True
-    )
+    window_end_seconds = parse_duration(raw.get("window_end", "0s").lstrip("-"), allow_zero=True)
     if window_end_seconds >= window_start_seconds:
         raise DataDiffConfigError(
             f"window_end must be closer to fire time than window_start "
@@ -127,7 +123,6 @@ def _target_table_name(
 
 
 @dataclass(frozen=True)
-# pylint: disable=too-many-instance-attributes
 class CheckDefinition:
     """A normalized, credential-free version of one table check."""
 
@@ -175,8 +170,7 @@ class CheckDefinition:
         return hashlib.sha256(payload).hexdigest()
 
 
-# pylint: disable=too-many-locals,too-many-branches
-def extract_check_definitions(
+def extract_check_definitions(  # noqa: PLR0912
     global_config: dict,
     targets: dict,
     selected_taps: Optional[Iterable[str]] = None,
@@ -203,10 +197,7 @@ def extract_check_definitions(
                     if table_config is None:
                         continue
                     raw = {**tap.get("data_diff_defaults", {}), **table_config}
-                    missing_timing = [
-                        field for field in ("frequency", "window_start")
-                        if not raw.get(field)
-                    ]
+                    missing_timing = [field for field in ("frequency", "window_start") if not raw.get(field)]
                     if missing_timing:
                         raise DataDiffConfigError(
                             "Data-diff timing must be defined on the table or inherited "
@@ -236,13 +227,10 @@ def extract_check_definitions(
                             f"{source_schema}.{table['table_name']}"
                         )
                     transformed_columns = {
-                        transformation["column"]
-                        for transformation in table.get("transformations", [])
+                        transformation["column"] for transformation in table.get("transformations", [])
                     }
                     incomparable = sorted(
-                        {key_column, timestamp_column, *compare_columns}.intersection(
-                            transformed_columns
-                        )
+                        {key_column, timestamp_column, *compare_columns}.intersection(transformed_columns)
                     )
                     if incomparable:
                         raise DataDiffConfigError(
@@ -250,9 +238,7 @@ def extract_check_definitions(
                             f"{table['table_name']}: {', '.join(incomparable)}"
                         )
 
-                    full_check_name = "/".join(
-                        (target_id, tap_id, source_schema, table["table_name"])
-                    )
+                    full_check_name = "/".join((target_id, tap_id, source_schema, table["table_name"]))
                     frequency = _validate_frequency(raw["frequency"], full_check_name)
                     window_start_seconds = parse_duration(raw["window_start"].lstrip("-"))
                     definitions.append(
@@ -266,34 +252,21 @@ def extract_check_definitions(
                             target_database=target["db_conn"]["dbname"],
                             source_schema=source_schema,
                             source_table=table["table_name"],
-                            target_schema=_target_identifier(
-                                target_schema, target_type
-                            ),
-                            target_table=_target_table_name(
-                                source_schema, table["table_name"], target_type
-                            ),
+                            target_schema=_target_identifier(target_schema, target_type),
+                            target_table=_target_table_name(source_schema, table["table_name"], target_type),
                             source_key_column=key_column,
-                            target_key_column=_target_identifier(
-                                key_column, target_type
-                            ),
+                            target_key_column=_target_identifier(key_column, target_type),
                             source_timestamp_column=timestamp_column,
-                            target_timestamp_column=_target_identifier(
-                                timestamp_column, target_type
-                            ),
+                            target_timestamp_column=_target_identifier(timestamp_column, target_type),
                             source_compare_columns=compare_columns,
                             target_compare_columns=tuple(
-                                _target_identifier(column, target_type)
-                                for column in compare_columns
+                                _target_identifier(column, target_type) for column in compare_columns
                             ),
                             checks=checks,
                             frequency=frequency,
                             window_start_seconds=window_start_seconds,
-                            window_end_seconds=_parse_window_end(
-                                raw, window_start_seconds, full_check_name
-                            ),
-                            statement_timeout_seconds=parse_duration(
-                                raw.get("statement_timeout", "5min")
-                            ),
+                            window_end_seconds=_parse_window_end(raw, window_start_seconds, full_check_name),
+                            statement_timeout_seconds=parse_duration(raw.get("statement_timeout", "5min")),
                         )
                     )
 
@@ -301,8 +274,7 @@ def extract_check_definitions(
         # Data-diff is opt-in through backend_db. Without it there is nowhere to
         # persist definitions, so drop them rather than blocking replication.
         LOGGER.warning(
-            "Ignoring %s data_diff definition(s): config.yml does not define"
-            " backend_db. Replication is unaffected.",
+            "Ignoring %s data_diff definition(s): config.yml does not define backend_db. Replication is unaffected.",
             len(definitions),
         )
         return []

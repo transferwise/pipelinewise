@@ -12,7 +12,6 @@ from pipelinewise.cli.alert_handlers.victorops_alert_handler import (
 )
 
 
-# pylint: disable=too-few-public-methods
 class TestAlertSender:
     """
     Unit tests for PipelineWise CLI alert sender classes
@@ -24,180 +23,147 @@ class TestAlertSender:
         with pytest.raises(errors.InvalidAlertHandlerException):
             AlertSender(123)
         with pytest.raises(errors.InvalidAlertHandlerException):
-            AlertSender('123')
+            AlertSender("123")
         with pytest.raises(errors.InvalidAlertHandlerException):
             AlertSender([1, 2, 3])
 
         # Should get the correct alert handler tuple from a list of alert handlers
         alert_sender = AlertSender(
             {
-                'handler1': {'unknown-prop1': 'alert-handler-property1'},
-                'handler2': {'unknown-prop2': 'alert-handler-property2'},
+                "handler1": {"unknown-prop1": "alert-handler-property1"},
+                "handler2": {"unknown-prop2": "alert-handler-property2"},
             }
         )
-        # pylint: disable=protected-access
-        assert alert_sender._AlertSender__get_alert_handler('handler1') == AlertHandler(
-            type='handler1', config={'unknown-prop1': 'alert-handler-property1'}
+        assert alert_sender._AlertSender__get_alert_handler("handler1") == AlertHandler(
+            type="handler1", config={"unknown-prop1": "alert-handler-property1"}
         )
 
         # Should raise an exception when trying to get a not configured alert handler
         with pytest.raises(errors.NotConfiguredAlertHandlerException):
             alert_sender = AlertSender(
                 {
-                    'handler1': {'unknown-prop1': 'alert-handler-property1'},
-                    'handler2': {'unknown-prop2': 'alert-handler-property2'},
+                    "handler1": {"unknown-prop1": "alert-handler-property1"},
+                    "handler2": {"unknown-prop2": "alert-handler-property2"},
                 }
             )
-            # pylint: disable=protected-access
-            alert_sender._AlertSender__get_alert_handler('handler3')
+            alert_sender._AlertSender__get_alert_handler("handler3")
 
         # send_to_handler: Should raise an exception if alert handler not configured
         with pytest.raises(errors.NotConfiguredAlertHandlerException):
             alert_sender = AlertSender(
                 {
-                    'handler1': {'unknown-prop1': 'alert-handler-property1'},
-                    'handler2': {'unknown-prop2': 'alert-handler-property2'},
+                    "handler1": {"unknown-prop1": "alert-handler-property1"},
+                    "handler2": {"unknown-prop2": "alert-handler-property2"},
                 }
             )
-            alert_sender.send_to_handler('handler3', 'test message to an alert handler')
+            alert_sender.send_to_handler("handler3", "test message to an alert handler")
 
         # send_to_handler: Should raise an exception if alert handler not implemented
         with pytest.raises(errors.NotImplementedAlertHandlerException):
             alert_sender = AlertSender(
                 {
-                    'handler1': {'unknown-prop1': 'alert-handler-property1'},
-                    'handler2': {'unknown-prop2': 'alert-handler-property2'},
+                    "handler1": {"unknown-prop1": "alert-handler-property1"},
+                    "handler2": {"unknown-prop2": "alert-handler-property2"},
                 }
             )
-            alert_sender.send_to_handler('handler1', 'test message to an alert handler')
+            alert_sender.send_to_handler("handler1", "test message to an alert handler")
 
         # send_to_all_handlers: Should send an alert if the alert handler configured correctly
-        with patch('slack.WebClient.chat_postMessage') as slack_post_message_mock:
+        with patch("slack.WebClient.chat_postMessage") as slack_post_message_mock:
             slack_post_message_mock.return_value = []
             alert_sender = AlertSender(
                 {
-                    'slack': {'token': 'test-slack-token', 'channel': '#test-channel'},
-                    'handler2': {'unknown-prop2': 'alert-handler-property2'},
+                    "slack": {"token": "test-slack-token", "channel": "#test-channel"},
+                    "handler2": {"unknown-prop2": "alert-handler-property2"},
                 }
             )
-            assert (
-                alert_sender.send_to_handler(
-                    'slack', 'test message to all alert handlers'
-                )
-                is True
-            )
+            assert alert_sender.send_to_handler("slack", "test message to all alert handlers") is True
 
         # send_to_all_handlers: Should raise an exception if alert handler not configured
         with pytest.raises(errors.NotImplementedAlertHandlerException):
             alert_sender = AlertSender(
                 {
-                    'handler1': {'unknown-prop1': 'alert-handler-property1'},
-                    'handler2': {'unknown-prop2': 'alert-handler-property2'},
+                    "handler1": {"unknown-prop1": "alert-handler-property1"},
+                    "handler2": {"unknown-prop2": "alert-handler-property2"},
                 }
             )
-            alert_sender.send_to_all_handlers('test message to all alert handlers')
+            alert_sender.send_to_all_handlers("test message to all alert handlers")
 
         # send_to_all_handlers: Should raise an exception if alert handler not implemented
         with pytest.raises(errors.NotImplementedAlertHandlerException):
             alert_sender = AlertSender(
                 {
-                    'handler1': {'unknown-prop1': 'alert-handler-property1'},
-                    'handler2': {'unknown-prop2': 'alert-handler-property2'},
+                    "handler1": {"unknown-prop1": "alert-handler-property1"},
+                    "handler2": {"unknown-prop2": "alert-handler-property2"},
                 }
             )
-            alert_sender.send_to_all_handlers('test message to all alert handlers')
+            alert_sender.send_to_all_handlers("test message to all alert handlers")
 
         # send_to_all_handlers: Should send an alert if the alert handler configured correctly
-        with patch('slack.WebClient.chat_postMessage') as slack_post_message_mock:
+        with patch("slack.WebClient.chat_postMessage") as slack_post_message_mock:
             slack_post_message_mock.return_value = []
-            alert_sender = AlertSender(
-                {'slack': {'token': 'test-slack-token', 'channel': '#test-channel'}}
-            )
-            assert alert_sender.send_to_all_handlers(
-                'test message to all alert handlers'
-            ) == {'sent': 1}
+            alert_sender = AlertSender({"slack": {"token": "test-slack-token", "channel": "#test-channel"}})
+            assert alert_sender.send_to_all_handlers("test message to all alert handlers") == {"sent": 1}
 
     def test_slack_handler(self):
         """Functions to test slack alert handler"""
         # Should raise an exception if no token provided
         with pytest.raises(errors.InvalidAlertHandlerException):
-            SlackAlertHandler({'no-slack-token': 'no-token'})
+            SlackAlertHandler({"no-slack-token": "no-token"})
 
         # Should raise an exception if no channel provided
         with pytest.raises(errors.InvalidAlertHandlerException):
-            SlackAlertHandler({'no-slack-channel': '#no-channel'})
+            SlackAlertHandler({"no-slack-channel": "#no-channel"})
 
         # Should raise an exception if no valid token provided
         with pytest.raises(SlackApiError):
-            slack = SlackAlertHandler(
-                {'token': 'invalid-token', 'channel': '#my-channel'}
-            )
-            slack.send('test message')
+            slack = SlackAlertHandler({"token": "invalid-token", "channel": "#my-channel"})
+            slack.send("test message")
 
         # Should send message if valid token and channel provided
-        with patch('slack.WebClient.chat_postMessage') as slack_post_message_mock:
+        with patch("slack.WebClient.chat_postMessage") as slack_post_message_mock:
             slack_post_message_mock.return_value = []
-            slack = SlackAlertHandler(
-                {'token': 'valid-token', 'channel': '#my-channel'}
-            )
-            slack.send('test message')
+            slack = SlackAlertHandler({"token": "valid-token", "channel": "#my-channel"})
+            slack.send("test message")
 
     def test_victorops_handler(self):
         """Functions to test victorops alert handler"""
         # Should raise an exception if no base url and routing_key provided
         with pytest.raises(errors.InvalidAlertHandlerException):
-            VictoropsAlertHandler({'no-victorops-url': 'no-url'})
+            VictoropsAlertHandler({"no-victorops-url": "no-url"})
 
         # Should raise an exception if no base_url provided
         with pytest.raises(errors.InvalidAlertHandlerException):
-            VictoropsAlertHandler({'routing_key': 'some-routing-key'})
+            VictoropsAlertHandler({"routing_key": "some-routing-key"})
 
         # Should raise an exception if no routing_key provided
         with pytest.raises(errors.InvalidAlertHandlerException):
-            VictoropsAlertHandler({'base_url': 'some-url'})
+            VictoropsAlertHandler({"base_url": "some-url"})
 
         # Should send alert if valid victorops REST endpoint URL provided
-        with patch('requests.post') as victorops_post_message_mock:
-            VictorOpsResponseMock = collections.namedtuple(
-                'VictorOpsResponseMock', 'status_code'
-            )
-            victorops_post_message_mock.return_value = VictorOpsResponseMock(
-                status_code=200
-            )
-            victorops = VictoropsAlertHandler(
-                {'base_url': 'some-url', 'routing_key': 'some-routing-key'}
-            )
-            victorops.send('test message')
+        with patch("requests.post") as victorops_post_message_mock:
+            VictorOpsResponseMock = collections.namedtuple("VictorOpsResponseMock", "status_code")
+            victorops_post_message_mock.return_value = VictorOpsResponseMock(status_code=200)
+            victorops = VictoropsAlertHandler({"base_url": "some-url", "routing_key": "some-routing-key"})
+            victorops.send("test message")
 
     def test_victorops_handler_sends_alerts_that_carry_an_exception(self):
         """An exception must be stringified: the object is not JSON serializable"""
-        with patch('requests.post') as victorops_post_message_mock:
-            VictorOpsResponseMock = collections.namedtuple(
-                'VictorOpsResponseMock', 'status_code'
-            )
-            victorops_post_message_mock.return_value = VictorOpsResponseMock(
-                status_code=200
-            )
-            victorops = VictoropsAlertHandler(
-                {'base_url': 'some-url', 'routing_key': 'some-routing-key'}
-            )
-            victorops.send('test message', exc=ValueError('some failure'))
+        with patch("requests.post") as victorops_post_message_mock:
+            VictorOpsResponseMock = collections.namedtuple("VictorOpsResponseMock", "status_code")
+            victorops_post_message_mock.return_value = VictorOpsResponseMock(status_code=200)
+            victorops = VictoropsAlertHandler({"base_url": "some-url", "routing_key": "some-routing-key"})
+            victorops.send("test message", exc=ValueError("some failure"))
 
-            sent = json.loads(victorops_post_message_mock.call_args.kwargs['data'])
-            assert sent['state_message'] == 'some failure'
+            sent = json.loads(victorops_post_message_mock.call_args.kwargs["data"])
+            assert sent["state_message"] == "some failure"
 
     def test_victorops_handler_bounds_the_request(self):
         """An unresponsive endpoint must not stall the run reporting the failure."""
-        with patch('requests.post') as victorops_post_message_mock:
-            VictorOpsResponseMock = collections.namedtuple(
-                'VictorOpsResponseMock', 'status_code'
-            )
-            victorops_post_message_mock.return_value = VictorOpsResponseMock(
-                status_code=200
-            )
-            victorops = VictoropsAlertHandler(
-                {'base_url': 'some-url', 'routing_key': 'some-routing-key'}
-            )
-            victorops.send('test message')
+        with patch("requests.post") as victorops_post_message_mock:
+            VictorOpsResponseMock = collections.namedtuple("VictorOpsResponseMock", "status_code")
+            victorops_post_message_mock.return_value = VictorOpsResponseMock(status_code=200)
+            victorops = VictoropsAlertHandler({"base_url": "some-url", "routing_key": "some-routing-key"})
+            victorops.send("test message")
 
-            assert victorops_post_message_mock.call_args.kwargs['timeout'] > 0
+            assert victorops_post_message_mock.call_args.kwargs["timeout"] > 0

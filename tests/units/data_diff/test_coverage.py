@@ -8,8 +8,6 @@ from pipelinewise.data_diff.coverage import (
     coverage_event_type,
 )
 
-# pylint: disable=missing-function-docstring,invalid-name
-
 
 def _instant(hour):
     return datetime(2026, 7, 22, hour, tzinfo=timezone.utc)
@@ -28,11 +26,13 @@ def _run(start, end, status, *, slot=None, attempt=1, run_id=None):
 
 def test_failed_interval_blocks_later_successful_coverage():
     failed = _run(11, 12, "FAIL")
-    coverage = calculate_coverage([
-        _run(10, 11, "PASS"),
-        failed,
-        _run(12, 13, "PASS"),
-    ])
+    coverage = calculate_coverage(
+        [
+            _run(10, 11, "PASS"),
+            failed,
+            _run(12, 13, "PASS"),
+        ]
+    )
 
     assert coverage["coverage_start"] == _instant(10)
     assert coverage["verified_through"] == _instant(11)
@@ -42,12 +42,14 @@ def test_failed_interval_blocks_later_successful_coverage():
 
 def test_successful_remediation_fills_gap_and_advances_over_later_passes():
     original_id = uuid4()
-    coverage = calculate_coverage([
-        _run(10, 11, "PASS"),
-        _run(11, 12, "FAIL", run_id=original_id),
-        _run(11, 12, "PASS", attempt=2),
-        _run(12, 13, "PASS"),
-    ])
+    coverage = calculate_coverage(
+        [
+            _run(10, 11, "PASS"),
+            _run(11, 12, "FAIL", run_id=original_id),
+            _run(11, 12, "PASS", attempt=2),
+            _run(12, 13, "PASS"),
+        ]
+    )
 
     assert coverage["verified_through"] == _instant(13)
     assert coverage["coverage_status"] == "CONTIGUOUS"
@@ -59,20 +61,20 @@ def test_later_failed_revalidation_invalidates_previous_coverage():
         "verified_through": _instant(12),
         "coverage_status": "CONTIGUOUS",
     }
-    current = calculate_coverage([
-        _run(10, 11, "PASS"),
-        _run(11, 12, "PASS", attempt=1),
-        _run(11, 12, "FAIL", attempt=2),
-    ])
+    current = calculate_coverage(
+        [
+            _run(10, 11, "PASS"),
+            _run(11, 12, "PASS", attempt=1),
+            _run(11, 12, "FAIL", attempt=2),
+        ]
+    )
 
     assert current["verified_through"] == _instant(11)
     assert coverage_event_type(previous, current) == "INVALIDATE"
 
 
 def test_metadata_only_definition_never_advances_coverage():
-    coverage = calculate_coverage(
-        [_run(10, 11, "PASS")], data_checks_enabled=False
-    )
+    coverage = calculate_coverage([_run(10, 11, "PASS")], data_checks_enabled=False)
 
     assert coverage["verified_through"] == _instant(10)
     assert coverage["coverage_status"] == "BLOCKED"
@@ -80,10 +82,12 @@ def test_metadata_only_definition_never_advances_coverage():
 
 
 def test_missing_interval_is_reported_as_blocked_without_failure_run():
-    coverage = calculate_coverage([
-        _run(10, 11, "PASS"),
-        _run(12, 13, "PASS"),
-    ])
+    coverage = calculate_coverage(
+        [
+            _run(10, 11, "PASS"),
+            _run(12, 13, "PASS"),
+        ]
+    )
 
     assert coverage["verified_through"] == _instant(11)
     assert coverage["blocking_run_id"] is None
@@ -99,14 +103,16 @@ def _schedule(cadence_hours, start_offset, end_offset, slots=4):
     runs = []
     for index in range(slots):
         fire = base + timedelta(hours=cadence_hours * index)
-        runs.append({
-            "run_id": uuid4(),
-            "scheduled_for": fire,
-            "window_start": fire - timedelta(hours=start_offset),
-            "window_end": fire - timedelta(hours=end_offset),
-            "attempt": 1,
-            "status": "PASS",
-        })
+        runs.append(
+            {
+                "run_id": uuid4(),
+                "scheduled_for": fire,
+                "window_start": fire - timedelta(hours=start_offset),
+                "window_end": fire - timedelta(hours=end_offset),
+                "attempt": 1,
+                "status": "PASS",
+            }
+        )
     return runs
 
 

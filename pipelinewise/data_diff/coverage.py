@@ -1,6 +1,5 @@
 """Derive contiguous timestamp coverage from immutable check attempts."""
 
-
 TERMINAL_STATUSES = {"PASS", "FAIL", "ERROR"}
 
 
@@ -56,10 +55,7 @@ def calculate_coverage(runs: list, *, data_checks_enabled: bool = True) -> dict:
     if not data_checks_enabled:
         reason = "Metadata-only checks cannot advance table coverage"
     elif blocking_run:
-        reason = (
-            f"Run {blocking_run['run_id']} has status {blocking_run['status']} at the "
-            "coverage boundary"
-        )
+        reason = f"Run {blocking_run['run_id']} has status {blocking_run['status']} at the coverage boundary"
     elif status == "BLOCKED":
         reason = "No successful run covers the next timestamp interval"
     else:
@@ -116,13 +112,9 @@ def advance_coverage(previous: dict, run: dict, *, data_checks_enabled: bool = T
         verified_through = run["window_start"]
         blocking_run_id = run["run_id"]
 
-    coverage_status = (
-        "CONTIGUOUS" if verified_through >= max_observed_end else "BLOCKED"
-    )
+    coverage_status = "CONTIGUOUS" if verified_through >= max_observed_end else "BLOCKED"
     if blocking_run_id:
-        reason = (
-            f"Run {blocking_run_id} has status {run['status']} at the coverage boundary"
-        )
+        reason = f"Run {blocking_run_id} has status {run['status']} at the coverage boundary"
     elif coverage_status == "BLOCKED":
         reason = "No successful run covers the next timestamp interval"
     else:

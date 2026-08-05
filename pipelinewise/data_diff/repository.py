@@ -43,7 +43,6 @@ class DataDiffRepository:
         """Run Alembic migrations via the shared backend database."""
         self.database.migrate()
 
-    # pylint: disable=too-many-locals
     def sync_definitions(
         self,
         definitions: Iterable[CheckDefinition],
@@ -139,19 +138,28 @@ class DataDiffRepository:
             )
             """,
             (
-                uuid.uuid4(), definition.full_check_name, revision,
+                uuid.uuid4(),
+                definition.full_check_name,
+                revision,
                 definition.config_hash,
                 psycopg2.extras.Json(definition.canonical_config),
                 definition.target_id,
-                definition.tap_id, definition.source_type, definition.target_type,
-                definition.source_database, definition.target_database,
-                definition.source_schema, definition.source_table,
-                definition.target_schema, definition.target_table,
-                definition.source_key_column, definition.target_key_column,
+                definition.tap_id,
+                definition.source_type,
+                definition.target_type,
+                definition.source_database,
+                definition.target_database,
+                definition.source_schema,
+                definition.source_table,
+                definition.target_schema,
+                definition.target_table,
+                definition.source_key_column,
+                definition.target_key_column,
                 definition.source_timestamp_column,
                 definition.target_timestamp_column,
                 psycopg2.extras.Json(list(definition.checks)),
-                definition.frequency, definition.window_start_seconds,
+                definition.frequency,
+                definition.window_start_seconds,
                 definition.window_end_seconds,
                 definition.statement_timeout_seconds,
                 now,
@@ -252,12 +260,8 @@ class DataDiffRepository:
             for raw_row in cursor.fetchall():
                 row = dict(raw_row)
                 canonical_config = row.get("canonical_config") or {}
-                row["source_compare_columns"] = canonical_config.get(
-                    "source_compare_columns", []
-                )
-                row["target_compare_columns"] = canonical_config.get(
-                    "target_compare_columns", []
-                )
+                row["source_compare_columns"] = canonical_config.get("source_compare_columns", [])
+                row["target_compare_columns"] = canonical_config.get("target_compare_columns", [])
                 checks.append(row)
             return checks
 
@@ -281,17 +285,11 @@ class DataDiffRepository:
             )
             raw_row = cursor.fetchone()
             if raw_row is None:
-                raise ValueError(
-                    f"Data-diff check '{check_id}' does not exist"
-                )
+                raise ValueError(f"Data-diff check '{check_id}' does not exist")
             row = dict(raw_row)
             canonical_config = row.get("canonical_config") or {}
-            row["source_compare_columns"] = canonical_config.get(
-                "source_compare_columns", []
-            )
-            row["target_compare_columns"] = canonical_config.get(
-                "target_compare_columns", []
-            )
+            row["source_compare_columns"] = canonical_config.get("source_compare_columns", [])
+            row["target_compare_columns"] = canonical_config.get("target_compare_columns", [])
             return row
 
     def latest_scheduled_for(self, check_id):
@@ -332,10 +330,7 @@ class DataDiffRepository:
             raise ValueError("A remediation reference is required")
 
         with self.cursor() as cursor:
-            lock_key = (
-                f"{original_run['dd_check_id']}:"
-                f"{original_run['scheduled_for'].isoformat()}"
-            )
+            lock_key = f"{original_run['dd_check_id']}:{original_run['scheduled_for'].isoformat()}"
             cursor.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", (lock_key,))
             cursor.execute(
                 f"""
@@ -345,7 +340,7 @@ class DataDiffRepository:
                  GROUP BY status
                 """,
                 (
-                    original_run['dd_check_id'],
+                    original_run["dd_check_id"],
                     original_run["scheduled_for"],
                 ),
             )
@@ -365,10 +360,15 @@ class DataDiffRepository:
                 ) VALUES (%s, %s, %s, %s, %s, %s, 'REMEDIATION', 'RUNNING', %s, %s, %s)
                 """,
                 (
-                    run_id, original_run['dd_check_id'],
-                    original_run["scheduled_for"], original_run["window_start"],
-                    original_run["window_end"], attempt, root_run_id,
-                    remediation_reference, started_at,
+                    run_id,
+                    original_run["dd_check_id"],
+                    original_run["scheduled_for"],
+                    original_run["window_start"],
+                    original_run["window_end"],
+                    attempt,
+                    root_run_id,
+                    remediation_reference,
+                    started_at,
                 ),
             )
             return {
@@ -418,8 +418,14 @@ class DataDiffRepository:
                 ) VALUES (%s, %s, %s, %s, %s, %s, %s, 'RUNNING', %s)
                 """,
                 (
-                    run_id, check["check_id"], scheduled_for, window_start, window_end,
-                    attempt, trigger, started_at,
+                    run_id,
+                    check["check_id"],
+                    scheduled_for,
+                    window_start,
+                    window_end,
+                    attempt,
+                    trigger,
+                    started_at,
                 ),
             )
             return {"run_id": run_id, "attempt": attempt, "trigger": trigger}
@@ -437,8 +443,11 @@ class DataDiffRepository:
                 ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 (
-                    preflight_id, check_id, preflight["status"],
-                    datetime.now(timezone.utc), preflight["query_fingerprint"],
+                    preflight_id,
+                    check_id,
+                    preflight["status"],
+                    datetime.now(timezone.utc),
+                    preflight["query_fingerprint"],
                     psycopg2.extras.Json(preflight.get("index_metadata", [])),
                     psycopg2.extras.Json(preflight.get("findings", [])),
                     preflight.get("error"),
@@ -469,11 +478,14 @@ class DataDiffRepository:
                     ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                     """,
                     (
-                        run_id, result["check_type"], result["status"],
+                        run_id,
+                        result["check_type"],
+                        result["status"],
                         psycopg2.extras.Json(result.get("source_value")),
                         psycopg2.extras.Json(result.get("target_value")),
                         result.get("source_query_seconds"),
-                        result.get("target_query_seconds"), result.get("error"),
+                        result.get("target_query_seconds"),
+                        result.get("error"),
                     ),
                 )
             finished_at = datetime.now(timezone.utc)
@@ -507,18 +519,14 @@ class DataDiffRepository:
             (f"pipelinewise.data_diff.coverage:{definition['check_id']}",),
         )
 
-        previous = DataDiffRepository._coverage_state_for_update(
-            cursor, definition["check_id"]
-        )
+        previous = DataDiffRepository._coverage_state_for_update(cursor, definition["check_id"])
         existing = DataDiffRepository._effective_attempt_for_update(
             cursor, definition["check_id"], definition["scheduled_for"]
         )
         has_later_attempt = DataDiffRepository._has_later_effective_attempt(
             cursor, definition["check_id"], definition["scheduled_for"]
         )
-        effective_changed = DataDiffRepository._upsert_effective_attempt(
-            cursor, definition
-        )
+        effective_changed = DataDiffRepository._upsert_effective_attempt(cursor, definition)
 
         data_checks_enabled = bool(set(definition["checks"]) - {"schema_compatibility"})
         if effective_changed and previous and existing is None and not has_later_attempt:
@@ -531,8 +539,12 @@ class DataDiffRepository:
             coverage = {
                 key: previous[key]
                 for key in (
-                    "coverage_start", "verified_through", "max_observed_end",
-                    "coverage_status", "blocking_run_id", "reason",
+                    "coverage_start",
+                    "verified_through",
+                    "max_observed_end",
+                    "coverage_status",
+                    "blocking_run_id",
+                    "reason",
                 )
             }
         else:
@@ -619,9 +631,12 @@ class DataDiffRepository:
             RETURNING run_id
             """,
             (
-                definition["check_id"], definition["scheduled_for"],
-                definition["run_id"], definition["attempt"],
-                definition["window_start"], definition["window_end"],
+                definition["check_id"],
+                definition["scheduled_for"],
+                definition["run_id"],
+                definition["attempt"],
+                definition["window_start"],
+                definition["window_end"],
                 definition["status"],
             ),
         )
@@ -672,10 +687,16 @@ class DataDiffRepository:
                    reason = EXCLUDED.reason
             """,
             (
-                definition["check_id"], coverage["coverage_start"],
-                coverage["verified_through"], coverage["max_observed_end"],
-                coverage["coverage_status"], coverage["blocking_run_id"],
-                definition["run_id"], event_type, state_version, recorded_at,
+                definition["check_id"],
+                coverage["coverage_start"],
+                coverage["verified_through"],
+                coverage["max_observed_end"],
+                coverage["coverage_status"],
+                coverage["blocking_run_id"],
+                definition["run_id"],
+                event_type,
+                state_version,
+                recorded_at,
                 coverage["reason"],
             ),
         )
@@ -699,12 +720,18 @@ class DataDiffRepository:
             ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
             (
-                uuid.uuid4(), definition["check_id"], definition["run_id"],
-                event_type, coverage["coverage_start"],
+                uuid.uuid4(),
+                definition["check_id"],
+                definition["run_id"],
+                event_type,
+                coverage["coverage_start"],
                 previous["verified_through"] if previous else None,
-                coverage["verified_through"], coverage["max_observed_end"],
-                coverage["coverage_status"], coverage["blocking_run_id"],
-                recorded_at, coverage["reason"],
+                coverage["verified_through"],
+                coverage["max_observed_end"],
+                coverage["coverage_status"],
+                coverage["blocking_run_id"],
+                recorded_at,
+                coverage["reason"],
             ),
         )
 

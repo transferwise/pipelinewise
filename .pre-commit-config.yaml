@@ -1,13 +1,15 @@
 repos:
--   repo: https://github.com/pre-commit/mirrors-yapf
-    rev: v0.29.0
+  - repo: local
     hooks:
-    - id: yapf
--   repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v2.4.0
-    hooks:
-    - id: double-quote-string-fixer
--   repo: https://github.com/pre-commit/mirrors-pylint
-    rev: v2.4.4
-    hooks:
-    - id: pylint
+      - id: ruff-check
+        name: Ruff lint
+        entry: ruff check --fix
+        language: system
+        types: [python]
+        exclude: ^singer-connectors/(tap-(github|jira|kafka|mixpanel|mongodb|s3-csv|salesforce|slack|snowflake|twilio|zendesk)|target-(postgres|s3-csv)|transform-field)/
+      - id: ruff-format
+        name: Ruff format
+        entry: ruff format
+        language: system
+        types: [python]
+        exclude: ^singer-connectors/(tap-(github|jira|kafka|mixpanel|mongodb|s3-csv|salesforce|slack|snowflake|twilio|zendesk)|target-(postgres|s3-csv)|transform-field)/

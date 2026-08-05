@@ -266,28 +266,27 @@ def _grant_application_privileges():
     these grants a separate application user cannot read its own backend. No-op
     when both roles are the same, or when the application user is unknown.
     """
-    application_user = op.get_context().config.get_main_option(
-        "pipelinewise_application_user"
-    )
+    application_user = op.get_context().config.get_main_option("pipelinewise_application_user")
     if not application_user:
         return
 
     role = _quote_identifier(application_user)
     for table in (
-        "dd_checks", "dd_preflights", "dd_runs", "dd_results",
-        "dd_effective_attempts", "dd_coverage_state", "dd_coverage_events",
+        "dd_checks",
+        "dd_preflights",
+        "dd_runs",
+        "dd_results",
+        "dd_effective_attempts",
+        "dd_coverage_state",
+        "dd_coverage_events",
     ):
-        op.execute(
-            f"GRANT SELECT, INSERT, UPDATE ON {SCHEMA}.{table} TO {role}"
-        )
+        op.execute(f"GRANT SELECT, INSERT, UPDATE ON {SCHEMA}.{table} TO {role}")
     for view in ("dd_current_coverage", "dd_remediation_history"):
         op.execute(f"GRANT SELECT ON {SCHEMA}.{view} TO {role}")
 
     # dd_coverage_events.event_sequence is a BIGSERIAL: inserting needs the
     # sequence, not just the table.
-    op.execute(
-        f"GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA {SCHEMA} TO {role}"
-    )
+    op.execute(f"GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA {SCHEMA} TO {role}")
 
     # alembic_version is read on every connection that checks the schema version.
     op.execute(f"GRANT SELECT ON {SCHEMA}.alembic_version TO {role}")

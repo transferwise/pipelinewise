@@ -188,10 +188,11 @@ Test objects will be created in the `postgres` database.
   make integration_test
 ```
 
-### To run pylint:
+### To run Ruff:
 
-Install python dependencies and run python linter
+Install the test dependencies, then run the format and lint checks:
 ```
   make venv
-  make pylint
+  make lint
+  make format
 ```

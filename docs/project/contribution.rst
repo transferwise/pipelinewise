@@ -8,6 +8,20 @@ PipelineWise is using the `Singer Specification <https://github.com/singer-io/ge
 for moving data from Taps to Targets. Adding new taps and targets that are following the singer specification is relatively
 simple but requires some preparation to make sure the new component is compatible with the PipelineWise framework.
 
+Development checks
+''''''''''''''''''
+
+Ruff formats and lints PipelineWise, ``tap-mysql``, ``tap-postgres``, and ``target-snowflake``. It uses the default
+formatter with a 120-character line length. Run both checks from the repository root before opening a pull request:
+
+.. code-block:: bash
+
+   ruff format --check .
+   ruff check .
+
+Run ``ruff format .`` to apply formatting. Other connectors retain the development tools declared by their local
+Makefiles and package configuration.
+
 To add new item to the supported :ref:`taps` or :ref:`targets` please follow the steps below.
 
 Adding new tap

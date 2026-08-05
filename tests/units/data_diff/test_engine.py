@@ -26,9 +26,6 @@ from pipelinewise.data_diff.engine import (
     run_check,
 )
 
-# pylint: disable=missing-class-docstring,missing-function-docstring,invalid-name
-# pylint: disable=abstract-method,super-init-not-called,arguments-renamed
-
 
 def _usable_index(columns, name="idx", **overrides):
     """Index metadata as a healthy btree index reports it."""
@@ -81,25 +78,26 @@ def test_metric_query_is_half_open_parameterized_and_quotes_identifiers():
     adapter = FakeAdapter(indexes=[])
     sql = build_metric_query(
         adapter,
-        'public',
+        "public",
         'order"items',
-        'select',
-        'updated_at',
+        "select",
+        "updated_at",
         (
-            "row_count", "distinct_key_count", "null_key_count",
-            "duplicate_key_count", "min_key", "max_key",
+            "row_count",
+            "distinct_key_count",
+            "null_key_count",
+            "duplicate_key_count",
+            "min_key",
+            "max_key",
         ),
     )
 
     assert 'FROM "public"."order""items"' in sql
     assert '"updated_at" >= %s' in sql
     assert '"updated_at" < %s' in sql
-    assert "COUNT(DISTINCT \"select\")" in sql
+    assert 'COUNT(DISTINCT "select")' in sql
     assert 'COUNT(*) - COUNT("select") AS "null_key_count"' in sql
-    assert (
-        'COUNT("select") - COUNT(DISTINCT "select") AS "duplicate_key_count"'
-        in sql
-    )
+    assert 'COUNT("select") - COUNT(DISTINCT "select") AS "duplicate_key_count"' in sql
 
 
 def _column(name, data_type, **metadata):
@@ -112,22 +110,26 @@ def _column(name, data_type, **metadata):
 
 
 def test_schema_compatibility_uses_replication_type_families_and_reports_missing():
-    compatible = schema_compatibility_result([
-        ("id", _column("id", "bigint"), _column("ID", "NUMBER")),
-        (
-            "created_at",
-            _column("created_at", "date"),
-            _column("CREATED_AT", "TIMESTAMP_NTZ"),
-        ),
-        ("status", _column("status", "text"), _column("STATUS", "VARCHAR")),
-    ])
-    missing = schema_compatibility_result([
-        (
-            "status",
-            _column("status", "text"),
-            {"name": "STATUS", "data_type": None, "missing": True},
-        )
-    ])
+    compatible = schema_compatibility_result(
+        [
+            ("id", _column("id", "bigint"), _column("ID", "NUMBER")),
+            (
+                "created_at",
+                _column("created_at", "date"),
+                _column("CREATED_AT", "TIMESTAMP_NTZ"),
+            ),
+            ("status", _column("status", "text"), _column("STATUS", "VARCHAR")),
+        ]
+    )
+    missing = schema_compatibility_result(
+        [
+            (
+                "status",
+                _column("status", "text"),
+                {"name": "STATUS", "data_type": None, "missing": True},
+            )
+        ]
+    )
 
     assert compatible["status"] == "PASS"
     assert missing["status"] == "FAIL"
@@ -154,22 +156,38 @@ def test_checksum_uses_common_typed_normalization_for_each_dialect():
 
     postgres_sql = build_metric_query(
         FakeAdapter(indexes=[]),
-        "public", "payments", "id", "updated_at", ("row_checksum",),
+        "public",
+        "payments",
+        "id",
+        "updated_at",
+        ("row_checksum",),
         checksum_columns_for_query=source_columns,
     )
     mysql_sql = build_metric_query(
         MySQLAdapter(None, 30),
-        "public", "payments", "id", "updated_at", ("row_checksum",),
+        "public",
+        "payments",
+        "id",
+        "updated_at",
+        ("row_checksum",),
         checksum_columns_for_query=source_columns,
     )
     snowflake_sql = build_metric_query(
         SnowflakeAdapter(None, 30),
-        "PUBLIC", "PAYMENTS", "ID", "UPDATED_AT", ("row_checksum",),
+        "PUBLIC",
+        "PAYMENTS",
+        "ID",
+        "UPDATED_AT",
+        ("row_checksum",),
         checksum_columns_for_query=target_columns,
     )
     postgres_target_sql = build_metric_query(
         PostgresAdapter(None, 30),
-        "replicated", "payments", "id", "updated_at", ("row_checksum",),
+        "replicated",
+        "payments",
+        "id",
+        "updated_at",
+        ("row_checksum",),
         checksum_columns_for_query=target_columns,
     )
 
@@ -179,7 +197,8 @@ def test_checksum_uses_common_typed_normalization_for_each_dialect():
     # Doubled in the SQL, single once PyMySQL interpolates the bound parameters.
     assert "DATE_FORMAT(`updated_at`, '%%Y-%%m-%%d %%H:%%i:%%s.%%f')" in mysql_sql
     assert "DATE_FORMAT(`updated_at`, '%Y-%m-%d %H:%i:%s.%f')" in mysql_sql % (
-        "2026-07-01", "2026-07-02",
+        "2026-07-01",
+        "2026-07-02",
     )
     assert "MD5_NUMBER_LOWER64" in snowflake_sql
     assert "CONVERT_TIMEZONE('UTC', \"UPDATED_AT\")" in snowflake_sql
@@ -190,22 +209,26 @@ def test_checksum_uses_common_typed_normalization_for_each_dialect():
 
 def test_checksum_rejects_approximate_and_missing_columns():
     with pytest.raises(UnsupportedComparisonError, match="unsupported type family"):
-        checksum_columns([
-            (
-                "amount",
-                _column("amount", "double precision"),
-                _column("AMOUNT", "FLOAT"),
-            )
-        ])
+        checksum_columns(
+            [
+                (
+                    "amount",
+                    _column("amount", "double precision"),
+                    _column("AMOUNT", "FLOAT"),
+                )
+            ]
+        )
 
     with pytest.raises(UnsupportedComparisonError, match="incompatible"):
-        checksum_columns([
-            (
-                "status",
-                _column("status", "text"),
-                {"name": "STATUS", "data_type": None, "missing": True},
-            )
-        ])
+        checksum_columns(
+            [
+                (
+                    "status",
+                    _column("status", "text"),
+                    {"name": "STATUS", "data_type": None, "missing": True},
+                )
+            ]
+        )
 
 
 def test_key_integrity_checks_require_zero_on_both_sides():
@@ -217,16 +240,20 @@ def test_key_integrity_checks_require_zero_on_both_sides():
 
 
 def test_schema_only_run_uses_metadata_without_executing_aggregate_query():
-    source = RunAdapter({
-        "id": _column("id", "bigint", numeric_scale=0),
-        "updated_at": _column("updated_at", "timestamp without time zone"),
-        "status": _column("status", "text"),
-    })
-    target = RunAdapter({
-        "ID": _column("ID", "NUMBER", numeric_scale=0),
-        "UPDATED_AT": _column("UPDATED_AT", "TIMESTAMP_NTZ"),
-        "STATUS": _column("STATUS", "VARCHAR"),
-    })
+    source = RunAdapter(
+        {
+            "id": _column("id", "bigint", numeric_scale=0),
+            "updated_at": _column("updated_at", "timestamp without time zone"),
+            "status": _column("status", "text"),
+        }
+    )
+    target = RunAdapter(
+        {
+            "ID": _column("ID", "NUMBER", numeric_scale=0),
+            "UPDATED_AT": _column("UPDATED_AT", "TIMESTAMP_NTZ"),
+            "STATUS": _column("STATUS", "VARCHAR"),
+        }
+    )
     check = {
         "source_schema": "public",
         "source_table": "payments",
@@ -243,12 +270,15 @@ def test_schema_only_run_uses_metadata_without_executing_aggregate_query():
     start = datetime(2026, 7, 22, 12, tzinfo=timezone.utc)
     end = datetime(2026, 7, 22, 13, tzinfo=timezone.utc)
 
-    with patch(
-        "pipelinewise.data_diff.engine.connect_source",
-        return_value=source,
-    ), patch(
-        "pipelinewise.data_diff.engine.connect_target",
-        return_value=target,
+    with (
+        patch(
+            "pipelinewise.data_diff.engine.connect_source",
+            return_value=source,
+        ),
+        patch(
+            "pipelinewise.data_diff.engine.connect_target",
+            return_value=target,
+        ),
     ):
         preflight, results, status = run_check(check, {}, {}, start, end)
 
@@ -265,12 +295,15 @@ def test_run_check_closes_source_when_target_connect_fails():
     start = datetime(2026, 7, 22, 12, tzinfo=timezone.utc)
     end = datetime(2026, 7, 22, 13, tzinfo=timezone.utc)
 
-    with patch(
-        "pipelinewise.data_diff.engine.connect_source",
-        return_value=source,
-    ), patch(
-        "pipelinewise.data_diff.engine.connect_target",
-        side_effect=DataDiffExecutionError("target unavailable"),
+    with (
+        patch(
+            "pipelinewise.data_diff.engine.connect_source",
+            return_value=source,
+        ),
+        patch(
+            "pipelinewise.data_diff.engine.connect_target",
+            side_effect=DataDiffExecutionError("target unavailable"),
+        ),
     ):
         with pytest.raises(DataDiffExecutionError):
             run_check(check, {}, {}, start, end)
@@ -281,16 +314,28 @@ def test_run_check_closes_source_when_target_connect_fails():
 def test_preflight_blocks_only_large_tables_without_a_timestamp_index():
     blocked = preflight_source(
         FakeAdapter(indexes=[], table_rows=100_001),
-        "public", "payments", "updated_at", "SELECT 1", (),
+        "public",
+        "payments",
+        "updated_at",
+        "SELECT 1",
+        (),
     )
     small = preflight_source(
         FakeAdapter(indexes=[], table_rows=100),
-        "public", "payments", "updated_at", "SELECT 1", (),
+        "public",
+        "payments",
+        "updated_at",
+        "SELECT 1",
+        (),
     )
     # A leading timestamp index makes windowed reads possible at any size.
     indexed = preflight_source(
         FakeAdapter(indexes=[_usable_index(["updated_at", "id"])], table_rows=10_000_000),
-        "public", "payments", "updated_at", "SELECT 1", (),
+        "public",
+        "payments",
+        "updated_at",
+        "SELECT 1",
+        (),
     )
 
     assert blocked["status"] == "BLOCKED"
@@ -302,7 +347,11 @@ def test_preflight_blocks_only_large_tables_without_a_timestamp_index():
 def test_preflight_reports_a_missing_index_without_blocking_a_small_table():
     preflight = preflight_source(
         FakeAdapter(indexes=[_usable_index(["id"])], table_rows=500),
-        "public", "payments", "updated_at", "SELECT 1", (),
+        "public",
+        "payments",
+        "updated_at",
+        "SELECT 1",
+        (),
     )
 
     assert preflight["status"] == "PASS"
@@ -316,7 +365,11 @@ def test_preflight_records_an_error_without_blocking_the_run_silently():
 
     preflight = preflight_source(
         FailingAdapter(indexes=[]),
-        "public", "payments", "updated_at", "SELECT 1", (),
+        "public",
+        "payments",
+        "updated_at",
+        "SELECT 1",
+        (),
     )
 
     assert preflight["status"] == "ERROR"
@@ -487,10 +540,7 @@ def test_postgres_target_is_direct_read_only_utc_and_time_limited():
     assert connect.call_args.kwargs["host"] == "target"
     assert connect.call_args.kwargs["user"] == "target_reader"
     assert connect.call_args.kwargs["sslmode"] == "require"
-    assert (
-        connect.call_args.kwargs["application_name"]
-        == "pipelinewise-data-diff-target"
-    )
+    assert connect.call_args.kwargs["application_name"] == "pipelinewise-data-diff-target"
     connection.set_session.assert_called_once_with(readonly=True, autocommit=False)
     assert cursor.execute.call_args_list == [
         call("SELECT set_config('TimeZone', 'UTC', true)"),
@@ -538,9 +588,7 @@ def test_mysql_checksum_sql_survives_client_side_interpolation():
 def test_mysql_time_checksum_sql_survives_client_side_interpolation():
     adapter = MySQLAdapter(Mock(), statement_timeout_seconds=60)
 
-    normalized = adapter.normalize_checksum_value(
-        {"name": "started_at", "checksum_kind": "time"}
-    )
+    normalized = adapter.normalize_checksum_value({"name": "started_at", "checksum_kind": "time"})
 
     assert normalized % () == "DATE_FORMAT(`started_at`, '%H:%i:%s.%f')"
 
@@ -560,9 +608,7 @@ def test_snowflake_execute_metrics_rejects_missing_row():
     adapter = SnowflakeAdapter(connection, statement_timeout_seconds=60)
 
     with pytest.raises(DataDiffExecutionError, match="Aggregate query returned no row"):
-        adapter.execute_metrics(
-            "SELECT COUNT(*) AS row_count", (), ("row_count",)
-        )
+        adapter.execute_metrics("SELECT COUNT(*) AS row_count", (), ("row_count",))
 
 
 def test_postgres_table_rows_reads_catalog_statistics():
@@ -598,9 +644,7 @@ def test_boolean_null_is_distinguishable_from_false_in_every_dialect():
     # source NULL against a target FALSE would be an invisible mismatch.
     column = {"name": "is_active", "checksum_kind": "boolean"}
 
-    for adapter in (
-        PostgresAdapter(None, 30), MySQLAdapter(None, 30), SnowflakeAdapter(None, 30)
-    ):
+    for adapter in (PostgresAdapter(None, 30), MySQLAdapter(None, 30), SnowflakeAdapter(None, 30)):
         expression = adapter.normalize_checksum_value(column)
         assert "IS NULL" in expression, adapter.__class__.__name__
 
@@ -617,11 +661,13 @@ def test_mysql_checksum_integer_casts_before_subtracting():
 def test_checksum_numeric_scale_keeps_the_wider_precision():
     # Rounding to the target's narrower scale would make a lossy replica hash
     # identically to its source.
-    pairs = [(
-        "amount",
-        _column("amount", "numeric", numeric_scale=4),
-        _column("AMOUNT", "NUMBER", numeric_scale=2),
-    )]
+    pairs = [
+        (
+            "amount",
+            _column("amount", "numeric", numeric_scale=4),
+            _column("AMOUNT", "NUMBER", numeric_scale=2),
+        )
+    ]
 
     source_columns, target_columns = checksum_columns(pairs)
 
@@ -632,12 +678,14 @@ def test_checksum_numeric_scale_keeps_the_wider_precision():
 def test_preflight_ignores_an_unusable_timestamp_index():
     # A partial, invalid, not-ready or non-btree index cannot serve a window scan,
     # so it must not count as proof the table is readable by timestamp.
-    unusable = _usable_index(
-        ["updated_at"], name="partial_idx", is_usable=False, is_partial=True
-    )
+    unusable = _usable_index(["updated_at"], name="partial_idx", is_usable=False, is_partial=True)
     preflight = preflight_source(
         FakeAdapter(indexes=[unusable], table_rows=100_001),
-        "public", "payments", "updated_at", "SELECT 1", (),
+        "public",
+        "payments",
+        "updated_at",
+        "SELECT 1",
+        (),
     )
 
     assert preflight["status"] == "BLOCKED"
@@ -651,7 +699,11 @@ def test_preflight_persists_its_decision_inputs():
     # cannot be re-checked after either changes.
     preflight = preflight_source(
         FakeAdapter(indexes=[_usable_index(["updated_at"])], table_rows=7),
-        "public", "payments", "updated_at", "SELECT 1", (),
+        "public",
+        "payments",
+        "updated_at",
+        "SELECT 1",
+        (),
     )
 
     assert preflight["status"] == "PASS"
@@ -665,11 +717,19 @@ def test_preflight_verdict_does_not_depend_on_the_window():
     # window over a well indexed table is expensive but optimal.
     adapter = FakeAdapter(indexes=[_usable_index(["updated_at"])], table_rows=10_000_000)
     narrow = preflight_source(
-        adapter, "public", "payments", "updated_at", "SELECT 1",
+        adapter,
+        "public",
+        "payments",
+        "updated_at",
+        "SELECT 1",
         ("2026-07-01", "2026-07-01 00:01:00"),
     )
     wide = preflight_source(
-        adapter, "public", "payments", "updated_at", "SELECT 1",
+        adapter,
+        "public",
+        "payments",
+        "updated_at",
+        "SELECT 1",
         ("2020-01-01", "2030-01-01"),
     )
 
@@ -684,18 +744,18 @@ def test_statement_timeout_never_reaches_zero(configured, expected):
     connection, cursor = _connection_with_cursor()
     check = {"source_type": "tap-mysql", "statement_timeout_seconds": configured}
     config = {
-        "host": "source", "port": 3306, "user": "reader",
-        "password": "secret", "dbname": "payments", "engine": "mariadb",
+        "host": "source",
+        "port": 3306,
+        "user": "reader",
+        "password": "secret",
+        "dbname": "payments",
+        "engine": "mariadb",
     }
 
-    with patch(
-        "pipelinewise.data_diff.engine.pymysql.connect", return_value=connection
-    ):
+    with patch("pipelinewise.data_diff.engine.pymysql.connect", return_value=connection):
         connect_source(check, config)
 
-    assert call("SET SESSION max_statement_time = %s", (expected,)) in (
-        cursor.execute.call_args_list
-    )
+    assert call("SET SESSION max_statement_time = %s", (expected,)) in (cursor.execute.call_args_list)
 
 
 def test_every_preflight_branch_is_published_before_execution():
@@ -706,14 +766,18 @@ def test_every_preflight_branch_is_published_before_execution():
     """
     published = []
 
-    source = RunAdapter({
-        "id": _column("id", "bigint", numeric_scale=0),
-        "updated_at": _column("updated_at", "timestamp without time zone"),
-    })
-    target = RunAdapter({
-        "id": _column("id", "bigint", numeric_scale=0),
-        "updated_at": _column("updated_at", "timestamp without time zone"),
-    })
+    source = RunAdapter(
+        {
+            "id": _column("id", "bigint", numeric_scale=0),
+            "updated_at": _column("updated_at", "timestamp without time zone"),
+        }
+    )
+    target = RunAdapter(
+        {
+            "id": _column("id", "bigint", numeric_scale=0),
+            "updated_at": _column("updated_at", "timestamp without time zone"),
+        }
+    )
     check = {
         "checks": ["schema_compatibility"],
         "source_type": "tap-postgres",
@@ -731,13 +795,14 @@ def test_every_preflight_branch_is_published_before_execution():
         "statement_timeout_seconds": 30,
     }
 
-    with patch(
-        "pipelinewise.data_diff.engine.connect_source", return_value=source
-    ), patch(
-        "pipelinewise.data_diff.engine.connect_target", return_value=target
+    with (
+        patch("pipelinewise.data_diff.engine.connect_source", return_value=source),
+        patch("pipelinewise.data_diff.engine.connect_target", return_value=target),
     ):
         preflight, _results, status = run_check(
-            check, {}, {},
+            check,
+            {},
+            {},
             datetime(2026, 7, 31, 11, tzinfo=timezone.utc),
             datetime(2026, 7, 31, 12, tzinfo=timezone.utc),
             on_preflight=published.append,
@@ -771,19 +836,25 @@ def _mysql_index_cursor(visibility_columns, index_rows):
         ("IGNORED", "YES", "NO"),
     ],
 )
-def test_mysql_hidden_index_is_not_usable(
-    visibility_column, hidden_value, visible_value
-):
+def test_mysql_hidden_index_is_not_usable(visibility_column, hidden_value, visible_value):
     """An INVISIBLE/IGNORED index yields no possible keys, so it cannot certify a scan."""
     rows = [
         {
-            "index_name": "ix_hidden", "column_name": "updated_at", "sequence": 1,
-            "non_unique": 1, "index_type": "BTREE", "sub_part": None,
+            "index_name": "ix_hidden",
+            "column_name": "updated_at",
+            "sequence": 1,
+            "non_unique": 1,
+            "index_type": "BTREE",
+            "sub_part": None,
             "visibility": hidden_value,
         },
         {
-            "index_name": "ix_live", "column_name": "created_at", "sequence": 1,
-            "non_unique": 1, "index_type": "BTREE", "sub_part": None,
+            "index_name": "ix_live",
+            "column_name": "created_at",
+            "sequence": 1,
+            "non_unique": 1,
+            "index_type": "BTREE",
+            "sub_part": None,
             "visibility": visible_value,
         },
     ]
@@ -800,11 +871,17 @@ def test_mysql_hidden_index_is_not_usable(
 def test_mysql_without_a_visibility_column_keeps_btree_indexes_usable():
     """MySQL 5.7 has neither column, so the probe must not disqualify every index."""
     # The query selects NULL AS visibility when neither column exists.
-    rows = [{
-        "index_name": "ix_ts", "column_name": "updated_at", "sequence": 1,
-        "non_unique": 1, "index_type": "BTREE", "sub_part": None,
-        "visibility": None,
-    }]
+    rows = [
+        {
+            "index_name": "ix_ts",
+            "column_name": "updated_at",
+            "sequence": 1,
+            "non_unique": 1,
+            "index_type": "BTREE",
+            "sub_part": None,
+            "visibility": None,
+        }
+    ]
     connection, cursor = _mysql_index_cursor([], rows)
     adapter = MySQLAdapter(connection, statement_timeout_seconds=60)
 
@@ -832,15 +909,18 @@ def test_mysql_visibility_column_is_probed_once_per_connection():
 def test_hidden_leading_index_blocks_a_large_source_table():
     """The end-to-end consequence: a hidden index must not certify a full scan."""
     adapter = Mock()
-    adapter.indexes.return_value = [{
-        "index_name": "ix_ts", "columns": ["updated_at"], "is_unique": False,
-        "access_method": "btree", "is_usable": False,
-    }]
+    adapter.indexes.return_value = [
+        {
+            "index_name": "ix_ts",
+            "columns": ["updated_at"],
+            "is_unique": False,
+            "access_method": "btree",
+            "is_usable": False,
+        }
+    ]
     adapter.table_rows.return_value = MAX_SAFE_FULL_SCAN_ROWS + 1
 
-    preflight = preflight_source(
-        adapter, "db", "payments", "updated_at", "SELECT 1", ()
-    )
+    preflight = preflight_source(adapter, "db", "payments", "updated_at", "SELECT 1", ())
 
     assert preflight["status"] == "BLOCKED"
     assert preflight["has_leading_index"] is False

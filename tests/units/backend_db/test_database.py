@@ -10,9 +10,6 @@ from pipelinewise.backend_db import BackendDatabase, BackendDatabaseConfigError
 from pipelinewise.cli import utils
 
 
-# pylint: disable=missing-function-docstring,invalid-name,protected-access
-
-
 def _config():
     return {
         "host": "backend",
@@ -85,9 +82,7 @@ def test_migrate_passes_sslmode_and_the_application_user_to_alembic():
     options = {}
     alembic_config.set_main_option.side_effect = options.__setitem__
 
-    with patch("alembic.config.Config", return_value=alembic_config), patch(
-        "alembic.command.upgrade"
-    ) as upgrade:
+    with patch("alembic.config.Config", return_value=alembic_config), patch("alembic.command.upgrade") as upgrade:
         database.migrate()
 
     upgrade.assert_called_once()
@@ -112,17 +107,13 @@ def test_migrate_preserves_special_url_characters_and_multiple_pg_options():
         }
     )
     database = BackendDatabase.from_config(config, application_name="consumer")
-    database._ddl_config["options"] = (
-        "-c timezone=UTC -c statement_timeout=5000"
-    )
+    database._ddl_config["options"] = "-c timezone=UTC -c statement_timeout=5000"
 
     alembic_config = Mock()
     options = {}
     alembic_config.set_main_option.side_effect = options.__setitem__
 
-    with patch("alembic.config.Config", return_value=alembic_config), patch(
-        "alembic.command.upgrade"
-    ):
+    with patch("alembic.config.Config", return_value=alembic_config), patch("alembic.command.upgrade"):
         database.migrate()
 
     url = _parse_alembic_url(options["sqlalchemy.url"])
@@ -158,9 +149,7 @@ def test_config_schema_accepts_every_key_from_config_is_read():
 
     config.pop("ddl_user")
     with pytest.raises(Exception, match="ddl_user"):
-        utils.validate(
-            instance={"backend_db": config}, schema=utils.load_schema("config")
-        )
+        utils.validate(instance={"backend_db": config}, schema=utils.load_schema("config"))
 
 
 def test_cursor_commits_successful_transactions():
@@ -209,8 +198,7 @@ def test_backend_database_has_no_data_diff_dependency():
             forbidden.extend(
                 imported
                 for imported in imports
-                if imported == "pipelinewise.data_diff"
-                or imported.startswith("pipelinewise.data_diff.")
+                if imported == "pipelinewise.data_diff" or imported.startswith("pipelinewise.data_diff.")
             )
 
     assert forbidden == []

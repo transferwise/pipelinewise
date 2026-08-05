@@ -33,17 +33,15 @@ Each `CLAUDE.md` is a relative symlink to the adjacent `AGENTS.md`. Edit the `AG
 
 ### Python gates
 
-Run the four CI lint commands verbatim and in order for implementation changes:
+Run the two CI style gates verbatim and in order for implementation changes:
 
 ```bash
 . .virtualenvs/pipelinewise/bin/activate
-ruff check pipelinewise tests
-pylint pipelinewise tests
-flake8 pipelinewise --count --select=E9,F63,F7,F82 --show-source --statistics
-flake8 pipelinewise --count --max-complexity=15 --max-line-length=120 --statistics
+ruff format --check .
+ruff check .
 ```
 
-Ruff and Pylint inspect `pipelinewise tests`; Flake8 inspects `pipelinewise`. Do not substitute bare Flake8, widen paths, add flags, or format in place of a gate.
+Ruff formats and lints PipelineWise plus `tap-mysql`, `tap-postgres`, and `target-snowflake` with 120-character lines and complexity 15. Other connectors remain excluded and use their local tooling. Apply formatting with `ruff format <changed paths>`; do not use formatting as a substitute for either check gate.
 
 Run the full unit gate from the root:
 
@@ -71,7 +69,7 @@ CI creates `.env` from `.env.template`; locally, never overwrite an existing `.e
 ### Scoped checks
 
 - Database, connector, migration, FastSync, data-diff, or E2E work: follow `tests/end_to_end/AGENTS.md` and report each relevant group.
-- Connector source: follow `singer-connectors/AGENTS.md`; root lint/unit gates do not inspect it. Connector CI separately installs all connectors and runs the Python 3.12 tap-mysql/tap-postgres `make unit_test_cov` gates.
+- Connector source: follow `singer-connectors/AGENTS.md`. Root Ruff gates inspect `tap-mysql`, `tap-postgres`, and `target-snowflake`; connector CI also runs their local Ruff and unit coverage gates on Python 3.12. Root unit tests do not inspect connector code.
 - Docs: follow `docs/AGENTS.md`; warnings fail the build.
 - Always run `git diff --check`.
 
@@ -85,8 +83,8 @@ CI creates `.env` from `.env.template`; locally, never overwrite an existing `.e
 
 ## Style and safety
 
-- Python: 120 characters, complexity 15, four spaces, Google docstrings, single quotes where consistent; `snake_case` functions/variables/JSON keys and `PascalCase` classes.
-- FastSync uppercases Snowflake identifiers. Scope Pylint disables to a line or function, never a module.
+- Python: Ruff's default formatter with 120-character lines, complexity 15, four spaces, Google docstrings, `snake_case` functions/variables/JSON keys, and `PascalCase` classes.
+- FastSync uppercases Snowflake identifiers. Scope Ruff `noqa` directives to the narrowest line or function; prefer symbolic rule codes with a short reason for non-obvious exceptions.
 - Comments explain non-obvious constraints and consequences in at most two lines; do not restate code, narrate edits, argue choices, or write walkthroughs.
 - Never run `pre-commit run --all-files`; it mutates files broadly and is not a CI gate.
 - Do not reformat or lint-fix unrelated files. Preserve user changes in dirty worktrees.
@@ -101,7 +99,7 @@ CI creates `.env` from `.env.template`; locally, never overwrite an existing `.e
 
 Before completion:
 
-1. Implementation changes pass all four lint gates and the full unit gate.
+1. Implementation changes pass both Ruff gates and the full unit gate.
 2. Configuration validation passes when applicable.
 3. Relevant E2E groups run per `tests/end_to_end/AGENTS.md`; report pass/skip/fail counts and never call a skipped suite complete.
 4. User-facing behavior/config changes update and validate docs.

@@ -5,7 +5,6 @@ from unittest.mock import MagicMock
 from pipelinewise.fastsync.commons.target_snowflake import FastSyncTargetSnowflake
 
 
-# pylint: disable=too-few-public-methods
 class S3Mock:
     """
     Mocked boto3
@@ -14,14 +13,12 @@ class S3Mock:
     def __init__(self):
         pass
 
-    # pylint: disable=invalid-name
-    def delete_object(self, Bucket, Key):
+    def delete_object(self, Bucket, Key):  # noqa: N803
         """Do nothing when trying to delete file on s3"""
 
     def copy_object(self, **kwargs):
         """Mock if needed"""
 
-    # pylint: disable=unused-argument
     def head_object(self, **kwargs):
         """Mock if needed"""
         return {}
@@ -51,57 +48,58 @@ class TestFastSyncTargetSnowflake(TestCase):
     def setUp(self) -> None:
         """Initialise test FastSyncTargetPostgres object"""
         self.snowflake = FastSyncTargetSnowflakeMock(
-            connection_config={'s3_bucket': 'dummy_bucket', 'stage': 'dummy_stage'},
+            connection_config={"s3_bucket": "dummy_bucket", "stage": "dummy_stage"},
             transformation_config={},
         )
 
     def test_create_schema(self):
         """Validate if create schema queries generated correctly"""
-        self.snowflake.create_schema('new_schema')
-        self.assertListEqual(
-            self.snowflake.executed_queries, ['CREATE SCHEMA IF NOT EXISTS new_schema']
-        )
+        self.snowflake.create_schema("new_schema")
+        self.assertListEqual(self.snowflake.executed_queries, ["CREATE SCHEMA IF NOT EXISTS new_schema"])
 
     def test_drop_table(self):
         """Validate if drop table queries generated correctly"""
-        self.snowflake.drop_table('test_schema', 'test_table')
-        self.snowflake.drop_table('test_schema', 'test_table', is_temporary=True)
-        self.snowflake.drop_table('test_schema', 'UPPERCASE_TABLE')
-        self.snowflake.drop_table('test_schema', 'UPPERCASE_TABLE', is_temporary=True)
-        self.snowflake.drop_table('test_schema', 'test table with space')
-        self.snowflake.drop_table(
-            'test_schema', 'test table with space', is_temporary=True
+        self.snowflake.drop_table("test_schema", "test_table")
+        self.snowflake.drop_table("test_schema", "test_table", is_temporary=True)
+        self.snowflake.drop_table("test_schema", "UPPERCASE_TABLE")
+        self.snowflake.drop_table("test_schema", "UPPERCASE_TABLE", is_temporary=True)
+        self.snowflake.drop_table("test_schema", "test table with space")
+        self.snowflake.drop_table("test_schema", "test table with space", is_temporary=True)
+        self.assertListEqual(
+            self.snowflake.executed_queries,
+            [
+                'DROP TABLE IF EXISTS test_schema."TEST_TABLE"',
+                'DROP TABLE IF EXISTS test_schema."TEST_TABLE_TEMP"',
+                'DROP TABLE IF EXISTS test_schema."UPPERCASE_TABLE"',
+                'DROP TABLE IF EXISTS test_schema."UPPERCASE_TABLE_TEMP"',
+                'DROP TABLE IF EXISTS test_schema."TEST TABLE WITH SPACE"',
+                'DROP TABLE IF EXISTS test_schema."TEST TABLE WITH SPACE_TEMP"',
+            ],
         )
-        self.assertListEqual(self.snowflake.executed_queries, [
-            'DROP TABLE IF EXISTS test_schema."TEST_TABLE"',
-            'DROP TABLE IF EXISTS test_schema."TEST_TABLE_TEMP"',
-            'DROP TABLE IF EXISTS test_schema."UPPERCASE_TABLE"',
-            'DROP TABLE IF EXISTS test_schema."UPPERCASE_TABLE_TEMP"',
-            'DROP TABLE IF EXISTS test_schema."TEST TABLE WITH SPACE"',
-            'DROP TABLE IF EXISTS test_schema."TEST TABLE WITH SPACE_TEMP"',
-        ])
 
     def test_merge_tables(self):
         """Validate if merge tables query is generated correctly"""
-        schema = 'test_schema'
-        source_table = 'source_table'
-        target_table = 'target_table'
-        list_of_columns = ['p1', 'col1', 'p2', 'col2', 'col3']
-        primary_keys = ['p1', 'p2']
-        on_clause = ' AND '.join(
+        schema = "test_schema"
+        source_table = "source_table"
+        target_table = "target_table"
+        list_of_columns = ["p1", "col1", "p2", "col2", "col3"]
+        primary_keys = ["p1", "p2"]
+        on_clause = " AND ".join(
             [f'"{source_table.upper()}".{p.upper()} = "{target_table.upper()}".{p.upper()}' for p in primary_keys]
         )
-        update_clause = ', '.join(
+        update_clause = ", ".join(
             [f'"{target_table.upper()}".{c.upper()} = "{source_table.upper()}".{c.upper()}' for c in list_of_columns]
         )
-        columns_for_insert = ', '.join([c.upper() for c in list_of_columns])
-        values = ', '.join([f'"{source_table.upper()}".{c.upper()}' for c in list_of_columns])
+        columns_for_insert = ", ".join([c.upper() for c in list_of_columns])
+        values = ", ".join([f'"{source_table.upper()}".{c.upper()}' for c in list_of_columns])
 
-        expected_merge_query = f'MERGE INTO {schema}."{target_table.upper()}" USING {schema}."{source_table.upper()}"' \
-                               f' ON {on_clause}' \
-                               f' WHEN MATCHED THEN UPDATE SET {update_clause}' \
-                               f' WHEN NOT MATCHED THEN INSERT ({columns_for_insert})' \
-                               f' VALUES ({values})'
+        expected_merge_query = (
+            f'MERGE INTO {schema}."{target_table.upper()}" USING {schema}."{source_table.upper()}"'
+            f" ON {on_clause}"
+            f" WHEN MATCHED THEN UPDATE SET {update_clause}"
+            f" WHEN NOT MATCHED THEN INSERT ({columns_for_insert})"
+            f" VALUES ({values})"
+        )
 
         self.snowflake.merge_tables(schema, source_table, target_table, list_of_columns, primary_keys)
 
@@ -109,10 +107,10 @@ class TestFastSyncTargetSnowflake(TestCase):
 
     def test_add_columns(self):
         """Test add_column method works as expected"""
-        schema = 'test_schema'
-        table = 'test_table'
-        adding_columns = {'col1': 'type1', 'col2': 'type2'}
-        columns_query = ', '.join([f'{col_name} {col_type}' for col_name, col_type in adding_columns.items()])
+        schema = "test_schema"
+        table = "test_table"
+        adding_columns = {"col1": "type1", "col2": "type2"}
+        columns_query = ", ".join([f"{col_name} {col_type}" for col_name, col_type in adding_columns.items()])
         expected_query = f'ALTER TABLE {schema}."{table.upper()}" ADD {columns_query}'
 
         self.snowflake.add_columns(schema, table, adding_columns)
@@ -123,62 +121,68 @@ class TestFastSyncTargetSnowflake(TestCase):
         # Create table with standard table and column names
         self.snowflake.executed_queries = []
         self.snowflake.create_table(
-            target_schema='test_schema',
-            table_name='test_table',
+            target_schema="test_schema",
+            table_name="test_table",
             columns=['"ID" INTEGER', '"TXT" VARCHAR'],
             primary_key=['"ID"'],
         )
-        self.assertListEqual(self.snowflake.executed_queries, [
-            'CREATE OR REPLACE TABLE "TEST_SCHEMA"."TEST_TABLE" ('
-            '"ID" INTEGER,"TXT" VARCHAR,'
-            '_SDC_EXTRACTED_AT TIMESTAMP_NTZ,'
-            '_SDC_BATCHED_AT TIMESTAMP_NTZ,'
-            '_SDC_DELETED_AT VARCHAR'
-            ', PRIMARY KEY ("ID"))',
-            'alter table "TEST_SCHEMA"."TEST_TABLE" alter column "ID" drop not null;'
-        ])
+        self.assertListEqual(
+            self.snowflake.executed_queries,
+            [
+                'CREATE OR REPLACE TABLE "TEST_SCHEMA"."TEST_TABLE" ('
+                '"ID" INTEGER,"TXT" VARCHAR,'
+                "_SDC_EXTRACTED_AT TIMESTAMP_NTZ,"
+                "_SDC_BATCHED_AT TIMESTAMP_NTZ,"
+                "_SDC_DELETED_AT VARCHAR"
+                ', PRIMARY KEY ("ID"))',
+                'alter table "TEST_SCHEMA"."TEST_TABLE" alter column "ID" drop not null;',
+            ],
+        )
 
         # Create table with reserved words in table and column names
         self.snowflake.executed_queries = []
         self.snowflake.create_table(
-            target_schema='test_schema',
-            table_name='order',
+            target_schema="test_schema",
+            table_name="order",
             columns=['"ID" INTEGER', '"TXT" VARCHAR', '"SELECT" VARCHAR'],
             primary_key=['"ID"'],
         )
         assert self.snowflake.executed_queries == [
             'CREATE OR REPLACE TABLE "TEST_SCHEMA"."ORDER" ('
             '"ID" INTEGER,"TXT" VARCHAR,"SELECT" VARCHAR,'
-            '_SDC_EXTRACTED_AT TIMESTAMP_NTZ,'
-            '_SDC_BATCHED_AT TIMESTAMP_NTZ,'
-            '_SDC_DELETED_AT VARCHAR'
+            "_SDC_EXTRACTED_AT TIMESTAMP_NTZ,"
+            "_SDC_BATCHED_AT TIMESTAMP_NTZ,"
+            "_SDC_DELETED_AT VARCHAR"
             ', PRIMARY KEY ("ID"))',
-            'alter table "TEST_SCHEMA"."ORDER" alter column "ID" drop not null;'
+            'alter table "TEST_SCHEMA"."ORDER" alter column "ID" drop not null;',
         ]
 
         # Create table with mixed lower and uppercase and space characters
         self.snowflake.executed_queries = []
         self.snowflake.create_table(
-            target_schema='test_schema',
-            table_name='TABLE with SPACE',
+            target_schema="test_schema",
+            table_name="TABLE with SPACE",
             columns=['"ID" INTEGER', '"COLUMN WITH SPACE" CHARACTER VARYING'],
             primary_key=['"ID"'],
         )
-        self.assertListEqual(self.snowflake.executed_queries, [
-            'CREATE OR REPLACE TABLE "TEST_SCHEMA"."TABLE WITH SPACE" ('
-            '"ID" INTEGER,"COLUMN WITH SPACE" CHARACTER VARYING,'
-            '_SDC_EXTRACTED_AT TIMESTAMP_NTZ,'
-            '_SDC_BATCHED_AT TIMESTAMP_NTZ,'
-            '_SDC_DELETED_AT VARCHAR'
-            ', PRIMARY KEY ("ID"))',
-            'alter table "TEST_SCHEMA"."TABLE WITH SPACE" alter column "ID" drop not null;'
-        ])
+        self.assertListEqual(
+            self.snowflake.executed_queries,
+            [
+                'CREATE OR REPLACE TABLE "TEST_SCHEMA"."TABLE WITH SPACE" ('
+                '"ID" INTEGER,"COLUMN WITH SPACE" CHARACTER VARYING,'
+                "_SDC_EXTRACTED_AT TIMESTAMP_NTZ,"
+                "_SDC_BATCHED_AT TIMESTAMP_NTZ,"
+                "_SDC_DELETED_AT VARCHAR"
+                ', PRIMARY KEY ("ID"))',
+                'alter table "TEST_SCHEMA"."TABLE WITH SPACE" alter column "ID" drop not null;',
+            ],
+        )
 
         # Create table with composite primary key
         self.snowflake.executed_queries = []
         self.snowflake.create_table(
-            target_schema='test_schema',
-            table_name='TABLE with SPACE',
+            target_schema="test_schema",
+            table_name="TABLE with SPACE",
             columns=[
                 '"ID" INTEGER',
                 '"NUM" INTEGER',
@@ -189,81 +193,84 @@ class TestFastSyncTargetSnowflake(TestCase):
         assert self.snowflake.executed_queries == [
             'CREATE OR REPLACE TABLE "TEST_SCHEMA"."TABLE WITH SPACE" ('
             '"ID" INTEGER,"NUM" INTEGER,"COLUMN WITH SPACE" CHARACTER VARYING,'
-            '_SDC_EXTRACTED_AT TIMESTAMP_NTZ,'
-            '_SDC_BATCHED_AT TIMESTAMP_NTZ,'
-            '_SDC_DELETED_AT VARCHAR'
+            "_SDC_EXTRACTED_AT TIMESTAMP_NTZ,"
+            "_SDC_BATCHED_AT TIMESTAMP_NTZ,"
+            "_SDC_DELETED_AT VARCHAR"
             ', PRIMARY KEY ("ID","NUM"))',
             'alter table "TEST_SCHEMA"."TABLE WITH SPACE" alter column "ID" drop not null;',
-            'alter table "TEST_SCHEMA"."TABLE WITH SPACE" alter column "NUM" drop not null;'
+            'alter table "TEST_SCHEMA"."TABLE WITH SPACE" alter column "NUM" drop not null;',
         ]
 
         # Create table with no primary key
         self.snowflake.executed_queries = []
         self.snowflake.create_table(
-            target_schema='test_schema',
-            table_name='test_table_no_pk',
+            target_schema="test_schema",
+            table_name="test_table_no_pk",
             columns=['"ID" INTEGER', '"TXT" CHARACTER VARYING'],
             primary_key=None,
         )
-        self.assertListEqual(self.snowflake.executed_queries, [
-            'CREATE OR REPLACE TABLE "TEST_SCHEMA"."TEST_TABLE_NO_PK" ('
-            '"ID" INTEGER,"TXT" CHARACTER VARYING,'
-            '_SDC_EXTRACTED_AT TIMESTAMP_NTZ,'
-            '_SDC_BATCHED_AT TIMESTAMP_NTZ,'
-            '_SDC_DELETED_AT VARCHAR)'
-        ])
+        self.assertListEqual(
+            self.snowflake.executed_queries,
+            [
+                'CREATE OR REPLACE TABLE "TEST_SCHEMA"."TEST_TABLE_NO_PK" ('
+                '"ID" INTEGER,"TXT" CHARACTER VARYING,'
+                "_SDC_EXTRACTED_AT TIMESTAMP_NTZ,"
+                "_SDC_BATCHED_AT TIMESTAMP_NTZ,"
+                "_SDC_DELETED_AT VARCHAR)"
+            ],
+        )
 
     def test_copy_to_table(self):
         """Validate if COPY command generated correctly"""
         # COPY table with standard table and column names
         self.snowflake.executed_queries = []
         self.snowflake.copy_to_table(
-            s3_key='s3_key',
-            target_schema='test_schema',
-            table_name='test_table',
+            s3_key="s3_key",
+            target_schema="test_schema",
+            table_name="test_table",
             size_bytes=1000,
             is_temporary=False,
             skip_csv_header=False,
         )
         assert self.snowflake.executed_queries == [
-            'COPY INTO test_schema."TEST_TABLE" FROM \'@dummy_stage/s3_key\''
-            ' FILE_FORMAT = (type=CSV escape=NONE escape_unenclosed_field=\'\\x1e\''
-            ' field_optionally_enclosed_by=\'\"\' skip_header=0'
-            ' compression=GZIP binary_format=HEX)'
+            "COPY INTO test_schema.\"TEST_TABLE\" FROM '@dummy_stage/s3_key'"
+            " FILE_FORMAT = (type=CSV escape=NONE escape_unenclosed_field='\\x1e'"
+            " field_optionally_enclosed_by='\"' skip_header=0"
+            " compression=GZIP binary_format=HEX)"
         ]
 
         # COPY table with reserved word in table and column names in temp table
         self.snowflake.executed_queries = []
         self.snowflake.copy_to_table(
-            s3_key='s3_key',
-            target_schema='test_schema',
-            table_name='full',
+            s3_key="s3_key",
+            target_schema="test_schema",
+            table_name="full",
             size_bytes=1000,
             is_temporary=True,
             skip_csv_header=False,
         )
         assert self.snowflake.executed_queries == [
-            'COPY INTO test_schema."FULL_TEMP" FROM \'@dummy_stage/s3_key\''
-            ' FILE_FORMAT = (type=CSV escape=NONE escape_unenclosed_field=\'\\x1e\''
-            ' field_optionally_enclosed_by=\'\"\' skip_header=0'
-            ' compression=GZIP binary_format=HEX)'
+            "COPY INTO test_schema.\"FULL_TEMP\" FROM '@dummy_stage/s3_key'"
+            " FILE_FORMAT = (type=CSV escape=NONE escape_unenclosed_field='\\x1e'"
+            " field_optionally_enclosed_by='\"' skip_header=0"
+            " compression=GZIP binary_format=HEX)"
         ]
 
         # COPY table with space and uppercase in table name and s3 key
         self.snowflake.executed_queries = []
         self.snowflake.copy_to_table(
-            s3_key='s3 key with space',
-            target_schema='test_schema',
-            table_name='table with SPACE and UPPERCASE',
+            s3_key="s3 key with space",
+            target_schema="test_schema",
+            table_name="table with SPACE and UPPERCASE",
             size_bytes=1000,
             is_temporary=True,
             skip_csv_header=False,
         )
         assert self.snowflake.executed_queries == [
-            'COPY INTO test_schema."TABLE WITH SPACE AND UPPERCASE_TEMP" FROM \'@dummy_stage/s3 key with space\''
-            ' FILE_FORMAT = (type=CSV escape=NONE escape_unenclosed_field=\'\\x1e\''
-            ' field_optionally_enclosed_by=\'\"\' skip_header=0'
-            ' compression=GZIP binary_format=HEX)'
+            "COPY INTO test_schema.\"TABLE WITH SPACE AND UPPERCASE_TEMP\" FROM '@dummy_stage/s3 key with space'"
+            " FILE_FORMAT = (type=CSV escape=NONE escape_unenclosed_field='\\x1e'"
+            " field_optionally_enclosed_by='\"' skip_header=0"
+            " compression=GZIP binary_format=HEX)"
         ]
 
     def test_grant_select_on_table(self):
@@ -271,33 +278,29 @@ class TestFastSyncTargetSnowflake(TestCase):
         # GRANT table with standard table and column names
         self.snowflake.executed_queries = []
         self.snowflake.grant_select_on_table(
-            target_schema='test_schema',
-            table_name='test_table',
-            role='test_role',
+            target_schema="test_schema",
+            table_name="test_table",
+            role="test_role",
             is_temporary=False,
         )
-        assert self.snowflake.executed_queries == [
-            'GRANT SELECT ON test_schema."TEST_TABLE" TO ROLE test_role'
-        ]
+        assert self.snowflake.executed_queries == ['GRANT SELECT ON test_schema."TEST_TABLE" TO ROLE test_role']
 
         # GRANT table with reserved word in table and column names in temp table
         self.snowflake.executed_queries = []
         self.snowflake.grant_select_on_table(
-            target_schema='test_schema',
-            table_name='full',
-            role='test_role',
+            target_schema="test_schema",
+            table_name="full",
+            role="test_role",
             is_temporary=False,
         )
-        assert self.snowflake.executed_queries == [
-            'GRANT SELECT ON test_schema."FULL" TO ROLE test_role'
-        ]
+        assert self.snowflake.executed_queries == ['GRANT SELECT ON test_schema."FULL" TO ROLE test_role']
 
         # GRANT table with with space and uppercase in table name and s3 key
         self.snowflake.executed_queries = []
         self.snowflake.grant_select_on_table(
-            target_schema='test_schema',
-            table_name='table with SPACE and UPPERCASE',
-            role='test_role',
+            target_schema="test_schema",
+            table_name="table with SPACE and UPPERCASE",
+            role="test_role",
             is_temporary=False,
         )
         assert self.snowflake.executed_queries == [
@@ -307,28 +310,20 @@ class TestFastSyncTargetSnowflake(TestCase):
     def test_grant_usage_on_schema(self):
         """Validate if GRANT command generated correctly"""
         self.snowflake.executed_queries = []
-        self.snowflake.grant_usage_on_schema(
-            target_schema='test_schema', role='test_role'
-        )
-        assert self.snowflake.executed_queries == [
-            'GRANT USAGE ON SCHEMA test_schema TO ROLE test_role'
-        ]
+        self.snowflake.grant_usage_on_schema(target_schema="test_schema", role="test_role")
+        assert self.snowflake.executed_queries == ["GRANT USAGE ON SCHEMA test_schema TO ROLE test_role"]
 
     def test_grant_select_on_schema(self):
         """Validate if GRANT command generated correctly"""
         self.snowflake.executed_queries = []
-        self.snowflake.grant_select_on_schema(
-            target_schema='test_schema', role='test_role'
-        )
-        assert self.snowflake.executed_queries == [
-            'GRANT SELECT ON ALL TABLES IN SCHEMA test_schema TO ROLE test_role'
-        ]
+        self.snowflake.grant_select_on_schema(target_schema="test_schema", role="test_role")
+        assert self.snowflake.executed_queries == ["GRANT SELECT ON ALL TABLES IN SCHEMA test_schema TO ROLE test_role"]
 
     def test_swap_tables(self):
         """Validate if swap table commands generated correctly"""
         # Swap tables with standard table and column names
         self.snowflake.executed_queries = []
-        self.snowflake.swap_tables(schema='test_schema', table_name='test_table')
+        self.snowflake.swap_tables(schema="test_schema", table_name="test_table")
         assert self.snowflake.executed_queries == [
             'ALTER TABLE test_schema."TEST_TABLE_TEMP" SWAP WITH test_schema."TEST_TABLE"',
             'DROP TABLE IF EXISTS test_schema."TEST_TABLE_TEMP"',
@@ -336,7 +331,7 @@ class TestFastSyncTargetSnowflake(TestCase):
 
         # Swap tables with reserved word in table and column names in temp table
         self.snowflake.executed_queries = []
-        self.snowflake.swap_tables(schema='test_schema', table_name='full')
+        self.snowflake.swap_tables(schema="test_schema", table_name="full")
         assert self.snowflake.executed_queries == [
             'ALTER TABLE test_schema."FULL_TEMP" SWAP WITH test_schema."FULL"',
             'DROP TABLE IF EXISTS test_schema."FULL_TEMP"',
@@ -344,9 +339,7 @@ class TestFastSyncTargetSnowflake(TestCase):
 
         # Swap tables with with space and uppercase in table name and s3 key
         self.snowflake.executed_queries = []
-        self.snowflake.swap_tables(
-            schema='test_schema', table_name='table with SPACE and UPPERCASE'
-        )
+        self.snowflake.swap_tables(schema="test_schema", table_name="table with SPACE and UPPERCASE")
         assert self.snowflake.executed_queries == [
             'ALTER TABLE test_schema."TABLE WITH SPACE AND UPPERCASE_TEMP" '
             'SWAP WITH test_schema."TABLE WITH SPACE AND UPPERCASE"',
@@ -355,102 +348,94 @@ class TestFastSyncTargetSnowflake(TestCase):
 
     def test_create_query_tag(self):
         """Validate if query tag generated correctly"""
-        self.snowflake.connection_config['dbname'] = 'fake_db'
+        self.snowflake.connection_config["dbname"] = "fake_db"
 
         # not passing query_tag_props
         assert json.loads(self.snowflake.create_query_tag()) == {
-            'ppw_component': 'fastsync',
-            'tap_id': None,
-            'database': 'fake_db',
-            'schema': None,
-            'table': None,
+            "ppw_component": "fastsync",
+            "tap_id": None,
+            "database": "fake_db",
+            "schema": None,
+            "table": None,
         }
 
         # passing invalid query_tag_props (string)
-        assert json.loads(self.snowflake.create_query_tag('invalid_query_props')) == {
-            'ppw_component': 'fastsync',
-            'tap_id': None,
-            'database': 'fake_db',
-            'schema': None,
-            'table': None,
+        assert json.loads(self.snowflake.create_query_tag("invalid_query_props")) == {
+            "ppw_component": "fastsync",
+            "tap_id": None,
+            "database": "fake_db",
+            "schema": None,
+            "table": None,
         }
 
         # passing invalid query_tag_props (number)
-        self.snowflake.connection_config['tap_id'] = 'fake_tap'
+        self.snowflake.connection_config["tap_id"] = "fake_tap"
         assert json.loads(self.snowflake.create_query_tag(1234567890)) == {
-            'ppw_component': 'fastsync',
-            'tap_id': 'fake_tap',
-            'database': 'fake_db',
-            'schema': None,
-            'table': None,
+            "ppw_component": "fastsync",
+            "tap_id": "fake_tap",
+            "database": "fake_db",
+            "schema": None,
+            "table": None,
         }
 
         # passing invalid query_tag_props (array)
-        self.snowflake.connection_config['tap_id'] = 'fake_tap'
+        self.snowflake.connection_config["tap_id"] = "fake_tap"
         assert json.loads(self.snowflake.create_query_tag([1, 2, 3])) == {
-            'ppw_component': 'fastsync',
-            'tap_id': 'fake_tap',
-            'database': 'fake_db',
-            'schema': None,
-            'table': None,
+            "ppw_component": "fastsync",
+            "tap_id": "fake_tap",
+            "database": "fake_db",
+            "schema": None,
+            "table": None,
         }
 
         # passing invalid query_tag_props
-        self.snowflake.connection_config['tap_id'] = 'fake_tap'
+        self.snowflake.connection_config["tap_id"] = "fake_tap"
         assert json.loads(self.snowflake.create_query_tag()) == {
-            'ppw_component': 'fastsync',
-            'tap_id': 'fake_tap',
-            'database': 'fake_db',
-            'schema': None,
-            'table': None,
+            "ppw_component": "fastsync",
+            "tap_id": "fake_tap",
+            "database": "fake_db",
+            "schema": None,
+            "table": None,
         }
 
         # passing valid query_props
-        self.snowflake.connection_config['tap_id'] = 'fake_tap'
-        assert json.loads(
-            self.snowflake.create_query_tag(
-                {'schema': 'fake_schema', 'table': 'fake_table'}
-            )
-        ) == {
-            'ppw_component': 'fastsync',
-            'tap_id': 'fake_tap',
-            'database': 'fake_db',
-            'schema': 'fake_schema',
-            'table': 'fake_table',
+        self.snowflake.connection_config["tap_id"] = "fake_tap"
+        assert json.loads(self.snowflake.create_query_tag({"schema": "fake_schema", "table": "fake_table"})) == {
+            "ppw_component": "fastsync",
+            "tap_id": "fake_tap",
+            "database": "fake_db",
+            "schema": "fake_schema",
+            "table": "fake_table",
         }
 
         # passing partial query_props
-        self.snowflake.connection_config['tap_id'] = 'fake_tap'
-        assert json.loads(
-            self.snowflake.create_query_tag({'schema': 'fake_schema'})
-        ) == {
-            'ppw_component': 'fastsync',
-            'tap_id': 'fake_tap',
-            'database': 'fake_db',
-            'schema': 'fake_schema',
-            'table': None,
+        self.snowflake.connection_config["tap_id"] = "fake_tap"
+        assert json.loads(self.snowflake.create_query_tag({"schema": "fake_schema"})) == {
+            "ppw_component": "fastsync",
+            "tap_id": "fake_tap",
+            "database": "fake_db",
+            "schema": "fake_schema",
+            "table": None,
         }
 
         # passing partial query_props
-        self.snowflake.connection_config['tap_id'] = 'fake_tap'
-        assert json.loads(self.snowflake.create_query_tag({'table': 'fake_table'})) == {
-            'ppw_component': 'fastsync',
-            'tap_id': 'fake_tap',
-            'database': 'fake_db',
-            'schema': None,
-            'table': 'fake_table',
+        self.snowflake.connection_config["tap_id"] = "fake_tap"
+        assert json.loads(self.snowflake.create_query_tag({"table": "fake_table"})) == {
+            "ppw_component": "fastsync",
+            "tap_id": "fake_tap",
+            "database": "fake_db",
+            "schema": None,
+            "table": "fake_table",
         }
 
         # passing not supported query_props
-        self.snowflake.connection_config['tap_id'] = 'fake_tap'
-        assert json.loads(
-            self.snowflake.create_query_tag({'fake_prop': 'fake_value'})
-        ) == {
-            'ppw_component': 'fastsync',
-            'tap_id': 'fake_tap',
-            'database': 'fake_db',
-            'schema': None,
-            'table': None,
+        self.snowflake.connection_config["tap_id"] = "fake_tap"
+        assert json.loads(self.snowflake.create_query_tag({"fake_prop": "fake_value"})) == {
+            "ppw_component": "fastsync",
+            "tap_id": "fake_tap",
+            "database": "fake_db",
+            "schema": None,
+            "table": None,
         }
 
     def test_obfuscate_columns_case1(self):
@@ -458,8 +443,8 @@ class TestFastSyncTargetSnowflake(TestCase):
         Test obfuscation where given transformations are emtpy
         Test should pass with no executed queries
         """
-        target_schema = 'my_schema'
-        table_name = 'public.my_table'
+        target_schema = "my_schema"
+        table_name = "public.my_table"
 
         self.snowflake.transformation_config = {}
 
@@ -471,15 +456,15 @@ class TestFastSyncTargetSnowflake(TestCase):
         Test obfuscation where given transformations has an unsupported transformation type
         Test should fail
         """
-        target_schema = 'my_schema'
-        table_name = 'public.my_table'
+        target_schema = "my_schema"
+        table_name = "public.my_table"
 
         self.snowflake.transformation_config = {
-            'transformations': [
+            "transformations": [
                 {
-                    'field_id': 'col_7',
-                    'tap_stream_name': 'public-my_table',
-                    'type': 'RANDOM',
+                    "field_id": "col_7",
+                    "tap_stream_name": "public-my_table",
+                    "type": "RANDOM",
                 }
             ]
         }
@@ -494,46 +479,46 @@ class TestFastSyncTargetSnowflake(TestCase):
         Test obfuscation where given transformations have no conditions
         Test should pass
         """
-        target_schema = 'my_schema'
-        table_name = 'public.my_table'
+        target_schema = "my_schema"
+        table_name = "public.my_table"
 
         self.snowflake.transformation_config = {
-            'transformations': [
+            "transformations": [
                 {
-                    'field_id': 'col_1',
-                    'tap_stream_name': 'public-my_table',
-                    'type': 'SET-NULL',
+                    "field_id": "col_1",
+                    "tap_stream_name": "public-my_table",
+                    "type": "SET-NULL",
                 },
                 {
-                    'field_id': 'col_2',
-                    'tap_stream_name': 'public-my_table',
-                    'type': 'MASK-HIDDEN',
+                    "field_id": "col_2",
+                    "tap_stream_name": "public-my_table",
+                    "type": "MASK-HIDDEN",
                 },
                 {
-                    'field_id': 'col_3',
-                    'tap_stream_name': 'public-my_table',
-                    'type': 'MASK-DATE',
+                    "field_id": "col_3",
+                    "tap_stream_name": "public-my_table",
+                    "type": "MASK-DATE",
                 },
                 {
-                    'field_id': 'col_4',
-                    'tap_stream_name': 'public-my_table',
-                    'safe_field_id': '"COL_4"',
-                    'type': 'MASK-NUMBER',
+                    "field_id": "col_4",
+                    "tap_stream_name": "public-my_table",
+                    "safe_field_id": '"COL_4"',
+                    "type": "MASK-NUMBER",
                 },
                 {
-                    'field_id': 'col_5',
-                    'tap_stream_name': 'public-my_table',
-                    'type': 'HASH',
+                    "field_id": "col_5",
+                    "tap_stream_name": "public-my_table",
+                    "type": "HASH",
                 },
                 {
-                    'field_id': 'col_6',
-                    'tap_stream_name': 'public-my_table',
-                    'type': 'HASH-SKIP-FIRST-5',
+                    "field_id": "col_6",
+                    "tap_stream_name": "public-my_table",
+                    "type": "HASH-SKIP-FIRST-5",
                 },
                 {
-                    'field_id': 'col_7',
-                    'tap_stream_name': 'public-my_table',
-                    'type': 'MASK-STRING-SKIP-ENDS-3',
+                    "field_id": "col_7",
+                    "tap_stream_name": "public-my_table",
+                    "type": "MASK-STRING-SKIP-ENDS-3",
                 },
             ]
         }
@@ -545,7 +530,7 @@ class TestFastSyncTargetSnowflake(TestCase):
             [
                 'UPDATE "MY_SCHEMA"."MY_TABLE_TEMP" SET '
                 '"COL_1" = NULL, '
-                '"COL_2" = \'hidden\', '
+                "\"COL_2\" = 'hidden', "
                 '"COL_3" = TIMESTAMP_NTZ_FROM_PARTS(DATE_FROM_PARTS(YEAR("COL_3"), 1, 1),TO_TIME("COL_3")), '
                 '"COL_4" = 0, '
                 '"COL_5" = SHA2("COL_5", 256), '
@@ -553,7 +538,7 @@ class TestFastSyncTargetSnowflake(TestCase):
                 '"COL_7" = CASE WHEN LENGTH("COL_7") > 2 * 3 THEN '
                 'CONCAT(SUBSTRING("COL_7", 1, 3), REPEAT(\'*\', LENGTH("COL_7")-(2 * 3)), '
                 'SUBSTRING("COL_7", LENGTH("COL_7")-3+1, 3)) '
-                'ELSE REPEAT(\'*\', LENGTH("COL_7")) END;'
+                "ELSE REPEAT('*', LENGTH(\"COL_7\")) END;"
             ],
         )
 
@@ -562,60 +547,60 @@ class TestFastSyncTargetSnowflake(TestCase):
         Test obfuscation where given transformations have conditions
         Test should pass
         """
-        target_schema = 'my_schema'
-        table_name = 'public.my_table'
+        target_schema = "my_schema"
+        table_name = "public.my_table"
 
         self.snowflake.transformation_config = {
-            'transformations': [
+            "transformations": [
                 {
-                    'field_id': 'col_1',
-                    'tap_stream_name': 'public-my_table',
-                    'type': 'SET-NULL',
+                    "field_id": "col_1",
+                    "tap_stream_name": "public-my_table",
+                    "type": "SET-NULL",
                 },
                 {
-                    'field_id': 'col_2',
-                    'tap_stream_name': 'public-my_table',
-                    'type': 'MASK-HIDDEN',
-                    'when': [
-                        {'column': 'col_4', 'safe_column': '"COL_4"', 'equals': None},
+                    "field_id": "col_2",
+                    "tap_stream_name": "public-my_table",
+                    "type": "MASK-HIDDEN",
+                    "when": [
+                        {"column": "col_4", "safe_column": '"COL_4"', "equals": None},
                         {
-                            'column': 'col_1',
+                            "column": "col_1",
                         },
                     ],
                 },
                 {
-                    'field_id': 'col_3',
-                    'tap_stream_name': 'public-my_table',
-                    'type': 'MASK-DATE',
-                    'when': [{'column': 'col_5', 'equals': 'some_value'}],
+                    "field_id": "col_3",
+                    "tap_stream_name": "public-my_table",
+                    "type": "MASK-DATE",
+                    "when": [{"column": "col_5", "equals": "some_value"}],
                 },
                 {
-                    'field_id': 'col_4',
-                    'tap_stream_name': 'public-my_table',
-                    'type': 'MASK-NUMBER',
+                    "field_id": "col_4",
+                    "tap_stream_name": "public-my_table",
+                    "type": "MASK-NUMBER",
                 },
                 {
-                    'field_id': 'col_5',
-                    'tap_stream_name': 'public-my_table',
-                    'type': 'HASH',
+                    "field_id": "col_5",
+                    "tap_stream_name": "public-my_table",
+                    "type": "HASH",
                 },
                 {
-                    'field_id': 'col_6',
-                    'tap_stream_name': 'public-my_table',
-                    'type': 'HASH-SKIP-FIRST-5',
-                    'when': [
-                        {'column': 'col_1', 'equals': 30},
-                        {'column': 'col_2', 'regex_match': r'[0-9]{3}\.[0-9]{3}'},
+                    "field_id": "col_6",
+                    "tap_stream_name": "public-my_table",
+                    "type": "HASH-SKIP-FIRST-5",
+                    "when": [
+                        {"column": "col_1", "equals": 30},
+                        {"column": "col_2", "regex_match": r"[0-9]{3}\.[0-9]{3}"},
                     ],
                 },
                 {
-                    'field_id': 'col_7',
-                    'tap_stream_name': 'public-my_table',
-                    'type': 'MASK-STRING-SKIP-ENDS-3',
-                    'when': [
-                        {'column': 'col_1', 'equals': 30},
-                        {'column': 'col_2', 'regex_match': r'[0-9]{3}\.[0-9]{3}'},
-                        {'column': 'col_4', 'equals': None},
+                    "field_id": "col_7",
+                    "tap_stream_name": "public-my_table",
+                    "type": "MASK-STRING-SKIP-ENDS-3",
+                    "when": [
+                        {"column": "col_1", "equals": 30},
+                        {"column": "col_2", "regex_match": r"[0-9]{3}\.[0-9]{3}"},
+                        {"column": "col_4", "equals": None},
                     ],
                 },
             ]
@@ -632,106 +617,97 @@ class TestFastSyncTargetSnowflake(TestCase):
                 'UPDATE "MY_SCHEMA"."MY_TABLE_TEMP" SET '
                 '"COL_6" = CONCAT(SUBSTRING("COL_6", 1, 5), SHA2(SUBSTRING("COL_6", 5 + 1), 256)) '
                 'WHERE ("COL_1" = 30) AND ("COL_2" '
-                'REGEXP \'[0-9]{3}\.[0-9]{3}\');',  # pylint: disable=W1401  # noqa: W605
+                "REGEXP '[0-9]{3}\.[0-9]{3}');",  # noqa: W605
                 'UPDATE "MY_SCHEMA"."MY_TABLE_TEMP" SET '
                 '"COL_7" = CASE WHEN LENGTH("COL_7") > 2 * 3 THEN '
                 'CONCAT(SUBSTRING("COL_7", 1, 3), REPEAT(\'*\', LENGTH("COL_7")-(2 * 3)), '
                 'SUBSTRING("COL_7", LENGTH("COL_7")-3+1, 3)) '
                 'ELSE REPEAT(\'*\', LENGTH("COL_7")) END WHERE ("COL_1" = 30) AND ("COL_2" '
-                'REGEXP \'[0-9]{3}\.[0-9]{3}\') AND ("COL_4" IS NULL);',  # pylint: disable=W1401  # noqa: W605
+                "REGEXP '[0-9]{3}\.[0-9]{3}') AND (\"COL_4\" IS NULL);",  # noqa: W605
                 'UPDATE "MY_SCHEMA"."MY_TABLE_TEMP" SET "COL_1" = NULL, "COL_4" = 0, "COL_5" = SHA2("COL_5", 256);',
             ],
         )
 
-    # pylint: disable=invalid-name
     def test_default_archive_destination(self):
         """
         Validate parameters passed to s3 copy_object method when custom s3 bucket and folder are not defined
         """
         mock_copy_object = MagicMock()
         self.snowflake.s3.copy_object = mock_copy_object
-        self.snowflake.connection_config['s3_bucket'] = 'some_bucket'
+        self.snowflake.connection_config["s3_bucket"] = "some_bucket"
         self.snowflake.copy_to_archive(
-            'snowflake-import/ppw_20210615115603_fastsync.csv.gz',
-            'some-tap',
-            'some_schema.some_table',
+            "snowflake-import/ppw_20210615115603_fastsync.csv.gz",
+            "some-tap",
+            "some_schema.some_table",
         )
 
         mock_copy_object.assert_called_with(
-            Bucket='some_bucket',
-            CopySource='some_bucket/snowflake-import/ppw_20210615115603_fastsync.csv.gz',
-            Key='archive/some-tap/some_table/ppw_20210615115603_fastsync.csv.gz',
+            Bucket="some_bucket",
+            CopySource="some_bucket/snowflake-import/ppw_20210615115603_fastsync.csv.gz",
+            Key="archive/some-tap/some_table/ppw_20210615115603_fastsync.csv.gz",
             Metadata={
-                'tap': 'some-tap',
-                'schema': 'some_schema',
-                'table': 'some_table',
-                'archived-by': 'pipelinewise_fastsync_postgres_to_snowflake',
+                "tap": "some-tap",
+                "schema": "some_schema",
+                "table": "some_table",
+                "archived-by": "pipelinewise_fastsync_postgres_to_snowflake",
             },
-            MetadataDirective='REPLACE',
+            MetadataDirective="REPLACE",
         )
 
-    # pylint: disable=invalid-name
     def test_custom_archive_destination(self):
         """
         Validate parameters passed to s3 copy_object method when using custom s3 bucket and folder
         """
         mock_copy_object = MagicMock()
         self.snowflake.s3.copy_object = mock_copy_object
-        self.snowflake.connection_config['s3_bucket'] = 'some_bucket'
-        self.snowflake.connection_config[
-            'archive_load_files_s3_bucket'
-        ] = 'archive_bucket'
-        self.snowflake.connection_config[
-            'archive_load_files_s3_prefix'
-        ] = 'archive_folder'
+        self.snowflake.connection_config["s3_bucket"] = "some_bucket"
+        self.snowflake.connection_config["archive_load_files_s3_bucket"] = "archive_bucket"
+        self.snowflake.connection_config["archive_load_files_s3_prefix"] = "archive_folder"
         self.snowflake.copy_to_archive(
-            'snowflake-import/ppw_20210615115603_fastsync.csv.gz',
-            'some-tap',
-            'some_schema.some_table',
+            "snowflake-import/ppw_20210615115603_fastsync.csv.gz",
+            "some-tap",
+            "some_schema.some_table",
         )
 
         mock_copy_object.assert_called_with(
-            Bucket='archive_bucket',
-            CopySource='some_bucket/snowflake-import/ppw_20210615115603_fastsync.csv.gz',
-            Key='archive_folder/some-tap/some_table/ppw_20210615115603_fastsync.csv.gz',
+            Bucket="archive_bucket",
+            CopySource="some_bucket/snowflake-import/ppw_20210615115603_fastsync.csv.gz",
+            Key="archive_folder/some-tap/some_table/ppw_20210615115603_fastsync.csv.gz",
             Metadata={
-                'tap': 'some-tap',
-                'schema': 'some_schema',
-                'table': 'some_table',
-                'archived-by': 'pipelinewise_fastsync_postgres_to_snowflake',
+                "tap": "some-tap",
+                "schema": "some_schema",
+                "table": "some_table",
+                "archived-by": "pipelinewise_fastsync_postgres_to_snowflake",
             },
-            MetadataDirective='REPLACE',
+            MetadataDirective="REPLACE",
         )
 
-    # pylint: disable=invalid-name
     def test_copied_archive_metadata(self):
         """
         Validate parameters passed to s3 copy_object method when custom s3 bucket and folder are not defined
         """
         mock_head_object = MagicMock()
-        mock_head_object.return_value = {
-            'Metadata': {'copied-old-key': 'copied-old-value'}
-        }
+        mock_head_object.return_value = {"Metadata": {"copied-old-key": "copied-old-value"}}
         mock_copy_object = MagicMock()
         self.snowflake.s3.copy_object = mock_copy_object
         self.snowflake.s3.head_object = mock_head_object
-        self.snowflake.connection_config['s3_bucket'] = 'some_bucket'
+        self.snowflake.connection_config["s3_bucket"] = "some_bucket"
         self.snowflake.copy_to_archive(
-            'snowflake-import/ppw_20210615115603_fastsync.csv.gz',
-            'some-tap',
-            'some_schema.some_table',
+            "snowflake-import/ppw_20210615115603_fastsync.csv.gz",
+            "some-tap",
+            "some_schema.some_table",
         )
 
         mock_copy_object.assert_called_with(
-            Bucket='some_bucket',
-            CopySource='some_bucket/snowflake-import/ppw_20210615115603_fastsync.csv.gz',
-            Key='archive/some-tap/some_table/ppw_20210615115603_fastsync.csv.gz',
+            Bucket="some_bucket",
+            CopySource="some_bucket/snowflake-import/ppw_20210615115603_fastsync.csv.gz",
+            Key="archive/some-tap/some_table/ppw_20210615115603_fastsync.csv.gz",
             Metadata={
-                'copied-old-key': 'copied-old-value',
-                'tap': 'some-tap',
-                'schema': 'some_schema',
-                'table': 'some_table',
-                'archived-by': 'pipelinewise_fastsync_postgres_to_snowflake',
+                "copied-old-key": "copied-old-value",
+                "tap": "some-tap",
+                "schema": "some_schema",
+                "table": "some_table",
+                "archived-by": "pipelinewise_fastsync_postgres_to_snowflake",
             },
-            MetadataDirective='REPLACE',
+            MetadataDirective="REPLACE",
         )

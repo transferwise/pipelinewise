@@ -5,11 +5,9 @@ from unittest import TestCase
 from pipelinewise import cli
 from pipelinewise.cli.errors import InvalidConfigException
 
-TAP_GITHUB_YAML = '{}/resources/tap-github.yml'.format(os.path.dirname(__file__))
+TAP_GITHUB_YAML = "{}/resources/tap-github.yml".format(os.path.dirname(__file__))
 
 
-# pylint: disable=too-many-public-methods,fixme
-# pylint: disable=E1136,E1137  # False positive when loading vault encrypted YAML
 class TestUtils(TestCase):
     """
     Unit Tests for Tap Github PipelineWise CLI utility functions
@@ -24,7 +22,7 @@ class TestUtils(TestCase):
         """
         Test Should pass with valid json schema
         """
-        schema = cli.utils.load_schema('tap')
+        schema = cli.utils.load_schema("tap")
 
         actual_yaml = cli.utils.load_yaml(TAP_GITHUB_YAML)
         self.assertIsNone(cli.utils.validate(actual_yaml, schema))
@@ -35,11 +33,11 @@ class TestUtils(TestCase):
         """
         Test should pass if organization and repos include missing but repository exists
         """
-        schema = cli.utils.load_schema('tap')
+        schema = cli.utils.load_schema("tap")
 
         actual_yaml = cli.utils.load_yaml(TAP_GITHUB_YAML)
-        del actual_yaml['db_conn']['organization']
-        del actual_yaml['db_conn']['repos_include']
+        del actual_yaml["db_conn"]["organization"]
+        del actual_yaml["db_conn"]["repos_include"]
 
         self.assertIsNone(cli.utils.validate(actual_yaml, schema))
 
@@ -49,11 +47,11 @@ class TestUtils(TestCase):
         """
         Test should pass if organization and repository missing but repos_include exists
         """
-        schema = cli.utils.load_schema('tap')
+        schema = cli.utils.load_schema("tap")
 
         actual_yaml = cli.utils.load_yaml(TAP_GITHUB_YAML)
-        del actual_yaml['db_conn']['organization']
-        del actual_yaml['db_conn']['repository']
+        del actual_yaml["db_conn"]["organization"]
+        del actual_yaml["db_conn"]["repository"]
 
         self.assertIsNone(cli.utils.validate(actual_yaml, schema))
 
@@ -75,10 +73,10 @@ class TestUtils(TestCase):
         """
         Test Should fail when access token is missing
         """
-        schema = cli.utils.load_schema('tap')
+        schema = cli.utils.load_schema("tap")
 
         actual_yaml = cli.utils.load_yaml(TAP_GITHUB_YAML)
-        del actual_yaml['db_conn']['access_token']
+        del actual_yaml["db_conn"]["access_token"]
 
         self.assert_json_is_invalid(schema, actual_yaml)
 
@@ -86,10 +84,10 @@ class TestUtils(TestCase):
         """
         Test should fail when start date is missing
         """
-        schema = cli.utils.load_schema('tap')
+        schema = cli.utils.load_schema("tap")
 
         actual_yaml = cli.utils.load_yaml(TAP_GITHUB_YAML)
-        del actual_yaml['db_conn']['start_date']
+        del actual_yaml["db_conn"]["start_date"]
 
         self.assert_json_is_invalid(schema, actual_yaml)
 
@@ -97,10 +95,10 @@ class TestUtils(TestCase):
         """
         Test should fail when access token is not string
         """
-        schema = cli.utils.load_schema('tap')
+        schema = cli.utils.load_schema("tap")
 
         actual_yaml = cli.utils.load_yaml(TAP_GITHUB_YAML)
-        actual_yaml['db_conn']['access_token'] = 123456
+        actual_yaml["db_conn"]["access_token"] = 123456
 
         self.assert_json_is_invalid(schema, actual_yaml)
 
@@ -108,10 +106,10 @@ class TestUtils(TestCase):
         """
         Test should fail when start date is not string
         """
-        schema = cli.utils.load_schema('tap')
+        schema = cli.utils.load_schema("tap")
 
         actual_yaml = cli.utils.load_yaml(TAP_GITHUB_YAML)
-        actual_yaml['db_conn']['start_date'] = 123456
+        actual_yaml["db_conn"]["start_date"] = 123456
 
         self.assert_json_is_invalid(schema, actual_yaml)
 
@@ -119,10 +117,10 @@ class TestUtils(TestCase):
         """
         Test should fail when organization is not string
         """
-        schema = cli.utils.load_schema('tap')
+        schema = cli.utils.load_schema("tap")
 
         actual_yaml = cli.utils.load_yaml(TAP_GITHUB_YAML)
-        actual_yaml['db_conn']['organization'] = []
+        actual_yaml["db_conn"]["organization"] = []
 
         self.assert_json_is_invalid(schema, actual_yaml)
 
@@ -130,10 +128,10 @@ class TestUtils(TestCase):
         """
         Test should fail when repos include is not string
         """
-        schema = cli.utils.load_schema('tap')
+        schema = cli.utils.load_schema("tap")
 
         actual_yaml = cli.utils.load_yaml(TAP_GITHUB_YAML)
-        actual_yaml['db_conn']['repos_include'] = []
+        actual_yaml["db_conn"]["repos_include"] = []
 
         self.assert_json_is_invalid(schema, actual_yaml)
 
@@ -141,10 +139,10 @@ class TestUtils(TestCase):
         """
         Test should fail when repos exclude is not string
         """
-        schema = cli.utils.load_schema('tap')
+        schema = cli.utils.load_schema("tap")
 
         actual_yaml = cli.utils.load_yaml(TAP_GITHUB_YAML)
-        actual_yaml['db_conn']['repos_include'] = {}
+        actual_yaml["db_conn"]["repos_include"] = {}
 
         self.assert_json_is_invalid(schema, actual_yaml)
 
@@ -152,10 +150,10 @@ class TestUtils(TestCase):
         """
         Test should fail when repository is not string
         """
-        schema = cli.utils.load_schema('tap')
+        schema = cli.utils.load_schema("tap")
 
         actual_yaml = cli.utils.load_yaml(TAP_GITHUB_YAML)
-        actual_yaml['db_conn']['repository'] = {}
+        actual_yaml["db_conn"]["repository"] = {}
 
         self.assert_json_is_invalid(schema, actual_yaml)
 
@@ -163,10 +161,10 @@ class TestUtils(TestCase):
         """
         Test should fail when include archived is not boolean
         """
-        schema = cli.utils.load_schema('tap')
+        schema = cli.utils.load_schema("tap")
 
         actual_yaml = cli.utils.load_yaml(TAP_GITHUB_YAML)
-        actual_yaml['db_conn']['include_archived'] = 'false'
+        actual_yaml["db_conn"]["include_archived"] = "false"
 
         self.assert_json_is_invalid(schema, actual_yaml)
 
@@ -174,10 +172,10 @@ class TestUtils(TestCase):
         """
         Test should fail when include disabled is not boolean
         """
-        schema = cli.utils.load_schema('tap')
+        schema = cli.utils.load_schema("tap")
 
         actual_yaml = cli.utils.load_yaml(TAP_GITHUB_YAML)
-        actual_yaml['db_conn']['include_archived'] = 'false'
+        actual_yaml["db_conn"]["include_archived"] = "false"
 
         self.assert_json_is_invalid(schema, actual_yaml)
 
@@ -185,10 +183,10 @@ class TestUtils(TestCase):
         """
         Test should fail when max rate limit wait seconds is not integer
         """
-        schema = cli.utils.load_schema('tap')
+        schema = cli.utils.load_schema("tap")
 
         actual_yaml = cli.utils.load_yaml(TAP_GITHUB_YAML)
-        actual_yaml['db_conn']['max_rate_limit_wait_seconds'] = '111'
+        actual_yaml["db_conn"]["max_rate_limit_wait_seconds"] = "111"
 
         self.assert_json_is_invalid(schema, actual_yaml)
 
@@ -196,10 +194,10 @@ class TestUtils(TestCase):
         """
         Test should fail when max rate limit wait seconds is above the max
         """
-        schema = cli.utils.load_schema('tap')
+        schema = cli.utils.load_schema("tap")
 
         actual_yaml = cli.utils.load_yaml(TAP_GITHUB_YAML)
-        actual_yaml['db_conn']['max_rate_limit_wait_seconds'] = 4000
+        actual_yaml["db_conn"]["max_rate_limit_wait_seconds"] = 4000
 
         self.assert_json_is_invalid(schema, actual_yaml)
 
@@ -207,9 +205,9 @@ class TestUtils(TestCase):
         """
         Test should fail when max rate limit wait seconds is below the min
         """
-        schema = cli.utils.load_schema('tap')
+        schema = cli.utils.load_schema("tap")
 
         actual_yaml = cli.utils.load_yaml(TAP_GITHUB_YAML)
-        actual_yaml['db_conn']['max_rate_limit_wait_seconds'] = 30
+        actual_yaml["db_conn"]["max_rate_limit_wait_seconds"] = 30
 
         self.assert_json_is_invalid(schema, actual_yaml)

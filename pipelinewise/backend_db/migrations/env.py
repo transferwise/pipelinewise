@@ -20,7 +20,7 @@ def run_migrations_online():
             connection=connection,
             target_metadata=None,
             compare_type=True,
-            version_table_schema='public',
+            version_table_schema="public",
         )
         with context.begin_transaction():
             context.run_migrations()

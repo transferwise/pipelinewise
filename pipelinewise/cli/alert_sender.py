@@ -1,6 +1,7 @@
 """
 PipelineWise CLI - Alert sender class
 """
+
 import logging
 from typing import Dict
 from collections import namedtuple
@@ -16,14 +17,14 @@ from .alert_handlers.errors import NotConfiguredAlertHandlerException
 LOGGER = logging.getLogger(__name__)
 
 # Alert handler entries from PPW config.yml transformed to Tuples
-AlertHandler = namedtuple('AlertHandler', ['type', 'config'])
+AlertHandler = namedtuple("AlertHandler", ["type", "config"])
 
 # Register new alert handlers class here
 # The key is the alert handler name from the PPW config.yml
 # Every alert handler class needs to implement the BaseAlertHandler base class
 ALERT_HANDLER_TYPES_TO_CLASS = {
-    'slack': SlackAlertHandler,
-    'victorops': VictoropsAlertHandler,
+    "slack": SlackAlertHandler,
+    "victorops": VictoropsAlertHandler,
 }
 
 
@@ -45,9 +46,7 @@ class AlertSender:
 
         # Raise an exception if alert_handlers is not a dictionary
         if not isinstance(self.alert_handlers, dict):
-            raise InvalidAlertHandlerException(
-                'alert_handlers needs to be a dictionary'
-            )
+            raise InvalidAlertHandlerException("alert_handlers needs to be a dictionary")
 
     @staticmethod
     def __init_handler_class(alert_handler: AlertHandler) -> BaseAlertHandler:
@@ -66,7 +65,7 @@ class AlertSender:
             handler = alert_handler_class(alert_handler.config)
         except KeyError as key_error:
             raise NotImplementedAlertHandlerException(
-                f'Alert handler type not implemented: {alert_handler.type}'
+                f"Alert handler type not implemented: {alert_handler.type}"
             ) from key_error
 
         return handler
@@ -83,14 +82,10 @@ class AlertSender:
         """
         if alert_handler_type in self.alert_handlers:
             alert_handler_config = self.alert_handlers[alert_handler_type]
-            alert_handler = AlertHandler(
-                type=alert_handler_type, config=alert_handler_config
-            )
+            alert_handler = AlertHandler(type=alert_handler_type, config=alert_handler_config)
             return alert_handler
 
-        raise NotConfiguredAlertHandlerException(
-            f'Alert handler type not configured: {alert_handler_type}'
-        )
+        raise NotConfiguredAlertHandlerException(f"Alert handler type not configured: {alert_handler_type}")
 
     def send_to_handler(
         self,
@@ -98,7 +93,7 @@ class AlertSender:
         message: str,
         level: str = BaseAlertHandler.ERROR,
         exc: Exception = None,
-        tap_slack_channel: str = None
+        tap_slack_channel: str = None,
     ) -> bool:
         """
         Sends an alert message to a specific alert handler type
@@ -119,7 +114,7 @@ class AlertSender:
         # Initialise and create an alert handler object from the the alert handler spec
         handler = self.__init_handler_class(alert_handler)
 
-        if alert_handler_type == 'slack':
+        if alert_handler_type == "slack":
             handler.send(message=message, level=level, exc=exc, tap_slack_channel=tap_slack_channel)
         else:
             handler.send(message=message, level=level, exc=exc)
@@ -147,4 +142,4 @@ class AlertSender:
             self.send_to_handler(handler_type, message, level, exc, tap_slack_channel)
             for handler_type in self.alert_handlers
         ]
-        return {'sent': len(sents)}
+        return {"sent": len(sents)}

@@ -6,9 +6,9 @@ from pathlib import Path
 from tests.end_to_end.helpers import assertions, tasks
 from tests.end_to_end.helpers.env import E2EEnv
 
-TEST_PROJECTS_DIR_PATH = 'tests/end_to_end/test-project'
-USER_HOME = os.path.expanduser('~')
-CONFIG_DIR = os.path.join(USER_HOME, '.pipelinewise')
+TEST_PROJECTS_DIR_PATH = "tests/end_to_end/test-project"
+USER_HOME = os.path.expanduser("~")
+CONFIG_DIR = os.path.join(USER_HOME, ".pipelinewise")
 
 
 class TargetSnowflake(unittest.TestCase):
@@ -16,7 +16,6 @@ class TargetSnowflake(unittest.TestCase):
     Base class for E2E tests for target snowflake
     """
 
-    # pylint: disable=arguments-differ
     def setUp(self, tap_id: str, target_id: str, tap_type: str):
         super().setUp()
 
@@ -24,25 +23,25 @@ class TargetSnowflake(unittest.TestCase):
         self.target_id = target_id
         self.e2e_env = self.get_e2e_env()
 
-        if self.e2e_env.env[tap_type]['is_configured'] is False:
-            self.skipTest(f'{tap_type} is not configured properly')
+        if self.e2e_env.env[tap_type]["is_configured"] is False:
+            self.skipTest(f"{tap_type} is not configured properly")
 
-        self.remove_dir_from_config_dir(f'{self.target_id}/{self.tap_id}')
+        self.remove_dir_from_config_dir(f"{self.target_id}/{self.tap_id}")
 
         self.check_snowflake_credentials_provided()
         self._cleanup_stale_sf_schemas(tap_type)
-        self.drop_sf_schema_if_exists(f'{self.tap_id}{self.e2e_env.sf_schema_postfix}')
+        self.drop_sf_schema_if_exists(f"{self.tap_id}{self.e2e_env.sf_schema_postfix}")
 
         self.check_validate_taps()
         self.check_import_config()
         self.tap_type = tap_type
 
     def tearDown(self):
-        self.remove_dir_from_config_dir(f'{self.target_id}/{self.tap_id}')
-        self.drop_sf_schema_if_exists(f'ppw_e2e_{self.tap_type}{self.e2e_env.sf_schema_postfix}'.upper())
-        self.drop_sf_schema_if_exists(f'ppw_e2e_{self.tap_type}_public2{self.e2e_env.sf_schema_postfix}'.upper())
+        self.remove_dir_from_config_dir(f"{self.target_id}/{self.tap_id}")
+        self.drop_sf_schema_if_exists(f"ppw_e2e_{self.tap_type}{self.e2e_env.sf_schema_postfix}".upper())
+        self.drop_sf_schema_if_exists(f"ppw_e2e_{self.tap_type}_public2{self.e2e_env.sf_schema_postfix}".upper())
         # The replica taps load into a _2 schema; without this it leaks every run.
-        self.drop_sf_schema_if_exists(f'ppw_e2e_{self.tap_type}_2{self.e2e_env.sf_schema_postfix}'.upper())
+        self.drop_sf_schema_if_exists(f"ppw_e2e_{self.tap_type}_2{self.e2e_env.sf_schema_postfix}".upper())
         super().tearDown()
 
     def get_e2e_env(self) -> E2EEnv:
@@ -51,41 +50,35 @@ class TargetSnowflake(unittest.TestCase):
         """
         test_projects_dir = Path(TEST_PROJECTS_DIR_PATH)
         if not (test_projects_dir.exists() and test_projects_dir.is_dir()):
-            raise Exception(f'{TEST_PROJECTS_DIR_PATH} does not exist')
+            raise Exception(f"{TEST_PROJECTS_DIR_PATH} does not exist")
         return E2EEnv(TEST_PROJECTS_DIR_PATH)
 
     def check_snowflake_credentials_provided(self):
         """
         check if snowflake credentials are provided
         """
-        if self.e2e_env.env['TARGET_SNOWFLAKE']['is_configured'] is False:
-            self.skipTest('TARGET SNOWFLAKE credentials are not configured')
+        if self.e2e_env.env["TARGET_SNOWFLAKE"]["is_configured"] is False:
+            self.skipTest("TARGET SNOWFLAKE credentials are not configured")
 
     def check_validate_taps(self):
         """
         run `pipelinewise validate`
         """
-        return_code, stdout, stderr = tasks.run_command(
-            f'pipelinewise validate --dir {TEST_PROJECTS_DIR_PATH}'
-        )
+        return_code, stdout, stderr = tasks.run_command(f"pipelinewise validate --dir {TEST_PROJECTS_DIR_PATH}")
         assertions.assert_command_success(return_code, stdout, stderr)
 
     def check_import_config(self):
         """
         run `pipelinewise import_config`
         """
-        return_code, stdout, stderr = tasks.run_command(
-            f'pipelinewise import_config --dir {TEST_PROJECTS_DIR_PATH}'
-        )
+        return_code, stdout, stderr = tasks.run_command(f"pipelinewise import_config --dir {TEST_PROJECTS_DIR_PATH}")
         assertions.assert_command_success(return_code, stdout, stderr)
 
     def drop_sf_schema_if_exists(self, schema: str):
         """
         drop schema from snowflake if it exists
         """
-        self.e2e_env.run_query_target_snowflake(
-            f'DROP SCHEMA IF EXISTS {schema} CASCADE'
-        )
+        self.e2e_env.run_query_target_snowflake(f"DROP SCHEMA IF EXISTS {schema} CASCADE")
 
     def _cleanup_stale_sf_schemas(self, tap_type):
         """Drop leftover PPW_E2E_* schemas for this tap type from previous test
@@ -93,17 +86,14 @@ class TargetSnowflake(unittest.TestCase):
         Only drops schemas matching the current tap type to avoid interfering
         with other tap suites running in the same session."""
         # tap_type is already 'TAP_MYSQL'/'TAP_POSTGRES', so no TAP_ prefix here.
-        pattern = f'PPW_E2E_{tap_type.upper()}_%'
+        pattern = f"PPW_E2E_{tap_type.upper()}_%"
         try:
             rows = self.e2e_env.run_query_target_snowflake(
-                f"SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA"
-                f" WHERE SCHEMA_NAME LIKE '{pattern}'"
+                f"SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME LIKE '{pattern}'"
             )
             for row in rows:
                 schema_name = row[0]
-                self.e2e_env.run_query_target_snowflake(
-                    f'DROP SCHEMA IF EXISTS {schema_name} CASCADE'
-                )
+                self.e2e_env.run_query_target_snowflake(f"DROP SCHEMA IF EXISTS {schema_name} CASCADE")
         except Exception:
             pass
 

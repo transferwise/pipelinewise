@@ -78,9 +78,7 @@ def _metadata_preflight(check: dict, column_pairs: list) -> dict:
         "target_table": check["target_table"],
         "columns": [logical_name for logical_name, _source, _target in column_pairs],
     }
-    fingerprint = hashlib.sha256(
-        json.dumps(payload, sort_keys=True).encode("utf-8")
-    ).hexdigest()
+    fingerprint = hashlib.sha256(json.dumps(payload, sort_keys=True).encode("utf-8")).hexdigest()
     return {
         "status": "PASS",
         "query_fingerprint": fingerprint,
@@ -92,7 +90,6 @@ def _metadata_preflight(check: dict, column_pairs: list) -> dict:
     }
 
 
-# pylint: disable=too-many-arguments
 def build_metric_query(
     adapter: DatabaseAdapter,
     schema: str,
@@ -149,9 +146,7 @@ def preflight_source(
         indexes = adapter.indexes(schema, table)
         table_rows = adapter.table_rows(schema, table)
         has_leading_index = any(
-            index.get("is_usable")
-            and index.get("columns")
-            and index["columns"][0].lower() == timestamp_column.lower()
+            index.get("is_usable") and index.get("columns") and index["columns"][0].lower() == timestamp_column.lower()
             for index in indexes
         )
 
@@ -166,11 +161,7 @@ def preflight_source(
             ]
             findings.append(
                 f"No usable source index starts with timestamp column "
-                f"'{timestamp_column}'"
-                + (
-                    f"; ignored as unusable: {', '.join(unusable)}"
-                    if unusable else ""
-                )
+                f"'{timestamp_column}'" + (f"; ignored as unusable: {', '.join(unusable)}" if unusable else "")
             )
         blocked = not has_leading_index and table_rows > MAX_SAFE_FULL_SCAN_ROWS
         if blocked:
@@ -264,9 +255,7 @@ def _connect_postgres(
         "host": connection_config.get(f"{prefix}host", connection_config["host"]),
         "port": connection_config.get(f"{prefix}port", connection_config["port"]),
         "user": connection_config.get(f"{prefix}user", connection_config["user"]),
-        "password": connection_config.get(
-            f"{prefix}password", connection_config["password"]
-        ),
+        "password": connection_config.get(f"{prefix}password", connection_config["password"]),
         "dbname": connection_config["dbname"],
         "connect_timeout": min(timeout, 30),
         "application_name": application_name,
@@ -303,9 +292,7 @@ def _mysql_ssl_context(connection_config: dict):
     if not certificate or not private_key:
         raise DataDiffExecutionError("MySQL ssl_cert and ssl_key must be configured together")
 
-    temp_dir = tempfile.TemporaryDirectory(  # pylint: disable=consider-using-with
-        prefix="pipelinewise-data-diff-tls-"
-    )
+    temp_dir = tempfile.TemporaryDirectory(prefix="pipelinewise-data-diff-tls-")
     try:
         certificate_path = certificate
         private_key_path = private_key
@@ -336,11 +323,9 @@ def connect_target(check: dict, connection_config: dict) -> DatabaseAdapter:
             application_name="pipelinewise-data-diff-target",
         )
     if check["target_type"] != "target-snowflake":
-        raise DataDiffExecutionError(
-            f"Unsupported target type: {check['target_type']}"
-        )
+        raise DataDiffExecutionError(f"Unsupported target type: {check['target_type']}")
 
-    import snowflake.connector  # pylint: disable=import-outside-toplevel
+    import snowflake.connector  # noqa: PLC0415
 
     connect_args = {
         "user": connection_config["user"],
@@ -353,9 +338,7 @@ def connect_target(check: dict, connection_config: dict) -> DatabaseAdapter:
             "TIMEZONE": "UTC",
             "STATEMENT_TIMEOUT_IN_SECONDS": timeout,
             "QUOTED_IDENTIFIERS_IGNORE_CASE": "FALSE",
-            "QUERY_TAG": json.dumps(
-                {"ppw_component": "data-diff", "check_id": str(check["check_id"])}
-            ),
+            "QUERY_TAG": json.dumps({"ppw_component": "data-diff", "check_id": str(check["check_id"])}),
         },
     }
     if connection_config.get("private_key"):
@@ -384,14 +367,11 @@ def _unique_columns(columns: list) -> list:
 def _require_resolved(columns: dict, name: str, qualified_table: str) -> dict:
     column = columns[name]
     if column.get("missing"):
-        raise DataDiffExecutionError(
-            f"Column '{name}' does not exist in {qualified_table}"
-        )
+        raise DataDiffExecutionError(f"Column '{name}' does not exist in {qualified_table}")
     return column
 
 
-# pylint: disable=too-many-branches,too-many-locals,too-many-statements
-def run_check(
+def run_check(  # noqa: PLR0915
     check: dict,
     source_config: dict,
     target_config: dict,
@@ -414,37 +394,39 @@ def run_check(
     try:
         source_compare = list(check.get("source_compare_columns") or [])
         target_compare = list(check.get("target_compare_columns") or [])
-        source_requested = _unique_columns([
-            check["source_key_column"], check["source_timestamp_column"],
-            *source_compare,
-        ])
-        target_requested = _unique_columns([
-            check["target_key_column"], check["target_timestamp_column"],
-            *target_compare,
-        ])
+        source_requested = _unique_columns(
+            [
+                check["source_key_column"],
+                check["source_timestamp_column"],
+                *source_compare,
+            ]
+        )
+        target_requested = _unique_columns(
+            [
+                check["target_key_column"],
+                check["target_timestamp_column"],
+                *target_compare,
+            ]
+        )
 
         source_columns = source.resolve_columns(
-            check["source_schema"], check["source_table"], source_requested,
+            check["source_schema"],
+            check["source_table"],
+            source_requested,
             allow_missing=True,
         )
         target_columns = target.resolve_columns(
-            check["target_schema"], check["target_table"], target_requested,
+            check["target_schema"],
+            check["target_table"],
+            target_requested,
             allow_missing=True,
         )
         source_table_name = f"{check['source_schema']}.{check['source_table']}"
         target_table_name = f"{check['target_schema']}.{check['target_table']}"
-        source_key_column = _require_resolved(
-            source_columns, check["source_key_column"], source_table_name
-        )
-        source_timestamp_column = _require_resolved(
-            source_columns, check["source_timestamp_column"], source_table_name
-        )
-        target_key_column = _require_resolved(
-            target_columns, check["target_key_column"], target_table_name
-        )
-        target_timestamp_column = _require_resolved(
-            target_columns, check["target_timestamp_column"], target_table_name
-        )
+        source_key_column = _require_resolved(source_columns, check["source_key_column"], source_table_name)
+        source_timestamp_column = _require_resolved(source_columns, check["source_timestamp_column"], source_table_name)
+        target_key_column = _require_resolved(target_columns, check["target_key_column"], target_table_name)
+        target_timestamp_column = _require_resolved(target_columns, check["target_timestamp_column"], target_table_name)
 
         _validate_timestamp_type(
             source_timestamp_column,
@@ -471,9 +453,7 @@ def run_check(
             if source_name.lower() in paired_names:
                 continue
             paired_names.add(source_name.lower())
-            column_pairs.append(
-                (source_name, source_columns[source_name], target_columns[target_name])
-            )
+            column_pairs.append((source_name, source_columns[source_name], target_columns[target_name]))
 
         checks = tuple(check["checks"])
         results_by_type = {}
@@ -485,9 +465,7 @@ def run_check(
         metric_checks = [item for item in checks if item != SCHEMA_CHECK]
         if CHECKSUM_CHECK in metric_checks:
             try:
-                source_checksum_columns, target_checksum_columns = checksum_columns(
-                    column_pairs
-                )
+                source_checksum_columns, target_checksum_columns = checksum_columns(column_pairs)
             except UnsupportedComparisonError as exc:
                 metric_checks.remove(CHECKSUM_CHECK)
                 results_by_type[CHECKSUM_CHECK] = {
@@ -512,30 +490,37 @@ def run_check(
         if metric_checks:
             metric_checks = tuple(metric_checks)
             source_sql = build_metric_query(
-                source, check["source_schema"], check["source_table"],
-                source_key_column["name"], source_timestamp_column["name"],
-                metric_checks, checksum_columns_for_query=source_checksum_columns,
+                source,
+                check["source_schema"],
+                check["source_table"],
+                source_key_column["name"],
+                source_timestamp_column["name"],
+                metric_checks,
+                checksum_columns_for_query=source_checksum_columns,
             )
             target_sql = build_metric_query(
-                target, check["target_schema"], check["target_table"],
-                target_key_column["name"], target_timestamp_column["name"],
+                target,
+                check["target_schema"],
+                check["target_table"],
+                target_key_column["name"],
+                target_timestamp_column["name"],
                 metric_checks,
                 checksum_columns_for_query=target_checksum_columns,
             )
             preflight = preflight_source(
-                source, check["source_schema"], check["source_table"],
-                source_timestamp_column["name"], source_sql, source_params,
+                source,
+                check["source_schema"],
+                check["source_table"],
+                source_timestamp_column["name"],
+                source_sql,
+                source_params,
             )
             _publish_preflight(on_preflight, preflight)
             if preflight["status"] != "PASS":
                 return preflight, [], None
 
-            source_result = source.execute_metrics(
-                source_sql, source_params, metric_checks
-            )
-            target_result = target.execute_metrics(
-                target_sql, target_params, metric_checks
-            )
+            source_result = source.execute_metrics(source_sql, source_params, metric_checks)
+            target_result = target.execute_metrics(target_sql, target_params, metric_checks)
             for check_type in metric_checks:
                 source_value = source_result.values[check_type]
                 target_value = target_result.values[check_type]

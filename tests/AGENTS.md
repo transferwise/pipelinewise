@@ -6,7 +6,7 @@ Read root `AGENTS.md` first. This covers `tests/`; also read the E2E file for da
 
 - `tests/units` is the credential/container-free root PipelineWise CI coverage gate; run the exact command in root `AGENTS.md`. Connector CI has separate tap-mysql and tap-postgres gates.
 - Selecting paths below `tests/units/data_diff/` or `tests/units/backend_db/` can break imports; collect from `tests/units` and narrow with `-k`.
-- Never run bare `pytest tests/`; it also collects credentialed E2E. CI overrides `.coveragerc` with 77, and Ruff/Pylint inspect root tests.
+- Never run bare `pytest tests/`; it also collects credentialed E2E. CI overrides `.coveragerc` with 77, and Ruff inspects root tests.
 - Connector tests are separate and uncollected here; follow `singer-connectors/AGENTS.md`. Database-backed and connector-route tests follow `tests/end_to_end/AGENTS.md`.
 
 ## Proof and reporting

@@ -31,9 +31,7 @@ def _stale_run_age(check: dict) -> timedelta:
     timeout has no upper bound: a generous one must not have its live runs expired.
     """
     budget = int(check.get("statement_timeout_seconds") or 0)
-    return STALE_RUN_GRACE + timedelta(
-        seconds=budget * STALE_RUN_QUERY_BUDGET_MULTIPLIER
-    )
+    return STALE_RUN_GRACE + timedelta(seconds=budget * STALE_RUN_QUERY_BUDGET_MULTIPLIER)
 
 
 def scheduled_slot(now: datetime, cron_expr: str) -> datetime:
@@ -115,20 +113,23 @@ def execute_started_run(
 
     def _record(preflight):
         # Called by run_check before either aggregate executes.
-        recorded["preflight_id"] = backend.record_preflight(
-            check["check_id"], preflight
-        )
+        recorded["preflight_id"] = backend.record_preflight(check["check_id"], preflight)
 
     with _terminating_signals_finish_run(backend, check, run, recorded):
         return _execute_and_persist(
-            backend, connection_config_loader, check, run,
-            scheduled_for, window_start, window_end,
-            recorded=recorded, on_preflight=_record,
+            backend,
+            connection_config_loader,
+            check,
+            run,
+            scheduled_for,
+            window_start,
+            window_end,
+            recorded=recorded,
+            on_preflight=_record,
         )
 
 
-# pylint: disable=too-many-arguments,too-many-locals
-def _execute_and_persist(
+def _execute_and_persist(  # noqa: PLR0913
     backend,
     connection_config_loader: ConnectionConfigLoader,
     check: dict,
@@ -147,20 +148,20 @@ def _execute_and_persist(
             *connection_config_loader(check),
         )
         preflight, results, status = run_check(
-            check, source_config, target_config, window_start, window_end,
+            check,
+            source_config,
+            target_config,
+            window_start,
+            window_end,
             on_preflight=on_preflight,
         )
         preflight_id = recorded["preflight_id"]
         if preflight["status"] != "PASS":
             error = preflight.get("error") or "; ".join(preflight.get("findings", []))
-            backend.finish_run(
-                run["run_id"], "ERROR", [], preflight_id=preflight_id, error=error
-            )
+            backend.finish_run(run["run_id"], "ERROR", [], preflight_id=preflight_id, error=error)
             status = "ERROR"
         else:
-            backend.finish_run(
-                run["run_id"], status, results, preflight_id=preflight_id
-            )
+            backend.finish_run(run["run_id"], status, results, preflight_id=preflight_id)
         return {
             "check": check,
             "run_id": run["run_id"],
@@ -177,7 +178,10 @@ def _execute_and_persist(
         # Only for interpreter-raised cases, e.g. Ctrl-C with no handler installed.
         # Real signals are converted to a terminal ERROR by the handler above.
         _finish_failed_run(
-            backend, check, run, recorded["preflight_id"],
+            backend,
+            check,
+            run,
+            recorded["preflight_id"],
             f"Interrupted by {type(exc).__name__} before the check completed",
         )
         raise
@@ -211,9 +215,11 @@ def _terminating_signals_finish_run(backend, check: dict, run: dict, recorded: d
     def _handle(signum, _frame):
         try:
             _finish_failed_run(
-                backend, check, run, recorded["preflight_id"],
-                f"Terminated by {signal.Signals(signum).name} "
-                "before the check completed",
+                backend,
+                check,
+                run,
+                recorded["preflight_id"],
+                f"Terminated by {signal.Signals(signum).name} before the check completed",
             )
         finally:
             signal.signal(signum, previous.get(signum, signal.SIG_DFL))
@@ -257,12 +263,9 @@ def _finish_failed_run(backend, check: dict, run: dict, preflight_id, error: str
                 "has_leading_index": None,
             },
         )
-    backend.finish_run(
-        run["run_id"], "ERROR", [], preflight_id=preflight_id, error=error
-    )
+    backend.finish_run(run["run_id"], "ERROR", [], preflight_id=preflight_id, error=error)
 
 
-# pylint: disable=too-many-locals
 def run_due_checks(
     backend,
     connection_config_loader: ConnectionConfigLoader,
@@ -282,9 +285,7 @@ def run_due_checks(
             continue
         # Before the latest slot is read, not per due slot: a RUNNING row counts as
         # observed, so leaving it would advance the scheduler past its own slot.
-        expired = backend.expire_stale_running_attempts(
-            check["check_id"], now - _stale_run_age(check)
-        )
+        expired = backend.expire_stale_running_attempts(check["check_id"], now - _stale_run_age(check))
         if expired:
             LOGGER.warning(
                 "Expired %s abandoned run(s) for %s",
@@ -294,7 +295,7 @@ def run_due_checks(
         latest = backend.latest_scheduled_for(check["check_id"])
         try:
             slots = due_slots(check, now, latest)
-        except Exception as exc:  # pylint: disable=broad-except
+        except Exception as exc:
             # No run row exists yet, so this cannot be recorded against one. Report
             # and continue: one broken definition must not stop the other checks.
             LOGGER.error(
@@ -315,9 +316,7 @@ def run_due_checks(
             continue
         for scheduled_for in slots:
             _, window_start, window_end = window_for_slot(check, scheduled_for)
-            run = backend.start_run(
-                check, scheduled_for, window_start, window_end, force=force
-            )
+            run = backend.start_run(check, scheduled_for, window_start, window_end, force=force)
             if run is None:
                 summaries.append(
                     {
@@ -331,8 +330,13 @@ def run_due_checks(
                 continue
             summaries.append(
                 execute_started_run(
-                    backend, connection_config_loader, check, run,
-                    scheduled_for, window_start, window_end,
+                    backend,
+                    connection_config_loader,
+                    check,
+                    run,
+                    scheduled_for,
+                    window_start,
+                    window_end,
                 )
             )
     return summaries
@@ -349,6 +353,11 @@ def rerun_failed_check(
     check = backend.get_check_version(original["dd_check_id"])
     run = backend.start_remediation_run(original, remediation_reference)
     return execute_started_run(
-        backend, connection_config_loader, check, run,
-        original["scheduled_for"], original["window_start"], original["window_end"],
+        backend,
+        connection_config_loader,
+        check,
+        run,
+        original["scheduled_for"],
+        original["window_start"],
+        original["window_end"],
     )

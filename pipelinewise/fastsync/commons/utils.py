@@ -10,9 +10,9 @@ from pipelinewise.cli.utils import generate_random_string
 
 LOGGER = logging.getLogger(__name__)
 
-SDC_EXTRACTED_AT = '_SDC_EXTRACTED_AT'
-SDC_BATCHED_AT = '_SDC_BATCHED_AT'
-SDC_DELETED_AT = '_SDC_DELETED_AT'
+SDC_EXTRACTED_AT = "_SDC_EXTRACTED_AT"
+SDC_BATCHED_AT = "_SDC_BATCHED_AT"
+SDC_DELETED_AT = "_SDC_DELETED_AT"
 
 
 class NotSelectedTableException(Exception):
@@ -25,7 +25,6 @@ class NotSelectedTableException(Exception):
         super().__init__(self, self.message)
 
 
-# pylint: disable=missing-function-docstring
 def get_cpu_cores():
     """Get CPU cores for multiprocessing"""
     try:
@@ -36,23 +35,23 @@ def get_cpu_cores():
 
 
 def load_json(path):
-    with open(path, encoding='utf-8') as fil:
+    with open(path, encoding="utf-8") as fil:
         return json.load(fil)
 
 
 def save_dict_to_json(path, data):
-    LOGGER.info('Saving new state file to %s', path)
-    with open(path, 'w', encoding='utf-8') as fil:
+    LOGGER.info("Saving new state file to %s", path)
+    with open(path, "w", encoding="utf-8") as fil:
         fil.write(json.dumps(data, indent=4, sort_keys=True))
 
 
 def check_config(config, required_keys):
     missing_keys = [key for key in required_keys if key not in config]
     if missing_keys:
-        raise Exception('Config is missing required keys: {}'.format(missing_keys))
+        raise Exception("Config is missing required keys: {}".format(missing_keys))
 
 
-def tablename_to_dict(table, separator='.'):
+def tablename_to_dict(table, separator="."):
     """Derive catalog, schema and table names from fully qualified table names"""
     catalog_name = None
     schema_name = None
@@ -65,13 +64,13 @@ def tablename_to_dict(table, separator='.'):
     if len(split_parts) > 2:
         catalog_name = split_parts[0]
         schema_name = split_parts[1]
-        table_name = '_'.join(split_parts[2:])
+        table_name = "_".join(split_parts[2:])
 
     return {
-        'catalog_name': catalog_name,
-        'schema_name': schema_name,
-        'table_name': table_name,
-        'temp_table_name': '{}_temp'.format(table_name),
+        "catalog_name": catalog_name,
+        "schema_name": schema_name,
+        "table_name": table_name,
+        "temp_table_name": "{}_temp".format(table_name),
     }
 
 
@@ -81,25 +80,21 @@ def get_tables_from_properties(properties: Dict) -> set:
     """
     tables = set()
 
-    for stream in properties.get('streams', tables):
-        metadata = stream.get('metadata', [])
-        table_name = stream.get('table_name', stream['stream'])
+    for stream in properties.get("streams", tables):
+        metadata = stream.get("metadata", [])
+        table_name = stream.get("table_name", stream["stream"])
 
         table_meta = next(
-            (
-                i
-                for i in metadata
-                if isinstance(i, dict) and len(i.get('breadcrumb', [])) == 0
-            ),
+            (i for i in metadata if isinstance(i, dict) and len(i.get("breadcrumb", [])) == 0),
             {},
-        ).get('metadata')
-        selected = table_meta.get('selected', False)
-        schema_name = table_meta.get('schema-name')
-        db_name = table_meta.get('database-name')
+        ).get("metadata")
+        selected = table_meta.get("selected", False)
+        schema_name = table_meta.get("schema-name")
+        db_name = table_meta.get("database-name")
 
         if table_name and selected:
             if schema_name is not None or db_name is not None:
-                tables.add('{}.{}'.format(schema_name or db_name, table_name))
+                tables.add("{}.{}".format(schema_name or db_name, table_name))
             else:
                 # Some tap types don't have db name nor schema name
                 tables.add(table_name)
@@ -114,42 +109,34 @@ def get_bookmark_for_table(table, properties, db_engine, dbname=None):
     bookmark = {}
 
     # Find table from properties and get bookmark based on replication method
-    for stream in properties.get('streams', []):
-        metadata = stream.get('metadata', [])
-        table_name = stream.get('table_name', stream['stream'])
+    for stream in properties.get("streams", []):
+        metadata = stream.get("metadata", [])
+        table_name = stream.get("table_name", stream["stream"])
 
         # Get table specific metadata i.e. replication method, replication key, etc.
         table_meta = next(
-            (
-                i
-                for i in metadata
-                if isinstance(i, dict) and len(i.get('breadcrumb', [])) == 0
-            ),
+            (i for i in metadata if isinstance(i, dict) and len(i.get("breadcrumb", [])) == 0),
             {},
-        ).get('metadata')
-        db_name = table_meta.get('database-name')
-        schema_name = table_meta.get('schema-name')
-        replication_method = table_meta.get('replication-method')
-        replication_key = table_meta.get('replication-key')
+        ).get("metadata")
+        db_name = table_meta.get("database-name")
+        schema_name = table_meta.get("schema-name")
+        replication_method = table_meta.get("replication-method")
+        replication_key = table_meta.get("replication-key")
 
         fully_qualified_table_name = (
-            '{}.{}'.format(schema_name or db_name, table_name)
+            "{}.{}".format(schema_name or db_name, table_name)
             if schema_name is not None or db_name is not None
             else table_name
         )
 
-        if (
-            dbname is None or db_name == dbname
-        ) and fully_qualified_table_name == table:
+        if (dbname is None or db_name == dbname) and fully_qualified_table_name == table:
             # Log based replication: get mysql binlog position
-            if replication_method == 'LOG_BASED':
+            if replication_method == "LOG_BASED":
                 bookmark = db_engine.fetch_current_log_pos()
 
             # Key based incremental replication: Get max replication key from source
-            elif replication_method == 'INCREMENTAL':
-                bookmark = db_engine.fetch_current_incremental_key_pos(
-                    fully_qualified_table_name, replication_key
-                )
+            elif replication_method == "INCREMENTAL":
+                bookmark = db_engine.fetch_current_incremental_key_pos(fully_qualified_table_name, replication_key)
 
             break
 
@@ -171,28 +158,25 @@ def get_target_schema(target_config, table):
                                             }
     """
     target_schema = None
-    config_default_target_schema = target_config.get(
-        'default_target_schema', ''
-    ).strip()
-    config_schema_mapping = target_config.get('schema_mapping', {})
+    config_default_target_schema = target_config.get("default_target_schema", "").strip()
+    config_schema_mapping = target_config.get("schema_mapping", {})
 
     table_dict = tablename_to_dict(table)
-    table_schema = table_dict['schema_name']
+    table_schema = table_dict["schema_name"]
     if config_schema_mapping and table_schema in config_schema_mapping:
-        target_schema = config_schema_mapping[table_schema].get('target_schema')
+        target_schema = config_schema_mapping[table_schema].get("target_schema")
     elif config_default_target_schema:
         target_schema = config_default_target_schema
 
     if not target_schema:
         raise Exception(
             "Target schema name not defined in config. Neither 'default_target_schema' (string) nor 'schema_mapping' "
-            '(object) defines target schema for {} stream. '.format(table)
+            "(object) defines target schema for {} stream. ".format(table)
         )
 
     return target_schema
 
 
-# pylint: disable=invalid-name
 def get_target_schemas(target_config, tables):
     """Get list of target schemas"""
     target_schemas = []
@@ -202,7 +186,6 @@ def get_target_schemas(target_config, tables):
     return list(dict.fromkeys(target_schemas))
 
 
-# pylint: disable=invalid-name
 def get_grantees(target_config, table):
     """Grantees can be defined in multiple ways:
 
@@ -221,17 +204,13 @@ def get_grantees(target_config, table):
                                                         }
     """
     grantees = []
-    config_default_target_schema_select_permissions = target_config.get(
-        'default_target_schema_select_permissions', []
-    )
-    config_schema_mapping = target_config.get('schema_mapping', {})
+    config_default_target_schema_select_permissions = target_config.get("default_target_schema_select_permissions", [])
+    config_schema_mapping = target_config.get("schema_mapping", {})
 
     table_dict = tablename_to_dict(table)
-    table_schema = table_dict['schema_name']
+    table_schema = table_dict["schema_name"]
     if config_schema_mapping and table_schema in config_schema_mapping:
-        grantees = config_schema_mapping[table_schema].get(
-            'target_schema_select_permissions', []
-        )
+        grantees = config_schema_mapping[table_schema].get("target_schema_select_permissions", [])
     elif config_default_target_schema_select_permissions:
         grantees = config_default_target_schema_select_permissions
 
@@ -240,12 +219,12 @@ def get_grantees(target_config, table):
         grantees = [grantees]
     # Grantees can be a dict with string/list of users and groups
     elif isinstance(grantees, dict):
-        users = grantees.get('users')
-        groups = grantees.get('groups')
+        users = grantees.get("users")
+        groups = grantees.get("groups")
 
         grantees = {
-            'users': [users] if isinstance(users, str) else users,
-            'groups': [groups] if isinstance(groups, str) else groups,
+            "users": [users] if isinstance(users, str) else users,
+            "groups": [groups] if isinstance(groups, str) else groups,
         }
     # Convert anything else that not list empty list
     elif not isinstance(grantees, list):
@@ -261,8 +240,8 @@ def grant_privilege(schema, grantees, grant_method, to_group=False):
     elif isinstance(grantees, str):
         grant_method(schema, grantees, to_group)
     elif isinstance(grantees, dict):
-        users = grantees.get('users')
-        groups = grantees.get('groups')
+        users = grantees.get("users")
+        groups = grantees.get("groups")
 
         grant_privilege(schema, users, grant_method)
         grant_privilege(schema, groups, grant_method, to_group=True)
@@ -271,15 +250,11 @@ def grant_privilege(schema, grantees, grant_method, to_group=False):
 def save_state_file(path, table, bookmark, dbname=None):
     table_dict = tablename_to_dict(table)
     if dbname:
-        stream_id = '{}-{}-{}'.format(
-            dbname, table_dict.get('schema_name'), table_dict.get('table_name')
-        )
-    elif table_dict['schema_name']:
-        stream_id = '{}-{}'.format(
-            table_dict['schema_name'], table_dict.get('table_name')
-        )
+        stream_id = "{}-{}-{}".format(dbname, table_dict.get("schema_name"), table_dict.get("table_name"))
+    elif table_dict["schema_name"]:
+        stream_id = "{}-{}".format(table_dict["schema_name"], table_dict.get("table_name"))
     else:
-        stream_id = table_dict['table_name']
+        stream_id = table_dict["table_name"]
 
     # Do nothing if state path not defined
     if not path:
@@ -291,12 +266,12 @@ def save_state_file(path, table, bookmark, dbname=None):
         state = load_json(path)
 
     # Find the current table position
-    bookmarks = state.get('bookmarks', {})
+    bookmarks = state.get("bookmarks", {})
 
     # Update the state file with the new values at the right place
-    state['currently_syncing'] = None
-    state['bookmarks'] = bookmarks
-    state['bookmarks'][stream_id] = bookmark
+    state["currently_syncing"] = None
+    state["bookmarks"] = bookmarks
+    state["bookmarks"][stream_id] = bookmark
 
     # Save the new state file
     save_dict_to_json(path, state)
@@ -319,21 +294,22 @@ def parse_args(required_config_keys: Dict) -> argparse.Namespace:
     we will automatically load and parse the JSON file.
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument('--tap', help='Tap Config file', required=True)
-    parser.add_argument('--state', help='State file')
-    parser.add_argument('--properties', help='Properties file')
-    parser.add_argument('--target', help='Target Config file', required=True)
-    parser.add_argument('--transform', help='Transformations Config file')
-    parser.add_argument('--tables', help='Sync only specific tables')
+    parser.add_argument("--tap", help="Tap Config file", required=True)
+    parser.add_argument("--state", help="State file")
+    parser.add_argument("--properties", help="Properties file")
+    parser.add_argument("--target", help="Target Config file", required=True)
+    parser.add_argument("--transform", help="Transformations Config file")
+    parser.add_argument("--tables", help="Sync only specific tables")
+    parser.add_argument("--temp_dir", help="Temporary directory required for CSV exports")
     parser.add_argument(
-        '--temp_dir', help='Temporary directory required for CSV exports'
+        "--drop_pg_slot",
+        help="Drop pg replication slot before starting resync",
+        action="store_true",
     )
     parser.add_argument(
-        '--drop_pg_slot',
-        help='Drop pg replication slot before starting resync',
-        action='store_true',
+        "--autoresync_size",
+        help="maximum value for table size to resync",
     )
-    parser.add_argument('--autoresync_size', help='maximum value for table size to resync', )
 
     args: argparse.Namespace = parser.parse_args()
 
@@ -356,7 +332,7 @@ def parse_args(required_config_keys: Dict) -> argparse.Namespace:
 
     if args.tables:
         # prevent duplicates
-        unique_tables_list = set(args.tables.split(','))
+        unique_tables_list = set(args.tables.split(","))
 
         # check if all the given tables are actually selected
         for table in unique_tables_list:
@@ -368,18 +344,17 @@ def parse_args(required_config_keys: Dict) -> argparse.Namespace:
         args.tables = all_selected_tables
 
     if not args.temp_dir:
-        args.temp_dir = os.path.realpath('.')
+        args.temp_dir = os.path.realpath(".")
 
-    check_config(args.tap, required_config_keys['tap'])
-    check_config(args.target, required_config_keys['target'])
+    check_config(args.tap, required_config_keys["tap"])
+    check_config(args.target, required_config_keys["target"])
 
     return args
 
 
-# pylint: disable=import-outside-toplevel
 def retry_pattern():
-    import backoff
-    from botocore.exceptions import ClientError
+    import backoff  # noqa: PLC0415
+    from botocore.exceptions import ClientError  # noqa: PLC0415
 
     return backoff.on_exception(
         backoff.expo,
@@ -392,8 +367,8 @@ def retry_pattern():
 
 def log_backoff_attempt(details):
     LOGGER.error(
-        'Error detected communicating with Amazon, triggering backoff: %s try',
-        details.get('tries'),
+        "Error detected communicating with Amazon, triggering backoff: %s try",
+        details.get("tries"),
     )
 
 
@@ -407,7 +382,7 @@ def get_pool_size(tap: Dict) -> int:
 
     """
     cpu_cores = get_cpu_cores()
-    fastsync_parallelism = tap.get('fastsync_parallelism', None)
+    fastsync_parallelism = tap.get("fastsync_parallelism", None)
 
     if fastsync_parallelism is None:
         return cpu_cores
@@ -416,7 +391,7 @@ def get_pool_size(tap: Dict) -> int:
 
 
 def gen_export_filename(
-    tap_id: str, table: str, suffix: str = None, postfix: str = None, ext: str = None, sync_type: str = 'fastsync'
+    tap_id: str, table: str, suffix: str = None, postfix: str = None, ext: str = None, sync_type: str = "fastsync"
 ) -> str:
     """
     Generates a unique filename used for exported fastsync data that avoids file name collision
@@ -435,12 +410,12 @@ def gen_export_filename(
         Unique filename as a string
     """
     if not suffix:
-        suffix = datetime.datetime.now().strftime('%Y%m%d-%H%M%S-%f')
+        suffix = datetime.datetime.now().strftime("%Y%m%d-%H%M%S-%f")
 
     if not postfix:
         postfix = generate_random_string()
 
     if not ext:
-        ext = 'csv.gz'
+        ext = "csv.gz"
 
-    return f'pipelinewise_{tap_id}_{table}_{suffix}_{sync_type}_{postfix}.{ext}'
+    return f"pipelinewise_{tap_id}_{table}_{suffix}_{sync_type}_{postfix}.{ext}"

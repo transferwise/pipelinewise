@@ -1,17 +1,17 @@
 import snowflake.connector
 import re
+import sys
 
 from singer import get_logger
 
-from typing import List, Dict, Union, Tuple, Set
+from typing import List, Dict, Union, Tuple
 from cryptography.hazmat.primitives import serialization
 
 
-# pylint: disable=too-many-public-methods,too-many-instance-attributes
 class CopyNativeToIceberg:
     """CopyNativeToIceberg class"""
 
-    def __init__(self, connection_config, fqtn=None, eventual='NATIVE'):
+    def __init__(self, connection_config, fqtn=None, eventual="NATIVE"):
         """
         connection_config:      Snowflake connection details
         fqtn:                   Fully qualified table name to be converted
@@ -24,46 +24,47 @@ class CopyNativeToIceberg:
         self.eventual = eventual
 
         if self.check_iceberg():
-            self.logger.info(f'Table {fqtn} already Iceberg')
-            exit(1)
+            self.logger.info(f"Table {fqtn} already Iceberg")
+            sys.exit(1)
 
         native_columns, iceberg_columns = self.get_columns()
         pk = self.get_pk()
 
-        if eventual == 'NATIVE':
-            self.logger.info(f'Creating {fqtn}_ICEBERG and copying data from {fqtn}_NATIVE to {fqtn}_ICEBERG')
+        if eventual == "NATIVE":
+            self.logger.info(f"Creating {fqtn}_ICEBERG and copying data from {fqtn}_NATIVE to {fqtn}_ICEBERG")
 
-        elif eventual == 'ICEBERG':
-            self.logger.info(f'Renaming {fqtn} to {fqtn}_NATIVE, Creating ICEBERG table {fqtn} and copying data from {fqtn}_NATIVE to {fqtn}')
+        elif eventual == "ICEBERG":
+            self.logger.info(
+                f"Renaming {fqtn} to {fqtn}_NATIVE, Creating ICEBERG table {fqtn} and copying data from "
+                f"{fqtn}_NATIVE to {fqtn}"
+            )
 
             # Rename existing table to _NATIVE
-            query=f"ALTER TABLE {fqtn} RENAME TO {fqtn}_NATIVE"
+            query = f"ALTER TABLE {fqtn} RENAME TO {fqtn}_NATIVE"
             self.logger.info(query)
             result = self.query(query)
             self.logger.info(result)
 
         # Create Iceberg table
-        query=self.get_create_iceberg(iceberg_columns, pk)
+        query = self.get_create_iceberg(iceberg_columns, pk)
         self.logger.info(query)
         result = self.query(query)
         self.logger.info(result)
 
         # Copy data to Iceberg
-        query=self.get_query_copy_to_iceberg(native_columns)
+        query = self.get_query_copy_to_iceberg(native_columns)
         self.logger.info(query)
         result = self.query(query)
         self.logger.info(result)
 
-
     def check_iceberg(self) -> bool:
         database, schema_name, table_name = self.parse_fqtn(self.fqtn)
 
-        self.logger.info(f'Checking if table {self.fqtn} is an Iceberg table')
+        self.logger.info(f"Checking if table {self.fqtn} is an Iceberg table")
         results = self.query(f"SHOW TERSE ICEBERG TABLES LIKE '{table_name}' IN SCHEMA {database}.{schema_name}")
         if len(results) == 0:
             return False
         return True
-
 
     def parse_fqtn(self, fqtn: str) -> Tuple[str, str, str]:
         if not fqtn or not isinstance(fqtn, str):
@@ -74,14 +75,14 @@ class CopyNativeToIceberg:
         # Pattern to match quoted or unquoted identifiers
         # Matches: database.schema.table or "database"."schema"."table" or mixed
         identifier_pattern = r'(?:"([^"]+)"|([^.]+))'
-        full_pattern = rf'^{identifier_pattern}\.{identifier_pattern}\.{identifier_pattern}$'
+        full_pattern = rf"^{identifier_pattern}\.{identifier_pattern}\.{identifier_pattern}$"
 
         match = re.match(full_pattern, fqtn)
 
         if not match:
             raise ValueError(
                 f"Invalid FQTN format: '{fqtn}'. "
-                "Expected format: 'database.schema.table' or '\"database\".\"schema\".\"table\"'"
+                'Expected format: \'database.schema.table\' or \'"database"."schema"."table"\''
             )
 
         # Extract matched groups (quoted or unquoted)
@@ -104,7 +105,6 @@ class CopyNativeToIceberg:
 
         return database, schema, table
 
-
     def get_columns(self):
         database, schema_name, table_name = self.parse_fqtn(self.fqtn)
 
@@ -122,22 +122,21 @@ class CopyNativeToIceberg:
         iceberg_columns = native_columns.copy()
         # Use Iceberg compatible data types
         for col in iceberg_columns:
-            if col['DATA_TYPE'] == 'NUMBER':
-                col['DATA_TYPE'] = 'NUMBER(19,0)'
-            if col['DATA_TYPE'] == 'TEXT':
-                col['DATA_TYPE'] = 'VARCHAR'
-            if col['DATA_TYPE'] == 'TIMESTAMP_TZ':
-                col['DATA_TYPE'] = 'TIMESTAMP_LTZ'
-            if col['DATA_TYPE'] == 'VARIANT':
-                col['DATA_TYPE'] = 'TEXT'
+            if col["DATA_TYPE"] == "NUMBER":
+                col["DATA_TYPE"] = "NUMBER(19,0)"
+            if col["DATA_TYPE"] == "TEXT":
+                col["DATA_TYPE"] = "VARCHAR"
+            if col["DATA_TYPE"] == "TIMESTAMP_TZ":
+                col["DATA_TYPE"] = "TIMESTAMP_LTZ"
+            if col["DATA_TYPE"] == "VARIANT":
+                col["DATA_TYPE"] = "TEXT"
 
         return native_columns, iceberg_columns
-
 
     def get_pk(self):
         queries = []
         # Query to get primary key constraints
-        query = f'SHOW PRIMARY KEYS IN TABLE {self.fqtn};'
+        query = f"SHOW PRIMARY KEYS IN TABLE {self.fqtn};"
         queries.extend([query])
 
         query = 'select "column_name" as COLUMN_NAME from table(result_scan(-1));'
@@ -148,38 +147,36 @@ class CopyNativeToIceberg:
         pk = self.query(queries)
         return pk
 
-
     def get_create_iceberg(self, columns, pk):
         """Generate CREATE ICEBERG TABLE SQL"""
         database, schema_name, table_name = self.parse_fqtn(self.fqtn)
 
-        if self.eventual == 'NATIVE':
+        if self.eventual == "NATIVE":
             statement = f"CREATE ICEBERG TABLE {database}.{schema_name}.{table_name}_ICEBERG ( "
-        elif self.eventual == 'ICEBERG':
+        elif self.eventual == "ICEBERG":
             statement = f"CREATE ICEBERG TABLE {database}.{schema_name}.{table_name} ( "
 
         # Add column definitions
         column_defs = []
         for col in columns:
-            col_name = col['COLUMN_NAME']
-            data_type = col['DATA_TYPE']
+            col_name = col["COLUMN_NAME"]
+            data_type = col["DATA_TYPE"]
             column_defs.append(f"{col_name} {data_type}")
         statement += ", ".join(column_defs)
 
         # Add primary key constraint if exists
         if pk:
-            pk_columns = [row['COLUMN_NAME'] for row in pk]
+            pk_columns = [row["COLUMN_NAME"] for row in pk]
             pk_constraint = f"PRIMARY KEY ({', '.join(pk_columns)})"
             statement += f", {pk_constraint}"
         statement += ")"
 
         # Add Iceberg table properties
-        statement += f" DATA_RETENTION_TIME_IN_DAYS=1"
-        statement += f" TARGET_FILE_SIZE='16MB'"
-        statement += f" ENABLE_DATA_COMPACTION=TRUE"
+        statement += " DATA_RETENTION_TIME_IN_DAYS=1"
+        statement += " TARGET_FILE_SIZE='16MB'"
+        statement += " ENABLE_DATA_COMPACTION=TRUE"
 
         return statement
-
 
     def get_query_copy_to_iceberg(self, native_columns):
         database, schema_name, table_name = self.parse_fqtn(self.fqtn)
@@ -187,24 +184,29 @@ class CopyNativeToIceberg:
         # Handle type conversions for native_columns that need casting
         select_columns = []
         for col in native_columns:
-            column_name = col['COLUMN_NAME']
-            data_type = col['DATA_TYPE']
+            column_name = col["COLUMN_NAME"]
+            data_type = col["DATA_TYPE"]
 
             # Add casting for native_columns that changed type
-            if data_type == 'TIMESTAMP_TZ':
+            if data_type == "TIMESTAMP_TZ":
                 select_columns.append(f"TO_TIMESTAMP_LTZ({column_name}) AS {column_name}")
             else:
                 select_columns.append(f"{column_name}")
 
         select_clause = ", ".join(select_columns)
 
-        if self.eventual == 'NATIVE':
-            statement = f"INSERT INTO {database}.{schema_name}.{table_name}_ICEBERG SELECT {select_clause} FROM {database}.{schema_name}.{table_name}"
-        elif self.eventual == 'ICEBERG':
-            statement = f"INSERT INTO {database}.{schema_name}.{table_name} SELECT {select_clause} FROM {database}.{schema_name}.{table_name}_NATIVE"
+        if self.eventual == "NATIVE":
+            statement = (
+                f"INSERT INTO {database}.{schema_name}.{table_name}_ICEBERG SELECT {select_clause} "
+                f"FROM {database}.{schema_name}.{table_name}"
+            )
+        elif self.eventual == "ICEBERG":
+            statement = (
+                f"INSERT INTO {database}.{schema_name}.{table_name} SELECT {select_clause} "
+                f"FROM {database}.{schema_name}.{table_name}_NATIVE"
+            )
 
         return statement
-
 
     def open_connection(self):
         """Open snowflake connection"""
@@ -220,7 +222,7 @@ class CopyNativeToIceberg:
             session_parameters={
                 # Quoted identifiers should be case sensitive
                 "QUOTED_IDENTIFIERS_IGNORE_CASE": "FALSE",
-                "QUERY_TAG": f"copy_native_to_iceberg: {self.fqtn}"
+                "QUERY_TAG": f"copy_native_to_iceberg: {self.fqtn}",
             },
         )
 
@@ -245,7 +247,6 @@ class CopyNativeToIceberg:
 
         with self.open_connection() as connection:
             with connection.cursor(snowflake.connector.DictCursor) as cur:
-
                 # Run every query in one transaction if query is a list of SQL
                 if isinstance(query, list):
                     self.logger.debug("Starting Transaction")
@@ -254,7 +255,6 @@ class CopyNativeToIceberg:
                 else:
                     queries = [query]
 
-                # pylint: disable=invalid-name
                 for q in queries:
                     cur.execute(q)
                     result = cur.fetchall()

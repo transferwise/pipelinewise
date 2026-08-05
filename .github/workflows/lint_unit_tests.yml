@@ -40,25 +40,13 @@ jobs:
         if: steps.check.outcome == 'failure'
         run: |
           . .virtualenvs/pipelinewise/bin/activate
-          ruff check pipelinewise tests
+          ruff format --check .
 
-      - name: Pylinting
+      - name: Lint Python
         if: steps.check.outcome == 'failure'
         run: |
           . .virtualenvs/pipelinewise/bin/activate
-          pylint pipelinewise tests
-
-      - name: Pep8
-        if: steps.check.outcome == 'failure'
-        run: |
-          . .virtualenvs/pipelinewise/bin/activate
-          flake8 pipelinewise --count --select=E9,F63,F7,F82 --show-source --statistics
-
-      - name: Pep8 complexity
-        if: steps.check.outcome == 'failure'
-        run: |
-          . .virtualenvs/pipelinewise/bin/activate
-          flake8 pipelinewise --count --max-complexity=15 --max-line-length=120 --statistics
+          ruff check .
 
       - name: Run Unit tests
         if: steps.check.outcome == 'failure'

@@ -4,15 +4,15 @@ Read root `AGENTS.md` first. This file covers `singer-connectors/`; use scoped E
 
 ## CI and environments
 
-This is tracked vendored source, not submodules. Root lint/unit gates do not inspect connector code. Connector CI has an all-connectors install job and a separate Python 3.12 matrix running connector-local `make venv` and `make unit_test_cov` for tap-mysql (47% minimum) and tap-postgres (58%). Behavioral changes still need connector-local tests plus an E2E route when one exists; otherwise report E2E unavailable.
+This is tracked vendored source, not submodules. Root Ruff gates inspect `tap-mysql`, `tap-postgres`, and `target-snowflake`; root unit tests do not inspect connector code. Connector CI installs every connector, then runs `make venv`, `make lint`, and `make unit_test_cov` for tap-mysql (47% minimum), tap-postgres (58%), and target-snowflake (67%) on Python 3.12. Behavioral changes still need connector-local tests plus an E2E route when one exists; otherwise report E2E unavailable.
 
 Root `make connectors -e pw_connector=<name>` creates runtime `.virtualenvs/<name>/`, consuming `pre_requirements.txt`, `requirements.txt`, then `setup.py` when present; it does not create the connector's test environment. Connector-local Makefiles usually create `./venv/` with test extras. Never mix PipelineWise, runtime-connector, local-test, or another connector's interpreter.
 
 ## Local validation
 
-Read the connector's files and Makefile before choosing targets. Where present, use its local Pylint config and run its environment/install, Pylint, unit, and integration targets from its directory; do not change a threshold to obtain a pass. Integration may need local containers, external credentials, or both—inspect its Makefile, Compose files, and environment first. Connector CI does not run integration suites.
+Read the connector's files and Makefile before choosing targets. For `tap-mysql`, `tap-postgres`, and `target-snowflake`, run the local environment/install, Ruff lint, unit, and applicable integration targets from its directory. Other connectors retain their local lint tools. Do not change a threshold to obtain a pass. Integration may need local containers, external credentials, or both—inspect its Makefile, Compose files, and environment first. Connector CI does not run integration suites.
 
-- Common targets are `venv`, `pylint`, `unit_test`, and `integration_test`, but Kafka uses `virtual_env` and containers; MongoDB uses `setup`, `test`, `test_cov`; Twilio uses `test`; S3 CSV uses plural `unit_tests`/`integration_tests`.
+- The Ruff-managed connectors use `venv`, `lint`, `format`, `unit_test`, and `integration_test`. Other common targets include `pylint`, but Kafka uses `virtual_env` and containers; MongoDB uses `setup`, `test`, `test_cov`; Twilio uses `test`; S3 CSV uses plural `unit_tests`/`integration_tests`.
 - PostgreSQL additionally gates `integration_test_cov` at 63 and `total_cov` at 85. MySQL uses Pytest for both unit and integration tests. Mixpanel, Slack, Twilio, and tap-snowflake test targets have no fail threshold. Other declared thresholds range from 30 to 87; the Makefile is authoritative.
 - Mixpanel, Slack, and Salesforce have no integration target.
 - GitHub, Jira, Zendesk, and transform-field have no Makefile. GitHub has `tests/`; Zendesk has singular `test/` and uses Nose; transform-field has `[test]` extras plus direct `tests/unit/` and `tests/integration/` suites and also receives Singer E2E coverage. Jira is only the external pin in `tap-jira/requirements.txt`, with no local source/tests. Salesforce has source and Makefile but no tests. None of GitHub, Jira, or Zendesk has a repository E2E route.

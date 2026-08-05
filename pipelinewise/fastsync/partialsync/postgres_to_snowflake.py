@@ -17,18 +17,17 @@ from pipelinewise.logger import Logger
 LOGGER = Logger().get_logger(__name__)
 
 
-# pylint: disable=too-many-locals
 def partial_sync_table(table: tuple, args: Namespace) -> Union[bool, str]:
     """Partial sync table for Postgres to Snowflake"""
     snowflake = FastSyncTargetSnowflake(args.target, args.transform)
-    tap_id = args.target.get('tap_id')
-    dbname = args.tap.get('dbname')
+    tap_id = args.target.get("tap_id")
+    dbname = args.tap.get("dbname")
     try:
         table_name = table[0]
 
-        column_name = table[1]['column']
+        column_name = table[1]["column"]
 
-        drop_target_table = table[1]['drop_target_table']
+        drop_target_table = table[1]["drop_target_table"]
         args.drop_target_table = drop_target_table
         args.table = table_name
 
@@ -37,8 +36,8 @@ def partial_sync_table(table: tuple, args: Namespace) -> Union[bool, str]:
         # Open connection
         postgres.open_connection()
 
-        start_value = utils.validate_boundary_value(postgres.query, table[1]['start_value'])
-        end_value = utils.validate_boundary_value(postgres.query, table[1]['end_value'])
+        start_value = utils.validate_boundary_value(postgres.query, table[1]["start_value"])
+        end_value = utils.validate_boundary_value(postgres.query, table[1]["end_value"])
 
         # Get bookmark - Binlog position or Incremental Key value
         bookmark = common_utils.get_bookmark_for_table(table_name, args.properties, postgres, dbname=dbname)
@@ -46,13 +45,13 @@ def partial_sync_table(table: tuple, args: Namespace) -> Union[bool, str]:
         # Get column differences
         target_schema = common_utils.get_target_schema(args.target, table_name)
         table_dict = common_utils.tablename_to_dict(table_name)
-        target_table = table_dict.get('table_name')
+        target_table = table_dict.get("table_name")
 
         target_sf = {
-            'sf_object': snowflake,
-            'schema': target_schema,
-            'table': target_table,
-            'temp': table_dict.get('temp_table_name')
+            "sf_object": snowflake,
+            "schema": target_schema,
+            "table": target_table,
+            "temp": table_dict.get("temp_table_name"),
         }
 
         snowflake_types = postgres.map_column_types_to_target(table_name)
@@ -62,34 +61,33 @@ def partial_sync_table(table: tuple, args: Namespace) -> Union[bool, str]:
         snowflake.create_table(
             target_schema=target_schema,
             table_name=target_table,
-            columns=snowflake_types['columns'],
-            primary_key=snowflake_types.get('primary_key'),
+            columns=snowflake_types["columns"],
+            primary_key=snowflake_types.get("primary_key"),
             is_temporary=False,
             sort_columns=False,
-            allow_replace_table=False
+            allow_replace_table=False,
         )
 
-        source_columns = snowflake_types.get('columns', [])
+        source_columns = snowflake_types.get("columns", [])
         columns_diff = utils.diff_source_target_columns(target_sf, source_columns=source_columns)
 
-        start_value_for_query = start_value if start_value == 'NULL' else f'\'{start_value}\''
-        where_clause_sql = f' WHERE {column_name} >= {start_value_for_query}'
+        start_value_for_query = start_value if start_value == "NULL" else f"'{start_value}'"
+        where_clause_sql = f" WHERE {column_name} >= {start_value_for_query}"
         if args.end_value:
-            where_clause_sql += f' AND {column_name} <= \'{end_value}\''
+            where_clause_sql += f" AND {column_name} <= '{end_value}'"
 
         file_parts = postgres.export_source_table_data(args, tap_id, where_clause_sql)
 
         # mark partial data as deleted in the target
         snowflake.query(
             f'UPDATE {target_schema}."{target_table.upper()}"'
-            f' SET _SDC_DELETEd_AT = CURRENT_TIMESTAMP(){where_clause_sql} AND _SDC_DELETED_AT IS NULL')
+            f" SET _SDC_DELETEd_AT = CURRENT_TIMESTAMP(){where_clause_sql} AND _SDC_DELETED_AT IS NULL"
+        )
 
         # Creating temp table in Snowflake
-        primary_keys = snowflake_types.get('primary_key')
+        primary_keys = snowflake_types.get("primary_key")
         snowflake.create_schema(target_schema)
-        snowflake.create_table(
-            target_schema, target_table, source_columns, primary_keys, is_temporary=True
-        )
+        snowflake.create_table(target_schema, target_table, source_columns, primary_keys, is_temporary=True)
 
         postgres.close_connection()
 
@@ -97,7 +95,8 @@ def partial_sync_table(table: tuple, args: Namespace) -> Union[bool, str]:
         _, s3_key_pattern = utils.upload_to_s3(snowflake, file_parts, args.temp_dir)
 
         utils.load_into_snowflake(
-            target_sf, args, columns_diff, primary_keys, s3_key_pattern, size_bytes, where_clause_sql)
+            target_sf, args, columns_diff, primary_keys, s3_key_pattern, size_bytes, where_clause_sql
+        )
 
         if file_parts:
             utils.update_state_file(args, bookmark)
@@ -105,7 +104,7 @@ def partial_sync_table(table: tuple, args: Namespace) -> Union[bool, str]:
         return True
     except Exception as exc:
         LOGGER.exception(exc)
-        return f'{table_name}: {exc}'
+        return f"{table_name}: {exc}"
 
 
 def main_impl():
@@ -121,7 +120,7 @@ def main_impl():
     pool_size = common_utils.get_pool_size(args.tap)
     # Log start info
     LOGGER.info(
-        '''
+        """
         -------------------------------------------------------
         STARTING PARTIAL SYNC
         -------------------------------------------------------
@@ -130,7 +129,11 @@ def main_impl():
             Start value                    : %s
             End value                      : %s
         -------------------------------------------------------
-        ''', args.table, args.column, args.start_value, args.end_value
+        """,
+        args.table,
+        args.column,
+        args.start_value,
+        args.end_value,
     )
 
     sync_tables = utils.get_sync_tables(args)
@@ -139,8 +142,7 @@ def main_impl():
     with multiprocessing.Pool(pool_size) as proc:
         sync_excs = list(
             filter(
-                lambda x: not isinstance(x, bool),
-                proc.map(partial(partial_sync_table, args=args), sync_tables.items())
+                lambda x: not isinstance(x, bool), proc.map(partial(partial_sync_table, args=args), sync_tables.items())
             )
         )
 
@@ -150,7 +152,7 @@ def main_impl():
     # Log summary
     end_time = datetime.now()
     LOGGER.info(
-        '''
+        """
         -------------------------------------------------------
         PARTIAL SYNC FINISHED - SUMMARY
         -------------------------------------------------------
@@ -162,7 +164,13 @@ def main_impl():
 
             Runtime                        : %s
         -------------------------------------------------------
-        ''', args.table, args.column, args.start_value, args.end_value, sync_excs, end_time - start_time
+        """,
+        args.table,
+        args.column,
+        args.start_value,
+        args.end_value,
+        sync_excs,
+        end_time - start_time,
     )
 
     if len(sync_excs) > 0:

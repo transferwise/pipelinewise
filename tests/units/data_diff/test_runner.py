@@ -18,9 +18,6 @@ from pipelinewise.data_diff.runner import (
     scheduled_slot,
 )
 
-# pylint: disable=missing-class-docstring,missing-function-docstring,invalid-name
-# pylint: disable=too-many-instance-attributes,attribute-defined-outside-init
-
 
 def _check():
     return {
@@ -97,18 +94,18 @@ PASS_PREFLIGHT = {
 
 def _fake_run_check(preflight, results, status):
     """Stand in for run_check, honouring its on_preflight contract."""
+
     def run(*_args, on_preflight=None, **_kwargs):
         if on_preflight is not None:
             on_preflight(preflight)
         return preflight, results, status
+
     return run
 
 
 @patch("pipelinewise.data_diff.runner.run_check")
 def test_run_persists_preflight_and_results(mock_run):
-    mock_run.side_effect = _fake_run_check(
-        PASS_PREFLIGHT, [{"check_type": "row_count", "status": "PASS"}], "PASS"
-    )
+    mock_run.side_effect = _fake_run_check(PASS_PREFLIGHT, [{"check_type": "row_count", "status": "PASS"}], "PASS")
     backend = FakeBackend(_check())
 
     summaries = run_due_checks(
@@ -218,9 +215,7 @@ def test_an_unschedulable_check_does_not_abort_the_batch():
         now=datetime(2026, 7, 30, 12, tzinfo=timezone.utc),
     )
 
-    by_name = {
-        summary["check"]["full_check_name"]: summary["status"] for summary in summaries
-    }
+    by_name = {summary["check"]["full_check_name"]: summary["status"] for summary in summaries}
     assert by_name["target/tap/public/first"] == "SKIPPED"
     assert by_name["target/tap/public/last"] == "SKIPPED"
     assert by_name["target/tap/public/broken"] == "ERROR"
@@ -336,7 +331,11 @@ def test_a_real_sigterm_marks_the_run_terminal_before_the_process_dies(tmp_path)
     script = SIGTERM_SCRIPT.format(repo=repo, outfile=str(outfile))
 
     completed = subprocess.run(
-        [sys.executable, "-c", script], capture_output=True, text=True, timeout=60,
+        [sys.executable, "-c", script],
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
     )
 
     # Killed by SIGTERM, exactly as the sender intended.
@@ -359,7 +358,8 @@ def test_the_sweep_is_not_scoped_to_a_slot_or_trigger():
     backend = FakeBackend(check, start=False)
 
     run_due_checks(
-        backend, _connection_configs,
+        backend,
+        _connection_configs,
         now=datetime(2026, 7, 22, 12, tzinfo=timezone.utc),
     )
 
@@ -379,10 +379,10 @@ def test_the_sweep_runs_before_the_scheduler_reads_the_latest_slot():
 
         def latest_scheduled_for(self, check_id):
             order.append("latest")
-            return None
 
     run_due_checks(
-        OrderedBackend(check, start=False), _connection_configs,
+        OrderedBackend(check, start=False),
+        _connection_configs,
         now=datetime(2026, 7, 22, 12, tzinfo=timezone.utc),
     )
 

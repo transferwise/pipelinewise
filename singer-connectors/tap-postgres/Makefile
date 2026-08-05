@@ -6,9 +6,14 @@ venv:
 	pip install --upgrade pip setuptools wheel;\
 	pip install -e .[test]
 
-pylint:
+lint:
 	. ./venv/bin/activate ;\
-	pylint --rcfile .pylintrc tap_postgres/
+	ruff format --check . ;\
+	ruff check .
+
+format:
+	. ./venv/bin/activate ;\
+	ruff format .
 
 start_db:
 	docker-compose up -d

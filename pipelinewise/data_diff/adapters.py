@@ -99,8 +99,7 @@ def _validate_timestamp_type(column: dict, qualified_name: str):
     data_type = column["data_type"].lower()
     if not any(data_type.startswith(supported) for supported in TIMESTAMP_TYPES):
         raise DataDiffExecutionError(
-            f"Data-diff timestamp column {qualified_name} has unsupported type "
-            f"'{column['data_type']}'"
+            f"Data-diff timestamp column {qualified_name} has unsupported type '{column['data_type']}'"
         )
 
 
@@ -159,20 +158,14 @@ class DatabaseAdapter:
 
     def checksum_integer(self, payload: str) -> str:
         """Convert the low 48 bits of an MD5 value to a centred integer."""
-        return (
-            f"(('x' || SUBSTRING(MD5({payload}), 21))::bit(48)::bigint "
-            f"- {CHECKSUM_OFFSET})"
-        )
+        return f"(('x' || SUBSTRING(MD5({payload}), 21))::bit(48)::bigint - {CHECKSUM_OFFSET})"
 
     def checksum_expression(self, columns: list) -> str:
         """Return a bounded aggregate checksum over ordered row values."""
         field_hashes = []
         for column in columns:
             normalized = self.normalize_checksum_value(column)
-            field_hashes.append(
-                f"CASE WHEN {normalized} IS NULL THEN MD5('N') "
-                f"ELSE MD5(CONCAT('V', {normalized})) END"
-            )
+            field_hashes.append(f"CASE WHEN {normalized} IS NULL THEN MD5('N') ELSE MD5(CONCAT('V', {normalized})) END")
         row_payload = f"CONCAT({', '.join(field_hashes)})"
         return f"SUM({self.checksum_integer(row_payload)})"
 
@@ -217,9 +210,7 @@ class PostgresAdapter(DatabaseAdapter):
                 (schema, table),
             )
             available = cursor.fetchall()
-        return _match_columns(
-            schema, table, requested, available, allow_missing=allow_missing
-        )
+        return _match_columns(schema, table, requested, available, allow_missing=allow_missing)
 
     def indexes(self, schema, table):
         """Return index metadata, marking which indexes can serve a window scan.
@@ -348,9 +339,7 @@ class MySQLAdapter(DatabaseAdapter):
                 (schema, table),
             )
             available = cursor.fetchall()
-        return _match_columns(
-            schema, table, requested, available, allow_missing=allow_missing
-        )
+        return _match_columns(schema, table, requested, available, allow_missing=allow_missing)
 
     def normalize_checksum_value(self, column):
         name = self.quote(column["name"])
@@ -376,10 +365,7 @@ class MySQLAdapter(DatabaseAdapter):
     def checksum_integer(self, payload):
         # CONV returns a string, so subtracting coerces to DOUBLE and SUM() loses
         # integer precision. The DECIMAL cast keeps MySQL agreeing with the others.
-        return (
-            f"(CAST(CONV(SUBSTRING(MD5({payload}), 21), 16, 10) AS DECIMAL(38, 0)) "
-            f"- {CHECKSUM_OFFSET})"
-        )
+        return f"(CAST(CONV(SUBSTRING(MD5({payload}), 21), 16, 10) AS DECIMAL(38, 0)) - {CHECKSUM_OFFSET})"
 
     def _visibility_column(self):
         """Return the STATISTICS column marking an index the optimizer will skip.
@@ -400,13 +386,10 @@ class MySQLAdapter(DatabaseAdapter):
                     """
                 )
                 available = {
-                    str(row["column_name"] if isinstance(row, dict) else row[0]).upper()
-                    for row in cursor.fetchall()
+                    str(row["column_name"] if isinstance(row, dict) else row[0]).upper() for row in cursor.fetchall()
                 }
             # IS_VISIBLE first: a fork exposing both is MySQL-compatible.
-            self._visibility = next(
-                (name for name in ("IS_VISIBLE", "IGNORED") if name in available), None
-            )
+            self._visibility = next((name for name in ("IS_VISIBLE", "IGNORED") if name in available), None)
         return self._visibility
 
     def indexes(self, schema, table):
@@ -414,9 +397,7 @@ class MySQLAdapter(DatabaseAdapter):
         # The two columns carry opposite senses, so normalise to one flag here rather
         # than at the comparison: NULL means "no such column", never "hidden".
         hidden_value = "NO" if visibility_column == "IS_VISIBLE" else "YES"
-        visibility = (
-            f"{visibility_column} AS visibility" if visibility_column else "NULL AS visibility"
-        )
+        visibility = f"{visibility_column} AS visibility" if visibility_column else "NULL AS visibility"
         with self.connection.cursor() as cursor:
             cursor.execute(
                 f"""
@@ -446,9 +427,7 @@ class MySQLAdapter(DatabaseAdapter):
                     # optimizer is told to ignore -- EXPLAIN reports no possible keys
                     # for those, so treating one as usable certifies a full scan.
                     "is_usable": (
-                        str(row["index_type"] or "").upper() == "BTREE"
-                        and row["sub_part"] is None
-                        and not hidden
+                        str(row["index_type"] or "").upper() == "BTREE" and row["sub_part"] is None and not hidden
                     ),
                 },
             )
@@ -490,7 +469,7 @@ class SnowflakeAdapter(DatabaseAdapter):
     """Snowflake metadata and aggregate operations."""
 
     def resolve_columns(self, schema, table, requested, *, allow_missing=False):
-        import snowflake.connector  # pylint: disable=import-outside-toplevel
+        import snowflake.connector  # noqa: PLC0415
 
         with self.connection.cursor(snowflake.connector.DictCursor) as cursor:
             cursor.execute(
@@ -508,9 +487,7 @@ class SnowflakeAdapter(DatabaseAdapter):
                 (schema, table),
             )
             available = cursor.fetchall()
-        return _match_columns(
-            schema, table, requested, available, allow_missing=allow_missing
-        )
+        return _match_columns(schema, table, requested, available, allow_missing=allow_missing)
 
     def normalize_checksum_value(self, column):
         name = self.quote(column["name"])
@@ -524,10 +501,7 @@ class SnowflakeAdapter(DatabaseAdapter):
             # NULL must stay NULL so the outer marker distinguishes it from FALSE.
             return f"IFF({name} IS NULL, NULL, IFF({name}, '1', '0'))"
         if kind == "timestamp":
-            return (
-                f"TO_CHAR(CONVERT_TIMEZONE('UTC', {name}), "
-                "'YYYY-MM-DD HH24:MI:SS.FF6')"
-            )
+            return f"TO_CHAR(CONVERT_TIMEZONE('UTC', {name}), 'YYYY-MM-DD HH24:MI:SS.FF6')"
         if kind == "time":
             return f"TO_CHAR({name}, 'HH24:MI:SS.FF6')"
         if kind == "binary":
@@ -535,13 +509,10 @@ class SnowflakeAdapter(DatabaseAdapter):
         raise DataDiffExecutionError(f"Unsupported checksum kind: {kind}")
 
     def checksum_integer(self, payload):
-        return (
-            f"(BITAND(MD5_NUMBER_LOWER64({payload}), {CHECKSUM_MASK}) "
-            f"- {CHECKSUM_OFFSET})"
-        )
+        return f"(BITAND(MD5_NUMBER_LOWER64({payload}), {CHECKSUM_MASK}) - {CHECKSUM_OFFSET})"
 
     def execute_metrics(self, sql, params, checks):
-        import snowflake.connector  # pylint: disable=import-outside-toplevel
+        import snowflake.connector  # noqa: PLC0415
 
         started = perf_counter()
         with self.connection.cursor(snowflake.connector.DictCursor) as cursor:
@@ -563,19 +534,12 @@ class SnowflakeAdapter(DatabaseAdapter):
 
 
 def _match_columns(schema, table, requested, available, *, allow_missing=False):
-    normalized_available = [
-        {str(key).lower(): value for key, value in dict(row).items()}
-        for row in available
-    ]
+    normalized_available = [{str(key).lower(): value for key, value in dict(row).items()} for row in available]
     matches = {}
     for requested_name in requested:
-        exact = [
-            row for row in normalized_available
-            if row["column_name"] == requested_name
-        ]
+        exact = [row for row in normalized_available if row["column_name"] == requested_name]
         candidates = exact or [
-            row for row in normalized_available
-            if row["column_name"].lower() == requested_name.lower()
+            row for row in normalized_available if row["column_name"].lower() == requested_name.lower()
         ]
         if not candidates and allow_missing:
             matches[requested_name] = {
@@ -585,9 +549,7 @@ def _match_columns(schema, table, requested, available, *, allow_missing=False):
             }
             continue
         if len(candidates) != 1:
-            raise DataDiffExecutionError(
-                f"Column '{requested_name}' does not resolve uniquely in {schema}.{table}"
-            )
+            raise DataDiffExecutionError(f"Column '{requested_name}' does not resolve uniquely in {schema}.{table}")
         matches[requested_name] = dict(candidates[0])
         matches[requested_name].update(
             name=candidates[0]["column_name"],

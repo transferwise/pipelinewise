@@ -1,6 +1,7 @@
 """
 PipelineWise CLI - Commands
 """
+
 import os
 import shlex
 import logging
@@ -15,24 +16,24 @@ from .errors import StreamBufferTooLargeException
 
 LOGGER = logging.getLogger(__name__)
 DEFAULT_STREAM_BUFFER_SIZE = 0  # Disabled by default
-DEFAULT_STREAM_BUFFER_BIN = 'mbuffer'
+DEFAULT_STREAM_BUFFER_BIN = "mbuffer"
 MIN_STREAM_BUFFER_SIZE = 10
 MAX_STREAM_BUFFER_SIZE = 2500
 
 PARAMS_VALIDATION_RETRY_PERIOD_SEC = 2
 PARAMS_VALIDATION_RETRY_TIMES = 3
 
-STATUS_RUNNING = 'running'
-STATUS_FAILED = 'failed'
-STATUS_SUCCESS = 'success'
+STATUS_RUNNING = "running"
+STATUS_FAILED = "failed"
+STATUS_SUCCESS = "success"
 
 
 def _verify_json_file(json_file_path: str, file_must_exists: bool, allowed_empty: bool) -> bool:
     """Checking if input file is a valid json or not, in some cases it is allowed to have an empty file,
-     or it is allowed file not exists!
+    or it is allowed file not exists!
     """
     try:
-        with open(json_file_path, 'r', encoding='utf-8') as json_file:
+        with open(json_file_path, "r", encoding="utf-8") as json_file:
             json.load(json_file)
     except FileNotFoundError:
         return not file_must_exists
@@ -47,9 +48,11 @@ def do_json_conf_validation(json_file: str, file_property: dict) -> bool:
     Validating a json format config property and retry if it is invalid
     """
     for _ in range(PARAMS_VALIDATION_RETRY_TIMES):
-        if _verify_json_file(json_file_path=json_file,
-                             file_must_exists=file_property['file_must_exists'],
-                             allowed_empty=file_property['allowed_empty']):
+        if _verify_json_file(
+            json_file_path=json_file,
+            file_must_exists=file_property["file_must_exists"],
+            allowed_empty=file_property["allowed_empty"],
+        ):
             return True
 
         time.sleep(PARAMS_VALIDATION_RETRY_PERIOD_SEC)
@@ -61,6 +64,7 @@ class TapParams:
     """
     TapParams validates json properties.
     """
+
     tap_id: str
     type: str
     bin: str
@@ -71,24 +75,23 @@ class TapParams:
 
     def __post_init__(self):
         if not self.config:
-            raise RunCommandException(
-                f'Invalid json file for config: {self.config}')
+            raise RunCommandException(f"Invalid json file for config: {self.config}")
 
         list_of_params_in_json_file = {
-            'config': {'file_must_exists': True, 'allowed_empty': False},
-            'properties': {'file_must_exists': True, 'allowed_empty': False},
-            'state': {'file_must_exists': False, 'allowed_empty': True}
+            "config": {"file_must_exists": True, "allowed_empty": False},
+            "properties": {"file_must_exists": True, "allowed_empty": False},
+            "state": {"file_must_exists": False, "allowed_empty": True},
         }
 
         for param, file_property in list_of_params_in_json_file.items():
-            valid_json = do_json_conf_validation(
-                json_file=getattr(self, param, None),
-                file_property=file_property
-               ) if getattr(self, param, None) else True
+            valid_json = (
+                do_json_conf_validation(json_file=getattr(self, param, None), file_property=file_property)
+                if getattr(self, param, None)
+                else True
+            )
 
             if not valid_json:
-                raise RunCommandException(
-                    f'Invalid json file for {param}: {getattr(self, param, None)}')
+                raise RunCommandException(f"Invalid json file for {param}: {getattr(self, param, None)}")
 
 
 @dataclass
@@ -96,6 +99,7 @@ class TargetParams:
     """
     TargetParams validates json properties.
     """
+
     target_id: str
     type: str
     bin: str
@@ -105,17 +109,22 @@ class TargetParams:
     def __post_init__(self):
         json_file = self.config
 
-        valid_json = do_json_conf_validation(
-            json_file=json_file,
-            file_property={'file_must_exists': True, 'allowed_empty': False}) if json_file else False
+        valid_json = (
+            do_json_conf_validation(
+                json_file=json_file, file_property={"file_must_exists": True, "allowed_empty": False}
+            )
+            if json_file
+            else False
+        )
 
         if not valid_json:
-            raise RunCommandException(f'Invalid json file for config: {self.config}')
+            raise RunCommandException(f"Invalid json file for config: {self.config}")
 
 
 @dataclass
 class TransformParams:
     """TransformParams."""
+
     bin: str
     python_bin: str
     config: str
@@ -123,11 +132,11 @@ class TransformParams:
     target_id: str
 
 
-# pylint: disable=unnecessary-pass
 class RunCommandException(Exception):
     """
     Custom exception to raise when run command fails
     """
+
     pass
 
 
@@ -146,18 +155,15 @@ def exists_and_executable(bin_path: str) -> bool:
     """
 
     if not os.access(bin_path, os.X_OK):
-
         try:
-            paths = f"{os.environ['PATH']}".split(':')
-            next(p for p in paths if os.access(f'{p}/{bin_path}', os.X_OK))
+            paths = f"{os.environ['PATH']}".split(":")
+            next(p for p in paths if os.access(f"{p}/{bin_path}", os.X_OK))
         except StopIteration:
             return False
     return True
 
 
-def build_tap_command(
-    tap: TapParams, profiling_mode: bool = False, profiling_dir: str = None
-) -> str:
+def build_tap_command(tap: TapParams, profiling_mode: bool = False, profiling_dir: str = None) -> str:
     """
     Builds a command that starts a singer tap connector with the
     required command line arguments
@@ -172,26 +178,22 @@ def build_tap_command(
     # Following the singer spec the catalog JSON file needs to be passed by the --catalog argument
     # However some tap (i.e. tap-mysql and tap-postgres) requires it as --properties
     # This is probably for historical reasons and need to clarify on Singer slack channels
-    catalog_argument = utils.get_tap_property_by_tap_type(
-        tap.type, 'tap_catalog_argument'
-    )
+    catalog_argument = utils.get_tap_property_by_tap_type(tap.type, "tap_catalog_argument")
 
-    state_arg = ''
+    state_arg = ""
     if tap.state and os.path.isfile(tap.state):
-        state_arg = f'--state {tap.state}'
+        state_arg = f"--state {tap.state}"
 
-    tap_command = f'{tap.bin} --config {tap.config} {catalog_argument} {tap.properties} {state_arg}'
+    tap_command = f"{tap.bin} --config {tap.config} {catalog_argument} {tap.properties} {state_arg}"
 
     if profiling_mode:
-        dump_file = os.path.join(profiling_dir, f'tap_{tap.tap_id}.pstat')
-        tap_command = f'{tap.python_bin} -m cProfile -o {dump_file} {tap_command}'
+        dump_file = os.path.join(profiling_dir, f"tap_{tap.tap_id}.pstat")
+        tap_command = f"{tap.python_bin} -m cProfile -o {dump_file} {tap_command}"
 
     return tap_command
 
 
-def build_target_command(
-    target: TargetParams, profiling_mode: bool = False, profiling_dir: str = None
-) -> str:
+def build_target_command(target: TargetParams, profiling_mode: bool = False, profiling_dir: str = None) -> str:
     """
     Builds a command that starts a singer target connector with the
     required command line arguments
@@ -204,13 +206,11 @@ def build_target_command(
         string of command line executable
     """
 
-    target_command = f'{target.bin} --config {target.config}'
+    target_command = f"{target.bin} --config {target.config}"
 
     if profiling_mode:
-        dump_file = os.path.join(profiling_dir, f'target_{target.target_id}.pstat')
-        target_command = (
-            f'{target.python_bin} -m cProfile -o {dump_file} {target_command}'
-        )
+        dump_file = os.path.join(profiling_dir, f"target_{target.target_id}.pstat")
+        target_command = f"{target.python_bin} -m cProfile -o {dump_file} {target_command}"
 
     return target_command
 
@@ -235,18 +235,16 @@ def build_transformation_command(
     # Detect if transformation is needed
     if os.path.isfile(transform.config):
         trans = utils.load_json(transform.config)
-        if 'transformations' in trans and len(trans['transformations']) > 0:
-            trans_command = f'{transform.bin} --config {transform.config}'
+        if "transformations" in trans and len(trans["transformations"]) > 0:
+            trans_command = f"{transform.bin} --config {transform.config}"
 
             if profiling_mode:
                 dump_file = os.path.join(
                     profiling_dir,
-                    f'transformation_{transform.tap_id}_{transform.target_id}.pstat',
+                    f"transformation_{transform.tap_id}_{transform.target_id}.pstat",
                 )
 
-                trans_command = (
-                    f'{transform.python_bin} -m cProfile -o {dump_file} {trans_command}'
-                )
+                trans_command = f"{transform.python_bin} -m cProfile -o {dump_file} {trans_command}"
 
     return trans_command
 
@@ -286,17 +284,16 @@ def build_stream_buffer_command(
         elif buffer_size > MAX_STREAM_BUFFER_SIZE:
             raise StreamBufferTooLargeException(buffer_size, MAX_STREAM_BUFFER_SIZE)
 
-        buffer_command = f'{stream_buffer_bin} -m {buffer_size}M'
+        buffer_command = f"{stream_buffer_bin} -m {buffer_size}M"
 
         # Log status to external file instead of stderr if log_file defined
         if log_file:
             log_file_stats = log_file_with_status(log_file, STATUS_RUNNING)
-            buffer_command = f'{buffer_command} -q -l {log_file_stats}'
+            buffer_command = f"{buffer_command} -q -l {log_file_stats}"
 
     return buffer_command
 
 
-# pylint: disable=too-many-positional-arguments
 def build_singer_command(
     tap: TapParams,
     target: TargetParams,
@@ -326,22 +323,18 @@ def build_singer_command(
     """
     tap_command = build_tap_command(tap, profiling_mode, profiling_dir)
 
-    LOGGER.debug('Tap command: %s', tap_command)
+    LOGGER.debug("Tap command: %s", tap_command)
 
     target_command = build_target_command(target, profiling_mode, profiling_dir)
 
-    LOGGER.debug('Target command: %s', target_command)
+    LOGGER.debug("Target command: %s", target_command)
 
-    transformation_command = build_transformation_command(
-        transform, profiling_mode, profiling_dir
-    )
-    LOGGER.debug('Transformation command: %s', transformation_command)
+    transformation_command = build_transformation_command(transform, profiling_mode, profiling_dir)
+    LOGGER.debug("Transformation command: %s", transformation_command)
 
-    stream_buffer_command = build_stream_buffer_command(
-        stream_buffer_size, stream_buffer_log_file
-    )
+    stream_buffer_command = build_stream_buffer_command(stream_buffer_size, stream_buffer_log_file)
 
-    LOGGER.debug('Buffer command: %s', stream_buffer_command)
+    LOGGER.debug("Buffer command: %s", stream_buffer_command)
 
     # Generate the final piped command with all the required components
     sub_commands = [
@@ -350,61 +343,55 @@ def build_singer_command(
         stream_buffer_command,
         target_command,
     ]
-    command = ' | '.join(list(filter(None, sub_commands)))
+    command = " | ".join(list(filter(None, sub_commands)))
 
     return command
 
 
-# pylint: disable=too-many-positional-arguments
-# pylint: disable=too-many-arguments
-def build_partialsync_command(
-        tap: TapParams,
-        target: TargetParams,
-        transform: TransformParams,
-        venv_dir: str,
-        temp_dir: str,
-        table: str,
-        column: str,
-        start_value: str,
-        end_value: str = None,
-        drop_target_table: str = None
+def build_partialsync_command(  # noqa: PLR0913, PLR0917
+    tap: TapParams,
+    target: TargetParams,
+    transform: TransformParams,
+    venv_dir: str,
+    temp_dir: str,
+    table: str,
+    column: str,
+    start_value: str,
+    end_value: str = None,
+    drop_target_table: str = None,
 ):
     """Builds a command that starts a partial sync"""
 
     partial_sync_bin = utils.get_partialsync_bin(venv_dir, tap.type, target.type)
 
-    command_args = ' '.join(
+    command_args = " ".join(
         list(
             filter(
                 None,
                 [
-                    f'--tap {tap.config}',
-                    f'--properties {tap.properties}',
-                    f'--state {tap.state}',
-                    f'--target {target.config}',
-                    f'--temp_dir {temp_dir}',
-                    f'--transform {transform.config}'
-                    if transform.config and os.path.isfile(transform.config)
-                    else '',
+                    f"--tap {tap.config}",
+                    f"--properties {tap.properties}",
+                    f"--state {tap.state}",
+                    f"--target {target.config}",
+                    f"--temp_dir {temp_dir}",
+                    f"--transform {transform.config}" if transform.config and os.path.isfile(transform.config) else "",
                     f'--table "{table}"',
                     f'--column "{column}"',
                     f'--start_value "{start_value}"',
                     f'--end_value "{end_value}"' if end_value else None,
-                    f'--drop_target_table {drop_target_table}' if drop_target_table else None
+                    f"--drop_target_table {drop_target_table}" if drop_target_table else None,
                 ],
             )
         )
     )
 
-    command = f'{partial_sync_bin} {command_args}'
+    command = f"{partial_sync_bin} {command_args}"
 
-    LOGGER.debug('PartialSync command: %s', command)
+    LOGGER.debug("PartialSync command: %s", command)
     return command
 
 
-# pylint: disable=too-many-positional-arguments
-# pylint: disable=too-many-arguments
-def build_fastsync_command(
+def build_fastsync_command(  # noqa: PLR0913, PLR0917
     tap: TapParams,
     target: TargetParams,
     transform: TransformParams,
@@ -414,7 +401,7 @@ def build_fastsync_command(
     profiling_mode: bool = False,
     profiling_dir: str = None,
     drop_pg_slot: bool = False,
-    autoresync_size: int = None
+    autoresync_size: int = None,
 ) -> str:
     """
     Builds a command that starts fastsync from a given tap to a
@@ -438,34 +425,32 @@ def build_fastsync_command(
     fastsync_bin = utils.get_fastsync_bin(venv_dir, tap.type, target.type)
     ppw_python_bin = utils.get_pipelinewise_python_bin(venv_dir)
 
-    command_args = ' '.join(
+    command_args = " ".join(
         list(
             filter(
                 None,
                 [
-                    f'--tap {tap.config}',
-                    f'--properties {tap.properties}',
-                    f'--state {tap.state}',
-                    f'--target {target.config}',
-                    f'--temp_dir {temp_dir}',
-                    f'--transform {transform.config}'
-                    if transform.config and os.path.isfile(transform.config)
-                    else '',
-                    f'--tables {tables}' if tables else '',
-                    '--drop_pg_slot' if drop_pg_slot else '',
-                    f'--autoresync_size {autoresync_size}' if autoresync_size else ''
+                    f"--tap {tap.config}",
+                    f"--properties {tap.properties}",
+                    f"--state {tap.state}",
+                    f"--target {target.config}",
+                    f"--temp_dir {temp_dir}",
+                    f"--transform {transform.config}" if transform.config and os.path.isfile(transform.config) else "",
+                    f"--tables {tables}" if tables else "",
+                    "--drop_pg_slot" if drop_pg_slot else "",
+                    f"--autoresync_size {autoresync_size}" if autoresync_size else "",
                 ],
             )
         )
     )
 
-    command = f'{fastsync_bin} {command_args}'
+    command = f"{fastsync_bin} {command_args}"
 
     if profiling_mode:
-        dump_file = os.path.join(profiling_dir, f'fastsync_{tap.tap_id}_{target.target_id}.pstat')
-        command = f'{ppw_python_bin} -m cProfile -o {dump_file} {command}'
+        dump_file = os.path.join(profiling_dir, f"fastsync_{tap.tap_id}_{target.target_id}.pstat")
+        command = f"{ppw_python_bin} -m cProfile -o {dump_file} {command}"
 
-    LOGGER.debug('FastSync command: %s', command)
+    LOGGER.debug("FastSync command: %s", command)
     return command
 
 
@@ -481,10 +466,9 @@ def log_file_with_status(log_file: str, status: str) -> str:
     Returns:
         string of log file path with status extension
     """
-    return f'{log_file}.{status}'
+    return f"{log_file}.{status}"
 
 
-# pylint: disable=too-many-locals
 def run_command(command: str, log_file: str = None, line_callback: callable = None):
     """
     Runs a shell command with or without log file with STDOUT and STDERR
@@ -495,12 +479,12 @@ def run_command(command: str, log_file: str = None, line_callback: callable = No
         line_callback: function to call on each line on stdout and stderr
     """
     piped_command = f"/bin/bash -o pipefail -c '{command}'"
-    LOGGER.debug('Running command %s', piped_command)
+    LOGGER.debug("Running command %s", piped_command)
 
     # Logfile is needed: Continuously polling STDOUT and STDERR and writing into a log file
     # Once the command finished STDERR redirects to STDOUT and returns _only_ STDOUT
     if log_file is not None:
-        LOGGER.info('Writing output into %s', log_file)
+        LOGGER.info("Writing output into %s", log_file)
 
         # Create log dir if not exists
         os.makedirs(os.path.dirname(log_file), exist_ok=True)
@@ -512,12 +496,12 @@ def run_command(command: str, log_file: str = None, line_callback: callable = No
 
         # Start command
         with Popen(shlex.split(piped_command), stdout=PIPE, stderr=STDOUT) as proc:
-            with open(log_file_running, 'a+', encoding='utf-8') as logfile:
-                stdout = ''
+            with open(log_file_running, "a+", encoding="utf-8") as logfile:
+                stdout = ""
                 while True:
                     line = proc.stdout.readline()
                     if line:
-                        decoded_line = line.decode('utf-8')
+                        decoded_line = line.decode("utf-8")
 
                         if line_callback is not None:
                             decoded_line = line_callback(decoded_line)
@@ -535,11 +519,9 @@ def run_command(command: str, log_file: str = None, line_callback: callable = No
             os.rename(log_file_running, log_file_failed)
 
             # Raise run command exception
-            errors = ''.join(utils.find_errors_in_log_file(log_file_failed))
+            errors = "".join(utils.find_errors_in_log_file(log_file_failed))
             raise RunCommandException(
-                f'Command failed. Return code: {proc_rc}\n'
-                f'Error(s) found:\n{errors}\n'
-                f'Full log: {log_file_failed}'
+                f"Command failed. Return code: {proc_rc}\nError(s) found:\n{errors}\nFull log: {log_file_failed}"
             )
 
         # Add success status to the log file name
@@ -551,8 +533,8 @@ def run_command(command: str, log_file: str = None, line_callback: callable = No
     with Popen(shlex.split(piped_command), stdout=PIPE, stderr=PIPE) as proc:
         proc_tuple = proc.communicate()
         proc_rc = proc.returncode
-        stdout = proc_tuple[0].decode('utf-8')
-        stderr = proc_tuple[1].decode('utf-8')
+        stdout = proc_tuple[0].decode("utf-8")
+        stderr = proc_tuple[1].decode("utf-8")
 
         if proc_rc != 0:
             LOGGER.error(stderr)

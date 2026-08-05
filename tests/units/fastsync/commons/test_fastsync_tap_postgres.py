@@ -15,7 +15,7 @@ class TestFastSyncTapPostgres(TestCase):
     def setUp(self) -> None:
         """Initialise test FastSyncTapPostgres object"""
         self.postgres = FastSyncTapPostgres(
-            connection_config={'dbname': 'test_database', 'tap_id': 'test_tap'},
+            connection_config={"dbname": "test_database", "tap_id": "test_tap"},
             tap_type_to_target_type={},
         )
         self.postgres.executed_queries_primary_host = []
@@ -29,41 +29,24 @@ class TestFastSyncTapPostgres(TestCase):
     def test_generate_repl_slot_name(self):
         """Validate if the replication slot name generated correctly"""
         # Provide only database name
-        assert (
-            self.postgres.generate_replication_slot_name('some_db')
-            == 'pipelinewise_some_db'
-        )
+        assert self.postgres.generate_replication_slot_name("some_db") == "pipelinewise_some_db"
 
         # Provide database name and tap_id
-        assert (
-            self.postgres.generate_replication_slot_name('some_db', 'some_tap')
-            == 'pipelinewise_some_db_some_tap'
-        )
+        assert self.postgres.generate_replication_slot_name("some_db", "some_tap") == "pipelinewise_some_db_some_tap"
 
         # Provide database name, tap_id and prefix
         assert (
-            self.postgres.generate_replication_slot_name(
-                'some_db', 'some_tap', prefix='custom_prefix'
-            )
-            == 'custom_prefix_some_db_some_tap'
+            self.postgres.generate_replication_slot_name("some_db", "some_tap", prefix="custom_prefix")
+            == "custom_prefix_some_db_some_tap"
         )
 
         # Replication slot name should be lowercase
-        assert (
-            self.postgres.generate_replication_slot_name('SoMe_DB', 'SoMe_TaP')
-            == 'pipelinewise_some_db_some_tap'
-        )
+        assert self.postgres.generate_replication_slot_name("SoMe_DB", "SoMe_TaP") == "pipelinewise_some_db_some_tap"
 
         # Invalid characters should be replaced by underscores
-        assert (
-            self.postgres.generate_replication_slot_name('some-db', 'some-tap')
-            == 'pipelinewise_some_db_some_tap'
-        )
+        assert self.postgres.generate_replication_slot_name("some-db", "some-tap") == "pipelinewise_some_db_some_tap"
 
-        assert (
-            self.postgres.generate_replication_slot_name('some.db', 'some.tap')
-            == 'pipelinewise_some_db_some_tap'
-        )
+        assert self.postgres.generate_replication_slot_name("some.db", "some.tap") == "pipelinewise_some_db_some_tap"
 
     def test_create_replication_slot_1(self):
         """
@@ -71,7 +54,7 @@ class TestFastSyncTapPostgres(TestCase):
         """
 
         def execute_mock(query):
-            print('Mocked execute called')
+            print("Mocked execute called")
             self.postgres.executed_queries_primary_host.append(query)
 
         # mock cursor with execute method
@@ -97,7 +80,7 @@ class TestFastSyncTapPostgres(TestCase):
         """
 
         def execute_mock(query):
-            print('Mocked execute called')
+            print("Mocked execute called")
             self.postgres.executed_queries_primary_host.append(query)
 
         # mock cursor with execute method
@@ -117,17 +100,17 @@ class TestFastSyncTapPostgres(TestCase):
             "SELECT * FROM pg_create_logical_replication_slot('pipelinewise_test_database', 'wal2json')",
         ]
 
-    @patch('pipelinewise.fastsync.commons.tap_postgres.psycopg2.connect')
+    @patch("pipelinewise.fastsync.commons.tap_postgres.psycopg2.connect")
     def test_get_connection_to_primary(self, connect_mock):
         """
         Check that get connection uses the right credentials to connect to primary
         """
         creds = {
-            'host': 'my_primary_host',
-            'user': 'my_primary_user',
-            'password': 'my_primary_user',
-            'dbname': 'my_db',
-            'port': 'my_primary_port',
+            "host": "my_primary_host",
+            "user": "my_primary_user",
+            "password": "my_primary_user",
+            "dbname": "my_db",
+            "port": "my_primary_port",
         }
 
         self.assertEqual(
@@ -142,21 +125,21 @@ class TestFastSyncTapPostgres(TestCase):
 
         self.assertTrue(connect_mock.autocommit)
 
-    @patch('pipelinewise.fastsync.commons.tap_postgres.psycopg2.connect')
+    @patch("pipelinewise.fastsync.commons.tap_postgres.psycopg2.connect")
     def test_get_connection_to_sec(self, connect_mock):
         """
         Check that get connection uses the right credentials to connect to secondary if present
         """
         creds = {
-            'host': 'my_primary_host',
-            'replica_host': 'my_replica_host',
-            'user': 'my_primary_user',
-            'replica_user': 'my_replica_user',
-            'password': 'my_primary_user',
-            'replica_password': 'my_replica_user',
-            'dbname': 'my_db',
-            'port': 'my_primary_port',
-            'replica_port': 'my_replica_port',
+            "host": "my_primary_host",
+            "replica_host": "my_replica_host",
+            "user": "my_primary_user",
+            "replica_user": "my_replica_user",
+            "password": "my_primary_user",
+            "replica_password": "my_replica_user",
+            "dbname": "my_db",
+            "port": "my_primary_port",
+            "replica_port": "my_replica_port",
         }
 
         self.assertEqual(
@@ -172,18 +155,18 @@ class TestFastSyncTapPostgres(TestCase):
 
         self.assertTrue(connect_mock.autocommit)
 
-    @patch('pipelinewise.fastsync.commons.tap_postgres.psycopg2.connect')
+    @patch("pipelinewise.fastsync.commons.tap_postgres.psycopg2.connect")
     def test_get_connection_fallback(self, connect_mock):
         """
         Check that get connection uses the primary server credentials as a fallback
         """
         creds = {
-            'host': 'my_primary_host',
-            'replica_host': 'my_replica_host',
-            'user': 'my_primary_user',
-            'password': 'my_primary_user',
-            'dbname': 'my_db',
-            'port': 'my_primary_port',
+            "host": "my_primary_host",
+            "replica_host": "my_replica_host",
+            "user": "my_primary_user",
+            "password": "my_primary_user",
+            "dbname": "my_db",
+            "port": "my_primary_port",
         }
 
         self.assertEqual(
@@ -198,18 +181,18 @@ class TestFastSyncTapPostgres(TestCase):
 
         self.assertTrue(connect_mock.autocommit)
 
-    @patch('pipelinewise.fastsync.commons.tap_postgres.psycopg2.connect')
+    @patch("pipelinewise.fastsync.commons.tap_postgres.psycopg2.connect")
     def test_get_connection_ssl(self, connect_mock):
         """
         Check that get connection uses ssl when present
         """
         creds = {
-            'host': 'my_primary_host',
-            'user': 'my_primary_user',
-            'password': 'my_primary_user',
-            'dbname': 'my_db',
-            'port': 'my_primary_port',
-            'ssl': 'true',
+            "host": "my_primary_host",
+            "user": "my_primary_user",
+            "password": "my_primary_user",
+            "dbname": "my_db",
+            "port": "my_primary_port",
+            "ssl": "true",
         }
 
         self.assertEqual(
@@ -224,32 +207,30 @@ class TestFastSyncTapPostgres(TestCase):
 
         self.assertTrue(connect_mock.autocommit)
 
-    @patch('pipelinewise.fastsync.commons.tap_postgres.psycopg2.connect')
+    @patch("pipelinewise.fastsync.commons.tap_postgres.psycopg2.connect")
     def test_drop_slot_v15(self, connect_mock):
         """
         Check that dropping slots works fine for v15 slots
         """
 
         def execute_mock(query):
-            print('Mocked execute called')
+            print("Mocked execute called")
             self.postgres.executed_queries_primary_host.append(query)
 
         creds = {
-            'host': 'my_primary_host',
-            'user': 'my_primary_user',
-            'password': 'my_primary_user',
-            'dbname': 'my_db',
-            'port': 'my_primary_port',
-            'ssl': 'true',
-            'tap_id': 'tap_test',
+            "host": "my_primary_host",
+            "user": "my_primary_user",
+            "password": "my_primary_user",
+            "dbname": "my_db",
+            "port": "my_primary_port",
+            "ssl": "true",
+            "tap_id": "tap_test",
         }
 
         # mock cursor with execute method
         cursor_mock = MagicMock().return_value
         cursor_mock.__enter__.return_value.execute.side_effect = execute_mock
-        type(cursor_mock.__enter__.return_value).rowcount = PropertyMock(
-            side_effect=[1, 2]
-        )
+        type(cursor_mock.__enter__.return_value).rowcount = PropertyMock(side_effect=[1, 2])
 
         # mock PG connection instance with ability to open cursor
         pg_con = Mock()
@@ -261,36 +242,34 @@ class TestFastSyncTapPostgres(TestCase):
 
         assert self.postgres.executed_queries_primary_host == [
             "SELECT * FROM pg_replication_slots WHERE slot_name = 'pipelinewise_my_db';",
-            'SELECT pg_drop_replication_slot(slot_name) FROM pg_replication_slots WHERE '
+            "SELECT pg_drop_replication_slot(slot_name) FROM pg_replication_slots WHERE "
             "slot_name = 'pipelinewise_my_db';",
         ]
 
-    @patch('pipelinewise.fastsync.commons.tap_postgres.psycopg2.connect')
+    @patch("pipelinewise.fastsync.commons.tap_postgres.psycopg2.connect")
     def test_drop_slot_v16(self, connect_mock):
         """
         Check that dropping slots works fine for v16 slots
         """
 
         def execute_mock(query):
-            print('Mocked execute called')
+            print("Mocked execute called")
             self.postgres.executed_queries_primary_host.append(query)
 
         creds = {
-            'host': 'my_primary_host',
-            'user': 'my_primary_user',
-            'password': 'my_primary_user',
-            'dbname': 'my_db',
-            'port': 'my_primary_port',
-            'ssl': 'true',
-            'tap_id': 'tap_test',
+            "host": "my_primary_host",
+            "user": "my_primary_user",
+            "password": "my_primary_user",
+            "dbname": "my_db",
+            "port": "my_primary_port",
+            "ssl": "true",
+            "tap_id": "tap_test",
         }
 
         # mock cursor with execute method
         cursor_mock = MagicMock().return_value
         cursor_mock.__enter__.return_value.execute.side_effect = execute_mock
-        type(cursor_mock.__enter__.return_value).rowcount = PropertyMock(
-            side_effect=[0, 1]
-        )
+        type(cursor_mock.__enter__.return_value).rowcount = PropertyMock(side_effect=[0, 1])
 
         # mock PG connection instance with ability to open cursor
         pg_con = Mock()
@@ -302,7 +281,7 @@ class TestFastSyncTapPostgres(TestCase):
 
         assert self.postgres.executed_queries_primary_host == [
             "SELECT * FROM pg_replication_slots WHERE slot_name = 'pipelinewise_my_db';",
-            'SELECT pg_drop_replication_slot(slot_name) FROM pg_replication_slots WHERE '
+            "SELECT pg_drop_replication_slot(slot_name) FROM pg_replication_slots WHERE "
             "slot_name = 'pipelinewise_my_db_tap_test';",
         ]
 
@@ -310,22 +289,22 @@ class TestFastSyncTapPostgres(TestCase):
         """
         test fetch_current_incremental_key_pos where result is empty, it should raise an exception
         """
-        with patch.object(self.postgres, 'query') as query_mock:
+        with patch.object(self.postgres, "query") as query_mock:
             query_mock.return_value = None
 
             with self.assertRaises(Exception) as context:
-                self.postgres.fetch_current_incremental_key_pos('schema.table1', 'id')
+                self.postgres.fetch_current_incremental_key_pos("schema.table1", "id")
 
-            self.assertEqual('Cannot get replication key value for table: schema.table1', str(context.exception))
+            self.assertEqual("Cannot get replication key value for table: schema.table1", str(context.exception))
 
     def test_fetch_current_incremental_key_pos_empty_key_value_return_empty_state(self):
         """
         test fetch_current_incremental_key_pos where result has empty value is empty, it should return an empty state
         """
-        with patch.object(self.postgres, 'query') as query_mock:
+        with patch.object(self.postgres, "query") as query_mock:
             query_mock.return_value = [{}]
 
-            state = self.postgres.fetch_current_incremental_key_pos('schema.table1', 'id')
+            state = self.postgres.fetch_current_incremental_key_pos("schema.table1", "id")
 
             self.assertFalse(state)
 
@@ -333,60 +312,72 @@ class TestFastSyncTapPostgres(TestCase):
         """
         test fetch_current_incremental_key_pos where result exists, it should return a non empty state with key value
         """
-        with patch.object(self.postgres, 'query') as query_mock:
-            query_mock.return_value = [{'key_value': 123}]
+        with patch.object(self.postgres, "query") as query_mock:
+            query_mock.return_value = [{"key_value": 123}]
 
-            state = self.postgres.fetch_current_incremental_key_pos('schema.table1', 'id')
+            state = self.postgres.fetch_current_incremental_key_pos("schema.table1", "id")
 
-            self.assertDictEqual({
-                'replication_key': 'id',
-                'replication_key_value': 123,
-                'version': 1,
-            }, state)
+            self.assertDictEqual(
+                {
+                    "replication_key": "id",
+                    "replication_key_value": 123,
+                    "version": 1,
+                },
+                state,
+            )
 
     def test_fetch_current_incremental_key_pos_datetime_key_value_return_state(self):
         """
         test fetch_current_incremental_key_pos where result is datetime, it should return a state with iso formatted
          datetime key value
         """
-        with patch.object(self.postgres, 'query') as query_mock:
-            query_mock.return_value = [{'key_value': datetime.datetime(2020, 1, 24, 7, 12, 6)}]
+        with patch.object(self.postgres, "query") as query_mock:
+            query_mock.return_value = [{"key_value": datetime.datetime(2020, 1, 24, 7, 12, 6)}]
 
-            state = self.postgres.fetch_current_incremental_key_pos('schema.table1', 'id')
+            state = self.postgres.fetch_current_incremental_key_pos("schema.table1", "id")
 
-            self.assertDictEqual({
-                'replication_key': 'id',
-                'replication_key_value': '2020-01-24T07:12:06',
-                'version': 1,
-            }, state)
+            self.assertDictEqual(
+                {
+                    "replication_key": "id",
+                    "replication_key_value": "2020-01-24T07:12:06",
+                    "version": 1,
+                },
+                state,
+            )
 
     def test_fetch_current_incremental_key_pos_date_key_value_return_state(self):
         """
         test fetch_current_incremental_key_pos where result is date, it should return a state with iso formatted
          datetime key value
         """
-        with patch.object(self.postgres, 'query') as query_mock:
-            query_mock.return_value = [{'key_value': datetime.date(2020, 1, 24)}]
+        with patch.object(self.postgres, "query") as query_mock:
+            query_mock.return_value = [{"key_value": datetime.date(2020, 1, 24)}]
 
-            state = self.postgres.fetch_current_incremental_key_pos('schema.table1', 'id')
+            state = self.postgres.fetch_current_incremental_key_pos("schema.table1", "id")
 
-            self.assertDictEqual({
-                'replication_key': 'id',
-                'replication_key_value': '2020-01-24T00:00:00',
-                'version': 1,
-            }, state)
+            self.assertDictEqual(
+                {
+                    "replication_key": "id",
+                    "replication_key_value": "2020-01-24T00:00:00",
+                    "version": 1,
+                },
+                state,
+            )
 
     def test_fetch_current_incremental_key_pos_decimal_key_value_return_state(self):
         """
         test fetch_current_incremental_key_pos where result is decimal, it should return a state with float key value
         """
-        with patch.object(self.postgres, 'query') as query_mock:
-            query_mock.return_value = [{'key_value': Decimal(4.222222222)}]
+        with patch.object(self.postgres, "query") as query_mock:
+            query_mock.return_value = [{"key_value": Decimal(4.222222222)}]
 
-            state = self.postgres.fetch_current_incremental_key_pos('schema.table1', 'id')
+            state = self.postgres.fetch_current_incremental_key_pos("schema.table1", "id")
 
-            self.assertDictEqual({
-                'replication_key': 'id',
-                'replication_key_value': 4.222222222,
-                'version': 1,
-            }, state)
+            self.assertDictEqual(
+                {
+                    "replication_key": "id",
+                    "replication_key_value": 4.222222222,
+                    "version": 1,
+                },
+                state,
+            )

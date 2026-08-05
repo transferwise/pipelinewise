@@ -16,15 +16,15 @@ from .commons.target_postgres import FastSyncTargetPostgres
 LOGGER = Logger().get_logger(__name__)
 
 REQUIRED_CONFIG_KEYS = {
-    'tap': [
-        'host',
-        'port',
-        'user',
-        'password',
-        'dbname',
-        'tap_id',  # tap_id is required to generate unique replication slot names
+    "tap": [
+        "host",
+        "port",
+        "user",
+        "password",
+        "dbname",
+        "tap_id",  # tap_id is required to generate unique replication slot names
     ],
-    'target': ['host', 'port', 'user', 'password'],
+    "target": ["host", "port", "user", "password"],
 }
 
 LOCK = multiprocessing.Lock()
@@ -33,38 +33,38 @@ LOCK = multiprocessing.Lock()
 def tap_type_to_target_type(pg_type, *_):
     """Data type mapping from Postgres to Postgres"""
     return {
-        'char': 'CHARACTER VARYING',
-        'character': 'CHARACTER VARYING',
-        'varchar': 'CHARACTER VARYING',
-        'character varying': 'CHARACTER VARYING',
-        'text': 'CHARACTER VARYING',
-        'bit': 'BOOLEAN',
-        'varbit': 'DOUBLE PRECISION',
-        'bit varying': 'DOUBLE PRECISION',
-        'smallint': 'SMALLINT NULL',
-        'int': 'INTEGER NULL',
-        'integer': 'INTEGER NULL',
-        'bigint': 'BIGINT NULL',
-        'smallserial': 'DOUBLE PRECISION',
-        'serial': 'DOUBLE PRECISION',
-        'bigserial': 'DOUBLE PRECISION',
-        'numeric': 'DOUBLE PRECISION',
-        'double precision': 'DOUBLE PRECISION',
-        'real': 'DOUBLE PRECISION',
-        'bool': 'BOOLEAN',
-        'boolean': 'BOOLEAN',
-        'date': 'TIMESTAMP WITHOUT TIME ZONE',
-        'timestamp': 'TIMESTAMP WITHOUT TIME ZONE',
-        'timestamp without time zone': 'TIMESTAMP WITHOUT TIME ZONE',
-        'timestamp with time zone': 'TIMESTAMP WITHOUT TIME ZONE',
-        'time': 'TIME WITHOUT TIME ZONE',
-        'time without time zone': 'TIME WITHOUT TIME ZONE',
-        'time with time zone': 'TIME WITH TIME ZONE',
+        "char": "CHARACTER VARYING",
+        "character": "CHARACTER VARYING",
+        "varchar": "CHARACTER VARYING",
+        "character varying": "CHARACTER VARYING",
+        "text": "CHARACTER VARYING",
+        "bit": "BOOLEAN",
+        "varbit": "DOUBLE PRECISION",
+        "bit varying": "DOUBLE PRECISION",
+        "smallint": "SMALLINT NULL",
+        "int": "INTEGER NULL",
+        "integer": "INTEGER NULL",
+        "bigint": "BIGINT NULL",
+        "smallserial": "DOUBLE PRECISION",
+        "serial": "DOUBLE PRECISION",
+        "bigserial": "DOUBLE PRECISION",
+        "numeric": "DOUBLE PRECISION",
+        "double precision": "DOUBLE PRECISION",
+        "real": "DOUBLE PRECISION",
+        "bool": "BOOLEAN",
+        "boolean": "BOOLEAN",
+        "date": "TIMESTAMP WITHOUT TIME ZONE",
+        "timestamp": "TIMESTAMP WITHOUT TIME ZONE",
+        "timestamp without time zone": "TIMESTAMP WITHOUT TIME ZONE",
+        "timestamp with time zone": "TIMESTAMP WITHOUT TIME ZONE",
+        "time": "TIME WITHOUT TIME ZONE",
+        "time without time zone": "TIME WITHOUT TIME ZONE",
+        "time with time zone": "TIME WITH TIME ZONE",
         # ARRAY is uppercase, because postgres stores it in this format in information_schema.columns.data_type
-        'ARRAY': 'JSONB',
-        'json': 'JSONB',
-        'jsonb': 'JSONB',
-    }.get(pg_type, 'CHARACTER VARYING')
+        "ARRAY": "JSONB",
+        "json": "JSONB",
+        "jsonb": "JSONB",
+    }.get(pg_type, "CHARACTER VARYING")
 
 
 def sync_table(table: str, args: Namespace) -> Union[bool, str]:
@@ -73,10 +73,8 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
     postgres_target = FastSyncTargetPostgres(args.target, args.transform)
 
     try:
-        dbname = args.tap.get('dbname')
-        filename = utils.gen_export_filename(
-            tap_id=args.target.get('tap_id'), table=table
-        )
+        dbname = args.tap.get("dbname")
+        filename = utils.gen_export_filename(tap_id=args.target.get("tap_id"), table=table)
         filepath = os.path.join(args.temp_dir, filename)
         target_schema = utils.get_target_schema(args.target, table)
 
@@ -84,15 +82,13 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
         postgres.open_connection()
 
         # Get bookmark - LSN position or Incremental Key value
-        bookmark = utils.get_bookmark_for_table(
-            table, args.properties, postgres, dbname=dbname
-        )
+        bookmark = utils.get_bookmark_for_table(table, args.properties, postgres, dbname=dbname)
 
         # Exporting table data, get table definitions and close connection to avoid timeouts
         postgres.copy_table(table, filepath)
         postgres_target_types = postgres.map_column_types_to_target(table)
-        postgres_target_columns = postgres_target_types.get('columns', [])
-        primary_key = postgres_target_types.get('primary_key')
+        postgres_target_columns = postgres_target_types.get("columns", [])
+        primary_key = postgres_target_types.get("primary_key")
         postgres.close_connection()
 
         # Creating temp table in Postgres
@@ -110,15 +106,13 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
             size_bytes = os.path.getsize(filepath)
 
             # Load into Postgres table
-            postgres_target.copy_to_table(
-                filepath, target_schema, table, size_bytes, is_temporary=True
-            )
+            postgres_target.copy_to_table(filepath, target_schema, table, size_bytes, is_temporary=True)
             os.remove(filepath)
 
             # Obfuscate columns
             postgres_target.obfuscate_columns(target_schema, table, is_temporary=True)
         else:
-            LOGGER.warning('Not export file has been generated, this is likely due to table being empty')
+            LOGGER.warning("Not export file has been generated, this is likely due to table being empty")
 
         # Create target table and swap with the temp table in Postgres
         postgres_target.swap_tables(target_schema, table)
@@ -133,18 +127,14 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
 
         # Table loaded, grant select on all tables in target schema
         grantees = utils.get_grantees(args.target, table)
-        utils.grant_privilege(
-            target_schema, grantees, postgres_target.grant_usage_on_schema
-        )
-        utils.grant_privilege(
-            target_schema, grantees, postgres_target.grant_select_on_schema
-        )
+        utils.grant_privilege(target_schema, grantees, postgres_target.grant_usage_on_schema)
+        utils.grant_privilege(target_schema, grantees, postgres_target.grant_select_on_schema)
 
         return True
 
     except Exception as exc:
         LOGGER.exception(exc)
-        return '{}: {}'.format(table, exc)
+        return "{}: {}".format(table, exc)
 
 
 def main_impl():

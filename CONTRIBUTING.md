@@ -59,9 +59,8 @@ People *love* thorough bug reports. I'm not even kidding.
 
 * Use Python 3.12 and four spaces for indentation; do not use tabs.
 * Follow PEP 8 and use Google-style docstrings.
-* Prefer single quotes for string literals where the surrounding code does so.
-* Run `pre-commit run --all-files` to apply the repository's formatting and lint checks.
-* Run `pytest --ignore tests/end_to_end` for the unit test suite.
+* Run `ruff format .` and `ruff check .` before opening a pull request. These commands include PipelineWise, `tap-mysql`, `tap-postgres`, and `target-snowflake`; use the local development tools for other connectors.
+* Run `pytest --cov=pipelinewise --cov-fail-under=77 -v tests/units` for the unit test suite.
 
 ## Versioning
 We use [Semantic versioning](https://semver.org/).

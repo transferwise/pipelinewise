@@ -1,4 +1,5 @@
 """Enums used by pipelinewise-target-snowflake"""
+
 from enum import Enum, unique
 from types import ModuleType
 from typing import Callable
@@ -6,13 +7,14 @@ from typing import Callable
 import target_snowflake.file_formats
 from target_snowflake.exceptions import FileFormatNotFoundException, InvalidFileFormatException
 
+
 # Supported types for file formats.
 @unique
 class FileFormatTypes(str, Enum):
     """Enum of supported file format types"""
 
-    CSV = 'csv'
-    PARQUET = 'parquet'
+    CSV = "csv"
+    PARQUET = "parquet"
 
     @staticmethod
     def list():
@@ -20,11 +22,10 @@ class FileFormatTypes(str, Enum):
         return list(map(lambda c: c.value, FileFormatTypes))
 
 
-# pylint: disable=too-few-public-methods
 class FileFormat:
     """File Format class"""
 
-    def __init__(self, file_format: str, query_fn: Callable, file_format_type: FileFormatTypes=None):
+    def __init__(self, file_format: str, query_fn: Callable, file_format_type: FileFormatTypes = None):
         """Find the file format in Snowflake, detect its type and
         initialise file format specific functions"""
         if file_format_type:
@@ -68,19 +69,18 @@ class FileFormat:
         Returns:
             FileFormatTypes enum item
         """
-        file_format_name = file_format.split('.')[-1]
+        file_format_name = file_format.rsplit(".", maxsplit=1)[-1]
         file_formats_in_sf = query_fn(f"SHOW FILE FORMATS LIKE '{file_format_name}'")
 
         if len(file_formats_in_sf) == 1:
             file_format = file_formats_in_sf[0]
             try:
-                file_format_type = FileFormatTypes(file_format['type'].lower())
+                file_format_type = FileFormatTypes(file_format["type"].lower())
             except ValueError as ex:
                 raise InvalidFileFormatException(
-                    f"Not supported named file format {file_format_name}. Supported file formats: {FileFormatTypes}") \
-                    from ex
+                    f"Not supported named file format {file_format_name}. Supported file formats: {FileFormatTypes}"
+                ) from ex
         else:
-            raise FileFormatNotFoundException(
-                f"Named file format not found: {file_format}")
+            raise FileFormatNotFoundException(f"Named file format not found: {file_format}")
 
         return file_format_type

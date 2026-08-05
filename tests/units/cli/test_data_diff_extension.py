@@ -8,9 +8,6 @@ from pipelinewise.cli import utils
 from pipelinewise.cli.config import Config
 
 
-# pylint: disable=missing-function-docstring,invalid-name
-
-
 def _config(tmp_path):
     config = Config(str(tmp_path))
     config.global_config = {
@@ -67,9 +64,7 @@ def _config(tmp_path):
 
 def _contains_data_diff(value):
     if isinstance(value, dict):
-        return "data_diff" in value or any(
-            _contains_data_diff(item) for item in value.values()
-        )
+        return "data_diff" in value or any(_contains_data_diff(item) for item in value.values())
     if isinstance(value, list):
         return any(_contains_data_diff(item) for item in value)
     return False
@@ -91,10 +86,7 @@ def test_main_json_excludes_data_diff_extension(tmp_path):
     config = _config(tmp_path)
     config.save()
 
-    generated = [
-        json.loads(path.read_text(encoding="utf-8"))
-        for path in Path(tmp_path).rglob("*.json")
-    ]
+    generated = [json.loads(path.read_text(encoding="utf-8")) for path in Path(tmp_path).rglob("*.json")]
 
     assert generated
     assert all(not _contains_data_diff(document) for document in generated)

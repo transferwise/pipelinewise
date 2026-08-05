@@ -10,20 +10,23 @@ from pipelinewise.data_diff.config import (
     extract_check_definitions,
     parse_duration,
 )
-# pylint: disable=missing-function-docstring,invalid-name
 
 
 def _config(tmp_path, *, backend=True, transformed=False):
     del tmp_path
-    global_config = {
-        "backend_db": {
-            "host": "backend",
-            "port": 5432,
-            "user": "pipelinewise",
-            "password": "secret",
-            "dbname": "pipelinewise",
+    global_config = (
+        {
+            "backend_db": {
+                "host": "backend",
+                "port": 5432,
+                "user": "pipelinewise",
+                "password": "secret",
+                "dbname": "pipelinewise",
+            }
         }
-    } if backend else {}
+        if backend
+        else {}
+    )
     transformations = [{"column": "updated_at", "type": "HASH"}] if transformed else []
     targets = {
         "snowflake": {
@@ -134,9 +137,7 @@ def test_extracts_deterministic_credential_free_definition(tmp_path):
 
 @pytest.mark.parametrize("source_type", ["tap-postgres", "tap-mysql"])
 def test_postgres_target_routes_use_target_postgres_identifiers(tmp_path, source_type):
-    definition = _definitions(
-        _use_postgres_target(_config(tmp_path), source_type)
-    )[0]
+    definition = _definitions(_use_postgres_target(_config(tmp_path), source_type))[0]
 
     assert definition.target_type == "target-postgres"
     assert definition.target_schema == "replicated_payments"
@@ -149,10 +150,10 @@ def test_postgres_target_routes_use_target_postgres_identifiers(tmp_path, source
 def test_ignores_definitions_when_no_backend_is_configured(tmp_path):
     # Data-diff is opt-in: without backend_db, definitions are dropped and
     # import_config still succeeds. Patched not caplog: logging.conf sets propagate=0.
-    with patch('pipelinewise.data_diff.config.LOGGER') as logger:
+    with patch("pipelinewise.data_diff.config.LOGGER") as logger:
         assert _definitions(_config(tmp_path, backend=False)) == []
 
-    assert 'backend_db' in logger.warning.call_args.args[0]
+    assert "backend_db" in logger.warning.call_args.args[0]
 
 
 # An empty frequency is caught earlier by the missing-timing check, which reports a
@@ -175,9 +176,7 @@ def test_rejects_transformed_comparison_columns(tmp_path):
 
 def test_row_checksum_requires_explicit_compare_columns(tmp_path):
     config = _config(tmp_path)
-    data_diff = config.targets["snowflake"]["taps"][0]["schemas"][0]["tables"][0][
-        "data_diff"
-    ]
+    data_diff = config.targets["snowflake"]["taps"][0]["schemas"][0]["tables"][0]["data_diff"]
     data_diff.pop("compare_columns")
 
     with pytest.raises(DataDiffConfigError, match="row_checksum requires"):
@@ -218,9 +217,7 @@ def test_tap_timing_defaults_are_inherited_and_table_values_override(tmp_path):
 
 def test_requires_timing_on_table_or_tap_defaults(tmp_path):
     config = _config(tmp_path)
-    data_diff = config.targets["snowflake"]["taps"][0]["schemas"][0]["tables"][0][
-        "data_diff"
-    ]
+    data_diff = config.targets["snowflake"]["taps"][0]["schemas"][0]["tables"][0]["data_diff"]
     data_diff.pop("frequency")
     data_diff.pop("window_start")
 
@@ -230,9 +227,7 @@ def test_requires_timing_on_table_or_tap_defaults(tmp_path):
 
 def test_rejects_window_end_further_from_fire_than_window_start(tmp_path):
     config = _config(tmp_path)
-    data_diff = config.targets["snowflake"]["taps"][0]["schemas"][0]["tables"][0][
-        "data_diff"
-    ]
+    data_diff = config.targets["snowflake"]["taps"][0]["schemas"][0]["tables"][0]["data_diff"]
     data_diff["window_start"] = "-1h"
     data_diff["window_end"] = "-6h"
 

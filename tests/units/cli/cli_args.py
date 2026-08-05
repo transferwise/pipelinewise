@@ -3,35 +3,33 @@ CLI Arguments Class for unit tests
 """
 
 
-# pylint: disable=redefined-builtin,too-many-instance-attributes,too-many-arguments,too-many-locals
 class CliArgs:
     """Class to simulate argparse command line arguments required by PipelineWise class"""
 
-    # pylint: disable=too-many-positional-arguments
-    def __init__(
+    def __init__(  # noqa: PLR0913, PLR0917
         self,
-        target='*',
-        tap='*',
-        taps='*',
+        target="*",
+        tap="*",
+        taps="*",
         tables=None,
-        dir='*',
-        name='*',
+        dir="*",
+        name="*",
         secret=None,
         string=None,
-        log='*',
+        log="*",
         extra_log=False,
         debug=False,
         profiler=False,
         force=False,
-        replication_method_only='*',
+        replication_method_only="*",
         check=None,
-        output_format='table',
+        output_format="table",
         include_versioned=False,
         run_id=None,
         remediation_ref=None,
-        table='*',
-        column='*',
-        start_value='*',
+        table="*",
+        column="*",
+        start_value="*",
         end_value=None,
         command=None,
     ):

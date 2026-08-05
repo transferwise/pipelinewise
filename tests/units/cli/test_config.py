@@ -6,7 +6,7 @@ from pipelinewise import cli
 from pipelinewise.cli.config import Config
 from pipelinewise.cli.errors import InvalidConfigException
 
-PIPELINEWISE_TEST_HOME = '/tmp/.pipelinewise'
+PIPELINEWISE_TEST_HOME = "/tmp/.pipelinewise"
 
 
 # Todo: Inherit from unittest.TestCase
@@ -18,19 +18,19 @@ class TestConfig:
     @staticmethod
     def _get_config(json_config_dir, yaml_path):
         # Load a full configuration set from YAML files
-        yaml_config_dir = f'{os.path.dirname(__file__)}/resources/{yaml_path}'
-        vault_secret = f'{os.path.dirname(__file__)}/resources/vault-secret.txt'
+        yaml_config_dir = f"{os.path.dirname(__file__)}/resources/{yaml_path}"
+        vault_secret = f"{os.path.dirname(__file__)}/resources/vault-secret.txt"
         return Config.from_yamls(json_config_dir, yaml_config_dir, vault_secret)
 
     @staticmethod
     def _get_json_files_path(tap_id, json_config_dir):
         return {
-            'main_config_json': f'{json_config_dir}/config.json',
-            'target_config_json': f'{json_config_dir}/test_snowflake_target/config.json',
-            'tap_config_json': f'{json_config_dir}/test_snowflake_target/{tap_id}/config.json',
-            'tap_inheritable_config_json': f'{json_config_dir}/test_snowflake_target/{tap_id}/inheritable_config.json',
-            'tap_selection_json': f'{json_config_dir}/test_snowflake_target/{tap_id}/selection.json',
-            'tap_transformation_json': f'{json_config_dir}/test_snowflake_target/{tap_id}/transformation.json',
+            "main_config_json": f"{json_config_dir}/config.json",
+            "target_config_json": f"{json_config_dir}/test_snowflake_target/config.json",
+            "tap_config_json": f"{json_config_dir}/test_snowflake_target/{tap_id}/config.json",
+            "tap_inheritable_config_json": f"{json_config_dir}/test_snowflake_target/{tap_id}/inheritable_config.json",
+            "tap_selection_json": f"{json_config_dir}/test_snowflake_target/{tap_id}/selection.json",
+            "tap_transformation_json": f"{json_config_dir}/test_snowflake_target/{tap_id}/transformation.json",
         }
 
     def test_constructor(self):
@@ -39,122 +39,120 @@ class TestConfig:
 
         # config dir and path should be generated automatically
         assert config.config_dir == PIPELINEWISE_TEST_HOME
-        assert config.config_path == '{}/config.json'.format(PIPELINEWISE_TEST_HOME)
+        assert config.config_path == "{}/config.json".format(PIPELINEWISE_TEST_HOME)
         assert config.targets == {}
 
     def test_connector_files(self):
         """Every singer connector must have a list of JSON files at certain locations"""
-        assert Config.get_connector_files('/var/singer-connector') == {
-            'config': '/var/singer-connector/config.json',
-            'inheritable_config': '/var/singer-connector/inheritable_config.json',
-            'properties': '/var/singer-connector/properties.json',
-            'state': '/var/singer-connector/state.json',
-            'transformation': '/var/singer-connector/transformation.json',
-            'selection': '/var/singer-connector/selection.json',
-            'pidfile': '/var/singer-connector/pipelinewise.pid',
+        assert Config.get_connector_files("/var/singer-connector") == {
+            "config": "/var/singer-connector/config.json",
+            "inheritable_config": "/var/singer-connector/inheritable_config.json",
+            "properties": "/var/singer-connector/properties.json",
+            "state": "/var/singer-connector/state.json",
+            "transformation": "/var/singer-connector/transformation.json",
+            "selection": "/var/singer-connector/selection.json",
+            "pidfile": "/var/singer-connector/pipelinewise.pid",
         }
 
     def test_from_yamls(self):
         """Test creating Config object using YAML configuration directory as the input"""
 
         # Create Config object by parsing target and tap YAMLs in a directory
-        yaml_config_dir = f'{os.path.dirname(__file__)}/resources/test_yaml_config'
+        yaml_config_dir = f"{os.path.dirname(__file__)}/resources/test_yaml_config"
 
-        vault_secret = f'{os.path.dirname(__file__)}/resources/vault-secret.txt'
+        vault_secret = f"{os.path.dirname(__file__)}/resources/vault-secret.txt"
 
         # Parse YAML files and create the config object
-        config = Config.from_yamls(
-            PIPELINEWISE_TEST_HOME, yaml_config_dir, vault_secret
-        )
+        config = Config.from_yamls(PIPELINEWISE_TEST_HOME, yaml_config_dir, vault_secret)
 
         # config dir and path should be generated automatically
         assert config.config_dir == PIPELINEWISE_TEST_HOME
-        assert config.config_path == f'{PIPELINEWISE_TEST_HOME}/config.json'
+        assert config.config_path == f"{PIPELINEWISE_TEST_HOME}/config.json"
 
         # Vault encrypted alert handlers should be loaded into global config
         assert config.global_config == {
-            'alert_handlers': {
-                'slack': {
-                    'token': 'Vault Encrypted Secret Fruit',
-                    'channel': '#slack-channel',
+            "alert_handlers": {
+                "slack": {
+                    "token": "Vault Encrypted Secret Fruit",
+                    "channel": "#slack-channel",
                 }
             }
         }
 
         # The target dictionary should contain every target and tap parsed from YAML files
         assert config.targets == {
-            'test_snowflake_target': {
-                'id': 'test_snowflake_target',
-                'name': 'Test Target Connector',
-                'type': 'target-snowflake',
-                'db_conn': {
-                    'account': 'account',
-                    'aws_access_key_id': 'access_key_id',
-                    'aws_secret_access_key': 'secret_access_key',
-                    'client_side_encryption_master_key': 'master_key',
-                    'dbname': 'foo_db',
-                    'file_format': 'foo_file_format',
-                    'private_key': 'private_key_path',
-                    's3_bucket': 's3_bucket',
-                    's3_key_prefix': 's3_prefix/',
-                    'stage': 'foo_stage',
-                    'user': 'user',
-                    'warehouse': 'MY_WAREHOUSE',
+            "test_snowflake_target": {
+                "id": "test_snowflake_target",
+                "name": "Test Target Connector",
+                "type": "target-snowflake",
+                "db_conn": {
+                    "account": "account",
+                    "aws_access_key_id": "access_key_id",
+                    "aws_secret_access_key": "secret_access_key",
+                    "client_side_encryption_master_key": "master_key",
+                    "dbname": "foo_db",
+                    "file_format": "foo_file_format",
+                    "private_key": "private_key_path",
+                    "s3_bucket": "s3_bucket",
+                    "s3_key_prefix": "s3_prefix/",
+                    "stage": "foo_stage",
+                    "user": "user",
+                    "warehouse": "MY_WAREHOUSE",
                 },
-                'files': {
-                    'config': f'{PIPELINEWISE_TEST_HOME}/test_snowflake_target/config.json',
-                    'inheritable_config': f'{ PIPELINEWISE_TEST_HOME}/test_snowflake_target/inheritable_config.json',
-                    'properties': f'{PIPELINEWISE_TEST_HOME}/test_snowflake_target/properties.json',
-                    'selection': f'{PIPELINEWISE_TEST_HOME}/test_snowflake_target/selection.json',
-                    'state': f'{PIPELINEWISE_TEST_HOME}/test_snowflake_target/state.json',
-                    'transformation': f'{PIPELINEWISE_TEST_HOME}/test_snowflake_target/transformation.json',
-                    'pidfile': f'{PIPELINEWISE_TEST_HOME}/test_snowflake_target/pipelinewise.pid',
+                "files": {
+                    "config": f"{PIPELINEWISE_TEST_HOME}/test_snowflake_target/config.json",
+                    "inheritable_config": f"{PIPELINEWISE_TEST_HOME}/test_snowflake_target/inheritable_config.json",
+                    "properties": f"{PIPELINEWISE_TEST_HOME}/test_snowflake_target/properties.json",
+                    "selection": f"{PIPELINEWISE_TEST_HOME}/test_snowflake_target/selection.json",
+                    "state": f"{PIPELINEWISE_TEST_HOME}/test_snowflake_target/state.json",
+                    "transformation": f"{PIPELINEWISE_TEST_HOME}/test_snowflake_target/transformation.json",
+                    "pidfile": f"{PIPELINEWISE_TEST_HOME}/test_snowflake_target/pipelinewise.pid",
                 },
-                'taps': [
+                "taps": [
                     {
-                        'id': 'mysql_sample',
-                        'name': 'Sample MySQL Database',
-                        'type': 'tap-mysql',
-                        'owner': 'somebody@foo.com',
-                        'target': 'test_snowflake_target',
-                        'batch_size_rows': 20000,
-                        'batch_wait_limit_seconds': 3600,
-                        'split_large_files': True,
-                        'split_file_chunk_size_mb': 500,
-                        'split_file_max_chunks': 25,
-                        'db_conn': {
-                            'dbname': '<DB_NAME>',
-                            'host': '<HOST>',
-                            'password': '<PASSWORD>',
-                            'port': 3306,
-                            'user': '<USER>',
+                        "id": "mysql_sample",
+                        "name": "Sample MySQL Database",
+                        "type": "tap-mysql",
+                        "owner": "somebody@foo.com",
+                        "target": "test_snowflake_target",
+                        "batch_size_rows": 20000,
+                        "batch_wait_limit_seconds": 3600,
+                        "split_large_files": True,
+                        "split_file_chunk_size_mb": 500,
+                        "split_file_max_chunks": 25,
+                        "db_conn": {
+                            "dbname": "<DB_NAME>",
+                            "host": "<HOST>",
+                            "password": "<PASSWORD>",
+                            "port": 3306,
+                            "user": "<USER>",
                         },
-                        'files': {
-                            'config': f'{PIPELINEWISE_TEST_HOME}/test_snowflake_target/mysql_sample/config.json',
-                            'inheritable_config': f'{PIPELINEWISE_TEST_HOME}'
-                                                  f'/test_snowflake_target/mysql_sample/inheritable_config.json',
-                            'properties': f'{PIPELINEWISE_TEST_HOME}/'
-                                          f'test_snowflake_target/mysql_sample/properties.json',
-                            'selection': f'{PIPELINEWISE_TEST_HOME}/test_snowflake_target/mysql_sample/selection.json',
-                            'state': f'{PIPELINEWISE_TEST_HOME}/test_snowflake_target/mysql_sample/state.json',
-                            'transformation': f'{PIPELINEWISE_TEST_HOME}'
-                                              f'/test_snowflake_target/mysql_sample/transformation.json',
-                            'pidfile': f'{PIPELINEWISE_TEST_HOME}/test_snowflake_target/mysql_sample/pipelinewise.pid',
+                        "files": {
+                            "config": f"{PIPELINEWISE_TEST_HOME}/test_snowflake_target/mysql_sample/config.json",
+                            "inheritable_config": f"{PIPELINEWISE_TEST_HOME}"
+                            f"/test_snowflake_target/mysql_sample/inheritable_config.json",
+                            "properties": f"{PIPELINEWISE_TEST_HOME}/"
+                            f"test_snowflake_target/mysql_sample/properties.json",
+                            "selection": f"{PIPELINEWISE_TEST_HOME}/test_snowflake_target/mysql_sample/selection.json",
+                            "state": f"{PIPELINEWISE_TEST_HOME}/test_snowflake_target/mysql_sample/state.json",
+                            "transformation": f"{PIPELINEWISE_TEST_HOME}"
+                            f"/test_snowflake_target/mysql_sample/transformation.json",
+                            "pidfile": f"{PIPELINEWISE_TEST_HOME}/test_snowflake_target/mysql_sample/pipelinewise.pid",
                         },
-                        'schemas': [
+                        "schemas": [
                             {
-                                'source_schema': 'my_db',
-                                'target_schema': 'repl_my_db',
-                                'target_schema_select_permissions': ['grp_stats'],
-                                'tables': [
+                                "source_schema": "my_db",
+                                "target_schema": "repl_my_db",
+                                "target_schema_select_permissions": ["grp_stats"],
+                                "tables": [
                                     {
-                                        'table_name': 'table_one',
-                                        'replication_method': 'INCREMENTAL',
-                                        'replication_key': 'last_update',
+                                        "table_name": "table_one",
+                                        "replication_method": "INCREMENTAL",
+                                        "replication_key": "last_update",
                                     },
                                     {
-                                        'table_name': 'table_two',
-                                        'replication_method': 'LOG_BASED',
+                                        "table_name": "table_two",
+                                        "replication_method": "LOG_BASED",
                                     },
                                 ],
                             }
@@ -168,10 +166,8 @@ class TestConfig:
         """Test creating Config object using invalid YAML configuration directory"""
 
         # Initialising config object with a tap that's referencing an unknown target should exit
-        yaml_config_dir = '{}/resources/test_invalid_tap_mongo_yaml_config'.format(
-            os.path.dirname(__file__)
-        )
-        vault_secret = '{}/resources/vault-secret.txt'.format(os.path.dirname(__file__))
+        yaml_config_dir = "{}/resources/test_invalid_tap_mongo_yaml_config".format(os.path.dirname(__file__))
+        vault_secret = "{}/resources/vault-secret.txt".format(os.path.dirname(__file__))
         print(yaml_config_dir)
         with pytest.raises(InvalidConfigException):
             Config.from_yamls(PIPELINEWISE_TEST_HOME, yaml_config_dir, vault_secret)
@@ -184,15 +180,11 @@ class TestConfig:
 
         # Initialising Config object with a not existing directory should raise an exception
         with pytest.raises(Exception):
-            Config.from_yamls(
-                PIPELINEWISE_TEST_HOME, 'not-existing-yaml-config-directory'
-            )
+            Config.from_yamls(PIPELINEWISE_TEST_HOME, "not-existing-yaml-config-directory")
 
         # Initialising config object with a tap that's referencing an unknown target should exit
-        yaml_config_dir = '{}/resources/test_invalid_yaml_config'.format(
-            os.path.dirname(__file__)
-        )
-        vault_secret = '{}/resources/vault-secret.txt'.format(os.path.dirname(__file__))
+        yaml_config_dir = "{}/resources/test_invalid_yaml_config".format(os.path.dirname(__file__))
+        vault_secret = "{}/resources/vault-secret.txt".format(os.path.dirname(__file__))
 
         with pytest.raises(SystemExit) as pytest_wrapped_e:
             Config.from_yamls(PIPELINEWISE_TEST_HOME, yaml_config_dir, vault_secret)
@@ -210,13 +202,11 @@ class TestConfig:
 
         # Initialising Config object with a not existing directory should raise an exception
         with pytest.raises(Exception):
-            Config.from_yamls(
-                PIPELINEWISE_TEST_HOME, 'not-existing-yaml-config-directory'
-            )
+            Config.from_yamls(PIPELINEWISE_TEST_HOME, "not-existing-yaml-config-directory")
 
         # Initialising config object with a tap that's referencing an unknown target should exit
-        yaml_config_dir = f'{os.path.dirname(__file__)}/resources/test_invalid_yaml_config_with_duplicate_targets'
-        vault_secret = f'{os.path.dirname(__file__)}/resources/vault-secret.txt'
+        yaml_config_dir = f"{os.path.dirname(__file__)}/resources/test_invalid_yaml_config_with_duplicate_targets"
+        vault_secret = f"{os.path.dirname(__file__)}/resources/vault-secret.txt"
 
         with pytest.raises(SystemExit) as pytest_wrapped_e:
             Config.from_yamls(PIPELINEWISE_TEST_HOME, yaml_config_dir, vault_secret)
@@ -228,121 +218,119 @@ class TestConfig:
         config = Config(PIPELINEWISE_TEST_HOME)
 
         # Target and tap directory should be g
-        assert config.get_temp_dir() == '{}/tmp'.format(PIPELINEWISE_TEST_HOME)
-        assert config.get_target_dir('test-target-id') == '{}/test-target-id'.format(
+        assert config.get_temp_dir() == "{}/tmp".format(PIPELINEWISE_TEST_HOME)
+        assert config.get_target_dir("test-target-id") == "{}/test-target-id".format(PIPELINEWISE_TEST_HOME)
+        assert config.get_tap_dir("test-target-id", "test-tap-id") == "{}/test-target-id/test-tap-id".format(
             PIPELINEWISE_TEST_HOME
         )
-        assert config.get_tap_dir(
-            'test-target-id', 'test-tap-id'
-        ) == '{}/test-target-id/test-tap-id'.format(PIPELINEWISE_TEST_HOME)
 
-        assert config.get_connector_files('/var/singer-connector') == {
-            'config': '/var/singer-connector/config.json',
-            'inheritable_config': '/var/singer-connector/inheritable_config.json',
-            'properties': '/var/singer-connector/properties.json',
-            'state': '/var/singer-connector/state.json',
-            'transformation': '/var/singer-connector/transformation.json',
-            'selection': '/var/singer-connector/selection.json',
-            'pidfile': '/var/singer-connector/pipelinewise.pid',
+        assert config.get_connector_files("/var/singer-connector") == {
+            "config": "/var/singer-connector/config.json",
+            "inheritable_config": "/var/singer-connector/inheritable_config.json",
+            "properties": "/var/singer-connector/properties.json",
+            "state": "/var/singer-connector/state.json",
+            "transformation": "/var/singer-connector/transformation.json",
+            "selection": "/var/singer-connector/selection.json",
+            "pidfile": "/var/singer-connector/pipelinewise.pid",
         }
 
     def test_save_config(self):
         """Test config target and tap JSON save functionalities"""
 
-        json_config_dir = './pipelinewise-test-config'
+        json_config_dir = "./pipelinewise-test-config"
 
-        config = self._get_config(json_config_dir, yaml_path='test_yaml_config')
+        config = self._get_config(json_config_dir, yaml_path="test_yaml_config")
         # Save the config as singer compatible JSON files
         config.save()
 
-        json_files = self._get_json_files_path('mysql_sample', json_config_dir)
+        json_files = self._get_json_files_path("mysql_sample", json_config_dir)
 
         # Check content of the generated JSON files
-        assert cli.utils.load_json(json_files['main_config_json']) == {
-            'alert_handlers': {
-                'slack': {
-                    'token': 'Vault Encrypted Secret Fruit',
-                    'channel': '#slack-channel',
+        assert cli.utils.load_json(json_files["main_config_json"]) == {
+            "alert_handlers": {
+                "slack": {
+                    "token": "Vault Encrypted Secret Fruit",
+                    "channel": "#slack-channel",
                 }
             },
-            'targets': [
+            "targets": [
                 {
-                    'id': 'test_snowflake_target',
-                    'type': 'target-snowflake',
-                    'name': 'Test Target Connector',
-                    'status': 'ready',
-                    'taps': [
+                    "id": "test_snowflake_target",
+                    "type": "target-snowflake",
+                    "name": "Test Target Connector",
+                    "status": "ready",
+                    "taps": [
                         {
-                            'id': 'mysql_sample',
-                            'type': 'tap-mysql',
-                            'name': 'Sample MySQL Database',
-                            'owner': 'somebody@foo.com',
-                            'stream_buffer_size': None,
-                            'send_alert': True,
-                            'enabled': True,
+                            "id": "mysql_sample",
+                            "type": "tap-mysql",
+                            "name": "Sample MySQL Database",
+                            "owner": "somebody@foo.com",
+                            "stream_buffer_size": None,
+                            "send_alert": True,
+                            "enabled": True,
                         }
                     ],
                 }
             ],
         }
-        assert cli.utils.load_json(json_files['target_config_json']) == {
-            'account': 'account',
-            'aws_access_key_id': 'access_key_id',
-            'aws_secret_access_key': 'secret_access_key',
-            'client_side_encryption_master_key': 'master_key',
-            'dbname': 'foo_db',
-            'file_format': 'foo_file_format',
-            'private_key': 'private_key_path',
-            's3_bucket': 's3_bucket',
-            's3_key_prefix': 's3_prefix/',
-            'stage': 'foo_stage',
-            'user': 'user',
-            'warehouse': 'MY_WAREHOUSE',
+        assert cli.utils.load_json(json_files["target_config_json"]) == {
+            "account": "account",
+            "aws_access_key_id": "access_key_id",
+            "aws_secret_access_key": "secret_access_key",
+            "client_side_encryption_master_key": "master_key",
+            "dbname": "foo_db",
+            "file_format": "foo_file_format",
+            "private_key": "private_key_path",
+            "s3_bucket": "s3_bucket",
+            "s3_key_prefix": "s3_prefix/",
+            "stage": "foo_stage",
+            "user": "user",
+            "warehouse": "MY_WAREHOUSE",
         }
-        assert cli.utils.load_json(json_files['tap_config_json']) == {
-            'dbname': '<DB_NAME>',
-            'host': '<HOST>',
-            'port': 3306,
-            'user': '<USER>',
-            'password': '<PASSWORD>',
-            'server_id': cli.utils.load_json(json_files['tap_config_json'])['server_id'],
+        assert cli.utils.load_json(json_files["tap_config_json"]) == {
+            "dbname": "<DB_NAME>",
+            "host": "<HOST>",
+            "port": 3306,
+            "user": "<USER>",
+            "password": "<PASSWORD>",
+            "server_id": cli.utils.load_json(json_files["tap_config_json"])["server_id"],
         }
-        assert cli.utils.load_json(json_files['tap_selection_json']) == {
-            'selection': [
+        assert cli.utils.load_json(json_files["tap_selection_json"]) == {
+            "selection": [
                 {
-                    'replication_key': 'last_update',
-                    'replication_method': 'INCREMENTAL',
-                    'tap_stream_id': 'my_db-table_one',
+                    "replication_key": "last_update",
+                    "replication_method": "INCREMENTAL",
+                    "tap_stream_id": "my_db-table_one",
                 },
-                {'replication_method': 'LOG_BASED', 'tap_stream_id': 'my_db-table_two'},
+                {"replication_method": "LOG_BASED", "tap_stream_id": "my_db-table_two"},
             ]
         }
-        assert cli.utils.load_json(json_files['tap_transformation_json']) == {'transformations': []}
-        assert cli.utils.load_json(json_files['tap_inheritable_config_json']) == {
-            'batch_size_rows': 20000,
-            'batch_wait_limit_seconds': 3600,
-            'data_flattening_max_level': 0,
-            'flush_all_streams': False,
-            'hard_delete': True,
-            'parallelism': 0,
-            'parallelism_max': 4,
-            'primary_key_required': True,
-            'schema_mapping': {
-                'my_db': {
-                    'target_schema': 'repl_my_db',
-                    'target_schema_select_permissions': ['grp_stats'],
+        assert cli.utils.load_json(json_files["tap_transformation_json"]) == {"transformations": []}
+        assert cli.utils.load_json(json_files["tap_inheritable_config_json"]) == {
+            "batch_size_rows": 20000,
+            "batch_wait_limit_seconds": 3600,
+            "data_flattening_max_level": 0,
+            "flush_all_streams": False,
+            "hard_delete": True,
+            "parallelism": 0,
+            "parallelism_max": 4,
+            "primary_key_required": True,
+            "schema_mapping": {
+                "my_db": {
+                    "target_schema": "repl_my_db",
+                    "target_schema_select_permissions": ["grp_stats"],
                 }
             },
-            'temp_dir': './pipelinewise-test-config/tmp',
-            'tap_id': 'mysql_sample',
-            'query_tag': '{"ppw_component": "tap-mysql", "tap_id": "mysql_sample", '
+            "temp_dir": "./pipelinewise-test-config/tmp",
+            "tap_id": "mysql_sample",
+            "query_tag": '{"ppw_component": "tap-mysql", "tap_id": "mysql_sample", '
             '"database": "{{database}}", "schema": "{{schema}}", "table": "{{table}}"}',
-            'validate_records': False,
-            'add_metadata_columns': False,
-            'split_large_files': True,
-            'split_file_chunk_size_mb': 500,
-            'split_file_max_chunks': 25,
-            'archive_load_files': False,
+            "validate_records": False,
+            "add_metadata_columns": False,
+            "split_large_files": True,
+            "split_file_chunk_size_mb": 500,
+            "split_file_max_chunks": 25,
+            "archive_load_files": False,
         }
 
         # Delete the generated JSON config directory
@@ -350,122 +338,122 @@ class TestConfig:
 
     def test_save_config_selected_tap(self):
         """Test config target and tap JSON save functionalities if specific taps are selected"""
-        json_config_dir = './pipelinewise-test-config'
-        config = self._get_config(json_config_dir, yaml_path='test_import_command')
-        json_files = self._get_json_files_path('tap_two', json_config_dir)
+        json_config_dir = "./pipelinewise-test-config"
+        config = self._get_config(json_config_dir, yaml_path="test_import_command")
+        json_files = self._get_json_files_path("tap_two", json_config_dir)
 
         # Save the config as singer compatible JSON files
-        config.save(['tap_two'])
+        config.save(["tap_two"])
 
         # Check content of the generated JSON files
-        generated_json_content = cli.utils.load_json(json_files['main_config_json'])
+        generated_json_content = cli.utils.load_json(json_files["main_config_json"])
 
-        generated_targets = generated_json_content.get('targets')
-        generated_targets_taps = generated_targets[0].pop('taps')
+        generated_targets = generated_json_content.get("targets")
+        generated_targets_taps = generated_targets[0].pop("taps")
 
-        assert generated_json_content.get('targets') == [
+        assert generated_json_content.get("targets") == [
             {
-                'id': 'test_snowflake_target',
-                'type': 'target-snowflake',
-                'name': 'Test Target Connector',
-                'status': 'ready'
+                "id": "test_snowflake_target",
+                "type": "target-snowflake",
+                "name": "Test Target Connector",
+                "status": "ready",
             }
         ]
 
         expected_generated_taps = [
             {
-                'id': 'tap_one',
-                'type': 'tap-mysql',
-                'name': 'Sample MySQL Database',
-                'owner': 'somebody@foo.com',
-                'stream_buffer_size': None,
-                'send_alert': True,
-                'enabled': True,
+                "id": "tap_one",
+                "type": "tap-mysql",
+                "name": "Sample MySQL Database",
+                "owner": "somebody@foo.com",
+                "stream_buffer_size": None,
+                "send_alert": True,
+                "enabled": True,
             },
             {
-                'id': 'tap_two',
-                'type': 'tap-mysql',
-                'name': 'Sample MySQL Database',
-                'owner': 'somebody@foo.com',
-                'stream_buffer_size': None,
-                'send_alert': True,
-                'enabled': True,
+                "id": "tap_two",
+                "type": "tap-mysql",
+                "name": "Sample MySQL Database",
+                "owner": "somebody@foo.com",
+                "stream_buffer_size": None,
+                "send_alert": True,
+                "enabled": True,
             },
             {
-                'id': 'tap_three',
-                'type': 'tap-mysql',
-                'name': 'Sample MySQL Database',
-                'owner': 'somebody@foo.com',
-                'stream_buffer_size': None,
-                'send_alert': True,
-                'enabled': True,
-            }
+                "id": "tap_three",
+                "type": "tap-mysql",
+                "name": "Sample MySQL Database",
+                "owner": "somebody@foo.com",
+                "stream_buffer_size": None,
+                "send_alert": True,
+                "enabled": True,
+            },
         ]
         assert len(generated_targets_taps) == len(expected_generated_taps)
         for tap in expected_generated_taps:
             assert tap in generated_targets_taps
 
-        assert cli.utils.load_json(json_files['target_config_json']) == {
-            'account': 'account',
-            'aws_access_key_id': 'access_key_id',
-            'aws_secret_access_key': 'secret_access_key',
-            'client_side_encryption_master_key': 'master_key',
-            'dbname': 'foo_db',
-            'file_format': 'foo_file_format',
-            'password': 'secret',
-            's3_bucket': 's3_bucket',
-            's3_key_prefix': 's3_prefix/',
-            'stage': 'foo_stage',
-            'user': 'user',
-            'warehouse': 'MY_WAREHOUSE',
+        assert cli.utils.load_json(json_files["target_config_json"]) == {
+            "account": "account",
+            "aws_access_key_id": "access_key_id",
+            "aws_secret_access_key": "secret_access_key",
+            "client_side_encryption_master_key": "master_key",
+            "dbname": "foo_db",
+            "file_format": "foo_file_format",
+            "password": "secret",
+            "s3_bucket": "s3_bucket",
+            "s3_key_prefix": "s3_prefix/",
+            "stage": "foo_stage",
+            "user": "user",
+            "warehouse": "MY_WAREHOUSE",
         }
-        assert cli.utils.load_json(json_files['tap_config_json']) == {
-            'dbname': '<DB_NAME>',
-            'host': '<HOST>',
-            'port': 3306,
-            'user': '<USER>',
-            'password': '<PASSWORD>',
-            'server_id': cli.utils.load_json(json_files['tap_config_json'])['server_id'],
+        assert cli.utils.load_json(json_files["tap_config_json"]) == {
+            "dbname": "<DB_NAME>",
+            "host": "<HOST>",
+            "port": 3306,
+            "user": "<USER>",
+            "password": "<PASSWORD>",
+            "server_id": cli.utils.load_json(json_files["tap_config_json"])["server_id"],
         }
-        assert cli.utils.load_json(json_files['tap_selection_json']) == {
-            'selection': [
+        assert cli.utils.load_json(json_files["tap_selection_json"]) == {
+            "selection": [
                 {
-                    'replication_key': 'last_update',
-                    'replication_method': 'INCREMENTAL',
-                    'tap_stream_id': 'my_db-table_one',
+                    "replication_key": "last_update",
+                    "replication_method": "INCREMENTAL",
+                    "tap_stream_id": "my_db-table_one",
                 },
-                {'replication_method': 'LOG_BASED', 'tap_stream_id': 'my_db-table_two'},
+                {"replication_method": "LOG_BASED", "tap_stream_id": "my_db-table_two"},
             ]
         }
-        assert cli.utils.load_json(json_files['tap_transformation_json']) == {'transformations': []}
-        assert cli.utils.load_json(json_files['tap_inheritable_config_json']) == {
-            'batch_size_rows': 20000,
-            'batch_wait_limit_seconds': 3600,
-            'data_flattening_max_level': 0,
-            'flush_all_streams': False,
-            'hard_delete': True,
-            'parallelism': 0,
-            'parallelism_max': 4,
-            'primary_key_required': True,
-            'schema_mapping': {
-                'my_db': {
-                    'target_schema': 'repl_my_db',
-                    'target_schema_select_permissions': ['grp_stats'],
+        assert cli.utils.load_json(json_files["tap_transformation_json"]) == {"transformations": []}
+        assert cli.utils.load_json(json_files["tap_inheritable_config_json"]) == {
+            "batch_size_rows": 20000,
+            "batch_wait_limit_seconds": 3600,
+            "data_flattening_max_level": 0,
+            "flush_all_streams": False,
+            "hard_delete": True,
+            "parallelism": 0,
+            "parallelism_max": 4,
+            "primary_key_required": True,
+            "schema_mapping": {
+                "my_db": {
+                    "target_schema": "repl_my_db",
+                    "target_schema_select_permissions": ["grp_stats"],
                 }
             },
-            'temp_dir': './pipelinewise-test-config/tmp',
-            'tap_id': 'tap_two',
-            'query_tag': '{"ppw_component": "tap-mysql", "tap_id": "tap_two", '
+            "temp_dir": "./pipelinewise-test-config/tmp",
+            "tap_id": "tap_two",
+            "query_tag": '{"ppw_component": "tap-mysql", "tap_id": "tap_two", '
             '"database": "{{database}}", "schema": "{{schema}}", "table": "{{table}}"}',
-            'validate_records': False,
-            'add_metadata_columns': False,
-            'split_large_files': True,
-            'split_file_chunk_size_mb': 500,
-            'split_file_max_chunks': 25,
-            'archive_load_files': False,
+            "validate_records": False,
+            "add_metadata_columns": False,
+            "split_large_files": True,
+            "split_file_chunk_size_mb": 500,
+            "split_file_max_chunks": 25,
+            "archive_load_files": False,
         }
 
-        tap_one_existence = os.path.exists(f'{json_config_dir}/test_snowflake_target/tap_one')
+        tap_one_existence = os.path.exists(f"{json_config_dir}/test_snowflake_target/tap_one")
 
         # Delete the generated JSON config directory
         shutil.rmtree(json_config_dir)
@@ -477,59 +465,57 @@ class TestConfig:
         """Test config target and tap JSON save functionalities if there is a optional setting for slack channel"""
 
         # Load a full configuration set from YAML files
-        yaml_config_dir = '{}/resources/test_yaml_config_with_slack_channel'.format(
-            os.path.dirname(__file__)
-        )
-        vault_secret = '{}/resources/vault-secret.txt'.format(os.path.dirname(__file__))
+        yaml_config_dir = "{}/resources/test_yaml_config_with_slack_channel".format(os.path.dirname(__file__))
+        vault_secret = "{}/resources/vault-secret.txt".format(os.path.dirname(__file__))
 
-        json_config_dir = './pipelinewise-test-config'
+        json_config_dir = "./pipelinewise-test-config"
         config = Config.from_yamls(json_config_dir, yaml_config_dir, vault_secret)
 
         # Save the config as singer compatible JSON files
         config.save()
 
         # Check if every required JSON file created, both for target and tap
-        main_config_json = '{}/config.json'.format(json_config_dir)
+        main_config_json = "{}/config.json".format(json_config_dir)
 
         # Check content of the generated JSON files
         actual_config_json = cli.utils.load_json(main_config_json)
 
         expected_taps_config = [
             {
-                'id': 'mysql_sample_1',
-                'type': 'tap-mysql',
-                'name': 'Sample MySQL Database',
-                'owner': 'somebody@foo.com',
-                'stream_buffer_size': None,
-                'send_alert': True,
-                'enabled': True,
-                'slack_alert_channel': '#test-channel_1'
+                "id": "mysql_sample_1",
+                "type": "tap-mysql",
+                "name": "Sample MySQL Database",
+                "owner": "somebody@foo.com",
+                "stream_buffer_size": None,
+                "send_alert": True,
+                "enabled": True,
+                "slack_alert_channel": "#test-channel_1",
             },
             {
-                'id': 'mysql_sample_2',
-                'type': 'tap-mysql',
-                'name': 'Sample MySQL Database',
-                'owner': 'somebody@foo.com',
-                'stream_buffer_size': None,
-                'send_alert': True,
-                'enabled': True,
-                'slack_alert_channel': '#test-channel_2'
+                "id": "mysql_sample_2",
+                "type": "tap-mysql",
+                "name": "Sample MySQL Database",
+                "owner": "somebody@foo.com",
+                "stream_buffer_size": None,
+                "send_alert": True,
+                "enabled": True,
+                "slack_alert_channel": "#test-channel_2",
             },
             {
-                'id': 'mysql_sample_3',
-                'type': 'tap-mysql',
-                'name': 'Sample MySQL Database',
-                'owner': 'somebody@foo.com',
-                'stream_buffer_size': None,
-                'send_alert': True,
-                'enabled': True,
-            }
+                "id": "mysql_sample_3",
+                "type": "tap-mysql",
+                "name": "Sample MySQL Database",
+                "owner": "somebody@foo.com",
+                "stream_buffer_size": None,
+                "send_alert": True,
+                "enabled": True,
+            },
         ]
 
-        assert len(actual_config_json['targets'][0]['taps']) == 3
+        assert len(actual_config_json["targets"][0]["taps"]) == 3
 
         for tap_config in expected_taps_config:
-            assert tap_config in actual_config_json['targets'][0]['taps']
+            assert tap_config in actual_config_json["targets"][0]["taps"]
 
         # Delete the generated JSON config directory
         shutil.rmtree(json_config_dir)

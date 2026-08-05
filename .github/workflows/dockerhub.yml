@@ -13,7 +13,7 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v7
 
     - name: Generate tag
       uses: frabert/replace-string-action@v2.0
@@ -50,7 +50,7 @@ jobs:
         tags: |
           transferwiseworkspace/pipelinewise-barebone:${{ steps.genTag.outputs.replaced }}
           transferwiseworkspace/pipelinewise-barebone:latest
-          
+
     - name: Build and push main image with only default connectors
       id: docker_build_default
       uses: docker/build-push-action@v2

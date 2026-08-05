@@ -172,25 +172,29 @@ You can run any pipelinewise command at this point. Tutorials to create and run 
 
 You can run any pipelinewise command at this point. Tutorials to create and run pipelines can be found here: [creating pipelines](https://transferwise.github.io/pipelinewise/installation_guide/creating_pipelines.html).
 
-**To run unit tests**:
+**To run the unit test and coverage gate**:
 
 ```sh
-$ pytest --ignore tests/end_to_end
+$ pytest --cov=pipelinewise --cov-fail-under=77 -v tests/units
 ```
 
-To run unit tests and generate code coverage:
+**To format and lint PipelineWise and the Ruff-managed connectors**:
 
-```
-$ coverage run -m pytest --ignore tests/end_to_end && coverage report
-```
-
-To generate code coverage HTML report.
-
-```
-$ coverage run -m pytest --ignore tests/end_to_end && coverage html -d coverage_html
+```sh
+$ ruff format .
+$ ruff check .
 ```
 
-**Note**: The HTML report will be generated in `coverage_html/index.html`
+The root Ruff configuration includes `tap-mysql`, `tap-postgres`, and `target-snowflake`. Run `make lint` or `make format`
+from one of those connector directories for a connector-only check. Other connectors retain their local development tools.
+
+To generate an HTML coverage report:
+
+```
+$ pytest --cov=pipelinewise --cov-fail-under=77 --cov-report=html:coverage_html -v tests/units
+```
+
+The HTML report is generated in `coverage_html/index.html`.
 
 **To run integration and end-to-end tests**:
 

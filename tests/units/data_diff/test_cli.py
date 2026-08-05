@@ -10,10 +10,6 @@ from pipelinewise.cli.pipelinewise import PipelineWise
 from tests.units.cli.cli_args import CliArgs
 
 
-# pylint: disable=missing-class-docstring,missing-function-docstring,invalid-name
-# pylint: disable=protected-access
-
-
 class RepositoryContext:
     def __init__(self, checks=None):
         self.checks = checks or []
@@ -107,12 +103,15 @@ def test_list_checks_reads_backend_and_supports_json(capsys):
 
 def test_run_checks_prints_utc_window_and_returns_on_pass(capsys):
     pipelinewise = _pipelinewise()
-    with patch(
-        "pipelinewise.cli.pipelinewise.DataDiffRepository.from_backend_config",
-        return_value=RepositoryContext(),
-    ), patch(
-        "pipelinewise.cli.pipelinewise.run_due_checks",
-        return_value=[_summary()],
+    with (
+        patch(
+            "pipelinewise.cli.pipelinewise.DataDiffRepository.from_backend_config",
+            return_value=RepositoryContext(),
+        ),
+        patch(
+            "pipelinewise.cli.pipelinewise.run_due_checks",
+            return_value=[_summary()],
+        ),
     ):
         pipelinewise.run_data_diff_checks()
 
@@ -122,13 +121,17 @@ def test_run_checks_prints_utc_window_and_returns_on_pass(capsys):
 
 def test_run_checks_alerts_and_exits_nonzero_on_mismatch():
     pipelinewise = _pipelinewise()
-    with patch(
-        "pipelinewise.cli.pipelinewise.DataDiffRepository.from_backend_config",
-        return_value=RepositoryContext(),
-    ), patch(
-        "pipelinewise.cli.pipelinewise.run_due_checks",
-        return_value=[_summary("FAIL")],
-    ), pytest.raises(SystemExit) as exc:
+    with (
+        patch(
+            "pipelinewise.cli.pipelinewise.DataDiffRepository.from_backend_config",
+            return_value=RepositoryContext(),
+        ),
+        patch(
+            "pipelinewise.cli.pipelinewise.run_due_checks",
+            return_value=[_summary("FAIL")],
+        ),
+        pytest.raises(SystemExit) as exc,
+    ):
         pipelinewise.run_data_diff_checks()
 
     assert exc.value.code == 1
@@ -143,13 +146,16 @@ def test_remediation_command_reports_linked_attempt(capsys):
         remediation_ref="AP-1234",
     )
 
-    with patch(
-        "pipelinewise.cli.pipelinewise.DataDiffRepository.from_backend_config",
-        return_value=RepositoryContext(),
-    ), patch(
-        "pipelinewise.cli.pipelinewise.rerun_failed_check",
-        return_value=summary,
-    ) as rerun:
+    with (
+        patch(
+            "pipelinewise.cli.pipelinewise.DataDiffRepository.from_backend_config",
+            return_value=RepositoryContext(),
+        ),
+        patch(
+            "pipelinewise.cli.pipelinewise.rerun_failed_check",
+            return_value=summary,
+        ) as rerun,
+    ):
         pipelinewise.rerun_data_diff_check()
 
     output = capsys.readouterr().out
@@ -173,12 +179,15 @@ def test_import_persists_definitions_only_after_successful_discovery():
     pipelinewise.load_config = Mock()
     pipelinewise.cleanup_after_deleted_config = Mock(return_value=0)
 
-    with patch(
-        "pipelinewise.cli.pipelinewise.Config.from_yamls",
-        return_value=imported,
-    ), patch(
-        "pipelinewise.cli.pipelinewise.DataDiffRepository.from_backend_config",
-        return_value=repository,
+    with (
+        patch(
+            "pipelinewise.cli.pipelinewise.Config.from_yamls",
+            return_value=imported,
+        ),
+        patch(
+            "pipelinewise.cli.pipelinewise.DataDiffRepository.from_backend_config",
+            return_value=repository,
+        ),
     ):
         pipelinewise.import_project()
 
@@ -198,13 +207,17 @@ def test_import_does_not_activate_definitions_after_discovery_failure():
     pipelinewise.load_config = Mock()
     pipelinewise.cleanup_after_deleted_config = Mock(return_value=0)
 
-    with patch(
-        "pipelinewise.cli.pipelinewise.Config.from_yamls",
-        return_value=imported,
-    ), patch(
-        "pipelinewise.cli.pipelinewise.DataDiffRepository.from_backend_config",
-        return_value=repository,
-    ), pytest.raises(SystemExit):
+    with (
+        patch(
+            "pipelinewise.cli.pipelinewise.Config.from_yamls",
+            return_value=imported,
+        ),
+        patch(
+            "pipelinewise.cli.pipelinewise.DataDiffRepository.from_backend_config",
+            return_value=repository,
+        ),
+        pytest.raises(SystemExit),
+    ):
         pipelinewise.import_project()
 
     assert repository.synced is None
@@ -217,21 +230,15 @@ def _alerting_pipelinewise(taps):
 
 
 def test_each_failed_window_alerts_to_the_owning_tap_channel():
-    pipelinewise = _alerting_pipelinewise(
-        [{"id": "tap", "send_alert": True, "slack_alert_channel": "#tap-owner"}]
-    )
+    pipelinewise = _alerting_pipelinewise([{"id": "tap", "send_alert": True, "slack_alert_channel": "#tap-owner"}])
     failures = [_summary("FAIL"), _summary("ERROR")]
 
-    returned = pipelinewise._alert_data_diff_failures(
-        [_summary("PASS"), _summary("SKIPPED")] + failures
-    )
+    returned = pipelinewise._alert_data_diff_failures([_summary("PASS"), _summary("SKIPPED")] + failures)
 
     assert [summary["status"] for summary in returned] == ["FAIL", "ERROR"]
     assert pipelinewise.alert_sender.send_to_all_handlers.call_count == 2
 
-    for call, summary in zip(
-        pipelinewise.alert_sender.send_to_all_handlers.call_args_list, failures
-    ):
+    for call, summary in zip(pipelinewise.alert_sender.send_to_all_handlers.call_args_list, failures):
         assert call.kwargs["tap_slack_channel"] == "#tap-owner"
         assert summary["check"]["full_check_name"] in call.kwargs["message"]
         assert str(summary["run_id"]) in call.kwargs["message"]

@@ -7,9 +7,6 @@ from uuid import uuid4
 from pipelinewise.data_diff.config import CheckDefinition
 from pipelinewise.data_diff.repository import DataDiffRepository
 
-# pylint: disable=missing-class-docstring,missing-function-docstring,invalid-name
-# pylint: disable=protected-access
-
 
 def _definition(config_hash_seed="one"):
     # The seed varies frequency to produce different config hashes.
@@ -84,12 +81,14 @@ def test_new_definition_is_inserted_as_revision_one():
 
 def test_same_hash_is_idempotent():
     definition = _definition()
-    current = [{
-        "check_id": uuid4(),
-        "full_check_name": definition.full_check_name,
-        "config_hash": definition.config_hash,
-        "tap_id": definition.tap_id,
-    }]
+    current = [
+        {
+            "check_id": uuid4(),
+            "full_check_name": definition.full_check_name,
+            "config_hash": definition.config_hash,
+            "tap_id": definition.tap_id,
+        }
+    ]
     cursor = ScriptedCursor(current)
     repository = _repository_with_cursor(cursor)
 
@@ -101,12 +100,14 @@ def test_same_hash_is_idempotent():
 
 def test_changed_definition_supersedes_active_revision():
     definition = _definition()
-    current = [{
-        "check_id": uuid4(),
-        "full_check_name": definition.full_check_name,
-        "config_hash": "stale" + "0" * 59,
-        "tap_id": definition.tap_id,
-    }]
+    current = [
+        {
+            "check_id": uuid4(),
+            "full_check_name": definition.full_check_name,
+            "config_hash": "stale" + "0" * 59,
+            "tap_id": definition.tap_id,
+        }
+    ]
     cursor = ScriptedCursor(current)
     repository = _repository_with_cursor(cursor)
 
@@ -114,11 +115,7 @@ def test_changed_definition_supersedes_active_revision():
 
     assert stats["superseded"] == 1
     assert stats["created"] == 1
-    supersede = next(
-        (sql, params)
-        for sql, params in cursor.executions
-        if "SET current = FALSE" in sql
-    )
+    supersede = next((sql, params) for sql, params in cursor.executions if "SET current = FALSE" in sql)
     assert supersede[1][1] == current[0]["check_id"]
     # dd_checks is keyed by check_id; dd_check_id only exists on dd_runs.
     assert "WHERE check_id = %s" in supersede[0]
@@ -136,11 +133,7 @@ def test_partial_scope_only_deactivates_selected_tap():
     stats = repository.sync_definitions([], selected_taps=["selected"])
 
     assert stats["deactivated"] == 1
-    updates = [
-        (sql, params)
-        for sql, params in cursor.executions
-        if "SET current = FALSE" in sql
-    ]
+    updates = [(sql, params) for sql, params in cursor.executions if "SET current = FALSE" in sql]
     assert updates[0][1][1] == current[0]["check_id"]
     # dd_checks is keyed by check_id; dd_check_id only exists on dd_runs.
     assert "WHERE check_id = %s" in updates[0][0]
@@ -166,13 +159,7 @@ def test_list_checks_exposes_compare_columns_from_version_snapshot():
 
 def test_schema_migration_never_drops_shared_schema():
     """Alembic migrations must not contain DROP SCHEMA in their upgrade path."""
-    versions_dir = (
-        Path(__file__).parents[3]
-        / "pipelinewise"
-        / "backend_db"
-        / "migrations"
-        / "versions"
-    )
+    versions_dir = Path(__file__).parents[3] / "pipelinewise" / "backend_db" / "migrations" / "versions"
     migration_files = list(versions_dir.glob("*.py"))
     assert len(migration_files) > 0, "No migration files found"
 
@@ -180,8 +167,8 @@ def test_schema_migration_never_drops_shared_schema():
     for path in migration_files:
         content = path.read_text(encoding="utf-8")
         # Extract only the upgrade() function content (rough heuristic)
-        if 'def upgrade' in content:
-            upgrade_section = content.split('def upgrade')[1].split('def downgrade')[0]
+        if "def upgrade" in content:
+            upgrade_section = content.split("def upgrade")[1].split("def downgrade")[0]
             all_upgrade_content.append(upgrade_section.upper())
 
     combined = "\n".join(all_upgrade_content)
@@ -222,9 +209,9 @@ def test_remediation_attempt_reuses_failed_window_and_links_original_run():
     assert run["trigger"] == "REMEDIATION"
     assert run["rerun_of_run_id"] == original_id
     insert_params = next(
-        call_args.args[1] for call_args in cursor.execute.call_args_list
-        if "INSERT INTO public.dd_runs"
-        in " ".join(call_args.args[0].split())
+        call_args.args[1]
+        for call_args in cursor.execute.call_args_list
+        if "INSERT INTO public.dd_runs" in " ".join(call_args.args[0].split())
     )
     assert insert_params[1] == check_id
     assert insert_params[2] == scheduled_for
@@ -284,20 +271,14 @@ def test_new_latest_slot_advances_coverage_without_history_scan():
     cursor.fetchone.return_value = attempt
     previous = _coverage_state(start, previous_end)
 
-    with patch.object(
-        DataDiffRepository, "_coverage_state_for_update", return_value=previous
-    ), patch.object(
-        DataDiffRepository, "_effective_attempt_for_update", return_value=None
-    ), patch.object(
-        DataDiffRepository, "_has_later_effective_attempt", return_value=False
-    ), patch.object(
-        DataDiffRepository, "_upsert_effective_attempt", return_value=True
-    ), patch.object(
-        DataDiffRepository, "_recalculate_effective_coverage"
-    ) as recalculate, patch.object(
-        DataDiffRepository, "_upsert_coverage_state"
-    ) as upsert_state, patch.object(
-        DataDiffRepository, "_insert_coverage_event"
+    with (
+        patch.object(DataDiffRepository, "_coverage_state_for_update", return_value=previous),
+        patch.object(DataDiffRepository, "_effective_attempt_for_update", return_value=None),
+        patch.object(DataDiffRepository, "_has_later_effective_attempt", return_value=False),
+        patch.object(DataDiffRepository, "_upsert_effective_attempt", return_value=True),
+        patch.object(DataDiffRepository, "_recalculate_effective_coverage") as recalculate,
+        patch.object(DataDiffRepository, "_upsert_coverage_state") as upsert_state,
+        patch.object(DataDiffRepository, "_insert_coverage_event"),
     ):
         DataDiffRepository._record_coverage_event(cursor, attempt["run_id"], attempt["window_end"])
 
@@ -322,24 +303,22 @@ def test_replacement_attempt_recalculates_from_effective_slots():
         "reason": "replacement failed",
     }
 
-    with patch.object(
-        DataDiffRepository, "_coverage_state_for_update", return_value=previous
-    ), patch.object(
-        DataDiffRepository,
-        "_effective_attempt_for_update",
-        return_value={"run_id": uuid4(), "attempt": 1},
-    ), patch.object(
-        DataDiffRepository, "_has_later_effective_attempt", return_value=False
-    ), patch.object(
-        DataDiffRepository, "_upsert_effective_attempt", return_value=True
-    ), patch.object(
-        DataDiffRepository,
-        "_recalculate_effective_coverage",
-        return_value=recalculated,
-    ) as recalculate, patch.object(
-        DataDiffRepository, "_upsert_coverage_state"
-    ), patch.object(
-        DataDiffRepository, "_insert_coverage_event"
+    with (
+        patch.object(DataDiffRepository, "_coverage_state_for_update", return_value=previous),
+        patch.object(
+            DataDiffRepository,
+            "_effective_attempt_for_update",
+            return_value={"run_id": uuid4(), "attempt": 1},
+        ),
+        patch.object(DataDiffRepository, "_has_later_effective_attempt", return_value=False),
+        patch.object(DataDiffRepository, "_upsert_effective_attempt", return_value=True),
+        patch.object(
+            DataDiffRepository,
+            "_recalculate_effective_coverage",
+            return_value=recalculated,
+        ) as recalculate,
+        patch.object(DataDiffRepository, "_upsert_coverage_state"),
+        patch.object(DataDiffRepository, "_insert_coverage_event"),
     ):
         DataDiffRepository._record_coverage_event(cursor, attempt["run_id"], end)
 
@@ -358,22 +337,18 @@ def test_out_of_order_new_slot_recalculates_from_effective_slots():
     cursor.fetchone.return_value = attempt
     previous = _coverage_state(start, end + timedelta(hours=2))
 
-    with patch.object(
-        DataDiffRepository, "_coverage_state_for_update", return_value=previous
-    ), patch.object(
-        DataDiffRepository, "_effective_attempt_for_update", return_value=None
-    ), patch.object(
-        DataDiffRepository, "_has_later_effective_attempt", return_value=True
-    ), patch.object(
-        DataDiffRepository, "_upsert_effective_attempt", return_value=True
-    ), patch.object(
-        DataDiffRepository,
-        "_recalculate_effective_coverage",
-        return_value=previous,
-    ) as recalculate, patch.object(
-        DataDiffRepository, "_upsert_coverage_state"
-    ), patch.object(
-        DataDiffRepository, "_insert_coverage_event"
+    with (
+        patch.object(DataDiffRepository, "_coverage_state_for_update", return_value=previous),
+        patch.object(DataDiffRepository, "_effective_attempt_for_update", return_value=None),
+        patch.object(DataDiffRepository, "_has_later_effective_attempt", return_value=True),
+        patch.object(DataDiffRepository, "_upsert_effective_attempt", return_value=True),
+        patch.object(
+            DataDiffRepository,
+            "_recalculate_effective_coverage",
+            return_value=previous,
+        ) as recalculate,
+        patch.object(DataDiffRepository, "_upsert_coverage_state"),
+        patch.object(DataDiffRepository, "_insert_coverage_event"),
     ):
         DataDiffRepository._record_coverage_event(cursor, attempt["run_id"], end)
 
@@ -418,9 +393,7 @@ def test_repository_builds_the_shared_database_from_backend_config():
         "password": "secret",
         "dbname": "pipelinewise",
     }
-    with patch(
-        "pipelinewise.data_diff.repository.BackendDatabase.from_config"
-    ) as database_from_config:
+    with patch("pipelinewise.data_diff.repository.BackendDatabase.from_config") as database_from_config:
         repository = DataDiffRepository.from_backend_config(config)
 
     database_from_config.assert_called_once_with(

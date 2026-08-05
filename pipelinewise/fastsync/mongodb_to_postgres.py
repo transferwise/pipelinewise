@@ -16,15 +16,15 @@ from .commons.target_postgres import FastSyncTargetPostgres
 LOGGER = Logger().get_logger(__name__)
 
 REQUIRED_CONFIG_KEYS = {
-    'tap': [
-        'host',
-        'port',
-        'user',
-        'password',
-        'auth_database',
-        'dbname',
+    "tap": [
+        "host",
+        "port",
+        "user",
+        "password",
+        "auth_database",
+        "dbname",
     ],
-    'target': ['host', 'port', 'user', 'password'],
+    "target": ["host", "port", "user", "password"],
 }
 
 LOCK = multiprocessing.Lock()
@@ -33,25 +33,22 @@ LOCK = multiprocessing.Lock()
 def tap_type_to_target_type(mongo_type, *_):
     """Data type mapping from MongoDB to Postgres"""
     return {
-        'string': 'CHARACTER VARYING',
-        'object': 'JSONB',
-        'array': 'JSONB',
-        'date': 'TIMESTAMP WITHOUT TIME ZONE',
-        'datetime': 'TIMESTAMP WITHOUT TIME ZONE',
-        'timestamp': 'TIMESTAMP WITHOUT TIME ZONE',
-    }.get(mongo_type, 'CHARACTER VARYING')
+        "string": "CHARACTER VARYING",
+        "object": "JSONB",
+        "array": "JSONB",
+        "date": "TIMESTAMP WITHOUT TIME ZONE",
+        "datetime": "TIMESTAMP WITHOUT TIME ZONE",
+        "timestamp": "TIMESTAMP WITHOUT TIME ZONE",
+    }.get(mongo_type, "CHARACTER VARYING")
 
 
-# pylint: disable=too-many-locals
 def sync_table(table: str, args: Namespace) -> Union[bool, str]:
     """Sync one table"""
     mongodb = FastSyncTapMongoDB(args.tap, tap_type_to_target_type)
     postgres = FastSyncTargetPostgres(args.target, args.transform)
 
     try:
-        filename = utils.gen_export_filename(
-            tap_id=args.target.get('tap_id'), table=table
-        )
+        filename = utils.gen_export_filename(tap_id=args.target.get("tap_id"), table=table)
         filepath = os.path.join(args.temp_dir, filename)
         target_schema = utils.get_target_schema(args.target, table)
 
@@ -59,23 +56,19 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
         mongodb.open_connection()
 
         # Get bookmark - token of the most recent ChangeStream for logbased
-        bookmark = utils.get_bookmark_for_table(
-            table, args.properties, mongodb, dbname=args.tap.get('dbname')
-        )
+        bookmark = utils.get_bookmark_for_table(table, args.properties, mongodb, dbname=args.tap.get("dbname"))
 
         # Exporting table data, get table definitions and close connection to avoid timeouts
         mongodb.copy_table(table, filepath, args.temp_dir)
         size_bytes = os.path.getsize(filepath)
         snowflake_types = mongodb.map_column_types_to_target()
-        postgres_columns = snowflake_types.get('columns', [])
-        primary_key = snowflake_types['primary_key']
+        postgres_columns = snowflake_types.get("columns", [])
+        primary_key = snowflake_types["primary_key"]
         mongodb.close_connection()
 
         # Creating temp table in Postgres
         postgres.drop_table(target_schema, table, is_temporary=True)
-        postgres.create_table(
-            target_schema, table, postgres_columns, primary_key, is_temporary=True
-        )
+        postgres.create_table(target_schema, table, postgres_columns, primary_key, is_temporary=True)
 
         # Load into Postgres table
         postgres.copy_to_table(
@@ -111,7 +104,7 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
 
     except Exception as exc:
         LOGGER.exception(exc)
-        return '{}: {}'.format(table, exc)
+        return "{}: {}".format(table, exc)
 
 
 def main_impl():

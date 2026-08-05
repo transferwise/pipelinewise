@@ -1,7 +1,6 @@
 from typing import Union
 
 import psycopg2
-import psycopg2.extras
 import pymongo
 import pymysql
 import snowflake.connector
@@ -10,13 +9,11 @@ from pymongo.database import Database
 
 from pipelinewise.utils import pem2der
 
-# pylint: disable=too-many-arguments
+
 def run_query_postgres(query, host, port, user, password, database):
     """Run and SQL query in a postgres database"""
     result_rows = []
-    with psycopg2.connect(
-        host=host, port=port, user=user, password=password, database=database
-    ) as conn:
+    with psycopg2.connect(host=host, port=port, user=user, password=password, database=database) as conn:
         conn.set_session(autocommit=True)
         with conn.cursor() as cur:
             cur.execute(query)
@@ -34,9 +31,9 @@ def run_query_mysql(query, host, port, user, password, database):
         user=user,
         password=password,
         database=database,
-        charset='utf8mb4',
+        charset="utf8mb4",
         cursorclass=pymysql.cursors.Cursor,
-        ssl={'': True}
+        ssl={"": True},
     ) as conn:
         with conn.cursor() as cur:
             cur.execute(query)
@@ -55,7 +52,7 @@ def run_query_snowflake(query, account, database, warehouse, user, private_key):
         user=user,
         private_key=pem2der(private_key),
         autocommit=True,
-        authenticator='SNOWFLAKE_JWT'
+        authenticator="SNOWFLAKE_JWT",
     ) as conn:
         with conn.cursor() as cur:
             cur.execute(query)
@@ -81,7 +78,7 @@ def sql_get_columns_for_table(table_schema: str, table_name: str) -> list:
 def sql_get_columns_mysql(schemas: list) -> str:
     """Generates an SQL command that gives the list of columns of every table
     in a specific schema from a mysql database"""
-    sql_schemas = ', '.join(f"'{schema}'" for schema in schemas)
+    sql_schemas = ", ".join(f"'{schema}'" for schema in schemas)
 
     return f"""
     SELECT table_name, GROUP_CONCAT(CONCAT(column_name, ':', data_type, ':', column_type)
@@ -95,7 +92,7 @@ def sql_get_columns_mysql(schemas: list) -> str:
 def sql_get_columns_postgres(schemas: list) -> str:
     """Generates an SQL command that gives the list of columns of every table
     in a specific schema from a postgres database"""
-    sql_schemas = ', '.join(f"'{schema}'" for schema in schemas)
+    sql_schemas = ", ".join(f"'{schema}'" for schema in schemas)
 
     return f"""
     SELECT table_name, STRING_AGG(CONCAT(column_name, ':', data_type, ':'), ';' ORDER BY column_name)
@@ -108,7 +105,7 @@ def sql_get_columns_postgres(schemas: list) -> str:
 def sql_get_columns_snowflake(schemas: list) -> str:
     """Generates an SQL command that gives the list of columns of every table
     in a specific schema from a snowflake database"""
-    sql_schemas = ', '.join(f"'{schema.upper()}'" for schema in schemas)
+    sql_schemas = ", ".join(f"'{schema.upper()}'" for schema in schemas)
     return f"""
     SELECT table_name, LISTAGG(CONCAT(column_name, ':', REPLACE(data_type, 'TEXT', 'VARCHAR'), ':'), ';')
                        WITHIN GROUP (ORDER BY column_name)
@@ -121,7 +118,7 @@ def sql_get_columns_snowflake(schemas: list) -> str:
 def sql_dynamic_row_count_mysql(schemas: list) -> str:
     """Generates ans SQL statement that counts the number of rows in
     every table in a specific schema(s) in a mysql database"""
-    sql_schemas = ', '.join(f"'{schema}'" for schema in schemas)
+    sql_schemas = ", ".join(f"'{schema}'" for schema in schemas)
 
     return f"""
     WITH table_list AS (
@@ -140,7 +137,7 @@ def sql_dynamic_row_count_mysql(schemas: list) -> str:
 def sql_dynamic_row_count_postgres(schemas: list) -> str:
     """Generates ans SQL statement that counts the number of rows in
     every table in a specific schema(s) in a postgres database"""
-    sql_schemas = ', '.join(f"'{schema}'" for schema in schemas)
+    sql_schemas = ", ".join(f"'{schema}'" for schema in schemas)
 
     return f"""
     WITH table_list AS (
@@ -160,7 +157,7 @@ def sql_dynamic_row_count_postgres(schemas: list) -> str:
 def sql_dynamic_row_count_snowflake(schemas: list) -> str:
     """Generates an SQL statement that counts the number of rows in
     every table in a specific schema(s) in a Snowflake database"""
-    sql_schemas = ', '.join(f"'{schema.upper()}'" for schema in schemas)
+    sql_schemas = ", ".join(f"'{schema.upper()}'" for schema in schemas)
 
     return f"""
     WITH table_list AS (
@@ -191,7 +188,7 @@ def get_mongodb_connection(
 
     """
     connection_string = (
-        f'mongodb://{user}:{password}@{host}:{port}/{database}?authSource={auth_database}'
-        '&tls=true&tlsAllowInvalidCertificates=true&directConnection=true'
+        f"mongodb://{user}:{password}@{host}:{port}/{database}?authSource={auth_database}"
+        "&tls=true&tlsAllowInvalidCertificates=true&directConnection=true"
     )
     return pymongo.MongoClient(connection_string)[database]

@@ -2,8 +2,8 @@ from pipelinewise.fastsync import mysql_to_snowflake
 from tests.end_to_end.helpers import assertions
 from tests.end_to_end.target_snowflake.tap_mariadb import TapMariaDB
 
-TAP_ID = 'mariadb_to_sf_split_large_files'
-TARGET_ID = 'snowflake'
+TAP_ID = "mariadb_to_sf_split_large_files"
+TARGET_ID = "snowflake"
 
 
 class TestResyncMariaDBToSFWithSplitLargeFiles(TapMariaDB):
@@ -11,7 +11,6 @@ class TestResyncMariaDBToSFWithSplitLargeFiles(TapMariaDB):
     Resync tables from MariaDB to Snowflake using splitting large files option
     """
 
-    # pylint: disable=arguments-differ
     def setUp(self):
         super().setUp(tap_id=TAP_ID, target_id=TARGET_ID)
 

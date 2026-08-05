@@ -15,8 +15,8 @@ from .commons.target_postgres import FastSyncTargetPostgres
 LOGGER = Logger().get_logger(__name__)
 
 REQUIRED_CONFIG_KEYS = {
-    'tap': ['host', 'port', 'user', 'password'],
-    'target': ['host', 'port', 'user', 'password'],
+    "tap": ["host", "port", "user", "password"],
+    "target": ["host", "port", "user", "password"],
 }
 
 LOCK = multiprocessing.Lock()
@@ -25,48 +25,46 @@ LOCK = multiprocessing.Lock()
 def tap_type_to_target_type(mysql_type, mysql_column_type):
     """Data type mapping from MySQL to Postgres"""
     return {
-        'char': 'CHARACTER VARYING',
-        'varchar': 'CHARACTER VARYING',
-        'binary': 'CHARACTER VARYING',
-        'varbinary': 'CHARACTER VARYING',
-        'blob': 'CHARACTER VARYING',
-        'tinyblob': 'CHARACTER VARYING',
-        'mediumblob': 'CHARACTER VARYING',
-        'longblob': 'CHARACTER VARYING',
-        'geometry': 'JSONB',
-        'point': 'JSONB',
-        'linestring': 'JSONB',
-        'polygon': 'JSONB',
-        'multipoint': 'JSONB',
-        'multilinestring': 'JSONB',
-        'multipolygon': 'JSONB',
-        'geometrycollection': 'JSONB',
-        'text': 'CHARACTER VARYING',
-        'tinytext': 'CHARACTER VARYING',
-        'mediumtext': 'CHARACTER VARYING',
-        'longtext': 'CHARACTER VARYING',
-        'enum': 'CHARACTER VARYING',
-        'int': 'INTEGER NULL',
-        'tinyint': 'BOOLEAN'
-        if mysql_column_type and mysql_column_type.startswith('tinyint(1)')
-        else 'SMALLINT NULL',
-        'smallint': 'SMALLINT NULL',
-        'mediumint': 'INTEGER NULL',
-        'bigint': 'BIGINT NULL',
-        'bit': 'BOOLEAN',
-        'decimal': 'DOUBLE PRECISION',
-        'double': 'DOUBLE PRECISION',
-        'float': 'DOUBLE PRECISION',
-        'bool': 'BOOLEAN',
-        'boolean': 'BOOLEAN',
-        'date': 'TIMESTAMP WITHOUT TIME ZONE',
-        'datetime': 'TIMESTAMP WITHOUT TIME ZONE',
-        'timestamp': 'TIMESTAMP WITHOUT TIME ZONE',
-        'time': 'TIME WITHOUT TIME ZONE',
-        'json': 'JSONB',
+        "char": "CHARACTER VARYING",
+        "varchar": "CHARACTER VARYING",
+        "binary": "CHARACTER VARYING",
+        "varbinary": "CHARACTER VARYING",
+        "blob": "CHARACTER VARYING",
+        "tinyblob": "CHARACTER VARYING",
+        "mediumblob": "CHARACTER VARYING",
+        "longblob": "CHARACTER VARYING",
+        "geometry": "JSONB",
+        "point": "JSONB",
+        "linestring": "JSONB",
+        "polygon": "JSONB",
+        "multipoint": "JSONB",
+        "multilinestring": "JSONB",
+        "multipolygon": "JSONB",
+        "geometrycollection": "JSONB",
+        "text": "CHARACTER VARYING",
+        "tinytext": "CHARACTER VARYING",
+        "mediumtext": "CHARACTER VARYING",
+        "longtext": "CHARACTER VARYING",
+        "enum": "CHARACTER VARYING",
+        "int": "INTEGER NULL",
+        "tinyint": "BOOLEAN" if mysql_column_type and mysql_column_type.startswith("tinyint(1)") else "SMALLINT NULL",
+        "smallint": "SMALLINT NULL",
+        "mediumint": "INTEGER NULL",
+        "bigint": "BIGINT NULL",
+        "bit": "BOOLEAN",
+        "decimal": "DOUBLE PRECISION",
+        "double": "DOUBLE PRECISION",
+        "float": "DOUBLE PRECISION",
+        "bool": "BOOLEAN",
+        "boolean": "BOOLEAN",
+        "date": "TIMESTAMP WITHOUT TIME ZONE",
+        "datetime": "TIMESTAMP WITHOUT TIME ZONE",
+        "timestamp": "TIMESTAMP WITHOUT TIME ZONE",
+        "time": "TIME WITHOUT TIME ZONE",
+        "json": "JSONB",
     }.get(
         mysql_type,
-        'CHARACTER VARYING',
+        "CHARACTER VARYING",
     )
 
 
@@ -76,9 +74,7 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
     postgres = FastSyncTargetPostgres(args.target, args.transform)
 
     try:
-        filename = utils.gen_export_filename(
-            tap_id=args.target.get('tap_id'), table=table
-        )
+        filename = utils.gen_export_filename(tap_id=args.target.get("tap_id"), table=table)
         filepath = os.path.join(args.temp_dir, filename)
         target_schema = utils.get_target_schema(args.target, table)
 
@@ -95,19 +91,15 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
         mysql.close_connections()
 
         size_bytes = os.path.getsize(filepath)
-        postgres_columns = postgres_types.get('columns', [])
-        primary_key = postgres_types.get('primary_key')
+        postgres_columns = postgres_types.get("columns", [])
+        primary_key = postgres_types.get("primary_key")
 
         # Creating temp table in Postgres
         postgres.drop_table(target_schema, table, is_temporary=True)
-        postgres.create_table(
-            target_schema, table, postgres_columns, primary_key, is_temporary=True
-        )
+        postgres.create_table(target_schema, table, postgres_columns, primary_key, is_temporary=True)
 
         # Load into Postgres table
-        postgres.copy_to_table(
-            filepath, target_schema, table, size_bytes, is_temporary=True
-        )
+        postgres.copy_to_table(filepath, target_schema, table, size_bytes, is_temporary=True)
         os.remove(filepath)
 
         # Obfuscate columns
@@ -133,7 +125,7 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
 
     except Exception as exc:
         LOGGER.exception(exc)
-        return '{}: {}'.format(table, exc)
+        return "{}: {}".format(table, exc)
 
     finally:
         # try closing connections again just in case, silence errors

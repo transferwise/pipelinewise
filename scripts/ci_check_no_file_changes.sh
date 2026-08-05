@@ -43,7 +43,7 @@ REGEXES=()
 for CHECK in "$@"
 do
   if [[ ${CHECK} == "python" ]]; then
-    REGEX="(^tests\/|^pipelinewise\/|^singer-connectors\/|^setup\.py|^Makefile)"
+    REGEX="(^tests\/|^pipelinewise\/|^singer-connectors\/|^setup\.py|^Makefile|^pyproject\.toml|^\.pre-commit-config\.yaml|^\.github\/workflows\/(lint_unit_tests|connectors)\.yml)"
     echo "Searching for changes in python files"
 
   elif [[ ${CHECK} == "doc" ]]; then

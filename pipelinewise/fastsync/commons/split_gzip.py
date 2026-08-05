@@ -1,4 +1,5 @@
 """Functions that write chunked gzipped files."""
+
 import io
 import logging
 import gzip
@@ -15,10 +16,9 @@ DEFAULT_MAX_CHUNKS = 20
 EST_COMPR_RATE = 0.12
 
 
-# pylint: disable=W0622,R1732
 def open(
     base_filename,
-    mode='wb',
+    mode="wb",
     chunk_size_mb=None,
     max_chunks=None,
     est_compr_rate=None,
@@ -41,18 +41,15 @@ def open(
     Return:
         File like object
     """
-    if mode not in ['wb', 'wt']:
-        raise ValueError('Invalid mode: %r' % (mode,))
+    if mode not in ["wb", "wt"]:
+        raise ValueError("Invalid mode: %r" % (mode,))
     if chunk_size_mb is not None and chunk_size_mb < 1:
-        raise ValueError('Invalid chunk_size_mb: %d' % (chunk_size_mb,))
+        raise ValueError("Invalid chunk_size_mb: %d" % (chunk_size_mb,))
     if max_chunks is not None and max_chunks < 0:
-        raise ValueError('Invalid max_chunks: %d' % (max_chunks,))
-    return SplitGzipFile(
-        base_filename, mode, chunk_size_mb, max_chunks, est_compr_rate, compress
-    )
+        raise ValueError("Invalid max_chunks: %d" % (max_chunks,))
+    return SplitGzipFile(base_filename, mode, chunk_size_mb, max_chunks, est_compr_rate, compress)
 
 
-# pylint: disable=R0902
 class SplitGzipFile(io.BufferedIOBase):
     """The SplitGzipFile file like object class that implements only the write method.
 
@@ -76,9 +73,7 @@ class SplitGzipFile(io.BufferedIOBase):
         self.max_chunks = max_chunks if max_chunks is not None else DEFAULT_MAX_CHUNKS
         self.compress = compress
         if compress:
-            self.est_compr_rate = (
-                est_compr_rate if est_compr_rate is not None else EST_COMPR_RATE
-            )
+            self.est_compr_rate = est_compr_rate if est_compr_rate is not None else EST_COMPR_RATE
         else:
             self.est_compr_rate = 1.0
         self.chunk_seq = 1
@@ -99,15 +94,12 @@ class SplitGzipFile(io.BufferedIOBase):
         if self.max_chunks == 0:
             chunk_filename = self.base_filename
         else:
-            if (
-                self.current_chunk_size_mb >= self.chunk_size_mb
-                and self.chunk_seq < self.max_chunks
-            ):
+            if self.current_chunk_size_mb >= self.chunk_size_mb and self.chunk_seq < self.max_chunks:
                 # Increase the chunk sequence and reset size to zero
                 self.chunk_seq += 1
                 self.current_chunk_size_mb = 0
 
-            chunk_filename = f'{self.base_filename}.part{self.chunk_seq:05d}'
+            chunk_filename = f"{self.base_filename}.part{self.chunk_seq:05d}"
 
         return chunk_filename
 
@@ -126,14 +118,10 @@ class SplitGzipFile(io.BufferedIOBase):
             if self.compress:
                 self.chunk_file = gzip.open(self.chunk_filename, self.mode)
             else:
-                if 'b' in self.mode:
-                    self.chunk_file = builtins.open(  # pylint: disable=unspecified-encoding
-                        self.chunk_filename, self.mode
-                    )
+                if "b" in self.mode:
+                    self.chunk_file = builtins.open(self.chunk_filename, self.mode)
                 else:
-                    self.chunk_file = builtins.open(
-                        self.chunk_filename, self.mode, encoding='utf-8'
-                    )
+                    self.chunk_file = builtins.open(self.chunk_filename, self.mode, encoding="utf-8")
 
     @staticmethod
     def _bytes_to_megabytes(size: int) -> float:
@@ -160,9 +148,7 @@ class SplitGzipFile(io.BufferedIOBase):
         self._activate_chunk_file()
 
         self.chunk_file.write(_bytes)
-        self.current_chunk_size_mb = SplitGzipFile._bytes_to_megabytes(
-            self.chunk_file.tell() * self.est_compr_rate
-        )
+        self.current_chunk_size_mb = SplitGzipFile._bytes_to_megabytes(self.chunk_file.tell() * self.est_compr_rate)
 
     def close(self):
         """

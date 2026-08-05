@@ -1,20 +1,65 @@
 [tool.ruff]
-# Set the maximum line length to 120
-line-length = 130
+line-length = 120
+target-version = "py312"
+extend-exclude = [
+    "singer-connectors/tap-github",
+    "singer-connectors/tap-jira",
+    "singer-connectors/tap-kafka",
+    "singer-connectors/tap-mixpanel",
+    "singer-connectors/tap-mongodb",
+    "singer-connectors/tap-s3-csv",
+    "singer-connectors/tap-salesforce",
+    "singer-connectors/tap-slack",
+    "singer-connectors/tap-snowflake",
+    "singer-connectors/tap-twilio",
+    "singer-connectors/tap-zendesk",
+    "singer-connectors/target-postgres",
+    "singer-connectors/target-s3-csv",
+    "singer-connectors/transform-field",
+]
 
 [tool.ruff.lint]
-# Select the rules you want to check (E=Error, F=Pyflakes, Q=Quotes)
-select = ["E", "F", "Q"]
+select = ["E", "F", "C90", "N", "PL", "PLR0917"]
+ignore = [
+    "E721",     # Preserve existing type-comparison behavior.
+    "N818",     # Preserve the public names of existing exception classes.
+    "PLR1730",  # Not enabled by the previous Pylint configuration.
+    "PLR2004",  # Not enabled by the previous Pylint configuration.
+    "PLR5501",  # Not enabled by the previous Pylint configuration.
+    "PLW2901",  # Not enabled by the previous Pylint configuration.
+]
+preview = true
+explicit-preview-rules = true
 
-# Add Q000, Q001, or any other rules you want to skip entirely
-# Q000: Single quotes found but double quotes preferred
-# Q001: Multiline string quote preference
-# Q003: Avoidable escaped quotes
-# Q004: Unnecessary escape on inner quote character
-ignore = ["Q000", "Q001", "Q003", "Q004", "E721"]
+[tool.ruff.lint.per-file-ignores]
+# The previous connector lint targets inspected package code only. Keep legacy
+# test naming, globals, and complexity out of scope while adding E/F checks.
+"singer-connectors/{tap-mysql,tap-postgres,target-snowflake}/tests/**/*.py" = [
+    "C901",
+    "N801",
+    "N802",
+    "N803",
+    "N806",
+    "PLC0206",
+    "PLR0911",
+    "PLR0912",
+    "PLR0915",
+    "PLR1716",
+    "PLW0108",
+    "PLW0602",
+    "PLW0603",
+]
 
-[tool.ruff.lint.flake8-quotes]
-# This sets your preference, but the 'ignore' above will
-# stop Ruff from complaining even if you break these rules.
-inline-quotes = "single"
-multiline-quotes = "single"
+[tool.ruff.lint.mccabe]
+max-complexity = 15
+
+[tool.ruff.lint.pylint]
+max-args = 7
+max-positional-args = 7
+max-branches = 12
+max-returns = 6
+max-locals = 15
+max-statements = 50
+max-public-methods = 20
+max-bool-expr = 5
+max-nested-blocks = 5

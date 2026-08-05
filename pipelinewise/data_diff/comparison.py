@@ -4,21 +4,58 @@ from decimal import Decimal
 
 
 _EXACT_NUMERIC_TYPES = {
-    "bigint", "bigserial", "decimal", "dec", "fixed", "int", "integer",
-    "mediumint", "number", "numeric", "serial", "smallint", "smallserial",
+    "bigint",
+    "bigserial",
+    "decimal",
+    "dec",
+    "fixed",
+    "int",
+    "integer",
+    "mediumint",
+    "number",
+    "numeric",
+    "serial",
+    "smallint",
+    "smallserial",
     "tinyint",
 }
 _APPROXIMATE_NUMERIC_TYPES = {
-    "double", "double precision", "float", "float4", "float8", "real",
+    "double",
+    "double precision",
+    "float",
+    "float4",
+    "float8",
+    "real",
 }
 _STRING_TYPES = {
-    "blob", "bpchar", "char", "character", "character varying", "enum",
-    "longblob", "mediumblob", "string", "text", "tinyblob", "uuid", "varchar",
+    "blob",
+    "bpchar",
+    "char",
+    "character",
+    "character varying",
+    "enum",
+    "longblob",
+    "mediumblob",
+    "string",
+    "text",
+    "tinyblob",
+    "uuid",
+    "varchar",
 }
 _BINARY_TYPES = {"binary", "bytea", "varbinary"}
 _SEMISTRUCTURED_TYPES = {
-    "array", "geometry", "geometrycollection", "json", "jsonb", "linestring",
-    "multilinestring", "multipoint", "multipolygon", "object", "point", "polygon",
+    "array",
+    "geometry",
+    "geometrycollection",
+    "json",
+    "jsonb",
+    "linestring",
+    "multilinestring",
+    "multipoint",
+    "multipolygon",
+    "object",
+    "point",
+    "polygon",
     "variant",
 }
 
@@ -38,8 +75,7 @@ def column_type_name(column: dict) -> str:
     return data_type
 
 
-# pylint: disable=too-many-return-statements
-def type_family(column: dict) -> str:
+def type_family(column: dict) -> str:  # noqa: PLR0911
     """Collapse route-specific physical types into comparable families."""
     type_name = column_type_name(column)
     if column.get("missing"):
@@ -102,10 +138,7 @@ def schema_compatibility_result(column_pairs: list) -> dict:
         source_evidence.append(_column_evidence(logical_name, source_column))
         target_evidence.append(_column_evidence(logical_name, target_column))
         if not _schema_families_compatible(source_family, target_family):
-            findings.append(
-                f"{logical_name}: source {source_family} is not compatible with "
-                f"target {target_family}"
-            )
+            findings.append(f"{logical_name}: source {source_family} is not compatible with target {target_family}")
     return {
         "check_type": "schema_compatibility",
         "status": "PASS" if not findings else "FAIL",
@@ -120,8 +153,15 @@ def schema_compatibility_result(column_pairs: list) -> dict:
 def _numeric_scale(column: dict):
     scale = column.get("numeric_scale")
     integer_types = {
-        "bigint", "bigserial", "int", "integer", "mediumint", "serial",
-        "smallint", "smallserial", "tinyint",
+        "bigint",
+        "bigserial",
+        "int",
+        "integer",
+        "mediumint",
+        "serial",
+        "smallint",
+        "smallserial",
+        "tinyint",
     }
     if scale is None and column_type_name(column) in integer_types:
         return 0
@@ -147,18 +187,20 @@ def checksum_columns(column_pairs: list) -> tuple:
             source_scale = _numeric_scale(source_column)
             target_scale = _numeric_scale(target_column)
             if source_scale is None or target_scale is None:
-                raise UnsupportedComparisonError(
-                    f"row_checksum column '{logical_name}' needs declared numeric scales"
-                )
+                raise UnsupportedComparisonError(f"row_checksum column '{logical_name}' needs declared numeric scales")
             # The wider scale: rounding down to the target's would make a target
             # that lost precision hash identically to its source.
             scale = max(source_scale, target_scale)
         elif checksum_kind not in {
-            "string", "boolean", "date", "timestamp", "time", "binary",
+            "string",
+            "boolean",
+            "date",
+            "timestamp",
+            "time",
+            "binary",
         }:
             raise UnsupportedComparisonError(
-                f"row_checksum column '{logical_name}' has unsupported type family "
-                f"'{checksum_kind}'"
+                f"row_checksum column '{logical_name}' has unsupported type family '{checksum_kind}'"
             )
         if checksum_kind == "date":
             checksum_kind = "timestamp"

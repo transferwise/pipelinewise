@@ -47,6 +47,7 @@
 - Add a CI step validating `dev-project/pipelinewise-config`
 - Run the `tap-mysql` and `tap-postgres` unit coverage gates in connector CI on Python 3.12; migrate the MySQL unit and integration suites from Nose to Pytest
 - Refresh the dev MariaDB TLS certificate bundle, replacing the expired server certificate so the local source works with mandatory TLS
+- Replace Pylint, Flake8, and YAPF checks for PipelineWise, `tap-mysql`, `tap-postgres`, and `target-snowflake` with Ruff linting and default formatting at 120 characters; add the three connector Ruff and unit coverage gates to CI
 
 **Fixes**
 

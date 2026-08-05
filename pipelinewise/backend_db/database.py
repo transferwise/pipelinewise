@@ -39,9 +39,7 @@ class BackendDatabase:
         required = ("host", "user", "password", "dbname", "ddl_user", "ddl_password")
         missing = [key for key in required if not config.get(key)]
         if missing:
-            raise BackendDatabaseConfigError(
-                "backend_db is missing required fields: " + ", ".join(missing)
-            )
+            raise BackendDatabaseConfigError("backend_db is missing required fields: " + ", ".join(missing))
 
         params = {
             "host": config["host"],
@@ -111,7 +109,8 @@ class BackendDatabase:
         # the root stderr handler around the import to keep migrations quiet.
         root = logging.getLogger()
         stderr_handlers = [
-            handler for handler in root.handlers
+            handler
+            for handler in root.handlers
             if isinstance(handler, logging.StreamHandler) and handler.stream is sys.stderr
         ]
         for handler in stderr_handlers:
@@ -119,8 +118,8 @@ class BackendDatabase:
         try:
             # Imported lazily so the stderr handler is detached before Alembic's
             # import-time plugin registration emits INFO logs.
-            from alembic import command  # pylint: disable=import-outside-toplevel
-            from alembic.config import Config  # pylint: disable=import-outside-toplevel
+            from alembic import command  # noqa: PLC0415
+            from alembic.config import Config  # noqa: PLC0415
 
             migrations_dir = os.path.join(os.path.dirname(__file__), "migrations")
             alembic_cfg = Config(os.path.join(migrations_dir, "alembic.ini"))
@@ -129,11 +128,7 @@ class BackendDatabase:
             # from_config always supplies a DDL config; the fallback covers instances
             # constructed directly.
             conn = self._ddl_config if self._ddl_config else self._connection_config
-            query = {
-                key: conn[key]
-                for key in ("options", "sslmode")
-                if conn.get(key)
-            }
+            query = {key: conn[key] for key in ("options", "sslmode") if conn.get(key)}
             url = URL.create(
                 "postgresql+psycopg2",
                 username=conn["user"],
@@ -144,18 +139,14 @@ class BackendDatabase:
                 query=query,
             )
             url_string = url.render_as_string(hide_password=False)
-            alembic_cfg.set_main_option(
-                "sqlalchemy.url", url_string.replace("%", "%%")
-            )
+            alembic_cfg.set_main_option("sqlalchemy.url", url_string.replace("%", "%%"))
 
             # ddl_user owns every object it creates, so the application user needs
             # explicit grants. Migrations read this to know who to grant to.
-            alembic_cfg.set_main_option(
-                "pipelinewise_application_user", self._connection_config["user"]
-            )
+            alembic_cfg.set_main_option("pipelinewise_application_user", self._connection_config["user"])
 
             command.upgrade(alembic_cfg, "head")
         finally:
             for handler in stderr_handlers:
                 root.addHandler(handler)
-        LOGGER.info("Backend DB schema is up to date (user: %s)", conn['user'])
+        LOGGER.info("Backend DB schema is up to date (user: %s)", conn["user"])
