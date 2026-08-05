@@ -41,7 +41,7 @@ setup(name='pipelinewise',
           'psutil==5.9.5',
           'ujson==5.12.1',
           'dnspython==2.1.*',
-          'boto3>=1.21,<1.27',
+          'boto3>=1.21,<1.44',
           'chardet==4.0.0',
           'backports.tarfile==1.2.0'
       ],
