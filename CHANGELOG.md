@@ -1,4 +1,4 @@
-0.78.0 (2026-07-31)
+0.78.0 (2026-08-05)
 -------------------
 
 **Connector updates**
@@ -6,23 +6,26 @@
 - `pipelinewise-tap-mixpanel` from `1.7.1` to `1.7.2`
     - Restore `mp_reserved_insert_id` as the export stream key property so newly discovered taps pass primary-key validation
     - Respect `denest_properties=false` during discovery so dynamic Mixpanel properties remain nested
+- Embedded `tap-mysql`
+    - Preserve valid ISO date-time strings and emit invalid MySQL and MariaDB date-time values as `null` across FULL_TABLE, INCREMENTAL, and LOG_BASED replication
+    - Include `_sdc_deleted_at` in LOG_BASED schema messages before emitting records
 
 **Data-diff checks**
 
-- Add data-diff: bounded aggregate reconciliation between source tables and their PostgreSQL or Snowflake replicas. Checks are declared per table in the tap YAML and persisted as immutable versioned definitions
+- Add data-diff: bounded aggregate reconciliation between source tables and their PostgreSQL or Snowflake replicas. Checks are declared per table in the tap YAML and stored as versioned definitions; a configuration change creates a new revision rather than overwriting the previous configuration
 - Add check types `schema_compatibility`, `row_count`, `distinct_key_count`, `null_key_count`, `duplicate_key_count`, `min_key`, `max_key`, and the experimental `row_checksum`
 - Add CLI commands `list_data_diff_checks`, `run_data_diff_checks`, and `rerun_data_diff_check`
 - Add supported routes MySQL/MariaDB and PostgreSQL sources to PostgreSQL and Snowflake targets
 - Add timestamp coverage tracking: `verified_through` advances only over a contiguous union of passing windows, and a failed or missing window blocks it until remediated
-- Add remediation: `rerun_data_diff_check` re-runs an exact failed window, preserving the original run as immutable evidence linked by `rerun_of_run_id`
-- Add source safety: read-only transactions, per-query `statement_timeout`, and a preflight that blocks a check whose source table is large and has no index leading with the timestamp column. No source rows or business values are stored, only aggregate metrics
+- Add remediation: `rerun_data_diff_check` re-runs an exact failed window and links the new attempt to the original run through `rerun_of_run_id`
+- Add source safety: read-only transactions, per-query `statement_timeout`, and a preflight that blocks a check whose source table is large and has no index leading with the timestamp column. No source rows are stored. Persisted results are aggregate values and operational evidence; `min_key` and `max_key` retain boundary key values when enabled
 - Add monitoring views `dd_current_coverage` and `dd_remediation_history`
-- A check window must be at least as wide as its cadence, or the time between windows is never verified and coverage stays `BLOCKED`. The shipped defaults are a 12-hour window on a 6-hour cadence so consecutive windows overlap
+- A check window must be at least as wide as its cadence, or the time between windows is never verified and coverage stays `BLOCKED`. The shipped examples use a 12-hour window on a 6-hour cadence so consecutive windows overlap
 - An interrupted check is recorded as `ERROR` so its window stays retryable, including on `SIGTERM` and `SIGINT`. An attempt abandoned by a killed worker is retired at the start of the next invocation, before the scheduler reads the latest slot and across every slot and trigger, so a `RUNNING` row cannot hide the slot it belongs to
 - The source preflight validates that a timestamp index is actually usable: a partial, expression, invalid, still-building, hash or BRIN index, or a MySQL `INVISIBLE` / MariaDB `IGNORED` one the planner refuses, is recorded as evidence but does not satisfy the check. Table size counts each partition once and treats absent statistics as unknown rather than empty, so a freshly loaded table cannot pass by reporting zero rows
 - The preflight is persisted before either aggregate query runs, together with the table size, row limit and index verdict it decided from, so a `PASS` remains auditable
 - `frequency` must be a crontab expression, validated at import. One unschedulable check is reported as `ERROR` without aborting the rest of the batch
-- Covered by 114 unit tests across config parsing, the comparison engine and its adapters, coverage arithmetic, the scheduler, the repository, and alerting, plus 8 end-to-end tests spanning all four routes. The engine tests pin the cross-dialect agreement the checksum depends on and the index verdicts the preflight depends on; the runner tests kill a real subprocess with `SIGTERM` to prove an interrupted attempt is recorded as terminal rather than left `RUNNING`
+- Covered by unit and end-to-end tests across all four supported routes, including mismatch detection, remediation, cross-dialect checksum normalization, source preflight decisions, and interrupted-run handling
 
 **Backend database**
 
@@ -42,10 +45,12 @@
 
 - Add a `pipelinewise-backend-db` service to the dev environment, with its own database and two distinct roles, so every end-to-end run exercises the DDL/application privilege split rather than assuming it. It is not a replication target
 - Add a CI step validating `dev-project/pipelinewise-config`
+- Run the `tap-mysql` and `tap-postgres` unit coverage gates in connector CI on Python 3.12; migrate the MySQL unit and integration suites from Nose to Pytest
+- Refresh the dev MariaDB TLS certificate bundle, replacing the expired server certificate so the local source works with mandatory TLS
 
 **Fixes**
 
-- Fix MySQL/MariaDB FastSync and binlog replication persisting invalid dates instead of NULL. Only the literal `0000-00-00 00:00:00` was filtered, so a zero year, a month outside 1-12, or a day beyond the month's length was replicated as-is and rejected or silently altered by the target
+- Fix MySQL/MariaDB FastSync mapping malformed `date`, `datetime`, and `timestamp` values to NULL. The old guard only caught `0000-00-00 00:00:00`; zero years, out-of-range months, and invalid days could be rejected or silently altered by the target
 - Fix the VictorOps alert handler failing to send **any** alert that carried an exception, which includes every tap and fast-sync failure. The exception object was placed in the request body unserialised, so `json.dumps` raised `TypeError` before the request was sent
 - Fix the VictorOps alert handler having no request timeout, so an unresponsive endpoint stalled the run that was trying to report a failure
 - Document that the VictorOps handler has only ever been exercised against a mocked endpoint, and that every alert goes to the single configured `routing_key` with no per-tap equivalent of `slack_alert_channel`

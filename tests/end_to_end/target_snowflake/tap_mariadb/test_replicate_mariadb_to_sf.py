@@ -64,6 +64,7 @@ class TestReplicateMariaDBToSF(TapMariaDB):
         )
 
         self.e2e_env.run_query_tap_mysql('UPDATE all_datatypes SET c_point = NULL')
+        self.e2e_env.delete_record_from_source('mysql', 'weight_unit', 'WHERE weight_unit_id=25')
 
         #  INCREMENTAL
         self.e2e_env.run_query_tap_mysql(
@@ -94,6 +95,12 @@ class TestReplicateMariaDBToSF(TapMariaDB):
             {'blob_col'},
             schema_postfix=self.e2e_env.sf_schema_postfix,
         )
+
+        result = self.e2e_env.run_query_target_snowflake(
+            f'SELECT COUNT(*) FROM ppw_e2e_tap_mysql{self.e2e_env.sf_schema_postfix}.weight_unit '
+            f'WHERE "WEIGHT_UNIT_ID" = 25'
+        )
+        self.assertEqual(result[0][0], 0)
 
         # Checking if mask-date transformation is working
         result = self.e2e_env.run_query_target_snowflake(

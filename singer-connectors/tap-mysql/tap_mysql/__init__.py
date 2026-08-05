@@ -360,11 +360,12 @@ def sync_non_binlog_streams(mysql_conn, non_binlog_catalog, state, use_gtid, eng
 def sync_binlog_streams(mysql_conn, binlog_catalog, config, state):
 
     if binlog_catalog.streams:
+        binlog_streams_map = binlog.generate_streams_map(binlog_catalog.streams)
+
         for stream in binlog_catalog.streams:
             write_schema_message(stream)
 
         with metrics.job_timer('sync_binlog'):
-            binlog_streams_map = binlog.generate_streams_map(binlog_catalog.streams)
             binlog.sync_binlog_stream(mysql_conn, config, binlog_streams_map, state)
 
 
