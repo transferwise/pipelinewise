@@ -9,7 +9,7 @@
   <title>Installation &mdash; PipelineWise  documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
-      <link rel="stylesheet" type="text/css" href="../_static/css/custom.css?v=1c6dfede" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/custom.css?v=36639f2a" />
 
   
     <link rel="shortcut icon" href="../_static/pipelinewise.png"/>
@@ -72,6 +72,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/yaml_config.html">YAML Configuration</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/encrypting_passwords.html">Encrypting Passwords</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/cli.html">Command Line Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/data_diff.html">Data-diff checks</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/scheduling.html">Scheduling</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/multi_server_cluster.html">Multi-Server Cluster</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/logging.html">Logging</a></li>
@@ -197,6 +198,10 @@ $<span class="w"> </span><span class="nb">cd</span><span class="w"> </span>./pip
 $<span class="w"> </span>make<span class="w"> </span>pipelinewise<span class="w"> </span>all_connectors
 </pre></div>
 </div>
+<p>The <code class="docutils literal notranslate"><span class="pre">pipelinewise</span></code> make target installs one Python project. Data-diff and the
+reusable PostgreSQL backend connection live in the internal
+<code class="docutils literal notranslate"><span class="pre">pipelinewise.data_diff</span></code> and <code class="docutils literal notranslate"><span class="pre">pipelinewise.backend_db</span></code> package namespaces,
+and data-diff operations are available through the main <code class="docutils literal notranslate"><span class="pre">pipelinewise</span></code> CLI.</p>
 <p>Press <code class="docutils literal notranslate"><span class="pre">Y</span></code> to accept the license agreement of the required singer components.</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>make<span class="w"> </span>pipelinewise<span class="w"> </span>all_connectors
 

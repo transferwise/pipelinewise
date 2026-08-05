@@ -9,7 +9,7 @@
   <title>Alerts &mdash; PipelineWise  documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
-      <link rel="stylesheet" type="text/css" href="../_static/css/custom.css?v=1c6dfede" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/custom.css?v=36639f2a" />
 
   
     <link rel="shortcut icon" href="../_static/pipelinewise.png"/>
@@ -63,6 +63,7 @@
 <li class="toctree-l1"><a class="reference internal" href="yaml_config.html">YAML Configuration</a></li>
 <li class="toctree-l1"><a class="reference internal" href="encrypting_passwords.html">Encrypting Passwords</a></li>
 <li class="toctree-l1"><a class="reference internal" href="cli.html">Command Line Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="data_diff.html">Data-diff checks</a></li>
 <li class="toctree-l1"><a class="reference internal" href="scheduling.html">Scheduling</a></li>
 <li class="toctree-l1"><a class="reference internal" href="multi_server_cluster.html">Multi-Server Cluster</a></li>
 <li class="toctree-l1"><a class="reference internal" href="logging.html">Logging</a></li>
@@ -123,6 +124,8 @@ alert handlers in the main <code class="docutils literal notranslate"><span clas
 when <a class="reference internal" href="../installation_guide/creating_pipelines.html#generating-pipelines"><span class="std std-ref">Generating Sample Pipelines</span></a>. Alerts are triggered when <a class="reference internal" href="cli.html#cli-run-tap"><span class="std std-ref">run_tap</span></a>
 or <a class="reference internal" href="cli.html#cli-fast-sync"><span class="std std-ref">fast_sync</span></a> fails. The alert provides the ID of the failed tap and a description of the failure
 to the alert handler.</p>
+<p>Failed <a class="reference internal" href="data_diff.html#data-diff"><span class="std std-ref">Data-diff checks</span></a> checks alert through the same handlers and channels
+configured here, including <code class="docutils literal notranslate"><span class="pre">slack_alert_channel</span></code> and <code class="docutils literal notranslate"><span class="pre">send_alert</span></code>.</p>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
 <p>You can optionally disable alerts on certain taps by adding <code class="docutils literal notranslate"><span class="pre">send_alert:</span> <span class="pre">False</span></code>
@@ -131,7 +134,7 @@ optional entry to any tap <a class="reference internal" href="yaml_config.html#y
 <dl class="simple">
 <dt>Currently available alert handlers:</dt><dd><ul class="simple">
 <li><p><a class="reference internal" href="#slack-alert-handler"><span class="std std-ref">Slack Alert Handler</span></a></p></li>
-<li><p><a class="reference internal" href="#victorops-alert-handler"><span class="std std-ref">VictorOps Alert Handler</span></a></p></li>
+<li><p><a class="reference internal" href="#victorops-alert-handler"><span class="std std-ref">VictorOps Alert Handler</span></a> — incomplete, see the limitations below</p></li>
 </ul>
 </dd>
 </dl>
@@ -166,6 +169,13 @@ to that tap’s YAML file in addition to the handler configuration above:</p>
 </section>
 <section id="victorops-alert-handler">
 <span id="id3"></span><h2>VictorOps Alert Handler<a class="headerlink" href="#victorops-alert-handler" title="Link to this heading"></a></h2>
+<div class="admonition attention">
+<p class="admonition-title">Attention</p>
+<p>This handler has only ever been exercised against a mocked endpoint, so verify it
+against your own VictorOps integration before relying on it for on-call. Note
+also that all alerts go to the single configured <code class="docutils literal notranslate"><span class="pre">routing_key</span></code> — there is no
+VictorOps equivalent of a tap’s <code class="docutils literal notranslate"><span class="pre">slack_alert_channel</span></code>.</p>
+</div>
 <p>To send alerts and open an incident on VictorOps:</p>
 <ol class="arabic">
 <li><p>Follow the instructions at <a class="reference external" href="https://help.victorops.com/knowledge-base/rest-endpoint-integration-guide/">Enable the VictorOps REST Endpoint</a> and get the long notify URL.</p></li>

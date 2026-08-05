@@ -36,6 +36,16 @@ It is created automatically when you run ``pipelinewise init``.
     # Optional: Path to a JSON file containing database switchover data for reset_state
     switch_over_data_file: "switch_over_data.json"
 
+    # Optional shared PostgreSQL control plane for operational modules
+    # Do not point this at a PostgreSQL replication target.
+    backend_db:
+      host: "backend.example.com"
+      port: 5432
+      user: "pipelinewise"
+      password: "<PASSWORD>"
+      dbname: "pipelinewise"
+      sslmode: "verify-full"
+
 **Top-level keys:**
 
 ``alert_handlers``: Configure alert destinations for pipeline failures. See :ref:`alerts` for details.
@@ -45,6 +55,13 @@ prevent ``fast_sync`` from resyncing a non-partial table larger than ``table_mb`
 Use ``fast_sync --force`` to override the limit. See :ref:`resync`.
 
 ``switch_over_data_file``: Path to a JSON file with database switchover data, used by the ``reset_state`` CLI command.
+
+``backend_db``: Shared PostgreSQL control-plane connection used by the internal
+``pipelinewise.backend_db`` and ``pipelinewise.data_diff`` packages. It stores
+immutable check revisions, audit evidence, and verified timestamp coverage.
+This database is not a PostgreSQL replication target: keep its service,
+database, role, credentials, and storage separate from every target.
+See :ref:`data_diff`.
 
 
 Tap Configuration (tap_*.yml)
@@ -81,6 +98,13 @@ Each tap YAML file defines a single data source pipeline. The general structure 
     #hard_delete: false                    # Optional: Retain and flag source-deleted rows
                                            # before flushing a partial batch (Snowflake target only)
 
+    # Optional defaults for every table-level data-diff block in this tap
+    data_diff_defaults:
+      frequency: "0 */6 * * *"
+      window_start: "-15h"
+      window_end: "-3h"
+      statement_timeout: "20min"
+
     # Schema mapping
     schemas:
       - source_schema: "my_schema"
@@ -90,8 +114,20 @@ Each tap YAML file defines a single data source pipeline. The general structure 
 
         tables:
           - table_name: "my_table"
-            replication_method: "INCREMENTAL"  # INCREMENTAL, LOG_BASED, or FULL_TABLE
-            replication_key: "updated_at"      # Required for INCREMENTAL
+            replication_method: "LOG_BASED"  # Preferred where the source supports it
+
+            # Optional independent source-to-target aggregate checks
+            data_diff:
+              checks:
+                - schema_compatibility
+                - row_count
+                - null_key_count
+                - duplicate_key_count
+                - row_checksum
+              key_column: "id"
+              timestamp_column: "updated_at"
+              compare_columns: ["status", "currency"]
+              frequency: "0 */12 * * *"   # Override the tap-level default
 
 **Key sections:**
 
@@ -126,6 +162,14 @@ before flushing a partial batch. Currently available only for the Snowflake targ
 ``add_metadata_columns`` and ``hard_delete``: Control ingestion metadata and source
 delete handling for this pipeline. ``hard_delete`` defaults to ``true`` and enables
 metadata columns automatically. See :ref:`metadata_columns` for all combinations.
+
+``data_diff_defaults``: Optional timing defaults consumed by the PipelineWise
+data-diff subsystem for every table-level ``data_diff`` block in this tap. A
+table can override any individual default.
+``frequency`` and ``window_start`` are required after resolving the tap defaults
+and table overrides.
+All check types in a table's ``data_diff`` block run on the same resolved cadence.
+See :ref:`data_diff` for scheduling and verified timestamp coverage semantics.
 
 ``schemas``: Maps source schemas and tables to target schemas. Each table entry specifies
 a ``replication_method`` (see :ref:`replication_methods`) and optionally a ``replication_key``

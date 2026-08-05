@@ -39,6 +39,10 @@ in the target. Rows outside the synced range are not affected.
 
 4. **Hard delete is disabled (soft delete)**
 
+.. deprecated::
+   Soft delete (``hard_delete: false``) is scheduled for removal. New taps
+   should use ``hard_delete: true`` exclusively.
+
 .. image:: ../img/partial_sync_case_4.png
 
 When ``hard_delete`` is ``false``, rows that have been deleted from the source are

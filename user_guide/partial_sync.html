@@ -9,7 +9,7 @@
   <title>Different cases of partial resync &mdash; PipelineWise  documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
-      <link rel="stylesheet" type="text/css" href="../_static/css/custom.css?v=1c6dfede" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/custom.css?v=36639f2a" />
 
   
     <link rel="shortcut icon" href="../_static/pipelinewise.png"/>
@@ -63,6 +63,7 @@
 <li class="toctree-l1"><a class="reference internal" href="yaml_config.html">YAML Configuration</a></li>
 <li class="toctree-l1"><a class="reference internal" href="encrypting_passwords.html">Encrypting Passwords</a></li>
 <li class="toctree-l1"><a class="reference internal" href="cli.html">Command Line Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="data_diff.html">Data-diff checks</a></li>
 <li class="toctree-l1"><a class="reference internal" href="scheduling.html">Scheduling</a></li>
 <li class="toctree-l1"><a class="reference internal" href="multi_server_cluster.html">Multi-Server Cluster</a></li>
 <li class="toctree-l1"><a class="reference internal" href="logging.html">Logging</a></li>
@@ -147,6 +148,10 @@ in the target. Rows outside the synced range are not affected.</p>
 <ol class="arabic simple" start="4">
 <li><p><strong>Hard delete is disabled (soft delete)</strong></p></li>
 </ol>
+<div class="deprecated">
+<p><span class="versionmodified deprecated">Deprecated since version Soft: </span>delete (<code class="docutils literal notranslate"><span class="pre">hard_delete:</span> <span class="pre">false</span></code>) is scheduled for removal. New taps
+should use <code class="docutils literal notranslate"><span class="pre">hard_delete:</span> <span class="pre">true</span></code> exclusively.</p>
+</div>
 <img alt="../_images/partial_sync_case_4.png" src="../_images/partial_sync_case_4.png" />
 <p>When <code class="docutils literal notranslate"><span class="pre">hard_delete</span></code> is <code class="docutils literal notranslate"><span class="pre">false</span></code>, rows that have been deleted from the source are
 <strong>not</strong> removed from the target. Instead, they receive a timestamp in the

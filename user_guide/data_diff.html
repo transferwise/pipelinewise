@@ -1,0 +1,533 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Data-diff checks &mdash; PipelineWise  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/custom.css?v=36639f2a" />
+
+  
+    <link rel="shortcut icon" href="../_static/pipelinewise.png"/>
+    <link rel="canonical" href="https://docs.ansible.com/ansible/latest/user_guide/data_diff.html"/>
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Scheduling" href="scheduling.html" />
+    <link rel="prev" title="Command Line Interface" href="cli.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            PipelineWise
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Installation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../installation_guide/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../installation_guide/creating_pipelines.html">Creating Pipelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../installation_guide/running_pipelines.html">Running Pipelines</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Concept</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../concept/singer.html">Singer.io</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concept/replication_methods.html">Replication Methods</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concept/fastsync.html">FastSync</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concept/linux_pipes.html">Linux Pipes in PipelineWise</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Using PipelineWise</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="yaml_config.html">YAML Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="encrypting_passwords.html">Encrypting Passwords</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cli.html">Command Line Interface</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Data-diff checks</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#supported-routes">Supported routes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#check-types">Check types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#configuration">Configuration</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#backend-database">Backend database</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#tap-yaml">Tap YAML</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#choosing-a-frequency-and-window">Choosing a frequency and window</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#cli-commands">CLI commands</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#alerts">Alerts</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#one-alert-per-failed-check-per-window">One alert per failed check per window</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#coverage-and-remediation">Coverage and remediation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#monitoring-views">Monitoring views</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#source-safety">Source safety</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#preflight">Preflight</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="scheduling.html">Scheduling</a></li>
+<li class="toctree-l1"><a class="reference internal" href="multi_server_cluster.html">Multi-Server Cluster</a></li>
+<li class="toctree-l1"><a class="reference internal" href="logging.html">Logging</a></li>
+<li class="toctree-l1"><a class="reference internal" href="alerts.html">Alerts</a></li>
+<li class="toctree-l1"><a class="reference internal" href="resync.html">Resync Tables</a></li>
+<li class="toctree-l1"><a class="reference internal" href="partial_sync.html">Different cases of partial resync</a></li>
+<li class="toctree-l1"><a class="reference internal" href="schema_changes.html">Schema Changes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="transformations.html">Transformations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="metadata_columns.html">Metadata Columns</a></li>
+<li class="toctree-l1"><a class="reference internal" href="troubleshooting.html">Troubleshooting</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Connectors</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../connectors/taps.html">Taps (Data Sources)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../connectors/taps.html#configuring-taps">Configuring taps</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../connectors/targets.html">Targets (Destinations)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../connectors/targets.html#configuring-the-targets">Configuring the targets</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Project</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../project/contribution.html">Contribution</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../project/about.html">Project</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../project/licenses.html">Licenses</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">PipelineWise</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Data-diff checks</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/user_guide/data_diff.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="data-diff-checks">
+<span id="data-diff"></span><h1>Data-diff checks<a class="headerlink" href="#data-diff-checks" title="Link to this heading"></a></h1>
+<p>Data-diff performs bounded aggregate reconciliation between source tables and
+their PostgreSQL or Snowflake replicas. Checks are defined in the tap YAML and
+persisted as immutable versioned definitions in the backend database.</p>
+<section id="supported-routes">
+<h2>Supported routes<a class="headerlink" href="#supported-routes" title="Link to this heading"></a></h2>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 50.0%" />
+<col style="width: 50.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Source</p></th>
+<th class="head"><p>Target</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>PostgreSQL</p></td>
+<td><p>PostgreSQL</p></td>
+</tr>
+<tr class="row-odd"><td><p>PostgreSQL</p></td>
+<td><p>Snowflake</p></td>
+</tr>
+<tr class="row-even"><td><p>MySQL / MariaDB</p></td>
+<td><p>PostgreSQL</p></td>
+</tr>
+<tr class="row-odd"><td><p>MySQL / MariaDB</p></td>
+<td><p>Snowflake</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="check-types">
+<h2>Check types<a class="headerlink" href="#check-types" title="Link to this heading"></a></h2>
+<table class="docutils align-default" id="id1" style="width: 100%">
+<caption><span class="caption-text">Available</span><a class="headerlink" href="#id1" title="Link to this table"></a></caption>
+<colgroup>
+<col style="width: 22.0%" />
+<col style="width: 40.0%" />
+<col style="width: 22.0%" />
+<col style="width: 16.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Check</p></th>
+<th class="head"><p>What it tests</p></th>
+<th class="head"><p>Pass condition</p></th>
+<th class="head"><p>Database impact</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">schema_compatibility</span></code></p></td>
+<td><p>Selected columns exist with compatible types on both sides</p></td>
+<td><p>All columns resolve</p></td>
+<td><p>Metadata only</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">row_count</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">COUNT(*)</span></code> in the window</p></td>
+<td><p>Source equals target</p></td>
+<td><p>Aggregate scan</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">distinct_key_count</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">COUNT(DISTINCT</span> <span class="pre">key)</span></code> in the window</p></td>
+<td><p>Source equals target</p></td>
+<td><p>Aggregate scan</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">null_key_count</span></code></p></td>
+<td><p>Rows with NULL key</p></td>
+<td><p>Both sides have zero</p></td>
+<td><p>Aggregate scan</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">duplicate_key_count</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">COUNT(key)</span> <span class="pre">-</span> <span class="pre">COUNT(DISTINCT</span> <span class="pre">key)</span></code></p></td>
+<td><p>Both sides have zero</p></td>
+<td><p>Aggregate scan</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">min_key</span></code> / <code class="docutils literal notranslate"><span class="pre">max_key</span></code></p></td>
+<td><p>Key boundary values</p></td>
+<td><p>Source equals target</p></td>
+<td><p>Aggregate scan</p></td>
+</tr>
+</tbody>
+</table>
+<table class="docutils align-default" id="id2" style="width: 100%">
+<caption><span class="caption-text">Experimental</span><a class="headerlink" href="#id2" title="Link to this table"></a></caption>
+<colgroup>
+<col style="width: 22.0%" />
+<col style="width: 40.0%" />
+<col style="width: 22.0%" />
+<col style="width: 16.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Check</p></th>
+<th class="head"><p>What it tests</p></th>
+<th class="head"><p>Pass condition</p></th>
+<th class="head"><p>Database impact</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">row_checksum</span></code></p></td>
+<td><p>Single hash over all rows’ key + timestamp + compare_columns</p></td>
+<td><p>Checksums match</p></td>
+<td><p>Heavier scan</p></td>
+</tr>
+</tbody>
+</table>
+<div class="admonition attention">
+<p class="admonition-title">Attention</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">row_checksum</span></code> is <strong>probabilistic</strong> — a mismatch identifies a window to investigate,
+but does not expose which individual rows differ</p></li>
+<li><p><strong>JSON</strong> and <strong>VARIANT</strong> columns have non-deterministic key ordering across
+databases, making consistent hashing impossible</p></li>
+<li><p><strong>FLOAT</strong> columns can differ due to IEEE 754 precision between database
+engines (e.g., <code class="docutils literal notranslate"><span class="pre">0.1</span> <span class="pre">+</span> <span class="pre">0.2</span></code> producing different representations)</p></li>
+<li><p>Exact numeric columns are compared at the <strong>wider</strong> of the source and target
+scales, so a target that truncated precision fails rather than passing</p></li>
+<li><p>Incompatible column types are recorded as <code class="docutils literal notranslate"><span class="pre">ERROR</span></code> (not <code class="docutils literal notranslate"><span class="pre">FAIL</span></code>);
+other check types in the same run still execute normally</p></li>
+</ul>
+</div>
+</section>
+<section id="configuration">
+<h2>Configuration<a class="headerlink" href="#configuration" title="Link to this heading"></a></h2>
+<section id="backend-database">
+<h3>Backend database<a class="headerlink" href="#backend-database" title="Link to this heading"></a></h3>
+<p>Add to <code class="docutils literal notranslate"><span class="pre">config.yml</span></code>:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">backend_db</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">host</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;backend.example.com&quot;</span>
+<span class="w">  </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5432</span>
+<span class="w">  </span><span class="nt">user</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;pipelinewise&quot;</span>
+<span class="w">  </span><span class="nt">password</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;vault</span><span class="nv"> </span><span class="s">encrypted&gt;&quot;</span>
+<span class="w">  </span><span class="nt">dbname</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;pipelinewise&quot;</span>
+<span class="w">  </span><span class="nt">sslmode</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;verify-full&quot;</span>
+<span class="w">  </span><span class="nt">ddl_user</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;pipelinewise_ddl&quot;</span>
+<span class="w">  </span><span class="nt">ddl_password</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;vault</span><span class="nv"> </span><span class="s">encrypted&gt;&quot;</span>
+</pre></div>
+</div>
+<p>The backend is independent of source and target connections; when PostgreSQL is also
+the target, give the backend its own service or database.</p>
+<p><code class="docutils literal notranslate"><span class="pre">backend_db</span></code> is what turns data-diff on. Without it, <code class="docutils literal notranslate"><span class="pre">import_config</span></code> warns and
+ignores every <code class="docutils literal notranslate"><span class="pre">data_diff</span></code> block. Replication never reads the backend, so an outage
+there pauses reconciliation only — though <code class="docutils literal notranslate"><span class="pre">import_config</span></code> does fail while it is
+unreachable, since persisting definitions is its final step.</p>
+<p><code class="docutils literal notranslate"><span class="pre">ddl_user</span></code> runs the Alembic migrations and owns the schema, so the application user
+can hold DML grants only and a compromised pipeline cannot alter the schema. The
+migration grants <code class="docutils literal notranslate"><span class="pre">user</span></code> what it needs, so that role requires nothing beyond
+<code class="docutils literal notranslate"><span class="pre">CONNECT</span></code>. Point <code class="docutils literal notranslate"><span class="pre">ddl_user</span></code> at the same credentials as <code class="docutils literal notranslate"><span class="pre">user</span></code> to run migrations
+as the application user instead.</p>
+</section>
+<section id="tap-yaml">
+<h3>Tap YAML<a class="headerlink" href="#tap-yaml" title="Link to this heading"></a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">data_diff</span></code> block goes inside <code class="docutils literal notranslate"><span class="pre">schemas[].tables[]</span></code> in the tap YAML:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">data_diff_defaults</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">frequency</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;0</span><span class="nv"> </span><span class="s">*/6</span><span class="nv"> </span><span class="s">*</span><span class="nv"> </span><span class="s">*</span><span class="nv"> </span><span class="s">*&quot;</span>
+<span class="w">  </span><span class="nt">window_start</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;-15h&quot;</span>
+<span class="w">  </span><span class="nt">window_end</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;-3h&quot;</span>
+<span class="w">  </span><span class="nt">statement_timeout</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;20min&quot;</span>
+
+<span class="nt">schemas</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">source_schema</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;public&quot;</span>
+<span class="w">    </span><span class="nt">target_schema</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;repl_payments&quot;</span>
+<span class="w">    </span><span class="nt">tables</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;transfers&quot;</span>
+<span class="w">        </span><span class="nt">replication_method</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;LOG_BASED&quot;</span>
+<span class="w">        </span><span class="nt">data_diff</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">checks</span><span class="p">:</span>
+<span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">schema_compatibility</span>
+<span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">row_count</span>
+<span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">row_checksum</span>
+<span class="w">          </span><span class="nt">key_column</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;transfer_id&quot;</span>
+<span class="w">          </span><span class="nt">timestamp_column</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;updated_at&quot;</span>
+<span class="w">          </span><span class="nt">compare_columns</span><span class="p">:</span>
+<span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;status&quot;</span>
+<span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;currency&quot;</span>
+<span class="w">          </span><span class="c1"># Override: this table is checked twice a day rather than four times</span>
+<span class="w">          </span><span class="nt">frequency</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;0</span><span class="nv"> </span><span class="s">*/12</span><span class="nv"> </span><span class="s">*</span><span class="nv"> </span><span class="s">*</span><span class="nv"> </span><span class="s">*&quot;</span>
+</pre></div>
+</div>
+<p>Every table must resolve <code class="docutils literal notranslate"><span class="pre">key_column</span></code>, <code class="docutils literal notranslate"><span class="pre">timestamp_column</span></code>, <code class="docutils literal notranslate"><span class="pre">checks</span></code>,
+<code class="docutils literal notranslate"><span class="pre">frequency</span></code>, and <code class="docutils literal notranslate"><span class="pre">window_start</span></code>. These can be set directly on the table or
+inherited from <code class="docutils literal notranslate"><span class="pre">data_diff_defaults</span></code> — the table value wins when both exist.</p>
+<p><strong>Field reference:</strong></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">frequency</span></code> — Crontab expression of when to fire the check</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">window_start</span></code> — Negative offset from fire time for the window start</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">window_end</span></code> — Negative offset for the window end. Must be closer to fire time
+than <code class="docutils literal notranslate"><span class="pre">window_start</span></code>. Default <code class="docutils literal notranslate"><span class="pre">&quot;0s&quot;</span></code> (fire time)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">statement_timeout</span></code> — Per-query timeout. Default <code class="docutils literal notranslate"><span class="pre">&quot;5min&quot;</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">key_column</span></code> — Scalar key for integrity and range checks</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">timestamp_column</span></code> — Column that defines the comparison window boundaries</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">compare_columns</span></code> — Required when <code class="docutils literal notranslate"><span class="pre">row_checksum</span></code> is selected. Must not have
+PipelineWise transformations</p></li>
+</ul>
+<p>Durations compose the units <code class="docutils literal notranslate"><span class="pre">s</span></code>, <code class="docutils literal notranslate"><span class="pre">min</span></code>, <code class="docutils literal notranslate"><span class="pre">h</span></code>, <code class="docutils literal notranslate"><span class="pre">d</span></code>, <code class="docutils literal notranslate"><span class="pre">w</span></code>: <code class="docutils literal notranslate"><span class="pre">&quot;-15h&quot;</span></code> is 15
+hours before fire time, and <code class="docutils literal notranslate"><span class="pre">&quot;1d6h&quot;</span></code> is valid too.</p>
+</section>
+<section id="choosing-a-frequency-and-window">
+<h3>Choosing a frequency and window<a class="headerlink" href="#choosing-a-frequency-and-window" title="Link to this heading"></a></h3>
+<p>Check infrequently, over a window that has already settled — the values above are
+the recommended starting point. Every check is an aggregate scan of both the
+source and the target, so frequency is a direct cost to the source database.
+<code class="docutils literal notranslate"><span class="pre">window_end</span></code> sets how long replication has to settle: too close to fire time and
+uncleared lag is reported as drift, producing a <code class="docutils literal notranslate"><span class="pre">FAIL</span></code> that resolves itself on
+the next run and trains people to ignore alerts. Raise it for taps that routinely
+lag further behind.</p>
+<div class="admonition important">
+<p class="admonition-title">Important</p>
+<p><strong>The window must be at least as wide as the cadence.</strong> Windows are positioned
+relative to fire time, so a narrower window leaves time no check ever examines,
+and those gaps block coverage permanently.</p>
+<p>Firing every 6 hours over a 3-hour window checks <code class="docutils literal notranslate"><span class="pre">[09:00,</span> <span class="pre">12:00)</span></code> then
+<code class="docutils literal notranslate"><span class="pre">[15:00,</span> <span class="pre">18:00)</span></code>: the 3 hours between are never verified, and coverage reports
+<code class="docutils literal notranslate"><span class="pre">BLOCKED</span></code> even though every check passed. The defaults are 12 hours wide on a
+6-hour cadence, so windows overlap and a skipped slot cannot open a gap — each row
+is checked twice, which is the cheaper mistake.</p>
+</div>
+<p>Give <code class="docutils literal notranslate"><span class="pre">statement_timeout</span></code> room to match the window. The examples use <code class="docutils literal notranslate"><span class="pre">&quot;20min&quot;</span></code>
+rather than the <code class="docutils literal notranslate"><span class="pre">&quot;5min&quot;</span></code> default: a timeout is recorded as <code class="docutils literal notranslate"><span class="pre">ERROR</span></code>, which
+blocks coverage exactly as a real mismatch does. Raise it further for tables where
+<code class="docutils literal notranslate"><span class="pre">row_checksum</span></code> is selected.</p>
+</section>
+</section>
+<section id="cli-commands">
+<h2>CLI commands<a class="headerlink" href="#cli-commands" title="Link to this heading"></a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Import/validate</span>
+pipelinewise<span class="w"> </span>validate<span class="w"> </span>--dir<span class="w"> </span>./pipelinewise-config
+pipelinewise<span class="w"> </span>import_config<span class="w"> </span>--dir<span class="w"> </span>./pipelinewise-config
+
+<span class="c1"># List persisted definitions</span>
+pipelinewise<span class="w"> </span>list_data_diff_checks<span class="w"> </span>--target<span class="w"> </span>snowflake<span class="w"> </span>--tap<span class="w"> </span>payments
+pipelinewise<span class="w"> </span>list_data_diff_checks<span class="w"> </span>--output-format<span class="w"> </span>json
+pipelinewise<span class="w"> </span>list_data_diff_checks<span class="w"> </span>--include-versioned
+
+<span class="c1"># Run checks (oldest unobserved slot first, max 24 catch-up windows)</span>
+pipelinewise<span class="w"> </span>run_data_diff_checks<span class="w"> </span>--target<span class="w"> </span>snowflake<span class="w"> </span>--tap<span class="w"> </span>payments
+pipelinewise<span class="w"> </span>run_data_diff_checks<span class="w"> </span>--all
+pipelinewise<span class="w"> </span>run_data_diff_checks<span class="w"> </span>--target<span class="w"> </span>snowflake<span class="w"> </span>--tap<span class="w"> </span>payments<span class="w"> </span>--force
+
+<span class="c1"># Remediate a specific failed run; both arguments are required</span>
+pipelinewise<span class="w"> </span>rerun_data_diff_check<span class="w"> </span>--run-id<span class="w"> </span>&lt;uuid&gt;<span class="w"> </span>--remediation-ref<span class="w"> </span>&lt;ticket&gt;
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">import_config</span></code> creates a new definition revision when config changes and
+deactivates removed ones; unchanged definitions are skipped. <code class="docutils literal notranslate"><span class="pre">--force</span></code> creates
+another attempt for the current slot, while <code class="docutils literal notranslate"><span class="pre">rerun_data_diff_check</span></code> repairs a
+historical one — see <a class="reference internal" href="#coverage-and-remediation">Coverage and remediation</a>.</p>
+<p>A mismatch exits non-zero and sends an alert. See <a class="reference internal" href="#data-diff-alerts"><span class="std std-ref">Alerts</span></a>.</p>
+</section>
+<section id="alerts">
+<span id="data-diff-alerts"></span><h2>Alerts<a class="headerlink" href="#alerts" title="Link to this heading"></a></h2>
+<p>Data-diff reuses the tap’s alert configuration, so whichever team owns the
+replication owns its checks and their alerts. There is nothing separate to
+configure:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">alert_handlers.slack.channel</span></code> in <code class="docutils literal notranslate"><span class="pre">config.yml</span></code> receives every alert.</p></li>
+<li><p>A tap’s <code class="docutils literal notranslate"><span class="pre">slack_alert_channel</span></code> also receives the alerts for that tap’s checks.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">send_alert:</span> <span class="pre">False</span></code> on a tap silences its checks along with its runs.</p></li>
+</ul>
+<p>See <a class="reference internal" href="alerts.html#alerts"><span class="std std-ref">Alerts</span></a> to configure the handlers. Alerts go to every configured handler,
+so the <a class="reference internal" href="alerts.html#victorops-alert-handler"><span class="std std-ref">VictorOps Alert Handler</span></a> limitations apply here too.</p>
+<section id="one-alert-per-failed-check-per-window">
+<h3>One alert per failed check per window<a class="headerlink" href="#one-alert-per-failed-check-per-window" title="Link to this heading"></a></h3>
+<p>One invocation can evaluate several windows for the same table when it backfills
+missed slots. Each <code class="docutils literal notranslate"><span class="pre">FAIL</span></code> or <code class="docutils literal notranslate"><span class="pre">ERROR</span></code> produces its own alert naming the check, the
+window, and the run ID needed to remediate it:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>data-diff FAIL snowflake/payments/public/transfers
+  window  2026-07-29T10:00:00+00:00 → 2026-07-29T11:00:00+00:00
+  run_id  2bd3e725-38fc-48c1-b565-b4f20e5bc7dd
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">SKIPPED</span></code> and <code class="docutils literal notranslate"><span class="pre">PASS</span></code> results are not alerted on. Failures are not batched or
+deduplicated, so a stalled tap alerts on every failing check and every backfilled
+window — up to 24 windows per check per invocation. Keeping <code class="docutils literal notranslate"><span class="pre">frequency</span></code> low is
+what keeps the volume sane.</p>
+</section>
+</section>
+<section id="coverage-and-remediation">
+<h2>Coverage and remediation<a class="headerlink" href="#coverage-and-remediation" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">verified_through</span></code> is the end of the contiguous union of successful windows
+for one definition revision:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>[10:00, 11:00) PASS  → verified_through = 11:00
+[11:00, 12:00) FAIL  → stays 11:00 (blocked)
+[12:00, 13:00) PASS  → stays 11:00
+rerun [11:00, 12:00) PASS → advances to 13:00
+</pre></div>
+</div>
+<p>A later pass cannot carry the watermark over an earlier gap. New definition revisions
+start independent coverage.</p>
+<p>An interrupted run is recorded as <code class="docutils literal notranslate"><span class="pre">ERROR</span></code> before the process exits, including on
+<code class="docutils literal notranslate"><span class="pre">SIGTERM</span></code> and <code class="docutils literal notranslate"><span class="pre">SIGINT</span></code>, so its slot stays retryable. A worker killed outright
+cannot do that, so every invocation first retires any attempt still <code class="docutils literal notranslate"><span class="pre">RUNNING</span></code> well
+past its query budget, across every slot and remediation attempts too. That sweep
+runs before scheduling because a <code class="docutils literal notranslate"><span class="pre">RUNNING</span></code> row makes its own slot look observed,
+which would otherwise advance the scheduler past the slot needing recovery.</p>
+<p>After repairing a failed window, rerun its exact definition and time boundaries:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pipelinewise<span class="w"> </span>rerun_data_diff_check<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--run-id<span class="w"> </span><span class="s2">&quot;2bd3e725-38fc-48c1-b565-b4f20e5bc7dd&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--remediation-ref<span class="w"> </span><span class="s2">&quot;AP-1234&quot;</span>
+</pre></div>
+</div>
+<p>The original run remains immutable. The rerun gets the next attempt number,
+<code class="docutils literal notranslate"><span class="pre">trigger</span> <span class="pre">=</span> <span class="pre">REMEDIATION</span></code>, and a <code class="docutils literal notranslate"><span class="pre">rerun_of_run_id</span></code> link. When it passes,
+the effective attempt for that scheduled slot changes and the watermark advances.</p>
+<p>PipelineWise keeps every attempt in <code class="docutils literal notranslate"><span class="pre">dd_runs</span></code> and every coverage transition in
+<code class="docutils literal notranslate"><span class="pre">dd_coverage_events</span></code>. <code class="docutils literal notranslate"><span class="pre">dd_effective_attempts</span></code> materializes only the highest
+terminal attempt for each scheduled slot, while <code class="docutils literal notranslate"><span class="pre">dd_coverage_state</span></code> stores the
+current watermark. A new chronological slot updates that state directly. A
+replacement or out-of-order slot recalculates it from the effective rows, without
+rescanning superseded attempts.</p>
+<section id="monitoring-views">
+<h3>Monitoring views<a class="headerlink" href="#monitoring-views" title="Link to this heading"></a></h3>
+<div class="highlight-sql notranslate"><div class="highlight"><pre><span></span><span class="c1">-- Coverage watermarks</span>
+<span class="k">SELECT</span><span class="w"> </span><span class="n">full_check_name</span><span class="p">,</span><span class="w"> </span><span class="n">coverage_start</span><span class="p">,</span><span class="w"> </span><span class="n">verified_through</span><span class="p">,</span>
+<span class="w">       </span><span class="n">coverage_status</span><span class="p">,</span><span class="w"> </span><span class="n">blocking_run_id</span><span class="p">,</span><span class="w"> </span><span class="n">verified_at</span>
+<span class="w">  </span><span class="k">FROM</span><span class="w"> </span><span class="k">public</span><span class="p">.</span><span class="n">dd_current_coverage</span><span class="p">;</span>
+
+<span class="c1">-- Remediation history</span>
+<span class="k">SELECT</span><span class="w"> </span><span class="n">full_check_name</span><span class="p">,</span><span class="w"> </span><span class="n">failed_run_id</span><span class="p">,</span><span class="w"> </span><span class="n">failed_status</span><span class="p">,</span>
+<span class="w">       </span><span class="n">window_start</span><span class="p">,</span><span class="w"> </span><span class="n">window_end</span><span class="p">,</span><span class="w"> </span><span class="n">remediation_status</span><span class="p">,</span>
+<span class="w">       </span><span class="n">remediation_reference</span><span class="p">,</span><span class="w"> </span><span class="n">recovered</span>
+<span class="w">  </span><span class="k">FROM</span><span class="w"> </span><span class="k">public</span><span class="p">.</span><span class="n">dd_remediation_history</span><span class="p">;</span>
+</pre></div>
+</div>
+</section>
+<section id="source-safety">
+<h3>Source safety<a class="headerlink" href="#source-safety" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p>All scheduling and window boundaries are UTC.</p></li>
+<li><p>Source queries use read-only transactions with timeouts.</p></li>
+<li><p>No source rows or business values are stored — only aggregate metrics.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">row_checksum</span></code> adds CPU to the same aggregate scan; monitor during rollout.</p></li>
+</ul>
+</section>
+<section id="preflight">
+<h3>Preflight<a class="headerlink" href="#preflight" title="Link to this heading"></a></h3>
+<p>Before either aggregate query runs, a preflight returns <code class="docutils literal notranslate"><span class="pre">BLOCKED</span></code> when the source
+table exceeds the safe row limit <strong>and</strong> has no usable index leading with the
+timestamp column, since every window would then scan the whole table. A missing index
+on a small table is reported but not blocked.</p>
+<p>Usable means a plain, valid, ready btree index the optimizer is allowed to choose.
+Partial, expression-based, still-building, hash and BRIN indexes cannot serve a
+timestamp range, and a MySQL <code class="docutils literal notranslate"><span class="pre">INVISIBLE</span></code> or MariaDB <code class="docutils literal notranslate"><span class="pre">IGNORED</span></code> index is one the
+planner refuses outright. All are recorded as evidence but none satisfies the check;
+those leading with the timestamp column are named in the findings, so a disabled index
+is distinguishable from a missing one.</p>
+<p>Table size comes from catalog statistics, counting each partition once. A table with
+no statistics is sized from its physical pages using a deliberately dense packing
+estimate, so an unanalyzed large table blocks rather than slipping through. Running
+<code class="docutils literal notranslate"><span class="pre">ANALYZE</span></code> on the source replaces the estimate with a real count.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The preflight establishes that the table <em>can</em> be read by timestamp, not that the
+optimizer will choose to. A window wide enough to select most of the table is still
+planned as a sequential scan — correctly, since that is the cheaper plan for it.
+Keep windows narrow relative to table size, and treat <code class="docutils literal notranslate"><span class="pre">statement_timeout</span></code> as the
+real bound on source cost.</p>
+</div>
+<p>Each verdict is written to <code class="docutils literal notranslate"><span class="pre">dd_preflights</span></code> with the table size, the row limit, and
+the index verdict it decided from, so a <code class="docutils literal notranslate"><span class="pre">PASS</span></code> stays auditable after the table or
+the limit changes.</p>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="cli.html" class="btn btn-neutral float-left" title="Command Line Interface" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="scheduling.html" class="btn btn-neutral float-right" title="Scheduling" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Wise Ltd..</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

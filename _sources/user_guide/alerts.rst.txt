@@ -10,6 +10,9 @@ when :ref:`generating_pipelines`. Alerts are triggered when :ref:`cli_run_tap`
 or :ref:`cli_fast_sync` fails. The alert provides the ID of the failed tap and a description of the failure
 to the alert handler.
 
+Failed :ref:`data_diff` checks alert through the same handlers and channels
+configured here, including ``slack_alert_channel`` and ``send_alert``.
+
 .. warning::
 
   You can optionally disable alerts on certain taps by adding ``send_alert: False``
@@ -18,7 +21,7 @@ to the alert handler.
 
 Currently available alert handlers:
  * :ref:`slack_alert_handler`
- * :ref:`victorops_alert_handler`
+ * :ref:`victorops_alert_handler` — incomplete, see the limitations below
 
 
 .. _slack_alert_handler:
@@ -67,6 +70,13 @@ to that tap's YAML file in addition to the handler configuration above:
 
 VictorOps Alert Handler
 '''''''''''''''''''''''
+
+.. attention::
+
+   This handler has only ever been exercised against a mocked endpoint, so verify it
+   against your own VictorOps integration before relying on it for on-call. Note
+   also that all alerts go to the single configured ``routing_key`` — there is no
+   VictorOps equivalent of a tap's ``slack_alert_channel``.
 
 To send alerts and open an incident on VictorOps:
 

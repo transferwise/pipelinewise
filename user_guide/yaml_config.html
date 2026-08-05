@@ -9,7 +9,7 @@
   <title>YAML Configuration &mdash; PipelineWise  documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
-      <link rel="stylesheet" type="text/css" href="../_static/css/custom.css?v=1c6dfede" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/custom.css?v=36639f2a" />
 
   
     <link rel="shortcut icon" href="../_static/pipelinewise.png"/>
@@ -69,6 +69,7 @@
 </li>
 <li class="toctree-l1"><a class="reference internal" href="encrypting_passwords.html">Encrypting Passwords</a></li>
 <li class="toctree-l1"><a class="reference internal" href="cli.html">Command Line Interface</a></li>
+<li class="toctree-l1"><a class="reference internal" href="data_diff.html">Data-diff checks</a></li>
 <li class="toctree-l1"><a class="reference internal" href="scheduling.html">Scheduling</a></li>
 <li class="toctree-l1"><a class="reference internal" href="multi_server_cluster.html">Multi-Server Cluster</a></li>
 <li class="toctree-l1"><a class="reference internal" href="logging.html">Logging</a></li>
@@ -144,6 +145,16 @@ It is created automatically when you run <code class="docutils literal notransla
 
 <span class="c1"># Optional: Path to a JSON file containing database switchover data for reset_state</span>
 <span class="nt">switch_over_data_file</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;switch_over_data.json&quot;</span>
+
+<span class="c1"># Optional shared PostgreSQL control plane for operational modules</span>
+<span class="c1"># Do not point this at a PostgreSQL replication target.</span>
+<span class="nt">backend_db</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">host</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;backend.example.com&quot;</span>
+<span class="w">  </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5432</span>
+<span class="w">  </span><span class="nt">user</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;pipelinewise&quot;</span>
+<span class="w">  </span><span class="nt">password</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;PASSWORD&gt;&quot;</span>
+<span class="w">  </span><span class="nt">dbname</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;pipelinewise&quot;</span>
+<span class="w">  </span><span class="nt">sslmode</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;verify-full&quot;</span>
 </pre></div>
 </div>
 <p><strong>Top-level keys:</strong></p>
@@ -152,6 +163,12 @@ It is created automatically when you run <code class="docutils literal notransla
 prevent <code class="docutils literal notranslate"><span class="pre">fast_sync</span></code> from resyncing a non-partial table larger than <code class="docutils literal notranslate"><span class="pre">table_mb</span></code>.
 Use <code class="docutils literal notranslate"><span class="pre">fast_sync</span> <span class="pre">--force</span></code> to override the limit. See <a class="reference internal" href="resync.html#resync"><span class="std std-ref">Resync Tables</span></a>.</p>
 <p><code class="docutils literal notranslate"><span class="pre">switch_over_data_file</span></code>: Path to a JSON file with database switchover data, used by the <code class="docutils literal notranslate"><span class="pre">reset_state</span></code> CLI command.</p>
+<p><code class="docutils literal notranslate"><span class="pre">backend_db</span></code>: Shared PostgreSQL control-plane connection used by the internal
+<code class="docutils literal notranslate"><span class="pre">pipelinewise.backend_db</span></code> and <code class="docutils literal notranslate"><span class="pre">pipelinewise.data_diff</span></code> packages. It stores
+immutable check revisions, audit evidence, and verified timestamp coverage.
+This database is not a PostgreSQL replication target: keep its service,
+database, role, credentials, and storage separate from every target.
+See <a class="reference internal" href="data_diff.html#data-diff"><span class="std std-ref">Data-diff checks</span></a>.</p>
 </section>
 <section id="tap-configuration-tap-yml">
 <h2>Tap Configuration (tap_*.yml)<a class="headerlink" href="#tap-configuration-tap-yml" title="Link to this heading"></a></h2>
@@ -183,6 +200,13 @@ Use <code class="docutils literal notranslate"><span class="pre">fast_sync</span
 <span class="c1">#hard_delete: false                    # Optional: Retain and flag source-deleted rows</span>
 <span class="w">                                       </span><span class="c1"># before flushing a partial batch (Snowflake target only)</span>
 
+<span class="c1"># Optional defaults for every table-level data-diff block in this tap</span>
+<span class="nt">data_diff_defaults</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">frequency</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;0</span><span class="nv"> </span><span class="s">*/6</span><span class="nv"> </span><span class="s">*</span><span class="nv"> </span><span class="s">*</span><span class="nv"> </span><span class="s">*&quot;</span>
+<span class="w">  </span><span class="nt">window_start</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;-15h&quot;</span>
+<span class="w">  </span><span class="nt">window_end</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;-3h&quot;</span>
+<span class="w">  </span><span class="nt">statement_timeout</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;20min&quot;</span>
+
 <span class="c1"># Schema mapping</span>
 <span class="nt">schemas</span><span class="p">:</span>
 <span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">source_schema</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;my_schema&quot;</span>
@@ -192,8 +216,20 @@ Use <code class="docutils literal notranslate"><span class="pre">fast_sync</span
 
 <span class="w">    </span><span class="nt">tables</span><span class="p">:</span>
 <span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;my_table&quot;</span>
-<span class="w">        </span><span class="nt">replication_method</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;INCREMENTAL&quot;</span><span class="w">  </span><span class="c1"># INCREMENTAL, LOG_BASED, or FULL_TABLE</span>
-<span class="w">        </span><span class="nt">replication_key</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;updated_at&quot;</span><span class="w">      </span><span class="c1"># Required for INCREMENTAL</span>
+<span class="w">        </span><span class="nt">replication_method</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;LOG_BASED&quot;</span><span class="w">  </span><span class="c1"># Preferred where the source supports it</span>
+
+<span class="w">        </span><span class="c1"># Optional independent source-to-target aggregate checks</span>
+<span class="w">        </span><span class="nt">data_diff</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">checks</span><span class="p">:</span>
+<span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">schema_compatibility</span>
+<span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">row_count</span>
+<span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null_key_count</span>
+<span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">duplicate_key_count</span>
+<span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">row_checksum</span>
+<span class="w">          </span><span class="nt">key_column</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;id&quot;</span>
+<span class="w">          </span><span class="nt">timestamp_column</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;updated_at&quot;</span>
+<span class="w">          </span><span class="nt">compare_columns</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;status&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;currency&quot;</span><span class="p p-Indicator">]</span>
+<span class="w">          </span><span class="nt">frequency</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;0</span><span class="nv"> </span><span class="s">*/12</span><span class="nv"> </span><span class="s">*</span><span class="nv"> </span><span class="s">*</span><span class="nv"> </span><span class="s">*&quot;</span><span class="w">   </span><span class="c1"># Override the tap-level default</span>
 </pre></div>
 </div>
 <p><strong>Key sections:</strong></p>
@@ -217,6 +253,13 @@ before flushing a partial batch. Currently available only for the Snowflake targ
 <p><code class="docutils literal notranslate"><span class="pre">add_metadata_columns</span></code> and <code class="docutils literal notranslate"><span class="pre">hard_delete</span></code>: Control ingestion metadata and source
 delete handling for this pipeline. <code class="docutils literal notranslate"><span class="pre">hard_delete</span></code> defaults to <code class="docutils literal notranslate"><span class="pre">true</span></code> and enables
 metadata columns automatically. See <a class="reference internal" href="metadata_columns.html#metadata-columns"><span class="std std-ref">Metadata Columns</span></a> for all combinations.</p>
+<p><code class="docutils literal notranslate"><span class="pre">data_diff_defaults</span></code>: Optional timing defaults consumed by the PipelineWise
+data-diff subsystem for every table-level <code class="docutils literal notranslate"><span class="pre">data_diff</span></code> block in this tap. A
+table can override any individual default.
+<code class="docutils literal notranslate"><span class="pre">frequency</span></code> and <code class="docutils literal notranslate"><span class="pre">window_start</span></code> are required after resolving the tap defaults
+and table overrides.
+All check types in a table’s <code class="docutils literal notranslate"><span class="pre">data_diff</span></code> block run on the same resolved cadence.
+See <a class="reference internal" href="data_diff.html#data-diff"><span class="std std-ref">Data-diff checks</span></a> for scheduling and verified timestamp coverage semantics.</p>
 <p><code class="docutils literal notranslate"><span class="pre">schemas</span></code>: Maps source schemas and tables to target schemas. Each table entry specifies
 a <code class="docutils literal notranslate"><span class="pre">replication_method</span></code> (see <a class="reference internal" href="../concept/replication_methods.html#replication-methods"><span class="std std-ref">Replication Methods</span></a>) and optionally a <code class="docutils literal notranslate"><span class="pre">replication_key</span></code>
 for incremental replication.</p>

@@ -103,6 +103,11 @@ PipelineWise CLI and every supported singer connectors into separated virtual en
     $ cd ./pipelinewise
     $ make pipelinewise all_connectors
 
+The ``pipelinewise`` make target installs one Python project. Data-diff and the
+reusable PostgreSQL backend connection live in the internal
+``pipelinewise.data_diff`` and ``pipelinewise.backend_db`` package namespaces,
+and data-diff operations are available through the main ``pipelinewise`` CLI.
+
 Press ``Y`` to accept the license agreement of the required singer components.
 
 .. code-block:: bash

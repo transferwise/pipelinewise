@@ -9,7 +9,7 @@
   <title>Command Line Interface &mdash; PipelineWise  documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
-      <link rel="stylesheet" type="text/css" href="../_static/css/custom.css?v=1c6dfede" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/custom.css?v=36639f2a" />
 
   
     <link rel="shortcut icon" href="../_static/pipelinewise.png"/>
@@ -22,7 +22,7 @@
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Scheduling" href="scheduling.html" />
+    <link rel="next" title="Data-diff checks" href="data_diff.html" />
     <link rel="prev" title="Encrypting Passwords" href="encrypting_passwords.html" /> 
 </head>
 
@@ -77,6 +77,9 @@
 <li class="toctree-l3"><a class="reference internal" href="#fast-sync">fast_sync</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#partial-sync-table">partial_sync_table</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#import-config">import_config</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#list-data-diff-checks">list_data_diff_checks</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#run-data-diff-checks">run_data_diff_checks</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#rerun-data-diff-check">rerun_data_diff_check</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#validate">validate</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#encrypt-string">encrypt_string</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#reset-state">reset_state</a></li>
@@ -90,6 +93,7 @@
 </li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="data_diff.html">Data-diff checks</a></li>
 <li class="toctree-l1"><a class="reference internal" href="scheduling.html">Scheduling</a></li>
 <li class="toctree-l1"><a class="reference internal" href="multi_server_cluster.html">Multi-Server Cluster</a></li>
 <li class="toctree-l1"><a class="reference internal" href="logging.html">Logging</a></li>
@@ -145,7 +149,8 @@
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>usage:<span class="w"> </span>pipelinewise<span class="w"> </span><span class="o">[</span>-h<span class="o">]</span>
 <span class="w">                    </span><span class="o">{</span>init,run_tap,stop_tap,discover_tap,status,test_tap_connection,
 <span class="w">                     </span>fast_sync,sync_tables,partial_sync_table,import_config,import,
-<span class="w">                     </span>validate,encrypt_string,reset_state<span class="o">}</span>
+<span class="w">                     </span>validate,encrypt_string,reset_state,list_data_diff_checks,
+<span class="w">                     </span>run_data_diff_checks,rerun_data_diff_check<span class="o">}</span>
 </pre></div>
 </div>
 <section id="positional-arguments">
@@ -314,6 +319,63 @@ deprecated alias.</p>
 in the project YAML files.</p>
 </dd>
 </dl>
+<p>Data-diff definitions are versioned in the
+backend database after successful discovery. See <a class="reference internal" href="data_diff.html#data-diff"><span class="std std-ref">Data-diff checks</span></a>.</p>
+</section>
+<section id="list-data-diff-checks">
+<span id="cli-list-data-diff-checks"></span><h3>list_data_diff_checks<a class="headerlink" href="#list-data-diff-checks" title="Link to this heading"></a></h3>
+<p>List persisted data-diff definition revisions and their PostgreSQL scheduling
+and verified timestamp coverage state. This reads the backend database rather
+than reconstructing output from YAML.</p>
+<dl class="field-list simple">
+<dt class="field-odd">–target<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Optional target id filter.</p>
+</dd>
+<dt class="field-even">–tap<span class="colon">:</span></dt>
+<dd class="field-even"><p>Optional tap id filter. Requires <code class="docutils literal notranslate"><span class="pre">--target</span></code>.</p>
+</dd>
+<dt class="field-odd">–output-format<span class="colon">:</span></dt>
+<dd class="field-odd"><p><code class="docutils literal notranslate"><span class="pre">table</span></code> (default) or <code class="docutils literal notranslate"><span class="pre">json</span></code>.</p>
+</dd>
+<dt class="field-even">–include-versioned<span class="colon">:</span></dt>
+<dd class="field-even"><p>Include superseded definition revisions.</p>
+</dd>
+</dl>
+</section>
+<section id="run-data-diff-checks">
+<span id="cli-run-data-diff-checks"></span><h3>run_data_diff_checks<a class="headerlink" href="#run-data-diff-checks" title="Link to this heading"></a></h3>
+<p>Run active data-diff definitions manually. Definitions are versioned and
+persisted by <a class="reference internal" href="#cli-import-config"><span class="std std-ref">import_config</span></a>; this command does not synchronize YAML.
+Use it for operator-triggered execution rather than continuous scheduling.</p>
+<dl class="field-list simple">
+<dt class="field-odd">–target<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Optional target id filter.</p>
+</dd>
+<dt class="field-even">–tap<span class="colon">:</span></dt>
+<dd class="field-even"><p>Optional tap id filter. Requires <code class="docutils literal notranslate"><span class="pre">--target</span></code>.</p>
+</dd>
+<dt class="field-odd">–check<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Optional data-diff check-name filter.</p>
+</dd>
+<dt class="field-even">–force<span class="colon">:</span></dt>
+<dd class="field-even"><p>Create another attempt for the current UTC frequency slot when a
+terminal attempt already exists.</p>
+</dd>
+</dl>
+</section>
+<section id="rerun-data-diff-check">
+<span id="cli-rerun-data-diff-check"></span><h3>rerun_data_diff_check<a class="headerlink" href="#rerun-data-diff-check" title="Link to this heading"></a></h3>
+<p>Re-execute the exact immutable definition and UTC window of a failed or errored
+run. The original attempt remains unchanged and the new attempt is linked to it
+for remediation reporting.</p>
+<dl class="field-list simple">
+<dt class="field-odd">–run-id<span class="colon">:</span></dt>
+<dd class="field-odd"><p>UUID of the failed or errored data-diff run.</p>
+</dd>
+<dt class="field-even">–remediation-ref<span class="colon">:</span></dt>
+<dd class="field-even"><p>Required incident, change, or repair reference.</p>
+</dd>
+</dl>
 </section>
 <section id="validate">
 <span id="cli-validate"></span><h3>validate<a class="headerlink" href="#validate" title="Link to this heading"></a></h3>
@@ -435,7 +497,7 @@ configuration files, state files, and logs generated by <code class="docutils li
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="encrypting_passwords.html" class="btn btn-neutral float-left" title="Encrypting Passwords" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="scheduling.html" class="btn btn-neutral float-right" title="Scheduling" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="data_diff.html" class="btn btn-neutral float-right" title="Data-diff checks" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>
