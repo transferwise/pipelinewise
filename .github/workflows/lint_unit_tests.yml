@@ -28,7 +28,7 @@ jobs:
 
       - name: Set up Python 3.12
         if: steps.check.outcome == 'failure'
-        uses: actions/setup-python@v5.1.0
+        uses: actions/setup-python@v7
         with:
           python-version: '3.12'
 

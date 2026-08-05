@@ -28,10 +28,41 @@ jobs:
         run: ./scripts/ci_check_no_file_changes.sh python
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@v5.1.0
+        uses: actions/setup-python@v7
         with:
           python-version: '3.12'
 
       - name: Check PipelineWise and all connectors are installable
         run: |
           make pipelinewise_no_test_extras all_connectors
+
+  test_connector_units:
+    name: Unit tests (${{ matrix.connector }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    strategy:
+      fail-fast: false
+      matrix:
+        connector:
+          - tap-mysql
+          - tap-postgres
+
+    steps:
+      - name: Checking out repo
+        uses: actions/checkout@v7
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: singer-connectors/${{ matrix.connector }}/setup.py
+
+      - name: Install connector test dependencies
+        run: make venv
+        working-directory: singer-connectors/${{ matrix.connector }}
+
+      - name: Run connector unit tests
+        run: make unit_test_cov
+        working-directory: singer-connectors/${{ matrix.connector }}

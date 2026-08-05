@@ -4,7 +4,7 @@ Read root `AGENTS.md` first. This covers `docs/`; consult scoped implementation,
 
 ## Build and sources
 
-`docs/Makefile` uses `SPHINXOPTS = -W`; publishing is clean, so any warning fails. After every docs change run:
+`docs/Makefile` uses `SPHINXOPTS = -W`; publishing is clean, so any warning fails. The root `test` extra does not install Sphinx: use a docs environment containing the editable root package, `sphinx`, and `sphinx-rtd-theme`. `scripts/publish_docs.sh` shows those dependencies but mutates Git state and is not a local validation command. After changing RST, Sphinx config, or docs assets run:
 
 ```bash
 cd docs && make clean html
@@ -14,15 +14,18 @@ Check prose against implementation, CLI help, JSON Schemas, example YAML, and ru
 
 ## Content style
 
+- Write public documentation for PipelineWise operators and integration engineers; keep Wise-internal hosts, credentials, and runbooks out of this repository.
 - Use a concise, authoritative, pragmatic, mildly operations-first engineering tone.
+- Lead with supported behavior, prerequisites, and defaults; then explain operational impact, failure modes, diagnosis, and recovery where relevant.
+- Distinguish defaults from examples and current support from future intent. Do not document planned behavior as available.
 - Avoid repetition within and across pages, but repeat essential context where a section must stand alone or repetition prevents an operational mistake.
 
 ## RST
 
-- `concept/` titles use `-`; `user_guide/` titles use `=`; subsections use `'`, then `"`.
+- Preserve each file's established heading hierarchy and do not normalize adornments opportunistically. For a new page, use `=` for the title, `-` for first-level sections, then `'` and `"`, unless its owning section consistently uses another hierarchy.
 - Put `.. _label_name:` immediately before its heading and reference it with ``:ref:`label_name` ``.
 - Declare every code-block language (`yaml`, `bash`, `sql`, etc.); use Sphinx admonitions.
-- Add new pages to the correct `docs/index.rst` toctree; strict builds reject orphans.
+- Add new pages to their owning toctree, including a nested connector index when applicable; strict builds reject orphans.
 
 ## Update map
 
@@ -30,6 +33,7 @@ Check prose against implementation, CLI help, JSON Schemas, example YAML, and ru
 | --- | --- |
 | CLI add/remove/rename | `user_guide/cli.rst`: arguments, environment, references, examples, inline mentions. |
 | Connector add/remove | Connector page; tap/target gallery; `project/licenses.rst`; `installation_guide/installation.rst` table/guidance. |
+| Connector behavior/capabilities/limitations | Owning connector page; a concept page for cross-cutting behavior. |
 | YAML parameters | `user_guide/yaml_config.rst` and relevant connector page. |
 | Singer replication | `concept/replication_methods.rst`; `concept/singer.rst` when relevant. |
 | FastSync components/selection/pairs | `concept/fastsync.rst`; keep FastSync out of Singer replication-method lists. |
@@ -38,7 +42,6 @@ Check prose against implementation, CLI help, JSON Schemas, example YAML, and ru
 | PartialSync edge cases | `user_guide/partial_sync.rst`, including affected visuals. |
 | Alert handlers | `user_guide/alerts.rst`. |
 | Operational diagnostic/known failure | `user_guide/troubleshooting.rst`. |
-| New page | Page plus appropriate `index.rst` toctree entry. |
 
 Backend schema changes also follow migration/ERD history in `pipelinewise/AGENTS.md`.
 

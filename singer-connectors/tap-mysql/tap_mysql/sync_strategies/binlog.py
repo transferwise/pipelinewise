@@ -258,6 +258,9 @@ def row_to_singer_record(catalog_entry, version, db_column_map, row, time_extrac
             else:
                 row_to_persist[column_name] = None
 
+        elif property_format == 'date-time' and common.is_invalid_mysql_datetime(val):
+            row_to_persist[column_name] = None
+
         elif isinstance(val, bytes):
             # encode bytes as hex bytes then to utf8 string
             row_to_persist[column_name] = codecs.encode(val, 'hex').decode('utf-8')
@@ -272,9 +275,6 @@ def row_to_singer_record(catalog_entry, version, db_column_map, row, time_extrac
             else:
                 boolean_representation = True
             row_to_persist[column_name] = boolean_representation
-
-        elif isinstance(val, str) and property_format == 'date-time':
-            row_to_persist[column_name] = None
 
         else:
             row_to_persist[column_name] = val

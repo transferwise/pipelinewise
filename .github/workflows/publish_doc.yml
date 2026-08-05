@@ -21,7 +21,7 @@ jobs:
           fetch-depth: 0
           path: gh_doc_automation
 
-      - uses: actions/setup-python@v5.1.0
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
 

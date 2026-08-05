@@ -12,6 +12,21 @@ from tap_mysql.stream_utils import get_key_properties
 LOGGER = singer.get_logger('tap_mysql')
 
 
+def is_invalid_mysql_datetime(value):
+    if isinstance(value, (bytes, bytearray)):
+        return True
+
+    if not isinstance(value, str):
+        return False
+
+    try:
+        datetime.datetime.fromisoformat(value)
+    except ValueError:
+        return True
+
+    return False
+
+
 def escape(string):
     if '`' in string:
         raise Exception(f"Can't escape identifier {string} because it contains a backtick")
@@ -121,7 +136,7 @@ def row_to_singer_record(catalog_entry, version, row, columns, time_extracted):
                 boolean_representation = True
             row_to_persist += (boolean_representation,)
 
-        elif isinstance(elem, str) and property_format == 'date-time':
+        elif property_format == 'date-time' and is_invalid_mysql_datetime(elem):
             row_to_persist += (None,)
 
         else:

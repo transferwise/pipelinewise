@@ -1,8 +1,9 @@
 import datetime
+import os
 import socket
+import time
 
 import pytz
-import os
 
 from collections import namedtuple
 from typing import Dict
@@ -74,6 +75,7 @@ class TestBinlogSyncStrategy(TestCase):
         self.assertTrue(binlog.binlog_filename_key('mysql-bin.1000000') > binlog.binlog_filename_key('mysql-bin.999999'))
         self.assertTrue(binlog.binlog_filename_key('mysql-bin.2') > binlog.binlog_filename_key('mysql-bin.1'))
 
+    @patch.dict(os.environ, {'TZ': 'EET'})
     @patch('tap_mysql.sync_strategies.binlog.calculate_bookmark',
            return_value=('binlog0001', 50))
     @patch('tap_mysql.sync_strategies.binlog.fetch_current_log_file_and_pos',
@@ -87,9 +89,9 @@ class TestBinlogSyncStrategy(TestCase):
                                                       discover_catalog_mock,
                                                       *args):
 
-        # we're dealing with local datetimes, so tests passing depend on the local timezone
-        # pin the TZ to EET to avoid flakiness
-        os.environ['TZ'] = 'EET'
+        # Make the patched timezone effective, then restore the process timezone after the patch exits.
+        time.tzset()
+        self.addCleanup(time.tzset)
 
         config = {
             'server_id': '123',
@@ -854,6 +856,7 @@ class TestBinlogSyncStrategy(TestCase):
 
                 self.assertEqual(1, reader_mock.return_value.close.call_count)
 
+    @patch.dict(os.environ, {'TZ': 'EET'})
     @patch('tap_mysql.sync_strategies.binlog.calculate_gtid_bookmark',
            return_value='0-123-555')
     @patch('tap_mysql.sync_strategies.binlog.fetch_current_log_file_and_pos',
@@ -867,9 +870,9 @@ class TestBinlogSyncStrategy(TestCase):
                                           discover_catalog_mock,
                                           *args):
 
-        # we're dealing with local datetimes, so tests passing depend on the local timezone
-        # pin the TZ to EET to avoid flakiness
-        os.environ['TZ'] = 'EET'
+        # Make the patched timezone effective, then restore the process timezone after the patch exits.
+        time.tzset()
+        self.addCleanup(time.tzset)
 
         config = {
             'server_id': '123',
@@ -2185,3 +2188,53 @@ class TestBinlogSyncStrategy(TestCase):
         assert message.version == 1
         assert message.record == {'time': '08:30:00'}
         assert message.time_extracted is not None
+
+    def test_row_to_singer_record_only_nulls_invalid_datetime_values(self):
+        row = {
+            '_sdc_deleted_at': '2024-02-29T12:00:00+00:00',
+            'zero_datetime': '0000-00-00 00:00:00',
+            'zero_year': '0000-01-01 00:00:00',
+            'invalid_month': '2024-13-01 12:00:00',
+            'zero_day': '2024-05-00 12:00:00',
+            'invalid_day': '2024-02-30 12:00:00',
+            'invalid_timezone': '2024-02-29T12:00:00+99:00',
+            'invalid_bytes': b'0000-00-00 00:00:00',
+            'ordinary_string': 'not-a-date',
+        }
+        catalog_entry = CatalogEntry(
+            stream='stream',
+            schema=Schema.from_dict({
+                'type': 'object',
+                'properties': {
+                    **{
+                        column: {
+                            'type': ['null', 'string'],
+                            'format': 'date-time',
+                        }
+                        for column in row
+                        if column != 'ordinary_string'
+                    },
+                    'ordinary_string': {'type': ['null', 'string']},
+                },
+            }),
+        )
+
+        message = binlog.row_to_singer_record(
+            catalog_entry,
+            version=1,
+            row=row,
+            db_column_map={},
+            time_extracted=datetime.datetime.now(datetime.timezone.utc),
+        )
+
+        assert message.record == {
+            '_sdc_deleted_at': '2024-02-29T12:00:00+00:00',
+            'zero_datetime': None,
+            'zero_year': None,
+            'invalid_month': None,
+            'zero_day': None,
+            'invalid_day': None,
+            'invalid_timezone': None,
+            'invalid_bytes': None,
+            'ordinary_string': 'not-a-date',
+        }

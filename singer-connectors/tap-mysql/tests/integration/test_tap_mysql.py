@@ -3,6 +3,7 @@ import unittest
 from unittest.mock import patch
 
 import pymysql
+import pytest
 import singer
 import singer.metadata
 
@@ -21,13 +22,18 @@ import tap_mysql.sync_strategies.common as common
 from singer.schema import Schema
 
 SINGER_MESSAGES = []
+ORIGINAL_GET_STREAM_VERSION = common.get_stream_version
 
 
 def accumulate_singer_messages(message):
     SINGER_MESSAGES.append(message)
 
 
-singer.write_message = accumulate_singer_messages
+@pytest.fixture(autouse=True)
+def capture_singer_messages(monkeypatch):
+    SINGER_MESSAGES.clear()
+    monkeypatch.setattr(singer, 'write_message', accumulate_singer_messages)
+    monkeypatch.setattr(common, 'get_stream_version', ORIGINAL_GET_STREAM_VERSION)
 
 
 class TestTypeMapping(unittest.TestCase):

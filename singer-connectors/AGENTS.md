@@ -4,30 +4,22 @@ Read root `AGENTS.md` first. This file covers `singer-connectors/`; use scoped E
 
 ## CI and environments
 
-This is tracked vendored source, not submodules. Connector CI only installs everything through `make pipelinewise_no_test_extras all_connectors`; repository lint/unit gates do not inspect it. A behavioral change therefore needs connector-local tests plus an E2E route when one exists. If no route exists, run the available local checks and report E2E as unavailable.
+This is tracked vendored source, not submodules. Root lint/unit gates do not inspect connector code. Connector CI has an all-connectors install job and a separate Python 3.12 matrix running connector-local `make venv` and `make unit_test_cov` for tap-mysql (47% minimum) and tap-postgres (58%). Behavioral changes still need connector-local tests plus an E2E route when one exists; otherwise report E2E unavailable.
 
-`make connectors -e pw_connector=<name>` creates isolated `.virtualenvs/<name>/`, consuming `pre_requirements.txt`, `requirements.txt`, then `setup.py` when present. Never test with the PipelineWise, root, or another connector interpreter. Declare direct top-level dependencies instead of relying on transitive installation.
+Root `make connectors -e pw_connector=<name>` creates runtime `.virtualenvs/<name>/`, consuming `pre_requirements.txt`, `requirements.txt`, then `setup.py` when present; it does not create the connector's test environment. Connector-local Makefiles usually create `./venv/` with test extras. Never mix PipelineWise, runtime-connector, local-test, or another connector's interpreter.
 
 ## Local validation
 
-Read the connector's files and Makefile before choosing targets. Where present, run its environment/install, Pylint, unit, and credentialed integration targets from its directory; do not change a coverage threshold to obtain a pass.
+Read the connector's files and Makefile before choosing targets. Where present, use its local Pylint config and run its environment/install, Pylint, unit, and integration targets from its directory; do not change a threshold to obtain a pass. Integration may need local containers, external credentials, or both—inspect its Makefile, Compose files, and environment first. Connector CI does not run integration suites.
 
 - Common targets are `venv`, `pylint`, `unit_test`, and `integration_test`, but Kafka uses `virtual_env` and containers; MongoDB uses `setup`, `test`, `test_cov`; Twilio uses `test`; S3 CSV uses plural `unit_tests`/`integration_tests`.
-- PostgreSQL gates coverage in separate `unit_test_cov` (58), `integration_test_cov` (63), and `total_cov` (85) targets. MySQL uses Nose with 47. Mixpanel, Slack, Twilio, and tap-snowflake test targets have no fail threshold. Other declared thresholds range from 30 to 87; the Makefile is authoritative.
-- Mixpanel, Slack, and Salesforce have no integration target. Integration tests require live credentials and install CI does not run them.
-- GitHub, Jira, Zendesk, and transform-field have no Makefile. GitHub has `tests/`; Zendesk has singular `test/` and uses Nose; transform-field is validated by installation and indirectly by Singer E2E routes. Jira is only the external pin in `tap-jira/requirements.txt`, with no local source/tests. Salesforce has source and Makefile but no tests. None of GitHub, Jira, or Zendesk has a repository E2E route.
-- Local Pylint configs exist only at `tap-mongodb/pylintrc`, `tap-mysql/.pylintrc`, `tap-postgres/.pylintrc`, `tap-s3-csv/.pylintrc`, `tap-snowflake/pylintrc`, `target-snowflake/pylintrc`, and `transform-field/.pylintrc`.
+- PostgreSQL additionally gates `integration_test_cov` at 63 and `total_cov` at 85. MySQL uses Pytest for both unit and integration tests. Mixpanel, Slack, Twilio, and tap-snowflake test targets have no fail threshold. Other declared thresholds range from 30 to 87; the Makefile is authoritative.
+- Mixpanel, Slack, and Salesforce have no integration target.
+- GitHub, Jira, Zendesk, and transform-field have no Makefile. GitHub has `tests/`; Zendesk has singular `test/` and uses Nose; transform-field has `[test]` extras plus direct `tests/unit/` and `tests/integration/` suites and also receives Singer E2E coverage. Jira is only the external pin in `tap-jira/requirements.txt`, with no local source/tests. Salesforce has source and Makefile but no tests. None of GitHub, Jira, or Zendesk has a repository E2E route.
 
 ## Versioning and upstream
 
-Connector versions normally live in their own `setup.py`; Jira is the external version pin in `tap-jira/requirements.txt`. A behavioral change requires the applicable version bump, a connector `CHANGELOG.md` entry when that file exists, and a root `CHANGELOG.md` entry naming old/new package versions with the change nested below. Jira and Salesforce have no connector changelog, so use the root changelog only.
-
-Example:
-
-```text
-- `pipelinewise-target-snowflake` from `2.5.1` to `2.5.2`
-    - Support creating new Iceberg tables for pure Singer replications
-```
+Connector source in this directory ships with PipelineWise; standalone connector packages are released only when explicitly planned. Without such a plan, do not bump `setup.py` versions or add versioned connector changelog entries. Record release-visible runtime and dependency changes under the current PipelineWise release in the root `CHANGELOG.md`, without an old/new connector version. Jira remains an external version pin in `tap-jira/requirements.txt`. Test-only, CI, or fixture changes need a root changelog entry only when release-relevant.
 
 These are upstream-derived copies. Coordinate non-trivial divergence upstream; keep local fixes narrow and comments limited to why divergence is necessary. Do not run broad formatting or `pre-commit run --all-files`.
 

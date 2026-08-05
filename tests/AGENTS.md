@@ -4,23 +4,15 @@ Read root `AGENTS.md` first. This covers `tests/`; also read the E2E file for da
 
 ## Unit gate and boundaries
 
-From the repository root:
-
-```bash
-. .virtualenvs/pipelinewise/bin/activate
-pytest --cov=pipelinewise --cov-fail-under=77 -v tests/units
-```
-
-- Target `tests/units`, the only credential/container-free suite and the only one behind the CI coverage gate. Nested selection below `tests/units/data_diff/` or `backend_db/` can break imports; use root plus `-k`. Never run bare `pytest tests/`, which also collects credentialed E2E.
-- CI overrides `.coveragerc` with 77. Ruff/Pylint also inspect tests.
-- E2E needs the dev container and, for Snowflake/S3, live credentials; run it inside the container.
-- `dev-project/entrypoint.sh` executes all `tests/db/*.sh` seed scripts on every PipelineWise-container start. Only Docker image `initdb.d` scripts depend on an empty volume.
-- Connector tests are separate and uncollected here: usually `tests/`, Zendesk singular `test/`; Jira and Salesforce have none. Follow `singer-connectors/AGENTS.md`.
+- `tests/units` is the credential/container-free root PipelineWise CI coverage gate; run the exact command in root `AGENTS.md`. Connector CI has separate tap-mysql and tap-postgres gates.
+- Selecting paths below `tests/units/data_diff/` or `tests/units/backend_db/` can break imports; collect from `tests/units` and narrow with `-k`.
+- Never run bare `pytest tests/`; it also collects credentialed E2E. CI overrides `.coveragerc` with 77, and Ruff/Pylint inspect root tests.
+- Connector tests are separate and uncollected here; follow `singer-connectors/AGENTS.md`. Database-backed and connector-route tests follow `tests/end_to_end/AGENTS.md`.
 
 ## Proof and reporting
 
 - Generated-SQL assertions prove the string, not engine acceptance; state when real-engine execution is unverified.
 - Mirror implementation paths (`pipelinewise/data_diff/coverage.py` -> `tests/units/data_diff/test_coverage.py`).
 - Cover routing guards for documented unsupported cases, not only supported shapes. Prefer behavior assertions, except where exact emitted SQL is the behavior.
-- Module-boundary tests required by root guidance are mandatory.
+- When changing dependency seams, add or adjust import/AST boundary coverage; only the backend-db to data-diff prohibition is currently enforced directly.
 - Report pass/skip/fail counts per command group. Credential skips are not passes, and a partly skipped matrix is not complete.

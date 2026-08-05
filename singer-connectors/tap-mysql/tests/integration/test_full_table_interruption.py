@@ -1,4 +1,6 @@
 import unittest
+
+import pytest
 import singer
 import singer.metadata
 import tap_mysql
@@ -51,6 +53,11 @@ def singer_write_message_no_table_2(message):
 
 def singer_write_message_ok(message):
     SINGER_MESSAGES.append(message)
+
+
+@pytest.fixture(autouse=True)
+def isolate_singer_message_capture(monkeypatch):
+    monkeypatch.setattr(singer, 'write_message', singer_write_message_ok)
 
 
 def init_tables(conn):
