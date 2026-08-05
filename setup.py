@@ -55,7 +55,7 @@ setup(name='pipelinewise',
               'python-dotenv==0.19.1',
               'pylint==4.0.5',
               'ruff==0.15.11',
-              'pytest-timer~=0.0',
+              'pytest-timer~=1.0',
           ]
       },
       entry_points={
