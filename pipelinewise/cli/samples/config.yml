@@ -12,3 +12,16 @@ alert_handlers:
 #    base_url: "https://alert.victorops.com/integrations/generic/.../alert/.../..."
 #    routing_key: "victorops-routing-key"
 
+# PostgreSQL backend for data-diff definitions and evidence. Required when any
+# table declares a data_diff block. Values can be Ansible Vault encrypted.
+#backend_db:
+#  host: "<HOST>"
+#  port: 5432
+#  user: "<USER>"
+#  password: "<PASSWORD>"
+#  dbname: "pipelinewise"
+#  sslmode: "verify-full"
+#  # Alembic migrations run as this role. Repeat user/password above to run them
+#  # as the application user.
+#  ddl_user: "<DDL_USER>"
+#  ddl_password: "<DDL_PASSWORD>"

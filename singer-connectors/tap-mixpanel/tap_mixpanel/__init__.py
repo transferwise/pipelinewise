@@ -29,16 +29,18 @@ def _is_true(value):
     return str(value).lower() == "true"
 
 
-def do_discover(client, properties_flag):
+def do_discover(client, properties_flag, denest_properties_flag):
     """Call the discovery function.
 
     Args:
         client (MixpanelClient): Client object to make http calls.
         properties_flag (str): Setting this argument to `true` ensures that new properties on
                                events and engage records are captured.
+        denest_properties_flag (str): Setting this argument to `true` exposes Mixpanel
+                                      properties as top-level fields.
     """
     LOGGER.info("Starting discover")
-    catalog = _discover(client, properties_flag)
+    catalog = _discover(client, properties_flag, denest_properties_flag)
     json.dump(catalog.to_dict(), sys.stdout, indent=2)
     LOGGER.info("Finished discover")
 
@@ -92,13 +94,16 @@ def main():
 
         config = parsed_args.config
         properties_flag = config.get("select_properties_by_default")
+        denest_properties_flag = config.get("denest_properties", "false")
 
         if parsed_args.discover:
-            do_discover(client, properties_flag)
+            do_discover(client, properties_flag, denest_properties_flag)
         else:
             catalog = parsed_args.catalog
             if not catalog:
-                catalog = _discover(client, properties_flag)
+                catalog = _discover(
+                    client, properties_flag, denest_properties_flag
+                )
             _sync(
                 client=client,
                 config=config,

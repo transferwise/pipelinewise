@@ -14,7 +14,7 @@ import pidfile
 
 from datetime import datetime
 from time import time
-from typing import Dict, Optional, List, Any, NoReturn
+from typing import Dict, Optional, List, Any, NoReturn, Tuple
 from joblib import Parallel, delayed, parallel_backend
 from tabulate import tabulate
 
@@ -33,6 +33,9 @@ from .errors import (
 
 from pipelinewise.fastsync.commons.tap_postgres import FastSyncTapPostgres
 from pipelinewise.cli.multiprocess import Process
+from pipelinewise.data_diff.repository import DataDiffRepository
+from pipelinewise.data_diff.runner import rerun_failed_check, run_due_checks
+from pipelinewise.data_diff.runtime import RuntimeConnectorConfigLoader
 
 FASTSYNC_PAIRS = {
     ConnectorType.TAP_MYSQL: {
@@ -89,12 +92,19 @@ class PipelineWise:
         self.load_config()
         self.alert_sender = AlertSender(self.config.get('alert_handlers'))
 
-        if args.tap != '*':
+        data_diff_commands = {
+            'list_data_diff_checks',
+            'run_data_diff_checks',
+            'rerun_data_diff_check',
+        }
+        is_data_diff_command = getattr(args, 'command', None) in data_diff_commands
+
+        if args.tap != '*' and not is_data_diff_command:
             self.tap = self.get_tap(args.target, args.tap)
             self.tap_bin = self.get_connector_bin(self.tap['type'])
             self.tap_python_bin = self.get_connector_python_bin(self.tap['type'])
 
-        if args.target != '*':
+        if args.target != '*' and not is_data_diff_command:
             self.target = self.get_target(args.target)
             self.target_bin = self.get_connector_bin(self.target['type'])
             self.target_python_bin = self.get_connector_python_bin(self.target['type'])
@@ -109,8 +119,9 @@ class PipelineWise:
         self.force_fast_sync = True
 
         # Catch SIGINT and SIGTERM to exit gracefully
-        for sig in [signal.SIGINT, signal.SIGTERM]:
-            signal.signal(sig, self.stop_tap)
+        if not is_data_diff_command:
+            for sig in [signal.SIGINT, signal.SIGTERM]:
+                signal.signal(sig, self.stop_tap)
 
     def send_alert(
         self, message: str, level: str = BaseAlertHandler.ERROR, exc: Exception = None
@@ -136,6 +147,17 @@ class PipelineWise:
             )
 
         return stats
+
+    @staticmethod
+    def _validate_tap_catalog(properties: Any, tap_properties: str) -> None:
+        """Reject a missing or malformed Singer catalog before filtering."""
+        if not isinstance(properties, dict) or not isinstance(
+            properties.get('streams'), list
+        ):
+            raise ValueError(
+                f'Tap catalog is missing or invalid: {tap_properties}. '
+                'Run discover_tap before run_tap.'
+            )
 
     def create_consumable_target_config(self, target_config, tap_inheritable_config):
         """
@@ -202,13 +224,13 @@ class PipelineWise:
             properties = utils.load_json(tap_properties)
             state = utils.load_json(tap_state)
 
+            self._validate_tap_catalog(properties, tap_properties)
+
             # Create a dictionary for tables that don't meet filter criteria
             fallback_properties = copy.deepcopy(properties) if create_fallback else {}
 
             # Foreach stream (table) in the original properties
-            for stream_idx, stream in enumerate(
-                properties.get('streams', tap_properties)
-            ):
+            for stream_idx, stream in enumerate(properties['streams']):
                 initial_sync_required = False
 
                 # Collect required properties from the properties file
@@ -823,17 +845,18 @@ class PipelineWise:
                 'Testing tap connection (%s - %s) PASSED', target_id, tap_id
             )
 
-    # pylint: disable=too-many-locals,inconsistent-return-statements
-    def discover_tap(self, tap=None, target=None):
-        """
-        Run a specific tap in discovery mode. Discovery mode is connecting to the data source
-        and collecting information that is required for running the tap.
-        """
-        if tap is None:
-            tap = self.tap
-        if target is None:
-            target = self.target
+    def discover_tap(self):
+        """Run discovery for the tap selected by the CLI."""
+        error = self._discover_tap(self.tap, self.target)
+        if error:
+            self.logger.error(error)
+            raise SystemExit(1)
 
+    # pylint: disable=too-many-locals,inconsistent-return-statements
+    def _discover_tap(self, tap, target):
+        """
+        Discover a tap and return an error string so imports can aggregate failures.
+        """
         # Define tap props
         tap_id = tap.get('id')
         tap_type = tap.get('type')
@@ -1533,8 +1556,14 @@ class PipelineWise:
 
         target_schema = utils.load_schema('target')
         tap_schema = utils.load_schema('tap')
+        global_config_schema = utils.load_schema('config')
 
         vault_secret = self.args.secret
+
+        global_config_yaml = os.path.join(yaml_dir, 'config.yml')
+        if os.path.exists(global_config_yaml):
+            global_config = utils.load_yaml(global_config_yaml, vault_secret)
+            utils.validate(global_config, global_config_schema)
 
         # dictionary of targets ID and type
         targets = {}
@@ -1606,6 +1635,13 @@ class PipelineWise:
 
             self.logger.info('Finished validating %s', yaml_file)
 
+        validated_config = Config.from_yamls(
+            self.config_dir,
+            yaml_dir,
+            vault_secret,
+        )
+        validated_config.get_data_diff_definitions()
+        validated_config.get_scheduled_job_definitions()
         self.logger.info('Validation successful')
 
     def import_project(self):
@@ -1619,6 +1655,7 @@ class PipelineWise:
         # JSON files in a common directory structure
         config = Config.from_yamls(self.config_dir, self.args.dir, self.args.secret)
         selected_taps_id = self.args.taps.split(',')
+        data_diff_definitions = config.get_data_diff_definitions(selected_taps_id)
         config.save(selected_taps_id)
 
         # Activating tap stream selections
@@ -1659,7 +1696,7 @@ class PipelineWise:
                         filter(
                             None,
                             Parallel(verbose=100)(
-                                delayed(self.discover_tap)(tap=tap, target=target)
+                                delayed(self._discover_tap)(tap=tap, target=target)
                                 for tap in selected_taps
                             ),
                         )
@@ -1677,6 +1714,19 @@ class PipelineWise:
         deleted_taps_count = self.cleanup_after_deleted_config(old_config)
 
         end_time = datetime.now()
+
+        if not discover_excs and config.global_config.get('backend_db'):
+            with DataDiffRepository.from_backend_config(
+                config.global_config['backend_db']
+            ) as repository:
+                sync_stats = repository.sync_definitions(
+                    data_diff_definitions,
+                    selected_taps=selected_taps_id,
+                )
+            self.logger.info(
+                'Persisted data-diff definitions: %s',
+                sync_stats,
+            )
 
         # Log summary
         # pylint: disable=logging-too-many-args
@@ -1702,6 +1752,206 @@ class PipelineWise:
         )
         if len(discover_excs) > 0:
             sys.exit(1)
+
+    def _data_diff_repository(self):
+        backend_config = self.config.get('backend_db')
+        if not backend_config:
+            raise ValueError(
+                'PipelineWise config must define backend_db for data-diff operations'
+            )
+        return DataDiffRepository.from_backend_config(backend_config)
+
+    @staticmethod
+    def _print_data_diff_summaries(summaries):
+        rows = [
+            [
+                summary['check']['full_check_name'],
+                summary['status'],
+                summary.get('slot_status') or '',
+                # A check that could not be scheduled has no window to report.
+                summary['window_start'].isoformat() if summary['window_start'] else '',
+                summary['window_end'].isoformat() if summary['window_end'] else '',
+                str(summary.get('run_id', '')),
+            ]
+            for summary in summaries
+        ]
+        if rows:
+            print(
+                tabulate(
+                    rows,
+                    headers=[
+                        'Check', 'Status', 'Slot status', 'UTC start',
+                        'UTC end', 'Run ID',
+                    ],
+                )
+            )
+
+    def _get_tap_alert_settings(self, target_id: str, tap_id: str) -> Tuple[bool, str]:
+        """
+        Look up a tap's alert settings from config.json.
+
+        Unlike get_tap() this does not require the tap's connector directory, so it
+        works for data-diff commands, which never resolve a single tap.
+
+        Args:
+            target_id: ID of the target the tap loads into
+            tap_id: ID of the tap
+
+        Returns:
+            Tuple of (send_alert, slack_alert_channel). Defaults to (True, None) when
+            the tap is not found, so an alert is never silently dropped.
+        """
+        for target in self.config.get('targets', []):
+            if target.get('id') != target_id:
+                continue
+            for tap in target.get('taps', []):
+                if tap.get('id') == tap_id:
+                    return (
+                        tap.get('send_alert', True),
+                        tap.get('slack_alert_channel'),
+                    )
+
+        self.logger.warning(
+            'Cannot find %s tap in %s target to resolve alert settings, alerting anyway',
+            tap_id,
+            target_id,
+        )
+        return True, None
+
+    def _alert_data_diff_failures(self, summaries):
+        """
+        Send one alert per failed check per window.
+
+        Failures are not batched: each alert carries the check name, its window, and
+        the run ID needed to remediate it. Alerts go to the owning tap's channel in
+        addition to the default one, and a tap with send_alert disabled is skipped.
+        """
+        failures = [
+            summary
+            for summary in summaries
+            if summary['status'] in ('FAIL', 'ERROR')
+        ]
+
+        for summary in failures:
+            check = summary['check']
+            send_alert, tap_slack_channel = self._get_tap_alert_settings(
+                check['target_id'], check['tap_id']
+            )
+            if not send_alert:
+                continue
+
+            # A check that failed before it could be scheduled has no window or run
+            # to report, only the reason it could not run.
+            message = f"data-diff {summary['status']} {check['full_check_name']}"
+            if summary.get('window_start') and summary.get('window_end'):
+                message += (
+                    f"\n  window  {summary['window_start'].isoformat()}"
+                    f" → {summary['window_end'].isoformat()}"
+                )
+            if summary.get('run_id'):
+                message += f"\n  run_id  {summary['run_id']}"
+            if summary.get('error'):
+                message += f"\n  error   {summary['error']}"
+            self.alert_sender.send_to_all_handlers(
+                message=message,
+                level=BaseAlertHandler.ERROR,
+                tap_slack_channel=tap_slack_channel,
+            )
+
+        return failures
+
+    def list_data_diff_checks(self):
+        """List persisted definitions, schedule state, and timestamp coverage."""
+        with self._data_diff_repository() as repository:
+            checks = repository.list_checks(
+                target_id=self.args.target,
+                tap_id=self.args.tap,
+                include_versioned=self.args.include_versioned,
+            )
+
+        if self.args.output_format == 'json':
+            print(json.dumps(checks, indent=2, default=str))
+            return
+
+        rows = [
+            [
+                str(check['check_id']),
+                check['revision'],
+                'yes' if check['current'] else 'no',
+                check['target_id'],
+                check['tap_id'],
+                f"{check['source_schema']}.{check['source_table']}",
+                ','.join(check['checks']),
+                check['source_key_column'],
+                check['source_timestamp_column'],
+                ','.join(check.get('source_compare_columns', [])),
+                check['frequency'],
+                check['window_start_seconds'],
+                check['window_end_seconds'],
+                check.get('coverage_status') or '',
+                check['verified_through'].isoformat()
+                if check.get('verified_through') else '',
+            ]
+            for check in checks
+        ]
+        print(
+            tabulate(
+                rows,
+                headers=[
+                    'Check ID', 'Rev', 'Current', 'Target',
+                    'Tap', 'Source table', 'Checks', 'Key', 'Timestamp',
+                    'Compare columns', 'Frequency', 'Window start (s)',
+                    'Window end (s)', 'Coverage', 'Verified through',
+                ],
+            )
+        )
+
+    def run_data_diff_checks(self):
+        """Run due checks once."""
+        target_id = None if getattr(self.args, 'all', False) else self.args.target
+        tap_id = None if getattr(self.args, 'all', False) else self.args.tap
+
+        with self._data_diff_repository() as repository:
+            summaries = run_due_checks(
+                repository,
+                RuntimeConnectorConfigLoader(self.config_dir),
+                target_id=target_id,
+                tap_id=tap_id,
+                check_filter=self.args.check,
+                force=self.args.force,
+            )
+
+        self._print_data_diff_summaries(summaries)
+        if self._alert_data_diff_failures(summaries):
+            raise SystemExit(1)
+
+    def rerun_data_diff_check(self):
+        """Rerun an exact failed window and preserve linked remediation evidence."""
+        with self._data_diff_repository() as repository:
+            summary = rerun_failed_check(
+                repository,
+                RuntimeConnectorConfigLoader(self.config_dir),
+                self.args.run_id,
+                self.args.remediation_ref,
+            )
+
+        print(
+            tabulate(
+                [[
+                    summary['check']['full_check_name'], summary['status'],
+                    summary['attempt'], summary['window_start'].isoformat(),
+                    summary['window_end'].isoformat(), str(self.args.run_id),
+                    str(summary['run_id']), self.args.remediation_ref,
+                ]],
+                headers=[
+                    'Check', 'Status', 'Attempt', 'UTC start', 'UTC end',
+                    'Original run ID', 'Remediation run ID',
+                    'Remediation reference',
+                ],
+            )
+        )
+        if self._alert_data_diff_failures([summary]):
+            raise SystemExit(1)
 
     def encrypt_string(self):
         """

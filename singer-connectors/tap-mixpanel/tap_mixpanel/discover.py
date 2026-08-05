@@ -4,18 +4,22 @@ from tap_mixpanel.schema import get_schemas
 from tap_mixpanel.streams import STREAMS
 
 
-def discover(client, properties_flag):
+def discover(client, properties_flag, denest_properties_flag="false"):
     """Run the discovery mode, prepare the catalog file and return catalog.
 
     Args:
         client (MixpanelClient): Client object to make http calls.
         properties_flag (str): Setting this argument to `true` ensures that new properties on
                                events and engage records are captured.
+        denest_properties_flag (str): Setting this argument to `true` exposes Mixpanel
+                                      properties as top-level fields.
 
     Returns:
         singer.Catalog: Catalog object having schema and metadata of all the streams.
     """
-    schemas, field_metadata = get_schemas(client, properties_flag)
+    schemas, field_metadata = get_schemas(
+        client, properties_flag, denest_properties_flag
+    )
     catalog = Catalog([])
 
     for stream_name, schema_dict in schemas.items():

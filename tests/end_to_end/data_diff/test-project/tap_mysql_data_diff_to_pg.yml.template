@@ -1,0 +1,50 @@
+---
+
+id: "data_diff_mysql_to_pg"
+name: "Data-diff MySQL source"
+type: "tap-mysql"
+owner: "test-runner"
+
+db_conn:
+  host: "${TAP_MYSQL_HOST}"
+  port: ${TAP_MYSQL_PORT}
+  user: "${TAP_MYSQL_USER}"
+  password: "${TAP_MYSQL_PASSWORD}"
+  dbname: "${TAP_MYSQL_DB}"
+  # The dev container runs MariaDB, which has no max_execution_time variable.
+  engine: mariadb
+  fastsync_parallelism: 1
+
+target: "data_diff_postgres_dwh"
+batch_size_rows: 20000
+stream_buffer_size: 0
+
+data_diff_defaults:
+  frequency: "0 * * * *"
+  window_start: "-1d"
+  window_end: "0s"
+  statement_timeout: "1min"
+
+schemas:
+  - source_schema: "${TAP_MYSQL_DB}"
+    target_schema: "ppw_e2e_data_diff_mysql"
+
+    tables:
+      - table_name: "weight_unit"
+        replication_method: "FULL_TABLE"
+        data_diff:
+          # row_checksum on MySQL is the reason this test exists: DATE_FORMAT
+          # specifiers must survive PyMySQL's client-side interpolation.
+          checks:
+            - schema_compatibility
+            - row_count
+            - distinct_key_count
+            - null_key_count
+            - duplicate_key_count
+            - min_key
+            - max_key
+            - row_checksum
+          key_column: "weight_unit_id"
+          timestamp_column: "date_updated"
+          compare_columns:
+            - "weight_unit_name"

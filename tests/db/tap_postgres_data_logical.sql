@@ -10,6 +10,7 @@ CREATE SCHEMA logical1;
 CREATE TABLE logical1.logical1_table1(
     cid serial NOT NULL,
     cvarchar varchar,
+    updated_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (cid)
 );
 

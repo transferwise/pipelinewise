@@ -423,3 +423,67 @@ class TestFastSyncTapMySql(TestCase):
                     call('select @@server_uuid as server_uuid;', con),
                 ])
                 mysql_connect_mock.assert_called_once()
+
+    def test_invalid_dates_are_nulled_for_every_temporal_type(self):
+        """MySQL accepts dates no target will take, so FastSync must null them.
+
+        Only the literal 0000-00-00 00:00:00 used to be filtered, so a zero year, a
+        month outside 1-12, or a day past the end of the month replicated as-is and
+        was rejected or silently altered by the target.
+
+        Asserting on generated SQL rather than a live query, because unit tests here
+        have no database. Confirmed against MariaDB 10.6 with ALLOW_INVALID_DATES: the
+        old expression returned all four invalid values unchanged, this one NULLs each
+        and leaves a valid date intact.
+        """
+        self.mysql = FastSyncTapMySqlMock(connection_config=self.connection_config)
+        with patch.object(self.mysql, 'query', return_value=[]) as query_mock:
+            self.mysql.get_table_columns('my_db.my_table')
+
+        sql = query_mock.call_args.args[0]
+
+        # date is CAST to the target type; datetime/timestamp pass through.
+        for data_type in ("'date'", "'datetime', 'timestamp'"):
+            assert f'WHEN data_type IN ({data_type})' in sql
+
+        # Each guard, and why a naive equality check against the zero date misses it:
+        #   zero year      -> 0000-01-01 is a valid-looking date with no year
+        #   month 0 or 13  -> 2024-00-15, 2024-13-01
+        #   day 0          -> 2024-05-00
+        #   day past EOM   -> 2024-02-30, which LAST_DAY resolves per month
+        for guard in (
+            'YEAR(`',
+            '`) = 0 OR MONTH(`',
+            '`) NOT BETWEEN 1 AND 12 OR DAY(`',
+            '`) = 0 OR DAY(`',
+            '`) > DAY(LAST_DAY(DATE_FORMAT(`',
+        ):
+            assert guard in sql, guard
+
+        # The zero-date-only filter this replaced must be gone from both branches.
+        assert 'STR_TO_DATE("0000-00-00 00:00:00"' not in sql
+        assert 'nullif(' not in sql
+
+    def test_invalid_date_guard_nulls_rather_than_dropping_the_row(self):
+        """A guard that filtered rows would silently lose data instead of the value."""
+        self.mysql = FastSyncTapMySqlMock(connection_config=self.connection_config)
+        with patch.object(self.mysql, 'query', return_value=[]) as query_mock:
+            self.mysql.get_table_columns('my_db.my_table')
+
+        sql = query_mock.call_args.args[0]
+
+        # CASE ... THEN NULL ELSE <value> END, never a WHERE that removes the row.
+        assert 'THEN NULL ELSE' in sql
+        assert sql.count('THEN NULL ELSE') == 2, 'date and datetime/timestamp branches'
+
+    def test_date_columns_are_cast_to_the_requested_target_type(self):
+        """date_type varies per target, so the CAST must honour the caller's choice."""
+        self.mysql = FastSyncTapMySqlMock(connection_config=self.connection_config)
+        with patch.object(self.mysql, 'query', return_value=[]) as query_mock:
+            self.mysql.get_table_columns('my_db.my_table', date_type='timestamp')
+
+        sql = query_mock.call_args.args[0]
+
+        assert 'AS timestamp) END' in sql
+        # The datetime branch has no CAST, so the type must not leak into it.
+        assert 'AS date) END' not in sql

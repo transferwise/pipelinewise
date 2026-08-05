@@ -21,7 +21,8 @@
 #
 # to check for python changes, run with CHECKS=python
 # To check for doc changes, run with CHECKS=doc
-# To check for python and doc changes, run with CHECKS="python doc"
+# To check for sample/dev config changes, run with CHECKS=config
+# To check for several kinds at once, run with CHECKS="python doc config"
 if [[ (-z ${PR_NUMBER}) && (-z ${CIRCLE_PULL_REQUEST}) ]]; then
   echo "Not a PR; Exiting with FAILURE code"
   exit 1
@@ -48,6 +49,12 @@ do
   elif [[ ${CHECK} == "doc" ]]; then
     REGEX="(^docs\/|^scripts/publish_docs.sh)"
     echo "Searching for changes in documentation files"
+
+  elif [[ ${CHECK} == "config" ]]; then
+    # dev-project holds the YAML the docs tell users to copy. It is outside the
+    # python regex, so without this a config-only change skips every test job.
+    REGEX="(^dev-project\/)"
+    echo "Searching for changes in dev-project configuration files"
 
   else
     echo "Invalid check: \"${CHECK}\". Falling back to exiting with FAILURE code"

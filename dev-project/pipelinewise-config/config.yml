@@ -11,3 +11,17 @@ alert_handlers:
 #  victorops:
 #    base_url: "https://alert.victorops.com/integrations/generic/.../alert/.../..."
 #    routing_key: "victorops-routing-key"
+
+# PipelineWise operational database for data-diff definitions, schedules,
+# preflights, run evidence, and verified timestamp coverage. This is the
+# dedicated pipelinewise-backend-db service, not target_postgres.
+backend_db:
+  host: "{{ env_var['PIPELINEWISE_BACKEND_HOST'] }}"
+  port: {{ env_var['PIPELINEWISE_BACKEND_PORT'] }}
+  user: "{{ env_var['PIPELINEWISE_BACKEND_USER'] }}"
+  password: "{{ env_var['PIPELINEWISE_BACKEND_PASSWORD'] }}"
+  dbname: "{{ env_var['PIPELINEWISE_BACKEND_DB'] }}"
+  # Alembic migrations run as this role, which owns the schema. Separate from the
+  # application user above so the dev environment matches production.
+  ddl_user: "{{ env_var['PIPELINEWISE_BACKEND_DDL_USER'] }}"
+  ddl_password: "{{ env_var['PIPELINEWISE_BACKEND_DDL_PASSWORD'] }}"

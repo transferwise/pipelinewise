@@ -42,7 +42,10 @@ COMMANDS = [
     'validate',
     'encrypt_string',
     'partial_sync_table',
-    'reset_state'
+    'reset_state',
+    'list_data_diff_checks',
+    'run_data_diff_checks',
+    'rerun_data_diff_check',
 ]
 
 
@@ -152,13 +155,16 @@ def _validate_command_specific_arguments(args):
     if args.command == 'init' and args.name == '*':
         raise CommandSpecificArgumentsException('You must specify a project name using the argument --name')
 
-    if args.command in ['discover_tap', 'test_tap_connection', 'run_tap', 'stop_tap', 'fast_sync', 'sync_tables', 'reset_state']:
+    if args.command in [
+        'discover_tap', 'test_tap_connection', 'run_tap', 'stop_tap',
+        'fast_sync', 'sync_tables', 'reset_state',
+    ]:
         if args.tap == '*':
             raise CommandSpecificArgumentsException('You must specify a source name using the argument --tap')
         if args.target == '*':
             raise CommandSpecificArgumentsException('You must specify a destination name using the argument --target')
 
-    if args.command == 'import_config':
+    if args.command in ['import_config', 'import_project']:
         if args.dir == '*':
             raise CommandSpecificArgumentsException(
                 'You must specify a directory path with config YAML files using the argument --dir'
@@ -179,6 +185,36 @@ def _validate_command_specific_arguments(args):
 
     if args.command == 'partial_sync_table':
         _validate_partial_sync_arguments(args)
+
+    _validate_data_diff_arguments(args)
+
+
+def _validate_data_diff_arguments(args):
+    """Validate filters and remediation evidence."""
+    if args.command in [
+        'list_data_diff_checks',
+        'run_data_diff_checks',
+    ]:
+        if args.tap != '*' and args.target == '*':
+            raise CommandSpecificArgumentsException(
+                'You must specify --target when filtering data-diff checks by --tap'
+            )
+        if args.command == 'run_data_diff_checks':
+            if not getattr(args, 'all', False) and args.target == '*' and args.tap == '*':
+                raise CommandSpecificArgumentsException(
+                    'You must specify --target and --tap, or use --all to run all definitions'
+                )
+
+    if args.command == 'rerun_data_diff_check':
+        if not args.run_id:
+            raise CommandSpecificArgumentsException(
+                'You must specify the failed data-diff run using --run-id'
+            )
+        if not args.remediation_ref:
+            raise CommandSpecificArgumentsException(
+                'You must specify the repair or incident reference using '
+                '--remediation-ref'
+            )
 
 
 def _validate_partial_sync_arguments(args):
@@ -253,11 +289,24 @@ def main():
     parser.add_argument('--start_value', type=str, default='*', help='Start value of the column to partial sync')
     parser.add_argument('--end_value', type=str, default=None, help='End value of the column to partial sync')
     parser.add_argument('--force', default=False, required=False,
-                        help='Force fast_sync to proceed regardless of table size limits', action='store_true'
+                        help='Force fast_sync or a completed data-diff slot',
+                        action='store_true'
                         )
     parser.add_argument('--replication_method_only', default='*', type=str,
                         help='Sync only tables which their replication method is as entered value')
-
+    parser.add_argument('--check', type=str, default=None,
+                        help='Data-diff check name, logical key, or version ID')
+    parser.add_argument('--output-format', choices=['table', 'json'], default='table',
+                        help='Output format for list commands')
+    parser.add_argument('--include-versioned', default=False, action='store_true',
+                        help='Include superseded definition revisions')
+    parser.add_argument('--run-id', default=None,
+                        help='Failed data-diff run ID to reproduce for remediation')
+    parser.add_argument('--remediation-ref', default=None,
+                        help='Ticket, incident, or change reference for a remediation rerun')
+    parser.add_argument('--all', default=False, required=False,
+                        help='Run data-diff checks for all definitions across all taps and targets',
+                        action='store_true')
     args = parser.parse_args()
 
     # import_config and import commands are synonyms

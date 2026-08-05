@@ -1,8 +1,27 @@
-/* Content fonts */
-@import "https://fonts.googleapis.com/css?family=Comfortaa";
+/* Content fonts. 700 is requested so bold uses a real face, not a faux one. */
+@import "https://fonts.googleapis.com/css?family=Comfortaa:400,700";
 h1, h2, .rst-content .toctree-wrapper p.caption, h3, h4, h5, h6, legend {
   margin-top: 0;
   font-weight: 700;
+  font-family: "Comfortaa","ff-tisa-web-pro","Georgia",Arial,sans-serif;
+}
+
+/* Table captions read as headings, not centered italic labels. Selector matches
+   the theme's specificity, or text-align loses. */
+.rst-content table.docutils caption,
+.rst-content table.field-list caption,
+.wy-table caption {
+  text-align: left;
+  padding-left: 0;
+  padding-bottom: 0.4em;
+}
+
+/* Same family as the headings above. */
+.rst-content table > caption .caption-text {
+  font-style: normal;
+  font-weight: 900;
+  font-size: 140%;
+  color: #404040;
   font-family: "Comfortaa","ff-tisa-web-pro","Georgia",Arial,sans-serif;
 }
 
@@ -12,7 +31,7 @@ h1, h2, .rst-content .toctree-wrapper p.caption, h3, h4, h5, h6, legend {
 }
 
 .wy-nav-content {
-  max-width: 850px;
+  max-width: 1100px;
 }
 
 div.leftside {

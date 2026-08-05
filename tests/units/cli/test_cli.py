@@ -113,7 +113,7 @@ class TestCli:
         else:
             expected_save_arg = expected_taps = args.taps.split(',')
 
-        with patch.object(PipelineWise, 'discover_tap') as mocked_parallel:
+        with patch.object(PipelineWise, '_discover_tap') as mocked_parallel:
             with patch.object(Config, 'save') as mocked_config_save:
                 pipelinewise = PipelineWise(args, CONFIG_DIR, VIRTUALENVS_DIR)
                 mocked_parallel.return_value = None
@@ -361,6 +361,45 @@ class TestCli:
             'db_test_mysql-table_one',
             'db_test_mysql-table_two',
         ]
+
+    def test_create_filtered_tap_props_rejects_missing_catalog(self, tmp_path):
+        """A missing catalog should produce an actionable error."""
+        missing_catalog = tmp_path / 'properties.json'
+
+        with pytest.raises(
+            Exception,
+            match=(
+                f'Tap catalog is missing or invalid: {missing_catalog}. '
+                'Run discover_tap before run_tap.'
+            ),
+        ):
+            self.pipelinewise.create_filtered_tap_properties(
+                target_type=ConnectorType('target-snowflake'),
+                tap_type=ConnectorType('tap-mysql'),
+                tap_properties=str(missing_catalog),
+                tap_state=f'{RESOURCES_DIR}/sample_json_config/target_one/tap_one/state.json',
+                filters={},
+            )
+
+    def test_create_filtered_tap_props_rejects_catalog_without_streams(self, tmp_path):
+        """A catalog without a streams list should fail before filtering."""
+        invalid_catalog = tmp_path / 'properties.json'
+        invalid_catalog.write_text('{}', encoding='utf-8')
+
+        with pytest.raises(
+            Exception,
+            match=(
+                f'Tap catalog is missing or invalid: {invalid_catalog}. '
+                'Run discover_tap before run_tap.'
+            ),
+        ):
+            self.pipelinewise.create_filtered_tap_properties(
+                target_type=ConnectorType('target-snowflake'),
+                tap_type=ConnectorType('tap-mysql'),
+                tap_properties=str(invalid_catalog),
+                tap_state=f'{RESOURCES_DIR}/sample_json_config/target_one/tap_one/state.json',
+                filters={},
+            )
 
     def test_merge_empty_catalog(self):
         """Merging two empty singer schemas should be another empty"""
@@ -614,10 +653,36 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
 
         # Running discovery mode should detect the tap type and path to the connector
         # Since the executable is not available in this test then it should fail
-        result = pipelinewise.discover_tap()
+        with pytest.raises(SystemExit) as pytest_wrapped_e:
+            pipelinewise.discover_tap()
 
-        exp_err_pattern = '/tap-mysql/bin/tap-mysql: No such file or directory'
-        assert exp_err_pattern in result
+        assert pytest_wrapped_e.value.code == 1
+
+    def test_command_discover_tap_returns_when_worker_succeeds(self):
+        """Successful standalone discovery should return normally."""
+        args = CliArgs(target='target_one', tap='tap_one')
+        pipelinewise = PipelineWise(args, CONFIG_DIR, VIRTUALENVS_DIR)
+
+        with patch.object(pipelinewise, '_discover_tap', return_value=None) as discover:
+            pipelinewise.discover_tap()
+
+        discover.assert_called_once_with(pipelinewise.tap, pipelinewise.target)
+
+    def test_command_discover_tap_exits_when_worker_returns_an_error(self):
+        """Standalone discovery must not silently discard worker failures."""
+        args = CliArgs(target='target_one', tap='tap_one')
+        pipelinewise = PipelineWise(args, CONFIG_DIR, VIRTUALENVS_DIR)
+
+        with patch.object(
+            pipelinewise,
+            '_discover_tap',
+            return_value='Post import tap checks failed',
+        ), patch.object(pipelinewise, 'logger') as logger:
+            with pytest.raises(SystemExit) as pytest_wrapped_e:
+                pipelinewise.discover_tap()
+
+        assert pytest_wrapped_e.value.code == 1
+        logger.error.assert_called_once_with('Post import tap checks failed')
 
     def test_command_run_tap(self):
         """Test run tap command"""
@@ -626,7 +691,6 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
 
         # Running run mode should detect the tap type and path to the connector
         # Since the executable is not available in this test then it should fail
-        # TODO: sync discover_tap and run_tap behaviour. run_tap sys.exit but discover_tap does not.
         with pytest.raises(SystemExit) as pytest_wrapped_e:
             pipelinewise.run_tap()
         assert pytest_wrapped_e.type == SystemExit

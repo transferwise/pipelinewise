@@ -17,7 +17,7 @@ jobs:
 
     steps:
       - name: Checking out repo
-        uses: actions/checkout@v4.1.7
+        uses: actions/checkout@v7
 
       - name: Check if python changes are present
         id: check

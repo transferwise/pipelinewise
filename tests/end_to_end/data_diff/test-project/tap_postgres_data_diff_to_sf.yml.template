@@ -1,0 +1,51 @@
+---
+
+id: "data_diff_postgres_to_sf"
+name: "Data-diff PostgreSQL source to Snowflake"
+type: "tap-postgres"
+owner: "test-runner"
+
+db_conn:
+  host: "${TAP_POSTGRES_HOST}"
+  port: ${TAP_POSTGRES_PORT}
+  user: "${TAP_POSTGRES_USER}"
+  password: "${TAP_POSTGRES_PASSWORD}"
+  dbname: "${TAP_POSTGRES_DB}"
+  logical_poll_total_seconds: 5
+  break_at_end_lsn: false
+  max_run_seconds: 7
+  fastsync_parallelism: 1
+
+target: "data_diff_snowflake_dwh"
+batch_size_rows: 20000
+stream_buffer_size: 0
+
+data_diff_defaults:
+  frequency: "0 * * * *"
+  window_start: "-1d"
+  window_end: "0s"
+  statement_timeout: "5min"
+
+schemas:
+  - source_schema: "logical1"
+    target_schema: "ppw_e2e_data_diff_sf${TARGET_SNOWFLAKE_SCHEMA_POSTFIX}"
+
+    tables:
+      - table_name: "logical1_table1"
+        replication_method: "LOG_BASED"
+        data_diff:
+          # row_checksum is the check most likely to diverge across engines, so the
+          # cross-database route is where it needs proving.
+          checks:
+            - schema_compatibility
+            - row_count
+            - distinct_key_count
+            - null_key_count
+            - duplicate_key_count
+            - min_key
+            - max_key
+            - row_checksum
+          key_column: "cid"
+          timestamp_column: "updated_at"
+          compare_columns:
+            - "cvarchar"

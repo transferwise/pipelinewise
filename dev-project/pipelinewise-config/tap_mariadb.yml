@@ -31,6 +31,15 @@ target: "target_postgres"              # ID of the target connector where the da
 batch_size_rows: 20000                 # Batch size for the stream to optimise load performance
 stream_buffer_size: 0                  # In-memory buffer size (MB) between taps and targets for asynchronous data pipes
 
+# Default schedule for every table-level data_diff block in this tap.
+# Fires every 6 hours over a 12h window, so consecutive windows overlap and
+# cannot leave a coverage gap. Ends 3h back to let replication settle.
+data_diff_defaults:
+  frequency: "0 */6 * * *"
+  window_start: "-15h"
+  window_end: "-3h"
+  statement_timeout: "20min"
+
 
 # ------------------------------------------------------------------------------
 # Source to target Schema mapping
@@ -53,6 +62,21 @@ schemas:
                                           # Important! Log based must be enabled in MySQL and
                                           #            requires config adjustments
                                           # Doc: https://transferwise.github.io/pipelinewise/connectors/taps/mysql.html
+        data_diff:
+          name: "weight-unit-reconciliation"
+          checks:
+            - schema_compatibility
+            - row_count
+            - distinct_key_count
+            - null_key_count
+            - min_key
+            - max_key
+            - row_checksum
+          key_column: "weight_unit_id"
+          timestamp_column: "date_updated"
+          compare_columns:
+            - "weight_unit_name"
+            - "isActive"
 
       ### Table with INCREMENTAL replication
       - table_name: "address"
@@ -70,10 +94,33 @@ schemas:
 
           - column: "date_created"
             type: "MASK-DATE"
+        data_diff:
+          name: "address-reconciliation"
+          checks:
+            - schema_compatibility
+            - row_count
+            - distinct_key_count
+            - null_key_count
+            - min_key
+            - max_key
+          key_column: "address_id"
+          timestamp_column: "date_updated"
 
       ### Table with FULL_TABLE replication
       - table_name: "order"
         replication_method: "FULL_TABLE"
+        data_diff:
+          # Example: fully inline timing — does NOT use data_diff_defaults
+          name: "order-full-table-check"
+          frequency: "0 */12 * * *"
+          window_start: "-7d"
+          window_end: "-12h"
+          statement_timeout: "30min"
+          checks:
+            - schema_compatibility
+            - row_count
+          key_column: "order_id"
+          timestamp_column: "date_updated"
 
       ### Table with no primary key
       - table_name: "no_pk_table"
@@ -82,6 +129,17 @@ schemas:
       ### Table with binary and varbinary columns
       - table_name: "table_with_binary"
         replication_method: "LOG_BASED"
+        # Example: overrides only frequency, inherits the rest from data_diff_defaults.
+        # Left commented out: there is no `enabled` flag, so a block means an active check.
+        # data_diff:
+        #   name: "binary-table-drift-check"
+        #   frequency: "0 */12 * * *"
+        #   checks:
+        #     - schema_compatibility
+        #     - row_count
+        #     - distinct_key_count
+        #   key_column: "id"
+        #   timestamp_column: "created_at"
 
       ### Table with reserved words and columns and special characters
       - table_name: "edgydata"

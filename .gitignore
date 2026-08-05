@@ -21,6 +21,7 @@ test-reports/
 
 # Generated test yamls
 tests/end_to_end/test-project/*.yml
+tests/end_to_end/data_diff/test-project/*.yml
 
 # Dev project
 dev-project/.pipelinewise

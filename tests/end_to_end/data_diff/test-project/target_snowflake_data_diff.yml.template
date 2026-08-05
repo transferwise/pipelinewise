@@ -1,0 +1,21 @@
+---
+
+id: "data_diff_snowflake_dwh"
+name: "Data-diff Snowflake target"
+type: "target-snowflake"
+
+db_conn:
+  account: "${TARGET_SNOWFLAKE_ACCOUNT}"
+  dbname: "${TARGET_SNOWFLAKE_DBNAME}"
+  user: "${TARGET_SNOWFLAKE_USER}"
+  private_key: "${TARGET_SNOWFLAKE_PRIVATE_KEY}"
+  warehouse: "${TARGET_SNOWFLAKE_WAREHOUSE}"
+
+  aws_access_key_id: "${TARGET_SNOWFLAKE_AWS_ACCESS_KEY}"
+  aws_secret_access_key: "${TARGET_SNOWFLAKE_AWS_SECRET_ACCESS_KEY}"
+  s3_bucket: "${TARGET_SNOWFLAKE_S3_BUCKET}"
+  s3_key_prefix: "${TARGET_SNOWFLAKE_S3_KEY_PREFIX}"
+  s3_acl: "${TARGET_SNOWFLAKE_S3_ACL}"
+
+  stage: "${TARGET_SNOWFLAKE_STAGE}"
+  file_format: "${TARGET_SNOWFLAKE_FILE_FORMAT}"
