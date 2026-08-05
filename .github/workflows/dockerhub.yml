@@ -31,7 +31,7 @@ jobs:
 
     - name: Build and push main image
       id: docker_build_main
-      uses: docker/build-push-action@v2
+      uses: docker/build-push-action@v7
       with:
         file: ./Dockerfile
         context: .
@@ -42,7 +42,7 @@ jobs:
 
     - name: Build and push barebone image
       id: docker_build_barebone
-      uses: docker/build-push-action@v2
+      uses: docker/build-push-action@v7
       with:
         file: ./Dockerfile.barebone
         context: .
@@ -53,7 +53,7 @@ jobs:
           
     - name: Build and push main image with only default connectors
       id: docker_build_default
-      uses: docker/build-push-action@v2
+      uses: docker/build-push-action@v7
       with:
         file: ./Dockerfile
         context: .
