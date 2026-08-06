@@ -138,7 +138,8 @@ Example YAML for target-snowflake:
       # client_side_encryption_master_key: when both are set, files are not client side
       # encrypted, so the stage must not declare AWS_CSE encryption.
       #encryption_type: "KMS"                       # (Default: None) The type of encryption to use. Current supported options are: 'none' and 'KMS'.
-      #encryption_key: "<ENCRYPTION_KEY_ID>"        # Optional: The KMS encryption key ID (e.g. '1234abcd-1234-1234-1234-1234abcd1234') or ARN.
+      #encryption_key: "<ENCRYPTION_KEY_ID>"        # Optional: The KMS key ID (e.g. '1234abcd-1234-1234-1234-1234abcd1234'), key ARN or alias.
+                                                    # An alias resolves in the account making the request.
                                                     # If omitted, the S3 bucket default KMS key is used.
                                                     # This field is ignored if 'encryption_type' is none or blank.
 
@@ -179,7 +180,7 @@ integration avoids embedding static credentials in the stage definition:
     CREATE STAGE {database}.{schema}.{stage_name}
     URL = 's3://{s3_bucket}/{s3_key_prefix}'
     STORAGE_INTEGRATION = {integration_name}
-    ENCRYPTION = (TYPE = 'AWS_SSE_KMS' KMS_KEY_ID = '{encryption_key}');
+    ENCRYPTION = (TYPE = 'AWS_SSE_KMS' KMS_KEY_ID = '{kms_key_id}');
 
     GRANT USAGE ON STAGE {database}.{schema}.{stage_name} TO ROLE ppw_target_snowflake;
 
@@ -188,9 +189,12 @@ Run ``DESC STORAGE INTEGRATION {integration_name}`` to read the
 trust policy must allow.
 
 **Note**:
- * ``KMS_KEY_ID`` is only used when unloading; Snowflake ignores it on load and decrypts
-   using whichever key each object was written with. Set it so it matches ``encryption_key``
-   rather than relying on it for loads.
+ * ``KMS_KEY_ID`` takes a key ID, whereas ``encryption_key`` is sent to S3 and also accepts
+   a key ARN or an alias. The two settings therefore need not be written identically even
+   when they name the same key.
+ * Snowflake only uses ``KMS_KEY_ID`` when unloading. On load it ignores the value and
+   decrypts using whichever key each object was written with, so a stale ``KMS_KEY_ID`` does
+   not break loads; a missing ``kms:Decrypt`` grant does.
  * The stage must point at the same bucket and prefix as ``s3_bucket`` and ``s3_key_prefix``.
 
 Grant KMS permissions on the key named in ``encryption_key``, or on the bucket default key
