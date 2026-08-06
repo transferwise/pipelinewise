@@ -21,6 +21,9 @@ class S3Mock:
     def copy_object(self, **kwargs):
         """Mock if needed"""
 
+    def upload_file(self, file, bucket, s3_key, ExtraArgs=None):
+        """Mock if needed"""
+
     # pylint: disable=unused-argument
     def head_object(self, **kwargs):
         """Mock if needed"""
@@ -735,3 +738,107 @@ class TestFastSyncTargetSnowflake(TestCase):
             },
             MetadataDirective='REPLACE',
         )
+
+
+class TestFastSyncTargetSnowflakeS3Encryption(TestCase):
+    """
+    Unit tests for S3 upload encryption in fastsync target snowflake
+    """
+
+    def setUp(self) -> None:
+        """Initialise test FastSyncTargetSnowflake object"""
+        self.snowflake = FastSyncTargetSnowflakeMock(
+            connection_config={'s3_bucket': 'dummy_bucket', 'stage': 'dummy_stage'},
+            transformation_config={},
+        )
+        self.mock_upload_file = MagicMock()
+        self.snowflake.s3.upload_file = self.mock_upload_file
+
+    def test_upload_without_encryption(self):
+        """Validate that no encryption headers are sent when nothing is configured"""
+        self.snowflake.upload_to_s3('/tmp/some_file.csv.gz')
+
+        self.assertIsNone(self.mock_upload_file.call_args[1]['ExtraArgs'])
+
+    def test_upload_with_sse_kms(self):
+        """Validate that SSE-KMS headers are sent when a KMS key is configured"""
+        self.snowflake.connection_config['encryption_type'] = 'KMS'
+        self.snowflake.connection_config['encryption_key'] = 'test-key-id'
+        self.snowflake.upload_to_s3('/tmp/some_file.csv.gz')
+
+        self.assertDictEqual(
+            self.mock_upload_file.call_args[1]['ExtraArgs'],
+            {'ServerSideEncryption': 'aws:kms', 'SSEKMSKeyId': 'test-key-id'},
+        )
+
+    def test_upload_with_sse_kms_and_acl(self):
+        """Validate that SSE-KMS and ACL headers are combined"""
+        self.snowflake.connection_config['s3_acl'] = 'bucket-owner-full-control'
+        self.snowflake.connection_config['encryption_type'] = 'KMS'
+        self.snowflake.connection_config['encryption_key'] = 'test-key-id'
+        self.snowflake.upload_to_s3('/tmp/some_file.csv.gz')
+
+        self.assertDictEqual(
+            self.mock_upload_file.call_args[1]['ExtraArgs'],
+            {
+                'ACL': 'bucket-owner-full-control',
+                'ServerSideEncryption': 'aws:kms',
+                'SSEKMSKeyId': 'test-key-id',
+            },
+        )
+
+    def test_sse_kms_takes_precedence_over_client_side_encryption(self):
+        """Validate that SSE-KMS wins and the file is not client side encrypted"""
+        self.snowflake.connection_config[
+            'client_side_encryption_master_key'
+        ] = 'dGVzdC1tYXN0ZXIta2V5LWJhc2U2NA=='
+        self.snowflake.connection_config['encryption_type'] = 'KMS'
+        self.snowflake.connection_config['encryption_key'] = 'test-key-id'
+        self.snowflake.upload_to_s3('/tmp/some_file.csv.gz')
+
+        # The original file is uploaded as-is, with no client side encryption metadata
+        self.assertEqual(self.mock_upload_file.call_args[0][0], '/tmp/some_file.csv.gz')
+        extra_args = self.mock_upload_file.call_args[1]['ExtraArgs']
+        self.assertEqual(extra_args['ServerSideEncryption'], 'aws:kms')
+        self.assertNotIn('Metadata', extra_args)
+
+    def test_upload_with_kms_and_no_key_uses_bucket_default(self):
+        """Validate that omitting encryption_key falls back to the bucket default KMS key"""
+        self.snowflake.connection_config['encryption_type'] = 'KMS'
+        self.snowflake.upload_to_s3('/tmp/some_file.csv.gz')
+
+        self.assertDictEqual(
+            self.mock_upload_file.call_args[1]['ExtraArgs'],
+            {'ServerSideEncryption': 'aws:kms'},
+        )
+
+    def test_upload_with_encryption_type_none(self):
+        """Validate that an explicit none encryption type sends no headers"""
+        self.snowflake.connection_config['encryption_type'] = 'none'
+        self.snowflake.upload_to_s3('/tmp/some_file.csv.gz')
+
+        self.assertIsNone(self.mock_upload_file.call_args[1]['ExtraArgs'])
+
+    def test_unsupported_encryption_type_raises(self):
+        """Validate that an unsupported encryption type fails loudly"""
+        self.snowflake.connection_config['encryption_type'] = 'AES256'
+
+        with self.assertRaises(NotImplementedError):
+            self.snowflake.upload_to_s3('/tmp/some_file.csv.gz')
+
+    def test_archive_copy_with_sse_kms(self):
+        """Validate that archived copies carry the SSE-KMS headers of the original upload"""
+        mock_copy_object = MagicMock()
+        self.snowflake.s3.copy_object = mock_copy_object
+        self.snowflake.connection_config['s3_bucket'] = 'some_bucket'
+        self.snowflake.connection_config['encryption_type'] = 'KMS'
+        self.snowflake.connection_config['encryption_key'] = 'test-key-id'
+        self.snowflake.copy_to_archive(
+            'snowflake-import/ppw_20210615115603_fastsync.csv.gz',
+            'some-tap',
+            'some_schema.some_table',
+        )
+
+        call_kwargs = mock_copy_object.call_args[1]
+        self.assertEqual(call_kwargs['ServerSideEncryption'], 'aws:kms')
+        self.assertEqual(call_kwargs['SSEKMSKeyId'], 'test-key-id')

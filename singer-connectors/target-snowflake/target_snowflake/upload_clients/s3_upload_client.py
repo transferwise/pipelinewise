@@ -44,6 +44,30 @@ class S3UploadClient(BaseUploadClient):
                                   region_name=config.get('s3_region_name'),
                                   endpoint_url=config.get('s3_endpoint_url'))
 
+    def _get_server_side_encryption_args(self) -> dict:
+        """
+        Build the server side encryption ExtraArgs from config.
+
+        Uses the same 'encryption_type' and 'encryption_key' keys as target-s3-csv. An
+        'encryption_key' is optional: without one S3 applies the bucket default KMS key.
+        """
+        encryption_type = self.connection_config.get('encryption_type')
+
+        if encryption_type is None or encryption_type.lower() == 'none':
+            return {}
+
+        if encryption_type.lower() != 'kms':
+            raise NotImplementedError(
+                f"Encryption type '{encryption_type}' is not supported. Expected: 'none' or 'KMS'"
+            )
+
+        encryption_args = {'ServerSideEncryption': 'aws:kms'}
+        encryption_key = self.connection_config.get('encryption_key')
+        if encryption_key:
+            encryption_args['SSEKMSKeyId'] = encryption_key
+
+        return encryption_args
+
     def upload_file(self, file, stream, temp_dir=None):
         """Upload file to an external snowflake stage on s3"""
         # Generating key in S3 bucket
@@ -55,9 +79,19 @@ class S3UploadClient(BaseUploadClient):
         s3_key = f"{s3_key_prefix}pipelinewise_{stream}_{timestamp}_{os.path.basename(file)}"
         self.logger.info('Target S3 bucket: %s, local file: %s, S3 key: %s', bucket, file, s3_key)
 
-        # Encrypt csv if client side encryption enabled
         master_key = self.connection_config.get('client_side_encryption_master_key', '')
-        if master_key != '':
+        sse_args = self._get_server_side_encryption_args()
+
+        # Server side encryption takes precedence over client side encryption. Files are then
+        # uploaded unencrypted by us, so a Snowflake stage declaring AWS_CSE cannot read them.
+        if sse_args and master_key != '':
+            self.logger.warning(
+                'Both client_side_encryption_master_key and encryption_type are configured. '
+                'Server side encryption takes precedence and files are not client side encrypted.'
+            )
+
+        # Encrypt csv if client side encryption enabled
+        if not sse_args and master_key != '':
             # Encrypt the file
             encryption_material = SnowflakeFileEncryptionMaterial(
                 query_stage_master_key=master_key,
@@ -86,10 +120,7 @@ class S3UploadClient(BaseUploadClient):
         # Upload to S3 without client-side encrypting
         else:
             extra_args = {'ACL': s3_acl} if s3_acl else {}
-            kms_key_id = self.connection_config.get('s3_server_side_encryption_kms_key_id', '')
-            if kms_key_id:
-                extra_args['ServerSideEncryption'] = 'aws:kms'
-                extra_args['SSEKMSKeyId'] = kms_key_id
+            extra_args.update(sse_args)
             self.s3_client.upload_file(file, bucket, s3_key, ExtraArgs=extra_args or None)
 
         return s3_key
@@ -106,6 +137,11 @@ class S3UploadClient(BaseUploadClient):
         source_bucket, source_key = copy_source.split("/", 1)
         metadata = self.s3_client.head_object(Bucket=source_bucket, Key=source_key).get('Metadata', {})
         metadata.update(target_metadata)
+
+        # The copy creates a new S3 object, so it needs the same encryption headers as the original
+        # upload. Without them a bucket policy that enforces aws:kms rejects the copy.
+        encryption_args = self._get_server_side_encryption_args()
+
         # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#S3.Client.copy_object
         self.s3_client.copy_object(CopySource=copy_source, Bucket=target_bucket, Key=target_key,
-                                   Metadata=metadata, MetadataDirective="REPLACE")
+                                   Metadata=metadata, MetadataDirective="REPLACE", **encryption_args)

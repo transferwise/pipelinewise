@@ -47,6 +47,19 @@
         },
         "client_side_encryption_master_key": {
           "type": "string"
+        },
+        "encryption_type": {
+          "type": "string",
+          "enum": [
+            "none",
+            "None",
+            "NONE",
+            "kms",
+            "KMS"
+          ]
+        },
+        "encryption_key": {
+          "type": "string"
         }
       },
       "required": [

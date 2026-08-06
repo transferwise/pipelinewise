@@ -106,6 +106,30 @@ class FastSyncTargetSnowflake:
 
                 return []
 
+    def get_server_side_encryption_args(self) -> Dict:
+        """
+        Build the server side encryption ExtraArgs from config.
+
+        Uses the same 'encryption_type' and 'encryption_key' keys as target-s3-csv. An
+        'encryption_key' is optional: without one S3 applies the bucket default KMS key.
+        """
+        encryption_type = self.connection_config.get('encryption_type')
+
+        if encryption_type is None or encryption_type.lower() == 'none':
+            return {}
+
+        if encryption_type.lower() != 'kms':
+            raise NotImplementedError(
+                f'Encryption type \'{encryption_type}\' is not supported. Expected: \'none\' or \'KMS\''
+            )
+
+        encryption_args = {'ServerSideEncryption': 'aws:kms'}
+        encryption_key = self.connection_config.get('encryption_key')
+        if encryption_key:
+            encryption_args['SSEKMSKeyId'] = encryption_key
+
+        return encryption_args
+
     def upload_to_s3(self, file, tmp_dir=None):
         bucket = self.connection_config['s3_bucket']
         s3_acl = self.connection_config.get('s3_acl')
@@ -119,9 +143,19 @@ class FastSyncTargetSnowflake:
             s3_key,
         )
 
-        # Encrypt csv if client side encryption enabled
         master_key = self.connection_config.get('client_side_encryption_master_key', '')
-        if master_key != '':
+        sse_args = self.get_server_side_encryption_args()
+
+        # Server side encryption takes precedence over client side encryption. Files are then
+        # uploaded unencrypted by us, so a Snowflake stage declaring AWS_CSE cannot read them.
+        if sse_args and master_key != '':
+            LOGGER.warning(
+                'Both client_side_encryption_master_key and encryption_type are configured. '
+                'Server side encryption takes precedence and files are not client side encrypted.'
+            )
+
+        # Encrypt csv if client side encryption enabled
+        if not sse_args and master_key != '':
             # Encrypt the file
             LOGGER.info('Encrypting file %s...', file)
             encryption_material = SnowflakeFileEncryptionMaterial(
@@ -147,10 +181,7 @@ class FastSyncTargetSnowflake:
         # Upload to S3 without client-side encrypting
         else:
             extra_args = {'ACL': s3_acl} if s3_acl else {}
-            kms_key_id = self.connection_config.get('s3_server_side_encryption_kms_key_id', '')
-            if kms_key_id:
-                extra_args['ServerSideEncryption'] = 'aws:kms'
-                extra_args['SSEKMSKeyId'] = kms_key_id
+            extra_args.update(sse_args)
             self.s3.upload_file(file, bucket, s3_key, ExtraArgs=extra_args or None)
 
         return s3_key
@@ -195,12 +226,17 @@ class FastSyncTargetSnowflake:
         copy_source = '{}/{}'.format(source_s3_bucket, source_s3_key)
         LOGGER.info('Archiving %s to %s', copy_source, archive_key)
 
+        # The archived copy is a new S3 object, so it needs the same encryption headers as the
+        # original upload. Without them a bucket policy that enforces aws:kms rejects the copy.
+        encryption_args = self.get_server_side_encryption_args()
+
         self.s3.copy_object(
             CopySource=copy_source,
             Bucket=archive_s3_bucket,
             Key=archive_key,
             Metadata=metadata,
             MetadataDirective='REPLACE',
+            **encryption_args,
         )
 
     def create_schema(self, schema):
