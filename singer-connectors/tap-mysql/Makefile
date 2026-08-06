@@ -10,8 +10,10 @@ pylint:
 
 unit_test:
 	. ./venv/bin/activate ;\
-	nosetests -c .noserc --cover-min-percentage=47 tests/unit $(extra_args)
+	pytest --cov=tap_mysql --cov-fail-under=47 -v tests/unit $(extra_args)
+
+unit_test_cov: unit_test
 
 integration_test:
 	. ./venv/bin/activate ;\
-	nosetests -c .noserc tests/integration $(extra_args)
+	pytest --cov=tap_mysql -v tests/integration $(extra_args)

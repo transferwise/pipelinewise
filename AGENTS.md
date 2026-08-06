@@ -14,17 +14,19 @@ Read every scoped file touched by the task:
 
 Scoped files apply even when they were not auto-loaded from the current directory; multi-area changes follow all relevant files. More specific guidance adds to this file. Explicit user instructions win.
 
+Each `CLAUDE.md` is a relative symlink to the adjacent `AGENTS.md`. Edit the `AGENTS.md` and preserve the symlink.
+
 ## Architecture
 
 - **Framework:** Singer JSON messages over stdout/stdin; YAML definitions and generated JSON config, state, and catalogs.
 - **CLI:** argparse in `pipelinewise/cli/__init__.py`, dispatching to `PipelineWise`. Deprecated `sync_tables` maps to `fast_sync`; canonical `import_config` and deprecated `import` map to `import_project`.
-- **Singer path:** `tap | transform | target` for ongoing INCREMENTAL and LOG_BASED replication.
+- **Singer path:** `tap | [transform-field] | [mbuffer] | target`; handles INCREMENTAL/LOG_BASED and FULL_TABLE streams not selected for FastSync.
 - **FastSync:** native full or filtered bulk transfer, not a replication method. See `pipelinewise/AGENTS.md` and `docs/concept/fastsync.rst`.
 
 ## Environment
 
-- `make pipelinewise` installs PipelineWise, backend-db, and data-diff into canonical `.virtualenvs/pipelinewise/`; activate it before host validation.
-- A local `.venv/` is non-canonical and may be stale. Connectors use separate environments under `.virtualenvs/`.
+- `make pipelinewise` creates `.virtualenvs/pipelinewise/` and installs the editable root package with test extras; activate it before host validation.
+- Do not use a repository `.venv/`. Root connector installs use `.virtualenvs/<name>/`; connector-local Makefiles may create `venv/`. Never mix interpreters.
 - Run host commands below from the repository root.
 
 ## Validation
@@ -69,13 +71,9 @@ CI creates `.env` from `.env.template`; locally, never overwrite an existing `.e
 ### Scoped checks
 
 - Database, connector, migration, FastSync, data-diff, or E2E work: follow `tests/end_to_end/AGENTS.md` and report each relevant group.
-- Connector source: follow `singer-connectors/AGENTS.md`; repository lint and unit gates do not inspect it.
+- Connector source: follow `singer-connectors/AGENTS.md`; root lint/unit gates do not inspect it. Connector CI separately installs all connectors and runs the Python 3.12 tap-mysql/tap-postgres `make unit_test_cov` gates.
 - Docs: follow `docs/AGENTS.md`; warnings fail the build.
 - Always run `git diff --check`.
-
-## Connector CI boundary
-
-`singer-connectors/` is tracked vendored source, not submodules. CI checks that all connectors install via `make pipelinewise_no_test_extras all_connectors`; it does not run connector tests. Behavioral changes need connector-local tests and an E2E route when one exists. Coordinate non-trivial divergence with upstream. Details are in `singer-connectors/AGENTS.md`.
 
 ## Module boundaries
 
@@ -83,7 +81,7 @@ CI creates `.env` from `.env.template`; locally, never overwrite an existing `.e
 - `pipelinewise.data_diff` may import backend-db, but not Singer or FastSync execution.
 - Data-diff reads generated connector JSON only through its runtime loader.
 - `import_config` persists and versions data-diff definitions only after connector generation and discovery succeed.
-- Boundary tests enforce these directions.
+- An AST test enforces the backend-db to data-diff prohibition; add equivalent coverage when changing the other boundaries.
 
 ## Style and safety
 
@@ -93,6 +91,7 @@ CI creates `.env` from `.env.template`; locally, never overwrite an existing `.e
 - Never run `pre-commit run --all-files`; it mutates files broadly and is not a CI gate.
 - Do not reformat or lint-fix unrelated files. Preserve user changes in dirty worktrees.
 - Never commit secrets, `.tfvars`, private keys, or populated environment files.
+- When adding a third-party import, declare it in the owning package's `setup.py`; do not rely on transitive installation.
 - Use `import_config` in docs, examples, tests, and comments; `import` is only a deprecated alias.
 
 ## Git and completion
@@ -106,5 +105,6 @@ Before completion:
 2. Configuration validation passes when applicable.
 3. Relevant E2E groups run per `tests/end_to_end/AGENTS.md`; report pass/skip/fail counts and never call a skipped suite complete.
 4. User-facing behavior/config changes update and validate docs.
-5. `git diff --check` passes and `git status` contains only expected files.
-6. Report failed, skipped, or unavailable checks with output or blocker; never call partial verification complete.
+5. Release-visible connector changes update the root changelog per `singer-connectors/AGENTS.md`.
+6. `git diff --check` passes and `git status` contains only expected files.
+7. Report failed, skipped, or unavailable checks with output or blocker; never call partial verification complete.

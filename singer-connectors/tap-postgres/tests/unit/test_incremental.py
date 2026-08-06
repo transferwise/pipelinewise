@@ -32,7 +32,7 @@ class TestIncremental(TestCase):
             'use_secondary': False,
             'limit': None
         }
-        self.stream = {'tap_stream_id': 5, 'stream': 'bar', 'table_name': 'pg_tbl'}
+        self.stream = {'tap_stream_id': 'pg_catalog-pg_tbl', 'stream': 'bar', 'table_name': 'pg_tbl'}
         self.md_map = {
             (): {'schema-name': 'pg_catalog', 'replication-key': 'foo_key'},
             ('properties', 'foo_key'): {'sql-datatype': 'foo'},

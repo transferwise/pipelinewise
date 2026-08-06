@@ -7,4 +7,24 @@ updates:
   - package-ecosystem: "pip"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
+
+  - package-ecosystem: "pip"
+    directory: "/singer-connectors/tap-mysql"
+    schedule:
+      interval: "monthly"
+
+  - package-ecosystem: "pip"
+    directory: "/singer-connectors/tap-postgres"
+    schedule:
+      interval: "monthly"
+
+  - package-ecosystem: "pip"
+    directory: "/singer-connectors/target-snowflake"
+    schedule:
+      interval: "monthly"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"

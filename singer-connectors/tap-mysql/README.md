@@ -475,29 +475,25 @@ GRANT ALL PRIVILEGES ON tap_mysql_test.* TO <mysql-user>;
   export TAP_MYSQL_ENGINE=<engine>
 ```
 
-3. Install python test dependencies in a virtual env
+3. Install the test dependencies:
 
 ```bash
-python3 -m venv venv
-. venv/bin/activate
-pip install --upgrade pip
-pip install .[test]
+make venv
 ```
 
-4. To run tests:
+4. Run the unit and integration tests:
+
 ```bash
-nosetests -c .noserc tests
+make unit_test_cov
+make integration_test
 ```
 
 ### To run pylint:
 
-1. Install python dependencies and run python linter
-```
-  python3 -m venv venv
-  . venv/bin/activate
-  pip install --upgrade pip
-  pip install .[test]
-  pylint --rcfile .pylintrc tap_mysql
+After running `make venv`, run:
+
+```bash
+make pylint
 ```
 
 ---
