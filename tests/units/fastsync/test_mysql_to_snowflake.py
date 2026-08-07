@@ -1,4 +1,6 @@
 import unittest
+from unittest.mock import call
+
 from . import assertions
 
 from pipelinewise.fastsync.mysql_to_snowflake import (
@@ -13,7 +15,7 @@ TARGET = 'FastSyncTargetSnowflake'
 
 
 # pylint: disable=missing-function-docstring,invalid-name
-class S3CsvToPostgres(unittest.TestCase):
+class MySqlToSnowflake(unittest.TestCase):
     """
     Unit tests for fastsync mysql to snowflake
     """
@@ -21,15 +23,56 @@ class S3CsvToPostgres(unittest.TestCase):
     def test_tap_type_to_target_type_with_defined_tap_type_returns_equivalent_target_type(
         self,
     ):
-        self.assertEqual('BINARY', tap_type_to_target_type('binary', None))
-        self.assertEqual('VARIANT', tap_type_to_target_type('geometry', None))
-        self.assertEqual('VARIANT', tap_type_to_target_type('point', None))
-        self.assertEqual('VARIANT', tap_type_to_target_type('linestring', None))
-        self.assertEqual('VARIANT', tap_type_to_target_type('polygon', None))
-        self.assertEqual('VARIANT', tap_type_to_target_type('multipoint', None))
-        self.assertEqual('VARIANT', tap_type_to_target_type('multilinestring', None))
-        self.assertEqual('VARIANT', tap_type_to_target_type('multipolygon', None))
-        self.assertEqual('VARIANT', tap_type_to_target_type('geometrycollection', None))
+        type_mappings = {
+            ('char', None): 'VARCHAR',
+            ('varchar', None): 'VARCHAR',
+            ('binary', None): 'BINARY',
+            ('varbinary', None): 'BINARY',
+            ('blob', None): 'VARCHAR',
+            ('tinyblob', None): 'VARCHAR',
+            ('mediumblob', None): 'VARCHAR',
+            ('longblob', None): 'VARCHAR',
+            ('geometry', None): 'VARIANT',
+            ('point', None): 'VARIANT',
+            ('linestring', None): 'VARIANT',
+            ('polygon', None): 'VARIANT',
+            ('multipoint', None): 'VARIANT',
+            ('multilinestring', None): 'VARIANT',
+            ('multipolygon', None): 'VARIANT',
+            ('geometrycollection', None): 'VARIANT',
+            ('text', None): 'VARCHAR',
+            ('tinytext', None): 'VARCHAR',
+            ('mediumtext', None): 'VARCHAR',
+            ('longtext', None): 'VARCHAR',
+            ('enum', None): 'VARCHAR',
+            ('int', None): 'NUMBER',
+            ('tinyint', 'tinyint(1)'): 'BOOLEAN',
+            ('tinyint', 'tinyint(1) unsigned'): 'BOOLEAN',
+            ('tinyint', 'tinyint(1) unsigned zerofill'): 'BOOLEAN',
+            ('tinyint', 'TINYINT(1) ZEROFILL'): 'BOOLEAN',
+            ('tinyint', 'tinyint(4)'): 'NUMBER',
+            ('tinyint', 'tinyint(10)'): 'NUMBER',
+            ('tinyint', 'tinyint(11)'): 'NUMBER',
+            ('tinyint', None): 'NUMBER',
+            ('smallint', None): 'NUMBER',
+            ('mediumint', None): 'NUMBER',
+            ('bigint', None): 'NUMBER',
+            ('bit', None): 'BOOLEAN',
+            ('decimal', None): 'FLOAT',
+            ('double', None): 'FLOAT',
+            ('float', None): 'FLOAT',
+            ('bool', None): 'BOOLEAN',
+            ('boolean', None): 'BOOLEAN',
+            ('date', None): 'TIMESTAMP_NTZ',
+            ('datetime', None): 'TIMESTAMP_NTZ',
+            ('timestamp', None): 'TIMESTAMP_NTZ',
+            ('time', None): 'TIME',
+            ('json', None): 'VARIANT',
+        }
+
+        for source_type, expected_type in type_mappings.items():
+            with self.subTest(source_type=source_type):
+                self.assertEqual(expected_type, tap_type_to_target_type(*source_type))
 
     def test_tap_type_to_target_type_with_undefined_tap_type_returns_CHARACTER_VARYING(
         self,
@@ -40,14 +83,83 @@ class S3CsvToPostgres(unittest.TestCase):
 
     @staticmethod
     def test_sync_table_runs_successfully_returns_true():
-        assertions.assert_sync_table_returns_true_on_success(
-            sync_table, PACKAGE_IN_SCOPE, TAP, TARGET
+        assertions.assert_snowflake_sync_table_native_workflow(
+            sync_table, PACKAGE_IN_SCOPE, TAP, source_type='mysql',
+            type_mapper=tap_type_to_target_type,
+        )
+
+    @staticmethod
+    def test_sync_table_publish_failure_does_not_save_state():
+        assertions.assert_snowflake_sync_table_native_workflow(
+            sync_table,
+            PACKAGE_IN_SCOPE,
+            TAP,
+            source_type='mysql',
+            type_mapper=tap_type_to_target_type,
+            publish_error=RuntimeError('publish failed'),
+        )
+
+    @staticmethod
+    def test_sync_table_reports_state_failure():
+        assertions.assert_snowflake_sync_table_native_workflow(
+            sync_table,
+            PACKAGE_IN_SCOPE,
+            TAP,
+            source_type='mysql',
+            type_mapper=tap_type_to_target_type,
+            state_error=RuntimeError('state failed'),
+        )
+
+    @staticmethod
+    def test_sync_table_grant_failure_withholds_state():
+        assertions.assert_snowflake_sync_table_native_workflow(
+            sync_table,
+            PACKAGE_IN_SCOPE,
+            TAP,
+            source_type='mysql',
+            type_mapper=tap_type_to_target_type,
+            grant_error=RuntimeError('grant failed'),
+        )
+
+    @staticmethod
+    def test_sync_table_preserves_publication_and_finalization_failures():
+        assertions.assert_snowflake_sync_table_native_workflow(
+            sync_table,
+            PACKAGE_IN_SCOPE,
+            TAP,
+            source_type='mysql',
+            type_mapper=tap_type_to_target_type,
+            publish_error=RuntimeError('publish failed'),
+            grant_error=RuntimeError('grant failed'),
+        )
+
+    @staticmethod
+    def test_sync_table_later_upload_failure_rolls_back_staging():
+        assertions.assert_snowflake_sync_table_rolls_back_later_upload_failure(
+            sync_table,
+            PACKAGE_IN_SCOPE,
+            TAP,
+            source_type='mysql',
+        )
+
+    @staticmethod
+    def test_sync_table_reports_and_retries_upload_cleanup_debt():
+        assertions.assert_snowflake_sync_table_rolls_back_later_upload_failure(
+            sync_table,
+            PACKAGE_IN_SCOPE,
+            TAP,
+            source_type='mysql',
+            rollback_cleanup_error=RuntimeError('delete failed'),
         )
 
     @staticmethod
     def test_sync_table_exception_on_copy_table_returns_failed_table_name_and_exception():
         assertions.assert_sync_table_exception_on_failed_copy(
-            sync_table, PACKAGE_IN_SCOPE, TAP, TARGET
+            sync_table,
+            PACKAGE_IN_SCOPE,
+            TAP,
+            TARGET,
+            expected_cleanup=call.close_connections(silent=True),
         )
 
     @staticmethod

@@ -1,5 +1,9 @@
 from tests.end_to_end.helpers import assertions
-from tests.end_to_end.target_snowflake.tap_mariadb import TapMariaDB
+from tests.end_to_end.target_snowflake.tap_mariadb import (
+    TapMariaDB,
+    mariadb_initial_state_expectations,
+    mariadb_recurring_state_expectations,
+)
 
 
 class TestReplicateMariaDBToSFSoftDelete(TapMariaDB):
@@ -11,11 +15,21 @@ class TestReplicateMariaDBToSFSoftDelete(TapMariaDB):
 
     def test_log_based_delete_preserves_deleted_timestamp(self):
         """Preserve valid deletion metadata while nulling an invalid source date."""
-        assertions.assert_run_tap_success(self.tap_id, self.target_id, ['fastsync', 'singer'])
+        assertions.assert_run_tap_success(
+            self.tap_id,
+            self.target_id,
+            ['fastsync', 'singer'],
+            expected_state_streams=mariadb_initial_state_expectations(),
+        )
 
         self.e2e_env.delete_record_from_source('mysql', 'weight_unit', 'WHERE weight_unit_id=25')
 
-        assertions.assert_run_tap_success(self.tap_id, self.target_id, ['singer'])
+        assertions.assert_run_tap_success(
+            self.tap_id,
+            self.target_id,
+            ['fastsync', 'singer'],
+            expected_state_streams=mariadb_recurring_state_expectations(),
+        )
 
         records = self.e2e_env.run_query_target_snowflake(
             f'SELECT "_SDC_DELETED_AT", "DATE_CREATED" '

@@ -1,44 +1,58 @@
 .. _tap-twilio:
 
-Tap Twilio
-----------
+Twilio source
+=============
 
-The Twilio tap extracts standard Twilio, TaskRouter, and Programmable Chat
-resources. Generate a starting configuration with ``pipelinewise init`` (see
-:ref:`generating_pipelines`), then edit ``tap_twilio.yml``.
+``tap-twilio`` extracts standard Twilio, TaskRouter, and Programmable Chat
+resources.
 
-``account_sid`` and ``auth_token`` are required. ``start_date`` is the default
-incremental starting point when a stream has no bookmark. ``user_agent`` is an
-optional identifier, such as a team email address, for API request logging.
+.. list-table:: Support
+   :header-rows: 1
+   :widths: 28 24 48
+   :width: 100%
+
+   * - Source
+     - Status
+     - Load path
+   * - Twilio
+     - Experimental
+     - Singer only
+
+
+Configuration
+-------------
 
 .. code-block:: yaml
 
-    id: "twilio"
-    name: "Twilio"
-    type: "tap-twilio"
-    owner: "data-team@example.com"
+   id: "twilio"
+   name: "Twilio"
+   type: "tap-twilio"
+   owner: "data-platform@example.com"
+   db_conn:
+     account_sid: "<ACCOUNT_SID>"
+     auth_token: "{{ env_var['TWILIO_AUTH_TOKEN'] }}"
+     start_date: "2024-01-01T00:00:00Z"
+     user_agent: "data-platform@example.com"
+   target: "snowflake"
+   batch_size_rows: 20000
+   stream_buffer_size: 0
+   default_target_schema: "twilio"
+   schemas:
+     - source_schema: "twilio"
+       target_schema: "twilio"
+       tables:
+         - table_name: "workspaces"
+         - table_name: "activities"
+         - table_name: "events"
+         - table_name: "tasks"
 
-    db_conn:
-      account_sid: "<TWILIO_ACCOUNT_SID>"
-      auth_token: "<TWILIO_AUTH_TOKEN>"
-      start_date: "2024-01-01T00:00:00Z"
-      user_agent: "data-team@example.com"
+``account_sid`` and ``auth_token`` are required. ``start_date`` is the initial
+incremental boundary when no bookmark exists. Some streams are full-table and
+can retrieve substantial data on every run; check ``members`` and
+``chat_messages`` volume before selecting them.
 
-    target: "snowflake"
-    batch_size_rows: 20000
-    stream_buffer_size: 0
-    default_target_schema: "twilio"
+Use discovery to inspect the full stream list and verify API permissions:
 
-    schemas:
-      - source_schema: "twilio"
-        target_schema: "twilio"
-        tables:
-          - table_name: "workspaces"
-          - table_name: "activities"
-          - table_name: "events"
-          - table_name: "tasks"
+.. code-block:: bash
 
-Some streams use ``FULL_TABLE`` internally and may retrieve a large amount of
-data on every run. In particular, add ``members`` and ``chat_messages`` only
-after checking their expected volume. Run
-``pipelinewise discover_tap --tap twilio --target snowflake`` to see the full stream list.
+   pipelinewise discover_tap --tap twilio --target snowflake

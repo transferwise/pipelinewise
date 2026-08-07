@@ -1,11 +1,16 @@
 import argparse
+from contextlib import contextmanager
+import fcntl
 import json
 import multiprocessing
 import os
 import logging
 import datetime
+import re
+import stat
+import tempfile
 
-from typing import Dict
+from typing import Callable, Dict, List, Tuple
 from pipelinewise.cli.utils import generate_random_string
 
 LOGGER = logging.getLogger(__name__)
@@ -13,6 +18,330 @@ LOGGER = logging.getLogger(__name__)
 SDC_EXTRACTED_AT = '_SDC_EXTRACTED_AT'
 SDC_BATCHED_AT = '_SDC_BATCHED_AT'
 SDC_DELETED_AT = '_SDC_DELETED_AT'
+
+
+class StagingUploadError(RuntimeError):
+    """An upload failed and its successfully uploaded parts still need cleanup."""
+
+    def __init__(self, upload_error, cleanup_error, s3_keys):
+        super().__init__(
+            f'{upload_error}; staging upload rollback failed: {cleanup_error}'
+        )
+        self.s3_keys = list(s3_keys)
+
+
+def delete_s3_objects(
+    snowflake,
+    s3_keys: List[str],
+    bucket: str,
+    cleanup_context='FastSync staging cleanup',
+    max_attempts=3,
+) -> None:
+    """Delete every staging object with bounded retries and report any debt."""
+    failures = []
+    for s3_key in s3_keys:
+        for attempt in range(1, max_attempts + 1):
+            try:
+                snowflake.s3.delete_object(Bucket=bucket, Key=s3_key)
+                break
+            except Exception as exc:
+                if attempt == max_attempts:
+                    failures.append((s3_key, exc))
+                else:
+                    LOGGER.warning(
+                        '%s retry %s/%s failed for s3://%s/%s: %s',
+                        cleanup_context,
+                        attempt,
+                        max_attempts,
+                        bucket,
+                        s3_key,
+                        exc,
+                    )
+
+    if failures:
+        details = '; '.join(
+            f's3://{bucket}/{s3_key}: {exc}' for s3_key, exc in failures
+        )
+        raise RuntimeError(f'{cleanup_context} failed after {max_attempts} attempts: {details}')
+
+
+def cleanup_staging(
+    snowflake,
+    s3_keys,
+    bucket,
+    target_schema=None,
+    table=None,
+    temp_created=False,
+) -> None:
+    """Attempt all S3 and Snowflake staging cleanup before reporting failures."""
+    failures = []
+    if s3_keys:
+        try:
+            delete_s3_objects(
+                snowflake,
+                s3_keys,
+                bucket,
+                cleanup_context='Failed FastSync rollback',
+            )
+        except Exception as exc:
+            failures.append(f'S3 objects: {exc}')
+
+    if temp_created and target_schema and table:
+        try:
+            snowflake.drop_table(
+                target_schema,
+                table,
+                is_temporary=True,
+                max_attempts=3,
+            )
+        except Exception as exc:
+            failures.append(f'Snowflake staging table: {exc}')
+
+    if failures:
+        raise RuntimeError('; '.join(failures))
+
+
+def apply_snowflake_table_grants(
+    snowflake,
+    target_config,
+    target_schema,
+    table,
+    is_temporary=False,
+) -> None:
+    """Grant schema usage and SELECT on one obfuscated staging or live table."""
+    grantees = get_grantees(target_config, table)
+
+    def grant_select_on_live_table(schema, role, to_group=False):
+        snowflake.grant_select_on_table(
+            schema,
+            table,
+            role,
+            is_temporary=is_temporary,
+            to_group=to_group,
+        )
+
+    run_post_publication_actions([
+        (
+            'schema usage grant',
+            lambda: grant_privilege(
+                target_schema, grantees, snowflake.grant_usage_on_schema
+            ),
+        ),
+        (
+            'live table select grant',
+            lambda: grant_privilege(
+                target_schema, grantees, grant_select_on_live_table
+            ),
+        ),
+    ])
+
+
+def retry_snowflake_table_grants(
+    snowflake,
+    target_config,
+    target_schema,
+    table,
+    is_temporary=False,
+    max_attempts=3,
+) -> None:
+    """Retry idempotent grants so a transient failure does not force republish."""
+    for attempt in range(1, max_attempts + 1):
+        try:
+            apply_snowflake_table_grants(
+                snowflake,
+                target_config,
+                target_schema,
+                table,
+                is_temporary=is_temporary,
+            )
+            return
+        except Exception as exc:
+            if attempt == max_attempts:
+                raise
+            LOGGER.warning(
+                'Snowflake grant retry %s/%s failed for %s.%s: %s',
+                attempt,
+                max_attempts,
+                target_schema,
+                table,
+                exc,
+            )
+
+
+def finalize_snowflake_fullsync(
+    snowflake,
+    s3_keys,
+    bucket,
+    target_config,
+    target_schema,
+    table,
+    publication_error=None,
+) -> None:
+    """Attempt finalization without masking an earlier publication failure."""
+    try:
+        run_post_publication_actions([
+            (
+                'grant application',
+                lambda: apply_snowflake_table_grants(
+                    snowflake, target_config, target_schema, table
+                ),
+            ),
+            (
+                'S3 staging cleanup',
+                lambda: delete_s3_objects(
+                    snowflake,
+                    s3_keys,
+                    bucket,
+                    cleanup_context='Successful FullSync staging cleanup',
+                ),
+            ),
+            (
+                'Snowflake staging cleanup',
+                lambda: snowflake.drop_table(
+                    target_schema,
+                    table,
+                    is_temporary=True,
+                    max_attempts=3,
+                ),
+            ),
+        ])
+    except Exception as finalization_error:
+        if publication_error is not None:
+            raise RuntimeError(
+                f'{publication_error}; post-publication finalization failed: '
+                f'{finalization_error}'
+            ) from publication_error
+        raise
+
+
+def staging_failure_result(
+    snowflake,
+    s3_keys,
+    bucket,
+    target_schema,
+    table,
+    temp_created,
+    operation_error,
+) -> str:
+    """Roll back staging and preserve both the operation and cleanup errors."""
+    result = f'{table}: {operation_error}'
+    if not s3_keys and not temp_created:
+        return result
+
+    try:
+        cleanup_staging(
+            snowflake,
+            s3_keys,
+            bucket,
+            target_schema=target_schema,
+            table=table,
+            temp_created=temp_created,
+        )
+    except Exception as cleanup_error:
+        LOGGER.exception('Failed to clean up FastSync staging')
+        result = f'{result}; staging cleanup failed: {cleanup_error}'
+    return result
+
+
+def partial_sync_failure_result(
+    snowflake,
+    target_config,
+    source_table,
+    target_schema,
+    target_table,
+    staging,
+    operation_error,
+) -> str:
+    """Repair published grants, roll back staging, and preserve every error."""
+    if staging['publication_attempted'] and not staging['grants_attempted']:
+        try:
+            retry_snowflake_table_grants(
+                snowflake, target_config, target_schema, source_table
+            )
+        except Exception as grant_error:
+            LOGGER.exception('Failed to repair PartialSync grants')
+            operation_error = RuntimeError(
+                f'{operation_error}; grant application failed: {grant_error}'
+            )
+
+    return staging_failure_result(
+        snowflake,
+        staging['s3_keys'],
+        target_config.get('s3_bucket'),
+        target_schema,
+        target_table or source_table,
+        staging['temp_created'],
+        operation_error,
+    )
+
+
+def get_expected_s3_key(snowflake, file_part):
+    """Resolve a deterministic key so ambiguous upload outcomes can be cleaned."""
+    key_resolver = getattr(snowflake, '_get_s3_key', None)
+    if not callable(key_resolver):
+        return None
+    expected_key = key_resolver(file_part)
+    return expected_key if isinstance(expected_key, str) else None
+
+
+def upload_files_to_s3(
+    snowflake,
+    file_parts: List[str],
+    temp_dir: str,
+    bucket: str,
+) -> Tuple[List[str], str]:
+    """Upload every part before removing local files and roll back failed staging."""
+    s3_keys = []
+    try:
+        for file_part in file_parts:
+            expected_key = get_expected_s3_key(snowflake, file_part)
+            if expected_key:
+                s3_keys.append(expected_key)
+            uploaded_key = snowflake.upload_to_s3(file_part, tmp_dir=temp_dir)
+            if expected_key:
+                s3_keys[-1] = uploaded_key
+            else:
+                s3_keys.append(uploaded_key)
+        for file_part in file_parts:
+            os.remove(file_part)
+    except Exception as upload_error:
+        try:
+            delete_s3_objects(
+                snowflake,
+                s3_keys,
+                bucket,
+                cleanup_context='Failed FastSync upload rollback',
+            )
+        except Exception as cleanup_error:
+            LOGGER.exception('Failed to fully roll back uploaded FastSync staging objects')
+            raise StagingUploadError(
+                upload_error, cleanup_error, s3_keys
+            ) from upload_error
+        raise
+
+    s3_key_pattern = (
+        re.sub(r'\.part\d*$', '', s3_keys[0])
+        if s3_keys
+        else 'NO_FILES_TO_LOAD'
+    )
+    return s3_keys, s3_key_pattern
+
+
+def run_post_publication_actions(
+    actions: List[Tuple[str, Callable[[], None]]],
+) -> None:
+    """Attempt every required post-publication action before reporting failures."""
+    failures = []
+    for action_name, action in actions:
+        try:
+            action()
+        except Exception as exc:
+            LOGGER.exception('Post-publication %s failed', action_name)
+            failures.append((action_name, exc))
+
+    if failures:
+        details = '; '.join(f'{action_name}: {exc}' for action_name, exc in failures)
+        raise RuntimeError(f'Post-publication actions failed: {details}') from failures[0][1]
 
 
 class NotSelectedTableException(Exception):
@@ -40,10 +369,53 @@ def load_json(path):
         return json.load(fil)
 
 
+def _fsync_directory(path):
+    """Persist a renamed state-file directory entry across host crashes."""
+    directory_descriptor = os.open(path, os.O_RDONLY)
+    try:
+        os.fsync(directory_descriptor)
+    finally:
+        os.close(directory_descriptor)
+
+
 def save_dict_to_json(path, data):
     LOGGER.info('Saving new state file to %s', path)
-    with open(path, 'w', encoding='utf-8') as fil:
-        fil.write(json.dumps(data, indent=4, sort_keys=True))
+    path = os.path.realpath(path)
+    directory = os.path.dirname(path)
+    file_mode = stat.S_IMODE(os.stat(path).st_mode) if os.path.exists(path) else None
+    file_descriptor, temp_path = tempfile.mkstemp(
+        dir=directory,
+        prefix=f'.{os.path.basename(path)}.',
+        suffix='.tmp',
+    )
+
+    try:
+        with os.fdopen(file_descriptor, 'w', encoding='utf-8') as fil:
+            json.dump(data, fil, indent=4, sort_keys=True)
+            fil.flush()
+            os.fsync(fil.fileno())
+        if file_mode is not None:
+            os.chmod(temp_path, file_mode)
+        os.replace(temp_path, path)
+        _fsync_directory(directory)
+    except Exception:
+        try:
+            os.remove(temp_path)
+        except FileNotFoundError:
+            pass
+        raise
+
+
+@contextmanager
+def _state_file_lock(path):
+    """Serialize state updates across independently started FastSync processes."""
+    state_path = os.path.realpath(path)
+    with open(f'{state_path}.lock', 'a', encoding='utf-8') as lock_file:
+        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+        try:
+            yield state_path
+        finally:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
 
 
 def check_config(config, required_keys):
@@ -254,18 +626,32 @@ def get_grantees(target_config, table):
     return grantees
 
 
-def grant_privilege(schema, grantees, grant_method, to_group=False):
+def _grantee_entries(grantees, to_group=False):
+    """Normalize configured grantees while preserving user/group semantics."""
+    if isinstance(grantees, str):
+        return [(grantees, to_group)]
     if isinstance(grantees, list):
-        for grantee in grantees:
-            grant_method(schema, grantee, to_group)
-    elif isinstance(grantees, str):
-        grant_method(schema, grantees, to_group)
-    elif isinstance(grantees, dict):
-        users = grantees.get('users')
-        groups = grantees.get('groups')
+        return [(grantee, to_group) for grantee in grantees]
+    if isinstance(grantees, dict):
+        return (
+            _grantee_entries(grantees.get('users'))
+            + _grantee_entries(grantees.get('groups'), to_group=True)
+        )
+    return []
 
-        grant_privilege(schema, users, grant_method)
-        grant_privilege(schema, groups, grant_method, to_group=True)
+
+def grant_privilege(schema, grantees, grant_method, to_group=False):
+    """Attempt a privilege grant for every configured grantee."""
+    failures = []
+    for grantee, grantee_is_group in _grantee_entries(grantees, to_group):
+        try:
+            grant_method(schema, grantee, grantee_is_group)
+        except Exception as exc:
+            failures.append((grantee, exc))
+
+    if failures:
+        details = '; '.join(f'{grantee}: {exc}' for grantee, exc in failures)
+        raise RuntimeError(f'Privilege grants failed: {details}') from failures[0][1]
 
 
 def save_state_file(path, table, bookmark, dbname=None):
@@ -285,21 +671,23 @@ def save_state_file(path, table, bookmark, dbname=None):
     if not path:
         return
 
-    # Load the current state file
-    state = {}
-    if os.path.exists(path):
-        state = load_json(path)
+    with _state_file_lock(path) as state_path:
+        # Load the current state file
+        state = {}
+        if os.path.exists(state_path):
+            state = load_json(state_path)
 
-    # Find the current table position
-    bookmarks = state.get('bookmarks', {})
+        # Find the current table position
+        bookmarks = state.get('bookmarks', {})
 
-    # Update the state file with the new values at the right place
-    state['currently_syncing'] = None
-    state['bookmarks'] = bookmarks
-    state['bookmarks'][stream_id] = bookmark
+        # Update the state file with the new values at the right place
+        state['currently_syncing'] = None
+        state['bookmarks'] = bookmarks
+        state['bookmarks'][stream_id] = bookmark
 
-    # Save the new state file
-    save_dict_to_json(path, state)
+        # Save the new state file
+        save_dict_to_json(state_path, state)
+        LOGGER.info('FastSync state updated for stream: %s', stream_id)
 
 
 def parse_args(required_config_keys: Dict) -> argparse.Namespace:

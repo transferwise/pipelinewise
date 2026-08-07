@@ -1,122 +1,64 @@
-
 .. _tap-mixpanel:
 
-Tap Mixpanel
-------------
+Mixpanel source
+===============
+
+``tap-mixpanel`` extracts one Mixpanel project through the export APIs.
+
+.. list-table:: Support
+   :header-rows: 1
+   :widths: 28 24 48
+   :width: 100%
+
+   * - Source
+     - Status
+     - Load path
+   * - Mixpanel
+     - Experimental
+     - Singer only
+
 
 Authentication
-''''''''''''''
+--------------
 
-The Mixpanel API uses Basic Authorization with the ``api_secret`` from the tap config in base-64 encoded format.
-It is slightly different than normal Basic Authorization with username/password. All requests include this
-header with the ``api_secret`` as the username, with no password.
-
-* Authorization: ``Basic <base-64 encoded api_secret>``
-
-More details may be found in the Mixpanel `API Authentication <https://developer.mixpanel.com/docs/data-export-api#section-authentication>`_
-instructions.
-
-The API secret can be found in the Mixpanel Console, upper-right Settings (gear icon),
-Organization Settings > Projects and in the Access Keys section. For this tap,
-only the ``api_secret`` is needed (the ``api_key`` is legacy and the token is used only for uploading data).
-
-.. warning::
-
-    Each Mixpanel project has a different ``api_secret``; therefore each Mixpanel pipeline instance is for a single project.
+The connector uses the project's ``api_secret`` as a Basic Authentication user
+with no password. Each project has a different secret, so configure one tap per
+project.
 
 
-Configuring what to extract
-'''''''''''''''''''''''''''
-
-PipelineWise configures every tap with a common structured YAML file format.
-A sample YAML for the Mixpanel tap can be generated into a project directory by
-following the steps in the :ref:`generating_pipelines` section.
-
-Example YAML for ``tap-mixpanel``:
+Configuration
+-------------
 
 .. code-block:: yaml
 
-    ---
+   id: "mixpanel"
+   name: "Mixpanel"
+   type: "tap-mixpanel"
+   owner: "data-platform@example.com"
+   db_conn:
+     api_secret: "{{ env_var['MIXPANEL_API_SECRET'] }}"
+     start_date: "2024-01-01"
+     date_window_size: 30
+     attribution_window: 5
+     project_timezone: "Europe/London"
+     denest_properties: "false"
+   target: "snowflake"
+   batch_size_rows: 20000
+   stream_buffer_size: 0
+   default_target_schema: "mixpanel"
+   schemas:
+     - source_schema: "mixpanel"
+       target_schema: "mixpanel"
+       tables:
+         - table_name: "export"
+         - table_name: "funnels"
+         - table_name: "revenue"
 
-    # ------------------------------------------------------------------------------
-    # General Properties
-    # ------------------------------------------------------------------------------
-    id: "mixpanel"                         # Unique identifier of the tap
-    name: "Mixpanel"                       # Name of the tap
-    type: "tap-mixpanel"                   # !! THIS SHOULD NOT CHANGE !!
-    owner: "somebody@foo.com"              # Data owner to contact
-    #send_alert: False                     # Optional: Disable all configured alerts on this tap
-    #slack_alert_channel: "#tap-channel"   # Optional: Sending a copy of specific tap alerts to this slack channel
+``date_window_size`` defaults to 30 days; reduce it for high-volume projects.
+``attribution_window`` repeats recent days to capture late attribution and
+therefore increases API and target work. Disabling property denesting avoids very
+wide tables by retaining nested responses in a JSON value.
 
-
-    # ------------------------------------------------------------------------------
-    # Source (Tap) - Mixpanel connection details
-    # ------------------------------------------------------------------------------
-    db_conn:
-      api_secret: "<MIXPANEL_API_SECRET>"       # Mixpanel API secret
-      start_date: "2020-10-01"                  # The default value to use if no bookmark exists for an endpoint
-      date_window_size: 30                      # Number of days for date window looping through transactional endpoints
-                                                # with from_date and to_date. Default date_window_size is 30 days.
-                                                # Clients with large volumes of events may want to decrease this to 14, 7,
-                                                # or even down to 1-2 days.
-      attribution_window: 1                     # Latency minimum number of days to look-back to account for delays in
-                                                # attributing accurate results. Default attribution window is 5 days.
-      project_timezone: "Europe/London"         # Time zone in which integer date times are stored. The project timezone
-                                                # may be found in the project settings in the Mixpanel console.
-      user_agent: "tap-mixpanel <api@foo.com>"  # Optional: Process and email for API logging purposes.
-      #denest_properties: "false"               # Optional: Do not denest JSON responses in `export` and `engage` streams
-                                                # to avoid very wide tables. If denesting is disabled then responses are
-                                                # loaded into one JSON column in the target.
-                                                # Default denest_properties is false.
-
-      #export_events:                           # Optional: List of event names to export
-      #  - event_one
-      #  - event_two
-
-
-    # ------------------------------------------------------------------------------
-    # Destination (Target) - Target properties
-    # Connection details should be in the relevant target YAML file
-    # ------------------------------------------------------------------------------
-    target: "snowflake"                       # ID of the target connector where the data will be loaded
-    batch_size_rows: 20000                    # Batch size for the stream to optimise load performance
-    stream_buffer_size: 0                     # In-memory buffer size (MB) between taps and targets for asynchronous data pipes
-    default_target_schema: "mixpanel"         # Target schema where the data will be loaded
-    #default_target_schema_select_permission:  # Optional: Grant SELECT on schema and tables that created
-    #  - grp_power
-    #batch_wait_limit_seconds: 3600            # Optional: Maximum time to wait for `batch_size_rows`. Available only for snowflake target.
-
-    # Options only for Snowflake target
-    #archive_load_files: False                      # Optional: when enabled, the files loaded to Snowflake will also be stored in `archive_load_files_s3_bucket`
-    #archive_load_files_s3_prefix: "archive"        # Optional: When `archive_load_files` is enabled, the archived files will be placed in the archive S3 bucket under this prefix.
-    #archive_load_files_s3_bucket: "<BUCKET_NAME>"  # Optional: When `archive_load_files` is enabled, the archived files will be placed in this bucket. (Default: the value of `s3_bucket` in target snowflake YAML)
-
-
-    # ------------------------------------------------------------------------------
-    # Source to target Schema mapping
-    # ------------------------------------------------------------------------------
-    schemas:
-
-      - source_schema: "mixpanel"           # This is mandatory, but can be anything in this tap type
-        target_schema: "mixpanel"           # Target schema in the destination Data Warehouse
-        target_schema_select_permissions:   # Optional: Grant SELECT on schema and tables that created
-          - grp_stats
-
-        # List of Mixpanel tables to load into destination Data Warehouse
-        # Tap-Mixpanel will use the best incremental strategies automatically to replicate data
-        tables:
-          # Incrementally loaded tables
-          - table_name: "export"
-          - table_name: "funnels"
-          - table_name: "revenue"
-
-          # Tables that cannot load incrementally and will use FULL_TABLE method
-          #- table_name: "engage"
-          #- table_name: "annotations"
-          #- table_name: "cohorts"
-          #- table_name: "cohort_members"
-
-            # OPTIONAL: Load time transformations - you can add it to any table
-            #transformations:
-            #  - column: "some_column_to_transform" # Column to transform
-            #    type: "SET-NULL"                   # Transformation type
+Streams such as ``engage``, ``annotations``, ``cohorts``, and
+``cohort_members`` can require full-table extraction. Confirm API limits and
+expected volume before enabling them.

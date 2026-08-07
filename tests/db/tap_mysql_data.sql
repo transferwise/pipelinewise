@@ -69,7 +69,7 @@ DROP TABLE IF EXISTS `address`;
 CREATE TABLE `address` (
   `address_id` int(11) NOT NULL AUTO_INCREMENT,
   `isActive` tinyint(1) DEFAULT NULL,
-  `street_number` varchar(5) NOT NULL,
+  `street_number` varchar(5) DEFAULT NULL,
   `date_created` datetime DEFAULT CURRENT_TIMESTAMP,
   `date_updated` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `supplier_supplier_id` smallint(6) NOT NULL,
@@ -1730,6 +1730,14 @@ VALUES ('x',
         '{"k1": "value", "k2": 10}',
         '13:11:45'
 );
+INSERT INTO all_datatypes (
+    c_char,
+    c_tinyint_bool,
+    c_tinyint_unsigned_bool
+) VALUES
+    ('z', 0, 0),
+    ('t', 2, 2),
+    ('n', NULL, NULL);
 /*!40000 ALTER TABLE `all_datatypes` ENABLE KEYS */;
 UNLOCK TABLES;
 

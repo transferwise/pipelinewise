@@ -22,7 +22,7 @@ setup(name='pipelinewise-tap-s3-csv',
           'singer-encodings==0.0.*',
           'pipelinewise-singer-python==3.0.2',
           'voluptuous==0.13.1',
-          'ujson==5.12.0',
+          'ujson==5.13.0',
           'more_itertools==8.12.*',
       ],
       extras_require={

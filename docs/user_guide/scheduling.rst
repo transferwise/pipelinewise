@@ -1,56 +1,66 @@
-
 .. _scheduling:
 
 Scheduling
-----------
+==========
 
-Scheduling and running PipelineWise tasks automatically is not part of the PipelineWise
-package but any task scheduler that can run Unix CLI commands can trigger PipelineWise
-jobs to run. Both Single Server and :ref:`multi_server_cluster` installations are achievable.
-
-
-Let's say you have 5 microservice databases that you want to replicate to Snowflake
-and ``pipelinewise status`` output looks like this:
-
-.. code-block:: bash
-
-    $ pipelinewise status
-
-    Tap ID        Tap Type     Target ID   Target Type        Enabled    Status    Last Sync    Last Sync Result
-    ------------  ----------   ----------  -----------------  ---------  --------  -----------  ------------------
-    microserv_1   tap-mysql    snowflake   target-snowflake   True       ready                  unknown
-    microserv_2   tap-mysql    snowflake   target-snowflake   True       ready                  unknown
-    microserv_3   tap-postgres snowflake   target-snowflake   True       ready                  unknown
-    microserv_4   tap-postgres snowflake   target-snowflake   True       ready                  unknown
-    microserv_5   tap-postgres snowflake   target-snowflake   True       ready                  unknown
-    5 pipeline(s)
+PipelineWise does not include a scheduler. Any scheduler that can run a command,
+preserve its exit status, and keep the runtime directory available can trigger a
+pipeline.
 
 
-Since every pipeline runs, logs and manages state files independently, you'll need to run
-5 commands independently. For example if using
-`Unix Cron <https://en.wikipedia.org/wiki/Cron>`_ you can create the following crontab:
+Requirements
+------------
 
-.. code-block:: bash
+The scheduler must:
 
-   */5 *   * * * pipelinewise run_tap --tap microserv_1 --target snowflake # Sync every 5 minutes
-     0 *   * * * pipelinewise run_tap --tap microserv_2 --target snowflake # Sync every hour
-     0 */3 * * * pipelinewise run_tap --tap microserv_3 --target snowflake # Sync every three hours
-     0 0   * * * pipelinewise run_tap --tap microserv_4 --target snowflake # Sync every midnight
-     0 0   * * 6 pipelinewise run_tap --tap microserv_5 --target snowflake # Sync every Saturday
+- run with the same ``PIPELINEWISE_HOME`` and
+  ``PIPELINEWISE_CONFIG_DIRECTORY`` used during import;
+- provide source, target, secret, and cloud credentials;
+- prevent concurrent execution of the same tap-target pair;
+- retain standard output, standard error, and the PipelineWise run log;
+- treat a non-zero exit as failure; and
+- allow a run to finish or terminate it through ``pipelinewise stop_tap``.
+
+PipelineWise also uses a per-pipeline PID file and refuses a second local
+instance. Do not rely on that as a distributed scheduler lock without validating
+the shared filesystem's locking semantics.
 
 
-PipelineWise is tested and can run with at least the following
-schedulers:
+Example
+-------
 
-* `Unix Cron <https://en.wikipedia.org/wiki/Cron>`_ Unix Cron - This is the simplest option
-  for a single server installation.
+Run separate pipelines independently:
 
-* `Cicada <https://github.com/transferwise/cicada/>`_ Cicada Scheduler - A lightweight multi-server
-  CRON manager
+.. code-block:: text
 
-* `Cronicle <https://github.com/jhuckaby/Cronicle/>`_ - Cronicle is a reasonably good and
-  relatively simple tool to schedule PipelineWise jobs in both Single Server and Multi-Server
-  cluster installations.
+   */5 * * * * pipelinewise run_tap --tap orders --target snowflake
+   15 * * * * pipelinewise run_tap --tap ledger --target snowflake
 
-* `Apache Airflow <https://airflow.apache.org/>`_ - Airflow is a robust and mature tool to
-  schedule and monitor workflows.
+Redirecting output is optional when the scheduler captures it. PipelineWise still
+writes its connector logs under ``~/.pipelinewise``.
+
+
+Cadence and overlap
+-------------------
+
+Choose a cadence longer than normal run duration or configure the scheduler to
+skip overlap. A backlog that makes every run reach the next scheduled start is a
+throughput or source/target availability problem; increasing frequency makes it
+worse.
+
+For LOG_BASED sources, source-log retention must exceed the maximum time between
+the last target acknowledgement and successful recovery. For data-diff, schedule
+``run_data_diff_checks`` independently from replication and leave enough
+``window_end`` lag for the target to settle.
+
+
+Retries and recovery
+--------------------
+
+Retry the same command with unchanged state after a transient failure. Do not
+advance bookmarks as a retry mechanism. Limit automatic retry frequency so a
+credential, schema, or database outage does not create an alert or connection
+storm.
+
+After repeated failure, stop retries, retain evidence, correct the cause, and
+verify target contents after the next success. See :ref:`troubleshooting`.

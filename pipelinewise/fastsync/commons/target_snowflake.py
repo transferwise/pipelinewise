@@ -79,7 +79,7 @@ class FastSyncTargetSnowflake:
             }
         )
 
-    def open_connection(self, query_tag_props=None):
+    def open_connection(self, query_tag_props=None, autocommit=True):
         return snowflake.connector.connect(
             user=self.connection_config['user'],
             private_key=pem2der(self.connection_config['private_key']),
@@ -87,7 +87,7 @@ class FastSyncTargetSnowflake:
             database=self.connection_config['dbname'],
             warehouse=self.connection_config['warehouse'],
             authenticator='SNOWFLAKE_JWT',
-            autocommit=True,
+            autocommit=autocommit,
             session_parameters={
                 # Quoted identifiers should be case sensitive
                 'QUOTED_IDENTIFIERS_IGNORE_CASE': 'FALSE',
@@ -106,11 +106,44 @@ class FastSyncTargetSnowflake:
 
                 return []
 
+    def execute_transaction(self, queries, query_tag_props=None):
+        """Execute a sequence of statements atomically on one connection."""
+        connection = self.open_connection(query_tag_props, autocommit=False)
+        try:
+            with connection.cursor() as cur:
+                for query in queries:
+                    LOGGER.debug('Running transaction query: %s', query)
+                    cur.execute(query)
+            connection.commit()
+        except Exception:
+            try:
+                connection.rollback()
+            except Exception:  # pragma: no cover - driver-specific cleanup failure
+                LOGGER.warning(
+                    'Failed to roll back Snowflake publication transaction',
+                    exc_info=True,
+                )
+            raise
+        finally:
+            try:
+                connection.close()
+            except Exception:  # pragma: no cover - driver-specific cleanup failure
+                # Publication may already be committed, so a close failure must not
+                # turn a successful sync into an ambiguous retry.
+                LOGGER.warning(
+                    'Failed to close Snowflake publication connection',
+                    exc_info=True,
+                )
+
+    def _get_s3_key(self, file):
+        """Return the deterministic staging key before an upload is attempted."""
+        s3_key_prefix = self.connection_config.get('s3_key_prefix', '')
+        return '{}{}'.format(s3_key_prefix, os.path.basename(file))
+
     def upload_to_s3(self, file, tmp_dir=None):
         bucket = self.connection_config['s3_bucket']
         s3_acl = self.connection_config.get('s3_acl')
-        s3_key_prefix = self.connection_config.get('s3_key_prefix', '')
-        s3_key = '{}{}'.format(s3_key_prefix, os.path.basename(file))
+        s3_key = self._get_s3_key(file)
 
         LOGGER.info(
             'Uploading to S3 bucket: %s, local file: %s, S3 key: %s',
@@ -139,10 +172,19 @@ class FastSyncTargetSnowflake:
                 'x-amz-key': encryption_metadata.key,
                 'x-amz-iv': encryption_metadata.iv,
             }
-            self.s3.upload_file(encrypted_file, bucket, s3_key, ExtraArgs=extra_args)
-
-            # Remove the uploaded encrypted file
-            os.remove(encrypted_file)
+            try:
+                self.s3.upload_file(encrypted_file, bucket, s3_key, ExtraArgs=extra_args)
+            finally:
+                try:
+                    os.remove(encrypted_file)
+                except OSError:
+                    # Once upload succeeds the caller needs the key so it can either
+                    # publish or roll the object back; local cleanup is best-effort.
+                    LOGGER.warning(
+                        'Failed to remove encrypted staging file %s',
+                        encrypted_file,
+                        exc_info=True,
+                    )
 
         # Upload to S3 without encrypting
         else:
@@ -203,7 +245,13 @@ class FastSyncTargetSnowflake:
         sql = 'CREATE SCHEMA IF NOT EXISTS {}'.format(schema)
         self.query(sql, query_tag_props={'schema': schema})
 
-    def drop_table(self, target_schema, table_name, is_temporary=False):
+    def drop_table(
+        self,
+        target_schema,
+        table_name,
+        is_temporary=False,
+        max_attempts=1,
+    ):
         table_dict = utils.tablename_to_dict(table_name)
         target_table = (
             table_dict.get('table_name')
@@ -212,7 +260,24 @@ class FastSyncTargetSnowflake:
         )
 
         sql = 'DROP TABLE IF EXISTS {}."{}"'.format(target_schema, target_table.upper())
-        self.query(sql, query_tag_props={'schema': target_schema, 'table': table_name})
+        for attempt in range(1, max_attempts + 1):
+            try:
+                self.query(
+                    sql,
+                    query_tag_props={'schema': target_schema, 'table': table_name},
+                )
+                return
+            except Exception as exc:
+                if attempt == max_attempts:
+                    raise
+                LOGGER.warning(
+                    'Snowflake staging cleanup retry %s/%s failed for %s.%s: %s',
+                    attempt,
+                    max_attempts,
+                    target_schema,
+                    target_table,
+                    exc,
+                )
 
     # pylint: disable=too-many-positional-arguments
     def create_table(
@@ -223,7 +288,8 @@ class FastSyncTargetSnowflake:
         primary_key: Optional[List[str]],
         is_temporary: bool = False,
         sort_columns=False,
-        allow_replace_table=True
+        allow_replace_table=True,
+        normalize_primary_keys=True,
     ):
 
         table_dict = utils.tablename_to_dict(table_name)
@@ -231,6 +297,11 @@ class FastSyncTargetSnowflake:
             table_dict.get('table_name')
             if not is_temporary
             else table_dict.get('temp_table_name')
+        )
+        target_existed = (
+            self.table_exists(target_schema, table_name, is_temporary)
+            if normalize_primary_keys == 'if_created'
+            else False
         )
 
         # skip the EXTRACTED, BATCHED and DELETED columns in case they exist because they gonna be added later
@@ -259,19 +330,39 @@ class FastSyncTargetSnowflake:
         full_table_name = self._get_full_qualified_table_name(target_schema, target_table)
 
         sql_columns = ','.join(columns)
-        sql_primary_keys = ','.join(primary_key) if primary_key else None
-        create_sql = 'OR REPLACE TABLE' if allow_replace_table else 'TABLE IF NOT EXISTS'
-
         sql = (
-            f'CREATE {create_sql} {full_table_name} ({sql_columns}'
-            f'{f", PRIMARY KEY ({sql_primary_keys}))" if primary_key else ")"}'
+            f'CREATE '
+            f'{"OR REPLACE TABLE" if allow_replace_table else "TABLE IF NOT EXISTS"} '
+            f'{full_table_name} ({sql_columns}'
+            f'{f", PRIMARY KEY ({",".join(primary_key)}))" if primary_key else ")"}'
         )
 
         self.query(
             sql, query_tag_props={'schema': target_schema, 'table': target_table}
         )
 
-        self._drop_pk_non_nullability(target_schema, target_table, primary_key)
+        if normalize_primary_keys and not target_existed:
+            self._drop_pk_non_nullability(target_schema, target_table, primary_key)
+
+    def table_exists(self, target_schema, table_name, is_temporary=False):
+        """Return whether the exact standard or staging table already exists."""
+        table_dict = utils.tablename_to_dict(table_name)
+        target_table = (
+            table_dict.get('temp_table_name')
+            if is_temporary
+            else table_dict.get('table_name')
+        ).upper()
+        quoted_schema = target_schema.upper().replace('"', '""')
+        table_prefix = target_table.replace("'", "''")
+        rows = self.query(
+            f'SHOW TABLES IN SCHEMA "{quoted_schema}" '
+            f"STARTS WITH '{table_prefix}'",
+            query_tag_props={'schema': target_schema, 'table': table_name},
+        )
+        return any(
+            row.get('name', row.get('NAME')) == target_table
+            for row in rows
+        )
 
     def _drop_pk_non_nullability(self, target_schema: str, target_table: str, primary_keys: Optional[List[str]]):
         """
@@ -323,10 +414,13 @@ class FastSyncTargetSnowflake:
         inserts = 0
 
         stage = self.connection_config['stage']
+        # Keep Snowflake's default explicit: unquoted empty fields are NULL, while
+        # quoted empty fields remain empty strings.
         sql = (
             f'COPY INTO {target_schema}."{target_table.upper()}" FROM \'@{stage}/{s3_key}\''
             f' FILE_FORMAT = (type=CSV escape=NONE escape_unenclosed_field=\'\\x1e\''
-            f' field_optionally_enclosed_by=\'\"\' skip_header={int(skip_csv_header)}'
+            f' field_optionally_enclosed_by=\'\"\' empty_field_as_null=TRUE'
+            f' skip_header={int(skip_csv_header)}'
             f' compression=GZIP binary_format=HEX)'
         )
 
@@ -365,7 +459,7 @@ class FastSyncTargetSnowflake:
                 if not is_temporary
                 else table_dict.get('temp_table_name')
             )
-            sql = 'GRANT SELECT ON {}."{}" TO ROLE {}'.format(
+            sql = 'GRANT SELECT ON TABLE {}."{}" TO ROLE {}'.format(
                 target_schema, target_table.upper(), role
             )
             self.query(
@@ -422,7 +516,8 @@ class FastSyncTargetSnowflake:
 
         LOGGER.info('Obfuscation rules applied.')
 
-    def merge_tables(self, schema, source_table, target_table, columns, primary_keys):
+    @staticmethod
+    def _merge_tables_query(schema, source_table, target_table, columns, primary_keys):
         on_clause = ' AND '.join(
             [f'"{source_table.upper()}".{p.upper()} = "{target_table.upper()}".{p.upper()}' for p in primary_keys]
         )
@@ -432,19 +527,44 @@ class FastSyncTargetSnowflake:
         columns_for_insert = ', '.join([f'{c.upper()}' for c in columns])
         values = ', '.join([f'"{source_table.upper()}".{c.upper()}' for c in columns])
 
-        query = f'MERGE INTO {schema}."{target_table.upper()}" USING {schema}."{source_table.upper()}"'  \
-                f' ON {on_clause}'  \
-                f' WHEN MATCHED THEN UPDATE SET {update_clause}'  \
-                f' WHEN NOT MATCHED THEN INSERT ({columns_for_insert})'  \
-                f' VALUES ({values})'
-        self.query(query)
+        return f'MERGE INTO {schema}."{target_table.upper()}" USING {schema}."{source_table.upper()}"' \
+               f' ON {on_clause}' \
+               f' WHEN MATCHED THEN UPDATE SET {update_clause}' \
+               f' WHEN NOT MATCHED THEN INSERT ({columns_for_insert})' \
+               f' VALUES ({values})'
+
+    def merge_tables(self, schema, source_table, target_table, columns, primary_keys):
+        self.query(self._merge_tables_query(schema, source_table, target_table, columns, primary_keys))
+
+    @staticmethod
+    def _partial_hard_delete_query(schema, table, where_clause_sql):
+        return f'DELETE FROM {schema}."{table.upper()}"{where_clause_sql} AND _SDC_DELETED_AT IS NOT NULL'
 
     def partial_hard_delete(self, schema, table, where_clause_sql):
-        self.query(
-            f'DELETE FROM {schema}."{table.upper()}"{where_clause_sql} AND _SDC_DELETEd_AT IS NOT NULL'
-        )
+        self.query(self._partial_hard_delete_query(schema, table, where_clause_sql))
 
-    def swap_tables(self, schema, table_name) -> None:
+    def publish_partial_sync(
+        self,
+        schema,
+        source_table,
+        target_table,
+        columns,
+        primary_keys,
+        where_clause_sql,
+        hard_delete,
+    ):
+        """Atomically mark, merge, and optionally delete one partial range."""
+        queries = [
+            f'UPDATE {schema}."{target_table.upper()}" SET _SDC_DELETED_AT = CURRENT_TIMESTAMP()'
+            f'{where_clause_sql} AND _SDC_DELETED_AT IS NULL',
+            self._merge_tables_query(schema, source_table, target_table, columns, primary_keys),
+        ]
+        if hard_delete:
+            queries.append(self._partial_hard_delete_query(schema, target_table, where_clause_sql))
+
+        self.execute_transaction(queries, query_tag_props={'schema': schema, 'table': target_table})
+
+    def swap_tables(self, schema, table_name, cleanup_old_table=True) -> None:
         """
         Swaps given target table with its temp version and drops the latter
         Args:
@@ -456,16 +576,21 @@ class FastSyncTargetSnowflake:
         target_table = table_dict.get('table_name')
         temp_table = table_dict.get('temp_table_name')
 
-        # Swap tables and drop the temp tamp
+        # Swap tables and drop the old target now held under the temp name.
         self.query(
             f'ALTER TABLE {schema}."{temp_table.upper()}" SWAP WITH {schema}."{target_table.upper()}"',
             query_tag_props={'schema': schema, 'table': target_table},
         )
 
-        self.query(
-            f'DROP TABLE IF EXISTS {schema}."{temp_table.upper()}"',
-            query_tag_props={'schema': schema, 'table': temp_table},
-        )
+        if cleanup_old_table:
+            # Cleanup is part of successful publication. If it cannot complete,
+            # the caller withholds state and retries this idempotent range.
+            self.drop_table(
+                schema,
+                table_name,
+                is_temporary=True,
+                max_attempts=3,
+            )
 
     def add_columns(self, schema: str, table_name: str, adding_columns: dict) -> None:
         if adding_columns:

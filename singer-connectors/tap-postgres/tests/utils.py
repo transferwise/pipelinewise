@@ -4,11 +4,23 @@ import os
 import decimal
 import math
 import datetime
+import io
 
 from psycopg2.extensions import quote_ident
 from singer import get_logger, metadata
 
 LOGGER = get_logger()
+
+
+class SingerOutput(io.StringIO):
+    """Capture Singer writers that use either stdout text or stdout.buffer."""
+
+    @property
+    def buffer(self):
+        return self
+
+    def write(self, value):
+        return super().write(value.decode('utf-8') if isinstance(value, bytes) else value)
 
 
 class MockedConnect:
@@ -87,7 +99,8 @@ def get_test_connection_config(target_db='postgres', use_secondary=False):
 def get_test_connection(target_db='postgres', superuser=False):
     conn_config = get_test_connection_config(target_db)
 
-    user, password = ('postgres', conn_config['postgres_password']) if superuser \
+    user, password = (os.environ.get('TAP_POSTGRES_PG_USER', 'postgres'),
+                      conn_config['postgres_password']) if superuser \
         else (conn_config['user'], conn_config['password'])
 
     conn_string = "host='{}' dbname='{}' user='{}' password='{}' port='{}'".format(conn_config['host'],
@@ -131,6 +144,7 @@ def ensure_test_table(table_spec, target_db='postgres'):
             sql = build_table(table_spec, cur)
             LOGGER.info("create table sql: %s", sql)
             cur.execute(sql)
+            cur.execute('ANALYZE {}'.format(quote_ident(table_spec['name'], cur)))
 
 def unselect_column(our_stream, col):
     md = metadata.to_map(our_stream['metadata'])

@@ -1,106 +1,86 @@
-
 .. _alerts:
 
 Alerts
-------
+======
 
-PipelineWise can send alerts to external systems on run failures by configuring
-alert handlers in the main ``config.yml``. This file is created automatically
-when :ref:`generating_pipelines`. Alerts are triggered when :ref:`cli_run_tap`
-or :ref:`cli_fast_sync` fails. The alert provides the ID of the failed tap and a description of the failure
-to the alert handler.
-
-Failed :ref:`data_diff` checks alert through the same handlers and channels
-configured here, including ``slack_alert_channel`` and ``send_alert``.
-
-.. warning::
-
-  You can optionally disable alerts on certain taps by adding ``send_alert: False``
-  optional entry to any tap :ref:`yaml_configuration` file.
+PipelineWise sends failure alerts through handlers configured in ``config.yml``.
+Replication and data-diff share the same routing and per-tap suppression.
 
 
-Currently available alert handlers:
- * :ref:`slack_alert_handler`
- * :ref:`victorops_alert_handler` — incomplete, see the limitations below
+Handlers
+--------
+
+.. list-table:: Available
+   :header-rows: 1
+   :widths: 28 72
+   :width: 100%
+
+   * - Handler
+     - Behaviour
+   * - Slack
+     - Sends to the global channel and optional tap-specific channel.
+
+.. list-table:: Experimental
+   :header-rows: 1
+   :widths: 28 72
+   :width: 100%
+
+   * - Handler
+     - Limitation
+   * - VictorOps
+     - Mock-endpoint coverage only; all taps use one routing key.
 
 
 .. _slack_alert_handler:
 
-Slack Alert Handler
-'''''''''''''''''''
+Slack
+-----
 
-To send alerts to a Slack channel on failed tap runs:
-
-1. Follow the instructions at `Create a new Slack app <https://api.slack.com/authentication/basics>`_ and get a `Bot user token <https://api.slack.com/authentication/token-types#bot>`_.
-
-2. Add the ``chat:write`` OAuth Scope to the app.
-
-3. Invite the bot to the channel with the ``/invite <bot_name>`` Slack command.
-
-4. Configure the main ``config.yml``
-
-   **Config parameters**:
-
-   ``token``: Slack bot user token
-
-   ``channel``: Slack channel where the alerts will be sent
+Create a Slack app with ``chat:write``, install it to the workspace, and invite
+the bot to each destination channel.
 
 .. code-block:: yaml
 
-    ---
+   alert_handlers:
+     slack:
+       token: "{{ env_var['SLACK_BOT_TOKEN'] }}"
+       channel: "#pipeline-alerts"
 
-    alert_handlers:
-      slack:
-        token: "slack-token"
-        channel: "#slack-channel"
-
-
-To send a copy of a tap's alerts to a different channel, add the following setting
-to that tap's YAML file in addition to the handler configuration above:
+Add a second destination for one tap:
 
 .. code-block:: yaml
 
-    ---
+   slack_alert_channel: "#orders-alerts"
 
-    slack_alert_channel: "#specific-channel-for-this-tap"
-
+The tap-specific channel receives a copy; it does not replace the global channel.
 
 
 .. _victorops_alert_handler:
 
-VictorOps Alert Handler
-'''''''''''''''''''''''
+VictorOps
+---------
 
 .. attention::
 
-   This handler has only ever been exercised against a mocked endpoint, so verify it
-   against your own VictorOps integration before relying on it for on-call. Note
-   also that all alerts go to the single configured ``routing_key`` — there is no
-   VictorOps equivalent of a tap's ``slack_alert_channel``.
-
-To send alerts and open an incident on VictorOps:
-
-1. Follow the instructions at `Enable the VictorOps REST Endpoint <https://help.victorops.com/knowledge-base/rest-endpoint-integration-guide/>`_ and get the long notify URL.
-
-2. Find the routing key on the VictorOps settings page.
-
-3. Configure the main ``config.yml``:
-
-   **Config parameters**:
-
-   ``base_url``: The VictorOps notify URL **without** the routing key
-
-   ``routing_key``: VictorOps routing key
+   Verify this handler against the real integration before relying on it for
+   on-call response. It has only been exercised against a mocked endpoint.
 
 .. code-block:: yaml
 
-    ---
+   alert_handlers:
+     victorops:
+       base_url: "https://alert.victorops.com/integrations/generic/.../alert"
+       routing_key: "pipelinewise"
 
-    alert_handlers:
-      victorops:
-        base_url: "https://alert.victorops.com/integrations/generic/.../alert/.../..."
-        routing_key: "victorops-routing-key"
+``base_url`` must exclude the routing key. Requests time out after 10 seconds.
 
-.. warning::
 
-  Make sure the VictorOps ``base_url`` **does not include** the ``routing_key``.
+Routing and suppression
+-----------------------
+
+``send_alert: false`` in a tap YAML suppresses its replication and data-diff
+alerts. It does not change command exit status or persisted run results.
+
+Test every handler after configuration and monitor the handler itself. An alert
+channel is not a substitute for scheduler exit-status monitoring or target-data
+verification.

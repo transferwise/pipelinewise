@@ -1,74 +1,67 @@
-
 .. _schema_changes:
 
-Schema Changes
---------------
+Schema changes
+==============
 
-Taps detect schema changes in source databases and target connectors alter the
-destination tables automatically. Based on the schema change type, PipelineWise
-performs different actions in the destination tables as per the below:
+Singer taps emit schema messages and targets apply compatible changes before
+loading affected records. Target behaviour preserves existing data rather than
+silently coercing or deleting it.
 
-* **When new column added**: target connectors **add the new column** to the destination
-  table with the same name using a compatible data type.
 
-* **When column dropped**: target connectors **DO NOT drop columns**.
-  Old column remains in the table in case you need to do historical analysis on
-  the column. If the old column is not needed in the destination table then you can
-  perform a manual ``ALTER TABLE ... DROP COLUMN ...`` statement in the target database
-  or alternatively you can :ref:`resync`.
+Change outcomes
+---------------
 
-* **When column data type changed**: target connectors are **versioning the column**.
+.. list-table::
+   :header-rows: 1
+   :widths: 27 35 38
+   :width: 100%
+
+   * - Source change
+     - Target action
+     - Operational consequence
+   * - Add column
+     - Add a compatible target column.
+     - Historical rows normally contain ``NULL`` until explicitly backfilled.
+   * - Drop column
+     - Retain the target column.
+     - Historical values remain queryable; remove it manually only after
+       downstream review.
+   * - Change data type
+     - Rename the old target column with a timestamp suffix and create a new
+       column using the new type.
+     - Old and new values are split across columns until a resync or downstream
+       migration.
+
+Target-specific type mapping and experimental connector behaviour still apply.
+Test changes that narrow precision, alter timezone semantics, or change nested
+JSON shape before production rollout.
 
 
 .. _versioning_columns:
 
-Versioning columns
-''''''''''''''''''
+Column versioning
+-----------------
 
-Target connectors are versioning columns **when data type change is detected** in the source
-table. Versioning columns means that the old column with the old datatype is
-renamed by adding a timestamp to column name and a new column with the new data
-type will be added to the table.
+If ``COLUMN_THREE`` changes from ``INTEGER`` to ``VARCHAR``, the target keeps the
+old data in a name such as ``COLUMN_THREE_20260809_1520`` and writes subsequent
+records to a new ``COLUMN_THREE`` column.
 
-For example if the data type of ``COLUMN_THREE`` changes from ``INTEGER`` to ``VARCHAR``
-PipelineWise will replicate data in this order:
+PipelineWise does not convert historical values into the new type. Queries that
+need one logical field must handle both versions until the table is deliberately
+resynced or migrated.
 
-1. Before changing data type ``COLUMN_THREE`` is ``INTEGER`` just like in in source table:
 
-+----------------+----------------+------------------+
-| **COLUMN_ONE** | **COLUMN_TWO** | **COLUMN_THREE** |
-|                |                |   (INTEGER)      |
-+----------------+----------------+------------------+
-| text           | text           | 1                | 
-+----------------+----------------+------------------+
-| text           | text           | 2                | 
-+----------------+----------------+------------------+
-| text           | text           | 3                | 
-+----------------+----------------+------------------+
+Operational procedure
+---------------------
 
-2. After the data type change ``COLUMN_THREE_20190812_1520`` remains ``INTEGER`` with
-the old data and a new ``COLUMN_TREE`` column created with ``VARCHAR`` type that keeps
-data only after the change.
+Before a planned source change:
 
-+----------------+----------------+--------------------------------+------------------+
-| **COLUMN_ONE** | **COLUMN_TWO** | **COLUMN_THREE_20190812_1520** | **COLUMN_THREE** |
-|                |                |                   (INTEGER)    |    (VARCHAR)     |
-+----------------+----------------+--------------------------------+------------------+
-| text           | text           | 111                            |                  |
-+----------------+----------------+--------------------------------+------------------+
-| text           | text           | 222                            |                  |
-+----------------+----------------+--------------------------------+------------------+
-| text           | text           | 333                            |                  |
-+----------------+----------------+--------------------------------+------------------+
-| text           | text           |                                | 444-ABC          |
-+----------------+----------------+--------------------------------+------------------+
-| text           | text           |                                | 555-DEF          | 
-+----------------+----------------+--------------------------------+------------------+
+1. inspect target type mapping and downstream contracts;
+2. test discovery and one representative load;
+3. decide whether historical values require conversion;
+4. notify consumers of versioned or retained columns; and
+5. retain enough source log to recover if the first changed record fails.
 
-.. warning::
-
-  Please note the ``NULL`` values in ``COLUMN_THREE_20190812`` and ``COLUMN_THREE`` tables.
-  **Historical values are not converted to the new data types!**
-  If you need the actual representation of the table after data type changes then
-  you need to :ref:`resync` the table.
-
+After the change, verify the new target schema and representative values. Use
+:ref:`resync` only when its source and target cost is acceptable; a resync is not
+required merely because an old target column remains.

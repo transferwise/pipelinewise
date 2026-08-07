@@ -1,13 +1,13 @@
 import contextlib
-import io
 import json
 import unittest
 import unittest.mock
 
 import tap_postgres
+from tap_postgres.sync_strategies import common
 
 from ..utils import get_test_connection_config, ensure_test_table, create_replication_slot, drop_replication_slot, \
-    set_replication_method_for_stream, get_test_connection, insert_record, drop_table
+    set_replication_method_for_stream, get_test_connection, insert_record, drop_table, SingerOutput
 
 
 class TestLogicalReplication(unittest.TestCase):
@@ -76,7 +76,7 @@ class TestLogicalReplication(unittest.TestCase):
 
         state = {}
 
-        my_stdout = io.StringIO()
+        my_stdout = SingerOutput()
 
         # Would use full initial sync
         with contextlib.redirect_stdout(my_stdout):
@@ -88,6 +88,7 @@ class TestLogicalReplication(unittest.TestCase):
 
         self.assertEqual(messages[0]['type'], 'SCHEMA')
         self.assertEqual(messages[0]['stream'], f'public-{self.table_name}')
+        self.assertNotIn(common.RECORD_UPDATE_MODE_SCHEMA_KEY, messages[0]['schema'])
 
         self.assertEqual(messages[1]['type'], 'STATE')
         self.assertEqual(messages[0]['stream'], f'public-{self.table_name}')
@@ -165,6 +166,10 @@ class TestLogicalReplication(unittest.TestCase):
         messages = list(filter(lambda msg: msg['type'] != 'ACTIVATE_VERSION', messages))
 
         self.assertEqual(messages[0]['type'], 'SCHEMA')
+        self.assertEqual(
+            messages[0]['schema'][common.RECORD_UPDATE_MODE_SCHEMA_KEY],
+            common.PATCH_RECORD_UPDATE_MODE,
+        )
         self.assertDictEqual(messages[1], {
             'type': 'RECORD',
             'stream': f'public-{self.table_name}',
@@ -269,7 +274,7 @@ class TestUnselectedTableSlotAdvancement(unittest.TestCase):
 
         # Initial sync to establish bookmarks
         state = {}
-        my_stdout = io.StringIO()
+        my_stdout = SingerOutput()
         with contextlib.redirect_stdout(my_stdout):
             state = tap_postgres.do_sync(self.config, {'streams': [selected_stream]}, 'LOG_BASED', state, None)
 

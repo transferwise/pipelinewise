@@ -6,7 +6,7 @@ import itertools
 
 from contextlib import redirect_stdout
 from datetime import datetime, timedelta
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import target_snowflake
 
@@ -20,6 +20,131 @@ class TestTargetSnowflake(unittest.TestCase):
     def setUp(self):
         self.config = {}
         self.maxDiff = None
+
+    def test_store_record_coalesces_patch_events_for_same_primary_key(self):
+        db_sync = Mock(record_update_mode=target_snowflake.RECORD_UPDATE_MODE_PATCH)
+        records = {}
+
+        target_snowflake.store_record(records, '1', {'id': 1, 'payload': 'value'}, db_sync)
+        target_snowflake.store_record(records, '1', {'id': 1, 'marker': 'updated'}, db_sync)
+
+        self.assertEqual(records, {
+            '1': {'id': 1, 'payload': 'value', 'marker': 'updated'},
+        })
+
+    def test_store_record_patch_explicit_null_overwrites_buffered_value(self):
+        db_sync = Mock(record_update_mode=target_snowflake.RECORD_UPDATE_MODE_PATCH)
+        records = {}
+
+        target_snowflake.store_record(records, '1', {'id': 1, 'payload': 'value'}, db_sync)
+        target_snowflake.store_record(records, '1', {'id': 1, 'payload': None}, db_sync)
+
+        self.assertEqual(records, {'1': {'id': 1, 'payload': None}})
+
+    def test_store_record_replaces_non_patch_event_for_same_primary_key(self):
+        db_sync = Mock(record_update_mode=None)
+        records = {}
+
+        target_snowflake.store_record(records, '1', {'id': 1, 'payload': 'value'}, db_sync)
+        target_snowflake.store_record(records, '1', {'id': 1, 'marker': 'updated'}, db_sync)
+
+        self.assertEqual(records, {'1': {'id': 1, 'marker': 'updated'}})
+
+    def test_group_patch_records_distinguishes_absent_column_from_explicit_null(self):
+        db_sync = Mock(record_update_mode=target_snowflake.RECORD_UPDATE_MODE_PATCH)
+        db_sync.present_column_names.side_effect = lambda record: tuple(record)
+        records = {
+            '1': {'id': 1},
+            '2': {'id': 2, 'payload': None},
+            '3': {'id': 3, 'payload': 'value'},
+        }
+
+        groups = target_snowflake.group_records_by_update_columns(records, db_sync)
+
+        self.assertEqual(groups, [
+            (('id',), {'1': {'id': 1}}),
+            (('id', 'payload'), {
+                '2': {'id': 2, 'payload': None},
+                '3': {'id': 3, 'payload': 'value'},
+            }),
+        ])
+
+    def test_group_non_patch_records_keeps_one_unrestricted_batch(self):
+        db_sync = Mock(record_update_mode=None)
+        records = {'1': {'id': 1}, '2': {'id': 2, 'payload': None}}
+
+        self.assertEqual(
+            target_snowflake.group_records_by_update_columns(records, db_sync),
+            [(None, records)],
+        )
+
+    @patch('target_snowflake.flush_streams')
+    @patch('target_snowflake.DbSync')
+    def test_full_to_patch_schema_transition_flushes_and_rebuilds_stream(self, db_sync_mock,
+                                                                         flush_streams_mock):
+        schema = {
+            'type': 'object',
+            'properties': {
+                'id': {'type': ['integer']},
+                'payload': {'type': ['null', 'string']},
+            },
+        }
+        patch_schema = dict(schema)
+        patch_schema['x-pipelinewise-record-update-mode'] = 'PATCH'
+        lines = [
+            json.dumps({
+                'type': 'SCHEMA',
+                'stream': 'public-table',
+                'schema': schema,
+                'key_properties': ['id'],
+            }),
+            json.dumps({
+                'type': 'RECORD',
+                'stream': 'public-table',
+                'record': {'id': 1, 'payload': 'value'},
+            }),
+            json.dumps({
+                'type': 'SCHEMA',
+                'stream': 'public-table',
+                'schema': patch_schema,
+                'key_properties': ['id'],
+            }),
+        ]
+        db_sync_mock.return_value.record_primary_key_string.return_value = '1'
+        flush_streams_mock.return_value = None
+
+        target_snowflake.persist_lines({}, lines)
+
+        flush_streams_mock.assert_called_once()
+        self.assertEqual(db_sync_mock.call_count, 2)
+        self.assertNotIn(
+            'x-pipelinewise-record-update-mode',
+            db_sync_mock.call_args_list[0].args[1]['schema'],
+        )
+        self.assertEqual(
+            db_sync_mock.call_args_list[1].args[1]['schema']['x-pipelinewise-record-update-mode'],
+            'PATCH',
+        )
+
+    @patch('target_snowflake.flush_records')
+    def test_hard_delete_runs_only_after_patch_batch_loads(self, flush_records_mock):
+        db_sync = Mock()
+        row_count = {'public-table': 1}
+        records = {'1': {'id': 1, '_sdc_deleted_at': '2026-08-08T12:00:00Z'}}
+
+        target_snowflake.load_stream_batch(
+            'public-table',
+            records,
+            row_count,
+            db_sync,
+            delete_rows=True,
+        )
+
+        flush_records_mock.assert_called_once_with(
+            'public-table', records, db_sync, None, False, None
+        )
+        db_sync.delete_rows.assert_called_once_with('public-table')
+        self.assertEqual(row_count['public-table'], 0)
 
     @patch('target_snowflake.flush_streams')
     @patch('target_snowflake.DbSync')

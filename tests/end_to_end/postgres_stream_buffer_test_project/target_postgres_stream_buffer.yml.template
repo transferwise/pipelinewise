@@ -1,0 +1,12 @@
+---
+
+id: "postgres_stream_buffer_recovery_dwh"
+name: "PostgreSQL stream-buffer recovery target"
+type: "target-postgres"
+
+db_conn:
+  host: "${TARGET_POSTGRES_HOST}"
+  port: ${TARGET_POSTGRES_PORT}
+  user: "${TARGET_POSTGRES_USER}"
+  password: "${TARGET_POSTGRES_PASSWORD}"
+  dbname: "${TARGET_POSTGRES_DB}"

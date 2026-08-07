@@ -5,6 +5,30 @@ TAP_ID = 'pg_to_sf_defined_partial_sync'
 TARGET_ID = 'snowflake'
 
 
+def _postgres_comparison_column(name, normalizer):
+    return {
+        'name': name,
+        'source_expression': f'"{name}"',
+        'target_expression': f'"{name.upper()}"',
+        'normalizer': normalizer,
+    }
+
+
+CITY_COMPARISON_COLUMNS = [
+    _postgres_comparison_column('id', 'integer'),
+    _postgres_comparison_column('name', 'text'),
+    _postgres_comparison_column('countrycode', 'text'),
+    _postgres_comparison_column('district', 'text'),
+    _postgres_comparison_column('population', 'integer'),
+]
+
+ORDER_COMPARISON_COLUMNS = [
+    _postgres_comparison_column('id', 'integer'),
+    _postgres_comparison_column('cvarchar', 'text'),
+    _postgres_comparison_column('created_at', 'datetime'),
+]
+
+
 class TestDefinedPartialSyncPGToSF(TapPostgres):
     """
     Defined Partial Sync from Postgres to Snowflake
@@ -13,6 +37,24 @@ class TestDefinedPartialSyncPGToSF(TapPostgres):
     # pylint: disable=arguments-differ
     def setUp(self):
         super().setUp(tap_id=TAP_ID, target_id=TARGET_ID)
+
+    def _assert_partial_rows_equal(
+            self, table, primary_key, start_value, comparison_columns,
+            source_table=None, target_table=None):
+        assertions.assert_source_target_rows_equal(
+            {
+                'env': self.e2e_env,
+                'tap_type': self.tap_type,
+                'source_db': 'public',
+                'table': table,
+                'source_table': source_table or table,
+                'target_table': target_table or table,
+                'comparison_columns': comparison_columns,
+            },
+            primary_key=primary_key,
+            where_clause=f'WHERE {primary_key} >= {start_value}',
+            operation='defined PartialSync',
+        )
 
     def _manipulate_target_tables(self):
         self.e2e_env.run_query_target_snowflake(
@@ -44,8 +86,16 @@ class TestDefinedPartialSyncPGToSF(TapPostgres):
         from_value_order = 5
         # run-tap command
         assertions.assert_run_tap_success(
-            self.tap_id, self.target_id, ['fastsync', 'singer']
-
+            self.tap_id,
+            self.target_id,
+            ['fastsync', 'partialsync', 'singer'],
+            expected_state_streams={
+                'fastsync': {'public-customers': True},
+                'partialsync': {
+                    'public-city': True,
+                    'public-order': True,
+                },
+            },
         )
 
         # partial sync
@@ -55,6 +105,12 @@ class TestDefinedPartialSyncPGToSF(TapPostgres):
         assertions.assert_record_count_in_sf(self.e2e_env, self.tap_type, 'city', expected_records)
         assertions.assert_record_count_in_sf(
             self.e2e_env, self.tap_type, 'city', expected_records, f'WHERE id >= {from_value_city}')
+        self._assert_partial_rows_equal(
+            'city',
+            'id',
+            from_value_city,
+            CITY_COMPARISON_COLUMNS,
+        )
 
         # Partial sync
         source_records_order = self.e2e_env.get_source_records_count(self.tap_type, '"order"')
@@ -63,6 +119,14 @@ class TestDefinedPartialSyncPGToSF(TapPostgres):
         assertions.assert_record_count_in_sf(self.e2e_env, self.tap_type, 'order', expected_records)
         assertions.assert_record_count_in_sf(
             self.e2e_env, self.tap_type, 'order', expected_records, f'WHERE id >= {from_value_order}')
+        self._assert_partial_rows_equal(
+            'order',
+            'id',
+            from_value_order,
+            ORDER_COMPARISON_COLUMNS,
+            source_table='"order"',
+            target_table='"ORDER"',
+        )
 
         # Full fastsync
         source_records_customers = self.e2e_env.get_source_records_count(self.tap_type, 'customers')
@@ -72,12 +136,31 @@ class TestDefinedPartialSyncPGToSF(TapPostgres):
         self._manipulate_target_tables()
 
         # sync-tables command
-        assertions.assert_resync_tables_success(self.tap_id, self.target_id)
+        assertions.assert_resync_tables_success(
+            self.tap_id,
+            self.target_id,
+            sync_engines=('fastsync', 'partialsync'),
+            expected_state_streams={
+                'fastsync': {'public-customers': True},
+                'partialsync': {
+                    'public-city': True,
+                    'public-order': True,
+                },
+            },
+        )
 
         expected_records = source_records_order - from_value_order + 1
         assertions.assert_record_count_in_sf(self.e2e_env, self.tap_type, 'order', expected_records)
         assertions.assert_record_count_in_sf(
             self.e2e_env, self.tap_type, 'order', expected_records, f'WHERE id >= {from_value_order}')
+        self._assert_partial_rows_equal(
+            'order',
+            'id',
+            from_value_order,
+            ORDER_COMPARISON_COLUMNS,
+            source_table='"order"',
+            target_table='"ORDER"',
+        )
 
         # Partial sync
         additional_record_in_target = 1
@@ -88,6 +171,12 @@ class TestDefinedPartialSyncPGToSF(TapPostgres):
         assertions.assert_record_count_in_sf(
             self.e2e_env, self.tap_type,
             'city', expected_records_greater_than_from_value, f'WHERE id >= {from_value_city}')
+        self._assert_partial_rows_equal(
+            'city',
+            'id',
+            from_value_city,
+            CITY_COMPARISON_COLUMNS,
+        )
 
         # To test if target table is not dropped
         assertions.assert_record_count_in_sf(

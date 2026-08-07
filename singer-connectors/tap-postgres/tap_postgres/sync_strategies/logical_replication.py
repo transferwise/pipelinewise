@@ -21,6 +21,7 @@ from tap_postgres.stream_utils import refresh_streams_schema
 LOGGER = singer.get_logger('tap_postgres')
 
 UPDATE_BOOKMARK_PERIOD = 10000
+FEEDBACK_POLL_INTERVAL = 10
 FALLBACK_DATETIME = '9999-12-31T23:59:59.999+00:00'
 FALLBACK_DATE = '9999-12-31T00:00:00+00:00'
 
@@ -450,7 +451,10 @@ def consume_message(streams, state, msg, time_extracted, conn_info):
         add_automatic_properties(target_stream, conn_info.get('debug_lsn', False))
 
         # publish new schema
-        sync_common.send_schema_message(target_stream, ['lsn'])
+        sync_common.send_schema_message(
+            target_stream,
+            ['lsn'],
+            record_update_mode=sync_common.PATCH_RECORD_UPDATE_MODE)
 
     stream_version = get_stream_version(target_stream['tap_stream_id'], state)
     stream_md_map = metadata.to_map(target_stream['metadata'])
@@ -574,10 +578,33 @@ def streams_to_wal2json_tables(streams):
     return ','.join(tables)
 
 
+def _minimum_acknowledged_lsn(state, logical_streams):
+    """Return the oldest valid target-acknowledged LSN across logical streams."""
+    acknowledged_lsns = [
+        get_bookmark(state, stream['tap_stream_id'], 'lsn')
+        for stream in logical_streams
+    ]
+    if not acknowledged_lsns or any(
+            isinstance(lsn, bool) or not isinstance(lsn, int) or lsn < 0
+            for lsn in acknowledged_lsns):
+        raise ValueError('State does not contain a valid LSN for every logical stream')
+    return min(acknowledged_lsns)
+
+
+def _read_target_acknowledged_lsn(state_file, logical_streams, previous_safe_lsn):
+    """Read a target acknowledgement without accepting invalid or regressing state."""
+    try:
+        with open(state_file, mode='r', encoding='utf-8') as fh:
+            target_state = json.load(fh)
+        return max(previous_safe_lsn, _minimum_acknowledged_lsn(target_state, logical_streams))
+    except (AttributeError, KeyError, OSError, TypeError, UnicodeError, ValueError):
+        LOGGER.debug('Unable to open and parse %s', state_file)
+        return previous_safe_lsn
+
+
 def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
-    state_comitted = state
-    lsn_comitted = min([get_bookmark(state_comitted, s['tap_stream_id'], 'lsn') for s in logical_streams])
-    start_lsn = lsn_comitted
+    target_acknowledged_lsn = _minimum_acknowledged_lsn(state, logical_streams)
+    start_lsn = target_acknowledged_lsn
     lsn_to_flush = None
     time_extracted = utils.now()
     slot = locate_replication_slot(conn_info)
@@ -588,10 +615,13 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
     max_run_seconds = conn_info['max_run_seconds']
     break_at_end_lsn = conn_info['break_at_end_lsn']
     logical_poll_total_seconds = conn_info['logical_poll_total_seconds'] or 10800  # 3 hours
-    poll_interval = 10
+    poll_interval = FEEDBACK_POLL_INTERVAL
 
     for s in logical_streams:
-        sync_common.send_schema_message(s, ['lsn'])
+        sync_common.send_schema_message(
+            s,
+            ['lsn'],
+            record_update_mode=sync_common.PATCH_RECORD_UPDATE_MODE)
 
     version = get_pg_version(conn_info)
 
@@ -664,8 +694,8 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
                     lsn_currently_processing = msg.data_start
                     LOGGER.info('First wal message received is %s', int_to_lsn(lsn_currently_processing))
 
-                    # Flush Postgres wal up to lsn comitted in previous run, or first lsn received in this run
-                    lsn_to_flush = lsn_comitted
+                    # Flush Postgres wal up to the previous target acknowledgement, or the first LSN received.
+                    lsn_to_flush = target_acknowledged_lsn
                     if lsn_currently_processing < lsn_to_flush:
                         lsn_to_flush = lsn_currently_processing
                     LOGGER.info('Confirming write up to %s, flush to %s',
@@ -699,20 +729,15 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
                     LOGGER.info('Waiting for first wal message')
                 else:
                     LOGGER.info('Lastest wal message received was %s', int_to_lsn(lsn_last_processed))
-                    try:
-                        with open(state_file, mode="r", encoding="utf-8") as fh:
-                            state_comitted = json.load(fh)
-                    except Exception:
-                        LOGGER.debug('Unable to open and parse %s', state_file)
-                    finally:
-                        lsn_comitted = min(
-                            [get_bookmark(state_comitted, s['tap_stream_id'], 'lsn') for s in logical_streams])
-                        if (lsn_currently_processing > lsn_comitted) and (lsn_comitted > lsn_to_flush):
-                            lsn_to_flush = lsn_comitted
-                            LOGGER.info('Confirming write up to %s, flush to %s',
-                                        int_to_lsn(lsn_to_flush),
-                                        int_to_lsn(lsn_to_flush))
-                            cur.send_feedback(write_lsn=lsn_to_flush, flush_lsn=lsn_to_flush, reply=True, force=True)
+                    target_acknowledged_lsn = _read_target_acknowledged_lsn(
+                        state_file, logical_streams, target_acknowledged_lsn)
+                    if ((lsn_currently_processing > target_acknowledged_lsn)
+                            and (target_acknowledged_lsn > lsn_to_flush)):
+                        lsn_to_flush = target_acknowledged_lsn
+                        LOGGER.info('Confirming write up to %s, flush to %s',
+                                    int_to_lsn(lsn_to_flush),
+                                    int_to_lsn(lsn_to_flush))
+                        cur.send_feedback(write_lsn=lsn_to_flush, flush_lsn=lsn_to_flush, reply=True, force=True)
 
                 poll_timestamp = datetime.datetime.utcnow()
 
@@ -721,11 +746,11 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
         conn.close()
     finally:
         if lsn_last_processed:
-            if lsn_comitted > lsn_last_processed:
-                lsn_last_processed = lsn_comitted
-                LOGGER.info('Current lsn_last_processed %s is older than lsn_comitted %s',
+            if target_acknowledged_lsn > lsn_last_processed:
+                LOGGER.info('Current lsn_last_processed %s is older than target-acknowledged lsn %s',
                             int_to_lsn(lsn_last_processed),
-                            int_to_lsn(lsn_comitted))
+                            int_to_lsn(target_acknowledged_lsn))
+                lsn_last_processed = target_acknowledged_lsn
 
             LOGGER.info('Updating bookmarks for all streams to lsn = %s (%s)',
                         lsn_last_processed,

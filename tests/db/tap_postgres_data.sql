@@ -4514,8 +4514,12 @@ CREATE TABLE "table_with_space and UPPERCase"
     id serial primary key,
     cvarchar varchar,
     created_at timestamp default current_timestamp,
-    updated_at timestamp with time zone
+    updated_at timestamp with time zone,
+    json_metadata text
 );
+
+ALTER TABLE "table_with_space and UPPERCase"
+    ALTER COLUMN json_metadata SET STORAGE EXTERNAL;
 
 
 insert into "table_with_space and UPPERCase" (cvarchar, updated_at)

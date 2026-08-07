@@ -7,10 +7,10 @@ import psycopg2
 
 from collections import namedtuple
 from datetime import datetime, date, timezone
-from unittest.mock import patch
+from unittest.mock import Mock, call, mock_open, patch
 from dateutil.tz import tzoffset
 
-from tap_postgres.sync_strategies import logical_replication
+from tap_postgres.sync_strategies import common, logical_replication
 
 
 class PostgresCurReplicationSlotMock:
@@ -305,7 +305,10 @@ class TestLogicalReplication(unittest.TestCase):
                              })
 
         refresh_schema_mock.assert_called_once_with({}, [streams[0]])
-        send_schema_mock.assert_called_once()
+        send_schema_mock.assert_called_once_with(
+            streams[0],
+            ['lsn'],
+            record_update_mode=common.PATCH_RECORD_UPDATE_MODE)
         write_message_mock.assert_called_once()
 
     def test_selected_value_to_singer_value_impl_with_timestamp_ntz_value_as_string_expect_iso_format(self):
@@ -1070,13 +1073,15 @@ class TestLogicalReplication(unittest.TestCase):
 
         self.assertEqual(expected_message, str(exp.exception))
 
+    @patch('tap_postgres.sync_strategies.logical_replication.sync_common.send_schema_message')
     @patch('tap_postgres.sync_strategies.logical_replication.locate_replication_slot')
     @patch('tap_postgres.sync_strategies.logical_replication.get_pg_version')
     @patch("psycopg2.connect")
     def test_sync_tables_raises_exception_if_psycopg2_programming_error(self,
                                                                         mocked_connect,
                                                                         mocked_version,
-                                                                        mocked_locate_rep_slot):
+                                                                        mocked_locate_rep_slot,
+                                                                        send_schema_message):
         """Test if sync_tables raises exception on psycopg2.ProgrammingError"""
 
         mocked_start_replication = mocked_connect.return_value.cursor.return_value.start_replication
@@ -1095,6 +1100,10 @@ class TestLogicalReplication(unittest.TestCase):
         with self.assertRaises(Exception) as exp:
             logical_replication.sync_tables(self.conn_info, self.logical_streams, state, end_lsn, state_file)
         self.assertEqual(expected_message, str(exp.exception))
+        send_schema_message.assert_called_once_with(
+            self.logical_streams[0],
+            ['lsn'],
+            record_update_mode=common.PATCH_RECORD_UPDATE_MODE)
 
     @patch('tap_postgres.sync_strategies.logical_replication.datetime.datetime')
     @patch('tap_postgres.sync_strategies.logical_replication.locate_replication_slot')
@@ -1290,3 +1299,230 @@ class TestLogicalReplication(unittest.TestCase):
         mocked_send_feedback.assert_called_with(write_lsn=test_message.data_start,
                                                 flush_lsn=test_message.data_start,
                                                 reply=True, force=True)
+
+
+class TestLogicalReplicationFeedback(unittest.TestCase):
+    """Verify that only target-acknowledged WAL positions are flushed."""
+
+    def setUp(self):
+        self.WalMessage = namedtuple('WalMessage', ['payload', 'data_start'])
+        self.conn_info = {
+            'host': 'foo',
+            'dbname': 'foo_db',
+            'user': 'foo_user',
+            'password': 'foo_pass',
+            'port': 12345,
+            'use_secondary': False,
+            'tap_id': 'tap_id_value',
+            'max_run_seconds': 10,
+            'break_at_end_lsn': False,
+            'logical_poll_total_seconds': 1,
+        }
+        self.logical_streams = [self._stream('foo-bar', 'foo_table')]
+
+    @staticmethod
+    def _stream(tap_stream_id, table_name):
+        return {
+            'tap_stream_id': tap_stream_id,
+            'schema': {'properties': {}},
+            'stream': tap_stream_id,
+            'table_name': table_name,
+            'metadata': [{'metadata': {'schema-name': 'public'}, 'breadcrumb': []}],
+        }
+
+    @staticmethod
+    def _state(stream_lsns):
+        return {
+            'bookmarks': {
+                stream_id: {'lsn': lsn, 'version': 'version'}
+                for stream_id, lsn in stream_lsns.items()
+            }
+        }
+
+    def _message(self, action, lsn):
+        return self.WalMessage(payload=json.dumps({'action': action}), data_start=lsn)
+
+    @staticmethod
+    def _consume_message(streams, state, msg, *_):
+        if json.loads(msg.payload)['action'] in {'I', 'U', 'D'}:
+            singer.write_bookmark(state, streams[0]['tap_stream_id'], 'lsn', msg.data_start)
+        return state
+
+    @staticmethod
+    def _expected_feedback(*lsns):
+        return [
+            call(write_lsn=lsn, flush_lsn=lsn, reply=True, force=True)
+            for lsn in lsns
+        ]
+
+    def test_minimum_acknowledged_lsn_uses_oldest_stream(self):
+        streams = [self._stream('foo-bar', 'foo_table'), self._stream('foo-baz', 'baz_table')]
+        state = self._state({'foo-bar': 125, 'foo-baz': 100})
+
+        self.assertEqual(100, logical_replication._minimum_acknowledged_lsn(state, streams))
+
+    def test_minimum_acknowledged_lsn_rejects_invalid_initial_state(self):
+        cases = {
+            'missing': self._state({}),
+            'none': self._state({'foo-bar': None}),
+            'string': self._state({'foo-bar': '100'}),
+            'bool': self._state({'foo-bar': True}),
+            'negative': self._state({'foo-bar': -1}),
+        }
+
+        for name, state in cases.items():
+            with self.subTest(name=name), self.assertRaisesRegex(
+                    ValueError, 'State does not contain a valid LSN'):
+                logical_replication._minimum_acknowledged_lsn(state, self.logical_streams)
+
+    def test_target_acknowledgement_does_not_regress(self):
+        lower_state = mock_open(read_data=json.dumps(self._state({'foo-bar': 125})))
+
+        with patch('builtins.open', lower_state):
+            acknowledged_lsn = logical_replication._read_target_acknowledged_lsn(
+                'state.json', self.logical_streams, previous_safe_lsn=150)
+
+        self.assertEqual(150, acknowledged_lsn)
+
+    def _run_sync(self, state, messages, state_reader, logical_streams=None):
+        termination = RuntimeError('unexpected replication termination')
+        streams = self.logical_streams if logical_streams is None else logical_streams
+
+        with patch('tap_postgres.sync_strategies.logical_replication.FEEDBACK_POLL_INTERVAL', 0), \
+                patch('tap_postgres.sync_strategies.logical_replication.sync_common.send_schema_message'), \
+                patch('tap_postgres.sync_strategies.logical_replication.singer.write_message'), \
+                patch('tap_postgres.sync_strategies.logical_replication.consume_message',
+                      side_effect=self._consume_message), \
+                patch('tap_postgres.sync_strategies.logical_replication.locate_replication_slot',
+                      return_value='replication_slot'), \
+                patch('tap_postgres.sync_strategies.logical_replication.get_pg_version', return_value=150000), \
+                patch('builtins.open', state_reader), \
+                patch('psycopg2.connect') as mocked_connect:
+            cursor = mocked_connect.return_value.cursor.return_value
+            cursor.read_message.side_effect = [*messages, termination]
+
+            error = None
+            try:
+                logical_replication.sync_tables(self.conn_info, streams, state, 1000, 'state.json')
+            except Exception as exc:  # The harness captures the intentional termination or regression failure.
+                error = exc
+
+        return list(cursor.send_feedback.call_args_list), error, termination
+
+    def test_consuming_wal_does_not_advance_feedback_past_target_state(self):
+        state = self._state({'foo-bar': 100})
+        state_reader = mock_open(read_data=json.dumps(state))
+        messages = [self._message('I', 200), self._message('C', 300)]
+
+        feedback, error, termination = self._run_sync(state, messages, state_reader)
+
+        self.assertIs(error, termination)
+        self.assertEqual(self._expected_feedback(100), feedback)
+
+    def test_periodic_bookmark_does_not_acknowledge_processed_lsn(self):
+        state = self._state({'foo-bar': 100})
+        state_reader = mock_open(read_data=json.dumps(state))
+        messages = [
+            self._message('I', 200),
+            self._message('C', 300),
+            self._message('C', 400),
+        ]
+
+        with patch(
+                'tap_postgres.sync_strategies.logical_replication.UPDATE_BOOKMARK_PERIOD',
+                1):
+            feedback, error, termination = self._run_sync(
+                state, messages, state_reader)
+
+        self.assertIs(error, termination)
+        self.assertEqual(self._expected_feedback(100), feedback)
+
+    def test_feedback_advances_exactly_with_target_state(self):
+        state = self._state({'foo-bar': 100})
+        first_state = mock_open(read_data=json.dumps(self._state({'foo-bar': 125})))
+        second_state = mock_open(read_data=json.dumps(self._state({'foo-bar': 150})))
+        state_reader = Mock(side_effect=[first_state.return_value, second_state.return_value])
+        messages = [self._message('I', 200), self._message('C', 300)]
+
+        feedback, error, termination = self._run_sync(state, messages, state_reader)
+
+        self.assertIs(error, termination)
+        self.assertEqual(self._expected_feedback(100, 125, 150), feedback)
+
+    def test_feedback_remains_monotonic_when_target_state_regresses(self):
+        state = self._state({'foo-bar': 100})
+        acknowledged_states = [
+            mock_open(read_data=json.dumps(self._state({'foo-bar': lsn}))).return_value
+            for lsn in (150, 125, 175)
+        ]
+        state_reader = Mock(side_effect=acknowledged_states)
+        messages = [self._message('I', 200), self._message('C', 300), self._message('C', 400)]
+
+        feedback, error, termination = self._run_sync(state, messages, state_reader)
+
+        self.assertIs(error, termination)
+        self.assertEqual(self._expected_feedback(100, 150, 175), feedback)
+
+    def test_feedback_uses_minimum_target_state_lsn_for_multiple_streams(self):
+        streams = [self._stream('foo-bar', 'foo_table'), self._stream('foo-baz', 'baz_table')]
+        state = self._state({'foo-bar': 125, 'foo-baz': 100})
+        target_state = self._state({'foo-bar': 175, 'foo-baz': 150})
+        state_reader = mock_open(read_data=json.dumps(target_state))
+
+        feedback, error, termination = self._run_sync(
+            state,
+            [self._message('I', 200)],
+            state_reader,
+            logical_streams=streams,
+        )
+
+        self.assertIs(error, termination)
+        self.assertEqual(self._expected_feedback(100, 150), feedback)
+
+    def test_unavailable_or_invalid_state_retains_previous_safe_lsn(self):
+        invalid_state = self._state({'foo-bar': 'not-an-lsn'})
+        cases = {
+            'absent': Mock(side_effect=FileNotFoundError('state file is absent')),
+            'unreadable': Mock(side_effect=PermissionError('state file is unreadable')),
+            'truncated': mock_open(read_data='{"bookmarks":'),
+            'invalid_json': mock_open(read_data='not-json'),
+            'invalid_state': mock_open(read_data=json.dumps(invalid_state)),
+        }
+
+        for name, state_reader in cases.items():
+            with self.subTest(name=name):
+                state = self._state({'foo-bar': 100})
+                messages = [self._message('I', 200), self._message('C', 300)]
+
+                feedback, error, termination = self._run_sync(state, messages, state_reader)
+
+                self.assertIs(error, termination)
+                self.assertEqual(self._expected_feedback(100), feedback)
+
+    def test_feedback_recovers_after_state_file_is_temporarily_unreadable(self):
+        state = self._state({'foo-bar': 100})
+        recovered_state = mock_open(read_data=json.dumps(self._state({'foo-bar': 150})))
+        state_reader = Mock(side_effect=[
+            PermissionError('state file is unreadable'),
+            PermissionError('state file is unreadable'),
+            recovered_state.return_value,
+        ])
+        messages = [self._message('I', 200), self._message('C', 300), self._message('C', 400)]
+
+        feedback, error, termination = self._run_sync(state, messages, state_reader)
+
+        self.assertIs(error, termination)
+        self.assertEqual(self._expected_feedback(100, 150), feedback)
+
+    def test_read_exception_does_not_acknowledge_consumed_lsn(self):
+        state = self._state({'foo-bar': 100})
+        state_reader = mock_open(read_data=json.dumps(state))
+
+        feedback, error, termination = self._run_sync(
+            state,
+            [self._message('I', 200)],
+            state_reader,
+        )
+
+        self.assertIs(error, termination)
+        self.assertEqual(self._expected_feedback(100), feedback)

@@ -1,48 +1,94 @@
-
 .. _target-postgres:
 
-Target Postgres
-----------------
+PostgreSQL target
+=================
 
-Postgres setup requirements
-''''''''''''''''''''''''''''
+``target-postgres`` loads Singer streams into PostgreSQL and manages compatible
+target schema changes.
 
-Configuring PostgreSQL as a replication target is straightforward.
-You need to have a user with permissions to create new schemas and
-tables in a Postgres database and you can replicate data from all the
-supported :ref:`taps_list`.
+.. list-table:: Support
+   :header-rows: 1
+   :widths: 28 24 48
+   :width: 100%
 
-Configuring where to replicate data
-'''''''''''''''''''''''''''''''''''
+   * - Target
+     - Status
+     - Native transfer
+   * - PostgreSQL
+     - Available
+     - FullSync from MariaDB/MySQL, PostgreSQL, or MongoDB; no PartialSync
 
-PipelineWise configures every target with a common structured YAML file format.
-A sample YAML for Postgres target can be generated into a project directory by
-following the steps in the :ref:`generating_pipelines` section.
 
-Example YAML for ``target-postgres``:
+Prerequisites
+-------------
+
+The target user needs to connect to the database and create or alter schemas,
+tables, and indexes used by its pipelines. Grant only the target schemas it owns;
+do not reuse the :ref:`data_diff` backend database or role as a replication
+target.
+
+
+Configuration
+-------------
 
 .. code-block:: yaml
 
-    ---
+   id: "postgres_dwh"
+   name: "PostgreSQL warehouse"
+   type: "target-postgres"
+   db_conn:
+     host: "<HOST>"
+     port: 5432
+     user: "<USER>"
+     password: "{{ env_var['TARGET_POSTGRES_PASSWORD'] }}"
+     dbname: "analytics"
+     ssl: "true"
 
-    # ------------------------------------------------------------------------------
-    # General Properties
-    # ------------------------------------------------------------------------------
-    id: "postgres_dwh"                     # Unique identifier of the target
-    name: "Postgres Data Warehouse"        # Name of the target
-    type: "target-postgres"                # !! THIS SHOULD NOT CHANGE !!
+.. list-table:: Connection settings
+   :header-rows: 1
+   :widths: 24 18 18 40
+   :width: 100%
+
+   * - Setting
+     - Required
+     - Default
+     - Effect
+   * - ``host``
+     - Yes
+     - —
+     - PostgreSQL server hostname.
+   * - ``port``
+     - Yes
+     - —
+     - PostgreSQL server port.
+   * - ``user`` / ``password``
+     - Yes
+     - —
+     - Target role credentials.
+   * - ``dbname``
+     - Yes
+     - —
+     - Database that receives target schemas.
+   * - ``ssl``
+     - No
+     - Connector default
+     - Uses ``sslmode=require`` when enabled.
+   * - ``max_parallelism``
+     - No
+     - ``16``
+     - Caps automatic Singer stream-flush threads. Configure this in the target
+       ``db_conn``; tap-level ``parallelism_max`` is currently ineffective.
+
+Target schema names and grants are configured in the tap YAML. See
+:ref:`yaml_configuration` and generate the full template with
+``pipelinewise init``.
 
 
-    # ------------------------------------------------------------------------------
-    # Target - Data Warehouse connection details
-    # ------------------------------------------------------------------------------
-    db_conn:
-      host: "<HOST>"                       # PostgreSQL host
-      port: 5432                           # PostgreSQL port
-      user: "<USER>"                       # PostgreSQL user
-      password: "<PASSWORD>"               # Plain string or vault encrypted
-      dbname: "<DB_NAME>"                  # PostgreSQL database name
-      #ssl: "true"                         # Optional: Using SSL via postgres sslmode 'require' option.
-                                           #           If the server does not accept SSL connections or the client
-                                           #           certificate is not recognized the connection will fail
+Operational notes
+-----------------
 
+- Size transactions and ``batch_size_rows`` for available memory and WAL volume.
+- The target must acknowledge Singer state only after the corresponding records
+  are durable; PipelineWise persists that acknowledgement for source recovery.
+- Schema evolution can add or version columns. See :ref:`schema_changes` before
+  granting downstream consumers direct access.

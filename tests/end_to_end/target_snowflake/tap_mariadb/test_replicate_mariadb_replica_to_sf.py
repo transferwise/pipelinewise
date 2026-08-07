@@ -1,6 +1,9 @@
 from pipelinewise.fastsync import mysql_to_snowflake
 from tests.end_to_end.helpers import assertions
-from tests.end_to_end.target_snowflake.tap_mariadb import TapMariaDB
+from tests.end_to_end.target_snowflake.tap_mariadb import (
+    TapMariaDB,
+    mariadb_initial_state_expectations,
+)
 
 TAP_ID = 'mariadb_replica_to_sf'
 TARGET_ID = 'snowflake'
@@ -21,7 +24,12 @@ class TestReplicateMariaDBReplicaToSF(TapMariaDB):
         """
 
         assertions.assert_run_tap_success(
-            self.tap_id, self.target_id, ['fastsync', 'singer']
+            self.tap_id,
+            self.target_id,
+            ['fastsync', 'singer'],
+            expected_state_streams=mariadb_initial_state_expectations(
+                'mysql_source_db_2'
+            ),
         )
         assertions.assert_row_counts_equal(
             self.e2e_env.run_query_tap_mysql_2,

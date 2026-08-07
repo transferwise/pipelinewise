@@ -1,63 +1,52 @@
 # AI Coding Agent Instructions
 
-## Purpose and routing
+## Scope
 
-PipelineWise is a Python 3.12 Singer.io ELT framework for replicating taps to analytics warehouses. Write for senior engineers: emphasize operational precision, edge cases, and rationale.
+PipelineWise is a Python 3.12 Singer ELT framework. Write for senior engineers; prioritize operational precision, edge cases, and rationale.
 
-Read every scoped file touched by the task:
+Read every scoped file relevant to the task:
 
 - `pipelinewise/AGENTS.md`: orchestration, FastSync, backend migrations, data-diff.
-- `singer-connectors/AGENTS.md`: vendored tap and target source.
+- `singer-connectors/AGENTS.md`: vendored taps and targets.
 - `tests/AGENTS.md`: unit tests and suite boundaries.
 - `tests/end_to_end/AGENTS.md`: databases, connectors, E2E, `dev-project/`.
 - `docs/AGENTS.md`: documentation.
 
-Scoped files apply even when they were not auto-loaded from the current directory; multi-area changes follow all relevant files. More specific guidance adds to this file. Explicit user instructions win.
-
-Each `CLAUDE.md` is a relative symlink to the adjacent `AGENTS.md`. Edit the `AGENTS.md` and preserve the symlink.
+More-specific guidance adds to this file; explicit user instructions win. Each `CLAUDE.md` symlinks to its adjacent `AGENTS.md`; edit the latter and preserve the link.
 
 ## Architecture
 
-- **Framework:** Singer JSON messages over stdout/stdin; YAML definitions and generated JSON config, state, and catalogs.
-- **CLI:** argparse in `pipelinewise/cli/__init__.py`, dispatching to `PipelineWise`. Deprecated `sync_tables` maps to `fast_sync`; canonical `import_config` and deprecated `import` map to `import_project`.
-- **Singer path:** `tap | [transform-field] | [mbuffer] | target`; handles INCREMENTAL/LOG_BASED and FULL_TABLE streams not selected for FastSync.
-- **FastSync:** native full or filtered bulk transfer, not a replication method. See `pipelinewise/AGENTS.md` and `docs/concept/fastsync.rst`.
+- Singer JSON flows as `tap | [transform-field] | [mbuffer] | target`; YAML becomes generated config, state, and catalog JSON.
+- `pipelinewise/cli/__init__.py` defines argparse and dispatches to `PipelineWise`. Canonical `fast_sync` and `import_config` retain deprecated aliases `sync_tables` and `import`.
+- FastSync is a native full/filtered bulk-transfer optimization, not a replication method. Singer handles INCREMENTAL/LOG_BASED and FULL_TABLE streams not selected for FastSync.
 
 ## Environment
 
-- `make pipelinewise` creates `.virtualenvs/pipelinewise/` and installs the editable root package with test extras; activate it before host validation.
-- Do not use a repository `.venv/`. Root connector installs use `.virtualenvs/<name>/`; connector-local Makefiles may create `venv/`. Never mix interpreters.
-- Run host commands below from the repository root.
+- Prefer the `dev-project` Docker stack for supported development and verification. Its Linux runtime best approximates production; use the host only to manage Docker or when the container cannot run a check. Report host-only verification and its compatibility gap.
+- The repo is mounted at `/opt/pipelinewise`; run commands there in the `pipelinewise` container. `PIPELINEWISE_HOME` keeps its environments under `dev-project/.virtualenvs/`, which is on `PATH`.
+- `make pipelinewise` installs the editable root package with test extras. Connector runtime environments use `.virtualenvs/<name>/`; connector-local Makefiles may use `venv/`. Never mix interpreters or reuse environments across host and container. Never use repository `.venv/`.
 
 ## Validation
 
-### Python gates
-
-Run the four CI lint commands verbatim and in order for implementation changes:
+For implementation changes, run the four lint gates verbatim and in order, then the unit gate, from the repo root—preferably in the ready container:
 
 ```bash
-. .virtualenvs/pipelinewise/bin/activate
 ruff check pipelinewise tests
 pylint pipelinewise tests
 flake8 pipelinewise --count --select=E9,F63,F7,F82 --show-source --statistics
 flake8 pipelinewise --count --max-complexity=15 --max-line-length=120 --statistics
-```
-
-Ruff and Pylint inspect `pipelinewise tests`; Flake8 inspects `pipelinewise`. Do not substitute bare Flake8, widen paths, add flags, or format in place of a gate.
-
-Run the full unit gate from the root:
-
-```bash
 pytest --cov=pipelinewise --cov-fail-under=77 -v tests/units
 ```
 
-- Nested paths below `tests/units/data_diff/` or `tests/units/backend_db/` can break imports; narrow with `-k`, for example `pytest tests/units -k "data_diff"`.
-- Never run bare `pytest tests/`; it collects credentialed E2E tests. CI's coverage threshold is 77, not `.coveragerc`'s lower value.
-- See `tests/AGENTS.md` for suite boundaries and proof requirements.
+On an unavoidable host run, first activate `.virtualenvs/pipelinewise/`. Do not alter paths or flags: Ruff/Pylint inspect `pipelinewise tests`; Flake8 inspects `pipelinewise`. Never run bare `pytest tests/` because it collects credentialed E2E. For nested data-diff/backend-db tests, collect from `tests/units` and narrow with `-k` to avoid import failures.
 
-### Configuration
+For config-affecting changes, validate in Docker, where Compose loads `dev-project/.env`:
 
-The dev config references environment variables. Source the existing file before validating:
+```bash
+pipelinewise validate --dir dev-project/pipelinewise-config
+```
+
+For a host fallback, source the existing `.env` without overwriting it:
 
 ```bash
 set -a
@@ -66,45 +55,33 @@ set +a
 .virtualenvs/pipelinewise/bin/pipelinewise validate --dir dev-project/pipelinewise-config
 ```
 
-CI creates `.env` from `.env.template`; locally, never overwrite an existing `.env` because it may contain real credentials. Validate after changes to implementation, schemas, example config, or connector config.
+Validate after implementation, schema, example-config, or connector-config changes.
 
-### Scoped checks
+Also follow scoped checks:
 
-- Database, connector, migration, FastSync, data-diff, or E2E work: follow `tests/end_to_end/AGENTS.md` and report each relevant group.
-- Connector source: follow `singer-connectors/AGENTS.md`; root lint/unit gates do not inspect it. Connector CI separately installs all connectors and runs the Python 3.12 tap-mysql/tap-postgres `make unit_test_cov` gates.
-- Docs: follow `docs/AGENTS.md`; warnings fail the build.
-- Always run `git diff --check`.
-
-## Module boundaries
-
-- `pipelinewise.backend_db` must not import data-diff or replication orchestration.
-- `pipelinewise.data_diff` may import backend-db, but not Singer or FastSync execution.
-- Data-diff reads generated connector JSON only through its runtime loader.
-- `import_config` persists and versions data-diff definitions only after connector generation and discovery succeed.
-- An AST test enforces the backend-db to data-diff prohibition; add equivalent coverage when changing the other boundaries.
+- Database, migration, FastSync, data-diff, connector-route, or E2E: `tests/end_to_end/AGENTS.md`.
+- Connector source: `singer-connectors/AGENTS.md`; root gates do not inspect it.
+- Docs: `docs/AGENTS.md`; warnings fail.
 
 ## Style and safety
 
-- Python: 120 characters, complexity 15, four spaces, Google docstrings, single quotes where consistent; `snake_case` functions/variables/JSON keys and `PascalCase` classes.
-- FastSync uppercases Snowflake identifiers. Scope Pylint disables to a line or function, never a module.
-- Comments explain non-obvious constraints and consequences in at most two lines; do not restate code, narrate edits, argue choices, or write walkthroughs.
-- Never run `pre-commit run --all-files`; it mutates files broadly and is not a CI gate.
-- Do not reformat or lint-fix unrelated files. Preserve user changes in dirty worktrees.
+- Python: 120 columns, complexity 15, four spaces, Google docstrings, consistent single quotes, `snake_case` names/JSON keys, `PascalCase` classes.
+- Snowflake FastSync identifiers are uppercase. Scope Pylint disables to a line/function, never a module.
+- Comments should explain a non-obvious constraint or consequence in at most two lines; do not restate code, narrate edits, argue choices, or add walkthroughs.
+- Do not run `pre-commit run --all-files`, reformat unrelated files, or broaden lint fixes. Preserve dirty-worktree changes.
+- Declare third-party imports in the owning `setup.py`; never rely on transitive installs.
 - Never commit secrets, `.tfvars`, private keys, or populated environment files.
-- When adding a third-party import, declare it in the owning package's `setup.py`; do not rely on transitive installation.
-- Use `import_config` in docs, examples, tests, and comments; `import` is only a deprecated alias.
+- Use `import_config` in docs, examples, tests, and comments; `import` is deprecated.
 
 ## Git and completion
 
-- Branch from `master`; use `AP-NNNN-short-description` and `[AP-NNNN]` commit subjects when a ticket exists.
-- Keep diffs task-scoped; incidental cleanup hinders review and rollback.
+Branch from `master` and keep diffs task-scoped.
+
+Keep CHANGELOG entries concise and atomic: one independently reviewable change per bullet. Use headings to preserve test categories instead of combining multiple changes in one bullet.
 
 Before completion:
 
-1. Implementation changes pass all four lint gates and the full unit gate.
-2. Configuration validation passes when applicable.
-3. Relevant E2E groups run per `tests/end_to_end/AGENTS.md`; report pass/skip/fail counts and never call a skipped suite complete.
-4. User-facing behavior/config changes update and validate docs.
-5. Release-visible connector changes update the root changelog per `singer-connectors/AGENTS.md`.
-6. `git diff --check` passes and `git status` contains only expected files.
-7. Report failed, skipped, or unavailable checks with output or blocker; never call partial verification complete.
+1. Run all applicable lint, unit, config, scoped E2E, connector, and docs checks.
+2. Update validated docs for user-facing behavior/config changes and the root changelog for release-visible connector changes.
+3. Report pass/skip/fail counts per group; skips, failures, and unavailable checks are not passing verification.
+4. Ensure `git diff --check` passes and `git status` contains only expected files.

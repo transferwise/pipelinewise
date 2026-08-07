@@ -65,6 +65,25 @@ div.rightside {
   color: #839496;
 }
 
+.wy-menu-vertical .sidebar-collapse-all {
+  display: block;
+  width: 100%;
+  padding: 0.4em 1.618em;
+  border: 0;
+  background: transparent;
+  color: #b3b3b3;
+  font-weight: 700;
+  line-height: 1;
+  text-align: left;
+  cursor: pointer;
+}
+
+.wy-menu-vertical .sidebar-collapse-all:hover,
+.wy-menu-vertical .sidebar-collapse-all:focus-visible {
+  background: #4e4a4a;
+  color: #fff;
+}
+
 .highlight .c1 {
   color: #93a1a1;
 }

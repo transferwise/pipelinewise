@@ -1,44 +1,65 @@
 .. _tap-salesforce:
 
-Tap Salesforce
---------------
+Salesforce source
+=================
 
-The Salesforce tap extracts Salesforce objects through either the Bulk API or
-the REST API. Create a Salesforce connected app and complete its OAuth flow to
-obtain a client ID, client secret, and refresh token.
+``tap-salesforce`` extracts Salesforce objects through the Bulk or REST API.
 
-Generate a starting configuration with ``pipelinewise init`` (see
-:ref:`generating_pipelines`), then edit ``tap_salesforce.yml``. The
-``start_date`` must be an RFC 3339 timestamp and limits how far back the tap
-queries records. Set ``api_type`` to either ``BULK`` or ``REST``.
+.. list-table:: Support
+   :header-rows: 1
+   :widths: 28 24 48
+   :width: 100%
+
+   * - Source
+     - Status
+     - Load path
+   * - Salesforce
+     - Experimental
+     - Singer only
+
+
+Prerequisites
+-------------
+
+Create a connected app and complete its OAuth flow. The resulting principal must
+have API and field access to every selected object. Field-level security can make
+discovery or extraction incomplete without producing a database-style permission
+error.
+
+
+Configuration
+-------------
 
 .. code-block:: yaml
 
-    id: "salesforce"
-    name: "Salesforce"
-    type: "tap-salesforce"
-    owner: "data-team@example.com"
+   id: "salesforce"
+   name: "Salesforce"
+   type: "tap-salesforce"
+   owner: "data-platform@example.com"
+   db_conn:
+     client_id: "<CLIENT_ID>"
+     client_secret: "{{ env_var['SALESFORCE_CLIENT_SECRET'] }}"
+     refresh_token: "{{ env_var['SALESFORCE_REFRESH_TOKEN'] }}"
+     start_date: "2024-01-01T00:00:00Z"
+     api_type: "BULK"
+   target: "snowflake"
+   batch_size_rows: 20000
+   stream_buffer_size: 0
+   default_target_schema: "salesforce"
+   schemas:
+     - source_schema: "salesforce"
+       target_schema: "salesforce"
+       tables:
+         - table_name: "Account"
+         - table_name: "Contact"
 
-    db_conn:
-      client_id: "<CLIENT_ID>"
-      client_secret: "<CLIENT_SECRET>"
-      refresh_token: "<REFRESH_TOKEN>"
-      start_date: "2024-01-01T00:00:00Z"
-      api_type: "BULK"
+``start_date`` is an RFC 3339 timestamp. Set ``api_type`` to ``BULK`` or
+``REST``. Discover the objects visible to the connected user before finalising
+the table list:
 
-    target: "snowflake"
-    batch_size_rows: 20000
-    stream_buffer_size: 0
-    default_target_schema: "salesforce"
+.. code-block:: bash
 
-    schemas:
-      - source_schema: "salesforce"
-        target_schema: "salesforce"
-        tables:
-          - table_name: "Account"
-          - table_name: "Contact"
-          - table_name: "Opportunity"
+   pipelinewise discover_tap --tap salesforce --target snowflake
 
-The tap discovers most Salesforce objects. Use
-``pipelinewise discover_tap --tap salesforce --target snowflake`` to inspect the objects available
-to the connected user before finalising the ``tables`` list.
+Test API quotas, deleted-record handling, schema changes, and large objects
+before production use.

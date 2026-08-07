@@ -11,7 +11,7 @@ from pymongo.database import Database
 from pipelinewise.utils import pem2der
 
 # pylint: disable=too-many-arguments
-def run_query_postgres(query, host, port, user, password, database):
+def run_query_postgres(query, host, port, user, password, database, params=None):
     """Run and SQL query in a postgres database"""
     result_rows = []
     with psycopg2.connect(
@@ -19,13 +19,13 @@ def run_query_postgres(query, host, port, user, password, database):
     ) as conn:
         conn.set_session(autocommit=True)
         with conn.cursor() as cur:
-            cur.execute(query)
+            cur.execute(query, params)
             if cur.rowcount > 0 and cur.description:
                 result_rows = cur.fetchall()
     return result_rows
 
 
-def run_query_mysql(query, host, port, user, password, database):
+def run_query_mysql(query, host, port, user, password, database, params=None):
     """Run and SQL query in a mysql database"""
     result_rows = []
     with pymysql.connect(
@@ -39,7 +39,7 @@ def run_query_mysql(query, host, port, user, password, database):
         ssl={'': True}
     ) as conn:
         with conn.cursor() as cur:
-            cur.execute(query)
+            cur.execute(query, params)
             if cur.rowcount > 0:
                 result_rows = cur.fetchall()
     return result_rows

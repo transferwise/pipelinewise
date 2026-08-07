@@ -164,6 +164,8 @@ inherited from ``data_diff_defaults`` — the table value wins when both exist.
 
 **Field reference:**
 
+- ``schema_version`` — Optional compatibility marker; the only accepted value is
+  ``1``. The current normalizer does not change behaviour based on this field.
 - ``frequency`` — Crontab expression of when to fire the check
 - ``window_start`` — Negative offset from fire time for the window start
 - ``window_end`` — Negative offset for the window end. Must be closer to fire time
