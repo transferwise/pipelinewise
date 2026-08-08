@@ -1,4 +1,4 @@
- # Project scope notice
+  # Project scope notice
 
 After `v0.64.1`, PipelineWise began reducing the number of connectors it packages so development could focus on Wise's current requirements. [v0.64.1](https://github.com/transferwise/pipelinewise/tree/v0.64.1) is the last release from before that reduction; it is a historical reference, not a recommendation to use an older release.
 
