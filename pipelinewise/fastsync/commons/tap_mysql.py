@@ -158,15 +158,24 @@ class FastSyncTapMySql:
 
     def close_connections(self, silent=False):
         """
-        Close connection
+        Close and clear both buffered and unbuffered connections.
         """
-        try:
-            self.conn.close()
-            self.conn_unbuffered.close()
-        except Exception as exc:
-            if not silent:
-                LOGGER.exception(exc)
-                LOGGER.info('Connections seem to be already closed.')
+        connections = (
+            ('buffered', self.conn),
+            ('unbuffered', self.conn_unbuffered),
+        )
+        self.conn = None
+        self.conn_unbuffered = None
+
+        for connection_name, connection in connections:
+            if connection is None:
+                continue
+            try:
+                connection.close()
+            except Exception as exc:
+                if not silent:
+                    LOGGER.exception(exc)
+                    LOGGER.info('%s connection seems to be already closed.', connection_name.capitalize())
 
     # pylint: disable=too-many-arguments
     def query(self, query, conn=None, params=None, return_as_cursor=False, n_retry=1):

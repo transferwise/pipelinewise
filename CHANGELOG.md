@@ -1,3 +1,93 @@
+0.79.0-slice1 (TBD)
+-------------------
+
+**Fixes**
+
+- Make MariaDB/PostgreSQL Snowflake PartialSync publication atomic by staging, copying, and transforming before one mark/merge/delete transaction
+- Correct the Snowflake PartialSync `_SDC_DELETED_AT` hard-delete filter
+- Preserve live Snowflake data when PartialSync fails
+- Preserve replication state when PartialSync fails
+- Publish explicit empty PartialSync ranges
+- Preserve zero-valued PartialSync boundaries
+- Treat an unresolved dynamic PartialSync boundary as a successful no-op
+- Upload every Snowflake FullSync part before deleting local files
+- Roll back Snowflake FullSync staging failures
+- Clean encrypted FullSync temporary files
+- Preserve the live Snowflake table until FullSync cutover
+- Normalize primary keys only when FullSync creates a table
+- Retry FullSync cleanup
+- Retry FullSync grant application
+- Withhold FullSync state until publication completes
+- Grant each published Snowflake table explicitly instead of exposing a concurrent raw `_TEMP` table through `ALL TABLES IN SCHEMA`
+- Serialize FastSync state updates across sibling processes
+- Persist FastSync state with atomic replacement
+- Apply file and directory `fsync` to FastSync state writes
+- Preserve original FastSync state-file permissions
+- Close PostgreSQL FullSync source connections after failure
+- Close PostgreSQL primary-host bookmark connections after FullSync failure
+- Close MariaDB PartialSync source connections after failure
+- Close PostgreSQL PartialSync source connections after failure
+
+**Test hardening**
+
+**New tests added; runtime code was correct**
+
+- Confirm existing type mappings
+- Confirm failure short-circuiting
+- Confirm lock release
+- Confirm bookmark handling
+- Confirm state-error handling
+- Confirm first-upload preservation
+- Confirm MariaDB FullSync cleanup
+- Confirm single-part cleanup
+
+**New tests added; runtime code needed fixing**
+
+- Cover atomic FullSync publication
+- Cover atomic PartialSync publication
+- Cover staging rollback
+- Cover crash-safe state persistence
+- Cover source cleanup
+- Cover boundary values
+- Cover changed-file pagination
+- Cover changed-file detection failures
+
+**Existing tests needed fixing; runtime code was correct**
+
+- Repair PartialSync arguments
+- Repair retry assertions
+- Repair engine assertions
+- Repair log assertions
+- Repair source reset
+- Repair schema isolation
+- Repair temporary-file cleanup
+- Repair log-file cleanup
+- Repair route names
+- Repair profiling expectations
+- Repair optional-credential handling
+
+**Existing tests and runtime code needed fixing**
+
+- Correct publication-order assertions and behavior
+- Correct soft-delete assertions and behavior
+- Correct hard-delete assertions and behavior
+- Correct boundary assertions and behavior
+- Correct COPY SQL assertions and behavior
+- Correct grant SQL assertions and behavior
+- Correct FullSync lifecycle expectations and behavior
+- Correct complete-row comparisons and behavior
+- Correct exact-state assertions and behavior
+
+**CI and development**
+
+- Authenticate changed-file detection
+- Paginate changed-file detection so large pull requests cannot silently skip tests
+- Fail closed when changed-file detection is unavailable
+- Fail closed when changed-file responses are invalid
+- Run lint checks when changed-file detection fails
+- Run unit tests when changed-file detection fails
+- Run E2E tests when changed-file detection fails
+
 0.78.0 (2026-08-05)
 -------------------
 

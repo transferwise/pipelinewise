@@ -32,7 +32,7 @@ class FastSyncTapMySqlMock(FastSyncTapMySql):
         return []
 
 
-# pylint: disable=invalid-name
+# pylint: disable=invalid-name,too-many-public-methods
 class TestFastSyncTapMySql(TestCase):
     """
     Unit tests for fastsync tap mysql
@@ -59,6 +59,51 @@ class TestFastSyncTapMySql(TestCase):
         # Test if session variables applied on both connections
         self.assertListEqual(self.mysql.executed_queries, tap_mysql.DEFAULT_SESSION_SQLS)
         self.assertListEqual(self.mysql.executed_queries_unbuffered, self.mysql.executed_queries)
+
+    def test_close_connections_is_idempotent(self):
+        """Each MySQL connection is closed once and its reference is cleared."""
+        self.mysql = FastSyncTapMySql(self.connection_config, lambda value: value)
+        buffered_connection = Mock()
+        unbuffered_connection = Mock()
+        self.mysql.conn = buffered_connection
+        self.mysql.conn_unbuffered = unbuffered_connection
+
+        self.mysql.close_connections()
+        self.mysql.close_connections()
+
+        buffered_connection.close.assert_called_once_with()
+        unbuffered_connection.close.assert_called_once_with()
+        self.assertIsNone(self.mysql.conn)
+        self.assertIsNone(self.mysql.conn_unbuffered)
+
+    def test_close_connections_attempts_both_when_first_close_fails(self):
+        """A buffered close failure cannot leak the streaming connection."""
+        self.mysql = FastSyncTapMySql(self.connection_config, lambda value: value)
+        buffered_connection = Mock()
+        buffered_connection.close.side_effect = RuntimeError('buffered close failed')
+        unbuffered_connection = Mock()
+        self.mysql.conn = buffered_connection
+        self.mysql.conn_unbuffered = unbuffered_connection
+
+        self.mysql.close_connections(silent=True)
+
+        buffered_connection.close.assert_called_once_with()
+        unbuffered_connection.close.assert_called_once_with()
+        self.assertIsNone(self.mysql.conn)
+        self.assertIsNone(self.mysql.conn_unbuffered)
+
+    def test_close_connections_handles_a_partially_open_pair(self):
+        """Cleanup closes an unbuffered connection even when the first connect failed."""
+        self.mysql = FastSyncTapMySql(self.connection_config, lambda value: value)
+        unbuffered_connection = Mock()
+        self.mysql.conn = None
+        self.mysql.conn_unbuffered = unbuffered_connection
+
+        self.mysql.close_connections()
+
+        unbuffered_connection.close.assert_called_once_with()
+        self.assertIsNone(self.mysql.conn)
+        self.assertIsNone(self.mysql.conn_unbuffered)
 
     def test_get_connection_to_primary(self):
         """

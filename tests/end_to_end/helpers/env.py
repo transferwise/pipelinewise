@@ -51,6 +51,9 @@ class E2EEnv:
         load_dotenv(
             dotenv_path=os.path.join(DIR, '..', '..', '..', 'dev-project', '.env')
         )
+        schema_postfix_override = os.environ.get('TARGET_SNOWFLAKE_SCHEMA_POSTFIX')
+        self.sf_schema_postfix_is_override = bool(schema_postfix_override)
+        self.sf_schema_postfix = schema_postfix_override or self.sf_schema_postfix
         self.env = {
             # ------------------------------------------------------------------
             # Tap Postgres is a REQUIRED test connector and test database with test data available
@@ -244,7 +247,7 @@ class E2EEnv:
                         'optional': True,
                     },
                     'SCHEMA_POSTFIX': {
-                        'value': os.environ.get('TARGET_SNOWFLAKE_SCHEMA_POSTFIX', self.sf_schema_postfix),
+                        'value': self.sf_schema_postfix,
                         'optional': True,
                     }
                 },
@@ -384,7 +387,7 @@ class E2EEnv:
                 else:
                     try:
                         os.remove(yaml_path)
-                    except OSError:
+                    except FileNotFoundError:
                         pass
 
     @staticmethod
@@ -396,7 +399,7 @@ class E2EEnv:
     # Database functions to run queries in source and target databases
     # -------------------------------------------------------------------------
 
-    def run_query_tap_postgres(self, query):
+    def run_query_tap_postgres(self, query, params=None):
         """Run and SQL query in tap postgres database"""
         return db.run_query_postgres(
             query,
@@ -405,6 +408,7 @@ class E2EEnv:
             user=self.get_conn_env_var('TAP_POSTGRES', 'USER'),
             password=self.get_conn_env_var('TAP_POSTGRES', 'PASSWORD'),
             database=self.get_conn_env_var('TAP_POSTGRES', 'DB'),
+            params=params,
         )
 
     def get_tap_mongodb_connection(self):
@@ -461,7 +465,7 @@ class E2EEnv:
         This function is not yet implemented"""
         pass
 
-    def run_query_tap_mysql(self, query):
+    def run_query_tap_mysql(self, query, params=None):
         """Run and SQL query in tap mysql database"""
         return db.run_query_mysql(
             query,
@@ -470,6 +474,7 @@ class E2EEnv:
             user=self.get_conn_env_var('TAP_MYSQL', 'USER'),
             password=self.get_conn_env_var('TAP_MYSQL', 'PASSWORD'),
             database=self.get_conn_env_var('TAP_MYSQL', 'DB'),
+            params=params,
         )
 
     def run_query_tap_mysql_2(self, query):
@@ -567,8 +572,7 @@ class E2EEnv:
             'DROP SCHEMA IF EXISTS ppw_e2e_tap_mongodb CASCADE'
         )
 
-        # Clean config directory
-        shutil.rmtree(os.path.join(CONFIG_DIR, 'postgres_dwh'), ignore_errors=True)
+        self.remove_dir_from_config_dir('postgres_dwh')
 
     def setup_pipelinewise_backend(self):
         """Remove data-diff control-plane state without touching target data."""
@@ -615,28 +619,37 @@ class E2EEnv:
                 f'DROP SCHEMA IF EXISTS ppw_e2e_tap_mongodb{self.sf_schema_postfix} CASCADE'
             )
 
-        # Clean config directory
-        shutil.rmtree(os.path.join(CONFIG_DIR, 'snowflake'), ignore_errors=True)
+        self.remove_dir_from_config_dir('snowflake')
+
+    @staticmethod
+    def remove_dir_from_config_dir(dir_path):
+        """Remove generated config while surfacing failures other than absence."""
+        try:
+            shutil.rmtree(os.path.join(CONFIG_DIR, dir_path))
+        except FileNotFoundError:
+            pass
 
     def delete_record_from_target_snowflake(self, tap_type, table, where_clause):
         """Delete all records except the first one from the snowflake target"""
+        source_type = E2EEnv._normalize_tap_type(tap_type)
         self.run_query_target_snowflake(
-            f'DELETE from ppw_e2e_tap_{tap_type}{self.sf_schema_postfix}.{table} {where_clause}'
+            f'DELETE from ppw_e2e_tap_{source_type}{self.sf_schema_postfix}.{table} {where_clause}'
         )
 
     def add_column_into_target_sf(self, tap_type, table, new_column):
         """Add a record into the target"""
+        source_type = E2EEnv._normalize_tap_type(tap_type)
         self.run_query_target_snowflake(
-            f'ALTER TABLE ppw_e2e_tap_{tap_type}{self.sf_schema_postfix}.{table} ADD {new_column["name"]} int'
+            f'ALTER TABLE ppw_e2e_tap_{source_type}{self.sf_schema_postfix}.{table} ADD {new_column["name"]} int'
         )
         self.run_query_target_snowflake(
-            f'UPDATE ppw_e2e_tap_{tap_type}{self.sf_schema_postfix}.{table}'
+            f'UPDATE ppw_e2e_tap_{source_type}{self.sf_schema_postfix}.{table}'
             f' SET {new_column["name"]}={new_column["value"]} WHERE 1=1'
         )
 
     def add_column_into_source(self, tap_type, table, new_column):
         """Add a column into the source table"""
-        run_query_method = getattr(self, f'run_query_tap_{tap_type}')
+        run_query_method = E2EEnv._get_source_query_method(self, tap_type)
         run_query_method(
             f'ALTER TABLE {table} ADD {new_column["name"]} int'
         )
@@ -646,24 +659,58 @@ class E2EEnv:
 
     def delete_record_from_source(self, tap_type, table, where_clause):
         """Delete a record from the source"""
-        run_query_method = getattr(self, f'run_query_tap_{tap_type}')
+        run_query_method = E2EEnv._get_source_query_method(self, tap_type)
         run_query_method(
             f'DELETE FROM {table} {where_clause}'
         )
 
+    def _get_source_query_method(self, tap_type):
+        """Resolve lowercase and canonical TAP_* source route identifiers."""
+        source_type = E2EEnv._normalize_tap_type(tap_type)
+        return getattr(self, f'run_query_tap_{source_type}')
+
+    @staticmethod
+    def _normalize_tap_type(tap_type):
+        """Return the source suffix used in E2E method and schema names."""
+        source_type = str(tap_type).lower()
+        return source_type[4:] if source_type.startswith('tap_') else source_type
+
     def get_source_records_count(self, tap_type, table):
         """Getting count of records from the source"""
-        run_query_method = getattr(self, f'run_query_{tap_type.lower()}')
+        run_query_method = E2EEnv._get_source_query_method(self, tap_type)
         result = run_query_method(f'SELECT count(1) FROM {table}')
         return result[0][0]
 
+    def get_rows_from_source(
+            self, tap_type, source_db, table, columns, primary_key,
+            where_clause=None):
+        """Get representative ordered rows from a source fixture table."""
+        run_query_method = E2EEnv._get_source_query_method(self, tap_type)
+        filter_sql = f' {where_clause.strip()}' if where_clause else ''
+        return run_query_method(
+            f'SELECT {", ".join(columns)} FROM {source_db}.{table}'
+            f'{filter_sql} ORDER BY {primary_key}'
+        )
+
+    def get_rows_from_target_snowflake(
+            self, tap_type, table, columns, primary_key, where_clause=None):
+        """Get representative ordered rows from a Snowflake target table."""
+        source_type = E2EEnv._normalize_tap_type(tap_type)
+        filter_sql = f' {where_clause.strip()}' if where_clause else ''
+        return self.run_query_target_snowflake(
+            f'SELECT {", ".join(columns)} '
+            f'FROM ppw_e2e_tap_{source_type}{self.sf_schema_postfix}.{table}'
+            f'{filter_sql} ORDER BY "{primary_key.upper()}"'
+        )
+
     def get_records_from_target_snowflake(self, tap_type, table, column, primary_key):
         """"Getting all records from a specific table of snowflake target"""
-        records = self.run_query_target_snowflake(
-            f'SELECT {column} FROM ppw_e2e_tap_{tap_type}{self.sf_schema_postfix}.{table}'
-            f' ORDER BY "{primary_key.upper()}"'
+        return self.get_rows_from_target_snowflake(
+            tap_type=tap_type,
+            table=table,
+            columns=[column],
+            primary_key=primary_key,
         )
-        return records
 
     @staticmethod
     def remove_all_state_files():
@@ -673,10 +720,13 @@ class E2EEnv:
 
     @staticmethod
     def clean_up_temp_dir():
-        """Clean up temp folder to ensure tests behave the same every time"""
-        files = glob.glob(f'{CONFIG_DIR}/tmp/*')
-        for f in files:
+        """Remove temporary files and directories between E2E runs."""
+        entries = glob.glob(f'{CONFIG_DIR}/tmp/*')
+        for entry in entries:
             try:
-                os.remove(f)
-            except Exception:
+                if os.path.islink(entry) or not os.path.isdir(entry):
+                    os.remove(entry)
+                else:
+                    shutil.rmtree(entry)
+            except FileNotFoundError:
                 pass

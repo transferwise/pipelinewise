@@ -2024,12 +2024,11 @@ class PipelineWise:
                     table_columns.append(sync_settings['column'])
                     static_value = sync_settings.get('static_value')
                     dynamic_value = sync_settings.get('dynamic_value')
-                    if static_value and dynamic_value:
+                    if static_value is not None and dynamic_value is not None:
                         raise Exception('It is not allowed to have both dynamic and static values!')
-                    if static_value:
+                    if static_value is not None:
                         table_values.append(f'<S>{str(static_value)}')
-
-                    if dynamic_value:
+                    elif dynamic_value is not None:
                         table_values.append(f'<D>{str(dynamic_value)}')
 
                     table_drop_targets.append(sync_settings.get('drop_target_table'))

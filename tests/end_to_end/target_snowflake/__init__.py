@@ -27,23 +27,40 @@ class TargetSnowflake(unittest.TestCase):
         if self.e2e_env.env[tap_type]['is_configured'] is False:
             self.skipTest(f'{tap_type} is not configured properly')
 
-        self.remove_dir_from_config_dir(f'{self.target_id}/{self.tap_id}')
+        # import_config processes every Snowflake tap in the E2E project. Reset
+        # the whole generated target tree so stale sibling files cannot make
+        # discovery depend on a previous test's outcome.
+        self.remove_dir_from_config_dir(self.target_id)
 
         self.check_snowflake_credentials_provided()
-        self._cleanup_stale_sf_schemas(tap_type)
-        self.drop_sf_schema_if_exists(f'{self.tap_id}{self.e2e_env.sf_schema_postfix}')
+        self.tap_type = tap_type
+        self.addCleanup(
+            self.remove_dir_from_config_dir,
+            f'{self.target_id}/{self.tap_id}',
+        )
+        current_run_schemas = self._current_run_schemas()
+        for schema in current_run_schemas:
+            self.addCleanup(self.drop_sf_schema_if_exists, schema)
+        if self.e2e_env.sf_schema_postfix_is_override:
+            for schema in current_run_schemas:
+                self.drop_sf_schema_if_exists(schema)
 
+        self.prepare_source()
         self.check_validate_taps()
         self.check_import_config()
-        self.tap_type = tap_type
 
-    def tearDown(self):
-        self.remove_dir_from_config_dir(f'{self.target_id}/{self.tap_id}')
-        self.drop_sf_schema_if_exists(f'ppw_e2e_{self.tap_type}{self.e2e_env.sf_schema_postfix}'.upper())
-        self.drop_sf_schema_if_exists(f'ppw_e2e_{self.tap_type}_public2{self.e2e_env.sf_schema_postfix}'.upper())
-        # The replica taps load into a _2 schema; without this it leaks every run.
-        self.drop_sf_schema_if_exists(f'ppw_e2e_{self.tap_type}_2{self.e2e_env.sf_schema_postfix}'.upper())
-        super().tearDown()
+    def prepare_source(self):
+        """Prepare a source fixture before validation and discovery."""
+
+    def _current_run_schemas(self):
+        """Return only the schemas rendered for this test environment."""
+        schema_prefix = f'ppw_e2e_{self.tap_type}'
+        schema_postfix = self.e2e_env.sf_schema_postfix
+        return [
+            f'{schema_prefix}{schema_postfix}'.upper(),
+            f'{schema_prefix}_public2{schema_postfix}'.upper(),
+            f'{schema_prefix}_2{schema_postfix}'.upper(),
+        ]
 
     def get_e2e_env(self) -> E2EEnv:
         """
@@ -87,28 +104,11 @@ class TargetSnowflake(unittest.TestCase):
             f'DROP SCHEMA IF EXISTS {schema} CASCADE'
         )
 
-    def _cleanup_stale_sf_schemas(self, tap_type):
-        """Drop leftover PPW_E2E_* schemas for this tap type from previous test
-        runs that crashed or timed out before tearDown could clean up.
-        Only drops schemas matching the current tap type to avoid interfering
-        with other tap suites running in the same session."""
-        # tap_type is already 'TAP_MYSQL'/'TAP_POSTGRES', so no TAP_ prefix here.
-        pattern = f'PPW_E2E_{tap_type.upper()}_%'
-        try:
-            rows = self.e2e_env.run_query_target_snowflake(
-                f"SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA"
-                f" WHERE SCHEMA_NAME LIKE '{pattern}'"
-            )
-            for row in rows:
-                schema_name = row[0]
-                self.e2e_env.run_query_target_snowflake(
-                    f'DROP SCHEMA IF EXISTS {schema_name} CASCADE'
-                )
-        except Exception:
-            pass
-
     def remove_dir_from_config_dir(self, dir_path: str):
         """
         remove directory from config directory
         """
-        shutil.rmtree(os.path.join(CONFIG_DIR, dir_path), ignore_errors=True)
+        try:
+            shutil.rmtree(os.path.join(CONFIG_DIR, dir_path))
+        except FileNotFoundError:
+            pass

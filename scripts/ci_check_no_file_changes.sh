@@ -37,13 +37,64 @@ URL="https://api.github.com/repos/${GITHUB_REPO}/pulls/${PR_NUMBER}/files"
 
 echo "PR URL:${URL}"
 
-FILES=$(curl -s -X GET -G "${URL}" | jq -r '.[] | .filename')
+fetch_changed_files() {
+  local page=1
+  local page_size
+  local response
+  local -a curl_args=(
+    --fail
+    --silent
+    --show-error
+    --get
+    --header "Accept: application/vnd.github+json"
+    --header "X-GitHub-Api-Version: 2022-11-28"
+  )
+
+  if [[ -n ${GITHUB_TOKEN:-} ]]; then
+    curl_args+=(--header "Authorization: Bearer ${GITHUB_TOKEN}")
+  fi
+
+  while true; do
+    if ! response=$(curl "${curl_args[@]}" \
+      --data-urlencode "per_page=100" \
+      --data-urlencode "page=${page}" \
+      "${URL}"); then
+      echo "Failed to fetch changed files from GitHub" >&2
+      return 1
+    fi
+
+    if ! jq -e 'type == "array" and all(.[]; (.filename | type) == "string")' \
+      >/dev/null <<< "${response}"; then
+      echo "GitHub changed-files response is invalid" >&2
+      return 1
+    fi
+
+    if ! page_size=$(jq -r 'length' <<< "${response}"); then
+      echo "Failed to read GitHub changed-files page size" >&2
+      return 1
+    fi
+    if ! jq -r '.[].filename' <<< "${response}"; then
+      echo "Failed to read filenames from GitHub response" >&2
+      return 1
+    fi
+
+    if (( page_size < 100 )); then
+      break
+    fi
+    ((page += 1))
+  done
+}
+
+if ! FILES=$(fetch_changed_files); then
+  echo "Unable to determine changed files; Exiting with FAILURE code"
+  exit 1
+fi
 
 REGEXES=()
 for CHECK in "$@"
 do
   if [[ ${CHECK} == "python" ]]; then
-    REGEX="(^tests\/|^pipelinewise\/|^singer-connectors\/|^setup\.py|^Makefile)"
+    REGEX="(^tests\/|^pipelinewise\/|^singer-connectors\/|^scripts\/ci_check_no_file_changes\.sh$|^setup\.py|^Makefile)"
     echo "Searching for changes in python files"
 
   elif [[ ${CHECK} == "doc" ]]; then
@@ -70,8 +121,11 @@ $FILES
 
 EOF
 
-for FILE in ${FILES}
+while IFS= read -r FILE
 do
+  if [[ -z ${FILE} ]]; then
+    continue
+  fi
   for REGEX in "${REGEXES[@]}"
   do
     if [[ "${FILE}" =~ ${REGEX} ]]; then
@@ -80,6 +134,6 @@ do
       exit 1
     fi
   done
-done
+done <<< "${FILES}"
 echo "No changes detected... Exiting with SUCCESS code"
 exit 0

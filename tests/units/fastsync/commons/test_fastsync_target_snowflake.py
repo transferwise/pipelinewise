@@ -213,6 +213,26 @@ class TestFastSyncTargetSnowflake(TestCase):
             '_SDC_DELETED_AT VARCHAR)'
         ])
 
+    def test_create_table_if_not_exists(self):
+        """PartialSync must preserve an existing native target table."""
+        self.snowflake.create_table(
+            target_schema='test_schema',
+            table_name='test_table',
+            columns=['"ID" INTEGER', '"TXT" VARCHAR'],
+            primary_key=['"ID"'],
+            allow_replace_table=False,
+        )
+
+        self.assertListEqual(self.snowflake.executed_queries, [
+            'CREATE TABLE IF NOT EXISTS "TEST_SCHEMA"."TEST_TABLE" ('
+            '"ID" INTEGER,"TXT" VARCHAR,'
+            '_SDC_EXTRACTED_AT TIMESTAMP_NTZ,'
+            '_SDC_BATCHED_AT TIMESTAMP_NTZ,'
+            '_SDC_DELETED_AT VARCHAR'
+            ', PRIMARY KEY ("ID"))',
+            'alter table "TEST_SCHEMA"."TEST_TABLE" alter column "ID" drop not null;'
+        ])
+
     def test_copy_to_table(self):
         """Validate if COPY command generated correctly"""
         # COPY table with standard table and column names
@@ -228,7 +248,7 @@ class TestFastSyncTargetSnowflake(TestCase):
         assert self.snowflake.executed_queries == [
             'COPY INTO test_schema."TEST_TABLE" FROM \'@dummy_stage/s3_key\''
             ' FILE_FORMAT = (type=CSV escape=NONE escape_unenclosed_field=\'\\x1e\''
-            ' field_optionally_enclosed_by=\'\"\' skip_header=0'
+            ' field_optionally_enclosed_by=\'\"\' empty_field_as_null=TRUE skip_header=0'
             ' compression=GZIP binary_format=HEX)'
         ]
 
@@ -245,7 +265,7 @@ class TestFastSyncTargetSnowflake(TestCase):
         assert self.snowflake.executed_queries == [
             'COPY INTO test_schema."FULL_TEMP" FROM \'@dummy_stage/s3_key\''
             ' FILE_FORMAT = (type=CSV escape=NONE escape_unenclosed_field=\'\\x1e\''
-            ' field_optionally_enclosed_by=\'\"\' skip_header=0'
+            ' field_optionally_enclosed_by=\'\"\' empty_field_as_null=TRUE skip_header=0'
             ' compression=GZIP binary_format=HEX)'
         ]
 
@@ -262,7 +282,7 @@ class TestFastSyncTargetSnowflake(TestCase):
         assert self.snowflake.executed_queries == [
             'COPY INTO test_schema."TABLE WITH SPACE AND UPPERCASE_TEMP" FROM \'@dummy_stage/s3 key with space\''
             ' FILE_FORMAT = (type=CSV escape=NONE escape_unenclosed_field=\'\\x1e\''
-            ' field_optionally_enclosed_by=\'\"\' skip_header=0'
+            ' field_optionally_enclosed_by=\'\"\' empty_field_as_null=TRUE skip_header=0'
             ' compression=GZIP binary_format=HEX)'
         ]
 
@@ -277,7 +297,19 @@ class TestFastSyncTargetSnowflake(TestCase):
             is_temporary=False,
         )
         assert self.snowflake.executed_queries == [
-            'GRANT SELECT ON test_schema."TEST_TABLE" TO ROLE test_role'
+            'GRANT SELECT ON TABLE test_schema."TEST_TABLE" TO ROLE test_role'
+        ]
+
+        # GRANT the staging table that will become live after SWAP
+        self.snowflake.executed_queries = []
+        self.snowflake.grant_select_on_table(
+            target_schema='test_schema',
+            table_name='test_table',
+            role='test_role',
+            is_temporary=True,
+        )
+        assert self.snowflake.executed_queries == [
+            'GRANT SELECT ON TABLE test_schema."TEST_TABLE_TEMP" TO ROLE test_role'
         ]
 
         # GRANT table with reserved word in table and column names in temp table
@@ -289,7 +321,7 @@ class TestFastSyncTargetSnowflake(TestCase):
             is_temporary=False,
         )
         assert self.snowflake.executed_queries == [
-            'GRANT SELECT ON test_schema."FULL" TO ROLE test_role'
+            'GRANT SELECT ON TABLE test_schema."FULL" TO ROLE test_role'
         ]
 
         # GRANT table with with space and uppercase in table name and s3 key
@@ -301,7 +333,7 @@ class TestFastSyncTargetSnowflake(TestCase):
             is_temporary=False,
         )
         assert self.snowflake.executed_queries == [
-            'GRANT SELECT ON test_schema."TABLE WITH SPACE AND UPPERCASE" TO ROLE test_role'
+            'GRANT SELECT ON TABLE test_schema."TABLE WITH SPACE AND UPPERCASE" TO ROLE test_role'
         ]
 
     def test_grant_usage_on_schema(self):

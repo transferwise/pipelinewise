@@ -44,7 +44,7 @@ class TestDefinedPartialSyncMariaDBToSF(TapMariaDB):
         from_value_address = 400
         # run-tap command
         assertions.assert_run_tap_success(
-            self.tap_id, self.target_id, ['fastsync', 'singer']
+            self.tap_id, self.target_id, ['fastsync', 'partialsync', 'singer']
 
         )
 
@@ -73,7 +73,9 @@ class TestDefinedPartialSyncMariaDBToSF(TapMariaDB):
         self._manipulate_target_tables()
 
         # sync-tables command
-        assertions.assert_resync_tables_success(self.tap_id, self.target_id)
+        assertions.assert_resync_tables_success(
+            self.tap_id, self.target_id, sync_engines=('fastsync', 'partialsync')
+        )
 
         expected_records = source_records_weight - from_value_weight + 1
         assertions.assert_record_count_in_sf(self.e2e_env, self.tap_type, 'weight_unit', expected_records)

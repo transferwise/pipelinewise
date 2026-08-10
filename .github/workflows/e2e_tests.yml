@@ -40,6 +40,7 @@ jobs:
         id: check
         env:
           GITHUB_REPO: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         continue-on-error: true
         run: ./scripts/ci_check_no_file_changes.sh python config
@@ -89,6 +90,7 @@ jobs:
         id: check
         env:
           GITHUB_REPO: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         continue-on-error: true
         run: ./scripts/ci_check_no_file_changes.sh python config
@@ -148,6 +150,7 @@ jobs:
         id: check
         env:
           GITHUB_REPO: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         continue-on-error: true
         run: ./scripts/ci_check_no_file_changes.sh python config
@@ -207,6 +210,7 @@ jobs:
         id: check
         env:
           GITHUB_REPO: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         continue-on-error: true
         run: ./scripts/ci_check_no_file_changes.sh python config
@@ -263,6 +267,7 @@ jobs:
         id: check
         env:
           GITHUB_REPO: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         continue-on-error: true
         run: ./scripts/ci_check_no_file_changes.sh python config

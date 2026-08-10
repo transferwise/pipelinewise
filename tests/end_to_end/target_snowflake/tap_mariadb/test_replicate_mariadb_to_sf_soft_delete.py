@@ -15,7 +15,9 @@ class TestReplicateMariaDBToSFSoftDelete(TapMariaDB):
 
         self.e2e_env.delete_record_from_source('mysql', 'weight_unit', 'WHERE weight_unit_id=25')
 
-        assertions.assert_run_tap_success(self.tap_id, self.target_id, ['singer'])
+        assertions.assert_run_tap_success(
+            self.tap_id, self.target_id, ['fastsync', 'singer']
+        )
 
         records = self.e2e_env.run_query_target_snowflake(
             f'SELECT "_SDC_DELETED_AT", "DATE_CREATED" '

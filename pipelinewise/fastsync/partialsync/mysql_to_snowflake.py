@@ -25,88 +25,102 @@ def partial_sync_table(table: tuple, args: Namespace) -> Union[bool, str]:
     """Partial sync table for MySQL to Snowflake"""
     snowflake = FastSyncTargetSnowflake(args.target, args.transform)
     tap_id = args.target.get('tap_id')
+    table_name = table[0]
+    s3_keys = []
+    target_schema = None
+    target_table = None
+    temp_created = False
+    publication_status = {'attempted': False}
+    grants_attempted = False
 
     try:
-        table_name = table[0]
-
         column_name = table[1]['column']
 
-        drop_target_table = table[1]['drop_target_table']
-        args.drop_target_table = drop_target_table
-        args.table = table_name
+        args.drop_target_table, args.table = (
+            table[1]['drop_target_table'],
+            table_name,
+        )
 
         mysql = FastSyncTapMySql(args.tap, tap_type_to_target_type)
+        try:
+            mysql.open_connections()
 
-        mysql.open_connections()
+            start_value = utils.validate_boundary_value(mysql.query, table[1]['start_value'])
+            end_value = utils.validate_boundary_value(mysql.query, table[1]['end_value'])
 
-        start_value = utils.validate_boundary_value(mysql.query, table[1]['start_value'])
-        end_value = utils.validate_boundary_value(mysql.query, table[1]['end_value'])
+            if (
+                start_value is utils.DYNAMIC_BOUNDARY_NOT_READY
+                or end_value is utils.DYNAMIC_BOUNDARY_NOT_READY
+            ):
+                LOGGER.info('Dynamic boundary returned no value for %s; skipping PartialSync', table_name)
+                return True
 
-        # Get bookmark - Binlog position or Incremental Key value
-        bookmark = common_utils.get_bookmark_for_table(table_name, args.properties, mysql)
+            bookmark = common_utils.get_bookmark_for_table(table_name, args.properties, mysql)
+            snowflake_types = mysql.map_column_types_to_target(table_name)
+
+            start_value_for_query = start_value if start_value == 'NULL' else f'\'{start_value}\''
+            where_clause_sql = f' WHERE {column_name} >= {start_value_for_query}'
+            if end_value is not None:
+                where_clause_sql += f' AND {column_name} <= \'{end_value}\''
+
+            file_parts = mysql.export_source_table_data(args, tap_id, where_clause_sql)
+        finally:
+            mysql.close_connections(silent=True)
 
         target_schema = common_utils.get_target_schema(args.target, table_name)
         table_dict = common_utils.tablename_to_dict(table_name)
         target_table = table_dict.get('table_name')
-
         target_sf = {
             'sf_object': snowflake,
             'schema': target_schema,
             'table': target_table,
-            'temp': table_dict.get('temp_table_name')
+            'temp': table_dict.get('temp_table_name'),
+            'publication_status': publication_status,
         }
-
-        snowflake_types = mysql.map_column_types_to_target(table_name)
-
-        # making target table if not exists
-        snowflake.create_schema(target_schema)
-        snowflake.create_table(
-            target_schema=target_schema,
-            table_name=target_table,
-            columns=snowflake_types['columns'],
-            primary_key=snowflake_types.get('primary_key'),
-            is_temporary=False,
-            sort_columns=False,
-            allow_replace_table=False
-        )
-
         source_columns = snowflake_types.get('columns', [])
-        columns_diff = utils.diff_source_target_columns(target_sf, source_columns=source_columns)
 
-        start_value_for_query = start_value if start_value == 'NULL' else f'\'{start_value}\''
-        where_clause_sql = f' WHERE {column_name} >= {start_value_for_query}'
-        if end_value:
-            where_clause_sql += f' AND {column_name} <= \'{end_value}\''
-
-        # export data from source
-        file_parts = mysql.export_source_table_data(args, tap_id, where_clause_sql)
-
-        # mark partial data as deleted in the target
-        snowflake.query(f'UPDATE {target_schema}."{target_table.upper()}"'
-                        f' SET _SDC_DELETEd_AT = CURRENT_TIMESTAMP(){where_clause_sql} AND _SDC_DELETED_AT IS NULL')
-
-        # Creating temp table in Snowflake
         primary_keys = snowflake_types.get('primary_key')
         snowflake.create_schema(target_schema)
+        temp_created = True
         snowflake.create_table(
             target_schema, target_table, source_columns, primary_keys, is_temporary=True
         )
 
-        mysql.close_connections()
-
         size_bytes = sum([os.path.getsize(file_part) for file_part in file_parts])
-        _, s3_key_pattern = utils.upload_to_s3(snowflake, file_parts, args.temp_dir)
+        s3_keys, s3_key_pattern = utils.upload_to_s3(snowflake, file_parts, args.temp_dir)
 
         utils.load_into_snowflake(
-            target_sf, args, columns_diff, primary_keys, s3_key_pattern, size_bytes, where_clause_sql)
+            target_sf, args, source_columns, primary_keys, s3_key_pattern,
+            size_bytes, where_clause_sql,
+        )
+        publication_status['attempted'] = True
+        temp_created = False
 
-        if file_parts:
-            utils.update_state_file(args, bookmark)
+        grants_attempted = True
+        common_utils.retry_snowflake_table_grants(
+            snowflake, args.target, target_schema, table_name
+        )
+        utils.delete_s3_objects(snowflake, s3_keys, args.target.get('s3_bucket'))
+        s3_keys = []
+        utils.update_state_file(args, bookmark)
 
         return True
     except Exception as exc:
         LOGGER.exception(exc)
-        return f'{table_name}: {exc}'
+        return common_utils.partial_sync_failure_result(
+            snowflake,
+            args.target,
+            table_name,
+            target_schema,
+            target_table,
+            {
+                's3_keys': getattr(exc, 's3_keys', s3_keys),
+                'temp_created': temp_created,
+                'publication_attempted': publication_status['attempted'],
+                'grants_attempted': grants_attempted,
+            },
+            exc,
+        )
 
 
 def main_impl():
@@ -137,18 +151,14 @@ def main_impl():
     )
 
     sync_tables = utils.get_sync_tables(args)
-
     pool_size = len(sync_tables) if len(sync_tables) < pool_size else pool_size
     with multiprocessing.Pool(pool_size) as proc:
-        sync_excs = list(
-            filter(
-                lambda x: not isinstance(x, bool),
-                proc.map(partial(partial_sync_table, args=args), sync_tables.items())
-            )
+        sync_results = proc.map(
+            partial(partial_sync_table, args=args),
+            sync_tables.items(),
         )
 
-    if isinstance(sync_excs, bool):
-        sync_excs = None
+    sync_excs = [result for result in sync_results if result is not True]
 
     # Log summary
     end_time = datetime.now()

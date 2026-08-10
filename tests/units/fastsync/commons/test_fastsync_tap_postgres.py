@@ -65,6 +65,87 @@ class TestFastSyncTapPostgres(TestCase):
             == 'pipelinewise_some_db_some_tap'
         )
 
+    def test_close_connection_is_idempotent(self):
+        """Close each opened connection once and clear its cursor reference."""
+        connection = Mock()
+        primary_connection = Mock()
+        self.postgres.conn = connection
+        self.postgres.curr = Mock()
+        self.postgres.primary_host_conn = primary_connection
+        self.postgres.primary_host_curr = Mock()
+
+        self.postgres.close_connection()
+        self.postgres.close_connection()
+
+        connection.close.assert_called_once_with()
+        primary_connection.close.assert_called_once_with()
+        self.assertIsNone(self.postgres.conn)
+        self.assertIsNone(self.postgres.curr)
+        self.assertIsNone(self.postgres.primary_host_conn)
+        self.assertIsNone(self.postgres.primary_host_curr)
+
+    def test_close_connection_silences_driver_failure(self):
+        """Cleanup failures must not replace the original sync exception."""
+        connection = Mock()
+        connection.close.side_effect = RuntimeError('close failed')
+        self.postgres.conn = connection
+
+        self.postgres.close_connection(silent=True)
+
+        connection.close.assert_called_once_with()
+        self.assertIsNone(self.postgres.conn)
+
+    def test_fetch_current_log_pos_closes_primary_connection_on_success(self):
+        """The dedicated primary connection is released before reading the source LSN."""
+        primary_connection = Mock()
+
+        with patch.object(
+            self.postgres, 'get_connection', return_value=primary_connection
+        ), patch.object(
+            self.postgres, 'primary_host_query', return_value=[{'version': 120000}]
+        ), patch.object(
+            self.postgres, 'create_replication_slot'
+        ) as create_replication_slot, patch.object(
+            self.postgres, 'query', return_value=[{'current_lsn': '0/2A'}]
+        ):
+            bookmark = self.postgres.fetch_current_log_pos()
+
+        self.assertEqual({'lsn': 42, 'version': 1}, bookmark)
+        create_replication_slot.assert_called_once_with()
+        primary_connection.close.assert_called_once_with()
+        self.assertIsNone(self.postgres.primary_host_conn)
+        self.assertIsNone(self.postgres.primary_host_curr)
+
+    def test_fetch_current_log_pos_closes_primary_connection_on_failure(self):
+        """Primary setup, metadata, and replication-slot failures cannot leak their connection."""
+        failures = ('cursor', 'metadata', 'replication_slot')
+
+        for failure in failures:
+            with self.subTest(failure=failure):
+                primary_connection = Mock()
+                error_message = f'{failure.replace("_", " ")} failed'
+                primary_connection.cursor.side_effect = (
+                    RuntimeError(error_message) if failure == 'cursor' else None
+                )
+                primary_query_error = RuntimeError(error_message) if failure == 'metadata' else None
+                slot_error = RuntimeError(error_message) if failure == 'replication_slot' else None
+
+                with patch.object(
+                    self.postgres, 'get_connection', return_value=primary_connection
+                ), patch.object(
+                    self.postgres,
+                    'primary_host_query',
+                    return_value=[{'version': 120000}],
+                    side_effect=primary_query_error,
+                ), patch.object(
+                    self.postgres, 'create_replication_slot', side_effect=slot_error
+                ), self.assertRaisesRegex(RuntimeError, error_message):
+                    self.postgres.fetch_current_log_pos()
+
+                primary_connection.close.assert_called_once_with()
+                self.assertIsNone(self.postgres.primary_host_conn)
+                self.assertIsNone(self.postgres.primary_host_curr)
+
     def test_create_replication_slot_1(self):
         """
         Validate if replication slot creation SQL commands generated correctly in case no v15 slots exists

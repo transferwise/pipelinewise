@@ -44,7 +44,7 @@ class TestDefinedPartialSyncPGToSF(TapPostgres):
         from_value_order = 5
         # run-tap command
         assertions.assert_run_tap_success(
-            self.tap_id, self.target_id, ['fastsync', 'singer']
+            self.tap_id, self.target_id, ['fastsync', 'partialsync', 'singer']
 
         )
 
@@ -72,7 +72,9 @@ class TestDefinedPartialSyncPGToSF(TapPostgres):
         self._manipulate_target_tables()
 
         # sync-tables command
-        assertions.assert_resync_tables_success(self.tap_id, self.target_id)
+        assertions.assert_resync_tables_success(
+            self.tap_id, self.target_id, sync_engines=('fastsync', 'partialsync')
+        )
 
         expected_records = source_records_order - from_value_order + 1
         assertions.assert_record_count_in_sf(self.e2e_env, self.tap_type, 'order', expected_records)
