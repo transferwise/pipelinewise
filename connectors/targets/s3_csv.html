@@ -6,24 +6,25 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Target S3 CSV &mdash; PipelineWise  documentation</title>
+  <title>S3 CSV target &mdash; PipelineWise  documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
-      <link rel="stylesheet" type="text/css" href="../../_static/css/custom.css?v=36639f2a" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/custom.css?v=1fecaf93" />
 
   
     <link rel="shortcut icon" href="../../_static/pipelinewise.png"/>
-    <link rel="canonical" href="https://docs.ansible.com/ansible/latest/connectors/targets/s3_csv.html"/>
+    <link rel="canonical" href="https://transferwise.github.io/pipelinewise/connectors/targets/s3_csv.html"/>
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="../../_static/documentation_options.js?v=5929fcd5"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../_static/js/navigation.js?v=f8c789d3"></script>
     <script src="../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
-    <link rel="next" title="Contribution" href="../../project/contribution.html" />
-    <link rel="prev" title="Target Postgres" href="postgres.html" /> 
+    <link rel="next" title="Contributing" href="../../project/contribution.html" />
+    <link rel="prev" title="Snowflake Iceberg tables" href="snowflake_iceberg.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -47,54 +48,258 @@
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <p class="caption" role="heading"><span class="caption-text">Installation</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../../installation_guide/installation.html">Installation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../installation_guide/creating_pipelines.html">Creating Pipelines</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../installation_guide/running_pipelines.html">Running Pipelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../installation_guide/installation.html">Installation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../installation_guide/installation.html#choose-an-installation-method">Choose an installation method</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../installation_guide/installation.html#docker-installation">Docker installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../installation_guide/installation.html#source-installation">Source installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../installation_guide/installation.html#packaged-connectors">Packaged connectors</a></li>
 </ul>
-<p class="caption" role="heading"><span class="caption-text">Concept</span></p>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="../../concept/singer.html">Singer.io</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../concept/replication_methods.html">Replication Methods</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../concept/fastsync.html">FastSync</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../concept/linux_pipes.html">Linux Pipes in PipelineWise</a></li>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../installation_guide/creating_pipelines.html">Create a pipeline</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../installation_guide/creating_pipelines.html#generate-a-project">Generate a project</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../installation_guide/creating_pipelines.html#configure-snowflake">Configure Snowflake</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../installation_guide/creating_pipelines.html#configure-postgresql">Configure PostgreSQL</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../installation_guide/creating_pipelines.html#provide-secrets">Provide secrets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../installation_guide/creating_pipelines.html#validate-and-import">Validate and import</a></li>
 </ul>
-<p class="caption" role="heading"><span class="caption-text">Using PipelineWise</span></p>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../installation_guide/running_pipelines.html">Run a pipeline</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../installation_guide/running_pipelines.html#preflight">Preflight</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../installation_guide/running_pipelines.html#start-and-observe">Start and observe</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../installation_guide/running_pipelines.html#stop-safely">Stop safely</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../installation_guide/running_pipelines.html#confirm-success">Confirm success</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../installation_guide/running_pipelines.html#recover-from-failure">Recover from failure</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Concepts</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/yaml_config.html">YAML Configuration</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/encrypting_passwords.html">Encrypting Passwords</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/cli.html">Command Line Interface</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/data_diff.html">Data-diff checks</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/scheduling.html">Scheduling</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/multi_server_cluster.html">Multi-Server Cluster</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/logging.html">Logging</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/alerts.html">Alerts</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/resync.html">Resync Tables</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/partial_sync.html">Different cases of partial resync</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/schema_changes.html">Schema Changes</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/transformations.html">Transformations</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/metadata_columns.html">Metadata Columns</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/troubleshooting.html">Troubleshooting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../concept/singer.html">Singer data flow</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../concept/singer.html#messages">Messages</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../concept/singer.html#taps">Taps</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../concept/singer.html#targets">Targets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../concept/singer.html#acknowledgement-boundary">Acknowledgement boundary</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../concept/replication_methods.html">Replication methods</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../concept/replication_methods.html#choose-a-method">Choose a method</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../concept/replication_methods.html#log-based-replication">Log-based replication</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../concept/replication_methods.html#key-based-incremental-replication">Key-based incremental replication</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../concept/replication_methods.html#full-table-replication">Full-table replication</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../concept/fastsync.html">FastSync</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../concept/fastsync.html#supported-routes">Supported routes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../concept/fastsync.html#automatic-selection-and-handover">Automatic selection and handover</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../concept/fastsync.html#explicit-fullsync">Explicit FullSync</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../concept/fastsync.html#configured-partialsync">Configured PartialSync</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../concept/linux_pipes.html">Stream buffering and acknowledgement</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../concept/linux_pipes.html#configuration">Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../concept/linux_pipes.html#acknowledgement-boundary">Acknowledgement boundary</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../concept/linux_pipes.html#termination-and-restart">Termination and restart</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../concept/linux_pipes.html#operational-guidance">Operational guidance</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Operations</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/yaml_config.html">YAML configuration</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/yaml_config.html#project-files">Project files</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/yaml_config.html#global-configuration">Global configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/yaml_config.html#tap-configuration">Tap configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/yaml_config.html#schemas-and-tables">Schemas and tables</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/yaml_config.html#target-configuration">Target configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/yaml_config.html#secrets-and-validation">Secrets and validation</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/encrypting_passwords.html">Encrypt configuration values</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/encrypting_passwords.html#create-the-vault-password-file">Create the vault password file</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/encrypting_passwords.html#encrypt-a-value">Encrypt a value</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/encrypting_passwords.html#import-encrypted-yaml">Import encrypted YAML</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/encrypting_passwords.html#rotation-and-recovery">Rotation and recovery</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/cli.html">Command-line interface</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/cli.html#command-summary">Command summary</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/cli.html#project-lifecycle">Project lifecycle</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/cli.html#init"><code class="docutils literal notranslate"><span class="pre">init</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/cli.html#validate"><code class="docutils literal notranslate"><span class="pre">validate</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/cli.html#import-config"><code class="docutils literal notranslate"><span class="pre">import_config</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/cli.html#inspect-and-test">Inspect and test</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/cli.html#status"><code class="docutils literal notranslate"><span class="pre">status</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/cli.html#test-tap-connection"><code class="docutils literal notranslate"><span class="pre">test_tap_connection</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/cli.html#discover-tap"><code class="docutils literal notranslate"><span class="pre">discover_tap</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/cli.html#replication">Replication</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/cli.html#run-tap"><code class="docutils literal notranslate"><span class="pre">run_tap</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/cli.html#stop-tap"><code class="docutils literal notranslate"><span class="pre">stop_tap</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/cli.html#fast-sync"><code class="docutils literal notranslate"><span class="pre">fast_sync</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/cli.html#partial-sync-table"><code class="docutils literal notranslate"><span class="pre">partial_sync_table</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/cli.html#reset-state"><code class="docutils literal notranslate"><span class="pre">reset_state</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/cli.html#data-diff">Data-diff</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/cli.html#list-data-diff-checks"><code class="docutils literal notranslate"><span class="pre">list_data_diff_checks</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/cli.html#run-data-diff-checks"><code class="docutils literal notranslate"><span class="pre">run_data_diff_checks</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/cli.html#rerun-data-diff-check"><code class="docutils literal notranslate"><span class="pre">rerun_data_diff_check</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/cli.html#secrets">Secrets</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/cli.html#encrypt-string"><code class="docutils literal notranslate"><span class="pre">encrypt_string</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/cli.html#common-options-and-environment">Common options and environment</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/data_diff.html">Data-diff checks</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/data_diff.html#supported-routes">Supported routes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/data_diff.html#check-types">Check types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/data_diff.html#configuration">Configuration</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/data_diff.html#backend-database">Backend database</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/data_diff.html#tap-yaml">Tap YAML</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/data_diff.html#choosing-a-frequency-and-window">Choosing a frequency and window</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/data_diff.html#cli-commands">CLI commands</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/data_diff.html#alerts">Alerts</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/data_diff.html#one-alert-per-failed-check-per-window">One alert per failed check per window</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/data_diff.html#coverage-and-remediation">Coverage and remediation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/data_diff.html#monitoring-views">Monitoring views</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/data_diff.html#source-safety">Source safety</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/data_diff.html#preflight">Preflight</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/scheduling.html">Scheduling</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/scheduling.html#requirements">Requirements</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/scheduling.html#example">Example</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/scheduling.html#cadence-and-overlap">Cadence and overlap</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/scheduling.html#retries-and-recovery">Retries and recovery</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/multi_server_cluster.html">Multi-server operation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/multi_server_cluster.html#prerequisites">Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/multi_server_cluster.html#scheduling-boundary">Scheduling boundary</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/multi_server_cluster.html#failure-recovery">Failure recovery</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/logging.html">Logging</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/logging.html#filename-fields">Filename fields</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/logging.html#observe-a-run">Observe a run</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/logging.html#diagnose-failure">Diagnose failure</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/logging.html#retention">Retention</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/alerts.html">Alerts</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/alerts.html#handlers">Handlers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/alerts.html#slack">Slack</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/alerts.html#victorops">VictorOps</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/alerts.html#routing-and-suppression">Routing and suppression</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/resync.html">Resync and repair</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/resync.html#choose-an-operation">Choose an operation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/resync.html#preflight">Preflight</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/resync.html#full-resync">Full resync</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/resync.html#partial-repair">Partial repair</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/resync.html#failure-and-validation">Failure and validation</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/partial_sync.html">PartialSync behaviour</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/partial_sync.html#range-semantics">Range semantics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/partial_sync.html#merge-outcomes">Merge outcomes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/partial_sync.html#visual-examples">Visual examples</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/partial_sync.html#safety-and-validation">Safety and validation</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/schema_changes.html">Schema changes</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/schema_changes.html#change-outcomes">Change outcomes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/schema_changes.html#column-versioning">Column versioning</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/schema_changes.html#operational-procedure">Operational procedure</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/transformations.html">Load-time transformations</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/transformations.html#transformation-types">Transformation types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/transformations.html#configuration">Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/transformations.html#nested-json-fields">Nested JSON fields</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/transformations.html#conditions">Conditions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/transformations.html#validation-and-rollout">Validation and rollout</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/metadata_columns.html">Metadata columns and deletes</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/metadata_columns.html#columns">Columns</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/metadata_columns.html#configuration-outcomes">Configuration outcomes</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/troubleshooting.html">Troubleshooting</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/troubleshooting.html#symptom-index">Symptom index</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/troubleshooting.html#replication-checks">Replication checks</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/troubleshooting.html#mariadb-mysql-errors">MariaDB / MySQL Errors</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/troubleshooting.html#postgresql-errors">PostgreSQL Errors</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/troubleshooting.html#fastsync-errors">FastSync Errors</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/troubleshooting.html#logging-and-diagnostics">Logging and Diagnostics</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/troubleshooting.html#verify-recovery">Verify recovery</a></li>
+</ul>
+</li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Connectors</span></p>
 <ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="../taps.html">Taps (Data Sources)</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../taps.html#configuring-taps">Configuring taps</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../targets.html">Targets (Destinations)</a></li>
-<li class="toctree-l1 current"><a class="reference internal" href="../targets.html#configuring-the-targets">Configuring the targets</a><ul class="current">
-<li class="toctree-l2"><a class="reference internal" href="snowflake.html">Target Snowflake</a></li>
-<li class="toctree-l2"><a class="reference internal" href="postgres.html">Target Postgres</a></li>
-<li class="toctree-l2 current"><a class="current reference internal" href="#">Target S3 CSV</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#configuring-where-to-replicate-data">Configuring where to replicate data</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../index.html">Connector overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../taps.html">Sources</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../taps/mysql.html">MariaDB and MySQL source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../taps/postgres.html">PostgreSQL source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../taps/snowflake.html">Snowflake source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../taps/mongodb.html">MongoDB source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../taps/s3_csv.html">S3 CSV source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../taps/kafka.html">Kafka source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../taps/zendesk.html">Zendesk source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../taps/jira.html">Jira source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../taps/github.html">GitHub source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../taps/slack.html">Slack source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../taps/mixpanel.html">Mixpanel source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../taps/salesforce.html">Salesforce source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../taps/twilio.html">Twilio source</a></li>
 </ul>
 </li>
+<li class="toctree-l1 current"><a class="reference internal" href="../targets.html">Targets</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="postgres.html">PostgreSQL target</a></li>
+<li class="toctree-l2"><a class="reference internal" href="snowflake.html">Snowflake target</a></li>
+<li class="toctree-l2"><a class="reference internal" href="snowflake_iceberg.html">Snowflake Iceberg tables</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">S3 CSV target</a></li>
 </ul>
 </li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Project</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../../project/contribution.html">Contribution</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../project/about.html">Project</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../project/licenses.html">Licenses</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../project/contribution.html">Contributing</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../project/contribution.html#development-environment">Development environment</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../project/contribution.html#add-or-update-a-source-connector">Add or update a source connector</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../project/contribution.html#add-or-update-a-target-connector">Add or update a target connector</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../project/contribution.html#support-status">Support status</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../project/contribution.html#validation">Validation</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../project/about.html">Project</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../project/about.html#history">History</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../project/about.html#early-contributors">Early contributors</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../project/about.html#contribution">Contribution</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../project/about.html#resources-and-links">Resources and links</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../project/licenses.html">Licenses</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../project/licenses.html#packaged-components">Packaged components</a></li>
+</ul>
+</li>
 </ul>
 
         </div>
@@ -112,7 +317,7 @@
   <ul class="wy-breadcrumbs">
       <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
           <li class="breadcrumb-item"><a href="../targets.html">Targets (Destinations)</a></li>
-      <li class="breadcrumb-item active">Target S3 CSV</li>
+      <li class="breadcrumb-item active">S3 CSV target</li>
       <li class="wy-breadcrumbs-aside">
             <a href="../../_sources/connectors/targets/s3_csv.rst.txt" rel="nofollow"> View page source</a>
       </li>
@@ -122,74 +327,126 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="target-s3-csv">
-<span id="id1"></span><h1>Target S3 CSV<a class="headerlink" href="#target-s3-csv" title="Link to this heading"></a></h1>
-<p>Loading data to S3 in CSV file format is straightforward. You need to have
-access to an S3 bucket and you can generate data files on S3 from all the
-supported <a class="reference internal" href="../taps.html#taps-list"><span class="std std-ref">Taps (Data Sources)</span></a>.</p>
-<div class="admonition warning">
-<p class="admonition-title">Warning</p>
-<p><strong>Authentication Methods</strong></p>
-<blockquote>
-<div><ul>
-<li><p><strong>Profile based authentication</strong>: This is the default authentication method. Credentials taken from
-the <code class="docutils literal notranslate"><span class="pre">AWS_PROFILE</span></code> environment variable or the <code class="docutils literal notranslate"><span class="pre">default</span></code> AWS profile, that’s available on the host where
-PipelineWise is running.
-To use another profile set the <code class="docutils literal notranslate"><span class="pre">aws_profile</span></code> parameter.
-This method requires the presence of <code class="docutils literal notranslate"><span class="pre">~/.aws/credentials</span></code> file on the host.</p></li>
-<li><p><strong>Credentials based authentication</strong>: To provide fixed credentials set <code class="docutils literal notranslate"><span class="pre">aws_access_key_id</span></code>,
-<code class="docutils literal notranslate"><span class="pre">aws_secret_access_key</span></code> and optionally the <code class="docutils literal notranslate"><span class="pre">aws_session_token</span></code> parameters.</p>
-<p>Optionally the credentials can be vault-encrypted in the YAML. Please check <a class="reference internal" href="../../user_guide/encrypting_passwords.html#encrypting-passwords"><span class="std std-ref">Encrypting Passwords</span></a>
-for further details.</p>
-</li>
-<li><p><strong>IAM role based authentication</strong>: When no credentials and no AWS profile is given nor found on the host,
-PipelineWise will resort to use the IAM role attached to the host.</p></li>
-</ul>
-</div></blockquote>
-</div>
-<section id="configuring-where-to-replicate-data">
-<h2>Configuring where to replicate data<a class="headerlink" href="#configuring-where-to-replicate-data" title="Link to this heading"></a></h2>
-<p>PipelineWise configures every target with a common structured YAML file format.
-A sample YAML for S3 CSV target can be generated into a project directory by
-following the steps in the <a class="reference internal" href="../../installation_guide/creating_pipelines.html#generating-pipelines"><span class="std std-ref">Generating Sample Pipelines</span></a> section.</p>
-<p>Example YAML for <code class="docutils literal notranslate"><span class="pre">target-s3-csv</span></code>:</p>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nn">---</span>
-
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="c1"># General Properties</span>
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;s3&quot;</span><span class="w">                               </span><span class="c1"># Unique identifier of the target</span>
-<span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;S3</span><span class="nv"> </span><span class="s">Target</span><span class="nv"> </span><span class="s">connector&quot;</span><span class="w">            </span><span class="c1"># Name of the target</span>
-<span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;target-s3-csv&quot;</span><span class="w">                  </span><span class="c1"># !! THIS SHOULD NOT CHANGE !!</span>
-
-
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="c1"># Target - S3 details</span>
-<span class="c1"># ------------------------------------------------------------------------------</span>
+  <section id="s3-csv-target">
+<span id="target-s3-csv"></span><h1>S3 CSV target<a class="headerlink" href="#s3-csv-target" title="Link to this heading"></a></h1>
+<p><code class="docutils literal notranslate"><span class="pre">target-s3-csv</span></code> writes Singer streams as CSV objects in S3.</p>
+<table class="docutils align-default" id="id1" style="width: 100%">
+<caption><span class="caption-text">Support</span><a class="headerlink" href="#id1" title="Link to this table"></a></caption>
+<colgroup>
+<col style="width: 28.0%" />
+<col style="width: 24.0%" />
+<col style="width: 48.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Target</p></th>
+<th class="head"><p>Status</p></th>
+<th class="head"><p>Load path</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>S3 CSV</p></td>
+<td><p>Experimental</p></td>
+<td><p>Singer only; no FastSync or PartialSync</p></td>
+</tr>
+</tbody>
+</table>
+<section id="authentication">
+<h2>Authentication<a class="headerlink" href="#authentication" title="Link to this heading"></a></h2>
+<p>Credential resolution uses an explicit profile, environment credentials, then
+the host’s IAM role. Prefer temporary role credentials. If static credentials
+are unavoidable, encrypt them and rotate them independently of pipeline state.</p>
+<p><code class="docutils literal notranslate"><span class="pre">aws_profile</span></code> falls back to <code class="docutils literal notranslate"><span class="pre">AWS_PROFILE</span></code>. <code class="docutils literal notranslate"><span class="pre">aws_access_key_id</span></code>,
+<code class="docutils literal notranslate"><span class="pre">aws_secret_access_key</span></code>, and <code class="docutils literal notranslate"><span class="pre">aws_session_token</span></code> fall back to
+<code class="docutils literal notranslate"><span class="pre">AWS_ACCESS_KEY_ID</span></code>, <code class="docutils literal notranslate"><span class="pre">AWS_SECRET_ACCESS_KEY</span></code>, and <code class="docutils literal notranslate"><span class="pre">AWS_SESSION_TOKEN</span></code>.
+Configure the access-key ID and secret together; the session token is required
+only for temporary static credentials. With none configured, Boto3 uses its
+default credential chain.</p>
+</section>
+<section id="configuration">
+<h2>Configuration<a class="headerlink" href="#configuration" title="Link to this heading"></a></h2>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;s3_exports&quot;</span>
+<span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;S3</span><span class="nv"> </span><span class="s">CSV</span><span class="nv"> </span><span class="s">exports&quot;</span>
+<span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;target-s3-csv&quot;</span>
 <span class="nt">db_conn</span><span class="p">:</span>
-<span class="w">  </span><span class="c1"># Profile based authentication</span>
-<span class="w">  </span><span class="nt">aws_profile</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;AWS_PROFILE&gt;&quot;</span><span class="w">                  </span><span class="c1"># AWS profile name, if not provided, the AWS_PROFILE environment</span>
-<span class="w">                                                </span><span class="c1"># variable or the &#39;default&#39; profile will be used, if not</span>
-<span class="w">                                                </span><span class="c1"># available, then IAM role attached to the host will be used.</span>
-
-<span class="w">  </span><span class="c1"># Credentials based authentication</span>
-<span class="w">  </span><span class="c1">#aws_access_key_id: &quot;&lt;ACCESS_KEY&gt;&quot;            # Plain string or vault encrypted. Required for non-profile based auth. If not provided, AWS_ACCESS_KEY_ID environment variable will be used.</span>
-<span class="w">  </span><span class="c1">#aws_secret_access_key: &quot;&lt;SECRET_ACCESS_KEY&quot;  # Plain string or vault encrypted. Required for non-profile based auth. If not provided, AWS_SECRET_ACCESS_KEY environment variable will be used.</span>
-<span class="w">  </span><span class="c1">#aws_session_token: &quot;&lt;AWS_SESSION_TOKEN&gt;&quot;     # Optional: Plain string or vault encrypted. If not provided, AWS_SESSION_TOKEN environment variable will be used.</span>
-
-<span class="w">  </span><span class="nt">s3_bucket</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;BUCKET_NAME&gt;&quot;</span><span class="w">                     </span><span class="c1"># S3 bucket name</span>
-
-<span class="w">  </span><span class="nt">s3_key_prefix</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;pipelinewise-exports/&quot;</span><span class="w">         </span><span class="c1"># (Default: None) A static prefix before the generated S3 key names</span>
-<span class="w">  </span><span class="nt">delimiter</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;,&quot;</span><span class="w">                                 </span><span class="c1"># (Default: &#39;,&#39;) A one-character string used to separate fields.</span>
-<span class="w">  </span><span class="nt">quotechar</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;\&quot;&quot;</span><span class="w">                                </span><span class="c1"># Default: &#39;\&quot;&#39;. Quotes fields containing</span>
-<span class="w">                                                   </span><span class="c1"># special characters, delimiters or newlines.</span>
-
-<span class="w">  </span><span class="c1">#encryption_type: &quot;KMS&quot;                        # (Default: None) The type of encryption to use. Current supported options are: &#39;none&#39; and &#39;KMS&#39;.</span>
-<span class="w">  </span><span class="c1">#encryption_key: &quot;&lt;ENCRYPTION_KEY_ID&gt;&quot;        # A reference to the encryption key to use for data encryption.</span>
-<span class="w">                                                 </span><span class="c1"># For KMS encryption, this should be the name of the KMS encryption key ID (e.g. &#39;1234abcd-1234-1234-1234-1234abcd1234&#39;).</span>
-<span class="w">                                                 </span><span class="c1"># This field is ignored if &#39;encryption_type&#39; is none or blank.</span>
+<span class="w">  </span><span class="nt">s3_bucket</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;analytics-exports&quot;</span>
+<span class="w">  </span><span class="nt">s3_key_prefix</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;pipelinewise/&quot;</span>
+<span class="w">  </span><span class="nt">delimiter</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;,&quot;</span>
+<span class="w">  </span><span class="nt">quotechar</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;&quot;&#39;</span>
+<span class="w">  </span><span class="nt">encryption_type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;KMS&quot;</span>
+<span class="w">  </span><span class="nt">encryption_key</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;KMS_KEY_ID&gt;&quot;</span>
 </pre></div>
 </div>
+<table class="docutils align-default" id="id2" style="width: 100%">
+<caption><span class="caption-text">Connector-specific settings</span><a class="headerlink" href="#id2" title="Link to this table"></a></caption>
+<colgroup>
+<col style="width: 28.0%" />
+<col style="width: 18.0%" />
+<col style="width: 18.0%" />
+<col style="width: 36.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Setting</p></th>
+<th class="head"><p>Required</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Effect</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">s3_bucket</span></code></p></td>
+<td><p>Yes</p></td>
+<td><p>—</p></td>
+<td><p>Destination bucket.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">s3_key_prefix</span></code></p></td>
+<td><p>No</p></td>
+<td><p>None</p></td>
+<td><p>Static prefix for generated object keys.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">aws_profile</span></code></p></td>
+<td><p>No</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">AWS_PROFILE</span></code></p></td>
+<td><p>Selects a named profile when no static key pair is configured.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">aws_access_key_id</span></code> / <code class="docutils literal notranslate"><span class="pre">aws_secret_access_key</span></code></p></td>
+<td><p>No</p></td>
+<td><p>AWS environment</p></td>
+<td><p>Supplies a static credential pair; encrypt both YAML values.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">aws_session_token</span></code></p></td>
+<td><p>With temporary keys</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">AWS_SESSION_TOKEN</span></code></p></td>
+<td><p>Completes temporary static credentials.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">s3_acl</span></code></p></td>
+<td><p>No</p></td>
+<td><p>None</p></td>
+<td><p>Accepted by the PipelineWise schema but currently ignored by
+<code class="docutils literal notranslate"><span class="pre">target-s3-csv</span></code>; use bucket ownership and policy instead.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">delimiter</span></code></p></td>
+<td><p>No</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">,</span></code></p></td>
+<td><p>One-character field separator.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">quotechar</span></code></p></td>
+<td><p>No</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&quot;</span></code></p></td>
+<td><p>Quotes fields containing delimiters, quotes, or newlines.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">encryption_type</span></code></p></td>
+<td><p>No</p></td>
+<td><p>None</p></td>
+<td><p>Selects no encryption or KMS encryption.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">encryption_key</span></code></p></td>
+<td><p>With KMS</p></td>
+<td><p>—</p></td>
+<td><p>KMS key identifier.</p></td>
+</tr>
+</tbody>
+</table>
+<p>Before production use, verify object naming, retry duplication, CSV escaping,
+encryption, lifecycle retention, and downstream schema handling.</p>
 </section>
 </section>
 
@@ -197,8 +454,8 @@ following the steps in the <a class="reference internal" href="../../installatio
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="postgres.html" class="btn btn-neutral float-left" title="Target Postgres" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="../../project/contribution.html" class="btn btn-neutral float-right" title="Contribution" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="snowflake_iceberg.html" class="btn btn-neutral float-left" title="Snowflake Iceberg tables" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../../project/contribution.html" class="btn btn-neutral float-right" title="Contributing" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

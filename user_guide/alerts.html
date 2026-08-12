@@ -9,20 +9,21 @@
   <title>Alerts &mdash; PipelineWise  documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
-      <link rel="stylesheet" type="text/css" href="../_static/css/custom.css?v=36639f2a" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/custom.css?v=1fecaf93" />
 
   
     <link rel="shortcut icon" href="../_static/pipelinewise.png"/>
-    <link rel="canonical" href="https://docs.ansible.com/ansible/latest/user_guide/alerts.html"/>
+    <link rel="canonical" href="https://transferwise.github.io/pipelinewise/user_guide/alerts.html"/>
       <script src="../_static/jquery.js?v=5d32c60e"></script>
       <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="../_static/documentation_options.js?v=5929fcd5"></script>
       <script src="../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../_static/js/navigation.js?v=f8c789d3"></script>
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Resync Tables" href="resync.html" />
+    <link rel="next" title="Resync and repair" href="resync.html" />
     <link rel="prev" title="Logging" href="logging.html" /> 
 </head>
 
@@ -47,50 +48,258 @@
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <p class="caption" role="heading"><span class="caption-text">Installation</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../installation_guide/installation.html">Installation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../installation_guide/creating_pipelines.html">Creating Pipelines</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../installation_guide/running_pipelines.html">Running Pipelines</a></li>
-</ul>
-<p class="caption" role="heading"><span class="caption-text">Concept</span></p>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="../concept/singer.html">Singer.io</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../concept/replication_methods.html">Replication Methods</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../concept/fastsync.html">FastSync</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../concept/linux_pipes.html">Linux Pipes in PipelineWise</a></li>
-</ul>
-<p class="caption" role="heading"><span class="caption-text">Using PipelineWise</span></p>
-<ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="yaml_config.html">YAML Configuration</a></li>
-<li class="toctree-l1"><a class="reference internal" href="encrypting_passwords.html">Encrypting Passwords</a></li>
-<li class="toctree-l1"><a class="reference internal" href="cli.html">Command Line Interface</a></li>
-<li class="toctree-l1"><a class="reference internal" href="data_diff.html">Data-diff checks</a></li>
-<li class="toctree-l1"><a class="reference internal" href="scheduling.html">Scheduling</a></li>
-<li class="toctree-l1"><a class="reference internal" href="multi_server_cluster.html">Multi-Server Cluster</a></li>
-<li class="toctree-l1"><a class="reference internal" href="logging.html">Logging</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Alerts</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#slack-alert-handler">Slack Alert Handler</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#victorops-alert-handler">VictorOps Alert Handler</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../installation_guide/installation.html">Installation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../installation_guide/installation.html#choose-an-installation-method">Choose an installation method</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation_guide/installation.html#docker-installation">Docker installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation_guide/installation.html#source-installation">Source installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation_guide/installation.html#packaged-connectors">Packaged connectors</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="resync.html">Resync Tables</a></li>
-<li class="toctree-l1"><a class="reference internal" href="partial_sync.html">Different cases of partial resync</a></li>
-<li class="toctree-l1"><a class="reference internal" href="schema_changes.html">Schema Changes</a></li>
-<li class="toctree-l1"><a class="reference internal" href="transformations.html">Transformations</a></li>
-<li class="toctree-l1"><a class="reference internal" href="metadata_columns.html">Metadata Columns</a></li>
-<li class="toctree-l1"><a class="reference internal" href="troubleshooting.html">Troubleshooting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../installation_guide/creating_pipelines.html">Create a pipeline</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../installation_guide/creating_pipelines.html#generate-a-project">Generate a project</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation_guide/creating_pipelines.html#configure-snowflake">Configure Snowflake</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation_guide/creating_pipelines.html#configure-postgresql">Configure PostgreSQL</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation_guide/creating_pipelines.html#provide-secrets">Provide secrets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation_guide/creating_pipelines.html#validate-and-import">Validate and import</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../installation_guide/running_pipelines.html">Run a pipeline</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../installation_guide/running_pipelines.html#preflight">Preflight</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation_guide/running_pipelines.html#start-and-observe">Start and observe</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation_guide/running_pipelines.html#stop-safely">Stop safely</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation_guide/running_pipelines.html#confirm-success">Confirm success</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation_guide/running_pipelines.html#recover-from-failure">Recover from failure</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Concepts</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../concept/singer.html">Singer data flow</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../concept/singer.html#messages">Messages</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../concept/singer.html#taps">Taps</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../concept/singer.html#targets">Targets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../concept/singer.html#acknowledgement-boundary">Acknowledgement boundary</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../concept/replication_methods.html">Replication methods</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../concept/replication_methods.html#choose-a-method">Choose a method</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../concept/replication_methods.html#log-based-replication">Log-based replication</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../concept/replication_methods.html#key-based-incremental-replication">Key-based incremental replication</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../concept/replication_methods.html#full-table-replication">Full-table replication</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../concept/fastsync.html">FastSync</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#supported-routes">Supported routes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#automatic-selection-and-handover">Automatic selection and handover</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#explicit-fullsync">Explicit FullSync</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#configured-partialsync">Configured PartialSync</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../concept/linux_pipes.html">Stream buffering and acknowledgement</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../concept/linux_pipes.html#configuration">Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../concept/linux_pipes.html#acknowledgement-boundary">Acknowledgement boundary</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../concept/linux_pipes.html#termination-and-restart">Termination and restart</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../concept/linux_pipes.html#operational-guidance">Operational guidance</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Operations</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="yaml_config.html">YAML configuration</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="yaml_config.html#project-files">Project files</a></li>
+<li class="toctree-l2"><a class="reference internal" href="yaml_config.html#global-configuration">Global configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="yaml_config.html#tap-configuration">Tap configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="yaml_config.html#schemas-and-tables">Schemas and tables</a></li>
+<li class="toctree-l2"><a class="reference internal" href="yaml_config.html#target-configuration">Target configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="yaml_config.html#secrets-and-validation">Secrets and validation</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="encrypting_passwords.html">Encrypt configuration values</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="encrypting_passwords.html#create-the-vault-password-file">Create the vault password file</a></li>
+<li class="toctree-l2"><a class="reference internal" href="encrypting_passwords.html#encrypt-a-value">Encrypt a value</a></li>
+<li class="toctree-l2"><a class="reference internal" href="encrypting_passwords.html#import-encrypted-yaml">Import encrypted YAML</a></li>
+<li class="toctree-l2"><a class="reference internal" href="encrypting_passwords.html#rotation-and-recovery">Rotation and recovery</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="cli.html">Command-line interface</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="cli.html#command-summary">Command summary</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cli.html#project-lifecycle">Project lifecycle</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="cli.html#init"><code class="docutils literal notranslate"><span class="pre">init</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli.html#validate"><code class="docutils literal notranslate"><span class="pre">validate</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli.html#import-config"><code class="docutils literal notranslate"><span class="pre">import_config</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="cli.html#inspect-and-test">Inspect and test</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="cli.html#status"><code class="docutils literal notranslate"><span class="pre">status</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli.html#test-tap-connection"><code class="docutils literal notranslate"><span class="pre">test_tap_connection</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli.html#discover-tap"><code class="docutils literal notranslate"><span class="pre">discover_tap</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="cli.html#replication">Replication</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="cli.html#run-tap"><code class="docutils literal notranslate"><span class="pre">run_tap</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli.html#stop-tap"><code class="docutils literal notranslate"><span class="pre">stop_tap</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli.html#fast-sync"><code class="docutils literal notranslate"><span class="pre">fast_sync</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli.html#partial-sync-table"><code class="docutils literal notranslate"><span class="pre">partial_sync_table</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli.html#reset-state"><code class="docutils literal notranslate"><span class="pre">reset_state</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="cli.html#data-diff">Data-diff</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="cli.html#list-data-diff-checks"><code class="docutils literal notranslate"><span class="pre">list_data_diff_checks</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli.html#run-data-diff-checks"><code class="docutils literal notranslate"><span class="pre">run_data_diff_checks</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli.html#rerun-data-diff-check"><code class="docutils literal notranslate"><span class="pre">rerun_data_diff_check</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="cli.html#secrets">Secrets</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="cli.html#encrypt-string"><code class="docutils literal notranslate"><span class="pre">encrypt_string</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="cli.html#common-options-and-environment">Common options and environment</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="data_diff.html">Data-diff checks</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="data_diff.html#supported-routes">Supported routes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="data_diff.html#check-types">Check types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="data_diff.html#configuration">Configuration</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="data_diff.html#backend-database">Backend database</a></li>
+<li class="toctree-l3"><a class="reference internal" href="data_diff.html#tap-yaml">Tap YAML</a></li>
+<li class="toctree-l3"><a class="reference internal" href="data_diff.html#choosing-a-frequency-and-window">Choosing a frequency and window</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="data_diff.html#cli-commands">CLI commands</a></li>
+<li class="toctree-l2"><a class="reference internal" href="data_diff.html#alerts">Alerts</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="data_diff.html#one-alert-per-failed-check-per-window">One alert per failed check per window</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="data_diff.html#coverage-and-remediation">Coverage and remediation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="data_diff.html#monitoring-views">Monitoring views</a></li>
+<li class="toctree-l3"><a class="reference internal" href="data_diff.html#source-safety">Source safety</a></li>
+<li class="toctree-l3"><a class="reference internal" href="data_diff.html#preflight">Preflight</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="scheduling.html">Scheduling</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="scheduling.html#requirements">Requirements</a></li>
+<li class="toctree-l2"><a class="reference internal" href="scheduling.html#example">Example</a></li>
+<li class="toctree-l2"><a class="reference internal" href="scheduling.html#cadence-and-overlap">Cadence and overlap</a></li>
+<li class="toctree-l2"><a class="reference internal" href="scheduling.html#retries-and-recovery">Retries and recovery</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="multi_server_cluster.html">Multi-server operation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="multi_server_cluster.html#prerequisites">Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="multi_server_cluster.html#scheduling-boundary">Scheduling boundary</a></li>
+<li class="toctree-l2"><a class="reference internal" href="multi_server_cluster.html#failure-recovery">Failure recovery</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="logging.html">Logging</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="logging.html#filename-fields">Filename fields</a></li>
+<li class="toctree-l2"><a class="reference internal" href="logging.html#observe-a-run">Observe a run</a></li>
+<li class="toctree-l2"><a class="reference internal" href="logging.html#diagnose-failure">Diagnose failure</a></li>
+<li class="toctree-l2"><a class="reference internal" href="logging.html#retention">Retention</a></li>
+</ul>
+</li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Alerts</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#handlers">Handlers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#slack">Slack</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#victorops">VictorOps</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#routing-and-suppression">Routing and suppression</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="resync.html">Resync and repair</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="resync.html#choose-an-operation">Choose an operation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="resync.html#preflight">Preflight</a></li>
+<li class="toctree-l2"><a class="reference internal" href="resync.html#full-resync">Full resync</a></li>
+<li class="toctree-l2"><a class="reference internal" href="resync.html#partial-repair">Partial repair</a></li>
+<li class="toctree-l2"><a class="reference internal" href="resync.html#failure-and-validation">Failure and validation</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="partial_sync.html">PartialSync behaviour</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="partial_sync.html#range-semantics">Range semantics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="partial_sync.html#merge-outcomes">Merge outcomes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="partial_sync.html#visual-examples">Visual examples</a></li>
+<li class="toctree-l2"><a class="reference internal" href="partial_sync.html#safety-and-validation">Safety and validation</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="schema_changes.html">Schema changes</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="schema_changes.html#change-outcomes">Change outcomes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="schema_changes.html#column-versioning">Column versioning</a></li>
+<li class="toctree-l2"><a class="reference internal" href="schema_changes.html#operational-procedure">Operational procedure</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="transformations.html">Load-time transformations</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="transformations.html#transformation-types">Transformation types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="transformations.html#configuration">Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="transformations.html#nested-json-fields">Nested JSON fields</a></li>
+<li class="toctree-l2"><a class="reference internal" href="transformations.html#conditions">Conditions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="transformations.html#validation-and-rollout">Validation and rollout</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="metadata_columns.html">Metadata columns and deletes</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="metadata_columns.html#columns">Columns</a></li>
+<li class="toctree-l2"><a class="reference internal" href="metadata_columns.html#configuration-outcomes">Configuration outcomes</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="troubleshooting.html">Troubleshooting</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="troubleshooting.html#symptom-index">Symptom index</a></li>
+<li class="toctree-l2"><a class="reference internal" href="troubleshooting.html#replication-checks">Replication checks</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="troubleshooting.html#mariadb-mysql-errors">MariaDB / MySQL Errors</a></li>
+<li class="toctree-l3"><a class="reference internal" href="troubleshooting.html#postgresql-errors">PostgreSQL Errors</a></li>
+<li class="toctree-l3"><a class="reference internal" href="troubleshooting.html#fastsync-errors">FastSync Errors</a></li>
+<li class="toctree-l3"><a class="reference internal" href="troubleshooting.html#logging-and-diagnostics">Logging and Diagnostics</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="troubleshooting.html#verify-recovery">Verify recovery</a></li>
+</ul>
+</li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Connectors</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../connectors/taps.html">Taps (Data Sources)</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../connectors/taps.html#configuring-taps">Configuring taps</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../connectors/targets.html">Targets (Destinations)</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../connectors/targets.html#configuring-the-targets">Configuring the targets</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../connectors/index.html">Connector overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../connectors/taps.html">Sources</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/taps/mysql.html">MariaDB and MySQL source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/taps/postgres.html">PostgreSQL source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/taps/snowflake.html">Snowflake source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/taps/mongodb.html">MongoDB source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/taps/s3_csv.html">S3 CSV source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/taps/kafka.html">Kafka source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/taps/zendesk.html">Zendesk source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/taps/jira.html">Jira source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/taps/github.html">GitHub source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/taps/slack.html">Slack source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/taps/mixpanel.html">Mixpanel source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/taps/salesforce.html">Salesforce source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/taps/twilio.html">Twilio source</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../connectors/targets.html">Targets</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/targets/postgres.html">PostgreSQL target</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/targets/snowflake.html">Snowflake target</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/targets/snowflake_iceberg.html">Snowflake Iceberg tables</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/targets/s3_csv.html">S3 CSV target</a></li>
+</ul>
+</li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Project</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../project/contribution.html">Contribution</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../project/about.html">Project</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../project/licenses.html">Licenses</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../project/contribution.html">Contributing</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../project/contribution.html#development-environment">Development environment</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../project/contribution.html#add-or-update-a-source-connector">Add or update a source connector</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../project/contribution.html#add-or-update-a-target-connector">Add or update a target connector</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../project/contribution.html#support-status">Support status</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../project/contribution.html#validation">Validation</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../project/about.html">Project</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../project/about.html#history">History</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../project/about.html#early-contributors">Early contributors</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../project/about.html#contribution">Contribution</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../project/about.html#resources-and-links">Resources and links</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../project/licenses.html">Licenses</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../project/licenses.html#packaged-components">Packaged components</a></li>
+</ul>
+</li>
 </ul>
 
         </div>
@@ -119,85 +328,83 @@
              
   <section id="alerts">
 <span id="id1"></span><h1>Alerts<a class="headerlink" href="#alerts" title="Link to this heading"></a></h1>
-<p>PipelineWise can send alerts to external systems on run failures by configuring
-alert handlers in the main <code class="docutils literal notranslate"><span class="pre">config.yml</span></code>. This file is created automatically
-when <a class="reference internal" href="../installation_guide/creating_pipelines.html#generating-pipelines"><span class="std std-ref">Generating Sample Pipelines</span></a>. Alerts are triggered when <a class="reference internal" href="cli.html#cli-run-tap"><span class="std std-ref">run_tap</span></a>
-or <a class="reference internal" href="cli.html#cli-fast-sync"><span class="std std-ref">fast_sync</span></a> fails. The alert provides the ID of the failed tap and a description of the failure
-to the alert handler.</p>
-<p>Failed <a class="reference internal" href="data_diff.html#data-diff"><span class="std std-ref">Data-diff checks</span></a> checks alert through the same handlers and channels
-configured here, including <code class="docutils literal notranslate"><span class="pre">slack_alert_channel</span></code> and <code class="docutils literal notranslate"><span class="pre">send_alert</span></code>.</p>
-<div class="admonition warning">
-<p class="admonition-title">Warning</p>
-<p>You can optionally disable alerts on certain taps by adding <code class="docutils literal notranslate"><span class="pre">send_alert:</span> <span class="pre">False</span></code>
-optional entry to any tap <a class="reference internal" href="yaml_config.html#yaml-configuration"><span class="std std-ref">YAML Configuration</span></a> file.</p>
-</div>
-<dl class="simple">
-<dt>Currently available alert handlers:</dt><dd><ul class="simple">
-<li><p><a class="reference internal" href="#slack-alert-handler"><span class="std std-ref">Slack Alert Handler</span></a></p></li>
-<li><p><a class="reference internal" href="#victorops-alert-handler"><span class="std std-ref">VictorOps Alert Handler</span></a> — incomplete, see the limitations below</p></li>
-</ul>
-</dd>
-</dl>
-<section id="slack-alert-handler">
-<span id="id2"></span><h2>Slack Alert Handler<a class="headerlink" href="#slack-alert-handler" title="Link to this heading"></a></h2>
-<p>To send alerts to a Slack channel on failed tap runs:</p>
-<ol class="arabic">
-<li><p>Follow the instructions at <a class="reference external" href="https://api.slack.com/authentication/basics">Create a new Slack app</a> and get a <a class="reference external" href="https://api.slack.com/authentication/token-types#bot">Bot user token</a>.</p></li>
-<li><p>Add the <code class="docutils literal notranslate"><span class="pre">chat:write</span></code> OAuth Scope to the app.</p></li>
-<li><p>Invite the bot to the channel with the <code class="docutils literal notranslate"><span class="pre">/invite</span> <span class="pre">&lt;bot_name&gt;</span></code> Slack command.</p></li>
-<li><p>Configure the main <code class="docutils literal notranslate"><span class="pre">config.yml</span></code></p>
-<p><strong>Config parameters</strong>:</p>
-<p><code class="docutils literal notranslate"><span class="pre">token</span></code>: Slack bot user token</p>
-<p><code class="docutils literal notranslate"><span class="pre">channel</span></code>: Slack channel where the alerts will be sent</p>
-</li>
-</ol>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nn">---</span>
-
-<span class="nt">alert_handlers</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">slack</span><span class="p">:</span>
-<span class="w">    </span><span class="nt">token</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;slack-token&quot;</span>
-<span class="w">    </span><span class="nt">channel</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;#slack-channel&quot;</span>
-</pre></div>
-</div>
-<p>To send a copy of a tap’s alerts to a different channel, add the following setting
-to that tap’s YAML file in addition to the handler configuration above:</p>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nn">---</span>
-
-<span class="nt">slack_alert_channel</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;#specific-channel-for-this-tap&quot;</span>
-</pre></div>
-</div>
+<p>PipelineWise sends failure alerts through handlers configured in <code class="docutils literal notranslate"><span class="pre">config.yml</span></code>.
+Replication and data-diff share the same routing and per-tap suppression.</p>
+<section id="handlers">
+<h2>Handlers<a class="headerlink" href="#handlers" title="Link to this heading"></a></h2>
+<table class="docutils align-default" id="id2" style="width: 100%">
+<caption><span class="caption-text">Available</span><a class="headerlink" href="#id2" title="Link to this table"></a></caption>
+<colgroup>
+<col style="width: 28.0%" />
+<col style="width: 72.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Handler</p></th>
+<th class="head"><p>Behaviour</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Slack</p></td>
+<td><p>Sends to the global channel and optional tap-specific channel.</p></td>
+</tr>
+</tbody>
+</table>
+<table class="docutils align-default" id="id3" style="width: 100%">
+<caption><span class="caption-text">Experimental</span><a class="headerlink" href="#id3" title="Link to this table"></a></caption>
+<colgroup>
+<col style="width: 28.0%" />
+<col style="width: 72.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Handler</p></th>
+<th class="head"><p>Limitation</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>VictorOps</p></td>
+<td><p>Mock-endpoint coverage only; all taps use one routing key.</p></td>
+</tr>
+</tbody>
+</table>
 </section>
-<section id="victorops-alert-handler">
-<span id="id3"></span><h2>VictorOps Alert Handler<a class="headerlink" href="#victorops-alert-handler" title="Link to this heading"></a></h2>
+<section id="slack">
+<span id="slack-alert-handler"></span><h2>Slack<a class="headerlink" href="#slack" title="Link to this heading"></a></h2>
+<p>Create a Slack app with <code class="docutils literal notranslate"><span class="pre">chat:write</span></code>, install it to the workspace, and invite
+the bot to each destination channel.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">alert_handlers</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">slack</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">token</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;{{</span><span class="nv"> </span><span class="s">env_var[&#39;SLACK_BOT_TOKEN&#39;]</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="w">    </span><span class="nt">channel</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;#pipeline-alerts&quot;</span>
+</pre></div>
+</div>
+<p>Add a second destination for one tap:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">slack_alert_channel</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;#orders-alerts&quot;</span>
+</pre></div>
+</div>
+<p>The tap-specific channel receives a copy; it does not replace the global channel.</p>
+</section>
+<section id="victorops">
+<span id="victorops-alert-handler"></span><h2>VictorOps<a class="headerlink" href="#victorops" title="Link to this heading"></a></h2>
 <div class="admonition attention">
 <p class="admonition-title">Attention</p>
-<p>This handler has only ever been exercised against a mocked endpoint, so verify it
-against your own VictorOps integration before relying on it for on-call. Note
-also that all alerts go to the single configured <code class="docutils literal notranslate"><span class="pre">routing_key</span></code> — there is no
-VictorOps equivalent of a tap’s <code class="docutils literal notranslate"><span class="pre">slack_alert_channel</span></code>.</p>
+<p>Verify this handler against the real integration before relying on it for
+on-call response. It has only been exercised against a mocked endpoint.</p>
 </div>
-<p>To send alerts and open an incident on VictorOps:</p>
-<ol class="arabic">
-<li><p>Follow the instructions at <a class="reference external" href="https://help.victorops.com/knowledge-base/rest-endpoint-integration-guide/">Enable the VictorOps REST Endpoint</a> and get the long notify URL.</p></li>
-<li><p>Find the routing key on the VictorOps settings page.</p></li>
-<li><p>Configure the main <code class="docutils literal notranslate"><span class="pre">config.yml</span></code>:</p>
-<p><strong>Config parameters</strong>:</p>
-<p><code class="docutils literal notranslate"><span class="pre">base_url</span></code>: The VictorOps notify URL <strong>without</strong> the routing key</p>
-<p><code class="docutils literal notranslate"><span class="pre">routing_key</span></code>: VictorOps routing key</p>
-</li>
-</ol>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nn">---</span>
-
-<span class="nt">alert_handlers</span><span class="p">:</span>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">alert_handlers</span><span class="p">:</span>
 <span class="w">  </span><span class="nt">victorops</span><span class="p">:</span>
-<span class="w">    </span><span class="nt">base_url</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;https://alert.victorops.com/integrations/generic/.../alert/.../...&quot;</span>
-<span class="w">    </span><span class="nt">routing_key</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;victorops-routing-key&quot;</span>
+<span class="w">    </span><span class="nt">base_url</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;https://alert.victorops.com/integrations/generic/.../alert&quot;</span>
+<span class="w">    </span><span class="nt">routing_key</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;pipelinewise&quot;</span>
 </pre></div>
 </div>
-<div class="admonition warning">
-<p class="admonition-title">Warning</p>
-<p>Make sure the VictorOps <code class="docutils literal notranslate"><span class="pre">base_url</span></code> <strong>does not include</strong> the <code class="docutils literal notranslate"><span class="pre">routing_key</span></code>.</p>
-</div>
+<p><code class="docutils literal notranslate"><span class="pre">base_url</span></code> must exclude the routing key. Requests time out after 10 seconds.</p>
+</section>
+<section id="routing-and-suppression">
+<h2>Routing and suppression<a class="headerlink" href="#routing-and-suppression" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">send_alert:</span> <span class="pre">false</span></code> in a tap YAML suppresses its replication and data-diff
+alerts. It does not change command exit status or persisted run results.</p>
+<p>Test every handler after configuration and monitor the handler itself. An alert
+channel is not a substitute for scheduler exit-status monitoring or target-data
+verification.</p>
 </section>
 </section>
 
@@ -206,7 +413,7 @@ VictorOps equivalent of a tap’s <code class="docutils literal notranslate"><sp
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="logging.html" class="btn btn-neutral float-left" title="Logging" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="resync.html" class="btn btn-neutral float-right" title="Resync Tables" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="resync.html" class="btn btn-neutral float-right" title="Resync and repair" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

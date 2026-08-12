@@ -1,73 +1,72 @@
 .. _encrypting_passwords:
 
-Encrypting Passwords
-====================
+Encrypt configuration values
+============================
 
-PipelineWise has a built-in feature that allows you to keep sensitive data such as passwords or keys
-in encrypted format, rather than as plain text in the project YAML files. These encrypted strings can
-then be distributed or placed in source control.
+PipelineWise can decrypt Ansible Vault scalar values embedded in project YAML.
+Vault encryption protects stored configuration but does not replace access
+control, secret rotation, or runtime credential isolation.
 
-PipelineWise is using the `Ansible Vault <https://docs.ansible.com/ansible/latest/user_guide/vault.html>`_
-python libraries to encrypt and decrypt strings. The default cipher is AES (which is shared-secret based).
 
-1. To encrypt data, first create a file containing the vault password. Restrict
-its permissions before writing the secret, keep it outside source control, and
-store a recoverable copy in an approved secret manager:
+Create the vault password file
+------------------------------
+
+Store the vault password outside the project and restrict it before writing the
+secret:
 
 .. code-block:: bash
 
-    $ umask 077
-    $ printf '%s\n' 'M@st3rP@ssw0rd' > vault-password.txt
+   umask 077
+   printf '%s\n' '<vault-password>' > /secure/path/pipelinewise-vault-password
+
+Keep a recoverable copy in an approved secret manager. Anyone with this file and
+the encrypted YAML can recover every protected value.
 
 
-2. Now you can encrypt the sensitive strings in your PipelineWise project. These are usually database passwords
-or other data source or destination credentials that you don't want to place in source control as
-plain texts. To encrypt a string run:
+Encrypt a value
+---------------
+
+.. code-block:: bash
+
+   pipelinewise encrypt_string \
+     --secret /secure/path/pipelinewise-vault-password \
+     --string '<value>'
+
+The plaintext argument can be visible in shell history and process listings.
+Run the command only in an appropriately isolated session and clear any retained
+history according to local security policy.
+
+Copy the complete ``!vault`` result into YAML:
 
 .. code-block:: yaml
 
-    $ pipelinewise encrypt_string --secret vault-password.txt --string "This is a string to encrypt"
-    !vault |
-              $ANSIBLE_VAULT;1.1;AES256
-              66633736626365386334633463383431353762623562663733623833626637383762343430626163
-              3330383435323737383766333639616138363235356135360a343735366137393763323636353739
-              63646266353131363436363965336561323336663032336334323236616237363430613432386335
-              6631613665336365640a643531363765663631306431363433623536363061316234643737323465
-              34626363656166373230303162623531643638656665633731333338333464633565
-    Encryption successful
+   db_conn:
+     user: "pipelinewise"
+     password: !vault |
+       $ANSIBLE_VAULT;1.1;AES256
+       <encrypted-data>
 
 
-3. Now you can copy the output of the previous step  and use it in any YAML file instead of
-plain passwords. For example in a ``tap_mysql.yml`` file the ``db_conn`` section will look like this:
+Import encrypted YAML
+---------------------
 
 .. code-block:: bash
 
-  db_conn:
-    host: "mysql_source_database"
-    port: 3306
-    user: "jack_replica"
-    password: !vault |
-          $ANSIBLE_VAULT;1.1;AES256
-          66633736626365386334633463383431353762623562663733623833626637383762343430626163
-          3330383435323737383766333639616138363235356135360a343735366137393763323636353739
-          63646266353131363436363965336561323336663032336334323236616237363430613432386335
-          6631613665336365640a643531363765663631306431363433623536363061316234643737323465
-          34626363656166373230303162623531643638656665633731333338333464633565
-    dbname: "my_database"
+   pipelinewise import_config \
+     --dir <project> \
+     --secret /secure/path/pipelinewise-vault-password
 
-4. When importing the project YAML files into PipelineWise, you will need to provide
-the path to the file with the password (the one that you created in the first step) using the
-``--secret`` command line option. For example if you have a sample project in
-``pipelinewise_samples`` you will need to run:
-
-.. code-block:: bash
-
-    $ pipelinewise import_config --dir pipelinewise_samples --secret vault-password.txt
+Missing or incorrect vault credentials fail import before a pipeline is updated.
+Do not copy the vault password into the project, image, logs, or command output.
 
 
-------------
+Rotation and recovery
+---------------------
 
+To rotate the vault password, decrypt and re-encrypt every affected value in a
+controlled change, validate the project with the new password, then retire the
+old password. Rotate the underlying database or API credential separately.
 
-**Tip:**
-For further details about creating and importing projects, please check the :ref:`creating_pipelines`
-section.
+If the vault password is lost, PipelineWise cannot recover the plaintext. Replace
+the source credentials and update the YAML rather than bypassing validation or
+editing generated connector JSON.

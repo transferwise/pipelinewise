@@ -6,24 +6,25 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Tap Mixpanel &mdash; PipelineWise  documentation</title>
+  <title>Mixpanel source &mdash; PipelineWise  documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
-      <link rel="stylesheet" type="text/css" href="../../_static/css/custom.css?v=36639f2a" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/custom.css?v=1fecaf93" />
 
   
     <link rel="shortcut icon" href="../../_static/pipelinewise.png"/>
-    <link rel="canonical" href="https://docs.ansible.com/ansible/latest/connectors/taps/mixpanel.html"/>
+    <link rel="canonical" href="https://transferwise.github.io/pipelinewise/connectors/taps/mixpanel.html"/>
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="../../_static/documentation_options.js?v=5929fcd5"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../_static/js/navigation.js?v=f8c789d3"></script>
     <script src="../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
-    <link rel="next" title="Tap Salesforce" href="salesforce.html" />
-    <link rel="prev" title="Tap Slack" href="slack.html" /> 
+    <link rel="next" title="Salesforce source" href="salesforce.html" />
+    <link rel="prev" title="Slack source" href="slack.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -47,65 +48,258 @@
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <p class="caption" role="heading"><span class="caption-text">Installation</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../../installation_guide/installation.html">Installation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../installation_guide/creating_pipelines.html">Creating Pipelines</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../installation_guide/running_pipelines.html">Running Pipelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../installation_guide/installation.html">Installation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../installation_guide/installation.html#choose-an-installation-method">Choose an installation method</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../installation_guide/installation.html#docker-installation">Docker installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../installation_guide/installation.html#source-installation">Source installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../installation_guide/installation.html#packaged-connectors">Packaged connectors</a></li>
 </ul>
-<p class="caption" role="heading"><span class="caption-text">Concept</span></p>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="../../concept/singer.html">Singer.io</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../concept/replication_methods.html">Replication Methods</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../concept/fastsync.html">FastSync</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../concept/linux_pipes.html">Linux Pipes in PipelineWise</a></li>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../installation_guide/creating_pipelines.html">Create a pipeline</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../installation_guide/creating_pipelines.html#generate-a-project">Generate a project</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../installation_guide/creating_pipelines.html#configure-snowflake">Configure Snowflake</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../installation_guide/creating_pipelines.html#configure-postgresql">Configure PostgreSQL</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../installation_guide/creating_pipelines.html#provide-secrets">Provide secrets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../installation_guide/creating_pipelines.html#validate-and-import">Validate and import</a></li>
 </ul>
-<p class="caption" role="heading"><span class="caption-text">Using PipelineWise</span></p>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../installation_guide/running_pipelines.html">Run a pipeline</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../installation_guide/running_pipelines.html#preflight">Preflight</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../installation_guide/running_pipelines.html#start-and-observe">Start and observe</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../installation_guide/running_pipelines.html#stop-safely">Stop safely</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../installation_guide/running_pipelines.html#confirm-success">Confirm success</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../installation_guide/running_pipelines.html#recover-from-failure">Recover from failure</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Concepts</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/yaml_config.html">YAML Configuration</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/encrypting_passwords.html">Encrypting Passwords</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/cli.html">Command Line Interface</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/data_diff.html">Data-diff checks</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/scheduling.html">Scheduling</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/multi_server_cluster.html">Multi-Server Cluster</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/logging.html">Logging</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/alerts.html">Alerts</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/resync.html">Resync Tables</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/partial_sync.html">Different cases of partial resync</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/schema_changes.html">Schema Changes</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/transformations.html">Transformations</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/metadata_columns.html">Metadata Columns</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../user_guide/troubleshooting.html">Troubleshooting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../concept/singer.html">Singer data flow</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../concept/singer.html#messages">Messages</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../concept/singer.html#taps">Taps</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../concept/singer.html#targets">Targets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../concept/singer.html#acknowledgement-boundary">Acknowledgement boundary</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../concept/replication_methods.html">Replication methods</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../concept/replication_methods.html#choose-a-method">Choose a method</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../concept/replication_methods.html#log-based-replication">Log-based replication</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../concept/replication_methods.html#key-based-incremental-replication">Key-based incremental replication</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../concept/replication_methods.html#full-table-replication">Full-table replication</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../concept/fastsync.html">FastSync</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../concept/fastsync.html#supported-routes">Supported routes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../concept/fastsync.html#automatic-selection-and-handover">Automatic selection and handover</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../concept/fastsync.html#explicit-fullsync">Explicit FullSync</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../concept/fastsync.html#configured-partialsync">Configured PartialSync</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../concept/linux_pipes.html">Stream buffering and acknowledgement</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../concept/linux_pipes.html#configuration">Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../concept/linux_pipes.html#acknowledgement-boundary">Acknowledgement boundary</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../concept/linux_pipes.html#termination-and-restart">Termination and restart</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../concept/linux_pipes.html#operational-guidance">Operational guidance</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Operations</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/yaml_config.html">YAML configuration</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/yaml_config.html#project-files">Project files</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/yaml_config.html#global-configuration">Global configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/yaml_config.html#tap-configuration">Tap configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/yaml_config.html#schemas-and-tables">Schemas and tables</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/yaml_config.html#target-configuration">Target configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/yaml_config.html#secrets-and-validation">Secrets and validation</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/encrypting_passwords.html">Encrypt configuration values</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/encrypting_passwords.html#create-the-vault-password-file">Create the vault password file</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/encrypting_passwords.html#encrypt-a-value">Encrypt a value</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/encrypting_passwords.html#import-encrypted-yaml">Import encrypted YAML</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/encrypting_passwords.html#rotation-and-recovery">Rotation and recovery</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/cli.html">Command-line interface</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/cli.html#command-summary">Command summary</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/cli.html#project-lifecycle">Project lifecycle</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/cli.html#init"><code class="docutils literal notranslate"><span class="pre">init</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/cli.html#validate"><code class="docutils literal notranslate"><span class="pre">validate</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/cli.html#import-config"><code class="docutils literal notranslate"><span class="pre">import_config</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/cli.html#inspect-and-test">Inspect and test</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/cli.html#status"><code class="docutils literal notranslate"><span class="pre">status</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/cli.html#test-tap-connection"><code class="docutils literal notranslate"><span class="pre">test_tap_connection</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/cli.html#discover-tap"><code class="docutils literal notranslate"><span class="pre">discover_tap</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/cli.html#replication">Replication</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/cli.html#run-tap"><code class="docutils literal notranslate"><span class="pre">run_tap</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/cli.html#stop-tap"><code class="docutils literal notranslate"><span class="pre">stop_tap</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/cli.html#fast-sync"><code class="docutils literal notranslate"><span class="pre">fast_sync</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/cli.html#partial-sync-table"><code class="docutils literal notranslate"><span class="pre">partial_sync_table</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/cli.html#reset-state"><code class="docutils literal notranslate"><span class="pre">reset_state</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/cli.html#data-diff">Data-diff</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/cli.html#list-data-diff-checks"><code class="docutils literal notranslate"><span class="pre">list_data_diff_checks</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/cli.html#run-data-diff-checks"><code class="docutils literal notranslate"><span class="pre">run_data_diff_checks</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/cli.html#rerun-data-diff-check"><code class="docutils literal notranslate"><span class="pre">rerun_data_diff_check</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/cli.html#secrets">Secrets</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/cli.html#encrypt-string"><code class="docutils literal notranslate"><span class="pre">encrypt_string</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/cli.html#common-options-and-environment">Common options and environment</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/data_diff.html">Data-diff checks</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/data_diff.html#supported-routes">Supported routes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/data_diff.html#check-types">Check types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/data_diff.html#configuration">Configuration</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/data_diff.html#backend-database">Backend database</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/data_diff.html#tap-yaml">Tap YAML</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/data_diff.html#choosing-a-frequency-and-window">Choosing a frequency and window</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/data_diff.html#cli-commands">CLI commands</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/data_diff.html#alerts">Alerts</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/data_diff.html#one-alert-per-failed-check-per-window">One alert per failed check per window</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/data_diff.html#coverage-and-remediation">Coverage and remediation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/data_diff.html#monitoring-views">Monitoring views</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/data_diff.html#source-safety">Source safety</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/data_diff.html#preflight">Preflight</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/scheduling.html">Scheduling</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/scheduling.html#requirements">Requirements</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/scheduling.html#example">Example</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/scheduling.html#cadence-and-overlap">Cadence and overlap</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/scheduling.html#retries-and-recovery">Retries and recovery</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/multi_server_cluster.html">Multi-server operation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/multi_server_cluster.html#prerequisites">Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/multi_server_cluster.html#scheduling-boundary">Scheduling boundary</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/multi_server_cluster.html#failure-recovery">Failure recovery</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/logging.html">Logging</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/logging.html#filename-fields">Filename fields</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/logging.html#observe-a-run">Observe a run</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/logging.html#diagnose-failure">Diagnose failure</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/logging.html#retention">Retention</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/alerts.html">Alerts</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/alerts.html#handlers">Handlers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/alerts.html#slack">Slack</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/alerts.html#victorops">VictorOps</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/alerts.html#routing-and-suppression">Routing and suppression</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/resync.html">Resync and repair</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/resync.html#choose-an-operation">Choose an operation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/resync.html#preflight">Preflight</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/resync.html#full-resync">Full resync</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/resync.html#partial-repair">Partial repair</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/resync.html#failure-and-validation">Failure and validation</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/partial_sync.html">PartialSync behaviour</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/partial_sync.html#range-semantics">Range semantics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/partial_sync.html#merge-outcomes">Merge outcomes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/partial_sync.html#visual-examples">Visual examples</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/partial_sync.html#safety-and-validation">Safety and validation</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/schema_changes.html">Schema changes</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/schema_changes.html#change-outcomes">Change outcomes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/schema_changes.html#column-versioning">Column versioning</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/schema_changes.html#operational-procedure">Operational procedure</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/transformations.html">Load-time transformations</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/transformations.html#transformation-types">Transformation types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/transformations.html#configuration">Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/transformations.html#nested-json-fields">Nested JSON fields</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/transformations.html#conditions">Conditions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/transformations.html#validation-and-rollout">Validation and rollout</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/metadata_columns.html">Metadata columns and deletes</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/metadata_columns.html#columns">Columns</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/metadata_columns.html#configuration-outcomes">Configuration outcomes</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../user_guide/troubleshooting.html">Troubleshooting</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/troubleshooting.html#symptom-index">Symptom index</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/troubleshooting.html#replication-checks">Replication checks</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/troubleshooting.html#mariadb-mysql-errors">MariaDB / MySQL Errors</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/troubleshooting.html#postgresql-errors">PostgreSQL Errors</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/troubleshooting.html#fastsync-errors">FastSync Errors</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/troubleshooting.html#logging-and-diagnostics">Logging and Diagnostics</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/troubleshooting.html#verify-recovery">Verify recovery</a></li>
+</ul>
+</li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Connectors</span></p>
 <ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="../taps.html">Taps (Data Sources)</a></li>
-<li class="toctree-l1 current"><a class="reference internal" href="../taps.html#configuring-taps">Configuring taps</a><ul class="current">
-<li class="toctree-l2"><a class="reference internal" href="mysql.html">Tap MySQL</a></li>
-<li class="toctree-l2"><a class="reference internal" href="postgres.html">Tap PostgreSQL</a></li>
-<li class="toctree-l2"><a class="reference internal" href="s3_csv.html">Tap S3 CSV</a></li>
-<li class="toctree-l2"><a class="reference internal" href="kafka.html">Tap Kafka</a></li>
-<li class="toctree-l2"><a class="reference internal" href="snowflake.html">Tap Snowflake</a></li>
-<li class="toctree-l2"><a class="reference internal" href="mongodb.html">Tap MongoDB</a></li>
-<li class="toctree-l2"><a class="reference internal" href="zendesk.html">Tap Zendesk</a></li>
-<li class="toctree-l2"><a class="reference internal" href="jira.html">Tap Jira</a></li>
-<li class="toctree-l2"><a class="reference internal" href="github.html">Tap Github</a></li>
-<li class="toctree-l2"><a class="reference internal" href="slack.html">Tap Slack</a></li>
-<li class="toctree-l2 current"><a class="current reference internal" href="#">Tap Mixpanel</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#authentication">Authentication</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#configuring-what-to-extract">Configuring what to extract</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../index.html">Connector overview</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../taps.html">Sources</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="mysql.html">MariaDB and MySQL source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="postgres.html">PostgreSQL source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="snowflake.html">Snowflake source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mongodb.html">MongoDB source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="s3_csv.html">S3 CSV source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="kafka.html">Kafka source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="zendesk.html">Zendesk source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="jira.html">Jira source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="github.html">GitHub source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="slack.html">Slack source</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Mixpanel source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="salesforce.html">Salesforce source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="twilio.html">Twilio source</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="salesforce.html">Tap Salesforce</a></li>
-<li class="toctree-l2"><a class="reference internal" href="twilio.html">Tap Twilio</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../targets.html">Targets</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../targets/postgres.html">PostgreSQL target</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../targets/snowflake.html">Snowflake target</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../targets/snowflake_iceberg.html">Snowflake Iceberg tables</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../targets/s3_csv.html">S3 CSV target</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="../targets.html">Targets (Destinations)</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../targets.html#configuring-the-targets">Configuring the targets</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Project</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../../project/contribution.html">Contribution</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../project/about.html">Project</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../project/licenses.html">Licenses</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../project/contribution.html">Contributing</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../project/contribution.html#development-environment">Development environment</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../project/contribution.html#add-or-update-a-source-connector">Add or update a source connector</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../project/contribution.html#add-or-update-a-target-connector">Add or update a target connector</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../project/contribution.html#support-status">Support status</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../project/contribution.html#validation">Validation</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../project/about.html">Project</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../project/about.html#history">History</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../project/about.html#early-contributors">Early contributors</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../project/about.html#contribution">Contribution</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../project/about.html#resources-and-links">Resources and links</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../project/licenses.html">Licenses</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../project/licenses.html#packaged-components">Packaged components</a></li>
+</ul>
+</li>
 </ul>
 
         </div>
@@ -123,7 +317,7 @@
   <ul class="wy-breadcrumbs">
       <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
           <li class="breadcrumb-item"><a href="../taps.html">Taps (Data Sources)</a></li>
-      <li class="breadcrumb-item active">Tap Mixpanel</li>
+      <li class="breadcrumb-item active">Mixpanel source</li>
       <li class="wy-breadcrumbs-aside">
             <a href="../../_sources/connectors/taps/mixpanel.rst.txt" rel="nofollow"> View page source</a>
       </li>
@@ -133,118 +327,68 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="tap-mixpanel">
-<span id="id1"></span><h1>Tap Mixpanel<a class="headerlink" href="#tap-mixpanel" title="Link to this heading"></a></h1>
+  <section id="mixpanel-source">
+<span id="tap-mixpanel"></span><h1>Mixpanel source<a class="headerlink" href="#mixpanel-source" title="Link to this heading"></a></h1>
+<p><code class="docutils literal notranslate"><span class="pre">tap-mixpanel</span></code> extracts one Mixpanel project through the export APIs.</p>
+<table class="docutils align-default" id="id1" style="width: 100%">
+<caption><span class="caption-text">Support</span><a class="headerlink" href="#id1" title="Link to this table"></a></caption>
+<colgroup>
+<col style="width: 28.0%" />
+<col style="width: 24.0%" />
+<col style="width: 48.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Source</p></th>
+<th class="head"><p>Status</p></th>
+<th class="head"><p>Load path</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Mixpanel</p></td>
+<td><p>Experimental</p></td>
+<td><p>Singer only</p></td>
+</tr>
+</tbody>
+</table>
 <section id="authentication">
 <h2>Authentication<a class="headerlink" href="#authentication" title="Link to this heading"></a></h2>
-<p>The Mixpanel API uses Basic Authorization with the <code class="docutils literal notranslate"><span class="pre">api_secret</span></code> from the tap config in base-64 encoded format.
-It is slightly different than normal Basic Authorization with username/password. All requests include this
-header with the <code class="docutils literal notranslate"><span class="pre">api_secret</span></code> as the username, with no password.</p>
-<ul class="simple">
-<li><p>Authorization: <code class="docutils literal notranslate"><span class="pre">Basic</span> <span class="pre">&lt;base-64</span> <span class="pre">encoded</span> <span class="pre">api_secret&gt;</span></code></p></li>
-</ul>
-<p>More details may be found in the Mixpanel <a class="reference external" href="https://developer.mixpanel.com/docs/data-export-api#section-authentication">API Authentication</a>
-instructions.</p>
-<p>The API secret can be found in the Mixpanel Console, upper-right Settings (gear icon),
-Organization Settings &gt; Projects and in the Access Keys section. For this tap,
-only the <code class="docutils literal notranslate"><span class="pre">api_secret</span></code> is needed (the <code class="docutils literal notranslate"><span class="pre">api_key</span></code> is legacy and the token is used only for uploading data).</p>
-<div class="admonition warning">
-<p class="admonition-title">Warning</p>
-<p>Each Mixpanel project has a different <code class="docutils literal notranslate"><span class="pre">api_secret</span></code>; therefore each Mixpanel pipeline instance is for a single project.</p>
-</div>
+<p>The connector uses the project’s <code class="docutils literal notranslate"><span class="pre">api_secret</span></code> as a Basic Authentication user
+with no password. Each project has a different secret, so configure one tap per
+project.</p>
 </section>
-<section id="configuring-what-to-extract">
-<h2>Configuring what to extract<a class="headerlink" href="#configuring-what-to-extract" title="Link to this heading"></a></h2>
-<p>PipelineWise configures every tap with a common structured YAML file format.
-A sample YAML for the Mixpanel tap can be generated into a project directory by
-following the steps in the <a class="reference internal" href="../../installation_guide/creating_pipelines.html#generating-pipelines"><span class="std std-ref">Generating Sample Pipelines</span></a> section.</p>
-<p>Example YAML for <code class="docutils literal notranslate"><span class="pre">tap-mixpanel</span></code>:</p>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nn">---</span>
-
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="c1"># General Properties</span>
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;mixpanel&quot;</span><span class="w">                         </span><span class="c1"># Unique identifier of the tap</span>
-<span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Mixpanel&quot;</span><span class="w">                       </span><span class="c1"># Name of the tap</span>
-<span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;tap-mixpanel&quot;</span><span class="w">                   </span><span class="c1"># !! THIS SHOULD NOT CHANGE !!</span>
-<span class="nt">owner</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;somebody@foo.com&quot;</span><span class="w">              </span><span class="c1"># Data owner to contact</span>
-<span class="c1">#send_alert: False                     # Optional: Disable all configured alerts on this tap</span>
-<span class="c1">#slack_alert_channel: &quot;#tap-channel&quot;   # Optional: Sending a copy of specific tap alerts to this slack channel</span>
-
-
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="c1"># Source (Tap) - Mixpanel connection details</span>
-<span class="c1"># ------------------------------------------------------------------------------</span>
+<section id="configuration">
+<h2>Configuration<a class="headerlink" href="#configuration" title="Link to this heading"></a></h2>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;mixpanel&quot;</span>
+<span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Mixpanel&quot;</span>
+<span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;tap-mixpanel&quot;</span>
+<span class="nt">owner</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;data-platform@example.com&quot;</span>
 <span class="nt">db_conn</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">api_secret</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;MIXPANEL_API_SECRET&gt;&quot;</span><span class="w">       </span><span class="c1"># Mixpanel API secret</span>
-<span class="w">  </span><span class="nt">start_date</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;2020-10-01&quot;</span><span class="w">                  </span><span class="c1"># The default value to use if no bookmark exists for an endpoint</span>
-<span class="w">  </span><span class="nt">date_window_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">30</span><span class="w">                      </span><span class="c1"># Number of days for date window looping through transactional endpoints</span>
-<span class="w">                                            </span><span class="c1"># with from_date and to_date. Default date_window_size is 30 days.</span>
-<span class="w">                                            </span><span class="c1"># Clients with large volumes of events may want to decrease this to 14, 7,</span>
-<span class="w">                                            </span><span class="c1"># or even down to 1-2 days.</span>
-<span class="w">  </span><span class="nt">attribution_window</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span><span class="w">                     </span><span class="c1"># Latency minimum number of days to look-back to account for delays in</span>
-<span class="w">                                            </span><span class="c1"># attributing accurate results. Default attribution window is 5 days.</span>
-<span class="w">  </span><span class="nt">project_timezone</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Europe/London&quot;</span><span class="w">         </span><span class="c1"># Time zone in which integer date times are stored. The project timezone</span>
-<span class="w">                                            </span><span class="c1"># may be found in the project settings in the Mixpanel console.</span>
-<span class="w">  </span><span class="nt">user_agent</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;tap-mixpanel</span><span class="nv"> </span><span class="s">&lt;api@foo.com&gt;&quot;</span><span class="w">  </span><span class="c1"># Optional: Process and email for API logging purposes.</span>
-<span class="w">  </span><span class="c1">#denest_properties: &quot;false&quot;               # Optional: Do not denest JSON responses in `export` and `engage` streams</span>
-<span class="w">                                            </span><span class="c1"># to avoid very wide tables. If denesting is disabled then responses are</span>
-<span class="w">                                            </span><span class="c1"># loaded into one JSON column in the target.</span>
-<span class="w">                                            </span><span class="c1"># Default denest_properties is false.</span>
-
-<span class="w">  </span><span class="c1">#export_events:                           # Optional: List of event names to export</span>
-<span class="w">  </span><span class="c1">#  - event_one</span>
-<span class="w">  </span><span class="c1">#  - event_two</span>
-
-
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="c1"># Destination (Target) - Target properties</span>
-<span class="c1"># Connection details should be in the relevant target YAML file</span>
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="nt">target</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;snowflake&quot;</span><span class="w">                       </span><span class="c1"># ID of the target connector where the data will be loaded</span>
-<span class="nt">batch_size_rows</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">20000</span><span class="w">                    </span><span class="c1"># Batch size for the stream to optimise load performance</span>
-<span class="nt">stream_buffer_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span><span class="w">                     </span><span class="c1"># In-memory buffer size (MB) between taps and targets for asynchronous data pipes</span>
-<span class="nt">default_target_schema</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;mixpanel&quot;</span><span class="w">         </span><span class="c1"># Target schema where the data will be loaded</span>
-<span class="c1">#default_target_schema_select_permission:  # Optional: Grant SELECT on schema and tables that created</span>
-<span class="c1">#  - grp_power</span>
-<span class="c1">#batch_wait_limit_seconds: 3600            # Optional: Maximum time to wait for `batch_size_rows`. Available only for snowflake target.</span>
-
-<span class="c1"># Options only for Snowflake target</span>
-<span class="c1">#archive_load_files: False                      # Optional: when enabled, the files loaded to Snowflake will also be stored in `archive_load_files_s3_bucket`</span>
-<span class="c1">#archive_load_files_s3_prefix: &quot;archive&quot;        # Optional: When `archive_load_files` is enabled, the archived files will be placed in the archive S3 bucket under this prefix.</span>
-<span class="c1">#archive_load_files_s3_bucket: &quot;&lt;BUCKET_NAME&gt;&quot;  # Optional: When `archive_load_files` is enabled, the archived files will be placed in this bucket. (Default: the value of `s3_bucket` in target snowflake YAML)</span>
-
-
-<span class="c1"># ------------------------------------------------------------------------------</span>
-<span class="c1"># Source to target Schema mapping</span>
-<span class="c1"># ------------------------------------------------------------------------------</span>
+<span class="w">  </span><span class="nt">api_secret</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;{{</span><span class="nv"> </span><span class="s">env_var[&#39;MIXPANEL_API_SECRET&#39;]</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="w">  </span><span class="nt">start_date</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;2024-01-01&quot;</span>
+<span class="w">  </span><span class="nt">date_window_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">30</span>
+<span class="w">  </span><span class="nt">attribution_window</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5</span>
+<span class="w">  </span><span class="nt">project_timezone</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Europe/London&quot;</span>
+<span class="w">  </span><span class="nt">denest_properties</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;false&quot;</span>
+<span class="nt">target</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;snowflake&quot;</span>
+<span class="nt">batch_size_rows</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">20000</span>
+<span class="nt">stream_buffer_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span>
+<span class="nt">default_target_schema</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;mixpanel&quot;</span>
 <span class="nt">schemas</span><span class="p">:</span>
-
-<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">source_schema</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;mixpanel&quot;</span><span class="w">           </span><span class="c1"># This is mandatory, but can be anything in this tap type</span>
-<span class="w">    </span><span class="nt">target_schema</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;mixpanel&quot;</span><span class="w">           </span><span class="c1"># Target schema in the destination Data Warehouse</span>
-<span class="w">    </span><span class="nt">target_schema_select_permissions</span><span class="p">:</span><span class="w">   </span><span class="c1"># Optional: Grant SELECT on schema and tables that created</span>
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">grp_stats</span>
-
-<span class="w">    </span><span class="c1"># List of Mixpanel tables to load into destination Data Warehouse</span>
-<span class="w">    </span><span class="c1"># Tap-Mixpanel will use the best incremental strategies automatically to replicate data</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">source_schema</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;mixpanel&quot;</span>
+<span class="w">    </span><span class="nt">target_schema</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;mixpanel&quot;</span>
 <span class="w">    </span><span class="nt">tables</span><span class="p">:</span>
-<span class="w">      </span><span class="c1"># Incrementally loaded tables</span>
 <span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;export&quot;</span>
 <span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;funnels&quot;</span>
 <span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;revenue&quot;</span>
-
-<span class="w">      </span><span class="c1"># Tables that cannot load incrementally and will use FULL_TABLE method</span>
-<span class="w">      </span><span class="c1">#- table_name: &quot;engage&quot;</span>
-<span class="w">      </span><span class="c1">#- table_name: &quot;annotations&quot;</span>
-<span class="w">      </span><span class="c1">#- table_name: &quot;cohorts&quot;</span>
-<span class="w">      </span><span class="c1">#- table_name: &quot;cohort_members&quot;</span>
-
-<span class="w">        </span><span class="c1"># OPTIONAL: Load time transformations - you can add it to any table</span>
-<span class="w">        </span><span class="c1">#transformations:</span>
-<span class="w">        </span><span class="c1">#  - column: &quot;some_column_to_transform&quot; # Column to transform</span>
-<span class="w">        </span><span class="c1">#    type: &quot;SET-NULL&quot;                   # Transformation type</span>
 </pre></div>
 </div>
+<p><code class="docutils literal notranslate"><span class="pre">date_window_size</span></code> defaults to 30 days; reduce it for high-volume projects.
+<code class="docutils literal notranslate"><span class="pre">attribution_window</span></code> repeats recent days to capture late attribution and
+therefore increases API and target work. Disabling property denesting avoids very
+wide tables by retaining nested responses in a JSON value.</p>
+<p>Streams such as <code class="docutils literal notranslate"><span class="pre">engage</span></code>, <code class="docutils literal notranslate"><span class="pre">annotations</span></code>, <code class="docutils literal notranslate"><span class="pre">cohorts</span></code>, and
+<code class="docutils literal notranslate"><span class="pre">cohort_members</span></code> can require full-table extraction. Confirm API limits and
+expected volume before enabling them.</p>
 </section>
 </section>
 
@@ -252,8 +396,8 @@ following the steps in the <a class="reference internal" href="../../installatio
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="slack.html" class="btn btn-neutral float-left" title="Tap Slack" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="salesforce.html" class="btn btn-neutral float-right" title="Tap Salesforce" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="slack.html" class="btn btn-neutral float-left" title="Slack source" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="salesforce.html" class="btn btn-neutral float-right" title="Salesforce source" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

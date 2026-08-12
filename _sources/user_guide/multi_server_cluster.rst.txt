@@ -1,16 +1,53 @@
-
 .. _multi_server_cluster:
 
-Multi-Server Cluster
---------------------
+Multi-server operation
+======================
 
-Running Multi-Server Cluster requires a `Network File System <https://en.wikipedia.org/wiki/Network_File_System>`_
-that is accessible from every host in the PipelineWise cluster.
-(`Amazon EFS <https://aws.amazon.com/efs/>`_, `Google FileStore <https://cloud.google.com/filestore/>`_ or similar)
+PipelineWise can run commands from multiple hosts only when every host sees the
+same runtime configuration, state, logs, and lock files. PipelineWise does not
+provide a distributed scheduler, leader election, or state database for
+replication orchestration.
 
-Network File System is required because PipelineWise keeps runtime configuration files in
-a common place on the host machine at ``${HOME}/.pipelinewise`` directory. If you run
-PipelineWise commands on multiple nodes that operate on the same project, then
-every node has to read/write into the same directory, doesn't matter where the nodes are
-located. This is typically done by mounting ``${HOME}/.pipelinewise`` on every node to
-a shared directory on NFS/EFS.
+
+Prerequisites
+-------------
+
+Every host needs:
+
+- the same PipelineWise and connector versions;
+- identical ``PIPELINEWISE_HOME`` configuration;
+- a shared ``PIPELINEWISE_CONFIG_DIRECTORY`` mounted at the same path;
+- consistent secret and cloud identity;
+- synchronized clocks; and
+- network access to all configured sources and targets.
+
+The shared filesystem must provide reliable read-after-write visibility, atomic
+rename, and lock/PID-file behaviour. NFS, EFS, and Filestore configurations vary;
+validate these semantics with the selected mount options before production use.
+
+
+Scheduling boundary
+-------------------
+
+Use an external scheduler to assign one tap-target pair to one host at a time.
+Never start the same pipeline concurrently on two hosts. A PID file prevents a
+normal duplicate only when both hosts observe the same lock reliably.
+
+If a host disappears, first prove that its process cannot still write, then
+inspect the PID file, active log, and state before rescheduling elsewhere. Do not
+delete a lock solely because its originating host is unreachable.
+
+
+Failure recovery
+----------------
+
+After host loss:
+
+1. fence or terminate the old host;
+2. confirm shared runtime files are readable and complete;
+3. retain the interrupted log and state backup;
+4. restart the same tap-target pair on one healthy host; and
+5. verify target data and acknowledgement progress.
+
+For PostgreSQL LOG_BASED pipelines, also confirm the replication slot survives
+and retained WAL covers the acknowledged LSN. See :ref:`stream_buffering`.

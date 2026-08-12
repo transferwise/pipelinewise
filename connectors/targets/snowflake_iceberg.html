@@ -6,14 +6,14 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PostgreSQL target &mdash; PipelineWise  documentation</title>
+  <title>Snowflake Iceberg tables &mdash; PipelineWise  documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/custom.css?v=1fecaf93" />
 
   
     <link rel="shortcut icon" href="../../_static/pipelinewise.png"/>
-    <link rel="canonical" href="https://transferwise.github.io/pipelinewise/connectors/targets/postgres.html"/>
+    <link rel="canonical" href="https://transferwise.github.io/pipelinewise/connectors/targets/snowflake_iceberg.html"/>
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="../../_static/documentation_options.js?v=5929fcd5"></script>
@@ -23,8 +23,8 @@
     <script src="../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
-    <link rel="next" title="Snowflake target" href="snowflake.html" />
-    <link rel="prev" title="Targets (Destinations)" href="../targets.html" /> 
+    <link rel="next" title="S3 CSV target" href="s3_csv.html" />
+    <link rel="prev" title="Snowflake target" href="snowflake.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -272,9 +272,9 @@
 </ul>
 </li>
 <li class="toctree-l1 current"><a class="reference internal" href="../targets.html">Targets</a><ul class="current">
-<li class="toctree-l2 current"><a class="current reference internal" href="#">PostgreSQL target</a></li>
+<li class="toctree-l2"><a class="reference internal" href="postgres.html">PostgreSQL target</a></li>
 <li class="toctree-l2"><a class="reference internal" href="snowflake.html">Snowflake target</a></li>
-<li class="toctree-l2"><a class="reference internal" href="snowflake_iceberg.html">Snowflake Iceberg tables</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Snowflake Iceberg tables</a></li>
 <li class="toctree-l2"><a class="reference internal" href="s3_csv.html">S3 CSV target</a></li>
 </ul>
 </li>
@@ -317,9 +317,9 @@
   <ul class="wy-breadcrumbs">
       <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
           <li class="breadcrumb-item"><a href="../targets.html">Targets (Destinations)</a></li>
-      <li class="breadcrumb-item active">PostgreSQL target</li>
+      <li class="breadcrumb-item active">Snowflake Iceberg tables</li>
       <li class="wy-breadcrumbs-aside">
-            <a href="../../_sources/connectors/targets/postgres.rst.txt" rel="nofollow"> View page source</a>
+            <a href="../../_sources/connectors/targets/snowflake_iceberg.rst.txt" rel="nofollow"> View page source</a>
       </li>
   </ul>
   <hr/>
@@ -327,113 +327,177 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="postgresql-target">
-<span id="target-postgres"></span><h1>PostgreSQL target<a class="headerlink" href="#postgresql-target" title="Link to this heading"></a></h1>
-<p><code class="docutils literal notranslate"><span class="pre">target-postgres</span></code> loads Singer streams into PostgreSQL and manages compatible
-target schema changes.</p>
-<table class="docutils align-default" id="id1" style="width: 100%">
-<caption><span class="caption-text">Support</span><a class="headerlink" href="#id1" title="Link to this table"></a></caption>
+  <section id="snowflake-iceberg-tables">
+<span id="snowflake-iceberg"></span><h1>Snowflake Iceberg tables<a class="headerlink" href="#snowflake-iceberg-tables" title="Link to this heading"></a></h1>
+<p>PipelineWise can create new managed Snowflake Iceberg tables through the Singer
+target path or copy an existing native table into an Iceberg table with the
+<code class="docutils literal notranslate"><span class="pre">copy-native-to-iceberg</span></code> utility.</p>
+<section id="support">
+<h2>Support<a class="headerlink" href="#support" title="Link to this heading"></a></h2>
+<table class="docutils align-default" style="width: 100%">
 <colgroup>
-<col style="width: 28.0%" />
+<col style="width: 38.0%" />
 <col style="width: 24.0%" />
-<col style="width: 48.0%" />
+<col style="width: 38.0%" />
 </colgroup>
 <thead>
-<tr class="row-odd"><th class="head"><p>Target</p></th>
+<tr class="row-odd"><th class="head"><p>Operation</p></th>
 <th class="head"><p>Status</p></th>
-<th class="head"><p>Native transfer</p></th>
+<th class="head"><p>Behaviour</p></th>
 </tr>
 </thead>
 <tbody>
-<tr class="row-even"><td><p>PostgreSQL</p></td>
+<tr class="row-even"><td><p>Singer creates a new table</p></td>
 <td><p>Available</p></td>
-<td><p>FullSync from MariaDB/MySQL, PostgreSQL, or MongoDB; no PartialSync</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">iceberg_create:</span> <span class="pre">true</span></code> creates a managed Iceberg table.</p></td>
+</tr>
+<tr class="row-odd"><td><p>FastSync or PartialSync</p></td>
+<td><p>Unavailable</p></td>
+<td><p>Fails rather than replacing or merging an Iceberg table.</p></td>
+</tr>
+<tr class="row-even"><td><p>Convert an existing native table</p></td>
+<td><p>Available utility</p></td>
+<td><p>Copies data into a companion table, then optionally promotes it.</p></td>
 </tr>
 </tbody>
 </table>
-<section id="prerequisites">
-<h2>Prerequisites<a class="headerlink" href="#prerequisites" title="Link to this heading"></a></h2>
-<p>The target user needs to connect to the database and create or alter schemas,
-tables, and indexes used by its pipelines. Grant only the target schemas it owns;
-do not reuse the <a class="reference internal" href="../../user_guide/data_diff.html#data-diff"><span class="std std-ref">Data-diff checks</span></a> backend database or role as a replication
-target.</p>
 </section>
-<section id="configuration">
-<h2>Configuration<a class="headerlink" href="#configuration" title="Link to this heading"></a></h2>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;postgres_dwh&quot;</span>
-<span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;PostgreSQL</span><span class="nv"> </span><span class="s">warehouse&quot;</span>
-<span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;target-postgres&quot;</span>
-<span class="nt">db_conn</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">host</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;HOST&gt;&quot;</span>
-<span class="w">  </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5432</span>
-<span class="w">  </span><span class="nt">user</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;USER&gt;&quot;</span>
-<span class="w">  </span><span class="nt">password</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;{{</span><span class="nv"> </span><span class="s">env_var[&#39;TARGET_POSTGRES_PASSWORD&#39;]</span><span class="nv"> </span><span class="s">}}&quot;</span>
-<span class="w">  </span><span class="nt">dbname</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;analytics&quot;</span>
-<span class="w">  </span><span class="nt">ssl</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;true&quot;</span>
+<section id="snowflake-prerequisites">
+<h2>Snowflake prerequisites<a class="headerlink" href="#snowflake-prerequisites" title="Link to this heading"></a></h2>
+<p>Configure a default catalog and external volume on the target database:</p>
+<div class="highlight-sql notranslate"><div class="highlight"><pre><span></span><span class="k">CREATE</span><span class="w"> </span><span class="k">OR</span><span class="w"> </span><span class="k">REPLACE</span><span class="w"> </span><span class="k">EXTERNAL</span><span class="w"> </span><span class="n">VOLUME</span><span class="w"> </span><span class="o">&lt;</span><span class="n">external_volume</span><span class="o">&gt;</span><span class="w"> </span><span class="p">...;</span>
+<span class="k">ALTER</span><span class="w"> </span><span class="k">DATABASE</span><span class="w"> </span><span class="o">&lt;</span><span class="n">target_database</span><span class="o">&gt;</span><span class="w"> </span><span class="k">SET</span><span class="w"> </span><span class="k">CATALOG</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">&#39;snowflake&#39;</span><span class="p">;</span>
+<span class="k">ALTER</span><span class="w"> </span><span class="k">DATABASE</span><span class="w"> </span><span class="o">&lt;</span><span class="n">target_database</span><span class="o">&gt;</span>
+<span class="w">  </span><span class="k">SET</span><span class="w"> </span><span class="n">EXTERNAL_VOLUME</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;</span><span class="n">external_volume</span><span class="o">&gt;</span><span class="p">;</span>
 </pre></div>
 </div>
-<table class="docutils align-default" id="id2" style="width: 100%">
-<caption><span class="caption-text">Connection settings</span><a class="headerlink" href="#id2" title="Link to this table"></a></caption>
+<p>The target role needs the parent-object, warehouse, catalog, external-volume,
+and <code class="docutils literal notranslate"><span class="pre">CREATE</span> <span class="pre">ICEBERG</span> <span class="pre">TABLE</span></code> privileges required by Snowflake. Follow Snowflake’s
+<a class="reference external" href="https://docs.snowflake.com/en/user-guide/tables-iceberg">managed Iceberg table documentation</a> for the account-level
+setup.</p>
+</section>
+<section id="create-new-iceberg-tables">
+<h2>Create new Iceberg tables<a class="headerlink" href="#create-new-iceberg-tables" title="Link to this heading"></a></h2>
+<p>Set <code class="docutils literal notranslate"><span class="pre">iceberg_create</span></code> in the target YAML before the Singer target creates the
+table:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">db_conn</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">iceberg_create</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</pre></div>
+</div>
+<p>The setting affects new tables only. It does not convert an existing native
+table. Do not use <code class="docutils literal notranslate"><span class="pre">fast_sync</span></code> or <code class="docutils literal notranslate"><span class="pre">partial_sync_table</span></code> for a table that exists
+as Iceberg.</p>
+</section>
+<section id="convert-a-native-table">
+<h2>Convert a native table<a class="headerlink" href="#convert-a-native-table" title="Link to this heading"></a></h2>
+<p>Before conversion:</p>
+<ol class="arabic simple">
+<li><p>stop PipelineWise replication and every other writer to the source table;</p></li>
+<li><p>record row counts, primary-key coverage, ownership, grants, policies, tags,
+comments, constraints, defaults, clustering, and other metadata;</p></li>
+<li><p>choose whether the native or Iceberg name should be primary after the copy;</p></li>
+<li><p>use a role that can read every row and see unmasked values; and</p></li>
+<li><p>keep writers stopped until the copied table and metadata are validated.</p></li>
+</ol>
+<p>Writes during copy or cutover can be absent from the Iceberg result. Row-access
+or masking policies applied to <code class="docutils literal notranslate"><span class="pre">INSERT</span> <span class="pre">...</span> <span class="pre">SELECT</span></code> can copy an incomplete or
+permanently masked result.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>copy-native-to-iceberg<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--config<span class="w"> </span>&lt;target-snowflake-config.json&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--fqtn<span class="w"> </span>&lt;database.schema.table&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--eventual<span class="w"> </span>NATIVE
+</pre></div>
+</div>
+<table class="docutils align-default" id="id1" style="width: 100%">
+<caption><span class="caption-text">Cutover modes</span><a class="headerlink" href="#id1" title="Link to this table"></a></caption>
 <colgroup>
 <col style="width: 24.0%" />
-<col style="width: 18.0%" />
-<col style="width: 18.0%" />
-<col style="width: 40.0%" />
+<col style="width: 38.0%" />
+<col style="width: 38.0%" />
 </colgroup>
 <thead>
-<tr class="row-odd"><th class="head"><p>Setting</p></th>
-<th class="head"><p>Required</p></th>
-<th class="head"><p>Default</p></th>
-<th class="head"><p>Effect</p></th>
+<tr class="row-odd"><th class="head"><p>Mode</p></th>
+<th class="head"><p>Primary name after success</p></th>
+<th class="head"><p>Companion</p></th>
 </tr>
 </thead>
 <tbody>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">host</span></code></p></td>
-<td><p>Yes</p></td>
-<td><p>—</p></td>
-<td><p>PostgreSQL server hostname.</p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">NATIVE</span></code></p></td>
+<td><p>Original native <code class="docutils literal notranslate"><span class="pre">&lt;table&gt;</span></code></p></td>
+<td><p>Copied <code class="docutils literal notranslate"><span class="pre">&lt;table&gt;_ICEBERG</span></code></p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">port</span></code></p></td>
-<td><p>Yes</p></td>
-<td><p>—</p></td>
-<td><p>PostgreSQL server port.</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">user</span></code> / <code class="docutils literal notranslate"><span class="pre">password</span></code></p></td>
-<td><p>Yes</p></td>
-<td><p>—</p></td>
-<td><p>Target role credentials.</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">dbname</span></code></p></td>
-<td><p>Yes</p></td>
-<td><p>—</p></td>
-<td><p>Database that receives target schemas.</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">ssl</span></code></p></td>
-<td><p>No</p></td>
-<td><p>Connector default</p></td>
-<td><p>Uses <code class="docutils literal notranslate"><span class="pre">sslmode=require</span></code> when enabled.</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">max_parallelism</span></code></p></td>
-<td><p>No</p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">16</span></code></p></td>
-<td><p>Caps automatic Singer stream-flush threads. Configure this in the target
-<code class="docutils literal notranslate"><span class="pre">db_conn</span></code>; tap-level <code class="docutils literal notranslate"><span class="pre">parallelism_max</span></code> is currently ineffective.</p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">ICEBERG</span></code></p></td>
+<td><p>Promoted Iceberg <code class="docutils literal notranslate"><span class="pre">&lt;table&gt;</span></code></p></td>
+<td><p>Original <code class="docutils literal notranslate"><span class="pre">&lt;table&gt;_NATIVE</span></code></p></td>
 </tr>
 </tbody>
 </table>
-<p>Target schema names and grants are configured in the tap YAML. See
-<a class="reference internal" href="../../user_guide/yaml_config.html#yaml-configuration"><span class="std std-ref">YAML configuration</span></a> and generate the full template with
-<code class="docutils literal notranslate"><span class="pre">pipelinewise</span> <span class="pre">init</span></code>.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">&lt;table&gt;_NATIVE</span></code> and <code class="docutils literal notranslate"><span class="pre">&lt;table&gt;_ICEBERG</span></code> names are reserved. Rename
+independently managed objects with those names before running the utility.</p>
 </section>
-<section id="operational-notes">
-<h2>Operational notes<a class="headerlink" href="#operational-notes" title="Link to this heading"></a></h2>
+<section id="copied-data-and-metadata">
+<h2>Copied data and metadata<a class="headerlink" href="#copied-data-and-metadata" title="Link to this heading"></a></h2>
+<p>The utility copies rows, column names, compatible types, and primary-key column
+order. It applies these type conversions:</p>
+<table class="docutils align-default" style="width: 100%">
+<colgroup>
+<col style="width: 42.0%" />
+<col style="width: 58.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Native type</p></th>
+<th class="head"><p>Iceberg type</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">TEXT</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">VARCHAR</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">VARIANT</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">TEXT</span></code> representation</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">TIMESTAMP_TZ</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">TIMESTAMP_LTZ(6)</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">TIMESTAMP_NTZ</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">TIMESTAMP_NTZ(6)</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">TIMESTAMP_LTZ</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">TIMESTAMP_LTZ(6)</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">TIME</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">TIME(6)</span></code></p></td>
+</tr>
+</tbody>
+</table>
+<p>Timezone offsets and precision finer than microseconds are not retained. The
+utility does not copy ownership, grants, masking or row-access policies, tags,
+comments, nullability, default or autoincrement expressions, clustering,
+secondary constraints, or other table metadata. Reapply and validate required
+metadata before consumers or replication resume.</p>
+</section>
+<section id="interrupted-conversion-recovery">
+<h2>Interrupted conversion recovery<a class="headerlink" href="#interrupted-conversion-recovery" title="Link to this heading"></a></h2>
+<p>The utility fails safely when it cannot confirm a rename. A retry handles these
+identifiable states:</p>
 <ul class="simple">
-<li><p>Size transactions and <code class="docutils literal notranslate"><span class="pre">batch_size_rows</span></code> for available memory and WAL volume.</p></li>
-<li><p>The target must acknowledge Singer state only after the corresponding records
-are durable; PipelineWise persists that acknowledgement for source recovery.</p></li>
-<li><p>Schema evolution can add or version columns. See <a class="reference internal" href="../../user_guide/schema_changes.html#schema-changes"><span class="std std-ref">Schema changes</span></a> before
-granting downstream consumers direct access.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&lt;table&gt;</span></code> is already Iceberg: return successfully.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&lt;table&gt;</span></code> is absent and both companions exist: promote the loaded Iceberg
+table for <code class="docutils literal notranslate"><span class="pre">ICEBERG</span></code> mode, or restore the native name for <code class="docutils literal notranslate"><span class="pre">NATIVE</span></code> mode.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&lt;table&gt;</span></code> is absent and only <code class="docutils literal notranslate"><span class="pre">&lt;table&gt;_NATIVE</span></code> exists: restore the native
+name before copying again.</p></li>
 </ul>
+<p>For any other state, inspect all three object names and recover the intended
+<code class="docutils literal notranslate"><span class="pre">&lt;table&gt;</span></code> manually before retrying. The utility removes a stale
+<code class="docutils literal notranslate"><span class="pre">&lt;table&gt;_ICEBERG</span></code> before a new copy but never deletes <code class="docutils literal notranslate"><span class="pre">&lt;table&gt;_NATIVE</span></code>.</p>
+</section>
+<section id="validation">
+<h2>Validation<a class="headerlink" href="#validation" title="Link to this heading"></a></h2>
+<p>Before resuming writers, compare exact primary-key coverage, row counts, critical
+values, and required metadata. Confirm downstream roles can query the promoted
+table and that PipelineWise uses the Singer path. Retain the native companion
+until the Iceberg cutover has been observed through at least one successful
+replication and reconciliation cycle.</p>
 </section>
 </section>
 
@@ -441,8 +505,8 @@ granting downstream consumers direct access.</p></li>
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="../targets.html" class="btn btn-neutral float-left" title="Targets (Destinations)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="snowflake.html" class="btn btn-neutral float-right" title="Snowflake target" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="snowflake.html" class="btn btn-neutral float-left" title="Snowflake target" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="s3_csv.html" class="btn btn-neutral float-right" title="S3 CSV target" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

@@ -1,78 +1,62 @@
-Project scope notice
-====================
+PipelineWise
+============
 
-After ``v0.64.1``, PipelineWise began reducing the number of connectors it
-packages so that development could focus on Wise's current requirements.
-`v0.64.1 <https://github.com/transferwise/pipelinewise/tree/v0.64.1>`_ is the
-last release from before that reduction; it is a historical reference, not a
-recommendation to use an older release.
+PipelineWise is a Python framework for configuring, running, and operating
+Singer-based ELT pipelines. It moves source data into analytical destinations
+with log-based, incremental, or full-table replication and optional native bulk
+transfer through :ref:`fast_sync_main`.
 
-The connectors included by current builds are listed in :ref:`selecting_singer_connectors`.
-``pipelinewise init`` may still generate configuration templates for legacy
-connectors, but the presence of a template does not mean that its connector is
-packaged or maintained by the current release.
+.. important:: Project scope
 
-We thank everyone in the open-source community who helped make PipelineWise a
-robust framework for heterogeneous replication over the years.
+   Available sources are MariaDB and PostgreSQL; available targets are
+   PostgreSQL and Snowflake. Other packaged connectors, including the Snowflake
+   source, are experimental. ``pipelinewise init`` also generates some legacy
+   templates that are not packaged. Review :ref:`connector_support` before
+   selecting a source and target.
 
-.. image:: img/pipelinewise-with-text.png
-    :width: 300
+   Release ``v0.64.1`` is the last version from before the connector set was
+   reduced. It is a historical reference, not a recommendation to deploy an
+   older release.
+
+
+Start here
+----------
+
+1. :ref:`installation_guide` — install PipelineWise, preferably with Docker.
+2. :ref:`creating_pipelines` — configure an available source-to-target route.
+3. :ref:`running_pipelines` — validate, import, run, and inspect a pipeline.
+4. :ref:`troubleshooting` — diagnose failures and recover safely.
+
+
+Core capabilities
+-----------------
+
+.. list-table::
+   :header-rows: 1
+   :widths: 28 72
+   :width: 100%
+
+   * - Capability
+     - Behaviour
+   * - Singer replication
+     - Log-based change capture, key-based incremental loads, and full-table
+       snapshots.
+   * - FastSync
+     - Native FullSync and PartialSync transfers for supported database routes.
+   * - Schema evolution
+     - Detects source schema changes and applies compatible target changes.
+   * - Load-time protection
+     - Masks, hashes, or removes sensitive values before target loading.
+   * - Data-diff
+     - Performs bounded aggregate reconciliation with auditable coverage and
+       remediation.
+   * - Configuration as code
+     - Generates connector JSON, catalogs, and state from version-controlled YAML.
+
 
 Documentation
-=============
+-------------
 
-PipelineWise is a Data Pipeline Framework using the `Singer.io <https://www.singer.io/>`_
-specification to ingest and replicate data from various sources to various destinations.
-
-.. image:: img/pipelinewise-diagram-circle-bold.png
-
-------------
-
-Features
---------
-
-- **Built with ELT in mind**: PipelineWise fits into the ELT landscape and is not a traditional ETL tool. PipelineWise aims to reproduce the data from the source to an Analytics-Data-Store in as close to the original format as possible. Some minor load time transformations are supported but complex mapping and joins have to be done in the Analytics-Data-Store to extract meaning.
-- **Lightweight**: No daemons or database setup are required
-- **Replication Methods**: Log-Based (CDC), Key-Based Incremental and Full Table snapshots
-- **Managed Schema Changes**: When source data changes, PipelineWise detects the change and alters the schema in your Analytics-Data-Store automatically
-- **Load time transformations**: Ideal place to obfuscate, mask or filter sensitive data that should never be replicated in the Data Warehouse
-- **YAML based configuration**: Data pipelines are defined as YAML files, ensuring that the entire configuration is kept under version control
-- **Extensible**: PipelineWise is using `Singer.io <https://www.singer.io/>`_  compatible taps and target connectors. New connectors can be added to PipelineWise with relatively small effort
-
-
-Beyond the Horizon
-------------------
-
-PipelineWise is built on top of several `Singer.io <https://www.singer.io/>`_ components. Singer.io components
-are responsible for certain tasks like extracting data from a specific data source or loading data into a
-specific destination, however to replicate data end to end you'll need an extra layer on top of these components to
-run the jobs, create configurations, select streams to replicate, do logging and more.
-
-This is where PipelineWise comes in place. PipelineWise is a collection of pre-selected singer taps and
-targets to add the required functionalities to create, run and maintain data pipelines in a production Data Warehouse
-environment without the extra hassle.
-
-
-Taps (Data Source Connectors)
------------------------------
-
-:ref:`taps_list`
-
-
-Targets (Destination Connectors)
---------------------------------
-
-:ref:`targets_list`
-
-
-Transformation at load time
--------------------------------
-
-:ref:`transformations`
-
-
-Content
--------
 .. toctree::
    :maxdepth: 2
    :caption: Installation
@@ -83,7 +67,7 @@ Content
 
 .. toctree::
    :maxdepth: 2
-   :caption: Concept
+   :caption: Concepts
 
    concept/singer
    concept/replication_methods
@@ -92,7 +76,7 @@ Content
 
 .. toctree::
    :maxdepth: 2
-   :caption: Using PipelineWise
+   :caption: Operations
 
    user_guide/yaml_config
    user_guide/encrypting_passwords
@@ -112,9 +96,11 @@ Content
 .. toctree::
    :maxdepth: 2
    :caption: Connectors
+   :titlesonly:
 
-   connectors/taps
-   connectors/targets
+   Connector overview <connectors/index>
+   Sources <connectors/taps>
+   Targets <connectors/targets>
 
 .. toctree::
    :maxdepth: 2
@@ -123,10 +109,3 @@ Content
    project/contribution
    project/about
    project/licenses
-
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`

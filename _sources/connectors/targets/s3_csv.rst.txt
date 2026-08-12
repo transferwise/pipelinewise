@@ -1,77 +1,104 @@
-
 .. _target-s3-csv:
 
-Target S3 CSV
-----------------
+S3 CSV target
+=============
+
+``target-s3-csv`` writes Singer streams as CSV objects in S3.
+
+.. list-table:: Support
+   :header-rows: 1
+   :widths: 28 24 48
+   :width: 100%
+
+   * - Target
+     - Status
+     - Load path
+   * - S3 CSV
+     - Experimental
+     - Singer only; no FastSync or PartialSync
 
 
-Loading data to S3 in CSV file format is straightforward. You need to have
-access to an S3 bucket and you can generate data files on S3 from all the
-supported :ref:`taps_list`.
+Authentication
+--------------
+
+Credential resolution uses an explicit profile, environment credentials, then
+the host's IAM role. Prefer temporary role credentials. If static credentials
+are unavoidable, encrypt them and rotate them independently of pipeline state.
+
+``aws_profile`` falls back to ``AWS_PROFILE``. ``aws_access_key_id``,
+``aws_secret_access_key``, and ``aws_session_token`` fall back to
+``AWS_ACCESS_KEY_ID``, ``AWS_SECRET_ACCESS_KEY``, and ``AWS_SESSION_TOKEN``.
+Configure the access-key ID and secret together; the session token is required
+only for temporary static credentials. With none configured, Boto3 uses its
+default credential chain.
 
 
-.. warning::
-
-  **Authentication Methods**
-
-   * **Profile based authentication**: This is the default authentication method. Credentials taken from
-     the ``AWS_PROFILE`` environment variable or the ``default`` AWS profile, that's available on the host where
-     PipelineWise is running.
-     To use another profile set the ``aws_profile`` parameter.
-     This method requires the presence of ``~/.aws/credentials`` file on the host.
-
-   * **Credentials based authentication**: To provide fixed credentials set ``aws_access_key_id``,
-     ``aws_secret_access_key`` and optionally the ``aws_session_token`` parameters.
-
-     Optionally the credentials can be vault-encrypted in the YAML. Please check :ref:`encrypting_passwords`
-     for further details.
-
-   * **IAM role based authentication**: When no credentials and no AWS profile is given nor found on the host,
-     PipelineWise will resort to use the IAM role attached to the host.
-
-Configuring where to replicate data
-'''''''''''''''''''''''''''''''''''
-
-PipelineWise configures every target with a common structured YAML file format.
-A sample YAML for S3 CSV target can be generated into a project directory by
-following the steps in the :ref:`generating_pipelines` section.
-
-Example YAML for ``target-s3-csv``:
+Configuration
+-------------
 
 .. code-block:: yaml
 
-    ---
+   id: "s3_exports"
+   name: "S3 CSV exports"
+   type: "target-s3-csv"
+   db_conn:
+     s3_bucket: "analytics-exports"
+     s3_key_prefix: "pipelinewise/"
+     delimiter: ","
+     quotechar: '"'
+     encryption_type: "KMS"
+     encryption_key: "<KMS_KEY_ID>"
 
-    # ------------------------------------------------------------------------------
-    # General Properties
-    # ------------------------------------------------------------------------------
-    id: "s3"                               # Unique identifier of the target
-    name: "S3 Target connector"            # Name of the target
-    type: "target-s3-csv"                  # !! THIS SHOULD NOT CHANGE !!
+.. list-table:: Connector-specific settings
+   :header-rows: 1
+   :widths: 28 18 18 36
+   :width: 100%
 
+   * - Setting
+     - Required
+     - Default
+     - Effect
+   * - ``s3_bucket``
+     - Yes
+     - —
+     - Destination bucket.
+   * - ``s3_key_prefix``
+     - No
+     - None
+     - Static prefix for generated object keys.
+   * - ``aws_profile``
+     - No
+     - ``AWS_PROFILE``
+     - Selects a named profile when no static key pair is configured.
+   * - ``aws_access_key_id`` / ``aws_secret_access_key``
+     - No
+     - AWS environment
+     - Supplies a static credential pair; encrypt both YAML values.
+   * - ``aws_session_token``
+     - With temporary keys
+     - ``AWS_SESSION_TOKEN``
+     - Completes temporary static credentials.
+   * - ``s3_acl``
+     - No
+     - None
+     - Accepted by the PipelineWise schema but currently ignored by
+       ``target-s3-csv``; use bucket ownership and policy instead.
+   * - ``delimiter``
+     - No
+     - ``,``
+     - One-character field separator.
+   * - ``quotechar``
+     - No
+     - ``"``
+     - Quotes fields containing delimiters, quotes, or newlines.
+   * - ``encryption_type``
+     - No
+     - None
+     - Selects no encryption or KMS encryption.
+   * - ``encryption_key``
+     - With KMS
+     - —
+     - KMS key identifier.
 
-    # ------------------------------------------------------------------------------
-    # Target - S3 details
-    # ------------------------------------------------------------------------------
-    db_conn:
-      # Profile based authentication
-      aws_profile: "<AWS_PROFILE>"                  # AWS profile name, if not provided, the AWS_PROFILE environment
-                                                    # variable or the 'default' profile will be used, if not
-                                                    # available, then IAM role attached to the host will be used.
-
-      # Credentials based authentication
-      #aws_access_key_id: "<ACCESS_KEY>"            # Plain string or vault encrypted. Required for non-profile based auth. If not provided, AWS_ACCESS_KEY_ID environment variable will be used.
-      #aws_secret_access_key: "<SECRET_ACCESS_KEY"  # Plain string or vault encrypted. Required for non-profile based auth. If not provided, AWS_SECRET_ACCESS_KEY environment variable will be used.
-      #aws_session_token: "<AWS_SESSION_TOKEN>"     # Optional: Plain string or vault encrypted. If not provided, AWS_SESSION_TOKEN environment variable will be used.
-
-      s3_bucket: "<BUCKET_NAME>"                     # S3 bucket name
-
-      s3_key_prefix: "pipelinewise-exports/"         # (Default: None) A static prefix before the generated S3 key names
-      delimiter: ","                                 # (Default: ',') A one-character string used to separate fields.
-      quotechar: "\""                                # Default: '\"'. Quotes fields containing
-                                                       # special characters, delimiters or newlines.
-
-      #encryption_type: "KMS"                        # (Default: None) The type of encryption to use. Current supported options are: 'none' and 'KMS'.
-      #encryption_key: "<ENCRYPTION_KEY_ID>"        # A reference to the encryption key to use for data encryption.
-                                                     # For KMS encryption, this should be the name of the KMS encryption key ID (e.g. '1234abcd-1234-1234-1234-1234abcd1234').
-                                                     # This field is ignored if 'encryption_type' is none or blank.
+Before production use, verify object naming, retry duplication, CSV escaping,
+encryption, lifecycle retention, and downstream schema handling.

@@ -1,356 +1,368 @@
-
 .. _command_line_interface:
 
-Command Line Interface
+Command-line interface
 ======================
 
-PipelineWise's command line interface allows for a number of operation types on a pipeline.
+PipelineWise commands operate on a project directory or an imported tap-target
+pair. Commands exit non-zero on validation, discovery, replication, or
+reconciliation failure; automation must retain that exit status and the run log.
 
 
-.. code-block:: bash
+Command summary
+---------------
 
-    usage: pipelinewise [-h]
-                        {init,run_tap,stop_tap,discover_tap,status,test_tap_connection,
-                         fast_sync,sync_tables,partial_sync_table,import_config,import,
-                         validate,encrypt_string,reset_state,list_data_diff_checks,
-                         run_data_diff_checks,rerun_data_diff_check}
+.. list-table::
+   :header-rows: 1
+   :widths: 29 43 28
+   :width: 100%
+
+   * - Command
+     - Purpose
+     - Changes state or data
+   * - ``init``
+     - Generate a project and connector templates.
+     - Creates local files.
+   * - ``validate``
+     - Validate project YAML and references.
+     - No.
+   * - ``import_config``
+     - Discover sources and generate runtime configuration.
+     - Replaces generated config; persists data-diff definitions.
+   * - ``status``
+     - List imported pipelines and last results.
+     - No.
+   * - ``test_tap_connection``
+     - Test source connectivity.
+     - No target load.
+   * - ``discover_tap``
+     - Refresh or inspect source catalog metadata.
+     - Runs source discovery.
+   * - ``run_tap``
+     - Run normal initial and ongoing replication.
+     - Loads target data and advances acknowledged state.
+   * - ``stop_tap``
+     - Terminate a managed running pipeline.
+     - Stops processes; may leave replayable work.
+   * - ``fast_sync``
+     - FullSync or configured PartialSync selected tables.
+     - Rebuilds/merges data and resets bookmarks.
+   * - ``partial_sync_table``
+     - Repair one bounded source range.
+     - Merges target data; can update state.
+   * - ``reset_state``
+     - Move CDC state after a controlled switchover.
+     - Changes bookmarks without copying data.
+   * - ``encrypt_string``
+     - Produce an Ansible Vault YAML value.
+     - No pipeline state.
+   * - ``list_data_diff_checks``
+     - Inspect persisted data-diff definitions and coverage.
+     - No.
+   * - ``run_data_diff_checks``
+     - Run due data-diff checks.
+     - Persists attempts and coverage.
+   * - ``rerun_data_diff_check``
+     - Re-run one failed immutable window.
+     - Persists a remediation attempt.
 
 
-Positional Arguments
---------------------
-
-:subcommand: The operation to perform. ``sync_tables`` is a deprecated alias for
-             ``fast_sync``; ``import`` is a deprecated alias for ``import_config``.
-
-
-Sub-commands:
--------------
+Project lifecycle
+-----------------
 
 .. _cli_init:
 
-init
-""""
+``init``
+''''''''
 
-Initialise and create a sample project. The project will contain sample YAML
-configuration for every supported tap and target connectors.
+.. code-block:: bash
 
-Positional Arguments
-''''''''''''''''''''
+   pipelinewise init --name <project>
 
-:--name: name of the project
-
+Creates sample YAML for available, experimental, and some legacy connectors.
+Review :ref:`connector_support` before enabling a template.
 
 
-.. _cli_run_tap:
+.. _cli_validate:
 
-run_tap
-"""""""
+``validate``
+''''''''''''
 
-Run a specific pipeline
+.. code-block:: bash
 
-:--target: Target connector id
+   pipelinewise validate --dir <project>
 
-:--tap: Tap connector id
-
-:--extra_log: Optional: Copy logging into PipelineWise logger to see tap run logs at runtime in STDOUT
-
-
-.. _cli_stop_tap:
-
-stop_tap
-""""""""
-
-Stop a running pipeline. PipelineWise sends a termination signal to the running tap
-process. The target process will finish processing any remaining data in its buffer
-before exiting. Data that has already been loaded into the target is not affected.
-
-:--target: Target connector id
-
-:--tap: Tap connector id
-
-
-.. _cli_discover_tap:
-
-discover_tap
-""""""""""""
-
-Run a specific tap in discovery mode. Discovery mode connects to the data source
-and collects information (schemas, tables, columns, data types) that is required
-for running the tap. Discovery is also run automatically as part of the
-:ref:`cli_import_config` command, so you typically only need to run this manually when
-debugging connection or schema issues.
-
-:--target: Target connector id
-
-:--tap: Tap connector id
-
-
-.. _cli_status:
-
-status
-""""""
-
-Prints a status summary table of every imported pipeline with their tap and target.
-
-
-.. _cli_test_tap_connection:
-
-test_tap_connection
-"""""""""""""""""""
-
-Test the tap connection. It will connect to the data source that is defined in the tap
-and will return success if it's available.
-
-:--target: Target connector id
-
-:--tap: Tap connector id
-
-
-.. _cli_fast_sync:
-
-fast_sync
-"""""""""
-
-Sync or resync one or more tables from a specific datasource. It performs an initial
-sync and resets the table bookmarks to their new location.
-
-This command uses the **FullSync** component of :ref:`fast_sync_main`, bypassing
-Singer for performance. It requires a supported FullSync tap-target combination.
-If the combination is unsupported, the command fails without syncing any data; it
-does not fall back to Singer.
-
-.. note::
-
-   The legacy command name ``sync_tables`` is accepted as a backward-compatible alias.
-
-:--target: Target connector id
-
-:--tap: Tap connector id
-
-:--tables: Optional: Comma separated list of tables to sync from the data source.
-
-:--force: Optional: Ignore the configured table-size limit and perform the sync.
-
-:--replication_method_only: Optional: Sync only tables using the specified replication
-                            method (``full_table``, ``incremental`` or ``log_based``).
-
-
-.. _cli_partial_sync_table:
-
-partial_sync_table
-""""""""""""""""""
-
-Partially resync a specific range of rows from a single table. This is useful for
-repairing a specific segment of data without resyncing the entire table.
-
-This command uses the **PartialSync** component of :ref:`fast_sync_main`. It is
-available only from MySQL or PostgreSQL taps to a Snowflake target. If the
-tap-target combination is unsupported, the command fails; it does not fall back
-to FullSync or Singer.
-
-See :ref:`partial_sync_cases` for details on how partial sync handles different
-scenarios.
-
-:--target: Target connector id
-
-:--tap: Tap connector id
-
-:--table: Source schema and table name (e.g. ``schema_name.table_name``)
-
-:--column: Column name to use for the range filter
-
-:--start_value: Lower boundary of the range (inclusive)
-
-:--end_value: Optional upper boundary of the range (inclusive). When omitted, PipelineWise
-              captures the current replication position and updates state after the partial sync.
+Checks YAML syntax, required fields, connector types, schema mapping, and tap
+target references. It does not connect to a source or target.
 
 
 .. _cli_import_config:
 .. _cli_import:
 
-import_config
-"""""""""""""
-
-Import a project directory into PipelineWise. It will create every JSON file required for
-the tap and target connectors in ``~/.pipelinewise``. ``import`` is retained as a
-deprecated alias.
-
-:--dir: relative path to the project directory to import
-
-:--taps: Optional: Comma separated list of tap id's to create.
-
-:--secret: Optional: Path to the Ansible Vault password file needed to decrypt values
-           in the project YAML files.
-
-Data-diff definitions are versioned in the
-backend database after successful discovery. See :ref:`data_diff`.
-
-
-.. _cli_list_data_diff_checks:
-
-list_data_diff_checks
-"""""""""""""""""""""
-
-List persisted data-diff definition revisions and their PostgreSQL scheduling
-and verified timestamp coverage state. This reads the backend database rather
-than reconstructing output from YAML.
-
-:--target: Optional target id filter.
-
-:--tap: Optional tap id filter. Requires ``--target``.
-
-:--output-format: ``table`` (default) or ``json``.
-
-:--include-versioned: Include superseded definition revisions.
-
-
-.. _cli_run_data_diff_checks:
-
-run_data_diff_checks
-""""""""""""""""""""
-
-Run active data-diff definitions manually. Definitions are versioned and
-persisted by :ref:`cli_import_config`; this command does not synchronize YAML.
-Use it for operator-triggered execution rather than continuous scheduling.
-
-:--target: Optional target id filter.
-
-:--tap: Optional tap id filter. Requires ``--target``.
-
-:--check: Optional data-diff check-name filter.
-
-:--force: Create another attempt for the current UTC frequency slot when a
-          terminal attempt already exists.
-
-
-.. _cli_rerun_data_diff_check:
-
-rerun_data_diff_check
-"""""""""""""""""""""
-
-Re-execute the exact immutable definition and UTC window of a failed or errored
-run. The original attempt remains unchanged and the new attempt is linked to it
-for remediation reporting.
-
-:--run-id: UUID of the failed or errored data-diff run.
-
-:--remediation-ref: Required incident, change, or repair reference.
-
-
-.. _cli_validate:
-
-validate
-""""""""
-
-Validates a project directory with YAML tap and target files. This checks that:
-
-* All YAML files are syntactically valid
-* Required fields (``id``, ``type``, ``db_conn``, ``target``, ``schemas``) are present
-* Tap ``target`` references match an existing target YAML file
-* Connector types are supported
-* Schema mappings are correctly structured
-
-Validation does **not** test connectivity to data sources or targets.
-
-:--dir: relative path to the project directory with YAML taps and targets.
-
-
-.. _cli_encrypt_string:
-
-encrypt_string
-""""""""""""""
-
-Encrypt a value for use in a PipelineWise YAML file. The command prints an Ansible
-Vault value that can be copied into the YAML configuration. See
-:ref:`encrypting_passwords` for the complete workflow.
-
-:--secret: Path to the file containing the Ansible Vault password.
-
-:--string: The value to encrypt.
+``import_config``
+'''''''''''''''''''
 
 .. code-block:: bash
 
-    $ pipelinewise encrypt_string --secret vault-password.txt --string "value to encrypt"
+   pipelinewise import_config --dir <project>
+
+Useful options:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 28 72
+   :width: 100%
+
+   * - Option
+     - Behaviour
+   * - ``--taps <id,id>``
+     - Imports only the named tap IDs and their targets.
+   * - ``--secret <file>``
+     - Reads the Ansible Vault password needed by encrypted YAML values.
+
+The command validates, connects to sources, performs discovery, and writes
+generated files below ``~/.pipelinewise``. Data-diff definitions are versioned
+only after connector generation and discovery succeed. ``import`` remains a
+deprecated alias.
+
+.. warning::
+
+   Removing or renaming a tap or target in project YAML makes
+   ``import_config`` delete its generated runtime directory and saved state.
+   Removing a PostgreSQL tap also drops its replication slot. Back up state and
+   plan a new initial sync before importing that change.
+
+
+Inspect and test
+----------------
+
+.. _cli_status:
+
+``status``
+''''''''''
+
+.. code-block:: bash
+
+   pipelinewise status
+
+Shows imported tap-target pairs, enabled state, current status, and last run
+result. A successful status row does not prove source-to-target equality.
+
+
+.. _cli_test_tap_connection:
+
+``test_tap_connection``
+'''''''''''''''''''''''
+
+.. code-block:: bash
+
+   pipelinewise test_tap_connection --tap <tap_id> --target <target_id>
+
+Tests the configured source connection. It does not test the target or load
+records.
+
+
+.. _cli_discover_tap:
+
+``discover_tap``
+''''''''''''''''
+
+.. code-block:: bash
+
+   pipelinewise discover_tap --tap <tap_id> --target <target_id>
+
+Runs source discovery and writes catalog metadata. Use it to diagnose missing
+schemas, tables, fields, or permissions. ``import_config`` runs discovery
+automatically.
+
+
+Replication
+-----------
+
+.. _cli_run_tap:
+
+``run_tap``
+'''''''''''
+
+.. code-block:: bash
+
+   pipelinewise run_tap --tap <tap_id> --target <target_id>
+
+Runs eligible initial FastSync work, then Singer replication in the same
+invocation. ``--extra_log`` mirrors connector output to the PipelineWise logger.
+See :ref:`running_pipelines` for preflight and recovery.
+
+
+.. _cli_stop_tap:
+
+``stop_tap``
+''''''''''''
+
+.. code-block:: bash
+
+   pipelinewise stop_tap --tap <tap_id> --target <target_id>
+
+Signals the process tree associated with the tap-target PID file. The target is
+given an opportunity to finish data already received. Restart without editing
+state after an unexpected interruption.
+
+
+.. _cli_fast_sync:
+
+``fast_sync``
+'''''''''''''
+
+.. code-block:: bash
+
+   pipelinewise fast_sync \
+     --tap <tap_id> \
+     --target <target_id> \
+     --tables <schema.table,schema.table>
+
+.. list-table:: Important options
+   :header-rows: 1
+   :widths: 34 66
+   :width: 100%
+
+   * - Option
+     - Behaviour
+   * - ``--tables``
+     - Limits work to comma-separated source ``schema.table`` names.
+   * - ``--force``
+     - Overrides ``allowed_resync_max_size``.
+   * - ``--replication_method_only``
+     - Selects tables with ``full_table``, ``incremental``, or ``log_based``.
+
+The command fails when FullSync is unavailable for the route. It never falls
+back to Singer. A table with ``sync_start_from`` uses PartialSync. ``sync_tables``
+remains a deprecated alias.
+
+
+.. _cli_partial_sync_table:
+
+``partial_sync_table``
+''''''''''''''''''''''
+
+.. code-block:: bash
+
+   pipelinewise partial_sync_table \
+     --tap <tap_id> \
+     --target <target_id> \
+     --table <schema.table> \
+     --column <column> \
+     --start_value <inclusive_start> \
+     --end_value <inclusive_end>
+
+``--end_value`` is optional. When absent, PipelineWise captures the current
+replication position and can update state after the merge. PartialSync is
+available only from MariaDB/MySQL or PostgreSQL to Snowflake. See
+:ref:`partial_sync_cases`.
 
 
 .. _cli_reset_state:
 
-reset_state
-"""""""""""
+``reset_state``
+'''''''''''''''
 
-Reset the state file for log-based replication tables after a database switchover
-or failover. This updates the CDC bookmarks (binlog position for MySQL, LSN for
-PostgreSQL) to point to the new primary server. Unlike ``fast_sync``, this does
-not resync any data — it only updates the replication position.
+.. code-block:: bash
 
-This command works only for PostgreSQL and MySQL databases.
+   pipelinewise reset_state --tap <tap_id> --target <target_id>
 
-:--target: Target connector id
+Use this only after a controlled MariaDB/MySQL or PostgreSQL switchover whose old
+and new replication positions are known. The command changes state without
+copying rows; an incorrect mapping can skip data permanently.
 
-:--tap: Tap connector id
-
-
-For MySQL, the command requires a JSON file containing the switchover data in the
-following format:
-
-.. code-block:: JSON
-
-   {
-     "new_url_of_the_source_database": {
-       "old_identifier": "old_identifier_of_source_db",
-       "new_identifier": "new_identifier_of_source_db",
-       "old_host": "old_url_of_the_source_database",
-       "new_host": "new_url_of_the_source_database",
-       "engine": "mariadb",
-       "switchover_utc_timestamp": "2025-04-03 12:13:14+00:00",
-       "old_binlog_filename": "old_mysql-bin.000001",
-       "old_binlog_position": 1,
-       "new_binlog_filename": "new_mysql-bin.000002",
-       "new_binlog_position": 500
-     }
-   }
+For MariaDB/MySQL, ``switch_over_data_file`` in ``config.yml`` points to JSON
+that maps the new host to the old/new identifiers, hosts, timestamp, and binlog
+positions. Back up state and verify target continuity after the first run.
 
 
-.. attention::
+Data-diff
+---------
 
-   The filename for switchover data can be added in the `config.yml`:
+.. _cli_list_data_diff_checks:
 
-   .. code-block:: yaml
+``list_data_diff_checks``
+'''''''''''''''''''''''''
 
-       switch_over_data_file: "switch_over_data.json"
+.. code-block:: bash
 
+   pipelinewise list_data_diff_checks --target <target_id> --tap <tap_id>
 
-Common options
---------------
-
-The following options are accepted by all commands, although they are mainly useful
-for commands that run or inspect a pipeline:
-
-:--log: Write PipelineWise CLI logs to the specified file.
-
-:--extra_log: Copy Singer and FastSync subprocess logs to standard output.
-
-:--debug: Enable debug-level logging on standard output.
-
-:--profiler, -p: Enable Python profiling. Results are written below
-                 ``<config-directory>/profiling``.
-
-:--version: Print the installed PipelineWise version and exit.
+Options include ``--output-format table|json`` and ``--include-versioned``.
+``--tap`` requires ``--target``.
 
 
+.. _cli_run_data_diff_checks:
 
-Environment Variables
----------------------
+``run_data_diff_checks``
+''''''''''''''''''''''''
 
-`PIPELINEWISE_HOME`
-"""""""""""""""""""
+.. code-block:: bash
 
-Configures the PipelineWise installation root. PipelineWise expects connector virtual
-environments below ``${PIPELINEWISE_HOME}/.virtualenvs``. The default is
-``~/pipelinewise``.
+   pipelinewise run_data_diff_checks --target <target_id> --tap <tap_id>
+   pipelinewise run_data_diff_checks --all
 
-`PIPELINEWISE_CONFIG_DIRECTORY`
-"""""""""""""""""""""""""""""""
+``--check`` selects a check name, logical key, or version ID. ``--force`` creates
+another attempt for the current UTC slot when a terminal attempt already exists.
 
-Overrides the default directory (``~/.pipelinewise``) at which PipelineWise stores
-configuration files, state files, and logs generated by ``pipelinewise import_config``.
+
+.. _cli_rerun_data_diff_check:
+
+``rerun_data_diff_check``
+'''''''''''''''''''''''''
+
+.. code-block:: bash
+
+   pipelinewise rerun_data_diff_check \
+     --run-id <uuid> \
+     --remediation-ref <ticket_or_incident>
+
+Both options are required. The original attempt remains immutable. See
+:ref:`data_diff` for scheduling, coverage, and remediation semantics.
+
+
+Secrets
+-------
+
+.. _cli_encrypt_string:
+
+``encrypt_string``
+''''''''''''''''''
+
+.. code-block:: bash
+
+   pipelinewise encrypt_string \
+     --secret <vault-password-file> \
+     --string <value>
+
+The command prints an Ansible Vault YAML value. Avoid shared shell history and
+process inspection when supplying sensitive command-line values. See
+:ref:`encrypting_passwords`.
+
+
+Common options and environment
+------------------------------
+
+.. list-table::
+   :header-rows: 1
+   :widths: 28 72
+   :width: 100%
+
+   * - Option
+     - Behaviour
+   * - ``--log <file>``
+     - Writes PipelineWise CLI logs to a file.
+   * - ``--extra_log``
+     - Copies Singer and FastSync subprocess output to standard output.
+   * - ``--debug``
+     - Enables debug logging on standard output.
+   * - ``--profiler`` / ``-p``
+     - Writes cProfile output below the configured profiling directory.
+   * - ``--version``
+     - Prints installed component versions.
+
+``PIPELINEWISE_HOME`` selects the installation root containing connector virtual
+environments. It defaults to ``~/pipelinewise``.
+
+``PIPELINEWISE_CONFIG_DIRECTORY`` selects the runtime configuration, state, and
+log directory. It defaults to ``~/.pipelinewise``.

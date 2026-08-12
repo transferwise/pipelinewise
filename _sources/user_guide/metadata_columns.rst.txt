@@ -1,72 +1,66 @@
-
 .. _metadata_columns:
 
-Metadata Columns
-----------------
+Metadata columns and deletes
+============================
+
+Targets can add ``_SDC_`` columns that describe ingestion time and source-delete
+events. Configure the behaviour per tap because pipelines sharing a target can
+have different delete requirements.
 
 
-Metadata columns add extra row level information about data ingestion in target connectors.
-(i.e. when a row was read in source, when it was inserted or deleted in snowflake etc.)
+Columns
+-------
 
-Metadata and delete handling are configured in each tap YAML file because different
-pipelines can load into the same target with different behavior. PipelineWise adds
-columns with the ``_SDC_`` prefix when ``add_metadata_columns`` or ``hard_delete``
-is enabled:
-
-* ``_SDC_EXTRACTED_AT``: Timestamp when the record was extracted from the source
-
-* ``_SDC_BATCHED_AT``: Timestamp when the record was batched to load into target
-
-* ``_SDC_DELETED_AT``: Timestamp when the record delete event was received from source.
-
-For example if you replicate a table that has three columns in source ``COLUMN_ONE``,
-``COLUMN_TWO`` and ``COLUMN_THREE`` then typically you find ``_SDC_`` metadata columns
-at the end of the table:
-
-+----------------+----------------+------------------+-----------------------+---------------------+---------------------+
-| **COLUMN_ONE** | **COLUMN_TWO** | **COLUMN_THREE** | **_SDC_EXTRACTED_AT** | **_SDC_BATCHED_AT** | **_SDC_DELETED_AT** |
-+----------------+----------------+------------------+-----------------------+---------------------+---------------------+
-| text           | text           | 1                | 2019-08-20 16:10:01   | 2019-08-20 16:10:10 |                     |
-+----------------+----------------+------------------+-----------------------+---------------------+---------------------+
-| text           | text           | 2                | 2019-08-20 16:10:01   | 2019-08-20 16:10:10 |                     |
-+----------------+----------------+------------------+-----------------------+---------------------+---------------------+
-| text           | text           | 3                | 2019-08-20 17:15:12   | 2019-08-20 17:15:25 |                     |
-+----------------+----------------+------------------+-----------------------+---------------------+---------------------+
-
-The two settings combine as follows:
-
-.. list-table:: Tap metadata and delete settings
+.. list-table::
    :header-rows: 1
-   :widths: 24 20 56
+   :widths: 32 68
+   :width: 100%
 
-   * - Configuration
-     - Metadata columns
-     - Behaviour
-   * - ``hard_delete: true`` (default)
+   * - Column
+     - Meaning
+   * - ``_SDC_EXTRACTED_AT``
+     - Time the tap extracted the record.
+   * - ``_SDC_BATCHED_AT``
+     - Time the record entered a target load batch.
+   * - ``_SDC_DELETED_AT``
+     - Time a source delete event was received; ``NULL`` for active rows.
+
+
+Configuration outcomes
+----------------------
+
+.. list-table::
+   :header-rows: 1
+   :widths: 35 25 40
+   :width: 100%
+
+   * - Settings
+     - Metadata
+     - Delete behaviour
+   * - ``hard_delete: true``
      - Enabled automatically
-     - Physically deletes rows from the target when a source delete event arrives.
+     - Physically removes a target row after a source delete event.
    * - ``hard_delete: false`` and ``add_metadata_columns: true``
      - Enabled
-     - Retains the row and records the deletion time in ``_SDC_DELETED_AT``.
-   * - Both settings ``false``
+     - Retains the row and sets ``_SDC_DELETED_AT``.
+   * - Both ``false``
      - Disabled
-     - Retains the existing target row without marking it as deleted.
-
-.. deprecated::
-   Soft delete (``hard_delete: false``) is scheduled for removal in a future
-   release. New taps should use ``hard_delete: true`` exclusively.
-
-.. note::
-
-  Only :ref:`log_based` replication detects source delete events. Incremental and
-  full-table Singer runs do not emit individual delete events.
+     - Retains the target row without marking the source delete.
 
 .. code-block:: yaml
 
-    id: "mysql_orders"
-    name: "MySQL orders"
-    type: "tap-mysql"
-    add_metadata_columns: true
-    hard_delete: false
-    db_conn:
-      # ...
+   add_metadata_columns: true
+   hard_delete: true
+
+``hard_delete`` defaults to ``true``. Only LOG_BASED replication emits
+individual source-delete events; incremental replication cannot detect deletes.
+Full-table and PartialSync publication semantics can remove rows as part of
+replacing or reconciling a selected range.
+
+.. deprecated:: 0.79.0
+
+   Soft delete (``hard_delete: false``) is scheduled for removal. New pipelines
+   should use hard delete and model retention in a controlled downstream layer.
+
+Changing delete mode does not rewrite historical target rows. Plan a resync or
+explicit target migration when existing data must adopt the new behaviour.

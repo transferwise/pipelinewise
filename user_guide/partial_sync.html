@@ -6,24 +6,25 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Different cases of partial resync &mdash; PipelineWise  documentation</title>
+  <title>PartialSync behaviour &mdash; PipelineWise  documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
-      <link rel="stylesheet" type="text/css" href="../_static/css/custom.css?v=36639f2a" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/custom.css?v=1fecaf93" />
 
   
     <link rel="shortcut icon" href="../_static/pipelinewise.png"/>
-    <link rel="canonical" href="https://docs.ansible.com/ansible/latest/user_guide/partial_sync.html"/>
+    <link rel="canonical" href="https://transferwise.github.io/pipelinewise/user_guide/partial_sync.html"/>
       <script src="../_static/jquery.js?v=5d32c60e"></script>
       <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="../_static/documentation_options.js?v=5929fcd5"></script>
       <script src="../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../_static/js/navigation.js?v=f8c789d3"></script>
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Schema Changes" href="schema_changes.html" />
-    <link rel="prev" title="Resync Tables" href="resync.html" /> 
+    <link rel="next" title="Schema changes" href="schema_changes.html" />
+    <link rel="prev" title="Resync and repair" href="resync.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -47,46 +48,258 @@
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <p class="caption" role="heading"><span class="caption-text">Installation</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../installation_guide/installation.html">Installation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../installation_guide/creating_pipelines.html">Creating Pipelines</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../installation_guide/running_pipelines.html">Running Pipelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../installation_guide/installation.html">Installation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../installation_guide/installation.html#choose-an-installation-method">Choose an installation method</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation_guide/installation.html#docker-installation">Docker installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation_guide/installation.html#source-installation">Source installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation_guide/installation.html#packaged-connectors">Packaged connectors</a></li>
 </ul>
-<p class="caption" role="heading"><span class="caption-text">Concept</span></p>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../installation_guide/creating_pipelines.html">Create a pipeline</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../installation_guide/creating_pipelines.html#generate-a-project">Generate a project</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation_guide/creating_pipelines.html#configure-snowflake">Configure Snowflake</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation_guide/creating_pipelines.html#configure-postgresql">Configure PostgreSQL</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation_guide/creating_pipelines.html#provide-secrets">Provide secrets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation_guide/creating_pipelines.html#validate-and-import">Validate and import</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../installation_guide/running_pipelines.html">Run a pipeline</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../installation_guide/running_pipelines.html#preflight">Preflight</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation_guide/running_pipelines.html#start-and-observe">Start and observe</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation_guide/running_pipelines.html#stop-safely">Stop safely</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation_guide/running_pipelines.html#confirm-success">Confirm success</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation_guide/running_pipelines.html#recover-from-failure">Recover from failure</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Concepts</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../concept/singer.html">Singer.io</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../concept/replication_methods.html">Replication Methods</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../concept/fastsync.html">FastSync</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../concept/linux_pipes.html">Linux Pipes in PipelineWise</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../concept/singer.html">Singer data flow</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../concept/singer.html#messages">Messages</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../concept/singer.html#taps">Taps</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../concept/singer.html#targets">Targets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../concept/singer.html#acknowledgement-boundary">Acknowledgement boundary</a></li>
 </ul>
-<p class="caption" role="heading"><span class="caption-text">Using PipelineWise</span></p>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../concept/replication_methods.html">Replication methods</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../concept/replication_methods.html#choose-a-method">Choose a method</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../concept/replication_methods.html#log-based-replication">Log-based replication</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../concept/replication_methods.html#key-based-incremental-replication">Key-based incremental replication</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../concept/replication_methods.html#full-table-replication">Full-table replication</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../concept/fastsync.html">FastSync</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#supported-routes">Supported routes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#automatic-selection-and-handover">Automatic selection and handover</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#explicit-fullsync">Explicit FullSync</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#configured-partialsync">Configured PartialSync</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../concept/linux_pipes.html">Stream buffering and acknowledgement</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../concept/linux_pipes.html#configuration">Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../concept/linux_pipes.html#acknowledgement-boundary">Acknowledgement boundary</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../concept/linux_pipes.html#termination-and-restart">Termination and restart</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../concept/linux_pipes.html#operational-guidance">Operational guidance</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Operations</span></p>
 <ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="yaml_config.html">YAML Configuration</a></li>
-<li class="toctree-l1"><a class="reference internal" href="encrypting_passwords.html">Encrypting Passwords</a></li>
-<li class="toctree-l1"><a class="reference internal" href="cli.html">Command Line Interface</a></li>
-<li class="toctree-l1"><a class="reference internal" href="data_diff.html">Data-diff checks</a></li>
-<li class="toctree-l1"><a class="reference internal" href="scheduling.html">Scheduling</a></li>
-<li class="toctree-l1"><a class="reference internal" href="multi_server_cluster.html">Multi-Server Cluster</a></li>
-<li class="toctree-l1"><a class="reference internal" href="logging.html">Logging</a></li>
-<li class="toctree-l1"><a class="reference internal" href="alerts.html">Alerts</a></li>
-<li class="toctree-l1"><a class="reference internal" href="resync.html">Resync Tables</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Different cases of partial resync</a></li>
-<li class="toctree-l1"><a class="reference internal" href="schema_changes.html">Schema Changes</a></li>
-<li class="toctree-l1"><a class="reference internal" href="transformations.html">Transformations</a></li>
-<li class="toctree-l1"><a class="reference internal" href="metadata_columns.html">Metadata Columns</a></li>
-<li class="toctree-l1"><a class="reference internal" href="troubleshooting.html">Troubleshooting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="yaml_config.html">YAML configuration</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="yaml_config.html#project-files">Project files</a></li>
+<li class="toctree-l2"><a class="reference internal" href="yaml_config.html#global-configuration">Global configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="yaml_config.html#tap-configuration">Tap configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="yaml_config.html#schemas-and-tables">Schemas and tables</a></li>
+<li class="toctree-l2"><a class="reference internal" href="yaml_config.html#target-configuration">Target configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="yaml_config.html#secrets-and-validation">Secrets and validation</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="encrypting_passwords.html">Encrypt configuration values</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="encrypting_passwords.html#create-the-vault-password-file">Create the vault password file</a></li>
+<li class="toctree-l2"><a class="reference internal" href="encrypting_passwords.html#encrypt-a-value">Encrypt a value</a></li>
+<li class="toctree-l2"><a class="reference internal" href="encrypting_passwords.html#import-encrypted-yaml">Import encrypted YAML</a></li>
+<li class="toctree-l2"><a class="reference internal" href="encrypting_passwords.html#rotation-and-recovery">Rotation and recovery</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="cli.html">Command-line interface</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="cli.html#command-summary">Command summary</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cli.html#project-lifecycle">Project lifecycle</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="cli.html#init"><code class="docutils literal notranslate"><span class="pre">init</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli.html#validate"><code class="docutils literal notranslate"><span class="pre">validate</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli.html#import-config"><code class="docutils literal notranslate"><span class="pre">import_config</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="cli.html#inspect-and-test">Inspect and test</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="cli.html#status"><code class="docutils literal notranslate"><span class="pre">status</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli.html#test-tap-connection"><code class="docutils literal notranslate"><span class="pre">test_tap_connection</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli.html#discover-tap"><code class="docutils literal notranslate"><span class="pre">discover_tap</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="cli.html#replication">Replication</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="cli.html#run-tap"><code class="docutils literal notranslate"><span class="pre">run_tap</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli.html#stop-tap"><code class="docutils literal notranslate"><span class="pre">stop_tap</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli.html#fast-sync"><code class="docutils literal notranslate"><span class="pre">fast_sync</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli.html#partial-sync-table"><code class="docutils literal notranslate"><span class="pre">partial_sync_table</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli.html#reset-state"><code class="docutils literal notranslate"><span class="pre">reset_state</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="cli.html#data-diff">Data-diff</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="cli.html#list-data-diff-checks"><code class="docutils literal notranslate"><span class="pre">list_data_diff_checks</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli.html#run-data-diff-checks"><code class="docutils literal notranslate"><span class="pre">run_data_diff_checks</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli.html#rerun-data-diff-check"><code class="docutils literal notranslate"><span class="pre">rerun_data_diff_check</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="cli.html#secrets">Secrets</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="cli.html#encrypt-string"><code class="docutils literal notranslate"><span class="pre">encrypt_string</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="cli.html#common-options-and-environment">Common options and environment</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="data_diff.html">Data-diff checks</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="data_diff.html#supported-routes">Supported routes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="data_diff.html#check-types">Check types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="data_diff.html#configuration">Configuration</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="data_diff.html#backend-database">Backend database</a></li>
+<li class="toctree-l3"><a class="reference internal" href="data_diff.html#tap-yaml">Tap YAML</a></li>
+<li class="toctree-l3"><a class="reference internal" href="data_diff.html#choosing-a-frequency-and-window">Choosing a frequency and window</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="data_diff.html#cli-commands">CLI commands</a></li>
+<li class="toctree-l2"><a class="reference internal" href="data_diff.html#alerts">Alerts</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="data_diff.html#one-alert-per-failed-check-per-window">One alert per failed check per window</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="data_diff.html#coverage-and-remediation">Coverage and remediation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="data_diff.html#monitoring-views">Monitoring views</a></li>
+<li class="toctree-l3"><a class="reference internal" href="data_diff.html#source-safety">Source safety</a></li>
+<li class="toctree-l3"><a class="reference internal" href="data_diff.html#preflight">Preflight</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="scheduling.html">Scheduling</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="scheduling.html#requirements">Requirements</a></li>
+<li class="toctree-l2"><a class="reference internal" href="scheduling.html#example">Example</a></li>
+<li class="toctree-l2"><a class="reference internal" href="scheduling.html#cadence-and-overlap">Cadence and overlap</a></li>
+<li class="toctree-l2"><a class="reference internal" href="scheduling.html#retries-and-recovery">Retries and recovery</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="multi_server_cluster.html">Multi-server operation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="multi_server_cluster.html#prerequisites">Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="multi_server_cluster.html#scheduling-boundary">Scheduling boundary</a></li>
+<li class="toctree-l2"><a class="reference internal" href="multi_server_cluster.html#failure-recovery">Failure recovery</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="logging.html">Logging</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="logging.html#filename-fields">Filename fields</a></li>
+<li class="toctree-l2"><a class="reference internal" href="logging.html#observe-a-run">Observe a run</a></li>
+<li class="toctree-l2"><a class="reference internal" href="logging.html#diagnose-failure">Diagnose failure</a></li>
+<li class="toctree-l2"><a class="reference internal" href="logging.html#retention">Retention</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="alerts.html">Alerts</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="alerts.html#handlers">Handlers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="alerts.html#slack">Slack</a></li>
+<li class="toctree-l2"><a class="reference internal" href="alerts.html#victorops">VictorOps</a></li>
+<li class="toctree-l2"><a class="reference internal" href="alerts.html#routing-and-suppression">Routing and suppression</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="resync.html">Resync and repair</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="resync.html#choose-an-operation">Choose an operation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="resync.html#preflight">Preflight</a></li>
+<li class="toctree-l2"><a class="reference internal" href="resync.html#full-resync">Full resync</a></li>
+<li class="toctree-l2"><a class="reference internal" href="resync.html#partial-repair">Partial repair</a></li>
+<li class="toctree-l2"><a class="reference internal" href="resync.html#failure-and-validation">Failure and validation</a></li>
+</ul>
+</li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">PartialSync behaviour</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#range-semantics">Range semantics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#merge-outcomes">Merge outcomes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#visual-examples">Visual examples</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#safety-and-validation">Safety and validation</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="schema_changes.html">Schema changes</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="schema_changes.html#change-outcomes">Change outcomes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="schema_changes.html#column-versioning">Column versioning</a></li>
+<li class="toctree-l2"><a class="reference internal" href="schema_changes.html#operational-procedure">Operational procedure</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="transformations.html">Load-time transformations</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="transformations.html#transformation-types">Transformation types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="transformations.html#configuration">Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="transformations.html#nested-json-fields">Nested JSON fields</a></li>
+<li class="toctree-l2"><a class="reference internal" href="transformations.html#conditions">Conditions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="transformations.html#validation-and-rollout">Validation and rollout</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="metadata_columns.html">Metadata columns and deletes</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="metadata_columns.html#columns">Columns</a></li>
+<li class="toctree-l2"><a class="reference internal" href="metadata_columns.html#configuration-outcomes">Configuration outcomes</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="troubleshooting.html">Troubleshooting</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="troubleshooting.html#symptom-index">Symptom index</a></li>
+<li class="toctree-l2"><a class="reference internal" href="troubleshooting.html#replication-checks">Replication checks</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="troubleshooting.html#mariadb-mysql-errors">MariaDB / MySQL Errors</a></li>
+<li class="toctree-l3"><a class="reference internal" href="troubleshooting.html#postgresql-errors">PostgreSQL Errors</a></li>
+<li class="toctree-l3"><a class="reference internal" href="troubleshooting.html#fastsync-errors">FastSync Errors</a></li>
+<li class="toctree-l3"><a class="reference internal" href="troubleshooting.html#logging-and-diagnostics">Logging and Diagnostics</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="troubleshooting.html#verify-recovery">Verify recovery</a></li>
+</ul>
+</li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Connectors</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../connectors/taps.html">Taps (Data Sources)</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../connectors/taps.html#configuring-taps">Configuring taps</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../connectors/targets.html">Targets (Destinations)</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../connectors/targets.html#configuring-the-targets">Configuring the targets</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../connectors/index.html">Connector overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../connectors/taps.html">Sources</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/taps/mysql.html">MariaDB and MySQL source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/taps/postgres.html">PostgreSQL source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/taps/snowflake.html">Snowflake source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/taps/mongodb.html">MongoDB source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/taps/s3_csv.html">S3 CSV source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/taps/kafka.html">Kafka source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/taps/zendesk.html">Zendesk source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/taps/jira.html">Jira source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/taps/github.html">GitHub source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/taps/slack.html">Slack source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/taps/mixpanel.html">Mixpanel source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/taps/salesforce.html">Salesforce source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/taps/twilio.html">Twilio source</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../connectors/targets.html">Targets</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/targets/postgres.html">PostgreSQL target</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/targets/snowflake.html">Snowflake target</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/targets/snowflake_iceberg.html">Snowflake Iceberg tables</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/targets/s3_csv.html">S3 CSV target</a></li>
+</ul>
+</li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Project</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../project/contribution.html">Contribution</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../project/about.html">Project</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../project/licenses.html">Licenses</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../project/contribution.html">Contributing</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../project/contribution.html#development-environment">Development environment</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../project/contribution.html#add-or-update-a-source-connector">Add or update a source connector</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../project/contribution.html#add-or-update-a-target-connector">Add or update a target connector</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../project/contribution.html#support-status">Support status</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../project/contribution.html#validation">Validation</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../project/about.html">Project</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../project/about.html#history">History</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../project/about.html#early-contributors">Early contributors</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../project/about.html#contribution">Contribution</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../project/about.html#resources-and-links">Resources and links</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../project/licenses.html">Licenses</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../project/licenses.html#packaged-components">Packaged components</a></li>
+</ul>
+</li>
 </ul>
 
         </div>
@@ -103,7 +316,7 @@
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
       <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
-      <li class="breadcrumb-item active">Different cases of partial resync</li>
+      <li class="breadcrumb-item active">PartialSync behaviour</li>
       <li class="wy-breadcrumbs-aside">
             <a href="../_sources/user_guide/partial_sync.rst.txt" rel="nofollow"> View page source</a>
       </li>
@@ -113,69 +326,105 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="different-cases-of-partial-resync">
-<span id="partial-sync-cases"></span><h1>Different cases of partial resync<a class="headerlink" href="#different-cases-of-partial-resync" title="Link to this heading"></a></h1>
-<p>Partial sync resyncs a specific range of rows from a source table into the target.
-Data is exported from the source into a temporary staging area, loaded into a temp
-table on the target, and then merged with the existing target table. The behaviour
-varies depending on column differences and the <code class="docutils literal notranslate"><span class="pre">hard_delete</span></code> setting.</p>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>Partial sync uses the <strong>PartialSync</strong> component of <a class="reference internal" href="../concept/fastsync.html#fast-sync-main"><span class="std std-ref">FastSync</span></a>.
-It shares the same native database connectors as FullSync but applies a
-WHERE clause during export and merges (rather than replaces) the target data.</p>
+  <section id="partialsync-behaviour">
+<span id="partial-sync-cases"></span><h1>PartialSync behaviour<a class="headerlink" href="#partialsync-behaviour" title="Link to this heading"></a></h1>
+<p>PartialSync exports a bounded source range, loads a temporary target table, and
+merges that range into the existing target. It is available from MariaDB/MySQL or
+PostgreSQL to Snowflake.</p>
+<section id="range-semantics">
+<h2>Range semantics<a class="headerlink" href="#range-semantics" title="Link to this heading"></a></h2>
+<p>The start boundary is inclusive. An explicit end boundary is also inclusive.
+Choose a stable, comparable column and a range that can be verified independently.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pipelinewise<span class="w"> </span>partial_sync_table<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--tap<span class="w"> </span>&lt;tap_id&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--target<span class="w"> </span>snowflake<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--table<span class="w"> </span>&lt;schema.table&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--column<span class="w"> </span>&lt;column&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--start_value<span class="w"> </span>&lt;start&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--end_value<span class="w"> </span>&lt;end&gt;
+</pre></div>
 </div>
-<ol class="arabic simple">
-<li><p><strong>Normal</strong></p></li>
-</ol>
-<img alt="../_images/partial_sync_case_1.png" src="../_images/partial_sync_case_1.png" />
-<p>All source columns exist in the target. The exported rows are merged into the target
-table, updating existing rows and inserting new ones. This is the standard case.</p>
-<ol class="arabic simple" start="2">
-<li><p><strong>Some columns are deleted from the target</strong></p></li>
-</ol>
-<img alt="../_images/partial_sync_case_2.png" src="../_images/partial_sync_case_2.png" />
-<p>A column (e.g. <code class="docutils literal notranslate"><span class="pre">Col2</span></code>) has been removed from the target table. After merging,
-only the rows within the synced range will have values for that column — existing
-rows outside the range retain their original data.</p>
-<ol class="arabic simple" start="3">
-<li><p><strong>Some columns are deleted from the source</strong></p></li>
-</ol>
-<img alt="../_images/partial_sync_case_3.png" src="../_images/partial_sync_case_3.png" />
-<p>A column (e.g. <code class="docutils literal notranslate"><span class="pre">Col2</span></code>) has been removed from the source table. Since the column
-no longer exists in the exported data, merged rows will have <code class="docutils literal notranslate"><span class="pre">NULL</span></code> for that column
-in the target. Rows outside the synced range are not affected.</p>
-<ol class="arabic simple" start="4">
-<li><p><strong>Hard delete is disabled (soft delete)</strong></p></li>
-</ol>
+<p>Without an end value, PipelineWise captures a replication position at the start
+and can hand ongoing replication over from that position after the merge.</p>
+</section>
+<section id="merge-outcomes">
+<h2>Merge outcomes<a class="headerlink" href="#merge-outcomes" title="Link to this heading"></a></h2>
+<table class="docutils align-default" style="width: 100%">
+<colgroup>
+<col style="width: 28.0%" />
+<col style="width: 36.0%" />
+<col style="width: 36.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Condition</p></th>
+<th class="head"><p>Rows inside the range</p></th>
+<th class="head"><p>Rows outside the range</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Matching schemas</p></td>
+<td><p>Existing rows update; new rows insert.</p></td>
+<td><p>Unchanged.</p></td>
+</tr>
+<tr class="row-odd"><td><p>Column absent from target</p></td>
+<td><p>The target column is created and receives source values.</p></td>
+<td><p>Existing rows have no backfilled value.</p></td>
+</tr>
+<tr class="row-even"><td><p>Column absent from source</p></td>
+<td><p>Merged target values become <code class="docutils literal notranslate"><span class="pre">NULL</span></code> for that column.</p></td>
+<td><p>Existing values remain unchanged.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">hard_delete:</span> <span class="pre">true</span></code></p></td>
+<td><p>Target rows absent from the source range are deleted.</p></td>
+<td><p>Unchanged.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">hard_delete:</span> <span class="pre">false</span></code></p></td>
+<td><p>Missing source rows are retained and marked in <code class="docutils literal notranslate"><span class="pre">_SDC_DELETED_AT</span></code>.</p></td>
+<td><p>Unchanged.</p></td>
+</tr>
+</tbody>
+</table>
 <div class="deprecated">
-<p><span class="versionmodified deprecated">Deprecated since version Soft: </span>delete (<code class="docutils literal notranslate"><span class="pre">hard_delete:</span> <span class="pre">false</span></code>) is scheduled for removal. New taps
-should use <code class="docutils literal notranslate"><span class="pre">hard_delete:</span> <span class="pre">true</span></code> exclusively.</p>
+<p><span class="versionmodified deprecated">Deprecated since version 0.79.0: </span>Soft delete (<code class="docutils literal notranslate"><span class="pre">hard_delete:</span> <span class="pre">false</span></code>) is scheduled for removal. New pipelines
+should use <code class="docutils literal notranslate"><span class="pre">hard_delete:</span> <span class="pre">true</span></code>.</p>
 </div>
+</section>
+<section id="visual-examples">
+<h2>Visual examples<a class="headerlink" href="#visual-examples" title="Link to this heading"></a></h2>
+<p>Normal merge:</p>
+<img alt="../_images/partial_sync_case_1.png" src="../_images/partial_sync_case_1.png" />
+<p>Target missing a source column:</p>
+<img alt="../_images/partial_sync_case_2.png" src="../_images/partial_sync_case_2.png" />
+<p>Source missing a target column:</p>
+<img alt="../_images/partial_sync_case_3.png" src="../_images/partial_sync_case_3.png" />
+<p>Soft-delete and hard-delete outcomes:</p>
 <img alt="../_images/partial_sync_case_4.png" src="../_images/partial_sync_case_4.png" />
-<p>When <code class="docutils literal notranslate"><span class="pre">hard_delete</span></code> is <code class="docutils literal notranslate"><span class="pre">false</span></code>, rows that have been deleted from the source are
-<strong>not</strong> removed from the target. Instead, they receive a timestamp in the
-<code class="docutils literal notranslate"><span class="pre">_SDC_DELETED_AT</span></code> metadata column indicating when the delete was detected.</p>
-<ol class="arabic simple" start="5">
-<li><p><strong>Hard delete is enabled</strong></p></li>
-</ol>
 <img alt="../_images/partial_sync_case_5.png" src="../_images/partial_sync_case_5.png" />
-<p>When <code class="docutils literal notranslate"><span class="pre">hard_delete</span></code> is <code class="docutils literal notranslate"><span class="pre">true</span></code>, rows that have been deleted from the source within
-the synced range are physically removed from the target table.</p>
-<ol class="arabic simple" start="6">
-<li><p><strong>Combination of all cases</strong></p></li>
-</ol>
+<p>Combined schema and delete changes:</p>
 <img alt="../_images/partial_sync_case_all.png" src="../_images/partial_sync_case_all.png" />
-<p>This diagram shows the combined effect of column differences and delete handling
-when all of the above scenarios overlap.</p>
+</section>
+<section id="safety-and-validation">
+<h2>Safety and validation<a class="headerlink" href="#safety-and-validation" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>Stop overlapping writes or replication when the selected range can change
+during export and merge.</p></li>
+<li><p>Estimate the source range and target merge cost before running.</p></li>
+<li><p>Confirm the boundary query returns the intended rows; an empty range is a
+successful no-op.</p></li>
+<li><p>After completion, compare exact primary keys and critical values inside the
+range, then confirm the next normal Singer run advances state.</p></li>
+<li><p>On failure, retain staging objects and state until target publication is
+understood. Do not mark the range repaired from row count alone.</p></li>
+</ul>
+</section>
 </section>
 
 
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="resync.html" class="btn btn-neutral float-left" title="Resync Tables" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="schema_changes.html" class="btn btn-neutral float-right" title="Schema Changes" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="resync.html" class="btn btn-neutral float-left" title="Resync and repair" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="schema_changes.html" class="btn btn-neutral float-right" title="Schema changes" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

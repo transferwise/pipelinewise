@@ -9,21 +9,22 @@
   <title>FastSync &mdash; PipelineWise  documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
-      <link rel="stylesheet" type="text/css" href="../_static/css/custom.css?v=36639f2a" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/custom.css?v=1fecaf93" />
 
   
     <link rel="shortcut icon" href="../_static/pipelinewise.png"/>
-    <link rel="canonical" href="https://docs.ansible.com/ansible/latest/concept/fastsync.html"/>
+    <link rel="canonical" href="https://transferwise.github.io/pipelinewise/concept/fastsync.html"/>
       <script src="../_static/jquery.js?v=5d32c60e"></script>
       <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
       <script src="../_static/documentation_options.js?v=5929fcd5"></script>
       <script src="../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../_static/js/navigation.js?v=f8c789d3"></script>
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Linux Pipes in PipelineWise" href="linux_pipes.html" />
-    <link rel="prev" title="Replication Methods" href="replication_methods.html" /> 
+    <link rel="next" title="Stream buffering and acknowledgement" href="linux_pipes.html" />
+    <link rel="prev" title="Replication methods" href="replication_methods.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -47,52 +48,258 @@
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <p class="caption" role="heading"><span class="caption-text">Installation</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../installation_guide/installation.html">Installation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../installation_guide/creating_pipelines.html">Creating Pipelines</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../installation_guide/running_pipelines.html">Running Pipelines</a></li>
-</ul>
-<p class="caption" role="heading"><span class="caption-text">Concept</span></p>
-<ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="singer.html">Singer.io</a></li>
-<li class="toctree-l1"><a class="reference internal" href="replication_methods.html">Replication Methods</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">FastSync</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#supported-tap-target-combinations">Supported tap-target combinations</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#components">Components</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#when-does-pipelinewise-use-fastsync">When does PipelineWise use FastSync?</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#defined-partialsync-sync-start-from">Defined PartialSync (<code class="docutils literal notranslate"><span class="pre">sync_start_from</span></code>)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../installation_guide/installation.html">Installation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../installation_guide/installation.html#choose-an-installation-method">Choose an installation method</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation_guide/installation.html#docker-installation">Docker installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation_guide/installation.html#source-installation">Source installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation_guide/installation.html#packaged-connectors">Packaged connectors</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="linux_pipes.html">Linux Pipes in PipelineWise</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../installation_guide/creating_pipelines.html">Create a pipeline</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../installation_guide/creating_pipelines.html#generate-a-project">Generate a project</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation_guide/creating_pipelines.html#configure-snowflake">Configure Snowflake</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation_guide/creating_pipelines.html#configure-postgresql">Configure PostgreSQL</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation_guide/creating_pipelines.html#provide-secrets">Provide secrets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation_guide/creating_pipelines.html#validate-and-import">Validate and import</a></li>
 </ul>
-<p class="caption" role="heading"><span class="caption-text">Using PipelineWise</span></p>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../installation_guide/running_pipelines.html">Run a pipeline</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../installation_guide/running_pipelines.html#preflight">Preflight</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation_guide/running_pipelines.html#start-and-observe">Start and observe</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation_guide/running_pipelines.html#stop-safely">Stop safely</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation_guide/running_pipelines.html#confirm-success">Confirm success</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation_guide/running_pipelines.html#recover-from-failure">Recover from failure</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Concepts</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="singer.html">Singer data flow</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="singer.html#messages">Messages</a></li>
+<li class="toctree-l2"><a class="reference internal" href="singer.html#taps">Taps</a></li>
+<li class="toctree-l2"><a class="reference internal" href="singer.html#targets">Targets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="singer.html#acknowledgement-boundary">Acknowledgement boundary</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="replication_methods.html">Replication methods</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="replication_methods.html#choose-a-method">Choose a method</a></li>
+<li class="toctree-l2"><a class="reference internal" href="replication_methods.html#log-based-replication">Log-based replication</a></li>
+<li class="toctree-l2"><a class="reference internal" href="replication_methods.html#key-based-incremental-replication">Key-based incremental replication</a></li>
+<li class="toctree-l2"><a class="reference internal" href="replication_methods.html#full-table-replication">Full-table replication</a></li>
+</ul>
+</li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">FastSync</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#supported-routes">Supported routes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#automatic-selection-and-handover">Automatic selection and handover</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#explicit-fullsync">Explicit FullSync</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#configured-partialsync">Configured PartialSync</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="linux_pipes.html">Stream buffering and acknowledgement</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="linux_pipes.html#configuration">Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="linux_pipes.html#acknowledgement-boundary">Acknowledgement boundary</a></li>
+<li class="toctree-l2"><a class="reference internal" href="linux_pipes.html#termination-and-restart">Termination and restart</a></li>
+<li class="toctree-l2"><a class="reference internal" href="linux_pipes.html#operational-guidance">Operational guidance</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Operations</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/yaml_config.html">YAML Configuration</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/encrypting_passwords.html">Encrypting Passwords</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/cli.html">Command Line Interface</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/data_diff.html">Data-diff checks</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/scheduling.html">Scheduling</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/multi_server_cluster.html">Multi-Server Cluster</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/logging.html">Logging</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/alerts.html">Alerts</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/resync.html">Resync Tables</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/partial_sync.html">Different cases of partial resync</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/schema_changes.html">Schema Changes</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/transformations.html">Transformations</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/metadata_columns.html">Metadata Columns</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user_guide/troubleshooting.html">Troubleshooting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/yaml_config.html">YAML configuration</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/yaml_config.html#project-files">Project files</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/yaml_config.html#global-configuration">Global configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/yaml_config.html#tap-configuration">Tap configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/yaml_config.html#schemas-and-tables">Schemas and tables</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/yaml_config.html#target-configuration">Target configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/yaml_config.html#secrets-and-validation">Secrets and validation</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/encrypting_passwords.html">Encrypt configuration values</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/encrypting_passwords.html#create-the-vault-password-file">Create the vault password file</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/encrypting_passwords.html#encrypt-a-value">Encrypt a value</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/encrypting_passwords.html#import-encrypted-yaml">Import encrypted YAML</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/encrypting_passwords.html#rotation-and-recovery">Rotation and recovery</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/cli.html">Command-line interface</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/cli.html#command-summary">Command summary</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/cli.html#project-lifecycle">Project lifecycle</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../user_guide/cli.html#init"><code class="docutils literal notranslate"><span class="pre">init</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../user_guide/cli.html#validate"><code class="docutils literal notranslate"><span class="pre">validate</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../user_guide/cli.html#import-config"><code class="docutils literal notranslate"><span class="pre">import_config</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/cli.html#inspect-and-test">Inspect and test</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../user_guide/cli.html#status"><code class="docutils literal notranslate"><span class="pre">status</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../user_guide/cli.html#test-tap-connection"><code class="docutils literal notranslate"><span class="pre">test_tap_connection</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../user_guide/cli.html#discover-tap"><code class="docutils literal notranslate"><span class="pre">discover_tap</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/cli.html#replication">Replication</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../user_guide/cli.html#run-tap"><code class="docutils literal notranslate"><span class="pre">run_tap</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../user_guide/cli.html#stop-tap"><code class="docutils literal notranslate"><span class="pre">stop_tap</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../user_guide/cli.html#fast-sync"><code class="docutils literal notranslate"><span class="pre">fast_sync</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../user_guide/cli.html#partial-sync-table"><code class="docutils literal notranslate"><span class="pre">partial_sync_table</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../user_guide/cli.html#reset-state"><code class="docutils literal notranslate"><span class="pre">reset_state</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/cli.html#data-diff">Data-diff</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../user_guide/cli.html#list-data-diff-checks"><code class="docutils literal notranslate"><span class="pre">list_data_diff_checks</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../user_guide/cli.html#run-data-diff-checks"><code class="docutils literal notranslate"><span class="pre">run_data_diff_checks</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../user_guide/cli.html#rerun-data-diff-check"><code class="docutils literal notranslate"><span class="pre">rerun_data_diff_check</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/cli.html#secrets">Secrets</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../user_guide/cli.html#encrypt-string"><code class="docutils literal notranslate"><span class="pre">encrypt_string</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/cli.html#common-options-and-environment">Common options and environment</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/data_diff.html">Data-diff checks</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/data_diff.html#supported-routes">Supported routes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/data_diff.html#check-types">Check types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/data_diff.html#configuration">Configuration</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../user_guide/data_diff.html#backend-database">Backend database</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../user_guide/data_diff.html#tap-yaml">Tap YAML</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../user_guide/data_diff.html#choosing-a-frequency-and-window">Choosing a frequency and window</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/data_diff.html#cli-commands">CLI commands</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/data_diff.html#alerts">Alerts</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../user_guide/data_diff.html#one-alert-per-failed-check-per-window">One alert per failed check per window</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/data_diff.html#coverage-and-remediation">Coverage and remediation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../user_guide/data_diff.html#monitoring-views">Monitoring views</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../user_guide/data_diff.html#source-safety">Source safety</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../user_guide/data_diff.html#preflight">Preflight</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/scheduling.html">Scheduling</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/scheduling.html#requirements">Requirements</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/scheduling.html#example">Example</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/scheduling.html#cadence-and-overlap">Cadence and overlap</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/scheduling.html#retries-and-recovery">Retries and recovery</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/multi_server_cluster.html">Multi-server operation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/multi_server_cluster.html#prerequisites">Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/multi_server_cluster.html#scheduling-boundary">Scheduling boundary</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/multi_server_cluster.html#failure-recovery">Failure recovery</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/logging.html">Logging</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/logging.html#filename-fields">Filename fields</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/logging.html#observe-a-run">Observe a run</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/logging.html#diagnose-failure">Diagnose failure</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/logging.html#retention">Retention</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/alerts.html">Alerts</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/alerts.html#handlers">Handlers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/alerts.html#slack">Slack</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/alerts.html#victorops">VictorOps</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/alerts.html#routing-and-suppression">Routing and suppression</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/resync.html">Resync and repair</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/resync.html#choose-an-operation">Choose an operation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/resync.html#preflight">Preflight</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/resync.html#full-resync">Full resync</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/resync.html#partial-repair">Partial repair</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/resync.html#failure-and-validation">Failure and validation</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/partial_sync.html">PartialSync behaviour</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/partial_sync.html#range-semantics">Range semantics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/partial_sync.html#merge-outcomes">Merge outcomes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/partial_sync.html#visual-examples">Visual examples</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/partial_sync.html#safety-and-validation">Safety and validation</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/schema_changes.html">Schema changes</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/schema_changes.html#change-outcomes">Change outcomes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/schema_changes.html#column-versioning">Column versioning</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/schema_changes.html#operational-procedure">Operational procedure</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/transformations.html">Load-time transformations</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/transformations.html#transformation-types">Transformation types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/transformations.html#configuration">Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/transformations.html#nested-json-fields">Nested JSON fields</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/transformations.html#conditions">Conditions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/transformations.html#validation-and-rollout">Validation and rollout</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/metadata_columns.html">Metadata columns and deletes</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/metadata_columns.html#columns">Columns</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/metadata_columns.html#configuration-outcomes">Configuration outcomes</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../user_guide/troubleshooting.html">Troubleshooting</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/troubleshooting.html#symptom-index">Symptom index</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/troubleshooting.html#replication-checks">Replication checks</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../user_guide/troubleshooting.html#mariadb-mysql-errors">MariaDB / MySQL Errors</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../user_guide/troubleshooting.html#postgresql-errors">PostgreSQL Errors</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../user_guide/troubleshooting.html#fastsync-errors">FastSync Errors</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../user_guide/troubleshooting.html#logging-and-diagnostics">Logging and Diagnostics</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/troubleshooting.html#verify-recovery">Verify recovery</a></li>
+</ul>
+</li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Connectors</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../connectors/taps.html">Taps (Data Sources)</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../connectors/taps.html#configuring-taps">Configuring taps</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../connectors/targets.html">Targets (Destinations)</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../connectors/targets.html#configuring-the-targets">Configuring the targets</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../connectors/index.html">Connector overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../connectors/taps.html">Sources</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/taps/mysql.html">MariaDB and MySQL source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/taps/postgres.html">PostgreSQL source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/taps/snowflake.html">Snowflake source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/taps/mongodb.html">MongoDB source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/taps/s3_csv.html">S3 CSV source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/taps/kafka.html">Kafka source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/taps/zendesk.html">Zendesk source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/taps/jira.html">Jira source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/taps/github.html">GitHub source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/taps/slack.html">Slack source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/taps/mixpanel.html">Mixpanel source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/taps/salesforce.html">Salesforce source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/taps/twilio.html">Twilio source</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../connectors/targets.html">Targets</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/targets/postgres.html">PostgreSQL target</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/targets/snowflake.html">Snowflake target</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/targets/snowflake_iceberg.html">Snowflake Iceberg tables</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/targets/s3_csv.html">S3 CSV target</a></li>
+</ul>
+</li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Project</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../project/contribution.html">Contribution</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../project/about.html">Project</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../project/licenses.html">Licenses</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../project/contribution.html">Contributing</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../project/contribution.html#development-environment">Development environment</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../project/contribution.html#add-or-update-a-source-connector">Add or update a source connector</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../project/contribution.html#add-or-update-a-target-connector">Add or update a target connector</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../project/contribution.html#support-status">Support status</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../project/contribution.html#validation">Validation</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../project/about.html">Project</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../project/about.html#history">History</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../project/about.html#early-contributors">Early contributors</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../project/about.html#contribution">Contribution</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../project/about.html#resources-and-links">Resources and links</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../project/licenses.html">Licenses</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../project/licenses.html#packaged-components">Packaged components</a></li>
+</ul>
+</li>
 </ul>
 
         </div>
@@ -121,144 +328,161 @@
              
   <section id="fastsync">
 <span id="fast-sync-main"></span><h1>FastSync<a class="headerlink" href="#fastsync" title="Link to this heading"></a></h1>
-<p><strong>FastSync</strong> is a performance optimization that bypasses the
-<a class="reference external" href="https://github.com/singer-io/getting-started/blob/master/docs/SPEC.md">Singer Specification</a>
-for bulk data operations. Instead of piping JSON between tap and target processes,
-FastSync uses native database tools (<code class="docutils literal notranslate"><span class="pre">COPY</span></code>, staged files) to transfer data
-directly — typically 10–100x faster than the standard Singer path.</p>
-<p>FastSync is available only for specific tap-target combinations (see the table below).</p>
-<div class="admonition warning">
-<p class="admonition-title">Warning</p>
-<p><strong>Important</strong>: FastSync is not a selectable replication method in the <a class="reference internal" href="../user_guide/yaml_config.html#yaml-configuration"><span class="std std-ref">YAML Configuration</span></a>.
-PipelineWise detects automatically when FastSync gives better performance than the Singer
-components and uses it whenever it’s possible.</p>
-</div>
-<section id="supported-tap-target-combinations">
-<h2>Supported tap-target combinations<a class="headerlink" href="#supported-tap-target-combinations" title="Link to this heading"></a></h2>
-<p>FullSync and PartialSync support different tap-target combinations:</p>
-<table class="docutils align-default">
+<p>FastSync bypasses Singer JSON for supported bulk transfers and uses native
+database export, staging, copy, and merge operations. It has two components:</p>
+<table class="docutils align-default" style="width: 100%">
+<colgroup>
+<col style="width: 22.0%" />
+<col style="width: 38.0%" />
+<col style="width: 40.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Component</p></th>
+<th class="head"><p>Selection</p></th>
+<th class="head"><p>Target effect</p></th>
+</tr>
+</thead>
 <tbody>
-<tr class="row-odd"><td><p><strong>Tap</strong></p></td>
-<td><p><strong>Target</strong></p></td>
-<td><p><strong>FullSync</strong></p></td>
-<td><p><strong>PartialSync</strong></p></td>
+<tr class="row-even"><td><p>FullSync</p></td>
+<td><p>Initial load, <code class="docutils literal notranslate"><span class="pre">FULL_TABLE</span></code>, or explicit <code class="docutils literal notranslate"><span class="pre">fast_sync</span></code></p></td>
+<td><p>Publishes a complete source-table copy.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="../connectors/taps/mysql.html#tap-mysql"><span class="std std-ref">Tap MySQL</span></a></p></td>
-<td><p><strong>-&gt;</strong> <a class="reference internal" href="../connectors/targets/snowflake.html#target-snowflake"><span class="std std-ref">Target Snowflake</span></a></p></td>
+<tr class="row-odd"><td><p>PartialSync</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">partial_sync_table</span></code> or configured <code class="docutils literal notranslate"><span class="pre">sync_start_from</span></code></p></td>
+<td><p>Merges a filtered source range into the existing target.</p></td>
+</tr>
+</tbody>
+</table>
+<p>FastSync is not a replication method. <code class="docutils literal notranslate"><span class="pre">LOG_BASED</span></code>, <code class="docutils literal notranslate"><span class="pre">INCREMENTAL</span></code>, and
+<code class="docutils literal notranslate"><span class="pre">FULL_TABLE</span></code> remain the table’s replication methods.</p>
+<section id="supported-routes">
+<h2>Supported routes<a class="headerlink" href="#supported-routes" title="Link to this heading"></a></h2>
+<table class="docutils align-default" style="width: 100%">
+<colgroup>
+<col style="width: 28.0%" />
+<col style="width: 28.0%" />
+<col style="width: 22.0%" />
+<col style="width: 22.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Source</p></th>
+<th class="head"><p>Target</p></th>
+<th class="head"><p>FullSync</p></th>
+<th class="head"><p>PartialSync</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>MariaDB / MySQL</p></td>
+<td><p>Snowflake</p></td>
 <td><p>Yes</p></td>
 <td><p>Yes</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="../connectors/taps/postgres.html#tap-postgres"><span class="std std-ref">Tap PostgreSQL</span></a></p></td>
-<td><p><strong>-&gt;</strong> <a class="reference internal" href="../connectors/targets/snowflake.html#target-snowflake"><span class="std std-ref">Target Snowflake</span></a></p></td>
+<tr class="row-odd"><td><p>PostgreSQL</p></td>
+<td><p>Snowflake</p></td>
 <td><p>Yes</p></td>
 <td><p>Yes</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="../connectors/taps/mongodb.html#tap-mongodb"><span class="std std-ref">Tap MongoDB</span></a></p></td>
-<td><p><strong>-&gt;</strong> <a class="reference internal" href="../connectors/targets/snowflake.html#target-snowflake"><span class="std std-ref">Target Snowflake</span></a></p></td>
+<tr class="row-even"><td><p>MongoDB</p></td>
+<td><p>Snowflake</p></td>
 <td><p>Yes</p></td>
 <td><p>No</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="../connectors/taps/mysql.html#tap-mysql"><span class="std std-ref">Tap MySQL</span></a></p></td>
-<td><p><strong>-&gt;</strong> <a class="reference internal" href="../connectors/targets/postgres.html#target-postgres"><span class="std std-ref">Target Postgres</span></a></p></td>
+<tr class="row-odd"><td><p>MariaDB / MySQL</p></td>
+<td><p>PostgreSQL</p></td>
 <td><p>Yes</p></td>
 <td><p>No</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="../connectors/taps/postgres.html#tap-postgres"><span class="std std-ref">Tap PostgreSQL</span></a></p></td>
-<td><p><strong>-&gt;</strong> <a class="reference internal" href="../connectors/targets/postgres.html#target-postgres"><span class="std std-ref">Target Postgres</span></a></p></td>
+<tr class="row-even"><td><p>PostgreSQL</p></td>
+<td><p>PostgreSQL</p></td>
 <td><p>Yes</p></td>
 <td><p>No</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="../connectors/taps/mongodb.html#tap-mongodb"><span class="std std-ref">Tap MongoDB</span></a></p></td>
-<td><p><strong>-&gt;</strong> <a class="reference internal" href="../connectors/targets/postgres.html#target-postgres"><span class="std std-ref">Target Postgres</span></a></p></td>
+<tr class="row-odd"><td><p>MongoDB</p></td>
+<td><p>PostgreSQL</p></td>
 <td><p>Yes</p></td>
 <td><p>No</p></td>
 </tr>
 </tbody>
 </table>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>During a normal <a class="reference internal" href="../user_guide/cli.html#cli-run-tap"><span class="std std-ref">run_tap</span></a> run, PipelineWise uses the standard
-Singer-based sync when FullSync is not supported for the tap-target combination.</p>
-<p>The explicit <a class="reference internal" href="../user_guide/cli.html#cli-fast-sync"><span class="std std-ref">fast_sync</span></a> command behaves differently: it requires a
-supported FullSync combination and fails if one is not available. It never falls
-back to Singer.</p>
-</div>
+<p>Endpoint support status from <a class="reference internal" href="../connectors/index.html#connector-support"><span class="std std-ref">Connectors</span></a> still applies. A normal
+<code class="docutils literal notranslate"><span class="pre">run_tap</span></code> falls back to Singer when FullSync is unavailable. The explicit
+<code class="docutils literal notranslate"><span class="pre">fast_sync</span></code> command instead fails without loading data.</p>
 </section>
-<section id="components">
-<h2>Components<a class="headerlink" href="#components" title="Link to this heading"></a></h2>
-<p>FastSync has two components that share the same underlying infrastructure:</p>
-<p><strong>FullSync</strong></p>
-<p>Exports the entire source table, stages the data, and replaces the target table.
-This is the component used during initial syncs and when you explicitly run the
-<a class="reference internal" href="../user_guide/cli.html#cli-fast-sync"><span class="std std-ref">fast_sync</span></a> command.</p>
-<p><strong>PartialSync</strong></p>
-<p>Exports a filtered range of rows from the source table, stages the data, and
-merges it with the existing target table (updating existing rows and inserting
-new ones). This is the component used when you run the <a class="reference internal" href="../user_guide/cli.html#cli-partial-sync-table"><span class="std std-ref">partial_sync_table</span></a>
-command. See <a class="reference internal" href="../user_guide/partial_sync.html#partial-sync-cases"><span class="std std-ref">Different cases of partial resync</span></a> for details on how different scenarios are
-handled.</p>
-</section>
-<section id="when-does-pipelinewise-use-fastsync">
-<h2>When does PipelineWise use FastSync?<a class="headerlink" href="#when-does-pipelinewise-use-fastsync" title="Link to this heading"></a></h2>
-<p>PipelineWise automatically selects the <strong>FastSync</strong> component for a table when one of the
-following conditions are met:</p>
+<section id="automatic-selection-and-handover">
+<h2>Automatic selection and handover<a class="headerlink" href="#automatic-selection-and-handover" title="Link to this heading"></a></h2>
+<p>During <code class="docutils literal notranslate"><span class="pre">run_tap</span></code>, PipelineWise selects FullSync when:</p>
 <ul class="simple">
-<li><p>The replication method is <code class="docutils literal notranslate"><span class="pre">FULL_TABLE</span></code> (always treated as initial sync), <strong>or</strong></p></li>
-<li><p>The replication method is <code class="docutils literal notranslate"><span class="pre">INCREMENTAL</span></code> but no replication key value has been
-recorded yet, <strong>or</strong></p></li>
-<li><p>The replication method is <code class="docutils literal notranslate"><span class="pre">LOG_BASED</span></code> but no LSN, binlog position, GTID, or
-change stream token has been recorded yet.</p></li>
+<li><p>the table uses <code class="docutils literal notranslate"><span class="pre">FULL_TABLE</span></code>;</p></li>
+<li><p>an <code class="docutils literal notranslate"><span class="pre">INCREMENTAL</span></code> table has no replication-key bookmark; or</p></li>
+<li><p>a <code class="docutils literal notranslate"><span class="pre">LOG_BASED</span></code> table has no LSN, binlog, GTID, or change-stream bookmark.</p></li>
 </ul>
-<p>For <code class="docutils literal notranslate"><span class="pre">INCREMENTAL</span></code> and <code class="docutils literal notranslate"><span class="pre">LOG_BASED</span></code> tables, FastSync handles only the initial load.
-Once the initial sync completes, PipelineWise switches to the standard Singer path
-for ongoing incremental or log-based replication.</p>
-<p>When you run <a class="reference internal" href="../user_guide/cli.html#cli-fast-sync"><span class="std std-ref">fast_sync</span></a> explicitly, FullSync is used unconditionally for all
-supported tap-target combinations, regardless of bookmark state — unless a table has
-<code class="docutils literal notranslate"><span class="pre">sync_start_from</span></code> defined in its tap configuration (see <a class="reference internal" href="#defined-partial-sync"><span class="std std-ref">Defined PartialSync (sync_start_from)</span></a> below).</p>
-<p>The <strong>PartialSync</strong> component is also used when you run <a class="reference internal" href="../user_guide/cli.html#cli-partial-sync-table"><span class="std std-ref">partial_sync_table</span></a>
-explicitly.</p>
+<p>After a successful initial FullSync, PipelineWise writes the captured bookmark
+and starts the Singer portion of the same <code class="docutils literal notranslate"><span class="pre">run_tap</span></code> invocation for incremental
+or log-based tables. It does not wait for the next scheduled launch.</p>
+<p>If FullSync fails, Singer does not advance that table past an incomplete initial
+load. Restart the same command after correcting the failure.</p>
 </section>
-<section id="defined-partialsync-sync-start-from">
-<span id="defined-partial-sync"></span><h2>Defined PartialSync (<code class="docutils literal notranslate"><span class="pre">sync_start_from</span></code>)<a class="headerlink" href="#defined-partialsync-sync-start-from" title="Link to this heading"></a></h2>
-<p>You can configure individual tables to always use PartialSync instead of FullSync
-when <a class="reference internal" href="../user_guide/cli.html#cli-fast-sync"><span class="std std-ref">fast_sync</span></a> is run. This is done by adding a <code class="docutils literal notranslate"><span class="pre">sync_start_from</span></code> block
-to the table entry in your tap YAML configuration:</p>
+<section id="explicit-fullsync">
+<h2>Explicit FullSync<a class="headerlink" href="#explicit-fullsync" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">fast_sync</span></code> resyncs every selected table regardless of its current bookmark:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pipelinewise<span class="w"> </span>fast_sync<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--tap<span class="w"> </span>&lt;tap_id&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--target<span class="w"> </span>&lt;target_id&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--tables<span class="w"> </span>&lt;schema.table&gt;
+</pre></div>
+</div>
+<p>This operation can replace target data and reset replication bookmarks. Review
+<a class="reference internal" href="../user_guide/resync.html#resync"><span class="std std-ref">Resync and repair</span></a> before running it against a large or actively written table.</p>
+</section>
+<section id="configured-partialsync">
+<span id="defined-partial-sync"></span><h2>Configured PartialSync<a class="headerlink" href="#configured-partialsync" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">sync_start_from</span></code> makes explicit <code class="docutils literal notranslate"><span class="pre">fast_sync</span></code> use PartialSync for that table:</p>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">tables</span><span class="p">:</span>
-<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;my_table&quot;</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;orders&quot;</span>
 <span class="w">    </span><span class="nt">replication_method</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;LOG_BASED&quot;</span>
 <span class="w">    </span><span class="nt">sync_start_from</span><span class="p">:</span>
 <span class="w">      </span><span class="nt">column</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;updated_at&quot;</span>
-<span class="w">      </span><span class="nt">static_value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;2024-01-01&quot;</span><span class="w">      </span><span class="c1"># or use dynamic_value instead</span>
+<span class="w">      </span><span class="nt">static_value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;2024-01-01&quot;</span>
 <span class="w">      </span><span class="nt">drop_target_table</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
 </pre></div>
 </div>
-<p>When <code class="docutils literal notranslate"><span class="pre">fast_sync</span></code> encounters a table with <code class="docutils literal notranslate"><span class="pre">sync_start_from</span></code>, it routes that table
-through PartialSync automatically — applying a <code class="docutils literal notranslate"><span class="pre">WHERE</span> <span class="pre">column</span> <span class="pre">&gt;=</span> <span class="pre">value</span></code> filter during
-export and merging the result into the target rather than replacing it.</p>
-<p><strong>Configuration keys:</strong></p>
-<dl class="simple">
-<dt><code class="docutils literal notranslate"><span class="pre">column</span></code> <em>(required)</em></dt><dd><p>The column to use for the range filter (<code class="docutils literal notranslate"><span class="pre">WHERE</span> <span class="pre">column</span> <span class="pre">&gt;=</span> <span class="pre">value</span></code>).</p>
-</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">static_value</span></code> <em>(one of static/dynamic required)</em></dt><dd><p>A fixed literal value that the sync always starts from.</p>
-</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">dynamic_value</span></code> <em>(one of static/dynamic required)</em></dt><dd><p>A <code class="docutils literal notranslate"><span class="pre">SELECT</span></code> query that returns a single row with a single column. The query is
-evaluated at sync time against the source database, allowing the start value to
-be computed dynamically (e.g. <code class="docutils literal notranslate"><span class="pre">SELECT</span> <span class="pre">MAX(updated_at)</span> <span class="pre">-</span> <span class="pre">INTERVAL</span> <span class="pre">'7</span> <span class="pre">days'</span> <span class="pre">FROM</span> <span class="pre">my_table</span></code>).</p>
-</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">drop_target_table</span></code> <em>(optional, default: false)</em></dt><dd><p>When <code class="docutils literal notranslate"><span class="pre">true</span></code>, the target table is dropped and recreated before merging. This
-effectively converts the partial sync into a filtered full replacement.</p>
-</dd>
-</dl>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>Exactly one of <code class="docutils literal notranslate"><span class="pre">static_value</span></code> or <code class="docutils literal notranslate"><span class="pre">dynamic_value</span></code> must be provided, not both.</p>
-</div>
-<div class="admonition warning">
-<p class="admonition-title">Warning</p>
-<p>Defined PartialSync via <code class="docutils literal notranslate"><span class="pre">sync_start_from</span></code> is currently supported only for
-<a class="reference internal" href="../connectors/taps/mysql.html#tap-mysql"><span class="std std-ref">Tap MySQL</span></a> and <a class="reference internal" href="../connectors/taps/postgres.html#tap-postgres"><span class="std std-ref">Tap PostgreSQL</span></a> to <a class="reference internal" href="../connectors/targets/snowflake.html#target-snowflake"><span class="std std-ref">Target Snowflake</span></a>.</p>
-</div>
-<p>See the <a class="reference internal" href="../connectors/taps/mysql.html#tap-mysql"><span class="std std-ref">Tap MySQL</span></a> and <a class="reference internal" href="../connectors/taps/postgres.html#tap-postgres"><span class="std std-ref">Tap PostgreSQL</span></a> connector pages for full YAML examples.</p>
+<table class="docutils align-default" id="id1" style="width: 100%">
+<caption><span class="caption-text">Settings</span><a class="headerlink" href="#id1" title="Link to this table"></a></caption>
+<colgroup>
+<col style="width: 28.0%" />
+<col style="width: 22.0%" />
+<col style="width: 50.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Setting</p></th>
+<th class="head"><p>Required</p></th>
+<th class="head"><p>Behaviour</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">column</span></code></p></td>
+<td><p>Yes</p></td>
+<td><p>Applies <code class="docutils literal notranslate"><span class="pre">WHERE</span> <span class="pre">column</span> <span class="pre">&gt;=</span> <span class="pre">value</span></code> to the source export.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">static_value</span></code></p></td>
+<td><p>Exactly one value source</p></td>
+<td><p>Uses the same literal boundary on every run.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">dynamic_value</span></code></p></td>
+<td><p>Exactly one value source</p></td>
+<td><p>Runs a source query that must return one row and one column.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">drop_target_table</span></code></p></td>
+<td><p>No; default <code class="docutils literal notranslate"><span class="pre">false</span></code></p></td>
+<td><p>Recreates the target before loading the filtered result.</p></td>
+</tr>
+</tbody>
+</table>
+<p>Exactly one of <code class="docutils literal notranslate"><span class="pre">static_value</span></code> and <code class="docutils literal notranslate"><span class="pre">dynamic_value</span></code> is allowed. Configured
+PartialSync is supported only from MariaDB/MySQL or PostgreSQL to Snowflake.</p>
+<p>If a dynamic query returns no boundary, PipelineWise treats the partial range as
+empty and completes successfully. Use a static boundary when an empty result
+would hide a configuration or source-data problem.</p>
 </section>
 </section>
 
@@ -266,8 +490,8 @@ effectively converts the partial sync into a filtered full replacement.</p>
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="replication_methods.html" class="btn btn-neutral float-left" title="Replication Methods" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="linux_pipes.html" class="btn btn-neutral float-right" title="Linux Pipes in PipelineWise" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="replication_methods.html" class="btn btn-neutral float-left" title="Replication methods" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="linux_pipes.html" class="btn btn-neutral float-right" title="Stream buffering and acknowledgement" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

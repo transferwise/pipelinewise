@@ -2,151 +2,21 @@
 .. _taps_list:
 
 Taps (Data Sources)
--------------------
+===================
 
-PipelineWise can replicate data from the following data sources:
+Availability is directional and independent of packaging. See
+:ref:`connector_support` for the definitions and available route matrix.
 
-
-.. container:: tile-wrapper
-
-    .. container:: tile
-
-        .. container:: img-hover-zoom
-
-          .. image:: ../img/mysql-logo.png
-             :target: taps/mysql.html
-
-        :ref:`tap-mysql`
-
-    .. container:: tile
-
-        .. container:: img-hover-zoom
-
-          .. image:: ../img/mariadb-logo.png
-             :target: taps/mysql.html
-
-        :ref:`tap-mysql`
-
-.. container:: tile-wrapper
-
-    .. container:: tile
-
-        .. container:: img-hover-zoom
-
-          .. image:: ../img/postgres-logo.png
-             :target: taps/postgres.html
-
-        :ref:`tap-postgres`
-
-    .. container:: tile
-
-        .. container:: img-hover-zoom
-
-          .. image:: ../img/mongodb-logo.png
-             :target: taps/mongodb.html
-
-        :ref:`tap-mongodb`
-
-
-.. container:: tile-wrapper
-
-    .. container:: tile
-
-        .. container:: img-hover-zoom
-
-          .. image:: ../img/s3-logo.png
-             :target: taps/s3_csv.html
-
-        :ref:`tap-s3-csv`
-
-    .. container:: tile
-
-        .. container:: img-hover-zoom
-
-          .. image:: ../img/kafka-logo.png
-             :target: taps/kafka.html
-
-        :ref:`tap-kafka`
-
-
-    .. container:: tile
-
-        .. container:: img-hover-zoom
-
-          .. image:: ../img/zendesk-logo.png
-             :target: taps/zendesk.html
-
-        :ref:`tap-zendesk`
-
-.. container:: tile-wrapper
-
-    .. container:: tile
-
-        .. container:: img-hover-zoom
-
-          .. image:: ../img/jira-logo.png
-             :target: taps/jira.html
-
-        :ref:`tap-jira`
-
-.. container:: tile-wrapper
-
-    .. container:: tile
-
-        .. container:: img-hover-zoom
-
-          .. image:: ../img/github-logo.png
-             :target: taps/github.html
-
-        :ref:`tap-github`
-
-.. container:: tile-wrapper
-
-    .. container:: tile
-
-        .. container:: img-hover-zoom
-
-          .. image:: ../img/slack-logo.png
-             :target: taps/slack.html
-
-        :ref:`tap-slack`
-
-    .. container:: tile
-
-        .. container:: img-hover-zoom
-
-          .. image:: ../img/mixpanel-logo.png
-             :target: taps/mixpanel.html
-
-        :ref:`tap-mixpanel`
-
-    .. container:: tile
-
-        .. container:: img-hover-zoom
-
-          .. image:: ../img/snowflake-logo.png
-             :target: taps/snowflake.html
-
-        :ref:`tap-snowflake`
-
-Additional packaged data sources
-''''''''''''''''''''''''''''''''
-
-PipelineWise also packages :ref:`tap-salesforce` and :ref:`tap-twilio`.
-
-
-
-Configuring taps
-----------------
 .. toctree::
    :maxdepth: 1
+   :titlesonly:
 
    taps/mysql
    taps/postgres
-   taps/s3_csv
-   taps/kafka
    taps/snowflake
    taps/mongodb
+   taps/s3_csv
+   taps/kafka
    taps/zendesk
    taps/jira
    taps/github
@@ -154,3 +24,47 @@ Configuring taps
    taps/mixpanel
    taps/salesforce
    taps/twilio
+
+.. list-table:: Available
+    :header-rows: 1
+    :widths: 40 60
+    :width: 100%
+
+    * - Source
+      - Connector
+    * - MariaDB
+      - :ref:`tap-mysql`
+    * - PostgreSQL
+      - :ref:`tap-postgres`
+
+.. list-table:: Experimental
+    :header-rows: 1
+    :widths: 40 60
+    :width: 100%
+
+    * - Source
+      - Connector
+    * - MySQL
+      - :ref:`tap-mysql`
+    * - Snowflake
+      - :ref:`tap-snowflake`
+    * - MongoDB
+      - :ref:`tap-mongodb`
+    * - S3 CSV
+      - :ref:`tap-s3-csv`
+    * - Kafka
+      - :ref:`tap-kafka`
+    * - Zendesk
+      - :ref:`tap-zendesk`
+    * - Jira
+      - :ref:`tap-jira`
+    * - GitHub
+      - :ref:`tap-github`
+    * - Slack
+      - :ref:`tap-slack`
+    * - Mixpanel
+      - :ref:`tap-mixpanel`
+    * - Salesforce
+      - :ref:`tap-salesforce`
+    * - Twilio
+      - :ref:`tap-twilio`
