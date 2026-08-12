@@ -17,6 +17,10 @@ from target_snowflake.upload_clients.s3_upload_client import S3UploadClient
 from target_snowflake.upload_clients.snowflake_upload_client import SnowflakeUploadClient
 
 
+RECORD_UPDATE_MODE_SCHEMA_KEY = 'x-pipelinewise-record-update-mode'
+RECORD_UPDATE_MODE_PATCH = 'PATCH'
+
+
 def validate_config(config):
     """Validate configuration"""
     errors = []
@@ -201,6 +205,7 @@ class DbSync:
         self.connection_config = connection_config
         self.stream_schema_message = stream_schema_message
         self.table_cache = table_cache
+        self.record_update_mode = None
 
         # logger to be used across the class's methods
         self.logger = get_logger('target_snowflake')
@@ -286,6 +291,7 @@ class DbSync:
             self.data_flattening_max_level = self.connection_config.get('data_flattening_max_level', 0)
             self.flatten_schema = flattening.flatten_schema(stream_schema_message['schema'],
                                                             max_level=self.data_flattening_max_level)
+            self.record_update_mode = stream_schema_message['schema'].get(RECORD_UPDATE_MODE_SCHEMA_KEY)
 
         # Use external stage
         if connection_config.get('s3_bucket', None):
@@ -398,6 +404,22 @@ class DbSync:
 
         return ','.join(key_props)
 
+    def present_column_names(self, record):
+        """Return flattened schema columns represented by a PATCH record."""
+        schema_properties = self.stream_schema_message['schema'].get('properties', {})
+        present_schema = {
+            'properties': {
+                name: schema_properties[name]
+                for name in record
+                if name in schema_properties
+            }
+        }
+        present_flatten_schema = flattening.flatten_schema(
+            present_schema,
+            max_level=self.data_flattening_max_level,
+        )
+        return tuple(name for name in self.flatten_schema if name in present_flatten_schema)
+
     def put_to_stage(self, file, stream, count, temp_dir=None):
         """Upload file to snowflake stage"""
         self.logger.info('Uploading %d rows to stage', count)
@@ -446,7 +468,7 @@ class DbSync:
         table_name = self.table_name(stream, False, without_schema=True)
         return f"{self.schema_name}.%{table_name}"
 
-    def load_file(self, s3_key, count, size_bytes):
+    def load_file(self, s3_key, count, size_bytes, update_column_names=None):
         """Load a supported file type from snowflake stage into target table"""
         stream = self.stream_schema_message['stream']
         self.logger.info("Loading %d rows into '%s'", count, self.table_name(stream, False))
@@ -470,7 +492,12 @@ class DbSync:
                 inserts, updates = self._load_file_merge(
                     s3_key=s3_key,
                     stream=stream,
-                    columns_with_trans=columns_with_trans
+                    columns_with_trans=columns_with_trans,
+                    update_columns=(
+                        None
+                        if update_column_names is None
+                        else {safe_column_name(name) for name in update_column_names}
+                    ),
                 )
             except Exception as ex:
                 self.logger.error(
@@ -503,7 +530,7 @@ class DbSync:
             json.dumps({'inserts': inserts, 'updates': updates, 'size_bytes': size_bytes})
         )
 
-    def _load_file_merge(self, s3_key, stream, columns_with_trans) -> Tuple[int, int]:
+    def _load_file_merge(self, s3_key, stream, columns_with_trans, update_columns=None) -> Tuple[int, int]:
         # MERGE does insert and update
         inserts = 0
         updates = 0
@@ -515,7 +542,8 @@ class DbSync:
                     s3_key=s3_key,
                     file_format_name=self.connection_config['file_format'],
                     columns=columns_with_trans,
-                    pk_merge_condition=self.primary_key_merge_condition()
+                    pk_merge_condition=self.primary_key_merge_condition(),
+                    update_columns=update_columns,
                 )
                 self.logger.debug('Running query: %s', merge_sql)
                 cur.execute(merge_sql)

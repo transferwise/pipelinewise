@@ -16,21 +16,33 @@ from pipelinewise.fastsync.commons import utils as common_utils
 from pipelinewise.fastsync.commons.target_snowflake import FastSyncTargetSnowflake
 
 
+# A dynamic boundary query with no usable scalar is a successful no-op.
+DYNAMIC_BOUNDARY_NOT_READY = object()
+
+
 def upload_to_s3(snowflake: FastSyncTargetSnowflake, file_parts: List, temp_dir: str) -> Tuple[List, str]:
-    """Upload exported data into S3"""
-
-    s3_keys = []
-    for file_part in file_parts:
-        s3_keys.append(snowflake.upload_to_s3(file_part, tmp_dir=temp_dir))
-        os.remove(file_part)
-
-    # Create a pattern that match all file parts by removing multipart suffix
-    s3_key_pattern = (
-        re.sub(r'\.part\d*$', '', s3_keys[0])
-        if len(s3_keys) > 0
-        else 'NO_FILES_TO_LOAD'
+    """Upload PartialSync staging through the shared FastSync implementation."""
+    return common_utils.upload_files_to_s3(
+        snowflake,
+        file_parts,
+        temp_dir,
+        snowflake.connection_config.get('s3_bucket'),
     )
-    return s3_keys, s3_key_pattern
+
+
+def delete_s3_objects(
+    snowflake: FastSyncTargetSnowflake,
+    s3_keys: List,
+    bucket: str,
+    cleanup_context='PartialSync staging cleanup after successful publication',
+) -> None:
+    """Delete every staged object before state can advance."""
+    common_utils.delete_s3_objects(
+        snowflake,
+        s3_keys,
+        bucket,
+        cleanup_context=cleanup_context,
+    )
 
 
 def diff_source_target_columns(target_sf: dict, source_columns: list) -> dict:
@@ -52,34 +64,71 @@ def diff_source_target_columns(target_sf: dict, source_columns: list) -> dict:
     }
 
 
-def load_into_snowflake(target, args, columns_diff, primary_keys, s3_key_pattern, size_bytes,
+def load_into_snowflake(target, args, source_columns, primary_keys, s3_key_pattern, size_bytes,
                         where_clause_sql):
-    """Loading data from S3 to the temp table in snowflake and then merge it with the target table"""
+    """Load staging data before creating or modifying the live target table."""
 
     snowflake = target['sf_object']
-    # Load into Snowflake temp table
     snowflake.copy_to_table(
         s3_key_pattern, target['schema'], args.table, size_bytes, is_temporary=True
     )
-    # Obfuscate columns
     snowflake.obfuscate_columns(target['schema'], args.table)
 
-    snowflake.add_columns(target['schema'], target['table'], columns_diff['added_columns'])
-    added_metadata_columns = ['_SDC_EXTRACTED_AT', '_SDC_BATCHED_AT', '_SDC_DELETED_AT']
+    if args.drop_target_table:
+        common_utils.apply_snowflake_table_grants(
+            snowflake,
+            args.target,
+            target['schema'],
+            args.table,
+            is_temporary=True,
+        )
+
+    publication_status = target.get('publication_status')
+    if publication_status is not None:
+        publication_status['attempted'] = True
+    snowflake.create_table(
+        target_schema=target['schema'],
+        table_name=target['table'],
+        columns=source_columns,
+        primary_key=primary_keys,
+        is_temporary=False,
+        sort_columns=False,
+        allow_replace_table=False,
+        normalize_primary_keys=(
+            False if args.drop_target_table else 'if_created'
+        ),
+    )
     if args.drop_target_table:
         snowflake.swap_tables(target['schema'], target['table'])
     else:
-        snowflake.merge_tables(
-            target['schema'], target['temp'], target['table'],
-            list(columns_diff['source_columns'].keys()) + added_metadata_columns, primary_keys)
+        columns_diff = diff_source_target_columns(target, source_columns=source_columns)
+        # Snowflake DDL implicitly commits, so schema evolution must finish before atomic DML publication.
+        snowflake.add_columns(target['schema'], target['table'], columns_diff['added_columns'])
+        added_metadata_columns = ['_SDC_EXTRACTED_AT', '_SDC_BATCHED_AT', '_SDC_DELETED_AT']
+        snowflake.publish_partial_sync(
+            target['schema'],
+            target['temp'],
+            target['table'],
+            list(columns_diff['source_columns'].keys()) + added_metadata_columns,
+            primary_keys,
+            where_clause_sql,
+            hard_delete=args.target['hard_delete'] is True,
+        )
+        snowflake.drop_table(
+            target['schema'],
+            target['table'],
+            is_temporary=True,
+            max_attempts=3,
+        )
 
-        if args.target['hard_delete'] is True:
-            snowflake.partial_hard_delete(target['schema'], target['table'], where_clause_sql)
-        snowflake.drop_table(target['schema'], target['temp'])
 
-
-def update_state_file(args: argparse.Namespace, bookmark: Dict) -> None:
-    """Update state file"""
+def update_state_file(
+    args: argparse.Namespace,
+    bookmark: Dict,
+    state_lock=None,
+) -> None:
+    """Update state after an unbounded sync; the legacy lock argument is ignored."""
+    del state_lock
     # Save bookmark to singer state file
     if not args.end_value:
         common_utils.save_state_file(args.state, args.table, bookmark)
@@ -141,15 +190,13 @@ def _validate_static_boundary_value(string_to_check: str) -> str:
     return string_to_check
 
 
-def _validate_dynamic_boundary_value(query_object, string_to_check: str) -> str:
+def _validate_dynamic_boundary_value(query_object, string_to_check: str) -> object:
     """Validating if the dynamic boundary values are valid and there is no injection"""
     try:
         _check_for_allowed_query(string_to_check)
         return_value = query_object(string_to_check)
         if return_value == []:
-            # in this case it returns NULL and this NULL will be used in generating where clause later and
-            # partial sync can be selected again next time until this dynamic value returns something from the source!
-            return 'NULL'
+            return DYNAMIC_BOUNDARY_NOT_READY
         if len(return_value) > 1 or len(return_value[0]) != 1:
             raise Exception
 
@@ -157,12 +204,14 @@ def _validate_dynamic_boundary_value(query_object, string_to_check: str) -> str:
             boundary_value = list(return_value[0].values())[0]
         else:
             boundary_value = return_value[0][0]
+        if boundary_value is None:
+            return DYNAMIC_BOUNDARY_NOT_READY
     except Exception:
         raise (InvalidConfigException(f'Invalid query for boundary value: {string_to_check}')) from Exception
     return boundary_value
 
 
-def validate_boundary_value(query_object: object, string_to_check: Union[str, None]) -> Union[str, None]:
+def validate_boundary_value(query_object: object, string_to_check: Union[str, None]) -> object:
     """Validate and finding the boundary value"""
     if string_to_check:
         if string_to_check.startswith('<S>'):

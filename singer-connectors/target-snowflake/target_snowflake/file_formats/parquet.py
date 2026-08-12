@@ -2,7 +2,7 @@
 import os
 import pandas
 
-from typing import Dict, List
+from typing import Dict, Iterable, List, Optional
 from tempfile import mkstemp
 
 from target_snowflake import flattening
@@ -28,11 +28,18 @@ def create_merge_sql(table_name: str,
                      s3_key: str,
                      file_format_name: str,
                      columns: List,
-                     pk_merge_condition: str) -> str:
+                     pk_merge_condition: str,
+                     *,
+                     update_columns: Optional[Iterable[str]] = None) -> str:
     """Generate a Parquet compatible snowflake MERGE INTO command"""
+    update_column_names = None if update_columns is None else set(update_columns)
     p_source_columns = ', '.join([f"{c['trans']}($1:{c['json_element_name']}) {c['name']}"
                                   for i, c in enumerate(columns)])
-    p_update = ', '.join([f"{c['name']}=s.{c['name']}" for c in columns])
+    p_update = ', '.join([
+        f"{c['name']}=s.{c['name']}" for c in columns
+        if update_column_names is None or c['name'] in update_column_names
+    ])
+    p_update_clause = f'WHEN MATCHED THEN UPDATE SET {p_update} ' if p_update else ''
     p_insert_cols = ', '.join([c['name'] for c in columns])
     p_insert_values = ', '.join([f"s.{c['name']}" for c in columns])
 
@@ -41,7 +48,7 @@ def create_merge_sql(table_name: str,
            f"FROM '@{stage_name}/{s3_key}' " \
            f"(FILE_FORMAT => '{file_format_name}')) s " \
            f"ON {pk_merge_condition} " \
-           f"WHEN MATCHED THEN UPDATE SET {p_update} " \
+           f"{p_update_clause}" \
            "WHEN NOT MATCHED THEN " \
            f"INSERT ({p_insert_cols}) " \
            f"VALUES ({p_insert_values})"
@@ -66,7 +73,8 @@ def records_to_dataframe(records: Dict,
         flatten_record = flattening.flatten_record(record, schema, max_level=data_flattening_max_level)
         flattened_records.append(flatten_record)
 
-    return pandas.DataFrame(data=flattened_records)
+    dataframe = pandas.DataFrame(data=flattened_records)
+    return dataframe.reindex(columns=list(schema)) if schema else dataframe
 
 
 def records_to_file(records: Dict,

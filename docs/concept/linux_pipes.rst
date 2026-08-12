@@ -1,68 +1,87 @@
 .. _linux_pipes:
+.. _stream_buffering:
 
-Linux Pipes in PipelineWise
-===========================
+Stream buffering and acknowledgement
+====================================
 
-A pipe is a unidirectional interprocess communication channel. The term was coined by
-`Douglas McIlroy <https://en.wikipedia.org/wiki/Douglas_McIlroy>`_ for Unix shell and
-named by analogy with the pipeline.
+Singer replication connects the tap, optional transform, optional ``mbuffer``,
+and target as separate processes:
 
-Pipes are most often used in shell-scripts to connect multiple commands by redirecting the output of
-one command (stdout) to the input (stdin) of the next, using the pipe symbol '`|`'. The :ref:`singer` specification,
-hence PipelineWise is also using linux pipes to connect :ref:`taps_list` and :ref:`targets_list` connectors.
+.. code-block:: text
 
-For example in the following command ``tap-postgres`` Extracts data from a postgres database and the
-extracted data sent to ``target-snowflake`` to Load it into a Snowflake database:
+   tap | transform-field | mbuffer | target
 
-.. code-block:: bash
-
-    tap-postgres | target-snowflake
-
-Logic
------
-
-Pipes provide asynchronous execution of commands using buffered I/O routines. Thus, all the commands
-in the pipeline operate in parallel, each in its own process.
-
-The size of the buffer since kernel version 2.6.11 is 65536 bytes (64K) and is equal to the page memory
-in older kernels. When attempting to read from an empty buffer, the read process is blocked until data
-appears. Similarly, if you attempt to write to a full buffer, the recording process will be blocked until
-the necessary amount of space is available.
-
-It is important to note, that despite the fact that pipes operates using file descriptor I/O streams,
-operations are performed in memory without reading from or writing to disk.
-
-All the information given below is for bash shell 4.2 and kernel 3.10.10. Further details in the
-original `Linux Pipes Tips & Tricks <https://blog.dataart.com/linux-pipes-tips-tricks>`_ post.
-
-Increasing buffer size
-----------------------
-
-Sometimes the default 64K buffer size that provided by the Linux kernel is too small. For example in the
-example above when you extracting data from a busy postgres database and loading into a busy Snowflake
-database sometimes you will find that ``tap-postgres`` is blocked by ``target-snowflake``.
-
-This happens when the target cannot load the data fast enough. For example if you have lot of concurrent
-queries in the target database the database can queue up new queries (at least in case of a Snowflake database)
-and this is blocking the tap to extract more data. This scenario can cause unexpected timeout in
-``tap-postgres`` and other tap connectors. To avoid this scenario you can consider to increase the buffer size
-between the tap and target.
+Without ``mbuffer``, operating-system pipe capacity applies backpressure to the
+tap. ``stream_buffer_size`` inserts a larger in-memory queue so the tap can read
+ahead while the target is temporarily slower.
 
 
-.. warning::
+Configuration
+-------------
 
-  PipelineWise doesn't modify the kernel buffer size. When you need more buffer than
-  the default 64K that's provided by the kernel, PipelineWise will use its own
-  buffering mechanism between taps and targets.
+Set the buffer size in megabytes in the tap YAML:
 
-  PipelineWise is using `mbuffer <https://www.maier-komor.de/mbuffer.html>`_ to
-  create custom sized buffer between taps and targets.
+.. code-block:: yaml
 
-You can set custom buffer sizes in the tap YAML files by setting the ``stream_buffer_size``
-value. If ``stream_buffer_size`` is greater than 0 then the following piped command will be
-generated to create larger buffer between taps and targets than the default
-buffer that's provided by the Linux kernel:
+   batch_size_rows: 20000
+   stream_buffer_size: 256
 
-.. code-block:: bash
+``0`` disables ``mbuffer``. Valid configured values are 0–2500 MB; PipelineWise
+rounds every non-zero value below 10 up to 10 MB. Reserve the effective memory
+in addition to tap, transform, target, compression, and database-client memory.
+A larger buffer absorbs a longer slowdown but does not increase target
+throughput.
 
-    tap-postgres | mbuffer -m 10M | target-snowflake
+
+Acknowledgement boundary
+------------------------
+
+The tap can consume records ahead of the target. Data in ``mbuffer`` or target
+memory is not durable target state. PipelineWise therefore persists the state
+emitted by the target, not the latest position merely read by the tap.
+
+For PostgreSQL LOG_BASED replication:
+
+.. code-block:: text
+
+   consumed LSN >= safe target-acknowledged LSN
+   slot confirmed_flush_lsn <= safe target-acknowledged LSN
+
+Feedback may advance to the minimum acknowledged LSN across logical streams, but
+never directly to the latest consumed LSN. Missing, temporarily unreadable,
+truncated, invalid, or regressing state retains the previous monotonic safe LSN
+rather than trusting the current file contents.
+
+
+Termination and restart
+-----------------------
+
+``pipelinewise stop_tap`` sends termination through the managed process tree.
+The tap stops producing records and the target is given an opportunity to finish
+records already received. A forced kill, host loss, or out-of-memory termination
+can discard buffered records.
+
+After an unexpected termination:
+
+1. do not edit or advance ``state.json``;
+2. confirm the PostgreSQL replication slot still exists;
+3. restart the same tap-target pair; and
+4. verify exact target keys or a deterministic reconciliation, not row count
+   alone.
+
+Unacknowledged WAL is replayed while the slot and required WAL remain available.
+Targets can receive duplicates around the acknowledgement boundary and must keep
+their primary-key merge semantics.
+
+
+Operational guidance
+---------------------
+
+- Increase the buffer only after identifying target backpressure in logs and
+  database telemetry.
+- Monitor process memory, target latency, retained PostgreSQL WAL, and end-to-end
+  lag together.
+- Treat a continuously full buffer as a sustained throughput deficit, not a
+  sizing problem.
+- Keep source-log retention longer than the maximum detection and recovery time.
+- Use :ref:`data_diff` or an exact key/checksum comparison after interruption.

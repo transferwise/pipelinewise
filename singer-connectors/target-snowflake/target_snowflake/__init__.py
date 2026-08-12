@@ -8,7 +8,7 @@ import os
 import sys
 import copy
 
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 from joblib import Parallel, delayed, parallel_backend
 from jsonschema import Draft7Validator, FormatChecker
 from singer import get_logger
@@ -18,7 +18,7 @@ from target_snowflake.file_formats import csv
 from target_snowflake.file_formats import parquet
 from target_snowflake import stream_utils
 
-from target_snowflake.db_sync import DbSync
+from target_snowflake.db_sync import DbSync, RECORD_UPDATE_MODE_PATCH
 from target_snowflake.file_format import FileFormatTypes
 from target_snowflake.exceptions import (
     RecordValidationException,
@@ -171,9 +171,11 @@ def persist_lines(config, lines, table_cache=None, file_format_type: FileFormatT
 
             # append record
             if config.get('add_metadata_columns') or config.get('hard_delete'):
-                records_to_load[stream][primary_key_string] = stream_utils.add_metadata_values_to_record(o)
+                record = stream_utils.add_metadata_values_to_record(o)
             else:
-                records_to_load[stream][primary_key_string] = o['record']
+                record = o['record']
+
+            store_record(records_to_load[stream], primary_key_string, record, stream_to_sync[stream])
 
             if archive_load_files and stream in archive_load_files_data:
                 # Keep track of min and max of the designated column
@@ -434,8 +436,29 @@ def load_stream_batch(stream, records, row_count, db_sync, no_compression=False,
         row_count[stream] = 0
 
 
+def store_record(records, primary_key_string, record, db_sync):
+    """Buffer a record, coalescing repeated PATCH events for the same primary key."""
+    if db_sync.record_update_mode == RECORD_UPDATE_MODE_PATCH and primary_key_string in records:
+        records[primary_key_string].update(record)
+    else:
+        records[primary_key_string] = record
+
+
+def group_records_by_update_columns(records, db_sync):
+    """Group PATCH records by the columns their Snowflake MERGE may update."""
+    if db_sync.record_update_mode != RECORD_UPDATE_MODE_PATCH:
+        return [(None, records)]
+
+    grouped_records = {}
+    for primary_key_string, record in records.items():
+        update_column_names = db_sync.present_column_names(record)
+        grouped_records.setdefault(update_column_names, {})[primary_key_string] = record
+
+    return list(grouped_records.items())
+
+
 def flush_records(stream: str,
-                  records: List[Dict],
+                  records: Dict[str, Dict],
                   db_sync: DbSync,
                   temp_dir: str = None,
                   no_compression: bool = False,
@@ -445,9 +468,7 @@ def flush_records(stream: str,
 
     Args:
         stream: Name of the stream
-        records: List of dictionary, that represents multiple csv lines. Dict key is the column name, value is the
-                 column value
-        row_count:
+        records: Records keyed by their primary-key string
         db_sync: A DbSync object
         temp_dir: Directory where intermediate temporary files will be created. (Default: OS specific temp directory)
         no_compression: Disable to use compressed files. (Default: False)
@@ -456,7 +477,25 @@ def flush_records(stream: str,
     Returns:
         None
     """
-    # Generate file on disk in the required format
+    record_groups = group_records_by_update_columns(records, db_sync)
+    if len(record_groups) > 1:
+        LOGGER.info("Splitting PATCH batch for '%s' into %d column-presence groups", stream, len(record_groups))
+
+    for update_column_names, grouped_records in record_groups:
+        flush_record_group(
+            stream,
+            grouped_records,
+            db_sync,
+            update_column_names,
+            temp_dir,
+            no_compression,
+            archive_load_files,
+        )
+
+
+def flush_record_group(stream, records, db_sync, update_column_names, temp_dir, no_compression,
+                       archive_load_files):
+    """Write and load records sharing one PATCH update-column signature."""
     filepath = db_sync.file_format.formatter.records_to_file(records,
                                                              db_sync.flatten_schema,
                                                              compression=not no_compression,
@@ -470,7 +509,7 @@ def flush_records(stream: str,
 
     # Upload to s3 and load into Snowflake
     s3_key = db_sync.put_to_stage(filepath, stream, row_count, temp_dir=temp_dir)
-    db_sync.load_file(s3_key, row_count, size_bytes)
+    db_sync.load_file(s3_key, row_count, size_bytes, update_column_names=update_column_names)
 
     # Delete file from local disk
     os.remove(filepath)
@@ -550,7 +589,7 @@ def copy_native_to_iceberg():
         LOGGER.error('Fully qualified table name (fqtn) is required')
         sys.exit(1)
     else:
-        fqtn = args.fqtn.upper()
+        fqtn = args.fqtn
 
     if args.eventual.upper() not in ['NATIVE', 'ICEBERG']:
         LOGGER.error('EVENTUAL type of fqtn must be NATIVE or ICEBERG')

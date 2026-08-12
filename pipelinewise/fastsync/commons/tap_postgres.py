@@ -189,11 +189,41 @@ class FastSyncTapPostgres:
         )
         self.curr = self.conn.cursor()
 
-    def close_connection(self):
+    def close_connection(self, silent=False):
         """
-        Close connection
+        Close source connections
         """
-        self.conn.close()
+        connection = self.conn
+        self.conn = None
+        self.curr = None
+
+        self._close_primary_host_connection(silent=silent)
+
+        if connection is None:
+            return
+
+        try:
+            connection.close()
+        except Exception as exc:
+            if not silent:
+                LOGGER.exception(exc)
+                LOGGER.info('Connection seems to be already closed.')
+
+    def _close_primary_host_connection(self, silent=False):
+        """Close and clear the dedicated primary-host connection."""
+        connection = self.primary_host_conn
+        self.primary_host_conn = None
+        self.primary_host_curr = None
+
+        if connection is None:
+            return
+
+        try:
+            connection.close()
+        except Exception as exc:
+            if not silent:
+                LOGGER.exception(exc)
+                LOGGER.info('Primary host connection seems to be already closed.')
 
     def query(self, query, params=None):
         """
@@ -268,35 +298,35 @@ class FastSyncTapPostgres:
         self.primary_host_conn = self.get_connection(
             self.connection_config, prioritize_primary=True
         )
-        self.primary_host_curr = self.primary_host_conn.cursor()
+        try:
+            self.primary_host_curr = self.primary_host_conn.cursor()
 
-        # Make sure PostgreSQL version is 9.4 or higher
-        # pylint: disable=assignment-from-no-return
-        result = self.primary_host_query(
-            "SELECT setting::int AS version FROM pg_settings WHERE name='server_version_num'"
-        )
-        # pylint: disable=unsubscriptable-object
-        version = result[0].get('version')
+            # Make sure PostgreSQL version is 9.4 or higher
+            # pylint: disable=assignment-from-no-return
+            result = self.primary_host_query(
+                "SELECT setting::int AS version FROM pg_settings WHERE name='server_version_num'"
+            )
+            # pylint: disable=unsubscriptable-object
+            version = result[0].get('version')
 
-        # Do not allow minor versions with PostgreSQL BUG #15114
-        if (version >= 110000) and (version < 110002):
-            raise Exception('PostgreSQL upgrade required to minor version 11.2')
-        if (version >= 100000) and (version < 100007):
-            raise Exception('PostgreSQL upgrade required to minor version 10.7')
-        if (version >= 90600) and (version < 90612):
-            raise Exception('PostgreSQL upgrade required to minor version 9.6.12')
-        if (version >= 90500) and (version < 90516):
-            raise Exception('PostgreSQL upgrade required to minor version 9.5.16')
-        if (version >= 90400) and (version < 90421):
-            raise Exception('PostgreSQL upgrade required to minor version 9.4.21')
-        if version < 90400:
-            raise Exception('Logical replication not supported before PostgreSQL 9.4')
+            # Do not allow minor versions with PostgreSQL BUG #15114
+            if (version >= 110000) and (version < 110002):
+                raise Exception('PostgreSQL upgrade required to minor version 11.2')
+            if (version >= 100000) and (version < 100007):
+                raise Exception('PostgreSQL upgrade required to minor version 10.7')
+            if (version >= 90600) and (version < 90612):
+                raise Exception('PostgreSQL upgrade required to minor version 9.6.12')
+            if (version >= 90500) and (version < 90516):
+                raise Exception('PostgreSQL upgrade required to minor version 9.5.16')
+            if (version >= 90400) and (version < 90421):
+                raise Exception('PostgreSQL upgrade required to minor version 9.4.21')
+            if version < 90400:
+                raise Exception('Logical replication not supported before PostgreSQL 9.4')
 
-        # Create replication slot
-        self.create_replication_slot()
-
-        # Close replication slot dedicated connection
-        self.primary_host_conn.close()
+            # Create replication slot
+            self.create_replication_slot()
+        finally:
+            self._close_primary_host_connection()
 
         # is replica_host set ?
         if self.connection_config.get('replica_host'):

@@ -605,6 +605,8 @@ class TestArraysLikeTable(unittest.TestCase):
                     quote_ident(TestArraysLikeTable.table_name, cur))
 
                 cur.execute(create_sql)
+                cur.execute('ANALYZE {}'.format(
+                    quote_ident(TestArraysLikeTable.like_table_name, cur)))
 
     def test_catalog(self):
         conn_config = get_test_connection_config()

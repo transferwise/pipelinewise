@@ -36,13 +36,13 @@ fi
 python3 -m venv ~/venv-doc
 . ~/venv-doc/bin/activate
 pip install --upgrade pip
-pip install sphinx sphinx-rtd-theme
+pip install PyYAML ruff==0.16.1 sphinx sphinx-rtd-theme
 pip install -e .
 
 # CD into docs, make them. If you're not using Sphinx, you'll probably
 # have a different build script.
 cd docs
-make clean html
+make check
 cd ..
 
 # Move the docs to the top-level directory, stash for checkout

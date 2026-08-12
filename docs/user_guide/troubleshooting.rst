@@ -2,15 +2,49 @@
 .. _troubleshooting:
 
 Troubleshooting
----------------
+===============
 
-This page collects common issues and diagnostic tips for PipelineWise pipelines.
-If you run into a problem not listed here, check the :ref:`logging` output and
-the :ref:`alerts` configuration for more context.
+Start with the exact failing log line, connector versions, last acknowledged
+state, and source/target errors from the same UTC interval. Do not resync or edit
+state until the unavailable boundary has been identified.
 
 
-Replication Tips
-''''''''''''''''
+Symptom index
+-------------
+
+.. list-table::
+   :header-rows: 1
+   :widths: 42 28 30
+   :width: 100%
+
+   * - Symptom
+     - Area
+     - First check
+   * - ``Lost connection`` or ``max_allowed_packet``
+     - MariaDB / MySQL
+     - Session timeouts and packet limits.
+   * - Missing or corrupt binlog
+     - MariaDB / MySQL LOG_BASED
+     - Source retention and saved binlog position.
+   * - ``wal_level >= logical`` or missing slot
+     - PostgreSQL LOG_BASED
+     - Primary configuration and slot existence.
+   * - ``PGRES_COPY_BOTH``
+     - PostgreSQL LOG_BASED
+     - ``wal_sender_timeout`` and target backpressure.
+   * - Recovery conflict
+     - PostgreSQL replica reads
+     - Standby replay delay settings.
+   * - Table not found or zero discovered tables
+     - Discovery / FastSync
+     - Source name and replication-user permissions.
+   * - Stale ``.running`` log
+     - Process lifecycle
+     - PID file and complete process tree.
+
+
+Replication checks
+------------------
 
 See :ref:`replication_methods` for a detailed explanation of each replication method.
 
@@ -151,9 +185,10 @@ retention period.
 
 **Changing the binlog position in state.json**
 
-When you need to manually update the binlog file name in a tap's ``state.json``
-(for example after a server failover), stop the tap and back up the state first.
-Never edit a state file while its tap is running.
+Prefer :ref:`cli_reset_state` for a controlled failover with an exact position
+mapping. If no supported mapping is available and manual recovery is unavoidable,
+stop the tap and back up the state first. Never edit a state file while its tap is
+running.
 
 .. code-block:: bash
 
@@ -385,3 +420,17 @@ You can also check the temporary files being written during a sync:
 .. code-block:: bash
 
     $ ls -lah ~/.pipelinewise/tmp/*<tap_id>*
+
+
+Verify recovery
+---------------
+
+After applying a repair:
+
+1. restart the same tap-target pair without advancing state again;
+2. confirm the command and ``pipelinewise status`` report success;
+3. verify exact primary keys or a deterministic checksum in the affected range;
+4. confirm the source bookmark or replication-slot acknowledgement advances;
+5. retain the failed log and state backup until another normal run succeeds; and
+6. remove temporary or staging objects only after their publication state is
+   understood.

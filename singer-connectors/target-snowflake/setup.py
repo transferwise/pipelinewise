@@ -27,12 +27,12 @@ setup(name="pipelinewise-target-snowflake",
           'numpy==1.26.4',         #  numpy 2.X is not compatible with our used pandas
           'snowflake-connector-python[pandas]==3.15.0',
           'inflection==0.5.1',
-          'joblib==1.2.0',
-          'boto3==1.28.20',
+          'joblib==1.5.3',
+          'boto3==1.43.62',
       ],
       extras_require={
           "test": [
-              "pylint==4.0.5",
+              "pylint==4.0.6",
               'pytest==9.0.3',
               'pytest-cov==7.1.0',
               "python-dotenv==1.2.2"

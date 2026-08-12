@@ -1,236 +1,114 @@
-# Project scope notice
+# PipelineWise
 
-After `v0.64.1`, PipelineWise began reducing the number of connectors it packages so development could focus on Wise's current requirements. [v0.64.1](https://github.com/transferwise/pipelinewise/tree/v0.64.1) is the last release from before that reduction; it is a historical reference, not a recommendation to use an older release.
+PipelineWise is a Python 3.12 framework for configuring, running, and operating
+[Singer](https://github.com/singer-io/getting-started/blob/master/docs/SPEC.md)
+ELT pipelines. It supports log-based, incremental, and full-table replication,
+plus native FastSync transfers for selected database routes.
 
-The connectors included by current builds are listed in the [installation documentation](https://transferwise.github.io/pipelinewise/installation_guide/installation.html#selecting-singer-connectors). `pipelinewise init` may still generate configuration templates for legacy connectors, but the presence of a template does not mean that its connector is packaged or maintained by the current release.
+[Documentation](https://transferwise.github.io/pipelinewise/) ·
+[Issues](https://github.com/transferwise/pipelinewise/issues) ·
+[Docker images](https://hub.docker.com/r/transferwiseworkspace/pipelinewise)
 
-We thank everyone in the open-source community who helped make PipelineWise a robust framework for heterogeneous replication over the years.
+![PipelineWise](docs/img/pipelinewise-diagram-circle-bold.png)
 
-## PipelineWise
+## Project scope
 
-[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/pipelinewise-tap-mysql.svg)](https://pypi.org/project/pipelinewise-tap-mysql/)
-[![License: Apache2](https://img.shields.io/badge/License-Apache2-yellow.svg)](https://opensource.org/licenses/Apache-2.0)
+Available sources are MariaDB and PostgreSQL; available targets are PostgreSQL
+and Snowflake. Other packaged connectors, including the Snowflake source, are
+experimental. `pipelinewise init` also generates some legacy templates that are
+not packaged.
 
-PipelineWise is a Data Pipeline Framework using the [Singer.io](https://www.singer.io/) specification to ingest and replicate data from various sources to various destinations.
-Documentation is available at https://transferwise.github.io/pipelinewise/
+Release [`v0.64.1`](https://github.com/transferwise/pipelinewise/tree/v0.64.1)
+is the last release from before the connector set was reduced. It is a historical
+reference, not a recommendation to deploy an older release.
 
-![Logo](docs/img/pipelinewise-diagram-circle-bold.png)
-
-
-## Table of Contents
-
-- [PipelineWise](#pipelinewise)
-  - [Features](#features)
-  - [Official docker images](#official-docker-images)
-  - [Connectors](#connectors)
-    - [Running from docker](#running-from-docker)
-    - [Building from source](#building-from-source)
-  - [Developing with Docker](#developing-with-docker)
-  - [Contribution](#contribution)
-  - [Links](#links)
-  - [License](#license)
-
-## Features
-
-* **Built with ELT in mind**: PipelineWise fits into the ELT landscape and is not a traditional ETL tool. PipelineWise aims to reproduce the data from the source to an Analytics-Data-Store in as close to the original format as possible. Some minor load time transformations are supported but complex mapping and joins have to be done in the Analytics-Data-Store to extract meaning.
-
-* **Managed Schema Changes**: When source data changes, PipelineWise detects the change and alters the schema in your Analytics-Data-Store automatically
-* **Load time transformations**: Ideal place to obfuscate, mask or filter sensitive data that should never be replicated in the Data Warehouse
-* **YAML based configuration**: Data pipelines are defined as YAML files, ensuring that the entire configuration is kept under version control
-* **Lightweight**: No daemons or database setup are required
-* **Extensible**: PipelineWise is using [Singer.io](https://www.singer.io/) compatible taps and target connectors. New connectors can be added to PipelineWise with relatively small effort
-
-
-## Official docker images
-
-Pipelinewise images are published to: [dockerhub](https://hub.docker.com/r/transferwiseworkspace/pipelinewise)
-
-Pull image with:
-```shell
-docker pull transferwiseworkspace/pipelinewise:{tag}
-```
+See the [connector support and route
+matrix](https://transferwise.github.io/pipelinewise/connectors/index.html) before
+creating a pipeline.
 
 ## Connectors
 
-Tap extracts data from any source and write it to a standard stream in a JSON-based format, and target
-consumes data from taps and do something with it, like load it into a file, API or database
+### Available
 
+| Direction | Platform | Component |
+|---|---|---|
+| Source | MariaDB | `tap-mysql` |
+| Source | PostgreSQL | `tap-postgres` |
+| Target | PostgreSQL | `target-postgres` |
+| Target | Snowflake | `target-snowflake` |
 
-| Type      | Name       | Extra | Latest Version | Description                                          |
-|-----------|------------|-------|----------------|------------------------------------------------------|
-| Tap       | **[Postgres](https://github.com/transferwise/pipelinewise-tap-postgres)** | | [![PyPI version](https://badge.fury.io/py/pipelinewise-tap-postgres.svg)](https://badge.fury.io/py/pipelinewise-tap-postgres) | Extracts data from PostgreSQL databases. Supporting Log-Based, Key-Based Incremental and Full Table replications |
-| Tap       | **[MySQL](https://github.com/transferwise/pipelinewise-tap-mysql)** | | [![PyPI version](https://badge.fury.io/py/pipelinewise-tap-mysql.svg)](https://badge.fury.io/py/pipelinewise-tap-mysql) | Extracts data from MySQL databases. Supporting Log-Based, Key-Based Incremental and Full Table replications |
-| Tap       | **[Kafka](https://github.com/transferwise/pipelinewise-tap-kafka)** | | [![PyPI version](https://badge.fury.io/py/pipelinewise-tap-kafka.svg)](https://badge.fury.io/py/pipelinewise-tap-kafka) | Extracts data from Kafka topics |
-| Tap       | **[S3 CSV](https://github.com/transferwise/pipelinewise-tap-s3-csv)** | | [![PyPI version](https://badge.fury.io/py/pipelinewise-tap-s3-csv.svg)](https://badge.fury.io/py/pipelinewise-tap-s3-csv) | Extracts data from S3 csv files (currently a fork of tap-s3-csv because we wanted to use our own auth method) |
-| Tap       | **[Zendesk](https://github.com/singer-io/tap-zendesk)** | | [![PyPI version](https://badge.fury.io/py/tap-zendesk.svg)](https://badge.fury.io/py/tap-zendesk) | Extracts data from Zendesk using OAuth and Key-Based incremental replications |
-| Tap       | **[Snowflake](https://github.com/transferwise/pipelinewise-tap-snowflake)** | | [![PyPI version](https://badge.fury.io/py/pipelinewise-tap-snowflake.svg)](https://badge.fury.io/py/pipelinewise-tap-snowflake) | Extracts data from Snowflake databases. Supporting Key-Based Incremental and Full Table replications |
-| Tap       | **[Salesforce](https://github.com/singer-io/tap-salesforce)** | | [![PyPI version](https://badge.fury.io/py/tap-salesforce.svg)](https://badge.fury.io/py/tap-salesforce) | Extracts data from Salesforce database using BULK and REST extraction API with Key-Based incremental replications |
-| Tap       | **[Jira](https://github.com/singer-io/tap-jira)** | | [![PyPI version](https://badge.fury.io/py/tap-jira.svg)](https://badge.fury.io/py/tap-jira) | Extracts data from Atlassian Jira using Base auth or OAuth credentials |
-| Tap       | **[MongoDB](https://github.com/transferwise/pipelinewise-tap-mongodb)** | | [![PyPI version](https://badge.fury.io/py/pipelinewise-tap-mongodb.svg)](https://badge.fury.io/py/pipelinewise-tap-mongodb) | Extracts data from MongoDB databases. Supporting Log-Based and Full Table replications |
-| Tap       | **[Google Analytics](https://github.com/transferwise/pipelinewise-tap-google-analytics)** | Extra | [![PyPI version](https://badge.fury.io/py/pipelinewise-tap-google-analytics.svg)](https://badge.fury.io/py/tap-adwords) | Extracts data from Google Analytics |
-| Tap       | **[Oracle](https://github.com/transferwise/pipelinewise-tap-oracle)** | Extra | [![PyPI version](https://badge.fury.io/py/pipelinewise-tap-oracle.svg)](https://badge.fury.io/py/pipelinewise-tap-oracle) | Extracts data from Oracle databases. Supporting Log-Based, Key-Based Incremental and Full Table replications |
-| Tap       | **[Zuora](https://github.com/transferwise/pipelinewise-tap-zuora)** | Extra | [![PyPI version](https://badge.fury.io/py/pipelinewise-tap-zuora.svg)](https://badge.fury.io/py/pipelinewise-tap-zuora) | Extracts data from Zuora database using AQAA and REST extraction API with Key-Based incremental replications |
-| Tap       | **[GitHub](https://github.com/transferwise/pipelinewise-tap-github)** |       | [![PyPI version](https://badge.fury.io/py/pipelinewise-tap-github.svg)](https://badge.fury.io/py/pipelinewise-tap-github) | Extracts data from GitHub API using Personal Access Token and Key-Based incremental replications |
-| Tap       | **[Shopify](https://github.com/singer-io/tap-shopify)** | Extra | [![PyPI version](https://badge.fury.io/py/tap-shopify.svg)](https://badge.fury.io/py/tap-shopify) | Extracts data from Shopify API using Personal App API Password and date based incremental replications |
-| Tap       | **[Slack](https://github.com/transferwise/pipelinewise-tap-slack)** |       | [![PyPI version](https://badge.fury.io/py/pipelinewise-tap-slack.svg)](https://badge.fury.io/py/pipelinewise-tap-slack) | Extracts data from a Slack API using Bot User Token and Key-Based incremental replications |
-| Tap       | **[Mixpanel](https://github.com/transferwise/pipelinewise-tap-mixpanel)** |       | [![PyPI version](https://badge.fury.io/py/pipelinewise-tap-mixpanel.svg)](https://badge.fury.io/py/pipelinewise-tap-mixpanel) | Extracts data from the Mixpanel API. |
-| Tap       | **[Twilio](https://github.com/transferwise/pipelinewise-tap-twilio)** |       | [![PyPI version](https://badge.fury.io/py/pipelinewise-tap-twilio.svg)](https://badge.fury.io/py/pipelinewise-tap-twilio) | Extracts data from the Twilio API using OAuth and Key-Based incremental replications. |
-| Target    | **[Postgres](https://github.com/transferwise/pipelinewise-target-postgres)** | | [![PyPI version](https://badge.fury.io/py/pipelinewise-target-postgres.svg)](https://badge.fury.io/py/pipelinewise-target-postgres) | Loads data from any tap into PostgreSQL database |
-| Target    | **[Snowflake](https://github.com/transferwise/pipelinewise-target-snowflake)** | | [![PyPI version](https://badge.fury.io/py/pipelinewise-target-snowflake.svg)](https://badge.fury.io/py/pipelinewise-target-snowflake) | Loads data from any tap into Snowflake Data Warehouse |
-| Target    | **[S3 CSV](https://github.com/transferwise/pipelinewise-target-s3-csv)** | | [![PyPI version](https://badge.fury.io/py/pipelinewise-target-s3-csv.svg)](https://badge.fury.io/py/pipelinewise-target-s3-csv) | Uploads data from any tap to S3 in CSV format |
-| Transform | **[Field](https://github.com/transferwise/pipelinewise-transform-field)** | | [![PyPI version](https://badge.fury.io/py/pipelinewise-transform-field.svg)](https://badge.fury.io/py/pipelinewise-transform-field) | Transforms fields from any tap and sends the results to any target. Recommended for data masking/ obfuscation |
+MariaDB and MySQL share `tap-mysql`; MariaDB is available while MySQL remains
+experimental.
 
-**Note**: Rows marked **Extra** describe legacy, community-contributed connectors. They are not packaged by the current `all_connectors` build. A generated sample configuration does not guarantee that a connector is included; check the [current connector list](https://transferwise.github.io/pipelinewise/installation_guide/installation.html#selecting-singer-connectors).
+### Experimental
 
-### Running from docker
+Packaged experimental sources are GitHub, Jira, Kafka, Mixpanel, MongoDB, MySQL,
+S3 CSV, Salesforce, Slack, Snowflake, Twilio, and Zendesk. `target-s3-csv` is an
+experimental target. Packaging means the component is included by
+`make all_connectors`; it does not imply production support.
 
-If you have [Docker](https://www.docker.com/) installed then using docker is the recommended and easiest method to start using PipelineWise.
+## Install with Docker
 
-#### Use official image
+Docker is the recommended runtime because it isolates connector and system
+dependencies:
 
-PipelineWise images are built on each release and available on [Dockerhub](https://hub.docker.com/r/transferwiseworkspace/pipelinewise)
-
-    ```sh
-    $ docker pull transferwiseworkspace/pipelinewise
-    ```
-
-#### Build your own docker image
-
-1. Build an executable docker image that has every required dependency and is isolated from your host system.
-
-By default, the image will build with *all* connectors. In order to keep image size small, we strongly recommend you change it to just the connectors you need by supplying the `--build-arg` command:
-
-    ```sh
-    $ docker build --build-arg connectors=tap-mysql,target-snowflake -t pipelinewise:latest .
-    ```
-
-2. Once the image is ready, create an alias to the docker wrapper script:
-
-    ```sh
-    $ alias pipelinewise="$(PWD)/bin/pipelinewise-docker"
-    ```
-
-3. Check if the installation was successful by running the `pipelinewise status` command:
-
-    ```sh
-    $ pipelinewise status
-
-    Tap ID    Tap Type      Target ID     Target Type      Enabled    Status    Last Sync    Last Sync Result
-    --------  ------------  ------------  ---------------  ---------  --------  -----------  ------------------
-    0 pipeline(s)
-    ```
-
-You can run any pipelinewise command at this point. Tutorials to create and run pipelines is at [creating pipelines](https://transferwise.github.io/pipelinewise/installation_guide/creating_pipelines.html).
-
-**Running tests**:
-
-* To run unit tests, follow the instructions in the [Building from source](#building-from-source) section.
-* To run integration and unit tests, follow the instructions in the [Developing with Docker](#developing-with-docker) section.
-
-### Building from source
-
-1. Make sure that all dependencies are installed on your system:
-    * Python 3.12
-    * python3-dev
-    * python3-venv
-    * mongo-tools
-    * mbuffer
-
-2. Run the Makefile that installs the PipelineWise CLI and all supported singer connectors into separate virtual environments:
-
-    ```shell
-    $ make pipelinewise all_connectors
-    ```
-    Press `Y` to accept the license agreement of the required singer components. To automate the installation and accept every license agreement run:
-    ```shell
-    $ make pipelinewise all_connectors -e pw_acceptlicenses=y
-    ```
-    And to install only a specific list of singer connectors:
-    ```shell
-    $ make pipelinewise connectors -e pw_connector=<connector_1>,<connector_2>
-    ```
-
-   Run `make` or `make -h` to see the help for Makefile and all options.
-
-3. To start the CLI you need to activate the CLI virtual environment and set `PIPELINEWISE_HOME` environment variable:
-
-    ```sh
-    $ source {ACTUAL_ABSOLUTE_PATH}/.virtualenvs/pipelinewise/bin/activate
-    $ export PIPELINEWISE_HOME={ACTUAL_ABSOLUTE_PATH}
-    ```
-    (The `ACTUAL_ABSOLUTE_PATH` differs on every system, running `make -h` prints the correct commands for CLI)
-
-4. Check if the installation was successful by running the `pipelinewise status` command:
-
-    ```sh
-    $ pipelinewise status
-
-    Tap ID    Tap Type      Target ID     Target Type      Enabled    Status    Last Sync    Last Sync Result
-    --------  ------------  ------------  ---------------  ---------  --------  -----------  ------------------
-    0 pipeline(s)
-    ```
-
-You can run any pipelinewise command at this point. Tutorials to create and run pipelines can be found here: [creating pipelines](https://transferwise.github.io/pipelinewise/installation_guide/creating_pipelines.html).
-
-**To run unit tests**:
-
-```sh
-$ pytest --ignore tests/end_to_end
+```bash
+git clone https://github.com/transferwise/pipelinewise.git
+cd pipelinewise
+docker pull transferwiseworkspace/pipelinewise:latest
+docker tag transferwiseworkspace/pipelinewise:latest pipelinewise:latest
+alias pipelinewise="$(pwd)/bin/pipelinewise-docker"
+pipelinewise status
 ```
 
-To run unit tests and generate code coverage:
+Pin a release tag instead of `latest` in production. To customise the image,
+build it locally:
 
-```
-$ coverage run -m pytest --ignore tests/end_to_end && coverage report
-```
-
-To generate code coverage HTML report.
-
-```
-$ coverage run -m pytest --ignore tests/end_to_end && coverage html -d coverage_html
+```bash
+docker build -t pipelinewise:latest .
 ```
 
-**Note**: The HTML report will be generated in `coverage_html/index.html`
+The wrapper persists generated configuration, state, and logs below
+`~/.pipelinewise` on the host. Continue with the [installation and first-pipeline
+guide](https://transferwise.github.io/pipelinewise/installation_guide/installation.html).
 
-**To run integration and end-to-end tests**:
+## Install from source
 
-To run integration and end-to-end tests you need to use the [Docker Development Environment](dev-project/README.md). This will spin up a pre-configured PipelineWise project with pre-configured source and target databases in several docker containers which is required for the end-to-end test cases.
+Source installations own Python, system-library, and connector compatibility.
+Install the CLI and only the required connectors:
 
-## Developing with Docker
+```bash
+make pipelinewise
+make connectors -e pw_connector=tap-postgres,target-snowflake
+export PIPELINEWISE_HOME="$(pwd)"
+source .virtualenvs/pipelinewise/bin/activate
+pipelinewise status
+```
 
-If you have [Docker](https://www.docker.com/) and [Docker Compose](https://docs.docker.com/compose/) installed,
-you can create a local development environment that includes not only the PipelineWise executables but also a
-pre-configured development project with some databases as source and targets for a more convenient
-development experience and to run integration and end-to-end tests.
+Do not use a root `pip install` as a replacement for the Makefile workflow; it
+does not create isolated connector environments.
 
-For further instructions about setting up local development environment go to
-[Test Project for Docker Development Environment](dev-project/README.md).
+## Develop and test
 
+Use the [`dev-project`](dev-project/README.md) Docker environment for development,
+tests, and verification wherever possible. It provides Linux, source databases,
+targets, and the runtime layout closest to production.
 
-## Contribution
+Read the repository and scoped `AGENTS.md` files for the authoritative lint, unit,
+connector, E2E, and documentation commands. Do not run bare `pytest tests/`; it
+collects credentialed end-to-end tests.
 
-To add new taps and targets follow the instructions on
-* [Contribution Page](https://transferwise.github.io/pipelinewise/project/contribution.html)
-* [Code contribution guide](./CONTRIBUTING.md)
+## Contribute
 
-
-## Links
-
-* [PipelineWise documentation](https://transferwise.github.io/pipelinewise/)
-* [Singer ETL specification](https://github.com/singer-io/getting-started/blob/master/docs/SPEC.md)
-* [Singer.io community slack channel](https://singer-slackin.herokuapp.com/)
-
+See the [contribution
+guide](https://transferwise.github.io/pipelinewise/project/contribution.html) and
+[`CONTRIBUTING.md`](CONTRIBUTING.md). New connectors begin as experimental until
+their ownership, compatibility, recovery, CI, and operated route are documented.
 
 ## License
 
-Apache License Version 2.0
-
-See [LICENSE](LICENSE) to see the full text.
-
-**Important Note:**
-
-PipelineWise as a standalone software is licensed under Apache License Version 2.0 but bundled components can
-use different licenses and may overwrite the terms and conditions detailed in Apache License Version 2.0.
-You can customise which connectors you want to include into the final PipelineWise build and the final license of
-your build depends on the included connectors. For further details please check the
-[Licenses](https://transferwise.github.io/pipelinewise/project/licenses.html) section in the documentation.
+PipelineWise core is licensed under Apache License 2.0. Packaged connectors can
+use different licenses, including AGPL 3.0; the obligations of a distributed
+image depend on every included component. See the [license
+inventory](https://transferwise.github.io/pipelinewise/project/licenses.html)
+and [`LICENSE`](LICENSE).

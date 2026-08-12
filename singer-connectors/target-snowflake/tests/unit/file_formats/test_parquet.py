@@ -50,6 +50,22 @@ class TestParquet(unittest.TestCase):
                                'key5': ['I\'m good', 'I\'m good too', 'I want to be good'],
                                'key6': [None, None, None]}))
 
+    def test_sparse_records_to_dataframe_retains_full_schema_shape(self):
+        records = {
+            '1': {'id': 1, 'marker': 'updated'},
+            '2': {'id': 2, 'marker': 'updated again'},
+        }
+        schema = {
+            'id': {'type': ['integer']},
+            'payload': {'type': ['null', 'string']},
+            'marker': {'type': ['null', 'string']},
+        }
+
+        dataframe = parquet.records_to_dataframe(records=records, schema=schema)
+
+        self.assertEqual(list(dataframe.columns), ['id', 'payload', 'marker'])
+        self.assertTrue(dataframe['payload'].isna().all())
+
     def test_create_copy_sql(self):
         self.assertEqual(parquet.create_copy_sql(table_name='foo_table',
                                                  stage_name='foo_stage',
@@ -88,3 +104,42 @@ class TestParquet(unittest.TestCase):
                          "WHEN NOT MATCHED THEN "
                          "INSERT (COL_1, COL_2, COL_3) "
                          "VALUES (s.COL_1, s.COL_2, s.COL_3)")
+
+    def test_create_merge_sql_with_restricted_update_columns(self):
+        self.assertEqual(parquet.create_merge_sql(table_name='foo_table',
+                                                  stage_name='foo_stage',
+                                                  s3_key='foo_s3_key.parquet',
+                                                  file_format_name='foo_file_format',
+                                                  columns=[
+                                                      {'name': 'COL_1', 'json_element_name': 'col_1', 'trans': ''},
+                                                      {'name': 'COL_2', 'json_element_name': 'colTwo', 'trans': ''},
+                                                      {'name': 'COL_3', 'json_element_name': 'col_3',
+                                                       'trans': 'parse_json'}
+                                                  ],
+                                                  pk_merge_condition='s.COL_1 = t.COL_1',
+                                                  update_columns={'COL_2'}),
+
+                         "MERGE INTO foo_table t USING ("
+                         "SELECT ($1:col_1) COL_1, ($1:colTwo) COL_2, parse_json($1:col_3) COL_3 "
+                         "FROM '@foo_stage/foo_s3_key.parquet' "
+                         "(FILE_FORMAT => 'foo_file_format')) s "
+                         "ON s.COL_1 = t.COL_1 "
+                         "WHEN MATCHED THEN UPDATE SET COL_2=s.COL_2 "
+                         "WHEN NOT MATCHED THEN "
+                         "INSERT (COL_1, COL_2, COL_3) "
+                         "VALUES (s.COL_1, s.COL_2, s.COL_3)")
+
+    def test_create_merge_sql_with_no_update_columns(self):
+        merge_sql = parquet.create_merge_sql(table_name='foo_table',
+                                             stage_name='foo_stage',
+                                             s3_key='foo_s3_key.parquet',
+                                             file_format_name='foo_file_format',
+                                             columns=[
+                                                 {'name': 'COL_1', 'json_element_name': 'col_1', 'trans': ''},
+                                                 {'name': 'COL_2', 'json_element_name': 'colTwo', 'trans': ''}
+                                             ],
+                                             pk_merge_condition='s.COL_1 = t.COL_1',
+                                             update_columns=[])
+
+        self.assertNotIn('WHEN MATCHED THEN UPDATE', merge_sql)
+        self.assertIn('INSERT (COL_1, COL_2) VALUES (s.COL_1, s.COL_2)', merge_sql)

@@ -1,6 +1,10 @@
 import re
 import shlex
 import subprocess
+from collections import Counter
+
+
+SYNC_ENGINES = ('fastsync', 'partialsync', 'singer')
 
 
 def run_command(command):
@@ -29,7 +33,29 @@ def find_run_tap_log_file(stdout, sync_engine=None):
     else:
         pattern = re.compile(r'Writing output into (.+\.log)')
 
-    return pattern.search(stdout).group(1)
+    log_files = pattern.findall(stdout)
+    assert len(log_files) == 1, (
+        f'Expected exactly one {sync_engine or "sync"} log file, '
+        f'found {len(log_files)}'
+    )
+    return log_files[0]
+
+
+def assert_run_tap_log_engines(stdout, expected_engines):
+    """Require exactly the requested engine logs and reject hidden extra runs."""
+    actual_engines = Counter()
+    for sync_engine in SYNC_ENGINES:
+        pattern = re.compile(
+            r'Writing output into (.+\.{}\.log)'.format(sync_engine)
+        )
+        actual_engines[sync_engine] = len(pattern.findall(stdout))
+
+    actual_engines = +actual_engines
+    expected_engines = Counter(expected_engines)
+    assert actual_engines == expected_engines, (
+        f'Expected sync engine logs {dict(expected_engines)}, '
+        f'found {dict(actual_engines)}'
+    )
 
 
 def find_profiling_folder(stdout):

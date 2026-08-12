@@ -1,70 +1,94 @@
 # Contributing to PipelineWise
 
-When contributing to this repository, please first discuss the change you wish to make via issue, [slack channel](https://singer-io.slack.com/archives/CNL7DL597), or any other method with the owners of this repository before making a change.
+PipelineWise accepts focused bug fixes, tests, documentation, and connector
+improvements. Discuss large features or compatibility changes in a GitHub issue
+before implementation so support, migration, and operational requirements are
+clear.
 
-We love your input! We want to make contributing to this project as easy and transparent as possible, whether it's:
+## Before changing code
 
-- Reporting a bug
-- Discussing the current state of the code
-- Submitting a fix
-- Proposing new features
-- Becoming a maintainer
+1. Fork the repository and branch from `master`.
+2. Read the root `AGENTS.md` and the scoped file for the package you will change.
+3. Inspect the existing worktree and preserve unrelated changes.
+4. Reproduce the problem with the smallest deterministic test.
+5. Use the `dev-project` Docker environment wherever possible; its Linux,
+   database, and connector layout best approximates production.
 
-Please keep all your communication respectful. 
+Do not include credentials, populated environment files, private keys, source
+records, or production identifiers in a pull request.
 
-## On PipelineWise at Wise (fka TransferWise)
-PipelineWise is the ELT engine used at Wise to move data from +150 sources to different targets, 
-the main sources include Mysql/MariaDB, Postgres, S3 buckets and targets include Snowflake and S3 buckets, 
-this means we are extra careful when making changes to/dealing with PRs touching any of the connectors that are used 
-at Wise.
+## Implementation expectations
 
+- Keep changes within the owning package and avoid unrelated formatting.
+- Add regression coverage for observable behaviour, failure boundaries, state,
+  cleanup, and retries.
+- Preserve target-bounded Singer acknowledgement and replay safety.
+- Update connector configuration, samples, schemas, and documentation together.
+- Treat FastSync as a native transfer optimisation, not a replication method.
+- Add a changelog entry for release-visible behaviour or dependency changes.
 
-## We Develop with GitHub
-We use GitHub to host code, track public issues and feature requests, and accept pull requests.
+New connectors begin as Experimental. Promotion to Available requires maintained
+ownership, dependency and CI coverage, deterministic interruption recovery, and a
+documented operated route.
 
+## Verification
 
-## We Use [Github Flow](https://guides.github.com/introduction/flow/index.html), So All Code Changes Happen Through Pull Requests
-Pull requests are the best way to propose changes to the codebase (we use [Github Flow](https://guides.github.com/introduction/flow/index.html)). We actively welcome your pull requests:
+Run checks in the ready `pipelinewise` container. The root implementation gates
+are:
 
-1. Fork the repo and create your branch from `master`.
-2. If you've added code that should be tested, add tests: unit and End-2-End if possible.
-3. If you've added a new feature or changed the behavior of existing one, update the tests and the relevant documentation in [README.md](./README.md) and [online documentation code](./docs).
-4. Ensure the test suite passes.
-5. Make sure your code lints.
-6. Issue that pull request!
+```bash
+ruff check pipelinewise tests
+pylint pipelinewise tests
+flake8 pipelinewise --count --select=E9,F63,F7,F82 --show-source --statistics
+flake8 pipelinewise --count --max-complexity=15 --max-line-length=120 --statistics
+pytest --cov=pipelinewise --cov-fail-under=77 -v tests/units
+```
 
+Never run bare `pytest tests/`; it collects credentialed end-to-end tests.
 
-## Any contributions you make will be under the Apache License Version 2.0.
-In short, when you submit code changes, your submissions are understood to be under the same [Apache License Version 2.0](./LICENSE) that covers the project. Feel free to contact the maintainers if that's a concern.
+Connector source has its own Makefile, lint, unit, coverage, integration, and E2E
+requirements under `singer-connectors/AGENTS.md`. Root gates do not inspect it.
 
-## Report bugs using Github's [issues](https://github.com/transferwise/pipelinewise/issues)
-We use GitHub issues to track public bugs. Report a bug by [opening a new issue](https://github.com/transferwise/pipelinewise/issues/new); it's that easy!
+For documentation changes, run:
 
-## Write bug reports with detail, background and setup
-Here's [a great example from Craig Hockenberry](http://www.openradar.me/11905408)
+```bash
+cd docs
+make check
+```
 
-**Great Bug Reports** tend to have:
+Always run `git diff --check`. Report exact commands and pass, fail, and skip
+counts; an unavailable or skipped integration is not a passing result.
 
-- A quick summary and/or background
-- Steps to reproduce
-  - Be specific!
-  - Describe your source/target setup.
-- What you expected would happen
-- What actually happens
-- Notes (possibly including why you think this might be happening, or stuff you tried that didn't work)
+## Pull requests
 
-People *love* thorough bug reports. I'm not even kidding.
+A pull request should contain:
 
-## Use a Consistent Coding Style
+- the problem and operational consequence;
+- the chosen behaviour and compatibility impact;
+- tests that fail without the change;
+- migration, rollback, or recovery instructions where relevant;
+- documentation and changelog updates; and
+- exact validation evidence.
 
-* Use Python 3.12 and four spaces for indentation; do not use tabs.
-* Follow PEP 8 and use Google-style docstrings.
-* Prefer single quotes for string literals where the surrounding code does so.
-* Run `pre-commit run --all-files` to apply the repository's formatting and lint checks.
-* Run `pytest --ignore tests/end_to_end` for the unit test suite.
+Keep each pull request small enough to review and revert independently.
 
-## Versioning
-We use [Semantic versioning](https://semver.org/).
+## Bug reports
+
+[Open an issue](https://github.com/transferwise/pipelinewise/issues/new) with:
+
+- PipelineWise and connector versions;
+- source, target, and replication method;
+- minimal configuration with secrets removed;
+- exact reproduction steps;
+- expected and actual results;
+- the complete relevant log excerpt; and
+- whether state or target data changed.
+
+Do not attach production data. Replace sensitive values with deterministic test
+fixtures that preserve the failing type, size, or boundary.
 
 ## License
-By contributing, you agree that your contributions will be licensed under its Apache License Version 2.0
+
+Contributions are licensed under Apache License 2.0. Packaged connector licenses
+can differ; review the [license inventory](docs/project/licenses.rst) before adding
+or redistributing a component.

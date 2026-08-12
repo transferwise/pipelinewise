@@ -1,3 +1,172 @@
+0.79.0 (2026-08-10)
+--------------------
+
+**Fixes**
+
+- Make MariaDB/PostgreSQL Snowflake PartialSync publication atomic by staging, copying, and transforming before one mark/merge/delete transaction
+- Correct the Snowflake PartialSync `_SDC_DELETED_AT` hard-delete filter
+- Preserve live Snowflake data when PartialSync fails
+- Preserve replication state when PartialSync fails
+- Publish explicit empty PartialSync ranges
+- Preserve zero-valued PartialSync boundaries
+- Treat an unresolved dynamic PartialSync boundary as a successful no-op
+- Upload every Snowflake FullSync part before deleting local files
+- Roll back Snowflake FullSync staging failures
+- Clean encrypted FullSync temporary files
+- Preserve the live Snowflake table until FullSync cutover
+- Normalize primary keys only when FullSync creates a table
+- Retry FullSync cleanup
+- Retry FullSync grant application
+- Withhold FullSync state until publication completes
+- Grant each published Snowflake table explicitly instead of exposing a concurrent raw `_TEMP` table through `ALL TABLES IN SCHEMA`
+- Serialize FastSync state updates across sibling processes
+- Persist FastSync state with atomic replacement
+- Apply file and directory `fsync` to FastSync state writes
+- Preserve original FastSync state-file permissions
+- Close PostgreSQL FullSync source connections after failure
+- Close PostgreSQL primary-host bookmark connections after FullSync failure
+- Close MariaDB PartialSync source connections after failure
+- Close PostgreSQL PartialSync source connections after failure
+- Stop native-to-Iceberg conversion from mutating source metadata
+- Load the Iceberg replacement before renaming the live table
+- Use `ALTER ICEBERG TABLE` when promoting an Iceberg replacement
+- Recover safely from interrupted native-to-Iceberg renames
+- Bound native-to-Iceberg state discovery in large schemas
+- Preserve numeric precision during native-to-Iceberg conversion
+- Normalize TIME values to Iceberg microsecond precision
+- Normalize timestamp values to Iceberg microsecond precision
+- Preserve quoted identifiers during native-to-Iceberg conversion
+- Preserve primary-key order during native-to-Iceberg conversion
+- Map only width-one MySQL/MariaDB `TINYINT` columns to Boolean, including `UNSIGNED` and `ZEROFILL` declarations
+- Preserve empty strings in MySQL/MariaDB FastSync by quoting every non-NULL CSV field
+- Preserve empty strings and other falsey non-NULL values in target-snowflake Singer CSV serialization
+- Prevent PostgreSQL LOG_BASED sparse updates from clearing unchanged TOASTed values, including large JSON text
+- Combine same-primary-key events within a target-snowflake batch
+- Preserve explicit SQL `NULL` values in target-snowflake sparse updates
+- Advance PostgreSQL LOG_BASED feedback to the minimum target-acknowledged LSN across streams
+- Retain the previous safe LSN when target state is missing, unreadable, invalid, or regresses
+
+**Dependencies**
+
+- Extend the compatible `boto3` range to `<1.44`
+- Update target-snowflake `boto3` to `1.43.62`
+- Extend the compatible `pymongo` range to `<4.18`
+- Update `sqlparse` to `0.5.5`
+- Update `ujson` to `5.13.0`
+- Update `joblib` to `1.5.3`
+- Update `simplejson` to `4.1.1`
+- Update `tzlocal` to `5.4.4`
+- Update Ruff to `0.16.1`
+- Update Pytest to `9.1.1`
+- Update pytest-timer to `1.0`
+- Update Pylint to `4.0.6`
+- Update `actions/checkout` to `v7` for Docker image publication
+- Update `frabert/replace-string-action` to `v2.5`
+- Update `docker/login-action` to `v4`
+- Update `docker/build-push-action` to `v7`
+
+**Test hardening**
+
+**New tests added; runtime code was correct**
+
+- Confirm existing type mappings
+- Confirm failure short-circuiting
+- Confirm lock release
+- Confirm bookmark handling
+- Confirm state-error handling
+- Confirm first-upload preservation
+- Confirm MariaDB FullSync cleanup
+- Confirm single-part cleanup
+
+**New tests added; runtime code needed fixing**
+
+- Cover atomic FullSync publication
+- Cover atomic PartialSync publication
+- Cover staging rollback
+- Cover crash-safe state persistence
+- Cover source cleanup
+- Cover boundary values
+- Cover CSV fidelity
+- Cover `TINYINT` fidelity
+- Cover native-to-Iceberg conversion
+- Cover sparse TOAST updates
+- Cover target-bounded WAL feedback
+- Cover deterministic buffered interruption and restart replay
+
+**Existing tests needed fixing; runtime code was correct**
+
+- Repair PartialSync arguments
+- Repair retry assertions
+- Repair engine assertions
+- Repair log assertions
+- Repair source reset
+- Repair schema isolation
+- Repair temporary-file cleanup
+- Repair log-file cleanup
+- Repair route names
+- Repair profiling expectations
+- Repair optional-credential handling
+
+**Existing tests and runtime code needed fixing**
+
+- Correct publication-order assertions and behavior
+- Correct soft-delete assertions and behavior
+- Correct hard-delete assertions and behavior
+- Correct boundary assertions and behavior
+- Correct COPY SQL assertions and behavior
+- Correct grant SQL assertions and behavior
+- Correct NULL and empty-string fixtures and behavior
+- Correct `TINYINT` fixtures and behavior
+- Correct FullSync lifecycle expectations and behavior
+- Correct complete-row comparisons and behavior
+- Correct exact-state assertions and behavior
+
+**CI and development**
+
+- Run target-snowflake unit tests in GitHub CI
+- Run PostgreSQL stream-buffer recovery E2E in GitHub CI
+- Keep credentialed Snowflake integration tests manual
+- Paginate changed-file detection so large pull requests cannot silently skip tests
+- Run lint checks when changed-file detection fails
+- Run unit tests when changed-file detection fails
+- Run E2E tests when changed-file detection fails
+- Make documentation validation a required publish step
+- Apply the same strict documentation checks in the publishing script
+- Condense repository guidance
+- Make the `dev-project` Docker environment the default for development
+- Make the `dev-project` Docker environment the default for verification
+
+**Documentation**
+
+- Rewrite the README around support, prerequisites, defaults, impact, recovery, and verification
+- Rewrite the contribution guide around the supported development and validation workflow
+- Rewrite operator documentation around supported behavior and recovery
+- Rewrite connector documentation around supported behavior and recovery
+- Mark MariaDB and PostgreSQL sources as available
+- Mark PostgreSQL and Snowflake targets as available
+- Mark other sources, including Snowflake, experimental
+- Mark other targets experimental
+- Distinguish connector availability from packaging
+- Document supported source-to-target routes
+- Document Singer capability per connector
+- Document FastSync capability per connector
+- Document Singer-created Snowflake Iceberg tables
+- Document native-to-Iceberg conversion
+- Document native-to-Iceberg cutover privileges
+- Document native-to-Iceberg metadata limits
+- Document that FastSync is unavailable for Iceberg tables
+- Document that PartialSync is unavailable for Iceberg tables
+- Add submenu links for every connector
+- Allow documentation sidebar sections to expand independently
+- Add a collapse-all sidebar control
+- Validate embedded documentation YAML
+- Validate documented CLI references against the implementation
+- Validate documented schema references against the implementation
+- Validate documented packaged-connector references against the implementation
+- Lint the documentation checker
+- Add unit tests for the documentation checker
+- Run strict Sphinx builds after documentation validation
+
 0.78.0 (2026-08-05)
 -------------------
 

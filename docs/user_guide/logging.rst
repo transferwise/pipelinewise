@@ -1,45 +1,82 @@
-
 .. _logging:
 
 Logging
--------
+========
 
-PipelineWise is generating log files at ``~/.pipelinewise/<TARGET_ID>/<TAP_ID>/log``
-from every run started by the ``run_tap`` command. Please check :ref:`running_pipelines`
-section for further details how to run tap when you do a data sync.
+Each replication run writes a connector log below:
 
-Every log file will match the following pattern: ``<TARGET_ID>-<TAP_ID>-<DATE>_<TIME>.<SYNC_ENGINE>.log.<STATUS>``
+.. code-block:: text
 
-Variables:
+   ~/.pipelinewise/<target_id>/<tap_id>/log/
 
-  * **TARGET_ID**: Unique identifier of the target. This is the ``id`` property from a :ref:`targets_list` YAML.
-  * **TAP_ID**: Unique identifier of the tap. This is the ``id`` property from a :ref:`taps_list` YAML.
-  * **DATE**: Date when the tap started in ``YYYYMMDD`` format
-  * **TIME**: Time when the tap started in ``HH24MMSS`` format
-  * **SYNC_ENGINE**: One of ``singer`` or ``fastsync``. Check :ref:`fast_sync_main` for further details.
-  * **STATUS**: One of ``running``, ``failed`` or ``success``
+The filename is
+``<target>-<tap>-<YYYYMMDD>_<HHMMSS>.<engine>.log.<status>``.
 
 
-Example:
+Filename fields
+---------------
+
+.. list-table::
+   :header-rows: 1
+   :widths: 24 76
+   :width: 100%
+
+   * - Field
+     - Values
+   * - ``engine``
+     - ``singer`` or ``fastsync``.
+   * - ``status``
+     - ``running``, ``success``, ``failed``, or ``terminated``.
+   * - Timestamp
+     - UTC run start time as ``YYYYMMDD_HHMMSS``.
+
+FastSync and Singer portions of one ``run_tap`` can write separate files. Keep
+both when diagnosing an initial-load failure.
+
+
+Observe a run
+-------------
+
+Find and follow the active log:
 
 .. code-block:: bash
 
-    $ ls -lah ~/.pipelinewise/snowflake/fx/log/
-    -rw-rw-r-- 1 pipelinewise pipelinewise  13K May  8 00:02 snowflake-fx-20190508_000038.singer.log.success
-    -rw-rw-r-- 1 pipelinewise pipelinewise  13K May  8 00:31 snowflake-fx-20190508_003014.singer.log.success
-    -rw-rw-r-- 1 pipelinewise pipelinewise  13K May  8 01:04 snowflake-fx-20190508_010031.singer.log.success
-    -rw-rw-r-- 1 pipelinewise pipelinewise  13K May  8 01:33 snowflake-fx-20190508_013036.singer.log.success
-    -rw-rw-r-- 1 pipelinewise pipelinewise  13K May  8 02:02 snowflake-fx-20190508_020037.singer.log.success
-    -rw-rw-r-- 1 pipelinewise pipelinewise  13K May  8 02:32 snowflake-fx-20190508_023029.singer.log.success
-    -rw-rw-r-- 1 pipelinewise pipelinewise  13K May  8 03:02 snowflake-fx-20190508_030032.singer.log.success
-    -rw-rw-r-- 1 pipelinewise pipelinewise  13K May  8 03:31 snowflake-fx-20190508_033031.singer.log.success
-    -rw-rw-r-- 1 pipelinewise pipelinewise  13K May  8 04:02 snowflake-fx-20190508_040033.fastsync.log.success
-    -rw-rw-r-- 1 pipelinewise pipelinewise  13K May  8 04:04 snowflake-fx-20190508_040222.singer.log.success
-    -rw-rw-r-- 1 pipelinewise pipelinewise  13K May  8 04:30 snowflake-fx-20190508_043015.singer.log.success
-    -rw-rw-r-- 1 pipelinewise pipelinewise  13K May  8 05:01 snowflake-fx-20190508_050035.singer.log.success
-    -rw-rw-r-- 1 pipelinewise pipelinewise  13K May  8 05:31 snowflake-fx-20190508_053030.singer.log.failed
-    -rw-rw-r-- 1 pipelinewise pipelinewise  13K May  8 06:02 snowflake-fx-20190508_060037.singer.log.success
-    -rw-rw-r-- 1 pipelinewise pipelinewise  13K May  8 06:33 snowflake-fx-20190508_063032.singer.log.success
-    -rw-rw-r-- 1 pipelinewise pipelinewise   8K May  8 07:03 snowflake-fx-20190508_070036.singer.log.running
+   find ~/.pipelinewise/<target_id>/<tap_id>/log -name '*.running' -print
+   tail -f ~/.pipelinewise/<target_id>/<tap_id>/log/*.running
+
+Use ``--extra_log`` to mirror connector output to the invoking terminal:
+
+.. code-block:: bash
+
+   pipelinewise run_tap \
+     --tap <tap_id> \
+     --target <target_id> \
+     --extra_log
 
 
+Diagnose failure
+----------------
+
+Collect these together:
+
+1. the complete ``.failed`` or ``.terminated`` log;
+2. ``pipelinewise status`` output;
+3. the tap and target IDs and connector versions;
+4. the last successful log;
+5. source and target database errors at the same UTC time; and
+6. whether ``state.json`` changed and which bookmark it contains.
+
+Do not remove a ``.running`` file or PID file to make a live pipeline appear
+stopped. Use :ref:`cli_stop_tap`, then confirm the process tree has exited.
+
+
+Retention
+---------
+
+PipelineWise does not provide a log-retention policy. Apply filesystem or
+platform retention that preserves enough successful and failed history to cover
+the maximum investigation and recovery period. Never delete runtime state while
+rotating logs.
+
+See :ref:`troubleshooting` for known errors and :ref:`stream_buffering` for
+interrupted-run recovery.

@@ -4,6 +4,15 @@ import tempfile
 from tests.end_to_end.helpers import assertions
 from tests.end_to_end.target_snowflake.tap_postgres import TapPostgres
 
+
+ARCHIVE_STATE_EXPECTATIONS = {
+    'fastsync': {
+        'public-city': True,
+        'public-country': False,
+        'public2-wearehere': False,
+    }
+}
+
 TAP_ID = 'postgres_to_sf_archive_load_files'
 TARGET_ID = 'snowflake'
 ARCHIVE_S3_PREFIX = 'archive_folder'
@@ -54,7 +63,10 @@ class TestReplicatePGToSFWithArchiveLoadFiles(TapPostgres):
         self.delete_dangling_files_from_archive()
 
         assertions.assert_run_tap_success(
-            self.tap_id, self.target_id, ['fastsync', 'singer']
+            self.tap_id,
+            self.target_id,
+            ['fastsync', 'singer'],
+            expected_state_streams=ARCHIVE_STATE_EXPECTATIONS,
         )
 
         expected_archive_files_count = {

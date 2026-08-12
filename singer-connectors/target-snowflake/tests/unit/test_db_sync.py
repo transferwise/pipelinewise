@@ -331,6 +331,89 @@ class TestDBSync(unittest.TestCase):
         self.assertEqual(dbsync.record_primary_key_string({'id': 1, 'c_bool': False, 'c_str': 'xyz'}), '1,False')
 
     @patch('target_snowflake.db_sync.DbSync.query')
+    def test_patch_record_mode_and_present_flattened_columns(self, query_patch):
+        query_patch.return_value = [{'type': 'CSV'}]
+        minimal_config = {
+            'account': 'dummy-value',
+            'dbname': 'dummy-value',
+            'user': 'dummy-value',
+            'private_key': 'dummy-key',
+            'warehouse': 'dummy-value',
+            'default_target_schema': 'dummy-value',
+            'file_format': 'dummy-value',
+            'data_flattening_max_level': 1,
+        }
+        stream_schema_message = {
+            'stream': 'public-table1',
+            'schema': {
+                'x-pipelinewise-record-update-mode': 'PATCH',
+                'properties': {
+                    'id': {'type': ['integer']},
+                    'payload': {'type': ['null', 'string']},
+                    '_sdc_extracted_at': {'type': ['null', 'string']},
+                    '_sdc_batched_at': {'type': ['null', 'string']},
+                    '_sdc_deleted_at': {'type': ['null', 'string']},
+                    'profile': {
+                        'type': ['null', 'object'],
+                        'properties': {
+                            'first': {'type': ['null', 'string']},
+                            'last': {'type': ['null', 'string']},
+                        },
+                    },
+                    'untouched': {'type': ['null', 'string']},
+                },
+            },
+            'key_properties': ['id'],
+        }
+
+        dbsync = db_sync.DbSync(minimal_config, stream_schema_message)
+
+        self.assertEqual(dbsync.record_update_mode, db_sync.RECORD_UPDATE_MODE_PATCH)
+        self.assertEqual(
+            dbsync.present_column_names({'id': 1, 'payload': None, 'profile': {'first': 'Ada'}}),
+            ('id', 'payload', 'profile__first', 'profile__last'),
+        )
+        self.assertEqual(
+            dbsync.present_column_names({
+                'id': 1,
+                '_sdc_extracted_at': '2026-08-08T12:00:00Z',
+                '_sdc_batched_at': '2026-08-08T12:00:01Z',
+                '_sdc_deleted_at': '2026-08-08T12:00:02Z',
+            }),
+            ('_sdc_batched_at', '_sdc_deleted_at', '_sdc_extracted_at', 'id'),
+        )
+
+    @patch('target_snowflake.db_sync.DbSync.query')
+    @patch('target_snowflake.db_sync.DbSync._load_file_merge')
+    def test_load_file_restricts_patch_update_columns(self, load_file_merge_patch, query_patch):
+        query_patch.return_value = [{'type': 'CSV'}]
+        load_file_merge_patch.return_value = (0, 1)
+        minimal_config = {
+            'account': 'dummy-value',
+            'dbname': 'dummy-value',
+            'user': 'dummy-value',
+            'private_key': 'dummy-key',
+            'warehouse': 'dummy-value',
+            'default_target_schema': 'dummy-value',
+            'file_format': 'dummy-value',
+        }
+        stream_schema_message = {
+            'stream': 'public-table1',
+            'schema': {
+                'properties': {
+                    'id': {'type': ['integer']},
+                    'payload': {'type': ['null', 'string']},
+                },
+            },
+            'key_properties': ['id'],
+        }
+        dbsync = db_sync.DbSync(minimal_config, stream_schema_message)
+
+        dbsync.load_file('dummy-key', 1, 256, update_column_names=('id',))
+
+        self.assertEqual(load_file_merge_patch.call_args.kwargs['update_columns'], {'"ID"'})
+
+    @patch('target_snowflake.db_sync.DbSync.query')
     @patch('target_snowflake.db_sync.DbSync._load_file_merge')
     def test_merge_failure_message(self, load_file_merge_patch, query_patch):
         LOGGER_NAME = "target_snowflake"

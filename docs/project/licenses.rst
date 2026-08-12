@@ -3,54 +3,61 @@
 Licenses
 ========
 
-PipelineWise as a standalone software is licensed under Apache License Version 2.0 but bundled components can
-use different licenses and may overwrite the terms and conditions detailed in Apache License Version 2.0.
-You can customise which connectors you want to include into the final PipelineWise build and the final license of
-your build depends on the included connectors. Please note that if you use even one component with an AGPL license,
-this will result in the entire build falling under AGPL license. Please always double check license compatibilities
-and terms for all components.
+PipelineWise core is Apache License 2.0. Packaged connectors can use different
+licenses, so the obligations of a distributed image depend on every component it
+contains. Review the actual connector source and dependency licenses before
+building or distributing a customised image.
 
-More info in the :ref:`selecting_singer_connectors` section.
+.. warning::
 
-Connectors and Licenses
------------------------
+   Including an AGPL component can add AGPL obligations to the distributed
+   combined build. Obtain legal guidance for the intended use and distribution;
+   this page is an inventory, not legal advice.
 
-+---------------------------------------------+---------------------------------+
-| **Connector**                               | **Standalone License**          |
-+---------------------------------------------+---------------------------------+
-| PipelineWise: Core components               | Apache License Version 2.0      |
-+---------------------------------------------+---------------------------------+
-| PipelineWise: :ref:`transformations`        | Apache License Version 2.0      |
-+---------------------------------------------+---------------------------------+
-| :ref:`tap-github`                           | AGPL Version 3                  |
-+---------------------------------------------+---------------------------------+
-| :ref:`tap-jira`                             | AGPL Version 3                  |
-+---------------------------------------------+---------------------------------+
-| :ref:`tap-kafka`                            | AGPL Version 3                  |
-+---------------------------------------------+---------------------------------+
-| :ref:`tap-mixpanel`                         | AGPL Version 3                  |
-+---------------------------------------------+---------------------------------+
-| :ref:`tap-mongodb`                          | AGPL Version 3                  |
-+---------------------------------------------+---------------------------------+
-| :ref:`tap-mysql`                            | AGPL Version 3                  |
-+---------------------------------------------+---------------------------------+
-| :ref:`tap-postgres`                         | AGPL Version 3                  |
-+---------------------------------------------+---------------------------------+
-| :ref:`tap-s3-csv`                           | AGPL Version 3                  |
-+---------------------------------------------+---------------------------------+
-| :ref:`tap-salesforce`                       | AGPL Version 3                  |
-+---------------------------------------------+---------------------------------+
-| :ref:`tap-slack`                            | AGPL Version 3                  |
-+---------------------------------------------+---------------------------------+
-| :ref:`tap-snowflake`                        | Apache License Version 2.0      |
-+---------------------------------------------+---------------------------------+
-| :ref:`tap-twilio`                           | AGPL Version 3                  |
-+---------------------------------------------+---------------------------------+
-| :ref:`tap-zendesk`                          | AGPL Version 3                  |
-+---------------------------------------------+---------------------------------+
-| :ref:`target-postgres`                      | Apache License Version 2.0      |
-+---------------------------------------------+---------------------------------+
-| :ref:`target-s3-csv`                        | Apache License Version 2.0      |
-+---------------------------------------------+---------------------------------+
-| :ref:`target-snowflake`                     | Apache License Version 2.0      |
-+---------------------------------------------+---------------------------------+
+
+Packaged components
+-------------------
+
+.. list-table::
+   :header-rows: 1
+   :widths: 58 42
+   :width: 100%
+
+   * - Component
+     - Standalone license
+   * - PipelineWise core and ``transform-field``
+     - Apache License 2.0
+   * - ``tap-github``
+     - AGPL 3.0
+   * - ``tap-jira``
+     - AGPL 3.0
+   * - ``tap-kafka``
+     - AGPL 3.0
+   * - ``tap-mixpanel``
+     - AGPL 3.0
+   * - ``tap-mongodb``
+     - AGPL 3.0
+   * - ``tap-mysql``
+     - AGPL 3.0
+   * - ``tap-postgres``
+     - AGPL 3.0
+   * - ``tap-s3-csv``
+     - AGPL 3.0
+   * - ``tap-salesforce``
+     - AGPL 3.0
+   * - ``tap-slack``
+     - AGPL 3.0
+   * - ``tap-snowflake``
+     - Apache License 2.0
+   * - ``tap-twilio``
+     - AGPL 3.0
+   * - ``tap-zendesk``
+     - AGPL 3.0
+   * - ``target-postgres``
+     - Apache License 2.0
+   * - ``target-s3-csv``
+     - Apache License 2.0
+   * - ``target-snowflake``
+     - Apache License 2.0
+
+See :ref:`selecting_singer_connectors` to build only the required components.

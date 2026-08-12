@@ -40,6 +40,7 @@ jobs:
         id: check
         env:
           GITHUB_REPO: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         continue-on-error: true
         run: ./scripts/ci_check_no_file_changes.sh python config
@@ -73,6 +74,7 @@ jobs:
           -e TAP_S3_CSV_BUCKET=$TAP_S3_CSV_BUCKET \
           pipelinewise pytest \
           tests/end_to_end/test_target_postgres.py \
+          tests/end_to_end/test_postgres_stream_buffer_recovery.py \
           tests/end_to_end/data_diff/test_postgres_to_postgres.py \
           tests/end_to_end/data_diff/test_mysql_to_postgres.py \
           -vx --timer-top-n 10
@@ -89,6 +91,7 @@ jobs:
         id: check
         env:
           GITHUB_REPO: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         continue-on-error: true
         run: ./scripts/ci_check_no_file_changes.sh python config
@@ -148,6 +151,7 @@ jobs:
         id: check
         env:
           GITHUB_REPO: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         continue-on-error: true
         run: ./scripts/ci_check_no_file_changes.sh python config
@@ -207,6 +211,7 @@ jobs:
         id: check
         env:
           GITHUB_REPO: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         continue-on-error: true
         run: ./scripts/ci_check_no_file_changes.sh python config
@@ -263,6 +268,7 @@ jobs:
         id: check
         env:
           GITHUB_REPO: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         continue-on-error: true
         run: ./scripts/ci_check_no_file_changes.sh python config

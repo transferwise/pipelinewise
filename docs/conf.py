@@ -19,6 +19,7 @@ import importlib.metadata
 
 def setup(app):
     app.add_css_file('css/custom.css')
+    app.add_js_file('js/navigation.js')
 
 
 # -- Project information -----------------------------------------------------
@@ -65,6 +66,6 @@ html_static_path = ['_static']
 html_favicon = 'img/pipelinewise.png'
 
 html_theme_options = {
-    'canonical_url': "https://docs.ansible.com/ansible/latest/",
-    'collapse_navigation': "True"
+    'canonical_url': 'https://transferwise.github.io/pipelinewise/',
+    'collapse_navigation': False,
 }

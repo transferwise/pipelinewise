@@ -94,6 +94,27 @@ class TestCsv(unittest.TestCase):
         self.assertEqual(csv.record_to_csv_line(record, schema),
                          '"1","2030-01-22","10000-01-22 12:04:22","25:01:01","I\'m good",')
 
+    def test_record_to_csv_line_preserves_falsey_values_except_null(self):
+        record = {
+            'empty_string': '',
+            'empty_list': [],
+            'empty_object': {},
+            'false': False,
+            'none': None,
+        }
+        schema = {
+            'empty_string': {'type': ['null', 'string']},
+            'empty_list': {'type': ['null', 'array']},
+            'empty_object': {'type': ['null', 'object']},
+            'false': {'type': ['null', 'boolean']},
+            'none': {'type': ['null', 'string']},
+        }
+
+        self.assertEqual(
+            csv.record_to_csv_line(record, schema),
+            '"","[]","{}",false,',
+        )
+
     def test_create_copy_sql(self):
         self.assertEqual(csv.create_copy_sql(table_name='foo_table',
                                              stage_name='foo_stage',
@@ -127,3 +148,37 @@ class TestCsv(unittest.TestCase):
                          "WHEN NOT MATCHED THEN "
                          "INSERT (COL_1, COL_2, COL_3) "
                          "VALUES (s.COL_1, s.COL_2, s.COL_3)")
+
+    def test_create_merge_sql_with_restricted_update_columns(self):
+        self.assertEqual(csv.create_merge_sql(table_name='foo_table',
+                                             stage_name='foo_stage',
+                                             s3_key='foo_s3_key.csv',
+                                             file_format_name='foo_file_format',
+                                             columns=[{'name': 'COL_1', 'trans': ''},
+                                                      {'name': 'COL_2', 'trans': ''},
+                                                      {'name': 'COL_3', 'trans': 'parse_json'}],
+                                             pk_merge_condition='s.COL_1 = t.COL_1',
+                                             update_columns={'COL_2'}),
+
+                         "MERGE INTO foo_table t USING ("
+                         "SELECT ($1) COL_1, ($2) COL_2, parse_json($3) COL_3 "
+                         "FROM '@foo_stage/foo_s3_key.csv' "
+                         "(FILE_FORMAT => 'foo_file_format')) s "
+                         "ON s.COL_1 = t.COL_1 "
+                         "WHEN MATCHED THEN UPDATE SET COL_2=s.COL_2 "
+                         "WHEN NOT MATCHED THEN "
+                         "INSERT (COL_1, COL_2, COL_3) "
+                         "VALUES (s.COL_1, s.COL_2, s.COL_3)")
+
+    def test_create_merge_sql_with_no_update_columns(self):
+        merge_sql = csv.create_merge_sql(table_name='foo_table',
+                                         stage_name='foo_stage',
+                                         s3_key='foo_s3_key.csv',
+                                         file_format_name='foo_file_format',
+                                         columns=[{'name': 'COL_1', 'trans': ''},
+                                                  {'name': 'COL_2', 'trans': ''}],
+                                         pk_merge_condition='s.COL_1 = t.COL_1',
+                                         update_columns=[])
+
+        self.assertNotIn('WHEN MATCHED THEN UPDATE', merge_sql)
+        self.assertIn('INSERT (COL_1, COL_2) VALUES (s.COL_1, s.COL_2)', merge_sql)

@@ -1,6 +1,10 @@
 from pipelinewise.fastsync import mysql_to_snowflake
 from tests.end_to_end.helpers import assertions
-from tests.end_to_end.target_snowflake.tap_mariadb import TapMariaDB
+from tests.end_to_end.target_snowflake.tap_mariadb import (
+    TapMariaDB,
+    mariadb_initial_state_expectations,
+    mariadb_recurring_state_expectations,
+)
 
 TAP_ID = 'mariadb_to_sf_buffered_stream'
 TARGET_ID = 'snowflake'
@@ -24,7 +28,10 @@ class TestReplicateMariaDBToSFWithCustomBufferSize(TapMariaDB):
 
         # 1. Run tap first time - both fastsync and a singer should be triggered
         assertions.assert_run_tap_success(
-            self.tap_id, self.target_id, ['fastsync', 'singer']
+            self.tap_id,
+            self.target_id,
+            ['fastsync', 'singer'],
+            expected_state_streams=mariadb_initial_state_expectations(),
         )
         assertions.assert_row_counts_equal(
             self.e2e_env.run_query_tap_mysql,
@@ -74,7 +81,10 @@ class TestReplicateMariaDBToSFWithCustomBufferSize(TapMariaDB):
 
         # 3. Run tap second time - both fastsync and a singer should be triggered, there are some FULL_TABLE
         assertions.assert_run_tap_success(
-            self.tap_id, self.target_id, ['fastsync', 'singer']
+            self.tap_id,
+            self.target_id,
+            ['fastsync', 'singer'],
+            expected_state_streams=mariadb_recurring_state_expectations(),
         )
         assertions.assert_row_counts_equal(
             self.e2e_env.run_query_tap_mysql,

@@ -1,132 +1,110 @@
-
 .. _tap-s3-csv:
 
-Tap S3 CSV
------------
+S3 CSV source
+=============
+
+``tap-s3-csv`` discovers CSV objects in S3 and maps matching object keys to
+target tables.
+
+.. list-table:: Support
+   :header-rows: 1
+   :widths: 28 24 48
+   :width: 100%
+
+   * - Source
+     - Status
+     - Important limitation
+   * - S3 CSV
+     - Experimental
+     - Every CSV field is emitted as a string.
 
 
-Extracting data from S3 in CSV file format is straightforward. You need to have
-access to an S3 bucket and the tap will download every CSV file that matches the
-configured file pattern. It's tracking the ``Last-Modified`` timestamp on the
-S3 objects to incrementally download only the new or updated files.
+Authentication
+--------------
 
-.. note:: Every column in the csv files will be interpreted as string.
+Credential resolution follows the AWS profile/environment/instance-role chain.
+Prefer an instance role or temporary profile. Static access keys can be supplied
+and vault-encrypted but increase secret-management risk.
 
-.. warning::
+.. list-table:: AWS credential settings
+   :header-rows: 1
+   :widths: 34 22 44
+   :width: 100%
 
-  **Authentication Methods**
+   * - Setting
+     - Environment fallback
+     - Behaviour
+   * - ``aws_profile``
+     - ``AWS_PROFILE``
+     - Selects a named profile when no static key pair is configured.
+   * - ``aws_access_key_id``
+     - ``AWS_ACCESS_KEY_ID``
+     - Static access-key ID; configure it together with
+       ``aws_secret_access_key``.
+   * - ``aws_secret_access_key``
+     - ``AWS_SECRET_ACCESS_KEY``
+     - Static secret; encrypt it and never commit the clear-text value.
+   * - ``aws_session_token``
+     - ``AWS_SESSION_TOKEN``
+     - Session token required with temporary static credentials.
 
-   * **Profile based authentication**: This is the default authentication method. Credentials taken from
-     the ``AWS_PROFILE`` environment variable or the ``default`` AWS profile, that's available on the host where
-     PipelineWise is running.
-     To use another profile set the ``aws_profile`` parameter.
-     This method requires the presence of ``~/.aws/credentials`` file on the host.
+When none of these settings or environment variables is supplied, Boto3 uses
+its default credential chain, including workload and instance roles.
 
-   * **Credentials based authentication**: To provide fixed credentials set ``aws_access_key_id``,
-     ``aws_secret_access_key`` and optionally the ``aws_session_token`` parameters.
 
-     Optionally the credentials can be vault-encrypted in the YAML. Please check :ref:`encrypting_passwords`
-     for further details.
-
-   * **IAM role based authentication**: When no credentials and no AWS profile is given nor found on the host,
-     PipelineWise will resort to use the IAM role attached to the host.
-
-Configuring what to replicate
-'''''''''''''''''''''''''''''
-
-PipelineWise configures every tap with a common structured YAML file format.
-A sample YAML for S3 CSV replication can be generated into a project directory by
-following the steps in the :ref:`generating_pipelines` section.
-
-Example YAML for ``tap-s3-csv``:
+Configuration
+-------------
 
 .. code-block:: yaml
 
-    ---
+   id: "csv_orders"
+   name: "Orders CSV feed"
+   type: "tap-s3-csv"
+   owner: "data-platform@example.com"
+   db_conn:
+     bucket: "orders-feed"
+     start_date: "2024-01-01"
+     aws_profile: "pipelinewise"
+   target: "snowflake"
+   batch_size_rows: 20000
+   stream_buffer_size: 0
+   schemas:
+     - source_schema: "s3_feeds"
+       target_schema: "s3_feeds"
+       tables:
+         - table_name: "orders"
+           s3_csv_mapping:
+             search_prefix: "orders/"
+             search_pattern: "^orders_.*[.]csv$"
+             key_properties: ["id"]
+             delimiter: ","
 
-    # ------------------------------------------------------------------------------
-    # General Properties
-    # ------------------------------------------------------------------------------
-    id: "csv_on_s3"                        # Unique identifier of the tap
-    name: "Sample CSV files on S3"          # Name of the tap
-    type: "tap-s3-csv"                     # !! THIS SHOULD NOT CHANGE !!
-    owner: "somebody@foo.com"              # Data owner to contact
-    #send_alert: False                     # Optional: Disable all configured alerts on this tap
-    #slack_alert_channel: "#tap-channel"   # Optional: Sending a copy of specific tap alerts to this slack channel
+.. list-table:: Mapping settings
+   :header-rows: 1
+   :widths: 28 20 20 32
+   :width: 100%
 
+   * - Setting
+     - Required
+     - Default
+     - Effect
+   * - ``search_pattern``
+     - Yes
+     - —
+     - Regular expression matched against candidate object keys.
+   * - ``search_prefix``
+     - No
+     - Empty
+     - Limits the S3 listing before pattern matching.
+   * - ``key_properties``
+     - No
+     - None
+     - Defines fields used to deduplicate records.
+   * - ``delimiter``
+     - No
+     - ``,``
+     - Selects the one-character CSV delimiter.
 
-    # ------------------------------------------------------------------------------
-    # Source (Tap) - S3 connection details
-    # ------------------------------------------------------------------------------
-    db_conn:
-
-      # Profile based authentication
-      aws_profile: "<AWS_PROFILE>"                  # AWS profile name, if not provided, the AWS_PROFILE environment
-                                                    # variable or the 'default' profile will be used, if not
-                                                    # available, then IAM role attached to the host will be used.
-
-      # Credentials based authentication
-      #aws_access_key_id: "<ACCESS_KEY>"            # Plain string or vault encrypted. Required for non-profile based auth. If not provided, AWS_ACCESS_KEY_ID environment variable will be used.
-      #aws_secret_access_key: "<SECRET_ACCESS_KEY"  # Plain string or vault encrypted. Required for non-profile based auth. If not provided, AWS_SECRET_ACCESS_KEY environment variable will be used.
-      #aws_session_token: "<AWS_SESSION_TOKEN>"     # Optional: Plain string or vault encrypted. If not provided, AWS_SESSION_TOKEN environment variable will be used.
-
-      #aws_endpoint_url: "<FULL_ENDPOINT_URL>"      # Optional: for non AWS S3, for example https://nyc3.digitaloceanspaces.com
-
-      bucket: "my-bucket"                           # S3 Bucket name
-      start_date: "2000-01-01"                      # File before this data will be excluded
-      fastsync_parallelism: <int>                   # Optional: size of multiprocessing pool used by FastSync
-                                                    #           Min: 1
-                                                    #           Default: number of CPU cores
-    
-    # ------------------------------------------------------------------------------
-    # Destination (Target) - Target properties
-    # Connection details should be in the relevant target YAML file
-    # ------------------------------------------------------------------------------
-    target: "snowflake"                       # ID of the target connector where the data will be loaded
-    batch_size_rows: 20000                    # Batch size for the stream to optimise load performance
-    stream_buffer_size: 0                     # In-memory buffer size (MB) between taps and targets for asynchronous data pipes
-    default_target_schema: "s3_feeds"         # Target schema where the data will be loaded 
-    default_target_schema_select_permission:  # Optional: Grant SELECT on schema and tables that created
-      - grp_power
-    # primary_key_required: False             # Optional: in case you want to load tables without key
-                                              #            properties, uncomment this. Please note
-                                              #            that files without primary keys will not
-                                              #            be de-duplicated and could cause
-                                              #            duplicates. Always try selecting
-                                              #            a reasonable key from the CSV file
-    #batch_wait_limit_seconds: 3600           # Optional: Maximum time to wait for `batch_size_rows`. Available only for snowflake target.
-
-    # Options only for Snowflake target
-    #archive_load_files: False                      # Optional: when enabled, the files loaded to Snowflake will also be stored in `archive_load_files_s3_bucket`
-    #archive_load_files_s3_prefix: "archive"        # Optional: When `archive_load_files` is enabled, the archived files will be placed in the archive S3 bucket under this prefix.
-    #archive_load_files_s3_bucket: "<BUCKET_NAME>"  # Optional: When `archive_load_files` is enabled, the archived files will be placed in this bucket. (Default: the value of `s3_bucket` in target snowflake YAML)
-
-
-    # ------------------------------------------------------------------------------
-    # Source to target Schema mapping
-    # ------------------------------------------------------------------------------
-    schemas:
-      - source_schema: "s3_feeds" # This is mandatory, but can be anything in this tap type
-        target_schema: "s3_feeds" # Target schema in the destination Data Warehouse
-        
-        # List of CSV files to destination tables
-        tables:
-
-          # Every file in S3 bucket that matches the search pattern will be loaded into this table
-          - table_name: "feed_file_one"
-            s3_csv_mapping:
-              search_pattern: "^feed_file_one_.*.csv$" # Required.
-              search_prefix: ""                        # Optional
-              key_properties: ["id"]                   # Optional
-              delimiter: ","                           # Optional. Default: ','
-
-            # OPTIONAL: Load time transformations
-            #transformations:                    
-            #  - column: "last_name"            # Column to transform
-            #    type: "SET-NULL"               # Transformation type
-
-          # You can add as many tables as you need...
-          - table_name: "feed_file_two"
-            s3_csv_mapping:
-              search_pattern: "^feed_file_two_.csv$"
-
+Without key properties, repeated or overlapping files can create duplicates.
+Validate object naming, headers, quoting, and malformed-row handling before
+enabling a schedule.

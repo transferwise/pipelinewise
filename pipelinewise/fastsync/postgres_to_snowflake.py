@@ -2,7 +2,6 @@
 import os
 import sys
 import glob
-import re
 import multiprocessing
 
 from argparse import Namespace
@@ -41,8 +40,6 @@ REQUIRED_CONFIG_KEYS = {
         'file_format',
     ],
 }
-
-LOCK = multiprocessing.Lock()
 
 
 def tap_type_to_target_type(pg_type, *_):
@@ -89,6 +86,9 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
     snowflake = FastSyncTargetSnowflake(args.target, args.transform)
     tap_id = args.target.get('tap_id')
     archive_load_files = args.target.get('archive_load_files', False)
+    s3_keys = []
+    target_schema = None
+    temp_created = False
 
     try:
         dbname = args.tap.get('dbname')
@@ -123,21 +123,16 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
         primary_key = snowflake_types.get('primary_key')
         postgres.close_connection()
 
-        # Uploading to S3
-        s3_keys = []
-        for file_part in file_parts:
-            s3_keys.append(snowflake.upload_to_s3(file_part, tmp_dir=args.temp_dir))
-            os.remove(file_part)
-
-        # Create a pattern that match all file parts by removing multipart suffix
-        s3_key_pattern = (
-            re.sub(r'\.part\d*$', '', s3_keys[0])
-            if len(s3_keys) > 0
-            else 'NO_FILES_TO_LOAD'
+        s3_keys, s3_key_pattern = utils.upload_files_to_s3(
+            snowflake,
+            file_parts,
+            args.temp_dir,
+            args.target.get('s3_bucket'),
         )
 
         # Creating temp table in Snowflake
         snowflake.create_schema(target_schema)
+        temp_created = True
         snowflake.create_table(
             target_schema, table, snowflake_columns, primary_key, is_temporary=True
         )
@@ -152,34 +147,66 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
                 # Copy load file to archive
                 snowflake.copy_to_archive(s3_key, tap_id, table)
 
-            # Delete all file parts from s3
-            snowflake.s3.delete_object(Bucket=args.target.get('s3_bucket'), Key=s3_key)
-
         # Obfuscate columns
         snowflake.obfuscate_columns(target_schema, table)
 
         # Create target table and swap with the temp table in Snowflake
-        snowflake.create_table(target_schema, table, snowflake_columns, primary_key)
-        snowflake.swap_tables(target_schema, table)
-
-        # Save bookmark to singer state file
-        # Lock to ensure that only one process writes the same state file at a time
-        LOCK.acquire()
+        snowflake.create_table(
+            target_schema,
+            table,
+            snowflake_columns,
+            primary_key,
+            allow_replace_table=False,
+            normalize_primary_keys=False,
+        )
+        utils.apply_snowflake_table_grants(
+            snowflake,
+            args.target,
+            target_schema,
+            table,
+            is_temporary=True,
+        )
+        publication_error = None
         try:
-            utils.save_state_file(args.state, table, bookmark)
-        finally:
-            LOCK.release()
+            snowflake.swap_tables(
+                target_schema, table, cleanup_old_table=False
+            )
+        except Exception as exc:
+            publication_error = exc
 
-        # Table loaded, grant select on all tables in target schema
-        grantees = utils.get_grantees(args.target, table)
-        utils.grant_privilege(target_schema, grantees, snowflake.grant_usage_on_schema)
-        utils.grant_privilege(target_schema, grantees, snowflake.grant_select_on_schema)
+        utils.finalize_snowflake_fullsync(
+            snowflake,
+            s3_keys,
+            args.target.get('s3_bucket'),
+            args.target,
+            target_schema,
+            table,
+            publication_error=publication_error,
+        )
+        s3_keys = []
+        temp_created = False
+
+        if publication_error:
+            raise publication_error
+
+        utils.save_state_file(args.state, table, bookmark)
 
         return True
 
     except Exception as exc:
         LOGGER.exception(exc)
-        return '{}: {}'.format(table, exc)
+        return utils.staging_failure_result(
+            snowflake,
+            getattr(exc, 's3_keys', s3_keys),
+            args.target.get('s3_bucket'),
+            target_schema,
+            table,
+            temp_created,
+            exc,
+        )
+
+    finally:
+        postgres.close_connection(silent=True)
 
 
 def main_impl():

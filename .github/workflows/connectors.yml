@@ -23,6 +23,7 @@ jobs:
         id: check
         env:
           GITHUB_REPO: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         continue-on-error: true
         run: ./scripts/ci_check_no_file_changes.sh python
@@ -44,9 +45,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        connector:
-          - tap-mysql
-          - tap-postgres
+        include:
+          - connector: tap-mysql
+            test_target: unit_test_cov
+          - connector: tap-postgres
+            test_target: unit_test_cov
+          - connector: target-snowflake
+            test_target: unit_test
 
     steps:
       - name: Checking out repo
@@ -64,5 +69,5 @@ jobs:
         working-directory: singer-connectors/${{ matrix.connector }}
 
       - name: Run connector unit tests
-        run: make unit_test_cov
+        run: make ${{ matrix.test_target }}
         working-directory: singer-connectors/${{ matrix.connector }}

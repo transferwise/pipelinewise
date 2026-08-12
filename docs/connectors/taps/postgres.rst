@@ -1,227 +1,125 @@
-
 .. _tap-postgres:
 
-Tap PostgreSQL
---------------
+PostgreSQL source
+=================
 
-The Singer tap is at `pipelinewise-tap-postgres <https://github.com/transferwise/pipelinewise-tap-postgres>`_
+``tap-postgres`` extracts tables with full-table, key-based incremental, or
+wal2json logical replication.
 
-PostgreSQL setup requirements
-'''''''''''''''''''''''''''''
+.. list-table:: Support
+   :header-rows: 1
+   :widths: 28 24 48
+   :width: 100%
 
-**Step 1: Check if you have all the required credentials for replicating data from PostgreSQL**
-
-* ``CREATEROLE`` or ``SUPERUSER`` privilege - Either permission is required to create a database user for PipelineWise.
-
-**Step 2. Create a PipelineWise database user**
-
-Next, you’ll create a dedicated database user for PipelineWise. Create a new user and grant the required permissions
-on the database, schema and tables that you want to replicate:
-
-    * ``CREATE USER pipelinewise WITH ENCRYPTED PASSWORD '<password>'``
-    * ``GRANT CONNECT ON DATABASE <database_name> TO pipelinewise``
-    * ``GRANT USAGE ON SCHEMA <schema_name> TO pipelinewise``
-    * ``GRANT SELECT ON ALL TABLES IN SCHEMA <schema_name> TO pipelinewise``
+   * - Source
+     - Status
+     - Native transfer
+   * - PostgreSQL
+     - Available
+     - FullSync to PostgreSQL or Snowflake; PartialSync to Snowflake
 
 
-In order for pipelinewise user to automatically be able to access any tables created in the future, we recommend running the following query:
+Prerequisites
+-------------
 
-``ALTER DEFAULT PRIVILEGES IN SCHEMA <schema_name> GRANT SELECT ON TABLES TO pipelinewise;``
+The runtime user needs ``CONNECT`` on the database, ``USAGE`` on each source
+schema, and ``SELECT`` on replicated tables. Grant default privileges if future
+tables must be discovered automatically.
 
+LOG_BASED replication also requires:
 
-**Step 3: Configure Log-based Incremental Replication**
+- a connection to the writable primary;
+- ``wal_level=logical`` and sufficient ``max_replication_slots`` and
+  ``max_wal_senders`` capacity;
+- the `wal2json <https://github.com/eulerto/wal2json>`_ plugin with format
+  version 2 support; and
+- permission to create and consume a logical replication slot.
 
-.. note::
-
-  This step is only required if you use :ref:`log_based` replication method.
-
-.. warning::
-
-  :ref:`log_based` for PostgreSQL-based databases requires:
-
-  * **PostgreSQL databases running PostgreSQL versions 9.4.x or greater.**
-  * **To avoid a critical PostgreSQL bug, use at least one of the following minor versions**
-
-    * PostgreSQL 12.0
-
-    * PostgreSQL 11.2
-
-    * PostgreSQL 10.7
-
-    * PostgreSQL 9.6.12
-
-    * PostgreSQL 9.5.16
-
-    * PostgreSQL 9.4.21
-
-  * **A connection to the master instance.** Log-based replication will only work by connecting to the master instance.
-
-**Step 3.1: Install the wal2json plugin**
-
-To use :ref:`log_based` for your PostgreSQL integration, you must install the `wal2json <https://github
-.com/eulerto/wal2json>`_ plugin that has support for format-version=2 (wal2json >= 2.3). The wal2json plugin outputs
-JSON objects for logical decoding, which the tap then uses to perform Log-based Replication.
-
-Steps for installing the plugin vary depending on your operating system. Instructions for each operating system type are in the wal2json’s GitHub repository:
-
-* `Unix-based operating systems <https://github.com/eulerto/wal2json#unix-based-operating-systems>`_
-
-* `Windows <https://github.com/eulerto/wal2json#windows>`_
-
-After you’ve installed the plugin, you can move onto the next step.
-
-**Step 3.2: Edit the database configuration file**
-
-Locate the database configuration file (usually ``postgresql.conf``) and define the parameters as follows:
-
-.. code-block:: ini
-
-    wal_level=logical
-    max_replication_slots=5
-    max_wal_senders=5
-
-**Note**: For ``max_replication_slots`` and ``max_wal_senders``, we’re defaulting to a value of 5.
-This should be sufficient unless you have a large number of read replicas connected to the master instance.
-
-**Step 3.3: Restart the PostgreSQL service**
-
-Restart your PostgreSQL service to ensure the changes take effect.
-
-**Step 3.4: Replication slot**
-
-In PostgreSQL, a logical replication slot represents a stream of database changes that can then be replayed to a
-client in the order they were made on the original server. Each slot streams a sequence of changes from a single
-database.
-
-Pipelinewise automatically creates a dedicated logical replication slot for each database and tap.
+PipelineWise creates one slot for the tap database. PostgreSQL retains WAL needed
+by that slot, so monitor retained WAL and do not remove the slot while the tap is
+active.
 
 
-.. note:: ``wal2json`` is required to use :ref:`log_based` in Pipelinewise for PostgreSQL-backed databases.
-
-.. note:: In case of full resync of a whole tap, Pipelinewise will attempt to drop the slot.
-
-
-Configuring what to replicate
-'''''''''''''''''''''''''''''
-
-PipelineWise configures every tap with a common structured YAML file format.
-A sample YAML for Postgres replication can be generated into a project directory by
-following the steps in the :ref:`generating_pipelines` section.
-
-Example YAML for ``tap-postgres``:
+Configuration
+-------------
 
 .. code-block:: yaml
 
-    ---
+   id: "orders"
+   name: "Orders PostgreSQL"
+   type: "tap-postgres"
+   owner: "data-platform@example.com"
+   db_conn:
+     host: "<HOST>"
+     port: 5432
+     user: "<USER>"
+     password: "{{ env_var['POSTGRES_PASSWORD'] }}"
+     dbname: "orders"
+   target: "snowflake"
+   batch_size_rows: 20000
+   stream_buffer_size: 0
+   schemas:
+     - source_schema: "public"
+       target_schema: "repl_orders"
+       tables:
+         - table_name: "payments"
+           replication_method: "LOG_BASED"
 
-    # ------------------------------------------------------------------------------
-    # General Properties
-    # ------------------------------------------------------------------------------
-    id: "postgres_sample"                  # Unique identifier of the tap
-    name: "Sample Postgres Database"       # Name of the tap
-    type: "tap-postgres"                   # !! THIS SHOULD NOT CHANGE !!
-    owner: "somebody@foo.com"              # Data owner to contact
-    #send_alert: False                     # Optional: Disable all configured alerts on this tap
-    #slack_alert_channel: "#tap-channel"   # Optional: Sending a copy of specific tap alerts to this slack channel
+.. list-table:: Connector-specific settings
+   :header-rows: 1
+   :widths: 27 18 18 37
+   :width: 100%
+
+   * - Setting
+     - Required
+     - Default
+     - Effect
+   * - ``replica_host``
+     - No
+     - Primary host
+     - Offloads FastSync reads; logical replication remains on the primary.
+   * - ``filter_schemas``
+     - No
+     - All visible schemas
+     - Limits discovery to a comma-separated schema list.
+   * - ``max_run_seconds``
+     - No
+     - ``43200``
+     - Stops a logical replication run after this duration.
+   * - ``logical_poll_total_seconds``
+     - No
+     - ``10800``
+     - Stops after this total idle polling period.
+   * - ``break_at_end_lsn``
+     - No
+     - ``true``
+     - Stops after reaching the WAL boundary captured at startup.
+   * - ``ssl``
+     - No
+     - Connector default
+     - Uses PostgreSQL ``sslmode=require`` when enabled.
+   * - ``limit``
+     - No
+     - Unlimited
+     - Bounds rows returned by an incremental query.
+   * - ``fastsync_parallelism``
+     - No
+     - CPU count
+     - Controls concurrent FastSync table exports.
+
+Common tap settings are documented in :ref:`yaml_configuration`. Generate the
+full template with ``pipelinewise init``.
 
 
-    # ------------------------------------------------------------------------------
-    # Source (Tap) - PostgreSQL connection details
-    # ------------------------------------------------------------------------------
-    db_conn:
-      host: "<HOST>"                       # PostgreSQL host
-      port: 5432                           # PostgreSQL port
-      user: "<USER>"                       # PostgreSQL user
-      password: "<PASSWORD>"               # Plain string or vault encrypted
-      dbname: "<DB_NAME>"                  # PostgreSQL database name
-      #replica_host: "<REPLICA_HOST>"      # Optional: PostgresSQL replica host to offload initial/FastSync
-                                           #           to a read replica, switch back to primary for log-based 
-                                           #           replication. Used to resync large tables without impacting 
-                                           #           primary DB performance.
-      #filter_schemas: "schema1,schema2"   # Optional: Scan only the required schemas
-                                           #           to improve the performance of
-                                           #           data extraction
-      #max_run_seconds                     # Optional: Stop running the tap after certain
-                                           #           number of seconds
-                                           #           Default: 43200
-      #logical_poll_total_seconds:         # Optional: Stop running the tap when no data
-                                           #           received from wal after certain number of seconds
-                                           #           Default: 10800
-      #break_at_end_lsn:                   # Optional: Stop running the tap if the newly received lsn
-                                           #           is after the max lsn that was detected when the tap started
-                                           #           Default: true
-      #ssl: "true"                         # Optional: Using SSL via postgres sslmode 'require' option.
-                                           #           If the server does not accept SSL connections or the client
-                                           #           certificate is not recognized the connection will fail
-      #fastsync_parallelism: 4             # Optional: size of multiprocessing pool used by FastSync
-                                           #           Min: 1
-                                           #           Default: number of CPU cores
-      #limit: 50000                        # Optional: limit to add to incremental queries, this is useful to avoid long running transactions on the DB
+Acknowledgement and recovery
+----------------------------
 
-    # ------------------------------------------------------------------------------
-    # Destination (Target) - Target properties
-    # Connection details should be in the relevant target YAML file
-    # ------------------------------------------------------------------------------
-    target: "snowflake"                    # ID of the target connector where the data will be loaded
-    batch_size_rows: 20000                 # Batch size for the stream to optimise load performance
-    stream_buffer_size: 0                  # In-memory buffer size (MB) between taps and targets for asynchronous data pipes
-    #batch_wait_limit_seconds: 3600        # Optional: Maximum time (seconds) to wait for `batch_size_rows` before
-                                           #           flushing a partial batch. Available only for Snowflake target.
+Consuming WAL does not by itself advance the slot's safe flush position.
+PipelineWise sends feedback only up to the minimum target-acknowledged LSN stored
+in ``state.json``. Missing, unreadable, invalid, or regressing state retains the
+previous safe LSN.
 
-    # Options only for Snowflake target
-    #split_large_files: False                       # Optional: split large files to multiple pieces and create multipart zip files. (Default: False)
-    #split_file_chunk_size_mb: 1000                 # Optional: File chunk sizes if `split_large_files` enabled. (Default: 1000)
-    #split_file_max_chunks: 20                      # Optional: Max number of chunks if `split_large_files` enabled. (Default: 20)
-    #archive_load_files: False                      # Optional: when enabled, the files loaded to Snowflake will also be stored in `archive_load_files_s3_bucket`
-    #archive_load_files_s3_prefix: "archive"        # Optional: When `archive_load_files` is enabled, the archived files will be placed in the archive S3 bucket under this prefix.
-    #archive_load_files_s3_bucket: "<BUCKET_NAME>"  # Optional: When `archive_load_files` is enabled, the archived files will be placed in this bucket. (Default: the value of `s3_bucket` in target snowflake YAML)
-
-
-    # ------------------------------------------------------------------------------
-    # Source to target Schema mapping
-    # ------------------------------------------------------------------------------
-    schemas:
-
-      - source_schema: "public"            # Source schema in postgres with tables
-        target_schema: "repl_pg_public"    # Target schema in the destination Data Warehouse
-        target_schema_select_permissions:  # Optional: Grant SELECT on schema and tables that created
-          - grp_stats
-
-        # List of tables to replicate from Postgres to destination Data Warehouse
-        #
-        # Please check the Replication Strategies section in the documentation to understand the differences.
-        # For LOG_BASED replication method you might need to adjust the source PostgreSQL configuration.
-        tables:
-          - table_name: "table_one"
-            replication_method: "INCREMENTAL"   # One of INCREMENTAL, LOG_BASED and FULL_TABLE
-            replication_key: "last_update"      # Important: Incremental load always needs replication key
-
-            # OPTIONAL: Load time transformations
-            #transformations:                    
-            #  - column: "last_name"            # Column to transform
-            #    type: "SET-NULL"               # Transformation type
-
-          # You can add as many tables as you need...
-          - table_name: "table_two"
-            replication_method: "LOG_BASED"     # Important! Log based must be enabled in PostgreSQL
-
-          - table_name: "table_three"
-            replication_method: "LOG_BASED"
-            sync_start_from:                   # Optional, applies for the first sync and fast sync
-              column: "column_name"            # column name to be picked for partial sync with incremental or timestamp value
-              static_value: "start_value"      # A static value which the first sync always starts from column >= static_value
-              drop_target_table: true          # Optional, drops target table before syncing. default value is false
-
-          - table_name: "table_four"
-            replication_method: "LOG_BASED"
-            sync_start_from:                   # Optional, applies for the first sync and fast sync
-              column: "column_name"            # Column name to be picked for partial sync with incremental or timestamp value
-              dynamic_value: "SELECT MAX(updated_at) - INTERVAL '7 days' FROM table_four"
-              drop_target_table: true          # Optional, drops target table before syncing. default value is false
-
-      # You can add as many schemas as you need...
-      # Uncomment this if you want to replicate tables from multiple schemas
-      #- source_schema: "another_schema_in_postgres"
-      #  target_schema: "another_schema_in_target"
-
-      # Note: static and dynamic values cannot be defined together for a table; only one can be used.
+After an unexpected termination, restart the same tap without advancing state.
+Unacknowledged WAL remains replayable while the slot exists. Resync only when the
+slot or required WAL is unavailable, and monitor retained WAL during a prolonged
+target outage. See :ref:`stream_buffering` and :ref:`troubleshooting`.

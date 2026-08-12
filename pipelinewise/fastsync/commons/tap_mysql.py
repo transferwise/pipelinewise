@@ -29,6 +29,16 @@ DEFAULT_SESSION_SQLS = [
 ]
 
 
+def _create_csv_writer(output):
+    """Keep SQL NULL distinct from an empty string in Snowflake CSV loads."""
+    return csv.writer(
+        output,
+        delimiter=',',
+        quotechar='"',
+        quoting=csv.QUOTE_NOTNULL,
+    )
+
+
 class FastSyncTapMySql:
     """
     Common functions for fastsync from a MySQL database
@@ -158,15 +168,24 @@ class FastSyncTapMySql:
 
     def close_connections(self, silent=False):
         """
-        Close connection
+        Close and clear both buffered and unbuffered connections.
         """
-        try:
-            self.conn.close()
-            self.conn_unbuffered.close()
-        except Exception as exc:
-            if not silent:
-                LOGGER.exception(exc)
-                LOGGER.info('Connections seem to be already closed.')
+        connections = (
+            ('buffered', self.conn),
+            ('unbuffered', self.conn_unbuffered),
+        )
+        self.conn = None
+        self.conn_unbuffered = None
+
+        for connection_name, connection in connections:
+            if connection is None:
+                continue
+            try:
+                connection.close()
+            except Exception as exc:
+                if not silent:
+                    LOGGER.exception(exc)
+                    LOGGER.info('%s connection seems to be already closed.', connection_name.capitalize())
 
     # pylint: disable=too-many-arguments
     def query(self, query, conn=None, params=None, return_as_cursor=False, n_retry=1):
@@ -367,7 +386,7 @@ class FastSyncTapMySql:
                                     THEN concat('CASE WHEN YEAR(`', column_name, '`) = 0 OR MONTH(`', column_name, '`) NOT BETWEEN 1 AND 12 OR DAY(`', column_name, '`) = 0 OR DAY(`', column_name, '`) > DAY(LAST_DAY(DATE_FORMAT(`', column_name, '`, "%Y-%m-01"))) THEN NULL ELSE CAST(`', column_name, '` AS {date_type}) END')
                             WHEN data_type IN ('datetime', 'timestamp')
                                     THEN concat('CASE WHEN YEAR(`', column_name, '`) = 0 OR MONTH(`', column_name, '`) NOT BETWEEN 1 AND 12 OR DAY(`', column_name, '`) = 0 OR DAY(`', column_name, '`) > DAY(LAST_DAY(DATE_FORMAT(`', column_name, '`, "%Y-%m-01"))) THEN NULL ELSE `', column_name, '` END')
-                            WHEN column_type IN ('tinyint(1)')
+                            WHEN LOWER(column_type) REGEXP '^tinyint[(]1[)]( unsigned)?( zerofill)?$'
                                     THEN concat('CASE WHEN `' , column_name , '` is null THEN null WHEN `' , column_name , '` = 0 THEN 0 ELSE 1 END')
                             WHEN column_type IN ('geometry', 'point', 'linestring', 'polygon', 'multipoint', 'multilinestring', 'multipolygon', 'geometrycollection')
                                     THEN concat('ST_AsGeoJSON(', column_name, ')')
@@ -468,12 +487,7 @@ class FastSyncTapMySql:
             )
 
             with gzip_splitter as split_gzip_files:
-                writer = csv.writer(
-                    split_gzip_files,
-                    delimiter=',',
-                    quotechar='"',
-                    quoting=csv.QUOTE_MINIMAL,
-                )
+                writer = _create_csv_writer(split_gzip_files)
 
                 while True:
                     rows = cur.fetchmany(export_batch_rows)

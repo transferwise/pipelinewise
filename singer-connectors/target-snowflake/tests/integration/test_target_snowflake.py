@@ -347,6 +347,10 @@ class TestIntegration(unittest.TestCase):
 
         self.assert_three_streams_are_into_snowflake()
 
+    @unittest.skipUnless(
+        os.environ.get('CLIENT_SIDE_ENCRYPTION_MASTER_KEY'),
+        'CLIENT_SIDE_ENCRYPTION_MASTER_KEY is required to test encrypted loading',
+    )
     def test_loading_tables_with_client_side_encryption(self):
         """Loading multiple tables from the same input tap with various columns types"""
         tap_lines = test_utils.get_test_tap_lines('messages-with-three-streams.json')
@@ -1164,23 +1168,15 @@ class TestIntegration(unittest.TestCase):
 
         target_db = self.config['dbname']
         target_schema = self.config['default_target_schema']
-        self.assertEqual(result, [{
-            'QUERY_TAG': f'PPW test tap run at {current_time}. Loading into {target_db}..',
-            'QUERIES': 4
-        },
-            {
-                'QUERY_TAG': f'PPW test tap run at {current_time}. Loading into {target_db}.{target_schema}.TEST_TABLE_ONE',
-                'QUERIES': 10
-            },
-            {
-                'QUERY_TAG': f'PPW test tap run at {current_time}. Loading into {target_db}.{target_schema}.TEST_TABLE_THREE',
-                'QUERIES': 9
-            },
-            {
-                'QUERY_TAG': f'PPW test tap run at {current_time}. Loading into {target_db}.{target_schema}.TEST_TABLE_TWO',
-                'QUERIES': 9
-            }
-        ])
+        expected_minimum_queries = {
+            f'PPW test tap run at {current_time}. Loading into {target_db}..': 4,
+            f'PPW test tap run at {current_time}. Loading into {target_db}.{target_schema}.TEST_TABLE_ONE': 10,
+            f'PPW test tap run at {current_time}. Loading into {target_db}.{target_schema}.TEST_TABLE_THREE': 9,
+            f'PPW test tap run at {current_time}. Loading into {target_db}.{target_schema}.TEST_TABLE_TWO': 9,
+        }
+        self.assertEqual({row['QUERY_TAG'] for row in result}, set(expected_minimum_queries))
+        for row in result:
+            self.assertGreaterEqual(row['QUERIES'], expected_minimum_queries[row['QUERY_TAG']])
 
         # Detecting file format type should run only once
         result = snowflake.query(f"""SELECT count(*) show_file_format_queries

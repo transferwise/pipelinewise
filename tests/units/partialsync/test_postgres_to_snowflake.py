@@ -36,6 +36,123 @@ class PartialSyncTestCase(TestCase):
 
         self.assertEqual(f'{args.table}: {exception_message}', actual_return)
 
+    @mock.patch('pipelinewise.fastsync.commons.utils.save_state_file')
+    @mock.patch('pipelinewise.fastsync.commons.utils.get_bookmark_for_table', return_value='bookmark')
+    @mock.patch(
+        'pipelinewise.fastsync.partialsync.utils.upload_to_s3',
+        return_value=(['s3-key'], 's3-pattern'),
+    )
+    @mock.patch('pipelinewise.fastsync.partialsync.postgres_to_snowflake.FastSyncTapPostgres')
+    @mock.patch('pipelinewise.fastsync.partialsync.postgres_to_snowflake.FastSyncTargetSnowflake')
+    def test_postgres_partial_sync_failure_state_semantics(
+        self, mocked_fastsync_sf, mocked_fastsyncpg, _mocked_upload, _mocked_bookmark, mocked_save_state
+    ):
+        """Publication and staging-cleanup failures all withhold state."""
+        for failure_method, error_message in (
+            ('copy_to_table', 'copy failed'),
+            ('publish_partial_sync', 'transaction failed'),
+            ('drop_table', 'cleanup failed'),
+        ):
+            with self.subTest(failure_method=failure_method), TemporaryDirectory() as temp_directory:
+                args = PartialSync2SFArgs(temp_test_dir=temp_directory, end_value=None)
+                test_table = ('foo', {
+                    'column': 'foo_column',
+                    'start_value': '<S>1',
+                    'end_value': None,
+                    'drop_target_table': False,
+                })
+                file_part = f'{temp_directory}/part.csv.gz'
+                with open(file_part, 'w', encoding='utf8') as exported_file:
+                    exported_file.write('data')
+
+                source = mock.MagicMock()
+                source.export_source_table_data.return_value = [file_part]
+                source.map_column_types_to_target.return_value = {
+                    'columns': ['"ID" NUMBER'],
+                    'primary_key': ['"ID"'],
+                }
+                mocked_fastsyncpg.return_value = source
+
+                snowflake = mock.MagicMock()
+                snowflake.query.return_value = []
+                getattr(snowflake, failure_method).side_effect = RuntimeError(error_message)
+                mocked_fastsync_sf.return_value = snowflake
+                mocked_save_state.reset_mock()
+
+                result = postgres_to_snowflake.partial_sync_table(test_table, args)
+
+                source.close_connection.assert_called_once_with()
+                if failure_method == 'drop_table':
+                    self.assertIn('foo: cleanup failed; staging cleanup failed:', result)
+                else:
+                    self.assertEqual(f'foo: {error_message}', result)
+                mocked_save_state.assert_not_called()
+                snowflake.s3.delete_object.assert_called_once_with(
+                    Bucket=args.target['s3_bucket'], Key='s3-key'
+                )
+
+                if failure_method == 'copy_to_table':
+                    snowflake.obfuscate_columns.assert_not_called()
+                    snowflake.publish_partial_sync.assert_not_called()
+                    self.assertEqual(snowflake.create_table.call_count, 1)
+                elif failure_method == 'publish_partial_sync':
+                    snowflake.copy_to_table.assert_called_once_with(
+                        's3-pattern', 'foo_schema', 'foo', 4, is_temporary=True
+                    )
+                    snowflake.publish_partial_sync.assert_called_once()
+                expected_drop_call = mock.call(
+                    'foo_schema',
+                    'foo',
+                    is_temporary=True,
+                    max_attempts=3,
+                )
+                self.assertEqual(
+                    snowflake.drop_table.call_args_list,
+                    [expected_drop_call]
+                    * (2 if failure_method == 'drop_table' else 1),
+                )
+
+    @mock.patch('pipelinewise.fastsync.commons.utils.save_state_file')
+    @mock.patch(
+        'pipelinewise.fastsync.commons.utils.get_bookmark_for_table',
+        return_value='bookmark',
+    )
+    @mock.patch('pipelinewise.fastsync.partialsync.postgres_to_snowflake.FastSyncTapPostgres')
+    @mock.patch('pipelinewise.fastsync.partialsync.postgres_to_snowflake.FastSyncTargetSnowflake')
+    def test_postgres_empty_unbounded_sync_publishes_and_advances_state(
+        self,
+        mocked_fastsync_sf,
+        mocked_fastsyncpg,
+        _mocked_bookmark,
+        mocked_save_state,
+    ):
+        """An empty PostgreSQL export still publishes its range and bookmark."""
+        args = PartialSync2SFArgs(temp_test_dir='FOO_DIR', end_value=None)
+        test_table = ('foo', {
+            'column': 'foo_column',
+            'start_value': '<S>1',
+            'end_value': None,
+            'drop_target_table': False,
+        })
+        source = mocked_fastsyncpg.return_value
+        source.export_source_table_data.return_value = []
+        source.map_column_types_to_target.return_value = {
+            'columns': ['"ID" NUMBER'],
+            'primary_key': ['"ID"'],
+        }
+        snowflake = mocked_fastsync_sf.return_value
+        snowflake.query.return_value = []
+
+        result = postgres_to_snowflake.partial_sync_table(test_table, args)
+
+        self.assertIs(result, True)
+        snowflake.copy_to_table.assert_called_once_with(
+            'NO_FILES_TO_LOAD', 'foo_schema', 'foo', 0, is_temporary=True
+        )
+        snowflake.publish_partial_sync.assert_called_once()
+        snowflake.s3.delete_object.assert_not_called()
+        mocked_save_state.assert_called_once_with(args.state, 'foo', 'bookmark')
+
     def test_export_source_table_data(self):
         """Test export_source_table_data method"""
         expected_file_parts = []
@@ -195,7 +312,6 @@ class PartialSyncTestCase(TestCase):
             with TemporaryDirectory() as temp_directory:
                 file_size = 5
                 file_parts = [f'{temp_directory}/t1', ]
-                s3_keys = ['FOO_S3_KEYS', ]
                 s3_key_pattern = 'BAR_S3_KEY_PATTERN'
                 bookmark = 'foo_bookmark'
                 maped_column_types_to_target = {
@@ -210,40 +326,40 @@ class PartialSyncTestCase(TestCase):
 
                     return file_parts
 
-                mocked_upload_to_s3.return_value = (s3_keys, s3_key_pattern)
+                mocked_upload_to_s3.return_value = (['FOO_S3_KEYS'], s3_key_pattern)
                 mocked_bookmark.return_value = bookmark
                 mocked_export_data = mocked_fastsyncpg.return_value.export_source_table_data
                 mocked_fastsyncpg.return_value.map_column_types_to_target.return_value = maped_column_types_to_target
                 mocked_export_data.side_effect = export_data_to_file
 
                 actual_return = postgres_to_snowflake.partial_sync_table(test_table, args)
-                self.assertTrue(actual_return)
+                self.assertIs(actual_return, True)
+
+                mocked_fastsyncpg.assert_called_once_with(
+                    args.tap, postgres_to_snowflake.tap_type_to_target_type
+                )
 
                 target = {
                     'schema': 'foo_schema',
                     'sf_object': mocked_fastsync_sf(),
                     'table': table_name,
-                    'temp': 'foo_temp'
+                    'temp': 'foo_temp',
+                    'publication_status': {'attempted': True},
                 }
-                columns_diff = {
-                    'added_columns': {'bar': 'type2', 'foo': 'type1'},
-                    'removed_columns': {},
-                    'source_columns': {'bar': 'type2', 'foo': 'type1'},
-                    'target_columns': []
-                }
-
-                mocked_fastsync_sf.return_value.query.assert_called_with(
-                    'UPDATE foo_schema."FOO" SET _SDC_DELETEd_AT = CURRENT_TIMESTAMP()'
-                    ' WHERE foo_column >= \'1\' AND _SDC_DELETED_AT IS NULL'
-                                                                        )
                 mocked_fastsync_sf.return_value.create_schema.assert_called_with('foo_schema')
-                mocked_fastsync_sf.return_value.create_table.assert_called_with(
+                mocked_fastsync_sf.return_value.create_table.assert_called_once_with(
                     'foo_schema', 'foo', ['foo type1', 'bar type2'], 'foo_primary', is_temporary=True)
+                mocked_fastsync_sf.return_value.query.assert_not_called()
+                mocked_fastsyncpg.return_value.close_connection.assert_called_once_with()
 
                 mocked_load_into_sf.assert_called_with(
-                    target, args, columns_diff, maped_column_types_to_target['primary_key'],
+                    target, args, maped_column_types_to_target['columns'],
+                    maped_column_types_to_target['primary_key'],
                     s3_key_pattern, file_size,
-                    f" WHERE {test_table[1]['column']} >= '{test_table[1]['start_value'][3:]}'"
+                    f" WHERE {test_table[1]['column']} >= '{test_table[1]['start_value'][3:]}'",
+                )
+                mocked_fastsync_sf.return_value.s3.delete_object.assert_called_once_with(
+                    Bucket=args.target['s3_bucket'], Key='FOO_S3_KEYS'
                 )
 
                 if end_value:

@@ -1,178 +1,160 @@
-
 .. _target-snowflake:
 
-Target Snowflake
-----------------
+Snowflake target
+================
+
+``target-snowflake`` loads Singer records through staged CSV files and supports
+native FastSync for selected database sources.
+
+.. list-table:: Support
+   :header-rows: 1
+   :widths: 28 24 48
+   :width: 100%
+
+   * - Target
+     - Status
+     - Native transfer
+   * - Snowflake
+     - Available
+     - FullSync from MariaDB/MySQL, PostgreSQL, or MongoDB; PartialSync from
+       MariaDB/MySQL or PostgreSQL
 
 
-Snowflake setup requirements
-''''''''''''''''''''''''''''
+Prerequisites
+-------------
 
-.. warning::
+Create these Snowflake objects before importing a pipeline:
 
-  You need to create a few objects in a Snowflake schema before start replicating data to Snowflake:
-   * **Named External Stage**: to upload the CSV files to S3 and to MERGE data into snowflake tables.
-   * **Named File Format**: to run MERGE/COPY commands and to parse the CSV files correctly
-   * **A Role**: to grant all the required permissions
-   * **A User**: to run PipelineWise
+- a warehouse used for loading;
+- a target role and user;
+- an external S3 stage; and
+- a named CSV file format.
 
-1. Create a named external stage object on S3:
+The role needs warehouse usage, database usage, schema creation, and usage on the
+stage and file format. Grant ownership or table privileges only where the target
+must create, merge, alter, or replace tables.
 
-.. code-block:: bash
+Example stage and file format:
 
-    CREATE STAGE {database}.{schema}.{stage_name}
-    url='s3://{s3_bucket}'
-    credentials=(AWS_KEY_ID='{aws_key_id}' AWS_SECRET_KEY='{aws_secret_key}')
-    encryption=(MASTER_KEY='{client_side_encryption_master_key}');
+.. code-block:: sql
 
-**Note**:
- * The ``{schema}`` and ``{stage_name}`` can be any name that Snowflake accepts.
- * The encryption option is optional and used for client side encryption.
-   If you want client side encryption  you'll need to define the same master
-   key in the ``target-snowflake`` YAML. See the example below.
+   CREATE STAGE <database>.<schema>.<stage>
+     URL = 's3://<bucket>';
 
-2. Create a named file format:
+   CREATE FILE FORMAT <database>.<schema>.<file_format>
+     TYPE = 'CSV'
+     ESCAPE = '\\'
+     FIELD_OPTIONALLY_ENCLOSED_BY = '"';
 
-.. code-block:: bash
+Use a storage integration, instance role, or AWS profile where possible. If the
+stage uses client-side encryption, configure the same master key in PipelineWise.
 
-    CREATE FILE FORMAT {database}.{schema}.{file_format_name}
-    TYPE = 'CSV' ESCAPE='\\' FIELD_OPTIONALLY_ENCLOSED_BY='"';
-
-3. Create a Role with all the required permissions:
-
-.. code-block:: bash
-
-    CREATE OR REPLACE ROLE ppw_target_snowflake;
-    GRANT USAGE ON DATABASE {database} TO ROLE ppw_target_snowflake;
-    GRANT CREATE SCHEMA ON DATABASE {database} TO ROLE ppw_target_snowflake;
-
-    GRANT USAGE ON SCHEMA {database}.{schema} TO role ppw_target_snowflake;
-    GRANT USAGE ON STAGE {database}.{schema}.{stage_name} TO ROLE ppw_target_snowflake;
-    GRANT USAGE ON FILE FORMAT {database}.{schema}.{file_format_name} TO ROLE ppw_target_snowflake;
-    GRANT USAGE ON WAREHOUSE {warehouse} TO ROLE ppw_target_snowflake;
-
-Replace ``database``, ``schema``, ``warehouse``, ``stage_name`` and ``file_format_name``
-between ``{`` and ``}`` characters to the actual values from point 1 and 2.
+``aws_profile`` falls back to ``AWS_PROFILE``. ``aws_access_key_id``,
+``aws_secret_access_key``, and ``aws_session_token`` fall back to
+``AWS_ACCESS_KEY_ID``, ``AWS_SECRET_ACCESS_KEY``, and ``AWS_SESSION_TOKEN``.
+Configure the access-key ID and secret together; add the session token for
+temporary credentials. With none configured, Boto3 uses its default credential
+chain.
 
 
-4. Create a user and grant permission to the role:
-
-.. code-block:: bash
-
-    CREATE OR REPLACE USER {user}
-    PASSWORD = '{password}'
-    DEFAULT_ROLE = ppw_target_snowflake
-    DEFAULT_WAREHOUSE = '{warehouse}'
-    MUST_CHANGE_PASSWORD = FALSE;
-
-    GRANT ROLE ppw_target_snowflake TO USER {user};
-
-Replace ``warehouse`` between ``{`` and ``}`` characters to the actual values from point 3.
-
-Configuring where to replicate data
-'''''''''''''''''''''''''''''''''''
-
-PipelineWise configures every target with a common structured YAML file format.
-A sample YAML for Snowflake target can be generated into a project directory by
-following the steps in the :ref:`generating_pipelines` section.
-
-Example YAML for target-snowflake:
+Configuration
+-------------
 
 .. code-block:: yaml
 
-    ---
+   id: "snowflake"
+   name: "Analytics Snowflake"
+   type: "target-snowflake"
+   db_conn:
+     account: "<ACCOUNT>"
+     dbname: "<DATABASE>"
+     user: "<USER>"
+     private_key: "/run/secrets/snowflake-key.pem"
+     warehouse: "<WAREHOUSE>"
+     s3_bucket: "<STAGING_BUCKET>"
+     s3_key_prefix: "pipelinewise/"
+     stage: "<SCHEMA>.<STAGE>"
+     file_format: "<SCHEMA>.<FILE_FORMAT>"
+     iceberg_create: false
 
-    # ------------------------------------------------------------------------------
-    # General Properties
-    # ------------------------------------------------------------------------------
-    id: "snowflake"                        # Unique identifier of the target
-    name: "Snowflake"                      # Name of the target
-    type: "target-snowflake"               # !! THIS SHOULD NOT CHANGE !!
+.. list-table:: Connector-specific settings
+   :header-rows: 1
+   :widths: 28 18 18 36
+   :width: 100%
+
+   * - Setting
+     - Required
+     - Default
+     - Effect
+   * - ``account`` / ``dbname``
+     - Yes
+     - —
+     - Snowflake account and target database.
+   * - ``user`` / ``private_key``
+     - Yes
+     - —
+     - Key-pair authentication for the target role.
+   * - ``warehouse``
+     - Yes
+     - —
+     - Warehouse used for load and merge statements.
+   * - ``s3_bucket`` / ``s3_key_prefix``
+     - Yes
+     - —
+     - Staging location used by target loads.
+   * - ``aws_profile``
+     - No
+     - ``AWS_PROFILE``
+     - Selects a named profile when no static key pair is configured.
+   * - ``aws_access_key_id`` / ``aws_secret_access_key``
+     - No
+     - AWS environment
+     - Supplies a static credential pair; encrypt both YAML values.
+   * - ``aws_session_token``
+     - With temporary keys
+     - ``AWS_SESSION_TOKEN``
+     - Completes temporary static credentials.
+   * - ``s3_acl``
+     - No
+     - None
+     - Applies a canned ACL to staged uploads. Leave unset for
+       bucket-owner-enforced buckets.
+   * - ``stage`` / ``file_format``
+     - Yes
+     - —
+     - Pre-created Snowflake objects used by ``COPY`` and ``MERGE``.
+   * - ``client_side_encryption_master_key``
+     - No
+     - None
+     - Encrypts staged files using the stage's matching master key.
+   * - ``iceberg_create``
+     - No
+     - ``false``
+     - Creates new Singer-path tables as managed Iceberg tables.
+   * - ``max_parallelism``
+     - No
+     - ``16``
+     - Caps automatic Singer stream-flush threads. Configure this in the target
+       ``db_conn``; tap-level ``parallelism_max`` is currently ineffective.
+
+Generate the full template with ``pipelinewise init``. Common target and tap-side
+batch settings are documented in :ref:`yaml_configuration`.
 
 
-    # ------------------------------------------------------------------------------
-    # Target - Data Warehouse connection details
-    # ------------------------------------------------------------------------------
-    db_conn:
-      account: "rtxxxxx.eu-central-1"               # Snowflake account
-      dbname: "<DB_NAME>"                           # Snowflake database name
-      user: "<USER>"                                # Snowflake user
-      private_key: "<private_key_path>"             # File contains PEM format for connecting to Snowflake
-      warehouse: "<WAREHOUSE>"                      # Snowflake virtual warehouse
-      iceberg_create: false                         # Create new tables as Iceberg tables (only available for pure Singer replications)
+Publication and grants
+----------------------
 
-      # We use an external stage on S3 to load data into Snowflake
-      # S3 Profile based authentication
-      aws_profile: "<AWS_PROFILE>"                  # AWS profile name, if not provided, the AWS_PROFILE environment
-                                                    # variable or the 'default' profile will be used, if not
-                                                    # available, then IAM role attached to the host will be used.
-
-      # S3 Credentials based authentication
-      #aws_access_key_id: "<ACCESS_KEY>"            # Plain string or vault encrypted. Required for non-profile based auth. If not provided, AWS_ACCESS_KEY_ID environment variable will be used.
-      #aws_secret_access_key: "<SECRET_ACCESS_KEY"  # Plain string or vault encrypted. Required for non-profile based auth. If not provided, AWS_SECRET_ACCESS_KEY environment variable will be used.
-      #aws_session_token: "<AWS_SESSION_TOKEN>"     # Optional: Plain string or vault encrypted. If not provided, AWS_SESSION_TOKEN environment variable will be used.
-
-      #aws_endpoint_url: "<FULL_ENDPOINT_URL>"      # Optional: for non AWS S3, for example https://nyc3.digitaloceanspaces.com
-
-      s3_bucket: "<BUCKET_NAME>"                    # S3 external stage bucket name
-      s3_key_prefix: "snowflake-imports/"           # Optional: S3 key prefix
-      #s3_acl: "<S3_OBJECT_ACL>"                    # Optional: Assign the canned ACL to the uploaded file on S3
-
-      # stage and file_format are pre-created objects in Snowflake that requires to load and
-      # merge data correctly from S3 to tables in one step without using temp tables
-      #  stage      : External stage object pointing to an S3 bucket
-      #  file_format: Named file format object used for bulk loading data from S3 into
-      #               snowflake tables.
-      stage: "<SCHEMA>.<STAGE_OBJECT_NAME>"
-      file_format: "<SCHEMA>.<FILE_FORMAT_OBJECT_NAME>"
-
-      # Optional: Client Side Encryption
-      # The same master key has to be added to the external stage object created in snowflake
-      #client_side_encryption_master_key: "<MASTER_KEY>" # Plain string or vault encrypted
+MariaDB/MySQL and PostgreSQL FastSync apply configured select roles only after a
+table is published. They do not grant schema-wide access while an obfuscated
+``_TEMP`` staging table may exist. When adding a role, sync each existing table
+that needs the role or grant it explicitly. MongoDB FastSync retains its legacy
+schema-wide grant behaviour.
 
 
-Snowflake Iceberg tables
-''''''''''''''''''''''''
-Iceberg support needs to be setup in Snowflake
-Useful tutorial : https://docs.snowflake.com/en/user-guide/tutorials/create-your-first-iceberg-table
+Iceberg tables
+--------------
 
-PipelineWise expects the target database to already have default Iceberg settings
-
-.. code-block:: text
-
-    CREATE OR REPLACE EXTERNAL VOLUME ACCOUNT_ICEBERG_VOLUME ... ;
-    ALTER DATABASE {target-database} SET CATALOG='snowflake';
-    ALTER DATABASE {target-database} SET EXTERNAL_VOLUME = ACCOUNT_ICEBERG_VOLUME;
-
-To create "**new**" tables as Iceberg tables, update target-snowflake yaml to include ``iceberg_create: true``
-
-.. code-block:: yaml
-
-    db_conn:
-      account: "rtxxxxx.eu-central-1"               # Snowflake account
-      dbname: "<DB_NAME>"                           # Snowflake database name
-      user: "<USER>"                                # Snowflake user
-      private_key: "<private_key_path>"             # File contains PEM format for connecting to Snowflake
-      warehouse: "<WAREHOUSE>"                      # Snowflake virtual warehouse
-      iceberg_create: true                          # Create new tables as Iceberg tables (only available for pure Singer replications)
-
-target-snowflake has a utility that can be used to convert an *existing* Native table into an Iceberg table in a PipelineWise compatible manner
-
-.. code-block:: bash
-
-    usage: copy-native-to-iceberg [-h] [-c CONFIG] [-t FQTN] [-e EVENTUAL]
-
-    options:
-    -h, --help            show this help message and exit
-    -c CONFIG, --config CONFIG
-                            target-snowflake config file
-    -t FQTN, --fqtn FQTN  Snowflake fully qualified table name (fqtn) in format database.schema.table
-    -e EVENTUAL, --eventual EVENTUAL
-                            EVENTUAL type of fqtn : NATIVE (Default) or ICEBERG. The other table type will still exist as a copy
-
-Limitations
-^^^^^^^^^^^
-* Only target-snowflake using the standard Singer replication path (i.e. not :ref:`fast_sync_main`)
-  is able to create a new Iceberg table. FastSync and PartialSync do not support Iceberg.
-* PipelineWise ``fast_sync`` and ``partial_sync_table`` commands will fail with
-  ``(42710): SQL compilation error: table already exists as ICEBERG_TABLE``
+Singer-path loads can create new managed Iceberg tables. FastSync and PartialSync
+cannot currently create or load Iceberg tables. Existing native tables can be
+converted with the bundled utility. See :ref:`snowflake_iceberg` for prerequisites,
+cutover, limitations, and recovery.

@@ -1,60 +1,95 @@
-
 .. _running_pipelines:
 
-Running Pipelines
-=================
+Run a pipeline
+==============
 
-First get a list of the available pipelines by running ``pipelinewise status`` command. If you followed the steps at
-:ref:`example_replication_mysql_to_snowflake` then you should see this output:
-
-.. code-block:: bash
-
-    $ pipelinewise status
-    Tap ID        Tap Type    Target ID    Target Type       Enabled    Status    Last Sync    Last Sync Result
-    ------------  ----------  -----------  ----------------  ---------  --------  -----------  ------------------
-    mysql_sample  tap-mysql   snowflake    target-snowflake  True       ready                  unknown
-    1 pipeline(s)
+Run one imported tap-target pair at a time. PipelineWise selects FastSync for an
+eligible initial load and the Singer path for ongoing incremental or log-based
+replication.
 
 
-To run a pipeline use the ``run_tap`` command with ``--tap`` and ``--target`` arguments to specify which pipeline
-to run by IDs. In the above example we need to run ``pipelinewise run_tap --tap mysql_sample --target snowflake``:
+Preflight
+---------
+
+Check configuration, connectivity, and imported status before starting a load:
 
 .. code-block:: bash
 
-    $ pipelinewise run_tap --tap mysql_sample --target snowflake
+    pipelinewise validate --dir ./pipelinewise_samples
+    pipelinewise test_tap_connection --tap orders --target snowflake
+    pipelinewise status
 
-    2019-08-19 16:52:07 INFO: Running mysql_sample tap in snowflake target
-    2019-08-19 16:52:08 INFO: Table(s) selected to sync by fastsync: ['table_one']
-    2019-08-19 16:52:08 INFO: Table(s) selected to sync by singer: ['table_two', 'table_three']
-    2019-08-19 16:52:08 INFO: Writing output into /app/.pipelinewise/postgres_dwh/mysql_fx/log/postgres_dwh-mysql_fx-20190819_165207.singer.log
+Re-run ``import_config`` after changing project YAML. Validation alone does not
+update generated runtime configuration.
 
 
-The pipeline should start running, it will detect automatically if initial sync or incremental load
-is required, when was the last time when it was running and will replicate every change since the last run.
-Once it's successfully finished the data is available in the target database and PipelineWise will update
-the internal state file with the bookmark for the next run.
+Start and observe
+-----------------
 
-.. warning::
+.. code-block:: bash
 
-  If you :ref:`running in docker <running_in_docker>` then the full path to the log files in the output is
-  maybe not correct. Everything that referring to ``/app/.pipelinewise/...`` in the output
-  is available on your Docker host at ``${HOME}/.pipelinewise`` directory.
+    pipelinewise run_tap --tap orders --target snowflake
 
-  Read the :ref:`logging` section for further details about logging.
+During the run, PipelineWise:
 
-Typically you need to run the above command automatically, every midnight, every hour, every 5 minutes, etc.
-Now you can head to the :ref:`scheduling` section that will give you some idea about scheduling.
+1. locks the tap-target pair to prevent a concurrent run;
+2. selects FastSync-eligible initial tables and Singer tables;
+3. streams or stages records into the target;
+4. persists only target-acknowledged state; and
+5. marks the log ``success`` or ``failed``.
 
-Alternatively you can learn more about PipelineWise how it automatically performs
-schema changes, how it does logging or load time transformations etc. in the recommended sections below:
+Follow the active log from another terminal:
 
-* :ref:`schema_changes`
+.. code-block:: bash
 
-* :ref:`encrypting_passwords`
+    tail -f ~/.pipelinewise/snowflake/orders/log/*.running
 
-* :ref:`transformations`
+See :ref:`logging` for filenames and diagnostic collection.
 
-* :ref:`logging`
 
-* :ref:`resync`
+Stop safely
+-----------
 
+Use the CLI rather than killing an arbitrary child process:
+
+.. code-block:: bash
+
+    pipelinewise stop_tap --tap orders --target snowflake
+
+The tap stops producing records and the target is allowed to finish data it has
+already received. For PostgreSQL LOG_BASED replication, WAL feedback remains
+bounded by target-acknowledged state. An unexpected termination can replay
+records after restart; targets must therefore retain their normal primary-key
+merge semantics.
+
+
+Confirm success
+---------------
+
+After the command exits successfully:
+
+.. code-block:: bash
+
+    pipelinewise status
+
+Confirm the target data as well as the PipelineWise status. For critical tables,
+configure :ref:`data_diff` rather than treating a successful process exit as
+proof of source-to-target equality.
+
+
+Recover from failure
+--------------------
+
+Do not advance or edit state merely to make a failed run start. Instead:
+
+1. retain the failed log and exact error;
+2. correct the source, target, credential, or configuration problem;
+3. restart the same ``run_tap`` command; and
+4. verify target contents and the new acknowledged state.
+
+Use :ref:`troubleshooting` for known errors. Use :ref:`resync` only when the
+required source log or replication slot is no longer available, or when target
+data must be rebuilt deliberately.
+
+Schedule the command only after an interactive run succeeds; see
+:ref:`scheduling`.

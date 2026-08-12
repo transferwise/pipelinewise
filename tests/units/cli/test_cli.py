@@ -696,18 +696,20 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
         assert pytest_wrapped_e.type == SystemExit
         assert pytest_wrapped_e.value.code == 1
 
-    def test_command_stop_tap(self):
+    def test_command_stop_tap(self, tmp_path):
         """Test stop tap command"""
         args = CliArgs(target='target_one', tap='tap_one')
         pipelinewise = PipelineWise(args, CONFIG_DIR, VIRTUALENVS_DIR)
-        pipelinewise.tap_run_log_file = 'test-tap-run-dummy.log'
-        Path(f'{pipelinewise.tap_run_log_file}.running').touch()
+        pipelinewise.tap_run_log_file = str(tmp_path / 'test-tap-run-dummy.log')
+        pipelinewise.tap['files']['pidfile'] = str(tmp_path / 'pipelinewise.pid')
 
         # Tap is not running, pid file not exist, should exit with error
         with pytest.raises(SystemExit) as pytest_wrapped_e:
             pipelinewise.stop_tap()
         assert pytest_wrapped_e.type == SystemExit
         assert pytest_wrapped_e.value.code == 1
+
+        Path(f'{pipelinewise.tap_run_log_file}.running').touch()
 
         # Stop tap command should stop all the child processes
         # 1. Start the pipelinewise mock executable that's running
@@ -732,9 +734,6 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
 
         # Graceful exit should rename log file from running status to terminated
         assert os.path.isfile(f'{pipelinewise.tap_run_log_file}.terminated')
-
-        # Delete test log file
-        os.remove(f'{pipelinewise.tap_run_log_file}.terminated')
 
     def test_command_run_tap_exit_with_error_1_if_fastsync_exception(self):
         """Test if run_tap command returns error 1 if exception in fastsync"""
@@ -845,6 +844,36 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
         with open(test_state_file, 'a', encoding='UTF-8'):
             pass
         self._assert_calling_sync_tables(pipelinewise)
+
+    def test_defined_partial_sync_preserves_zero_static_boundary(self):
+        """A YAML numeric zero must remain aligned with its selected table."""
+        pipelinewise = self._init_for_sync_tables_states_cleanup()
+        pipelinewise.args.table = '*'
+        defined_tables = {
+            'db_test_mysql.table_one': {
+                'column': 'id',
+                'static_value': 0,
+                'drop_target_table': False,
+            }
+        }
+
+        with patch.object(
+            pipelinewise, '_check_if_complete_tap_configuration'
+        ), patch.object(
+            pipelinewise,
+            'create_consumable_target_config',
+            return_value=pipelinewise.target['files']['config'],
+        ), patch.object(
+            pipelinewise, 'get_tap_log_dir', return_value='/tmp'
+        ), patch.object(
+            pipelinewise, 'run_tap_partialsync'
+        ) as run_partial_sync, patch(
+            'pipelinewise.cli.pipelinewise.utils.silentremove'
+        ):
+            pipelinewise.sync_tables_partial_sync(defined_tables)
+
+        assert pipelinewise.args.start_value == '<S>0'
+        run_partial_sync.assert_called_once()
 
     def test_validate_command_1(self):
         """Test validate command should fail because of missing replication key for incremental"""
