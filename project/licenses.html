@@ -241,9 +241,35 @@
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/troubleshooting.html">Troubleshooting</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="../user_guide/troubleshooting.html#symptom-index">Symptom index</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../user_guide/troubleshooting.html#replication-checks">Replication checks</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="../user_guide/troubleshooting.html#mariadb-mysql-errors">MariaDB / MySQL Errors</a></li>
-<li class="toctree-l3"><a class="reference internal" href="../user_guide/troubleshooting.html#postgresql-errors">PostgreSQL Errors</a></li>
-<li class="toctree-l3"><a class="reference internal" href="../user_guide/troubleshooting.html#fastsync-errors">FastSync Errors</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../user_guide/troubleshooting.html#when-to-resync">When to resync</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../user_guide/troubleshooting.html#incremental-method-and-missing-updates">INCREMENTAL method and missing updates</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../user_guide/troubleshooting.html#using-replica-host-for-large-table-resyncs-1-tb">Using replica_host for large table resyncs (1 TB+)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../user_guide/troubleshooting.html#changes-to-transformations">Changes to transformations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../user_guide/troubleshooting.html#resync-table-size-limit">Resync table size limit</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../user_guide/troubleshooting.html#mariadb-mysql-errors">MariaDB / MySQL Errors</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../user_guide/troubleshooting.html#lost-connection-to-mysql-server-errno-104-connection-reset-by-peer">Lost connection to MySQL server (Errno 104, Connection reset by peer)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../user_guide/troubleshooting.html#unknown-encoding-utf8mb3">Unknown encoding: utf8mb3</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../user_guide/troubleshooting.html#bogus-data-in-log-event">Bogus data in log event</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../user_guide/troubleshooting.html#log-event-exceeded-max-allowed-packet">Log event exceeded max_allowed_packet</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../user_guide/troubleshooting.html#missing-binlog">Missing binlog</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../user_guide/troubleshooting.html#changing-the-binlog-position-in-state-json">Changing the binlog position in state.json</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../user_guide/troubleshooting.html#postgresql-errors">PostgreSQL Errors</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../user_guide/troubleshooting.html#requires-wal-level-logical">requires wal_level &gt;= logical</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../user_guide/troubleshooting.html#pgres-copy-both-and-no-message-from-the-libpq">PGRES_COPY_BOTH and no message from the libpq</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../user_guide/troubleshooting.html#log-based-replication-is-slow-or-falling-behind">LOG_BASED replication is slow or falling behind</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../user_guide/troubleshooting.html#canceling-statement-due-to-conflict-with-recovery">Canceling statement due to conflict with recovery</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../user_guide/troubleshooting.html#connection-already-closed">Connection already closed</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../user_guide/troubleshooting.html#recovery-is-in-progress">recovery is in progress</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../user_guide/troubleshooting.html#unable-to-find-replication-slot">Unable to find replication slot</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../user_guide/troubleshooting.html#fastsync-errors">FastSync Errors</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../user_guide/troubleshooting.html#table-not-found">Table not found</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../user_guide/troubleshooting.html#failure-to-import-tap-0-tables-discovered">Failure to import tap (0 tables discovered)</a></li>
+</ul>
+</li>
 <li class="toctree-l3"><a class="reference internal" href="../user_guide/troubleshooting.html#logging-and-diagnostics">Logging and Diagnostics</a></li>
 </ul>
 </li>

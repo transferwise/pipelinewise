@@ -242,9 +242,35 @@
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Troubleshooting</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#symptom-index">Symptom index</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#replication-checks">Replication checks</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#mariadb-mysql-errors">MariaDB / MySQL Errors</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#postgresql-errors">PostgreSQL Errors</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#fastsync-errors">FastSync Errors</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#when-to-resync">When to resync</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#incremental-method-and-missing-updates">INCREMENTAL method and missing updates</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#using-replica-host-for-large-table-resyncs-1-tb">Using replica_host for large table resyncs (1 TB+)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#changes-to-transformations">Changes to transformations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#resync-table-size-limit">Resync table size limit</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#mariadb-mysql-errors">MariaDB / MySQL Errors</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#lost-connection-to-mysql-server-errno-104-connection-reset-by-peer">Lost connection to MySQL server (Errno 104, Connection reset by peer)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#unknown-encoding-utf8mb3">Unknown encoding: utf8mb3</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#bogus-data-in-log-event">Bogus data in log event</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#log-event-exceeded-max-allowed-packet">Log event exceeded max_allowed_packet</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#missing-binlog">Missing binlog</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#changing-the-binlog-position-in-state-json">Changing the binlog position in state.json</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#postgresql-errors">PostgreSQL Errors</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#requires-wal-level-logical">requires wal_level &gt;= logical</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#pgres-copy-both-and-no-message-from-the-libpq">PGRES_COPY_BOTH and no message from the libpq</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#log-based-replication-is-slow-or-falling-behind">LOG_BASED replication is slow or falling behind</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#canceling-statement-due-to-conflict-with-recovery">Canceling statement due to conflict with recovery</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#connection-already-closed">Connection already closed</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#recovery-is-in-progress">recovery is in progress</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#unable-to-find-replication-slot">Unable to find replication slot</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#fastsync-errors">FastSync Errors</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#table-not-found">Table not found</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#failure-to-import-tap-0-tables-discovered">Failure to import tap (0 tables discovered)</a></li>
+</ul>
+</li>
 <li class="toctree-l3"><a class="reference internal" href="#logging-and-diagnostics">Logging and Diagnostics</a></li>
 </ul>
 </li>
@@ -346,31 +372,39 @@ state until the unavailable boundary has been identified.</p>
 </tr>
 </thead>
 <tbody>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">Lost</span> <span class="pre">connection</span></code> or <code class="docutils literal notranslate"><span class="pre">max_allowed_packet</span></code></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#troubleshooting-mysql-lost-connection"><span class="std std-ref">Lost connection</span></a> or
+<a class="reference internal" href="#troubleshooting-mysql-max-allowed-packet"><span class="std std-ref">max_allowed_packet</span></a></p></td>
 <td><p>MariaDB / MySQL</p></td>
 <td><p>Session timeouts and packet limits.</p></td>
 </tr>
-<tr class="row-odd"><td><p>Missing or corrupt binlog</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#troubleshooting-mysql-missing-binlog"><span class="std std-ref">Missing</span></a> or
+<a class="reference internal" href="#troubleshooting-mysql-bogus-log-event"><span class="std std-ref">corrupt binlog</span></a></p></td>
 <td><p>MariaDB / MySQL LOG_BASED</p></td>
 <td><p>Source retention and saved binlog position.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">wal_level</span> <span class="pre">&gt;=</span> <span class="pre">logical</span></code> or missing slot</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#troubleshooting-postgres-wal-level"><span class="std std-ref">wal_level</span></a> or
+<a class="reference internal" href="#troubleshooting-postgres-missing-slot"><span class="std std-ref">missing slot</span></a></p></td>
 <td><p>PostgreSQL LOG_BASED</p></td>
 <td><p>Primary configuration and slot existence.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">PGRES_COPY_BOTH</span></code></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#troubleshooting-postgres-pgres-copy-both"><span class="std std-ref">PGRES_COPY_BOTH</span></a></p></td>
 <td><p>PostgreSQL LOG_BASED</p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">wal_sender_timeout</span></code> and target backpressure.</p></td>
+<td><p>Source logs, network, timeout, and target backpressure.</p></td>
 </tr>
-<tr class="row-even"><td><p>Recovery conflict</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#troubleshooting-postgres-logical-decoding-spill"><span class="std std-ref">LOG_BASED throughput falls behind without errors</span></a></p></td>
+<td><p>PostgreSQL LOG_BASED</p></td>
+<td><p>Logical-decoding disk spill and <code class="docutils literal notranslate"><span class="pre">logical_decoding_work_mem</span></code>.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#troubleshooting-postgres-recovery-conflict"><span class="std std-ref">Recovery conflict</span></a></p></td>
 <td><p>PostgreSQL replica reads</p></td>
 <td><p>Standby replay delay settings.</p></td>
 </tr>
-<tr class="row-odd"><td><p>Table not found or zero discovered tables</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#troubleshooting-fastsync-table-not-found"><span class="std std-ref">Table not found</span></a> or
+<a class="reference internal" href="#troubleshooting-discovery-zero-tables"><span class="std std-ref">zero discovered tables</span></a></p></td>
 <td><p>Discovery / FastSync</p></td>
 <td><p>Source name and replication-user permissions.</p></td>
 </tr>
-<tr class="row-even"><td><p>Stale <code class="docutils literal notranslate"><span class="pre">.running</span></code> log</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#troubleshooting-logging"><span class="std std-ref">Stale running log</span></a></p></td>
 <td><p>Process lifecycle</p></td>
 <td><p>PID file and complete process tree.</p></td>
 </tr>
@@ -387,7 +421,8 @@ replication must have a primary key by default. <code class="docutils literal no
 not have this requirement. PipelineWise validates this during import and reports
 the affected stream before a run starts.</p>
 </div>
-<p><strong>When to resync</strong></p>
+<section id="when-to-resync">
+<span id="troubleshooting-when-to-resync"></span><h3>When to resync<a class="headerlink" href="#when-to-resync" title="Link to this heading"></a></h3>
 <ul class="simple">
 <li><p>For <strong>INCREMENTAL</strong> replication you almost never need to resync, unless there
 was data corruption or a large number of old rows were updated that need to
@@ -397,30 +432,40 @@ longer available.</p></li>
 <li><p>For <strong>LOG_BASED</strong> PostgreSQL, you need to resync if the replication slot is no
 longer available.</p></li>
 </ul>
-<p><strong>INCREMENTAL method and missing updates</strong></p>
+</section>
+<section id="incremental-method-and-missing-updates">
+<span id="troubleshooting-incremental-missing-updates"></span><h3>INCREMENTAL method and missing updates<a class="headerlink" href="#incremental-method-and-missing-updates" title="Link to this heading"></a></h3>
 <p>When using incremental replication, PipelineWise will miss new or updated records if
 the <code class="docutils literal notranslate"><span class="pre">replication_key</span></code> column is being back-filled (i.e. older rows are receiving
 new values for the replication key). Consider using <code class="docutils literal notranslate"><span class="pre">LOG_BASED</span></code> replication if
 you need to capture all changes.</p>
-<p><strong>Using replica_host for large table resyncs (1 TB+)</strong></p>
+</section>
+<section id="using-replica-host-for-large-table-resyncs-1-tb">
+<span id="troubleshooting-replica-host-resyncs"></span><h3>Using replica_host for large table resyncs (1 TB+)<a class="headerlink" href="#using-replica-host-for-large-table-resyncs-1-tb" title="Link to this heading"></a></h3>
 <p>Both MySQL and PostgreSQL taps support setting a <code class="docutils literal notranslate"><span class="pre">replica_host</span></code> key. When set,
 the initial FastSync will be done on the replica, reducing pressure on the primary
 database. Once the resync has completed, the tap will pick up the replication slot
 it created on the primary to continue replication.</p>
 <p>You can use this effectively with a partial sync (<code class="docutils literal notranslate"><span class="pre">sync_start_from</span></code>) to resync
 large tables and/or switch them to log-based replication.</p>
-<p><strong>Changes to transformations</strong></p>
+</section>
+<section id="changes-to-transformations">
+<span id="troubleshooting-transformation-changes"></span><h3>Changes to transformations<a class="headerlink" href="#changes-to-transformations" title="Link to this heading"></a></h3>
 <p>Changes to transformations will only be applied to newly extracted data. If you need
 the transformation applied to existing data in the target, you will need to resync
 the affected tables.</p>
-<p><strong>Resync table size limit</strong></p>
+</section>
+<section id="resync-table-size-limit">
+<span id="troubleshooting-resync-size-limit"></span><h3>Resync table size limit<a class="headerlink" href="#resync-table-size-limit" title="Link to this heading"></a></h3>
 <p>For MySQL and PostgreSQL taps, <code class="docutils literal notranslate"><span class="pre">fast_sync</span></code> checks the size of non-partial-sync
 tables and will refuse to proceed if any table exceeds the configured
 <code class="docutils literal notranslate"><span class="pre">allowed_resync_max_size</span></code> limit (see <a class="reference internal" href="resync.html#resync"><span class="std std-ref">Resync and repair</span></a>). Use <code class="docutils literal notranslate"><span class="pre">fast_sync</span> <span class="pre">--force</span></code>
 to override this check.</p>
+</section>
 <section id="mariadb-mysql-errors">
 <h3>MariaDB / MySQL Errors<a class="headerlink" href="#mariadb-mysql-errors" title="Link to this heading"></a></h3>
-<p><strong>Lost connection to MySQL server (Errno 104, Connection reset by peer)</strong></p>
+<section id="lost-connection-to-mysql-server-errno-104-connection-reset-by-peer">
+<span id="troubleshooting-mysql-lost-connection"></span><h4>Lost connection to MySQL server (Errno 104, Connection reset by peer)<a class="headerlink" href="#lost-connection-to-mysql-server-errno-104-connection-reset-by-peer" title="Link to this heading"></a></h4>
 <p><em>Log message:</em></p>
 <div class="highlight-text notranslate"><div class="highlight"><pre><span></span>pymysql.err.OperationalError: (2013, &#39;Lost connection to MySQL server
 during query ([Errno 104] Connection reset by peer)&#39;)
@@ -440,13 +485,17 @@ Add the following <code class="docutils literal notranslate"><span class="pre">s
 <span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">SET SESSION innodb_lock_wait_timeout=3600</span>
 </pre></div>
 </div>
-<p><strong>Unknown encoding: utf8mb3</strong></p>
+</section>
+<section id="unknown-encoding-utf8mb3">
+<span id="troubleshooting-mysql-utf8mb3"></span><h4>Unknown encoding: utf8mb3<a class="headerlink" href="#unknown-encoding-utf8mb3" title="Link to this heading"></a></h4>
 <p><em>How to fix:</em>
 The tap cannot decode <code class="docutils literal notranslate"><span class="pre">utf8mb3</span></code> data. Identify the affected table or column, then
 work with your database administrator to test and convert its character set to a
 supported encoding such as <code class="docutils literal notranslate"><span class="pre">utf8mb4</span></code>. A character-set conversion changes source
 data and should be tested before it is applied in production.</p>
-<p><strong>Bogus data in log event</strong></p>
+</section>
+<section id="bogus-data-in-log-event">
+<span id="troubleshooting-mysql-bogus-log-event"></span><h4>Bogus data in log event<a class="headerlink" href="#bogus-data-in-log-event" title="Link to this heading"></a></h4>
 <p><em>Why it happens:</em>
 The source server (OS or MySQL service) restarted unexpectedly, corrupting the
 current binlog position stored in PipelineWise state.</p>
@@ -454,7 +503,9 @@ current binlog position stored in PipelineWise state.</p>
 Run a full resync with
 <code class="docutils literal notranslate"><span class="pre">pipelinewise</span> <span class="pre">fast_sync</span> <span class="pre">--tap</span> <span class="pre">&lt;tap_id&gt;</span> <span class="pre">--target</span> <span class="pre">&lt;target_id&gt;</span></code>. See <a class="reference internal" href="resync.html#resync"><span class="std std-ref">Resync and repair</span></a>
 for the impact and available table-selection options.</p>
-<p><strong>Log event exceeded max_allowed_packet</strong></p>
+</section>
+<section id="log-event-exceeded-max-allowed-packet">
+<span id="troubleshooting-mysql-max-allowed-packet"></span><h4>Log event exceeded max_allowed_packet<a class="headerlink" href="#log-event-exceeded-max-allowed-packet" title="Link to this heading"></a></h4>
 <p><em>Log message:</em></p>
 <div class="highlight-text notranslate"><div class="highlight"><pre><span></span>log event entry exceeded max_allowed_packet; Increase max_allowed_packet on master
 </pre></div>
@@ -462,7 +513,9 @@ for the impact and available table-selection options.</p>
 <p><em>How to fix:</em>
 Increase <code class="docutils literal notranslate"><span class="pre">max_allowed_packet</span></code> on the source server. If the problem persists after
 increasing the value, run a FastSync to rebuild the affected tables.</p>
-<p><strong>Missing binlog</strong></p>
+</section>
+<section id="missing-binlog">
+<span id="troubleshooting-mysql-missing-binlog"></span><h4>Missing binlog<a class="headerlink" href="#missing-binlog" title="Link to this heading"></a></h4>
 <p><em>Log message:</em></p>
 <div class="highlight-text notranslate"><div class="highlight"><pre><span></span>Exception: Unable to replicate binlog stream because the following
 binary log(s) no longer exist: mysql-bin.000119
@@ -484,7 +537,9 @@ check the current setting with:</p>
 </li>
 <li><p>As a last resort, change the replication method from <code class="docutils literal notranslate"><span class="pre">LOG_BASED</span></code> to another method.</p></li>
 </ol>
-<p><strong>Changing the binlog position in state.json</strong></p>
+</section>
+<section id="changing-the-binlog-position-in-state-json">
+<span id="troubleshooting-mysql-state-position"></span><h4>Changing the binlog position in state.json<a class="headerlink" href="#changing-the-binlog-position-in-state-json" title="Link to this heading"></a></h4>
 <p>Prefer <a class="reference internal" href="cli.html#cli-reset-state"><span class="std std-ref">reset_state</span></a> for a controlled failover with an exact position
 mapping. If no supported mapping is available and manual recovery is unavoidable,
 stop the tap and back up the state first. Never edit a state file while its tap is
@@ -516,9 +571,11 @@ $<span class="w"> </span>mv<span class="w"> </span>state.json.new<span class="w"
 position can skip or duplicate data; use a full resync instead when the correct
 position is uncertain.</p>
 </section>
+</section>
 <section id="postgresql-errors">
 <h3>PostgreSQL Errors<a class="headerlink" href="#postgresql-errors" title="Link to this heading"></a></h3>
-<p><strong>requires wal_level &gt;= logical</strong></p>
+<section id="requires-wal-level-logical">
+<span id="troubleshooting-postgres-wal-level"></span><h4>requires wal_level &gt;= logical<a class="headerlink" href="#requires-wal-level-logical" title="Link to this heading"></a></h4>
 <p><em>Log message:</em></p>
 <div class="highlight-text notranslate"><div class="highlight"><pre><span></span>{SCHEMA_NAME}.{TABLE_NAME}:logical decoding requires wal_level &gt;= logical
 </pre></div>
@@ -529,32 +586,110 @@ The PostgreSQL source database does not have logical replication enabled.</p>
 Set <code class="docutils literal notranslate"><span class="pre">wal_level</span></code> to <code class="docutils literal notranslate"><span class="pre">logical</span></code> on the source database. Note that changing the WAL
 level requires restarting the database instance. If the tap owner cannot tolerate a
 restart, consider changing the replication method to something other than <code class="docutils literal notranslate"><span class="pre">LOG_BASED</span></code>.</p>
-<p><strong>PGRES_COPY_BOTH and no message from the libpq</strong></p>
+</section>
+<section id="pgres-copy-both-and-no-message-from-the-libpq">
+<span id="troubleshooting-postgres-pgres-copy-both"></span><h4>PGRES_COPY_BOTH and no message from the libpq<a class="headerlink" href="#pgres-copy-both-and-no-message-from-the-libpq" title="Link to this heading"></a></h4>
 <p><em>Log message:</em></p>
 <div class="highlight-text notranslate"><div class="highlight"><pre><span></span>logger_name=tap_postgres log_level=CRITICAL message=error with status
 PGRES_COPY_BOTH and no message from the libpq
 </pre></div>
 </div>
 <p><em>Why it happens:</em>
-PostgreSQL kills the replication connection because it thinks the client has died.
-This usually happens when it takes a long time to load data into the target.</p>
+This libpq message says that the replication COPY connection ended without a more
+specific client-side error; it does not identify the cause. Possible causes include
+a PostgreSQL restart or termination, a network interruption,
+<code class="docutils literal notranslate"><span class="pre">wal_sender_timeout</span></code> expiry, or delayed feedback while the target is blocked.
+Compare the PipelineWise, source PostgreSQL, and network logs from the same UTC
+interval before changing timeouts or state.</p>
 <p><em>How to fix:</em></p>
 <ul>
-<li><p><strong>Option 1: Upgrade to PostgreSQL 12 or above.</strong> PG12 and above supports session-level
-<code class="docutils literal notranslate"><span class="pre">wal_sender_timeout</span></code> and PipelineWise takes advantage of it.</p></li>
-<li><p><strong>Option 2: Increase the ``wal_sender_timeout`` value on the source.</strong>
-A <code class="docutils literal notranslate"><span class="pre">wal_sender_timeout</span></code> value of less than 5 minutes will often result in this error.
-Check the current value with:</p>
+<li><p><strong>If the source or network terminated the connection,</strong> correct that cause and
+restart the same tap without advancing state.</p></li>
+<li><p><strong>For PostgreSQL versions before 12, consider upgrading.</strong> PostgreSQL 12 and
+later support the session-level <code class="docutils literal notranslate"><span class="pre">wal_sender_timeout</span></code> that PipelineWise sets.</p></li>
+<li><p><strong>If the PostgreSQL log reports a sender timeout,</strong> check the effective value:</p>
 <div class="highlight-sql notranslate"><div class="highlight"><pre><span></span><span class="k">SELECT</span><span class="w"> </span><span class="n">name</span><span class="p">,</span><span class="w"> </span><span class="n">setting</span><span class="p">,</span><span class="w"> </span><span class="n">unit</span><span class="w"> </span><span class="k">FROM</span><span class="w"> </span><span class="n">pg_settings</span><span class="w"> </span><span class="k">WHERE</span><span class="w"> </span><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">&#39;wal_sender_timeout&#39;</span><span class="p">;</span>
 </pre></div>
 </div>
 </li>
-<li><p><strong>Option 3: Enable or increase the tap ``stream_buffer_size``.</strong>
-The <code class="docutils literal notranslate"><span class="pre">stream_buffer_size</span></code> is a buffer allowing synchronous reading and loading of data.
-Note that a small <code class="docutils literal notranslate"><span class="pre">wal_sender_timeout</span></code> will cause even a very large <code class="docutils literal notranslate"><span class="pre">stream_buffer_size</span></code>
-to run out of space, so fix <code class="docutils literal notranslate"><span class="pre">wal_sender_timeout</span></code> first.</p></li>
+<li><p><strong>If target backpressure is confirmed, enable or increase
+``stream_buffer_size``.</strong> This buffer decouples reading from loading. It cannot
+compensate indefinitely for a blocked target or an unsuitable timeout, so fix
+those causes first.</p></li>
 </ul>
-<p><strong>Canceling statement due to conflict with recovery</strong></p>
+</section>
+<section id="log-based-replication-is-slow-or-falling-behind">
+<span id="troubleshooting-postgres-logical-decoding-spill"></span><h4>LOG_BASED replication is slow or falling behind<a class="headerlink" href="#log-based-replication-is-slow-or-falling-behind" title="Link to this heading"></a></h4>
+<p><em>Why it happens:</em>
+On PostgreSQL 13 and later, <code class="docutils literal notranslate"><span class="pre">logical_decoding_work_mem</span></code> limits the memory used
+by each logical replication connection. When decoded changes exceed the limit,
+PostgreSQL writes them to local disk. A value that is too low for the source
+workload can therefore cause frequent disk spill and substantially reduce
+LOG_BASED throughput.</p>
+<p>Each active logical replication connection has its own buffer. A busy source, large
+or concurrent transactions, or several PipelineWise replications consuming slots
+on the same PostgreSQL cluster can increase both spill I/O and total memory demand.</p>
+<p><em>How to diagnose:</em>
+Check the configured value. PostgreSQL versions before 13 return no row because
+they do not provide this setting:</p>
+<div class="highlight-sql notranslate"><div class="highlight"><pre><span></span><span class="k">SELECT</span><span class="w"> </span><span class="n">name</span><span class="p">,</span><span class="w"> </span><span class="n">setting</span><span class="p">,</span><span class="w"> </span><span class="n">unit</span><span class="p">,</span><span class="w"> </span><span class="k">source</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">pg_settings</span>
+<span class="k">WHERE</span><span class="w"> </span><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">&#39;logical_decoding_work_mem&#39;</span><span class="p">;</span>
+</pre></div>
+</div>
+<p>On PostgreSQL 14 and later, compare the following counters over the period when
+replication is slow. Increasing <code class="docutils literal notranslate"><span class="pre">spill_count</span></code> or <code class="docutils literal notranslate"><span class="pre">spill_bytes</span></code> confirms that
+logical decoding is writing changes to disk; a large historical total alone does
+not prove a current bottleneck.</p>
+<div class="highlight-sql notranslate"><div class="highlight"><pre><span></span><span class="k">SELECT</span><span class="w"> </span><span class="n">slot_name</span><span class="p">,</span>
+<span class="w">       </span><span class="n">spill_txns</span><span class="p">,</span>
+<span class="w">       </span><span class="n">spill_count</span><span class="p">,</span>
+<span class="w">       </span><span class="n">pg_size_pretty</span><span class="p">(</span><span class="n">spill_bytes</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">spill_bytes</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">pg_stat_replication_slots</span>
+<span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">spill_bytes</span><span class="w"> </span><span class="k">DESC</span><span class="p">;</span>
+</pre></div>
+</div>
+<p>Check slot activity and acknowledgement separately. <code class="docutils literal notranslate"><span class="pre">confirmed_flush_lsn</span></code> is
+the position acknowledged by the consumer, while <code class="docutils literal notranslate"><span class="pre">restart_lsn</span></code> is the oldest
+WAL that may still be required. The calculated value approximates WAL retained
+for each slot:</p>
+<div class="highlight-sql notranslate"><div class="highlight"><pre><span></span><span class="k">SELECT</span><span class="w"> </span><span class="n">slot_name</span><span class="p">,</span>
+<span class="w">       </span><span class="n">active</span><span class="p">,</span>
+<span class="w">       </span><span class="n">confirmed_flush_lsn</span><span class="p">,</span>
+<span class="w">       </span><span class="n">restart_lsn</span><span class="p">,</span>
+<span class="w">       </span><span class="n">pg_size_pretty</span><span class="p">(</span>
+<span class="w">           </span><span class="n">pg_wal_lsn_diff</span><span class="p">(</span><span class="n">pg_current_wal_lsn</span><span class="p">(),</span><span class="w"> </span><span class="n">restart_lsn</span><span class="p">)::</span><span class="nb">bigint</span>
+<span class="w">       </span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">retained_wal</span>
+<span class="k">FROM</span><span class="w"> </span><span class="n">pg_replication_slots</span>
+<span class="k">WHERE</span><span class="w"> </span><span class="n">slot_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">&#39;logical&#39;</span>
+<span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">slot_name</span><span class="p">;</span>
+</pre></div>
+</div>
+<p>Sample these values over the same interval as the spill counters. An inactive
+slot identifies a disconnected consumer. A stationary <code class="docutils literal notranslate"><span class="pre">confirmed_flush_lsn</span></code>
+shows that acknowledgement is not advancing, but does not by itself distinguish
+source decoding from target or network backpressure.</p>
+<p>See the PostgreSQL documentation for
+<a class="reference external" href="https://www.postgresql.org/docs/current/runtime-config-resource.html#GUC-LOGICAL-DECODING-WORK-MEM">logical_decoding_work_mem</a>
+and
+<a class="reference external" href="https://www.postgresql.org/docs/current/monitoring-stats.html#MONITORING-PG-STAT-REPLICATION-SLOTS-VIEW">logical replication slot statistics</a>.</p>
+<p><em>How to fix:</em>
+Work with the source database administrator to increase the setting incrementally
+for the PipelineWise replication role and database. There is no universal value;
+test against the transaction sizes and concurrency of the source. For example:</p>
+<div class="highlight-sql notranslate"><div class="highlight"><pre><span></span><span class="k">ALTER</span><span class="w"> </span><span class="k">ROLE</span><span class="w"> </span><span class="o">&lt;</span><span class="n">replication_user</span><span class="o">&gt;</span><span class="w"> </span><span class="k">IN</span><span class="w"> </span><span class="k">DATABASE</span><span class="w"> </span><span class="o">&lt;</span><span class="n">source_database</span><span class="o">&gt;</span>
+<span class="k">SET</span><span class="w"> </span><span class="n">logical_decoding_work_mem</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">&#39;&lt;tested_value&gt;&#39;</span><span class="p">;</span>
+</pre></div>
+</div>
+<p>Restart the tap after changing a role or database default so its replication
+connection receives the new value. Budget memory for every concurrent logical
+replication connection and monitor database memory and disk I/O while tuning.
+Increasing this setting reduces decoding spill; it does not fix target, network,
+or <code class="docutils literal notranslate"><span class="pre">stream_buffer_size</span></code> backpressure. Replication lag alone does not require a
+resync.</p>
+</section>
+<section id="canceling-statement-due-to-conflict-with-recovery">
+<span id="troubleshooting-postgres-recovery-conflict"></span><h4>Canceling statement due to conflict with recovery<a class="headerlink" href="#canceling-statement-due-to-conflict-with-recovery" title="Link to this heading"></a></h4>
 <p><em>Log message:</em></p>
 <div class="highlight-text notranslate"><div class="highlight"><pre><span></span>logger_name=tap_postgres log_level=CRITICAL message=terminating connection due to
 conflict with recovery
@@ -573,7 +708,9 @@ values with:</p>
 </div>
 <p><em>How to fix:</em>
 Increase <code class="docutils literal notranslate"><span class="pre">max_standby_streaming_delay</span></code> on the replica.</p>
-<p><strong>Connection already closed</strong></p>
+</section>
+<section id="connection-already-closed">
+<span id="troubleshooting-postgres-connection-closed"></span><h4>Connection already closed<a class="headerlink" href="#connection-already-closed" title="Link to this heading"></a></h4>
 <p><em>Log message:</em></p>
 <div class="highlight-text notranslate"><div class="highlight"><pre><span></span>logger_name=tap_postgres log_level=CRITICAL message=connection already closed
 psycopg2.OperationalError: SSL connection has been closed unexpectedly
@@ -583,20 +720,21 @@ psycopg2.OperationalError: SSL connection has been closed unexpectedly
 The source server is likely configured to kill idle connections.</p>
 <p><em>How to fix:</em>
 Review the idle connection timeout settings on the source PostgreSQL server.</p>
-<p><strong>recovery is in progress</strong></p>
+</section>
+<section id="recovery-is-in-progress">
+<span id="troubleshooting-postgres-recovery-in-progress"></span><h4>recovery is in progress<a class="headerlink" href="#recovery-is-in-progress" title="Link to this heading"></a></h4>
 <p><em>Log message:</em></p>
 <div class="highlight-text notranslate"><div class="highlight"><pre><span></span>logger_name=tap_postgres log_level=CRITICAL message=recovery is in progress
 HINT: WAL control functions cannot be executed during recovery.
 </pre></div>
 </div>
 <p><em>Why it happens:</em>
-The tap is configured with a mix of incremental and log-based replication methods,
-and the connection points to a replica. Log-based replication cannot run against a
-replica.</p>
+The tap is reading INCREMENTAL or FULL_TABLE replication from a replica. (LOG_BASED from a replica is not possible)</p>
 <p><em>How to fix:</em>
-Point the tap at the primary server, or change the log-based tables to use a different
-replication method.</p>
-<p><strong>Unable to find replication slot</strong></p>
+Point the tap at the primary server, or increase <cite>max_standby_streaming_delay</cite>.</p>
+</section>
+<section id="unable-to-find-replication-slot">
+<span id="troubleshooting-postgres-missing-slot"></span><h4>Unable to find replication slot<a class="headerlink" href="#unable-to-find-replication-slot" title="Link to this heading"></a></h4>
 <p><em>How to fix:</em>
 Run <code class="docutils literal notranslate"><span class="pre">pipelinewise</span> <span class="pre">fast_sync</span> <span class="pre">--tap</span> <span class="pre">&lt;tap_id&gt;</span> <span class="pre">--target</span> <span class="pre">&lt;target_id&gt;</span></code> to resync the
 tap and recreate the replication slot. See <a class="reference internal" href="resync.html#resync"><span class="std std-ref">Resync and repair</span></a> before proceeding.</p>
@@ -606,9 +744,11 @@ tap and recreate the replication slot. See <a class="reference internal" href="r
 replication slot.</p>
 </div>
 </section>
+</section>
 <section id="fastsync-errors">
 <h3>FastSync Errors<a class="headerlink" href="#fastsync-errors" title="Link to this heading"></a></h3>
-<p><strong>Table not found</strong></p>
+<section id="table-not-found">
+<span id="troubleshooting-fastsync-table-not-found"></span><h4>Table not found<a class="headerlink" href="#table-not-found" title="Link to this heading"></a></h4>
 <p><em>Log message:</em></p>
 <div class="highlight-text notranslate"><div class="highlight"><pre><span></span>CRITICAL: {SCHEMA_NAME}.TABLE_NAME table not found.
 </pre></div>
@@ -633,7 +773,9 @@ it from the tap YAML file.</p></li>
 <p>If this returns no results, the replication user lacks <code class="docutils literal notranslate"><span class="pre">SELECT</span></code> privilege.</p>
 </li>
 </ol>
-<p><strong>Failure to import tap (0 tables discovered)</strong></p>
+</section>
+<section id="failure-to-import-tap-0-tables-discovered">
+<span id="troubleshooting-discovery-zero-tables"></span><h4>Failure to import tap (0 tables discovered)<a class="headerlink" href="#failure-to-import-tap-0-tables-discovered" title="Link to this heading"></a></h4>
 <p><em>Log message:</em></p>
 <div class="highlight-text notranslate"><div class="highlight"><pre><span></span>CRITICAL 0 tables were discovered across the entire cluster
 </pre></div>
@@ -651,20 +793,23 @@ the correct host and database name.</p></li>
 in the source database.</p></li>
 </ol>
 </section>
+</section>
 <section id="logging-and-diagnostics">
-<h3>Logging and Diagnostics<a class="headerlink" href="#logging-and-diagnostics" title="Link to this heading"></a></h3>
+<span id="troubleshooting-logging"></span><h3>Logging and Diagnostics<a class="headerlink" href="#logging-and-diagnostics" title="Link to this heading"></a></h3>
 <p>Use <code class="docutils literal notranslate"><span class="pre">pipelinewise</span> <span class="pre">status</span></code> to get an overview of all configured pipelines and
 their last run status. Use <code class="docutils literal notranslate"><span class="pre">pipelinewise</span> <span class="pre">test_tap_connection</span></code> to verify
 connectivity to a source before running a full sync.</p>
-<p>Log files are written to <code class="docutils literal notranslate"><span class="pre">~/.pipelinewise/&lt;target_id&gt;/&lt;tap_id&gt;/log/</span></code> with a
-<code class="docutils literal notranslate"><span class="pre">.success</span></code> or <code class="docutils literal notranslate"><span class="pre">.failed</span></code> suffix indicating the outcome of each run.
-See <a class="reference internal" href="logging.html#logging"><span class="std std-ref">Logging</span></a> for details.</p>
+<p>Runtime files are written below <code class="docutils literal notranslate"><span class="pre">PIPELINEWISE_CONFIG_DIRECTORY</span></code>, which defaults
+to <code class="docutils literal notranslate"><span class="pre">~/.pipelinewise</span></code>. Tap logs are stored under
+<code class="docutils literal notranslate"><span class="pre">&lt;target_id&gt;/&lt;tap_id&gt;/log/</span></code> and use <code class="docutils literal notranslate"><span class="pre">.running</span></code>, <code class="docutils literal notranslate"><span class="pre">.success</span></code>, or <code class="docutils literal notranslate"><span class="pre">.failed</span></code>
+suffixes. See <a class="reference internal" href="logging.html#logging"><span class="std std-ref">Logging</span></a> for details.</p>
 <p>To follow the progress of a running sync:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>tail<span class="w"> </span>-f<span class="w"> </span>~/.pipelinewise/&lt;target_id&gt;/&lt;tap_id&gt;/log/*running
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span><span class="nv">pipelinewise_config_dir</span><span class="o">=</span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">PIPELINEWISE_CONFIG_DIRECTORY</span><span class="k">:-</span><span class="nv">$HOME</span><span class="p">/.pipelinewise</span><span class="si">}</span><span class="s2">&quot;</span>
+$<span class="w"> </span>tail<span class="w"> </span>-f<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$pipelinewise_config_dir</span><span class="s2">/&lt;target_id&gt;/&lt;tap_id&gt;/log/&quot;</span>*running
 </pre></div>
 </div>
 <p>You can also check the temporary files being written during a sync:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>ls<span class="w"> </span>-lah<span class="w"> </span>~/.pipelinewise/tmp/*&lt;tap_id&gt;*
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>ls<span class="w"> </span>-lah<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$pipelinewise_config_dir</span><span class="s2">/tmp/&quot;</span>*&lt;tap_id&gt;*
 </pre></div>
 </div>
 </section>
