@@ -20,25 +20,33 @@ Symptom index
    * - Symptom
      - Area
      - First check
-   * - ``Lost connection`` or ``max_allowed_packet``
+   * - :ref:`Lost connection <troubleshooting_mysql_lost_connection>` or
+       :ref:`max_allowed_packet <troubleshooting_mysql_max_allowed_packet>`
      - MariaDB / MySQL
      - Session timeouts and packet limits.
-   * - Missing or corrupt binlog
+   * - :ref:`Missing <troubleshooting_mysql_missing_binlog>` or
+       :ref:`corrupt binlog <troubleshooting_mysql_bogus_log_event>`
      - MariaDB / MySQL LOG_BASED
      - Source retention and saved binlog position.
-   * - ``wal_level >= logical`` or missing slot
+   * - :ref:`wal_level <troubleshooting_postgres_wal_level>` or
+       :ref:`missing slot <troubleshooting_postgres_missing_slot>`
      - PostgreSQL LOG_BASED
      - Primary configuration and slot existence.
-   * - ``PGRES_COPY_BOTH``
+   * - :ref:`PGRES_COPY_BOTH <troubleshooting_postgres_pgres_copy_both>`
      - PostgreSQL LOG_BASED
-     - ``wal_sender_timeout`` and target backpressure.
-   * - Recovery conflict
+     - Source logs, network, timeout, and target backpressure.
+   * - :ref:`LOG_BASED throughput falls behind without errors
+       <troubleshooting_postgres_logical_decoding_spill>`
+     - PostgreSQL LOG_BASED
+     - Logical-decoding disk spill and ``logical_decoding_work_mem``.
+   * - :ref:`Recovery conflict <troubleshooting_postgres_recovery_conflict>`
      - PostgreSQL replica reads
      - Standby replay delay settings.
-   * - Table not found or zero discovered tables
+   * - :ref:`Table not found <troubleshooting_fastsync_table_not_found>` or
+       :ref:`zero discovered tables <troubleshooting_discovery_zero_tables>`
      - Discovery / FastSync
      - Source name and replication-user permissions.
-   * - Stale ``.running`` log
+   * - :ref:`Stale running log <troubleshooting_logging>`
      - Process lifecycle
      - PID file and complete process tree.
 
@@ -55,7 +63,10 @@ See :ref:`replication_methods` for a detailed explanation of each replication me
     not have this requirement. PipelineWise validates this during import and reports
     the affected stream before a run starts.
 
-**When to resync**
+.. _troubleshooting_when_to_resync:
+
+When to resync
+''''''''''''''
 
 * For **INCREMENTAL** replication you almost never need to resync, unless there
   was data corruption or a large number of old rows were updated that need to
@@ -65,14 +76,20 @@ See :ref:`replication_methods` for a detailed explanation of each replication me
 * For **LOG_BASED** PostgreSQL, you need to resync if the replication slot is no
   longer available.
 
-**INCREMENTAL method and missing updates**
+.. _troubleshooting_incremental_missing_updates:
+
+INCREMENTAL method and missing updates
+''''''''''''''''''''''''''''''''''''''
 
 When using incremental replication, PipelineWise will miss new or updated records if
 the ``replication_key`` column is being back-filled (i.e. older rows are receiving
 new values for the replication key). Consider using ``LOG_BASED`` replication if
 you need to capture all changes.
 
-**Using replica_host for large table resyncs (1 TB+)**
+.. _troubleshooting_replica_host_resyncs:
+
+Using replica_host for large table resyncs (1 TB+)
+''''''''''''''''''''''''''''''''''''''''''''''''''
 
 Both MySQL and PostgreSQL taps support setting a ``replica_host`` key. When set,
 the initial FastSync will be done on the replica, reducing pressure on the primary
@@ -82,13 +99,19 @@ it created on the primary to continue replication.
 You can use this effectively with a partial sync (``sync_start_from``) to resync
 large tables and/or switch them to log-based replication.
 
-**Changes to transformations**
+.. _troubleshooting_transformation_changes:
+
+Changes to transformations
+''''''''''''''''''''''''''
 
 Changes to transformations will only be applied to newly extracted data. If you need
 the transformation applied to existing data in the target, you will need to resync
 the affected tables.
 
-**Resync table size limit**
+.. _troubleshooting_resync_size_limit:
+
+Resync table size limit
+'''''''''''''''''''''''
 
 For MySQL and PostgreSQL taps, ``fast_sync`` checks the size of non-partial-sync
 tables and will refuse to proceed if any table exceeds the configured
@@ -99,7 +122,10 @@ to override this check.
 MariaDB / MySQL Errors
 ''''''''''''''''''''''
 
-**Lost connection to MySQL server (Errno 104, Connection reset by peer)**
+.. _troubleshooting_mysql_lost_connection:
+
+Lost connection to MySQL server (Errno 104, Connection reset by peer)
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
 *Log message:*
 
@@ -125,7 +151,10 @@ Add the following ``session_sqls`` block to your ``tap.yml``:
       - SET SESSION net_read_timeout=3600
       - SET SESSION innodb_lock_wait_timeout=3600
 
-**Unknown encoding: utf8mb3**
+.. _troubleshooting_mysql_utf8mb3:
+
+Unknown encoding: utf8mb3
+"""""""""""""""""""""""""
 
 *How to fix:*
 The tap cannot decode ``utf8mb3`` data. Identify the affected table or column, then
@@ -133,7 +162,10 @@ work with your database administrator to test and convert its character set to a
 supported encoding such as ``utf8mb4``. A character-set conversion changes source
 data and should be tested before it is applied in production.
 
-**Bogus data in log event**
+.. _troubleshooting_mysql_bogus_log_event:
+
+Bogus data in log event
+"""""""""""""""""""""""
 
 *Why it happens:*
 The source server (OS or MySQL service) restarted unexpectedly, corrupting the
@@ -144,7 +176,10 @@ Run a full resync with
 ``pipelinewise fast_sync --tap <tap_id> --target <target_id>``. See :ref:`resync`
 for the impact and available table-selection options.
 
-**Log event exceeded max_allowed_packet**
+.. _troubleshooting_mysql_max_allowed_packet:
+
+Log event exceeded max_allowed_packet
+"""""""""""""""""""""""""""""""""""""
 
 *Log message:*
 
@@ -156,7 +191,10 @@ for the impact and available table-selection options.
 Increase ``max_allowed_packet`` on the source server. If the problem persists after
 increasing the value, run a FastSync to rebuild the affected tables.
 
-**Missing binlog**
+.. _troubleshooting_mysql_missing_binlog:
+
+Missing binlog
+""""""""""""""
 
 *Log message:*
 
@@ -183,7 +221,10 @@ retention period.
 
 3. As a last resort, change the replication method from ``LOG_BASED`` to another method.
 
-**Changing the binlog position in state.json**
+.. _troubleshooting_mysql_state_position:
+
+Changing the binlog position in state.json
+""""""""""""""""""""""""""""""""""""""""""
 
 Prefer :ref:`cli_reset_state` for a controlled failover with an exact position
 mapping. If no supported mapping is available and manual recovery is unavoidable,
@@ -228,7 +269,10 @@ position is uncertain.
 PostgreSQL Errors
 '''''''''''''''''
 
-**requires wal_level >= logical**
+.. _troubleshooting_postgres_wal_level:
+
+requires wal_level >= logical
+"""""""""""""""""""""""""""""
 
 *Log message:*
 
@@ -244,7 +288,10 @@ Set ``wal_level`` to ``logical`` on the source database. Note that changing the 
 level requires restarting the database instance. If the tap owner cannot tolerate a
 restart, consider changing the replication method to something other than ``LOG_BASED``.
 
-**PGRES_COPY_BOTH and no message from the libpq**
+.. _troubleshooting_postgres_pgres_copy_both:
+
+PGRES_COPY_BOTH and no message from the libpq
+"""""""""""""""""""""""""""""""""""""""""""""
 
 *Log message:*
 
@@ -254,28 +301,121 @@ restart, consider changing the replication method to something other than ``LOG_
     PGRES_COPY_BOTH and no message from the libpq
 
 *Why it happens:*
-PostgreSQL kills the replication connection because it thinks the client has died.
-This usually happens when it takes a long time to load data into the target.
+This libpq message says that the replication COPY connection ended without a more
+specific client-side error; it does not identify the cause. Possible causes include
+a PostgreSQL restart or termination, a network interruption,
+``wal_sender_timeout`` expiry, or delayed feedback while the target is blocked.
+Compare the PipelineWise, source PostgreSQL, and network logs from the same UTC
+interval before changing timeouts or state.
 
 *How to fix:*
 
-* **Option 1: Upgrade to PostgreSQL 12 or above.** PG12 and above supports session-level
-  ``wal_sender_timeout`` and PipelineWise takes advantage of it.
+* **If the source or network terminated the connection,** correct that cause and
+  restart the same tap without advancing state.
 
-* **Option 2: Increase the ``wal_sender_timeout`` value on the source.**
-  A ``wal_sender_timeout`` value of less than 5 minutes will often result in this error.
-  Check the current value with:
+* **For PostgreSQL versions before 12, consider upgrading.** PostgreSQL 12 and
+  later support the session-level ``wal_sender_timeout`` that PipelineWise sets.
+
+* **If the PostgreSQL log reports a sender timeout,** check the effective value:
 
   .. code-block:: sql
 
       SELECT name, setting, unit FROM pg_settings WHERE name = 'wal_sender_timeout';
 
-* **Option 3: Enable or increase the tap ``stream_buffer_size``.**
-  The ``stream_buffer_size`` is a buffer allowing synchronous reading and loading of data.
-  Note that a small ``wal_sender_timeout`` will cause even a very large ``stream_buffer_size``
-  to run out of space, so fix ``wal_sender_timeout`` first.
+* **If target backpressure is confirmed, enable or increase
+  ``stream_buffer_size``.** This buffer decouples reading from loading. It cannot
+  compensate indefinitely for a blocked target or an unsuitable timeout, so fix
+  those causes first.
 
-**Canceling statement due to conflict with recovery**
+.. _troubleshooting_postgres_logical_decoding_spill:
+
+LOG_BASED replication is slow or falling behind
+"""""""""""""""""""""""""""""""""""""""""""""""
+
+*Why it happens:*
+On PostgreSQL 13 and later, ``logical_decoding_work_mem`` limits the memory used
+by each logical replication connection. When decoded changes exceed the limit,
+PostgreSQL writes them to local disk. A value that is too low for the source
+workload can therefore cause frequent disk spill and substantially reduce
+LOG_BASED throughput.
+
+Each active logical replication connection has its own buffer. A busy source, large
+or concurrent transactions, or several PipelineWise replications consuming slots
+on the same PostgreSQL cluster can increase both spill I/O and total memory demand.
+
+*How to diagnose:*
+Check the configured value. PostgreSQL versions before 13 return no row because
+they do not provide this setting:
+
+.. code-block:: sql
+
+    SELECT name, setting, unit, source
+    FROM pg_settings
+    WHERE name = 'logical_decoding_work_mem';
+
+On PostgreSQL 14 and later, compare the following counters over the period when
+replication is slow. Increasing ``spill_count`` or ``spill_bytes`` confirms that
+logical decoding is writing changes to disk; a large historical total alone does
+not prove a current bottleneck.
+
+.. code-block:: sql
+
+    SELECT slot_name,
+           spill_txns,
+           spill_count,
+           pg_size_pretty(spill_bytes) AS spill_bytes
+    FROM pg_stat_replication_slots
+    ORDER BY spill_bytes DESC;
+
+Check slot activity and acknowledgement separately. ``confirmed_flush_lsn`` is
+the position acknowledged by the consumer, while ``restart_lsn`` is the oldest
+WAL that may still be required. The calculated value approximates WAL retained
+for each slot:
+
+.. code-block:: sql
+
+    SELECT slot_name,
+           active,
+           confirmed_flush_lsn,
+           restart_lsn,
+           pg_size_pretty(
+               pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn)::bigint
+           ) AS retained_wal
+    FROM pg_replication_slots
+    WHERE slot_type = 'logical'
+    ORDER BY slot_name;
+
+Sample these values over the same interval as the spill counters. An inactive
+slot identifies a disconnected consumer. A stationary ``confirmed_flush_lsn``
+shows that acknowledgement is not advancing, but does not by itself distinguish
+source decoding from target or network backpressure.
+
+See the PostgreSQL documentation for
+`logical_decoding_work_mem <https://www.postgresql.org/docs/current/runtime-config-resource.html#GUC-LOGICAL-DECODING-WORK-MEM>`_
+and
+`logical replication slot statistics <https://www.postgresql.org/docs/current/monitoring-stats.html#MONITORING-PG-STAT-REPLICATION-SLOTS-VIEW>`_.
+
+*How to fix:*
+Work with the source database administrator to increase the setting incrementally
+for the PipelineWise replication role and database. There is no universal value;
+test against the transaction sizes and concurrency of the source. For example:
+
+.. code-block:: sql
+
+    ALTER ROLE <replication_user> IN DATABASE <source_database>
+    SET logical_decoding_work_mem = '<tested_value>';
+
+Restart the tap after changing a role or database default so its replication
+connection receives the new value. Budget memory for every concurrent logical
+replication connection and monitor database memory and disk I/O while tuning.
+Increasing this setting reduces decoding spill; it does not fix target, network,
+or ``stream_buffer_size`` backpressure. Replication lag alone does not require a
+resync.
+
+.. _troubleshooting_postgres_recovery_conflict:
+
+Canceling statement due to conflict with recovery
+"""""""""""""""""""""""""""""""""""""""""""""""""
 
 *Log message:*
 
@@ -300,7 +440,10 @@ values with:
 *How to fix:*
 Increase ``max_standby_streaming_delay`` on the replica.
 
-**Connection already closed**
+.. _troubleshooting_postgres_connection_closed:
+
+Connection already closed
+"""""""""""""""""""""""""
 
 *Log message:*
 
@@ -315,7 +458,10 @@ The source server is likely configured to kill idle connections.
 *How to fix:*
 Review the idle connection timeout settings on the source PostgreSQL server.
 
-**recovery is in progress**
+.. _troubleshooting_postgres_recovery_in_progress:
+
+recovery is in progress
+"""""""""""""""""""""""
 
 *Log message:*
 
@@ -325,15 +471,15 @@ Review the idle connection timeout settings on the source PostgreSQL server.
     HINT: WAL control functions cannot be executed during recovery.
 
 *Why it happens:*
-The tap is configured with a mix of incremental and log-based replication methods,
-and the connection points to a replica. Log-based replication cannot run against a
-replica.
+The tap is reading INCREMENTAL or FULL_TABLE replication from a replica. (LOG_BASED from a replica is not possible)
 
 *How to fix:*
-Point the tap at the primary server, or change the log-based tables to use a different
-replication method.
+Point the tap at the primary server, or increase `max_standby_streaming_delay`.
 
-**Unable to find replication slot**
+.. _troubleshooting_postgres_missing_slot:
+
+Unable to find replication slot
+"""""""""""""""""""""""""""""""
 
 *How to fix:*
 Run ``pipelinewise fast_sync --tap <tap_id> --target <target_id>`` to resync the
@@ -348,7 +494,10 @@ tap and recreate the replication slot. See :ref:`resync` before proceeding.
 FastSync Errors
 '''''''''''''''
 
-**Table not found**
+.. _troubleshooting_fastsync_table_not_found:
+
+Table not found
+"""""""""""""""
 
 *Log message:*
 
@@ -377,7 +526,10 @@ FastSync cannot find the table in the source database. Common causes:
 
    If this returns no results, the replication user lacks ``SELECT`` privilege.
 
-**Failure to import tap (0 tables discovered)**
+.. _troubleshooting_discovery_zero_tables:
+
+Failure to import tap (0 tables discovered)
+"""""""""""""""""""""""""""""""""""""""""""
 
 *Log message:*
 
@@ -398,6 +550,8 @@ FastSync cannot find the table in the source database. Common causes:
    in the source database.
 
 
+.. _troubleshooting_logging:
+
 Logging and Diagnostics
 '''''''''''''''''''''''
 
@@ -405,21 +559,23 @@ Use ``pipelinewise status`` to get an overview of all configured pipelines and
 their last run status. Use ``pipelinewise test_tap_connection`` to verify
 connectivity to a source before running a full sync.
 
-Log files are written to ``~/.pipelinewise/<target_id>/<tap_id>/log/`` with a
-``.success`` or ``.failed`` suffix indicating the outcome of each run.
-See :ref:`logging` for details.
+Runtime files are written below ``PIPELINEWISE_CONFIG_DIRECTORY``, which defaults
+to ``~/.pipelinewise``. Tap logs are stored under
+``<target_id>/<tap_id>/log/`` and use ``.running``, ``.success``, or ``.failed``
+suffixes. See :ref:`logging` for details.
 
 To follow the progress of a running sync:
 
 .. code-block:: bash
 
-    $ tail -f ~/.pipelinewise/<target_id>/<tap_id>/log/*running
+    $ pipelinewise_config_dir="${PIPELINEWISE_CONFIG_DIRECTORY:-$HOME/.pipelinewise}"
+    $ tail -f "$pipelinewise_config_dir/<target_id>/<tap_id>/log/"*running
 
 You can also check the temporary files being written during a sync:
 
 .. code-block:: bash
 
-    $ ls -lah ~/.pipelinewise/tmp/*<tap_id>*
+    $ ls -lah "$pipelinewise_config_dir/tmp/"*<tap_id>*
 
 
 Verify recovery

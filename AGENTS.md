@@ -76,6 +76,8 @@ Also follow scoped checks:
 ## Git and completion
 
 Branch from `master` and keep diffs task-scoped.
+Create every commit with a cryptographic signature using `git commit -S`; never
+create or push an unsigned commit.
 
 Keep CHANGELOG entries concise and atomic: one independently reviewable change per bullet. Use headings to preserve test categories instead of combining multiple changes in one bullet.
 
