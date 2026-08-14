@@ -1,25 +1,55 @@
 ## Context
 
-_Describe the problem your PR is trying to solve_
+<!-- Describe the problem, its operational consequence, and any related issue. -->
 
 
-## Types of changes
+## Changes
 
-What types of changes does your code introduce to PipelineWise?
-_Put an `x` in the boxes that apply_
+<!-- Summarize the chosen behaviour and explain non-obvious decisions. -->
 
-- [ ] Bugfix (non-breaking change which fixes an issue) [optional]
-- [ ] New feature (non-breaking change which adds functionality) [optional]
-- [ ] Breaking change (fix or feature that would cause existing functionality to not work as expected) [optional]
-- [ ] Documentation Update (if none of the other choices apply) [optional]
+
+## Type of change
+
+<!-- Select every type that applies. -->
+
+- [ ] Bug fix
+- [ ] New functionality
+- [ ] Maintenance, dependency, or CI
+- [ ] Documentation
+- [ ] Breaking change
+
+
+## Compatibility and operations
+
+<!--
+Describe compatibility, state, schema, data, migration, deployment, rollback, and
+recovery considerations. Write "N/A" where none apply.
+-->
+
+
+## Validation
+
+<!--
+List exact commands and pass, fail, and skip counts. Explain unavailable or
+credential-dependent checks; do not report them as passing.
+-->
+
+| Command or check | Result |
+|---|---|
+| `...` | ... |
 
 
 ## Checklist
 
-- [ ] I have read the [CONTRIBUTING](../CONTRIBUTING.md) doc
-- [ ] Description above provides context of the change
-- [ ] I have added tests that prove my fix is effective or that my feature works
-- [ ] Unit tests for changes (not needed for documentation changes)
-- [ ] CI checks pass with my changes
-- [ ] Branch name starts with `AP-NNN` (if applicable. AP-NNN = JIRA ID)
-- [ ] Relevant documentation is updated including usage instructions
+- [ ] I have read [CONTRIBUTING.md](../CONTRIBUTING.md).
+- [ ] This pull request is focused and can be reviewed and reverted
+      independently.
+- [ ] Behavioural changes have regression tests, or I explained why tests are not
+      applicable.
+- [ ] Relevant documentation and changelog entries are updated, or I explained
+      why they are not applicable.
+- [ ] Applicable local checks pass; failures, skips, and unavailable checks are
+      documented above.
+- [ ] The change contains no credentials, private keys, production identifiers,
+      or source records.
+- [ ] Breaking and compatibility impacts are identified above.
