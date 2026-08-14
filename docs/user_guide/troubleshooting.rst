@@ -32,6 +32,9 @@ Symptom index
    * - ``PGRES_COPY_BOTH``
      - PostgreSQL LOG_BASED
      - ``wal_sender_timeout`` and target backpressure.
+   * - LOG_BASED throughput falls behind without errors
+     - PostgreSQL LOG_BASED
+     - Logical-decoding disk spill and ``logical_decoding_work_mem``.
    * - Recovery conflict
      - PostgreSQL replica reads
      - Standby replay delay settings.
@@ -274,6 +277,65 @@ This usually happens when it takes a long time to load data into the target.
   The ``stream_buffer_size`` is a buffer allowing synchronous reading and loading of data.
   Note that a small ``wal_sender_timeout`` will cause even a very large ``stream_buffer_size``
   to run out of space, so fix ``wal_sender_timeout`` first.
+
+**LOG_BASED replication is slow or falling behind**
+
+*Why it happens:*
+On PostgreSQL 13 and later, ``logical_decoding_work_mem`` limits the memory used
+by each logical replication connection. When decoded changes exceed the limit,
+PostgreSQL writes them to local disk. A value that is too low for the source
+workload can therefore cause frequent disk spill and substantially reduce
+LOG_BASED throughput.
+
+Each active logical replication connection has its own buffer. A busy source, large
+or concurrent transactions, or several PipelineWise replications consuming slots
+on the same PostgreSQL cluster can increase both spill I/O and total memory demand.
+
+*How to diagnose:*
+Check the configured value. PostgreSQL versions before 13 return no row because
+they do not provide this setting:
+
+.. code-block:: sql
+
+    SELECT name, setting, unit, source
+    FROM pg_settings
+    WHERE name = 'logical_decoding_work_mem';
+
+On PostgreSQL 14 and later, compare the following counters over the period when
+replication is slow. Increasing ``spill_count`` or ``spill_bytes`` confirms that
+logical decoding is writing changes to disk; a large historical total alone does
+not prove a current bottleneck.
+
+.. code-block:: sql
+
+    SELECT slot_name,
+           spill_txns,
+           spill_count,
+           pg_size_pretty(spill_bytes) AS spill_bytes
+    FROM pg_stat_replication_slots
+    ORDER BY spill_bytes DESC;
+
+See the PostgreSQL documentation for
+`logical_decoding_work_mem <https://www.postgresql.org/docs/current/runtime-config-resource.html#GUC-LOGICAL-DECODING-WORK-MEM>`_
+and
+`logical replication slot statistics <https://www.postgresql.org/docs/current/monitoring-stats.html#MONITORING-PG-STAT-REPLICATION-SLOTS-VIEW>`_.
+
+*How to fix:*
+Work with the source database administrator to increase the setting incrementally
+for the PipelineWise replication role and database. There is no universal value;
+test against the transaction sizes and concurrency of the source. For example:
+
+.. code-block:: sql
+
+    ALTER ROLE <replication_user> IN DATABASE <source_database>
+    SET logical_decoding_work_mem = '<tested_value>';
+
+Restart the tap after changing a role or database default so its replication
+connection receives the new value. Budget memory for every concurrent logical
+replication connection and monitor database memory and disk I/O while tuning.
+Increasing this setting reduces decoding spill; it does not fix target, network,
+or ``stream_buffer_size`` backpressure. Replication lag alone does not require a
+resync.
 
 **Canceling statement due to conflict with recovery**
 
