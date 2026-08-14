@@ -8,12 +8,13 @@ requirements are clear.
 ## Before changing code
 
 1. Fork the repository and create a focused branch from `master`.
-2. Inspect the relevant implementation and tests before proposing a change.
-3. Reproduce defects with the smallest deterministic test you can.
-4. Use the [`dev-project`](dev-project/README.md) Docker environment wherever
+2. Sign every commit using `git commit -S`; unsigned commits are not accepted.
+3. Inspect the relevant implementation and tests before proposing a change.
+4. Reproduce defects with the smallest deterministic test you can.
+5. Use the [`dev-project`](dev-project/README.md) Docker environment wherever
    possible. Its Linux runtime, databases, and connector layout best approximate
    production.
-5. If you use an AI coding agent, ensure it follows the root and applicable
+6. If you use an AI coding agent, ensure it follows the root and applicable
    scoped `AGENTS.md` files.
 
 Never commit credentials, populated environment files, private keys, production
