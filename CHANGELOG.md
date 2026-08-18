@@ -21,6 +21,7 @@
 
 **Existing tests fixed**
 
+- Enable `wal2json` in fresh PostgreSQL E2E source containers
 - Exercise an actual unselected heartbeat update and assert that it emits no Singer record
 - Verify version-specific WAL queries use the connector connection seam and one connection
 - Update logical-replication harnesses for decoded marker payloads and state messages

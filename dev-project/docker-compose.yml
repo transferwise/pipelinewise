@@ -85,9 +85,10 @@ services:
     container_name: pipelinewise-postgres-source
     volumes:
       - ./pg/pg_hba.conf:/var/lib/postgresql/pg_hba.conf
-    # Making some logical decoding and ssl adjustments
+    # Enable logical decoding, including wal2json in the base-image allowlist, and SSL.
     command: >
       -c "wal_level=logical"
+      -c "output_plugin_libraries=pgoutput,test_decoding,decoderbufs,wal2json"
       -c "max_replication_slots=5"
       -c "max_wal_senders=5"
       -c "ssl=on"
