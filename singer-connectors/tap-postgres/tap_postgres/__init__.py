@@ -194,7 +194,8 @@ def sync_traditional_stream(conn_config, stream, state, sync_method, end_lsn):
     return state
 
 
-def sync_logical_streams(conn_config, logical_streams, state, end_lsn, state_file):
+# pylint: disable-next=too-many-arguments
+def sync_logical_streams(conn_config, logical_streams, state, end_lsn, state_file, *, wal_progress_content=None):
     """
     Sync streams that use LOG_BASED method
     """
@@ -218,7 +219,14 @@ def sync_logical_streams(conn_config, logical_streams, state, end_lsn, state_fil
                 new_state['bookmarks'][stream] = bookmark
         state = new_state
 
-        state = logical_replication.sync_tables(conn_config, logical_streams, state, end_lsn, state_file)
+        state = logical_replication.sync_tables(
+            conn_config,
+            logical_streams,
+            state,
+            end_lsn,
+            state_file,
+            wal_progress_content=wal_progress_content,
+        )
 
     return state
 
@@ -272,6 +280,7 @@ def register_type_adapters(conn_config):
                         (enum_oid,), f'ENUM_{enum_oid}[]', psycopg2.STRING))
 
 
+# pylint: disable-next=too-many-locals
 def do_sync(conn_config, catalog, default_replication_method, state, state_file=None):
     """
     Orchestrates sync of all streams
@@ -316,10 +325,21 @@ def do_sync(conn_config, catalog, default_replication_method, state, state_file=
                                         end_lsn)
 
     logical_streams.sort(key=lambda s: metadata.to_map(s['metadata']).get(()).get('database-name'))
-    for dbname, streams in itertools.groupby(logical_streams,
-                                             lambda s: metadata.to_map(s['metadata']).get(()).get('database-name')):
+    for dbname, streams in itertools.groupby(
+            logical_streams, lambda s: metadata.to_map(s['metadata']).get(()).get('database-name')):
         conn_config['dbname'] = dbname
-        state = sync_logical_streams(conn_config, list(streams), state, end_lsn, state_file)
+        # Logical messages are decoded only by slots in the same database.
+        wal_progress_content = logical_replication.emit_wal_progress_message(conn_config)
+        logical_end_lsn = (logical_replication.fetch_current_lsn(conn_config)
+                           if wal_progress_content is not None else end_lsn)
+        state = sync_logical_streams(
+            conn_config,
+            list(streams),
+            state,
+            logical_end_lsn,
+            state_file,
+            wal_progress_content=wal_progress_content,
+        )
     return state
 
 

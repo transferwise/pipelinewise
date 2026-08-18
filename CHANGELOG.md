@@ -1,3 +1,30 @@
+0.79.1 (TBD)
+------------
+
+**Fixes**
+
+- Advance idle PostgreSQL LOG_BASED bookmarks using committed database-local logical messages
+- Allow target-acknowledged PostgreSQL LOG_BASED progress markers to advance replication-slot feedback
+- Read PostgreSQL versions and WAL positions through one connection
+
+**Test hardening**
+
+**New tests**
+
+- Verify marker emission and fallback when logical messages are unavailable or fail
+- Verify each logical database receives its own marker and post-commit WAL boundary
+- Reject stale, incomplete, foreign, and non-transactional markers as bookmark boundaries
+- Verify bounded markers advance bookmarks without acknowledging unconfirmed state
+- Verify continuous taps advance marker feedback only after target acknowledgement
+- Skip invalid UTF-8 WAL payloads without advancing feedback
+- Verify idle PostgreSQL runs advance state and confirmed slot feedback without emitting records
+
+**Existing tests fixed**
+
+- Exercise an actual unselected heartbeat update and assert that it emits no Singer record
+- Verify version-specific WAL queries use the connector connection seam and one connection
+- Update logical-replication harnesses for decoded marker payloads and state messages
+
 0.79.0 (2026-08-10)
 --------------------
 

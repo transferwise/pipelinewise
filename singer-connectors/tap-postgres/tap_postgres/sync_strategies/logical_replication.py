@@ -6,6 +6,7 @@ import copy
 import json
 import re
 import singer
+import uuid
 import warnings
 
 from select import select
@@ -24,6 +25,8 @@ UPDATE_BOOKMARK_PERIOD = 10000
 FEEDBACK_POLL_INTERVAL = 10
 FALLBACK_DATETIME = '9999-12-31T23:59:59.999+00:00'
 FALLBACK_DATE = '9999-12-31T00:00:00+00:00'
+WAL_PROGRESS_MESSAGE_PREFIX = 'pipelinewise'
+WAL_PROGRESS_MESSAGE_CONTENT_PREFIX = 'wal_progress:'
 
 
 class ReplicationSlotNotFoundError(Exception):
@@ -35,13 +38,17 @@ class UnsupportedPayloadKindError(Exception):
 
 
 # pylint: disable=invalid-name,missing-function-docstring,too-many-branches,too-many-statements,too-many-arguments
-def get_pg_version(conn_info):
-    with post_db.open_connection(conn_info, False, True) as conn:
-        with conn.cursor() as cur:
-            cur.execute("SELECT setting::int AS version FROM pg_settings WHERE name='server_version_num'")
-            version = cur.fetchone()[0]
+def _read_pg_version(conn):
+    with conn.cursor() as cur:
+        cur.execute("SELECT setting::int AS version FROM pg_settings WHERE name='server_version_num'")
+        version = cur.fetchone()[0]
     LOGGER.debug('Detected PostgreSQL version: %s', version)
     return version
+
+
+def get_pg_version(conn_info):
+    with post_db.open_connection(conn_info, False, True) as conn:
+        return _read_pg_version(conn)
 
 
 def lsn_to_int(lsn):
@@ -79,23 +86,23 @@ def int_to_lsn(lsni):
 
 # pylint: disable=chained-comparison
 def fetch_current_lsn(conn_config):
-    version = get_pg_version(conn_config)
-    # Make sure PostgreSQL version is 9.4 or higher
-    # Do not allow minor versions with PostgreSQL BUG #15114
-    if (version >= 110000) and (version < 110002):
-        raise Exception('PostgreSQL upgrade required to minor version 11.2')
-    if (version >= 100000) and (version < 100007):
-        raise Exception('PostgreSQL upgrade required to minor version 10.7')
-    if (version >= 90600) and (version < 90612):
-        raise Exception('PostgreSQL upgrade required to minor version 9.6.12')
-    if (version >= 90500) and (version < 90516):
-        raise Exception('PostgreSQL upgrade required to minor version 9.5.16')
-    if (version >= 90400) and (version < 90421):
-        raise Exception('PostgreSQL upgrade required to minor version 9.4.21')
-    if version < 90400:
-        raise Exception('Logical replication not supported before PostgreSQL 9.4')
-
     with post_db.open_connection(conn_config, False, True) as conn:
+        version = _read_pg_version(conn)
+        # Make sure PostgreSQL version is 9.4 or higher
+        # Do not allow minor versions with PostgreSQL BUG #15114
+        if (version >= 110000) and (version < 110002):
+            raise Exception('PostgreSQL upgrade required to minor version 11.2')
+        if (version >= 100000) and (version < 100007):
+            raise Exception('PostgreSQL upgrade required to minor version 10.7')
+        if (version >= 90600) and (version < 90612):
+            raise Exception('PostgreSQL upgrade required to minor version 9.6.12')
+        if (version >= 90500) and (version < 90516):
+            raise Exception('PostgreSQL upgrade required to minor version 9.5.16')
+        if (version >= 90400) and (version < 90421):
+            raise Exception('PostgreSQL upgrade required to minor version 9.4.21')
+        if version < 90400:
+            raise Exception('Logical replication not supported before PostgreSQL 9.4')
+
         with conn.cursor() as cur:
             # Use version specific lsn command
             if version >= 100000:
@@ -105,6 +112,51 @@ def fetch_current_lsn(conn_config):
 
             current_lsn = cur.fetchone()[0]
             return lsn_to_int(current_lsn)
+
+
+def wal_progress_message_content(conn_info, marker_id):
+    """Return content unique to one tap invocation."""
+    return f"{WAL_PROGRESS_MESSAGE_CONTENT_PREFIX}{conn_info['tap_id']}:{marker_id}"
+
+
+def emit_wal_progress_message(conn_info):
+    """Emit a source-database marker when logical messages are available."""
+    availability_query = """
+        WITH function_check AS (
+            SELECT to_regprocedure(
+                'pg_catalog.pg_logical_emit_message(boolean,text,text)'
+            ) AS function_oid
+        )
+        SELECT CASE
+                   WHEN function_oid IS NULL THEN FALSE
+                   ELSE has_function_privilege(current_user, function_oid, 'EXECUTE')
+               END
+          FROM function_check
+    """
+
+    message_content = wal_progress_message_content(conn_info, uuid.uuid4().hex)
+    conn = None
+    try:
+        conn = post_db.open_connection(conn_info, False, True)
+        with conn:
+            with conn.cursor() as cur:
+                cur.execute(availability_query)
+                available = cur.fetchone()
+                if not available or available[0] is not True:
+                    LOGGER.debug('Logical WAL progress messages are unavailable')
+                    return None
+
+                cur.execute(
+                    'SELECT pg_catalog.pg_logical_emit_message(TRUE, %s, %s)',
+                    (WAL_PROGRESS_MESSAGE_PREFIX, message_content)
+                )
+        return message_content
+    except psycopg2.Error as ex:
+        LOGGER.warning('Unable to emit a logical WAL progress message; continuing without it: %s', ex)
+        return None
+    finally:
+        if conn is not None:
+            conn.close()
 
 
 def add_automatic_properties(stream, debug_lsn: bool = False):
@@ -378,15 +430,16 @@ def row_to_singer_message(stream, row, version, columns, time_extracted, md_map,
 
 
 # pylint: disable=unused-argument,too-many-locals
-def consume_message(streams, state, msg, time_extracted, conn_info):
-    try:
-        payload = json.loads(msg.payload)
-    except Exception:
-        return state
+def consume_message(streams, state, msg, time_extracted, conn_info, *, message_payload=None):
+    if message_payload is None:
+        try:
+            message_payload = json.loads(msg.payload)
+        except Exception:
+            return state
 
     lsn = msg.data_start
 
-    action = payload.get('action')
+    action = message_payload.get('action')
     # Action Types:
     # I = Insert
     # U = Update
@@ -405,7 +458,7 @@ def consume_message(streams, state, msg, time_extracted, conn_info):
 
     streams_lookup = {s['tap_stream_id']: s for s in streams}
 
-    tap_stream_id = post_db.compute_tap_stream_id(payload['schema'], payload['table'])
+    tap_stream_id = post_db.compute_tap_stream_id(message_payload['schema'], message_payload['table'])
     if streams_lookup.get(tap_stream_id) is None:
         return state
 
@@ -437,7 +490,7 @@ def consume_message(streams, state, msg, time_extracted, conn_info):
     # only inserts and updates have the list of columns that can be used to detect any different in columns
     diff = set()
     if action in {'I', 'U'}:
-        diff = {column['name'] for column in payload['columns']}.\
+        diff = {column['name'] for column in message_payload['columns']}.\
             difference(target_stream['schema']['properties'].keys())
 
     # if there is new columns in the payload that are not in the schema properties then refresh the stream schema
@@ -466,7 +519,7 @@ def consume_message(streams, state, msg, time_extracted, conn_info):
     col_vals = []
 
     if action in {'I', 'U'}:
-        for col in payload['columns']:
+        for col in message_payload['columns']:
             if col['name'] in desired_columns:
                 col_names.append(col['name'])
                 col_vals.append(col['value'])
@@ -475,7 +528,7 @@ def consume_message(streams, state, msg, time_extracted, conn_info):
         col_vals.append(None)
 
     elif action == 'D':
-        for column in payload['identity']:
+        for column in message_payload['identity']:
             if column['name'] in set(desired_columns):
                 col_names.append(column['name'])
                 col_vals.append(column['value'])
@@ -602,7 +655,14 @@ def _read_target_acknowledged_lsn(state_file, logical_streams, previous_safe_lsn
         return previous_safe_lsn
 
 
-def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
+def _write_lsn_state(state, logical_streams, lsn):
+    for stream in logical_streams:
+        state = singer.write_bookmark(state, stream['tap_stream_id'], 'lsn', lsn)
+    singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
+    return state
+
+
+def sync_tables(conn_info, logical_streams, state, end_lsn, state_file, *, wal_progress_content=None):
     target_acknowledged_lsn = _minimum_acknowledged_lsn(state, logical_streams)
     start_lsn = target_acknowledged_lsn
     lsn_to_flush = None
@@ -660,6 +720,8 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
     lsn_received_timestamp = datetime.datetime.utcnow()
     poll_timestamp = datetime.datetime.utcnow()
 
+    wal_progress_message_seen = False
+    completed_wal_progress_lsn = None
     try:
         while True:
             # Disconnect when no data received for logical_poll_total_seconds
@@ -686,7 +748,26 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
                                 int_to_lsn(end_lsn))
                     break
 
-                state = consume_message(logical_streams, state, msg, time_extracted, conn_info)
+                try:
+                    message_payload = json.loads(msg.payload)
+                except (TypeError, ValueError):
+                    message_payload = {}
+
+                if (wal_progress_content is not None
+                        and message_payload.get('action') == 'M'
+                        and message_payload.get('transactional') is True
+                        and message_payload.get('prefix') == WAL_PROGRESS_MESSAGE_PREFIX
+                        and message_payload.get('content') == wal_progress_content):
+                    wal_progress_message_seen = True
+
+                state = consume_message(
+                    logical_streams,
+                    state,
+                    msg,
+                    time_extracted,
+                    conn_info,
+                    message_payload=message_payload,
+                )
 
                 # When using wal2json with write-in-chunks, multiple messages can have the same lsn
                 # This is to ensure we only flush to lsn that has completed entirely
@@ -712,10 +793,20 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
                         LOGGER.debug('Updating bookmarks for all streams to lsn = %s (%s)',
                                     lsn_last_processed,
                                     int_to_lsn(lsn_last_processed))
-                        for s in logical_streams:
-                            state = singer.write_bookmark(state, s['tap_stream_id'], 'lsn', lsn_last_processed)
-                        singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
+                        state = _write_lsn_state(state, logical_streams, lsn_last_processed)
                         lsn_processed_count = 0
+
+                if wal_progress_message_seen and message_payload.get('action') == 'C':
+                    lsn_last_processed = msg.data_start
+                    completed_wal_progress_lsn = lsn_last_processed
+                    wal_progress_message_seen = False
+                    if break_at_end_lsn:
+                        LOGGER.info('Breaking - reached PipelineWise WAL progress message at %s',
+                                    int_to_lsn(lsn_last_processed))
+                        break
+                    LOGGER.info('Updating bookmarks at PipelineWise WAL progress message %s',
+                                int_to_lsn(lsn_last_processed))
+                    state = _write_lsn_state(state, logical_streams, lsn_last_processed)
             else:
                 try:
                     # Wait for a second unless a message arrives
@@ -731,8 +822,12 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
                     LOGGER.info('Lastest wal message received was %s', int_to_lsn(lsn_last_processed))
                     target_acknowledged_lsn = _read_target_acknowledged_lsn(
                         state_file, logical_streams, target_acknowledged_lsn)
-                    if ((lsn_currently_processing > target_acknowledged_lsn)
-                            and (target_acknowledged_lsn > lsn_to_flush)):
+                    target_lsn_is_complete = (
+                        lsn_currently_processing > target_acknowledged_lsn
+                        or (completed_wal_progress_lsn is not None
+                            and completed_wal_progress_lsn >= target_acknowledged_lsn)
+                    )
+                    if target_lsn_is_complete and target_acknowledged_lsn > lsn_to_flush:
                         lsn_to_flush = target_acknowledged_lsn
                         LOGGER.info('Confirming write up to %s, flush to %s',
                                     int_to_lsn(lsn_to_flush),
@@ -756,9 +851,8 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
                         lsn_last_processed,
                         int_to_lsn(lsn_last_processed))
 
-            for s in logical_streams:
-                state = singer.write_bookmark(state, s['tap_stream_id'], 'lsn', lsn_last_processed)
-
-        singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
+            state = _write_lsn_state(state, logical_streams, lsn_last_processed)
+        else:
+            singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
 
     return state

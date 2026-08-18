@@ -119,6 +119,17 @@ PipelineWise sends feedback only up to the minimum target-acknowledged LSN store
 in ``state.json``. Missing, unreadable, invalid, or regressing state retains the
 previous safe LSN.
 
+Before consuming ongoing LOG_BASED WAL on PostgreSQL 9.6 or later, PipelineWise
+attempts to emit a transactional ``pg_logical_emit_message`` in each tap
+database when the tap user can execute the function. The transaction's commit
+provides a decodable bookmark boundary even when the selected tables are idle.
+Slot feedback advances through that boundary only after the target acknowledges
+the state.
+
+If the function is unavailable or inaccessible, replication continues using
+the captured current-WAL boundary. Fully filtered idle WAL may then require a
+later decodable message before the bookmark and acknowledgement can advance.
+
 After an unexpected termination, restart the same tap without advancing state.
 Unacknowledged WAL remains replayable while the slot exists. Resync only when the
 slot or required WAL is unavailable, and monitor retained WAL during a prolonged
