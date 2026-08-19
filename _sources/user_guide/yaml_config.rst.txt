@@ -211,6 +211,16 @@ Tap configuration
      - Tap-specific or ``0``
      - Expands nested objects into columns. ``0`` keeps flattening disabled;
        higher values can create wide and changing target schemas.
+   * - ``target_table_format``
+     - Omitted
+     - Selects ``native`` or managed ``iceberg`` Snowflake tables for the
+       Singer target path. When omitted, missing tables are native unless the
+       deprecated target-level ``iceberg_create`` setting applies. The setting
+       applies to every table in the tap.
+   * - ``iceberg_version``
+     - None
+     - Must be integer ``3`` with ``target_table_format: iceberg`` and is
+       invalid otherwise.
    * - ``validate_records``
      - ``false``
      - Validates Singer records against their emitted schema before loading.
@@ -229,6 +239,18 @@ Tap configuration
    * - ``archive_load_files_s3_bucket`` / ``archive_load_files_s3_prefix``
      - None
      - Selects the archive destination when load-file archiving is enabled.
+
+.. important::
+
+   Tap-level Iceberg configuration currently provides Singer connector
+   groundwork only; it does not enable a complete RDBMS route. FullSync and
+   PartialSync with explicit Iceberg configuration fail before changing the
+   target. Explicit Iceberg v3 configuration is limited to
+   ``tap-mysql`` (MariaDB/MySQL) and ``tap-postgres`` with
+   ``target-snowflake``. It requires ``data_flattening_max_level: 0`` and
+   ``hard_delete: true``; deprecated ``hard_delete: false`` is rejected.
+   Omitting ``target_table_format`` creates native tables unless the deprecated
+   target-level ``iceberg_create`` setting applies.
 
 .. warning::
 

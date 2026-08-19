@@ -606,6 +606,18 @@ and Snowflake targets read <code class="docutils literal notranslate"><span clas
 <td><p>Expands nested objects into columns. <code class="docutils literal notranslate"><span class="pre">0</span></code> keeps flattening disabled;
 higher values can create wide and changing target schemas.</p></td>
 </tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">target_table_format</span></code></p></td>
+<td><p>Omitted</p></td>
+<td><p>Selects <code class="docutils literal notranslate"><span class="pre">native</span></code> or managed <code class="docutils literal notranslate"><span class="pre">iceberg</span></code> Snowflake tables for the
+Singer target path. When omitted, missing tables are native unless the
+deprecated target-level <code class="docutils literal notranslate"><span class="pre">iceberg_create</span></code> setting applies. The setting
+applies to every table in the tap.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">iceberg_version</span></code></p></td>
+<td><p>None</p></td>
+<td><p>Must be integer <code class="docutils literal notranslate"><span class="pre">3</span></code> with <code class="docutils literal notranslate"><span class="pre">target_table_format:</span> <span class="pre">iceberg</span></code> and is
+invalid otherwise.</p></td>
+</tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">validate_records</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">false</span></code></p></td>
 <td><p>Validates Singer records against their emitted schema before loading.</p></td>
@@ -632,6 +644,18 @@ higher values can create wide and changing target schemas.</p></td>
 </tr>
 </tbody>
 </table>
+<div class="admonition important">
+<p class="admonition-title">Important</p>
+<p>Tap-level Iceberg configuration currently provides Singer connector
+groundwork only; it does not enable a complete RDBMS route. FullSync and
+PartialSync with explicit Iceberg configuration fail before changing the
+target. Explicit Iceberg v3 configuration is limited to
+<code class="docutils literal notranslate"><span class="pre">tap-mysql</span></code> (MariaDB/MySQL) and <code class="docutils literal notranslate"><span class="pre">tap-postgres</span></code> with
+<code class="docutils literal notranslate"><span class="pre">target-snowflake</span></code>. It requires <code class="docutils literal notranslate"><span class="pre">data_flattening_max_level:</span> <span class="pre">0</span></code> and
+<code class="docutils literal notranslate"><span class="pre">hard_delete:</span> <span class="pre">true</span></code>; deprecated <code class="docutils literal notranslate"><span class="pre">hard_delete:</span> <span class="pre">false</span></code> is rejected.
+Omitting <code class="docutils literal notranslate"><span class="pre">target_table_format</span></code> creates native tables unless the deprecated
+target-level <code class="docutils literal notranslate"><span class="pre">iceberg_create</span></code> setting applies.</p>
+</div>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
 <p>The effective automatic Singer flush cap is currently 16, not 4. To change

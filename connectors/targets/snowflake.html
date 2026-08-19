@@ -424,7 +424,6 @@ chain.</p>
 <span class="w">  </span><span class="nt">s3_key_prefix</span><span class="p">:</span><span class="w"> </span><span class="s">"pipelinewise/"</span>
 <span class="w">  </span><span class="nt">stage</span><span class="p">:</span><span class="w"> </span><span class="s">"&lt;SCHEMA&gt;.&lt;STAGE&gt;"</span>
 <span class="w">  </span><span class="nt">file_format</span><span class="p">:</span><span class="w"> </span><span class="s">"&lt;SCHEMA&gt;.&lt;FILE_FORMAT&gt;"</span>
-<span class="w">  </span><span class="nt">iceberg_create</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
 </pre></div>
 </div>
 <table class="docutils align-default" id="id2" style="width: 100%">
@@ -497,7 +496,8 @@ bucket-owner-enforced buckets.</p></td>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">iceberg_create</span></code></p></td>
 <td><p>No</p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">false</span></code></p></td>
-<td><p>Creates new Singer-path tables as managed Iceberg tables.</p></td>
+<td><p>Deprecated target-wide setting for new Singer-path Iceberg tables.
+Prefer tap-level <code class="docutils literal notranslate"><span class="pre">target_table_format</span></code> and <code class="docutils literal notranslate"><span class="pre">iceberg_version</span></code>.</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">max_parallelism</span></code></p></td>
 <td><p>No</p></td>
@@ -520,10 +520,12 @@ schema-wide grant behaviour.</p>
 </section>
 <section id="iceberg-tables">
 <h2>Iceberg tables<a class="headerlink" href="#iceberg-tables" title="Link to this heading"></a></h2>
-<p>Singer-path loads can create new managed Iceberg tables. FastSync and PartialSync
-cannot currently create or load Iceberg tables. Existing native tables can be
-converted with the bundled utility. See <a class="reference internal" href="snowflake_iceberg.html#snowflake-iceberg"><span class="std std-ref">Snowflake Iceberg tables</span></a> for prerequisites,
-cutover, limitations, and recovery.</p>
+<p>The Singer connector can create managed Iceberg v3 tables when the tap selects
+that format. This does not yet enable a complete RDBMS-to-Iceberg route: fresh
+taps normally require FastSync first. FullSync and PartialSync with explicit
+Iceberg configuration fail before changing the target. Existing native tables
+can be converted with the bundled utility. See <a class="reference internal" href="snowflake_iceberg.html#snowflake-iceberg"><span class="std std-ref">Snowflake Iceberg tables</span></a> for
+configuration, prerequisites, and limitations.</p>
 </section>
 </section>
 

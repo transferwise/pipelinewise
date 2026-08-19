@@ -430,9 +430,12 @@ database export, staging, copy, and merge operations. It has two components:</p>
 </tr>
 </tbody>
 </table>
-<p>Endpoint support status from <a class="reference internal" href="../connectors/index.html#connector-support"><span class="std std-ref">Connectors</span></a> still applies. A normal
-<code class="docutils literal notranslate"><span class="pre">run_tap</span></code> falls back to Singer when FullSync is unavailable. The explicit
-<code class="docutils literal notranslate"><span class="pre">fast_sync</span></code> command instead fails without loading data.</p>
+<p>The Snowflake rows currently cover native tables only. With explicit
+<code class="docutils literal notranslate"><span class="pre">target_table_format:</span> <span class="pre">iceberg</span></code>, FullSync and PartialSync fail before target
+mutation and do not fall back to Singer.</p>
+<p>Endpoint support status from <a class="reference internal" href="../connectors/index.html#connector-support"><span class="std std-ref">Connectors</span></a> still applies. For a
+route without a FastSync component, a normal <code class="docutils literal notranslate"><span class="pre">run_tap</span></code> falls back to Singer.
+The explicit <code class="docutils literal notranslate"><span class="pre">fast_sync</span></code> command instead fails without loading data.</p>
 </section>
 <section id="automatic-selection-and-handover">
 <h2>Automatic selection and handover<a class="headerlink" href="#automatic-selection-and-handover" title="Link to this heading"></a></h2>

@@ -3,9 +3,11 @@
 Snowflake Iceberg tables
 ========================
 
-PipelineWise can create new managed Snowflake Iceberg tables through the Singer
-target path or copy an existing native table into an Iceberg table with the
-``copy-native-to-iceberg`` utility.
+The target-snowflake Singer connector can create managed Snowflake Iceberg v3
+tables. This is connector groundwork for later FastSync support, not a complete
+RDBMS-to-Iceberg route. Fresh RDBMS taps normally require FullSync before Singer,
+and that path remains unavailable. The existing ``copy-native-to-iceberg``
+utility can copy a native table separately.
 
 
 Support
@@ -19,12 +21,18 @@ Support
    * - Operation
      - Status
      - Behaviour
-   * - Singer creates a new table
-     - Available
-     - ``iceberg_create: true`` creates a managed Iceberg table.
+   * - Singer with explicit v3 tap configuration
+     - Connector groundwork
+     - When Singer runs without a FastSync selection, creates a managed Iceberg
+       v3 table and stores objects and arrays as ``VARIANT``.
+   * - Singer with target-level ``iceberg_create``
+     - Deprecated compatibility
+     - Preserves the existing Iceberg mapping, including objects and arrays as
+       ``TEXT``.
    * - FastSync or PartialSync
      - Unavailable
-     - Fails rather than replacing or merging an Iceberg table.
+     - Explicit tap-level Iceberg configuration fails before creating or
+       changing a target table.
    * - Convert an existing native table
      - Available utility
      - Copies data into a companion table, then optionally promotes it.
@@ -33,36 +41,81 @@ Support
 Snowflake prerequisites
 -----------------------
 
-Configure a default catalog and external volume on the target database:
+Explicit v3 creation sets ``CATALOG = 'SNOWFLAKE'`` and leaves
+``EXTERNAL_VOLUME`` unset. Snowflake uses the effective schema, database, or
+account default. If no different default is configured, Snowflake-managed
+storage is used.
+
+To use your own cloud storage, create an external volume and configure it as a
+default on the schema, database, or account. For example:
 
 .. code-block:: sql
 
    CREATE OR REPLACE EXTERNAL VOLUME <external_volume> ...;
-   ALTER DATABASE <target_database> SET CATALOG = 'snowflake';
    ALTER DATABASE <target_database>
      SET EXTERNAL_VOLUME = <external_volume>;
 
-The target role needs the parent-object, warehouse, catalog, external-volume,
-and ``CREATE ICEBERG TABLE`` privileges required by Snowflake. Follow Snowflake's
+The target role needs the parent-object, warehouse, and ``CREATE ICEBERG TABLE``
+privileges required by Snowflake. A custom external volume also requires its
+applicable privileges. PipelineWise does not preflight these privileges; a
+failed ``CREATE ICEBERG TABLE`` reports the Snowflake error. Follow Snowflake's
 `managed Iceberg table documentation
 <https://docs.snowflake.com/en/user-guide/tables-iceberg>`_ for the account-level
 setup.
 
 
-Create new Iceberg tables
--------------------------
+Create new Singer tables
+------------------------
 
-Set ``iceberg_create`` in the target YAML before the Singer target creates the
-table:
+Set the desired format in the tap YAML. It applies to every selected table in
+that tap:
+
+.. code-block:: yaml
+
+   target: "snowflake"
+   target_table_format: iceberg
+   iceberg_version: 3
+
+When tap-level format and the legacy target flag are omitted, new tables are
+native. ``target_table_format`` accepts only ``native`` or ``iceberg``. Iceberg
+requires integer version ``3``; a version is invalid when the format is native
+or omitted.
+
+Explicit Iceberg v3 configuration is limited to ``tap-mysql`` (MariaDB/MySQL)
+and ``tap-postgres`` with ``target-snowflake``. It requires
+``data_flattening_max_level: 0`` and ``hard_delete: true``. The deprecated
+``hard_delete: false`` behaviour is rejected for this route.
+
+An explicit setting must match an existing table. PipelineWise does not convert
+a native table, change an Iceberg table's catalog, or upgrade Iceberg v2. Nested
+objects and arrays use ``VARIANT`` only with the explicit v3 configuration.
+Keep both settings while replicating to a v3 table. Removing them restores the
+legacy ``TEXT`` mapping; PipelineWise stops on existing ``VARIANT`` columns and
+asks the operator to restore the explicit v3 configuration rather than changing
+the columns automatically.
+
+Fresh LOG_BASED and INCREMENTAL RDBMS taps normally select FullSync before
+Singer. With explicit tap-level Iceberg configuration, that FullSync fails
+before target mutation and does not fall back to Singer. ``fast_sync`` and
+``partial_sync_table`` are also unavailable for that configuration in this
+release.
+
+
+Legacy target setting
+---------------------
+
+The deprecated target-level setting remains available during migration:
 
 .. code-block:: yaml
 
    db_conn:
      iceberg_create: true
 
-The setting affects new tables only. It does not convert an existing native
-table. Do not use ``fast_sync`` or ``partial_sync_table`` for a table that exists
-as Iceberg.
+When tap-level format is omitted, PipelineWise preserves this setting's current
+new-table and type-mapping behaviour. The legacy setting affects missing tables;
+an existing physical table continues to win. When both settings are present,
+they must agree. Only an explicit tap-level format must match an existing table;
+neither setting converts it.
 
 
 Convert a native table

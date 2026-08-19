@@ -355,9 +355,11 @@
              
   <section id="snowflake-iceberg-tables">
 <span id="snowflake-iceberg"></span><h1>Snowflake Iceberg tables<a class="headerlink" href="#snowflake-iceberg-tables" title="Link to this heading"></a></h1>
-<p>PipelineWise can create new managed Snowflake Iceberg tables through the Singer
-target path or copy an existing native table into an Iceberg table with the
-<code class="docutils literal notranslate"><span class="pre">copy-native-to-iceberg</span></code> utility.</p>
+<p>The target-snowflake Singer connector can create managed Snowflake Iceberg v3
+tables. This is connector groundwork for later FastSync support, not a complete
+RDBMS-to-Iceberg route. Fresh RDBMS taps normally require FullSync before Singer,
+and that path remains unavailable. The existing <code class="docutils literal notranslate"><span class="pre">copy-native-to-iceberg</span></code>
+utility can copy a native table separately.</p>
 <section id="support">
 <h2>Support<a class="headerlink" href="#support" title="Link to this heading"></a></h2>
 <table class="docutils align-default" style="width: 100%">
@@ -373,15 +375,22 @@ target path or copy an existing native table into an Iceberg table with the
 </tr>
 </thead>
 <tbody>
-<tr class="row-even"><td><p>Singer creates a new table</p></td>
-<td><p>Available</p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">iceberg_create:</span> <span class="pre">true</span></code> creates a managed Iceberg table.</p></td>
+<tr class="row-even"><td><p>Singer with explicit v3 tap configuration</p></td>
+<td><p>Connector groundwork</p></td>
+<td><p>When Singer runs without a FastSync selection, creates a managed Iceberg
+v3 table and stores objects and arrays as <code class="docutils literal notranslate"><span class="pre">VARIANT</span></code>.</p></td>
 </tr>
-<tr class="row-odd"><td><p>FastSync or PartialSync</p></td>
+<tr class="row-odd"><td><p>Singer with target-level <code class="docutils literal notranslate"><span class="pre">iceberg_create</span></code></p></td>
+<td><p>Deprecated compatibility</p></td>
+<td><p>Preserves the existing Iceberg mapping, including objects and arrays as
+<code class="docutils literal notranslate"><span class="pre">TEXT</span></code>.</p></td>
+</tr>
+<tr class="row-even"><td><p>FastSync or PartialSync</p></td>
 <td><p>Unavailable</p></td>
-<td><p>Fails rather than replacing or merging an Iceberg table.</p></td>
+<td><p>Explicit tap-level Iceberg configuration fails before creating or
+changing a target table.</p></td>
 </tr>
-<tr class="row-even"><td><p>Convert an existing native table</p></td>
+<tr class="row-odd"><td><p>Convert an existing native table</p></td>
 <td><p>Available utility</p></td>
 <td><p>Copies data into a companion table, then optionally promotes it.</p></td>
 </tr>
@@ -390,29 +399,66 @@ target path or copy an existing native table into an Iceberg table with the
 </section>
 <section id="snowflake-prerequisites">
 <h2>Snowflake prerequisites<a class="headerlink" href="#snowflake-prerequisites" title="Link to this heading"></a></h2>
-<p>Configure a default catalog and external volume on the target database:</p>
+<p>Explicit v3 creation sets <code class="docutils literal notranslate"><span class="pre">CATALOG</span> <span class="pre">=</span> <span class="pre">'SNOWFLAKE'</span></code> and leaves
+<code class="docutils literal notranslate"><span class="pre">EXTERNAL_VOLUME</span></code> unset. Snowflake uses the effective schema, database, or
+account default. If no different default is configured, Snowflake-managed
+storage is used.</p>
+<p>To use your own cloud storage, create an external volume and configure it as a
+default on the schema, database, or account. For example:</p>
 <div class="highlight-sql notranslate"><div class="highlight"><pre><span></span><span class="k">CREATE</span><span class="w"> </span><span class="k">OR</span><span class="w"> </span><span class="k">REPLACE</span><span class="w"> </span><span class="k">EXTERNAL</span><span class="w"> </span><span class="n">VOLUME</span><span class="w"> </span><span class="o">&lt;</span><span class="n">external_volume</span><span class="o">&gt;</span><span class="w"> </span><span class="p">...;</span>
-<span class="k">ALTER</span><span class="w"> </span><span class="k">DATABASE</span><span class="w"> </span><span class="o">&lt;</span><span class="n">target_database</span><span class="o">&gt;</span><span class="w"> </span><span class="k">SET</span><span class="w"> </span><span class="k">CATALOG</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'snowflake'</span><span class="p">;</span>
 <span class="k">ALTER</span><span class="w"> </span><span class="k">DATABASE</span><span class="w"> </span><span class="o">&lt;</span><span class="n">target_database</span><span class="o">&gt;</span>
 <span class="w">  </span><span class="k">SET</span><span class="w"> </span><span class="n">EXTERNAL_VOLUME</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;</span><span class="n">external_volume</span><span class="o">&gt;</span><span class="p">;</span>
 </pre></div>
 </div>
-<p>The target role needs the parent-object, warehouse, catalog, external-volume,
-and <code class="docutils literal notranslate"><span class="pre">CREATE</span> <span class="pre">ICEBERG</span> <span class="pre">TABLE</span></code> privileges required by Snowflake. Follow Snowflake’s
+<p>The target role needs the parent-object, warehouse, and <code class="docutils literal notranslate"><span class="pre">CREATE</span> <span class="pre">ICEBERG</span> <span class="pre">TABLE</span></code>
+privileges required by Snowflake. A custom external volume also requires its
+applicable privileges. PipelineWise does not preflight these privileges; a
+failed <code class="docutils literal notranslate"><span class="pre">CREATE</span> <span class="pre">ICEBERG</span> <span class="pre">TABLE</span></code> reports the Snowflake error. Follow Snowflake’s
 <a class="reference external" href="https://docs.snowflake.com/en/user-guide/tables-iceberg">managed Iceberg table documentation</a> for the account-level
 setup.</p>
 </section>
-<section id="create-new-iceberg-tables">
-<h2>Create new Iceberg tables<a class="headerlink" href="#create-new-iceberg-tables" title="Link to this heading"></a></h2>
-<p>Set <code class="docutils literal notranslate"><span class="pre">iceberg_create</span></code> in the target YAML before the Singer target creates the
-table:</p>
+<section id="create-new-singer-tables">
+<h2>Create new Singer tables<a class="headerlink" href="#create-new-singer-tables" title="Link to this heading"></a></h2>
+<p>Set the desired format in the tap YAML. It applies to every selected table in
+that tap:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">target</span><span class="p">:</span><span class="w"> </span><span class="s">"snowflake"</span>
+<span class="nt">target_table_format</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">iceberg</span>
+<span class="nt">iceberg_version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span>
+</pre></div>
+</div>
+<p>When tap-level format and the legacy target flag are omitted, new tables are
+native. <code class="docutils literal notranslate"><span class="pre">target_table_format</span></code> accepts only <code class="docutils literal notranslate"><span class="pre">native</span></code> or <code class="docutils literal notranslate"><span class="pre">iceberg</span></code>. Iceberg
+requires integer version <code class="docutils literal notranslate"><span class="pre">3</span></code>; a version is invalid when the format is native
+or omitted.</p>
+<p>Explicit Iceberg v3 configuration is limited to <code class="docutils literal notranslate"><span class="pre">tap-mysql</span></code> (MariaDB/MySQL)
+and <code class="docutils literal notranslate"><span class="pre">tap-postgres</span></code> with <code class="docutils literal notranslate"><span class="pre">target-snowflake</span></code>. It requires
+<code class="docutils literal notranslate"><span class="pre">data_flattening_max_level:</span> <span class="pre">0</span></code> and <code class="docutils literal notranslate"><span class="pre">hard_delete:</span> <span class="pre">true</span></code>. The deprecated
+<code class="docutils literal notranslate"><span class="pre">hard_delete:</span> <span class="pre">false</span></code> behaviour is rejected for this route.</p>
+<p>An explicit setting must match an existing table. PipelineWise does not convert
+a native table, change an Iceberg table’s catalog, or upgrade Iceberg v2. Nested
+objects and arrays use <code class="docutils literal notranslate"><span class="pre">VARIANT</span></code> only with the explicit v3 configuration.
+Keep both settings while replicating to a v3 table. Removing them restores the
+legacy <code class="docutils literal notranslate"><span class="pre">TEXT</span></code> mapping; PipelineWise stops on existing <code class="docutils literal notranslate"><span class="pre">VARIANT</span></code> columns and
+asks the operator to restore the explicit v3 configuration rather than changing
+the columns automatically.</p>
+<p>Fresh LOG_BASED and INCREMENTAL RDBMS taps normally select FullSync before
+Singer. With explicit tap-level Iceberg configuration, that FullSync fails
+before target mutation and does not fall back to Singer. <code class="docutils literal notranslate"><span class="pre">fast_sync</span></code> and
+<code class="docutils literal notranslate"><span class="pre">partial_sync_table</span></code> are also unavailable for that configuration in this
+release.</p>
+</section>
+<section id="legacy-target-setting">
+<h2>Legacy target setting<a class="headerlink" href="#legacy-target-setting" title="Link to this heading"></a></h2>
+<p>The deprecated target-level setting remains available during migration:</p>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">db_conn</span><span class="p">:</span>
 <span class="w">  </span><span class="nt">iceberg_create</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
 </pre></div>
 </div>
-<p>The setting affects new tables only. It does not convert an existing native
-table. Do not use <code class="docutils literal notranslate"><span class="pre">fast_sync</span></code> or <code class="docutils literal notranslate"><span class="pre">partial_sync_table</span></code> for a table that exists
-as Iceberg.</p>
+<p>When tap-level format is omitted, PipelineWise preserves this setting’s current
+new-table and type-mapping behaviour. The legacy setting affects missing tables;
+an existing physical table continues to win. When both settings are present,
+they must agree. Only an explicit tap-level format must match an existing table;
+neither setting converts it.</p>
 </section>
 <section id="convert-a-native-table">
 <h2>Convert a native table<a class="headerlink" href="#convert-a-native-table" title="Link to this heading"></a></h2>
