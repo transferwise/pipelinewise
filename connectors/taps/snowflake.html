@@ -384,26 +384,26 @@ for the configured query cadence.</p>
 </section>
 <section id="configuration">
 <h2>Configuration<a class="headerlink" href="#configuration" title="Link to this heading"></a></h2>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;snowflake_source&quot;</span>
-<span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Operational</span><span class="nv"> </span><span class="s">Snowflake&quot;</span>
-<span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;tap-snowflake&quot;</span>
-<span class="nt">owner</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;data-platform@example.com&quot;</span>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="s">"snowflake_source"</span>
+<span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">"Operational</span><span class="nv"> </span><span class="s">Snowflake"</span>
+<span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">"tap-snowflake"</span>
+<span class="nt">owner</span><span class="p">:</span><span class="w"> </span><span class="s">"data-platform@example.com"</span>
 <span class="nt">db_conn</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">account</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;ACCOUNT&gt;&quot;</span>
-<span class="w">  </span><span class="nt">dbname</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;DATABASE&gt;&quot;</span>
-<span class="w">  </span><span class="nt">user</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;USER&gt;&quot;</span>
-<span class="w">  </span><span class="nt">password</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;{{</span><span class="nv"> </span><span class="s">env_var[&#39;SNOWFLAKE_PASSWORD&#39;]</span><span class="nv"> </span><span class="s">}}&quot;</span>
-<span class="w">  </span><span class="nt">warehouse</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;WAREHOUSE&gt;&quot;</span>
-<span class="nt">target</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;postgres_dwh&quot;</span>
+<span class="w">  </span><span class="nt">account</span><span class="p">:</span><span class="w"> </span><span class="s">"&lt;ACCOUNT&gt;"</span>
+<span class="w">  </span><span class="nt">dbname</span><span class="p">:</span><span class="w"> </span><span class="s">"&lt;DATABASE&gt;"</span>
+<span class="w">  </span><span class="nt">user</span><span class="p">:</span><span class="w"> </span><span class="s">"&lt;USER&gt;"</span>
+<span class="w">  </span><span class="nt">password</span><span class="p">:</span><span class="w"> </span><span class="s">"{{</span><span class="nv"> </span><span class="s">env_var['SNOWFLAKE_PASSWORD']</span><span class="nv"> </span><span class="s">}}"</span>
+<span class="w">  </span><span class="nt">warehouse</span><span class="p">:</span><span class="w"> </span><span class="s">"&lt;WAREHOUSE&gt;"</span>
+<span class="nt">target</span><span class="p">:</span><span class="w"> </span><span class="s">"postgres_dwh"</span>
 <span class="nt">batch_size_rows</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">20000</span>
 <span class="nt">stream_buffer_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span>
 <span class="nt">schemas</span><span class="p">:</span>
-<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">source_schema</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;PUBLIC&quot;</span>
-<span class="w">    </span><span class="nt">target_schema</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;repl_snowflake&quot;</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">source_schema</span><span class="p">:</span><span class="w"> </span><span class="s">"PUBLIC"</span>
+<span class="w">    </span><span class="nt">target_schema</span><span class="p">:</span><span class="w"> </span><span class="s">"repl_snowflake"</span>
 <span class="w">    </span><span class="nt">tables</span><span class="p">:</span>
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;ORDERS&quot;</span>
-<span class="w">        </span><span class="nt">replication_method</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;INCREMENTAL&quot;</span>
-<span class="w">        </span><span class="nt">replication_key</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;UPDATED_AT&quot;</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">"ORDERS"</span>
+<span class="w">        </span><span class="nt">replication_method</span><span class="p">:</span><span class="w"> </span><span class="s">"INCREMENTAL"</span>
+<span class="w">        </span><span class="nt">replication_key</span><span class="p">:</span><span class="w"> </span><span class="s">"UPDATED_AT"</span>
 </pre></div>
 </div>
 <p><code class="docutils literal notranslate"><span class="pre">INCREMENTAL</span></code> requires a stable key whose new value is greater than or equal

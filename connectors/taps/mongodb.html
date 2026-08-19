@@ -384,26 +384,26 @@ oplog. Confirm the source’s retention can cover the longest expected outage.</
 </section>
 <section id="configuration">
 <h2>Configuration<a class="headerlink" href="#configuration" title="Link to this heading"></a></h2>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;mongodb&quot;</span>
-<span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;MongoDB</span><span class="nv"> </span><span class="s">source&quot;</span>
-<span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;tap-mongodb&quot;</span>
-<span class="nt">owner</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;data-platform@example.com&quot;</span>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="s">"mongodb"</span>
+<span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">"MongoDB</span><span class="nv"> </span><span class="s">source"</span>
+<span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">"tap-mongodb"</span>
+<span class="nt">owner</span><span class="p">:</span><span class="w"> </span><span class="s">"data-platform@example.com"</span>
 <span class="nt">db_conn</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">host</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;mongo1.example.com,mongo2.example.com&quot;</span>
-<span class="w">  </span><span class="nt">auth_database</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;admin&quot;</span>
-<span class="w">  </span><span class="nt">dbname</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;orders&quot;</span>
-<span class="w">  </span><span class="nt">username</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;USER&gt;&quot;</span>
-<span class="w">  </span><span class="nt">password</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;{{</span><span class="nv"> </span><span class="s">env_var[&#39;MONGODB_PASSWORD&#39;]</span><span class="nv"> </span><span class="s">}}&quot;</span>
-<span class="w">  </span><span class="nt">replica_set</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;rs0&quot;</span>
-<span class="nt">target</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;snowflake&quot;</span>
+<span class="w">  </span><span class="nt">host</span><span class="p">:</span><span class="w"> </span><span class="s">"mongo1.example.com,mongo2.example.com"</span>
+<span class="w">  </span><span class="nt">auth_database</span><span class="p">:</span><span class="w"> </span><span class="s">"admin"</span>
+<span class="w">  </span><span class="nt">dbname</span><span class="p">:</span><span class="w"> </span><span class="s">"orders"</span>
+<span class="w">  </span><span class="nt">username</span><span class="p">:</span><span class="w"> </span><span class="s">"&lt;USER&gt;"</span>
+<span class="w">  </span><span class="nt">password</span><span class="p">:</span><span class="w"> </span><span class="s">"{{</span><span class="nv"> </span><span class="s">env_var['MONGODB_PASSWORD']</span><span class="nv"> </span><span class="s">}}"</span>
+<span class="w">  </span><span class="nt">replica_set</span><span class="p">:</span><span class="w"> </span><span class="s">"rs0"</span>
+<span class="nt">target</span><span class="p">:</span><span class="w"> </span><span class="s">"snowflake"</span>
 <span class="nt">batch_size_rows</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1000</span>
 <span class="nt">stream_buffer_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span>
 <span class="nt">schemas</span><span class="p">:</span>
-<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">source_schema</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;orders&quot;</span>
-<span class="w">    </span><span class="nt">target_schema</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;repl_orders&quot;</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">source_schema</span><span class="p">:</span><span class="w"> </span><span class="s">"orders"</span>
+<span class="w">    </span><span class="nt">target_schema</span><span class="p">:</span><span class="w"> </span><span class="s">"repl_orders"</span>
 <span class="w">    </span><span class="nt">tables</span><span class="p">:</span>
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;payments&quot;</span>
-<span class="w">        </span><span class="nt">replication_method</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;LOG_BASED&quot;</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">"payments"</span>
+<span class="w">        </span><span class="nt">replication_method</span><span class="p">:</span><span class="w"> </span><span class="s">"LOG_BASED"</span>
 </pre></div>
 </div>
 <table class="docutils align-default" id="id2" style="width: 100%">

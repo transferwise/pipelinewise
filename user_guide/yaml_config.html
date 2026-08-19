@@ -394,24 +394,24 @@ include legacy connectors; check <a class="reference internal" href="../connecto
 <h2>Global configuration<a class="headerlink" href="#global-configuration" title="Link to this heading"></a></h2>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">alert_handlers</span><span class="p">:</span>
 <span class="w">  </span><span class="nt">slack</span><span class="p">:</span>
-<span class="w">    </span><span class="nt">token</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;{{</span><span class="nv"> </span><span class="s">env_var[&#39;SLACK_BOT_TOKEN&#39;]</span><span class="nv"> </span><span class="s">}}&quot;</span>
-<span class="w">    </span><span class="nt">channel</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;#pipeline-alerts&quot;</span>
+<span class="w">    </span><span class="nt">token</span><span class="p">:</span><span class="w"> </span><span class="s">"{{</span><span class="nv"> </span><span class="s">env_var['SLACK_BOT_TOKEN']</span><span class="nv"> </span><span class="s">}}"</span>
+<span class="w">    </span><span class="nt">channel</span><span class="p">:</span><span class="w"> </span><span class="s">"#pipeline-alerts"</span>
 
 <span class="nt">allowed_resync_max_size</span><span class="p">:</span>
 <span class="w">  </span><span class="nt">table_mb</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">50000</span>
 
-<span class="nt">switch_over_data_file</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;switch_over_data.json&quot;</span>
+<span class="nt">switch_over_data_file</span><span class="p">:</span><span class="w"> </span><span class="s">"switch_over_data.json"</span>
 
 <span class="nt">backend_db</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">host</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;backend.example.com&quot;</span>
+<span class="w">  </span><span class="nt">host</span><span class="p">:</span><span class="w"> </span><span class="s">"backend.example.com"</span>
 <span class="w">  </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5432</span>
-<span class="w">  </span><span class="nt">user</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;pipelinewise&quot;</span>
-<span class="w">  </span><span class="nt">password</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;{{</span><span class="nv"> </span><span class="s">env_var[&#39;BACKEND_PASSWORD&#39;]</span><span class="nv"> </span><span class="s">}}&quot;</span>
-<span class="w">  </span><span class="nt">dbname</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;pipelinewise&quot;</span>
-<span class="w">  </span><span class="nt">sslmode</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;verify-full&quot;</span>
+<span class="w">  </span><span class="nt">user</span><span class="p">:</span><span class="w"> </span><span class="s">"pipelinewise"</span>
+<span class="w">  </span><span class="nt">password</span><span class="p">:</span><span class="w"> </span><span class="s">"{{</span><span class="nv"> </span><span class="s">env_var['BACKEND_PASSWORD']</span><span class="nv"> </span><span class="s">}}"</span>
+<span class="w">  </span><span class="nt">dbname</span><span class="p">:</span><span class="w"> </span><span class="s">"pipelinewise"</span>
+<span class="w">  </span><span class="nt">sslmode</span><span class="p">:</span><span class="w"> </span><span class="s">"verify-full"</span>
 <span class="w">  </span><span class="nt">connect_timeout</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
-<span class="w">  </span><span class="nt">ddl_user</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;pipelinewise_ddl&quot;</span>
-<span class="w">  </span><span class="nt">ddl_password</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;{{</span><span class="nv"> </span><span class="s">env_var[&#39;BACKEND_DDL_PASSWORD&#39;]</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="w">  </span><span class="nt">ddl_user</span><span class="p">:</span><span class="w"> </span><span class="s">"pipelinewise_ddl"</span>
+<span class="w">  </span><span class="nt">ddl_password</span><span class="p">:</span><span class="w"> </span><span class="s">"{{</span><span class="nv"> </span><span class="s">env_var['BACKEND_DDL_PASSWORD']</span><span class="nv"> </span><span class="s">}}"</span>
 </pre></div>
 </div>
 <table class="docutils align-default" id="id2" style="width: 100%">
@@ -465,30 +465,30 @@ target. See <a class="reference internal" href="data_diff.html#data-diff"><span 
 </section>
 <section id="tap-configuration">
 <h2>Tap configuration<a class="headerlink" href="#tap-configuration" title="Link to this heading"></a></h2>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;orders&quot;</span>
-<span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Orders</span><span class="nv"> </span><span class="s">PostgreSQL&quot;</span>
-<span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;tap-postgres&quot;</span>
-<span class="nt">owner</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;data-platform@example.com&quot;</span>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="s">"orders"</span>
+<span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">"Orders</span><span class="nv"> </span><span class="s">PostgreSQL"</span>
+<span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">"tap-postgres"</span>
+<span class="nt">owner</span><span class="p">:</span><span class="w"> </span><span class="s">"data-platform@example.com"</span>
 <span class="nt">db_conn</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">host</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;postgres.example.com&quot;</span>
+<span class="w">  </span><span class="nt">host</span><span class="p">:</span><span class="w"> </span><span class="s">"postgres.example.com"</span>
 <span class="w">  </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5432</span>
-<span class="w">  </span><span class="nt">user</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;pipelinewise&quot;</span>
-<span class="w">  </span><span class="nt">password</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;{{</span><span class="nv"> </span><span class="s">env_var[&#39;POSTGRES_PASSWORD&#39;]</span><span class="nv"> </span><span class="s">}}&quot;</span>
-<span class="w">  </span><span class="nt">dbname</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;orders&quot;</span>
-<span class="nt">target</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;snowflake&quot;</span>
+<span class="w">  </span><span class="nt">user</span><span class="p">:</span><span class="w"> </span><span class="s">"pipelinewise"</span>
+<span class="w">  </span><span class="nt">password</span><span class="p">:</span><span class="w"> </span><span class="s">"{{</span><span class="nv"> </span><span class="s">env_var['POSTGRES_PASSWORD']</span><span class="nv"> </span><span class="s">}}"</span>
+<span class="w">  </span><span class="nt">dbname</span><span class="p">:</span><span class="w"> </span><span class="s">"orders"</span>
+<span class="nt">target</span><span class="p">:</span><span class="w"> </span><span class="s">"snowflake"</span>
 <span class="nt">batch_size_rows</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">20000</span>
 <span class="nt">stream_buffer_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span>
 <span class="nt">add_metadata_columns</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
 <span class="nt">hard_delete</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
 <span class="nt">schemas</span><span class="p">:</span>
-<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">source_schema</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;public&quot;</span>
-<span class="w">    </span><span class="nt">target_schema</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;repl_orders&quot;</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">source_schema</span><span class="p">:</span><span class="w"> </span><span class="s">"public"</span>
+<span class="w">    </span><span class="nt">target_schema</span><span class="p">:</span><span class="w"> </span><span class="s">"repl_orders"</span>
 <span class="w">    </span><span class="nt">target_schema_select_permissions</span><span class="p">:</span>
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;analytics_reader&quot;</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">"analytics_reader"</span>
 <span class="w">    </span><span class="nt">tables</span><span class="p">:</span>
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;orders&quot;</span>
-<span class="w">        </span><span class="nt">replication_method</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;INCREMENTAL&quot;</span>
-<span class="w">        </span><span class="nt">replication_key</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;updated_at&quot;</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">"orders"</span>
+<span class="w">        </span><span class="nt">replication_method</span><span class="p">:</span><span class="w"> </span><span class="s">"INCREMENTAL"</span>
+<span class="w">        </span><span class="nt">replication_key</span><span class="p">:</span><span class="w"> </span><span class="s">"updated_at"</span>
 </pre></div>
 </div>
 <table class="docutils align-default" id="id3" style="width: 100%">
@@ -686,19 +686,19 @@ documented on their connector page.</p>
 </section>
 <section id="target-configuration">
 <h2>Target configuration<a class="headerlink" href="#target-configuration" title="Link to this heading"></a></h2>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;snowflake&quot;</span>
-<span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Analytics</span><span class="nv"> </span><span class="s">Snowflake&quot;</span>
-<span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;target-snowflake&quot;</span>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="s">"snowflake"</span>
+<span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">"Analytics</span><span class="nv"> </span><span class="s">Snowflake"</span>
+<span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">"target-snowflake"</span>
 <span class="nt">db_conn</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">account</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;ACCOUNT&gt;&quot;</span>
-<span class="w">  </span><span class="nt">dbname</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;DATABASE&gt;&quot;</span>
-<span class="w">  </span><span class="nt">user</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;USER&gt;&quot;</span>
-<span class="w">  </span><span class="nt">private_key</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/run/secrets/snowflake-key.pem&quot;</span>
-<span class="w">  </span><span class="nt">warehouse</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;WAREHOUSE&gt;&quot;</span>
-<span class="w">  </span><span class="nt">s3_bucket</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;BUCKET&gt;&quot;</span>
-<span class="w">  </span><span class="nt">s3_key_prefix</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;pipelinewise/&quot;</span>
-<span class="w">  </span><span class="nt">stage</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;SCHEMA&gt;.&lt;STAGE&gt;&quot;</span>
-<span class="w">  </span><span class="nt">file_format</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;SCHEMA&gt;.&lt;FILE_FORMAT&gt;&quot;</span>
+<span class="w">  </span><span class="nt">account</span><span class="p">:</span><span class="w"> </span><span class="s">"&lt;ACCOUNT&gt;"</span>
+<span class="w">  </span><span class="nt">dbname</span><span class="p">:</span><span class="w"> </span><span class="s">"&lt;DATABASE&gt;"</span>
+<span class="w">  </span><span class="nt">user</span><span class="p">:</span><span class="w"> </span><span class="s">"&lt;USER&gt;"</span>
+<span class="w">  </span><span class="nt">private_key</span><span class="p">:</span><span class="w"> </span><span class="s">"/run/secrets/snowflake-key.pem"</span>
+<span class="w">  </span><span class="nt">warehouse</span><span class="p">:</span><span class="w"> </span><span class="s">"&lt;WAREHOUSE&gt;"</span>
+<span class="w">  </span><span class="nt">s3_bucket</span><span class="p">:</span><span class="w"> </span><span class="s">"&lt;BUCKET&gt;"</span>
+<span class="w">  </span><span class="nt">s3_key_prefix</span><span class="p">:</span><span class="w"> </span><span class="s">"pipelinewise/"</span>
+<span class="w">  </span><span class="nt">stage</span><span class="p">:</span><span class="w"> </span><span class="s">"&lt;SCHEMA&gt;.&lt;STAGE&gt;"</span>
+<span class="w">  </span><span class="nt">file_format</span><span class="p">:</span><span class="w"> </span><span class="s">"&lt;SCHEMA&gt;.&lt;FILE_FORMAT&gt;"</span>
 </pre></div>
 </div>
 <p><code class="docutils literal notranslate"><span class="pre">id</span></code>, <code class="docutils literal notranslate"><span class="pre">name</span></code>, <code class="docutils literal notranslate"><span class="pre">type</span></code>, and <code class="docutils literal notranslate"><span class="pre">db_conn</span></code> are required. Connection fields are
@@ -707,7 +707,7 @@ target-specific; see <a class="reference internal" href="../connectors/targets.h
 <section id="secrets-and-validation">
 <h2>Secrets and validation<a class="headerlink" href="#secrets-and-validation" title="Link to this heading"></a></h2>
 <p>Inject environment values with Jinja:</p>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">password</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;{{</span><span class="nv"> </span><span class="s">env_var[&#39;POSTGRES_PASSWORD&#39;]</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">password</span><span class="p">:</span><span class="w"> </span><span class="s">"{{</span><span class="nv"> </span><span class="s">env_var['POSTGRES_PASSWORD']</span><span class="nv"> </span><span class="s">}}"</span>
 </pre></div>
 </div>
 <p>Ansible Vault values are also supported; see <a class="reference internal" href="encrypting_passwords.html#encrypting-passwords"><span class="std std-ref">Encrypt configuration values</span></a>.</p>

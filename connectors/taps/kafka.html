@@ -379,26 +379,26 @@ stream.</p>
 </table>
 <section id="configuration">
 <h2>Configuration<a class="headerlink" href="#configuration" title="Link to this heading"></a></h2>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;order_events&quot;</span>
-<span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Order</span><span class="nv"> </span><span class="s">events&quot;</span>
-<span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;tap-kafka&quot;</span>
-<span class="nt">owner</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;data-platform@example.com&quot;</span>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="s">"order_events"</span>
+<span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">"Order</span><span class="nv"> </span><span class="s">events"</span>
+<span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">"tap-kafka"</span>
+<span class="nt">owner</span><span class="p">:</span><span class="w"> </span><span class="s">"data-platform@example.com"</span>
 <span class="nt">db_conn</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">group_id</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;pipelinewise-orders&quot;</span>
-<span class="w">  </span><span class="nt">bootstrap_servers</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;kafka1.example.com:9092,kafka2.example.com:9092&quot;</span>
-<span class="w">  </span><span class="nt">topic</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;order-events&quot;</span>
-<span class="w">  </span><span class="nt">initial_start_time</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;latest&quot;</span>
+<span class="w">  </span><span class="nt">group_id</span><span class="p">:</span><span class="w"> </span><span class="s">"pipelinewise-orders"</span>
+<span class="w">  </span><span class="nt">bootstrap_servers</span><span class="p">:</span><span class="w"> </span><span class="s">"kafka1.example.com:9092,kafka2.example.com:9092"</span>
+<span class="w">  </span><span class="nt">topic</span><span class="p">:</span><span class="w"> </span><span class="s">"order-events"</span>
+<span class="w">  </span><span class="nt">initial_start_time</span><span class="p">:</span><span class="w"> </span><span class="s">"latest"</span>
 <span class="w">  </span><span class="nt">primary_keys</span><span class="p">:</span>
-<span class="w">    </span><span class="nt">order_id</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/order/id&quot;</span>
-<span class="nt">target</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;snowflake&quot;</span>
+<span class="w">    </span><span class="nt">order_id</span><span class="p">:</span><span class="w"> </span><span class="s">"/order/id"</span>
+<span class="nt">target</span><span class="p">:</span><span class="w"> </span><span class="s">"snowflake"</span>
 <span class="nt">batch_size_rows</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">20000</span>
 <span class="nt">stream_buffer_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span>
-<span class="nt">default_target_schema</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;kafka&quot;</span>
+<span class="nt">default_target_schema</span><span class="p">:</span><span class="w"> </span><span class="s">"kafka"</span>
 <span class="nt">schemas</span><span class="p">:</span>
-<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">source_schema</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;kafka&quot;</span>
-<span class="w">    </span><span class="nt">target_schema</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;kafka&quot;</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">source_schema</span><span class="p">:</span><span class="w"> </span><span class="s">"kafka"</span>
+<span class="w">    </span><span class="nt">target_schema</span><span class="p">:</span><span class="w"> </span><span class="s">"kafka"</span>
 <span class="w">    </span><span class="nt">tables</span><span class="p">:</span>
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;order_events&quot;</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">"order_events"</span>
 </pre></div>
 </div>
 <table class="docutils align-default" id="id2" style="width: 100%">

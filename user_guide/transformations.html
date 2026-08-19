@@ -410,13 +410,13 @@ masked.</p>
 <section id="configuration">
 <h2>Configuration<a class="headerlink" href="#configuration" title="Link to this heading"></a></h2>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">tables</span><span class="p">:</span>
-<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;users&quot;</span>
-<span class="w">    </span><span class="nt">replication_method</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;LOG_BASED&quot;</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">"users"</span>
+<span class="w">    </span><span class="nt">replication_method</span><span class="p">:</span><span class="w"> </span><span class="s">"LOG_BASED"</span>
 <span class="w">    </span><span class="nt">transformations</span><span class="p">:</span>
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">column</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;email&quot;</span>
-<span class="w">        </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;HASH&quot;</span>
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">column</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;phone&quot;</span>
-<span class="w">        </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;MASK-STRING-SKIP-ENDS-2&quot;</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">column</span><span class="p">:</span><span class="w"> </span><span class="s">"email"</span>
+<span class="w">        </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">"HASH"</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">column</span><span class="p">:</span><span class="w"> </span><span class="s">"phone"</span>
+<span class="w">        </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">"MASK-STRING-SKIP-ENDS-2"</span>
 </pre></div>
 </div>
 </section>
@@ -438,13 +438,13 @@ those routes, transform only top-level columns or omit the nested condition.</p>
 <span id="conditional-transformations"></span><h2>Conditions<a class="headerlink" href="#conditions" title="Link to this heading"></a></h2>
 <p><code class="docutils literal notranslate"><span class="pre">when</span></code> applies a transformation only when every condition matches:</p>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">transformations</span><span class="p">:</span>
-<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">column</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;value&quot;</span>
-<span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;SET-NULL&quot;</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">column</span><span class="p">:</span><span class="w"> </span><span class="s">"value"</span>
+<span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">"SET-NULL"</span>
 <span class="w">    </span><span class="nt">when</span><span class="p">:</span>
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">column</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;field_name&quot;</span>
-<span class="w">        </span><span class="nt">regex_match</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;password|secret|token&quot;</span>
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">column</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;environment&quot;</span>
-<span class="w">        </span><span class="nt">equals</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;production&quot;</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">column</span><span class="p">:</span><span class="w"> </span><span class="s">"field_name"</span>
+<span class="w">        </span><span class="nt">regex_match</span><span class="p">:</span><span class="w"> </span><span class="s">"password|secret|token"</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">column</span><span class="p">:</span><span class="w"> </span><span class="s">"environment"</span>
+<span class="w">        </span><span class="nt">equals</span><span class="p">:</span><span class="w"> </span><span class="s">"production"</span>
 </pre></div>
 </div>
 <p>Conditions can inspect a top-level column. Nested <code class="docutils literal notranslate"><span class="pre">field_path</span></code> conditions are

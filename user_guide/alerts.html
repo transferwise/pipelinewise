@@ -399,12 +399,12 @@ Replication and data-diff share the same routing and per-tap suppression.</p>
 the bot to each destination channel.</p>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">alert_handlers</span><span class="p">:</span>
 <span class="w">  </span><span class="nt">slack</span><span class="p">:</span>
-<span class="w">    </span><span class="nt">token</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;{{</span><span class="nv"> </span><span class="s">env_var[&#39;SLACK_BOT_TOKEN&#39;]</span><span class="nv"> </span><span class="s">}}&quot;</span>
-<span class="w">    </span><span class="nt">channel</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;#pipeline-alerts&quot;</span>
+<span class="w">    </span><span class="nt">token</span><span class="p">:</span><span class="w"> </span><span class="s">"{{</span><span class="nv"> </span><span class="s">env_var['SLACK_BOT_TOKEN']</span><span class="nv"> </span><span class="s">}}"</span>
+<span class="w">    </span><span class="nt">channel</span><span class="p">:</span><span class="w"> </span><span class="s">"#pipeline-alerts"</span>
 </pre></div>
 </div>
 <p>Add a second destination for one tap:</p>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">slack_alert_channel</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;#orders-alerts&quot;</span>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">slack_alert_channel</span><span class="p">:</span><span class="w"> </span><span class="s">"#orders-alerts"</span>
 </pre></div>
 </div>
 <p>The tap-specific channel receives a copy; it does not replace the global channel.</p>
@@ -418,8 +418,8 @@ on-call response. It has only been exercised against a mocked endpoint.</p>
 </div>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">alert_handlers</span><span class="p">:</span>
 <span class="w">  </span><span class="nt">victorops</span><span class="p">:</span>
-<span class="w">    </span><span class="nt">base_url</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;https://alert.victorops.com/integrations/generic/.../alert&quot;</span>
-<span class="w">    </span><span class="nt">routing_key</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;pipelinewise&quot;</span>
+<span class="w">    </span><span class="nt">base_url</span><span class="p">:</span><span class="w"> </span><span class="s">"https://alert.victorops.com/integrations/generic/.../alert"</span>
+<span class="w">    </span><span class="nt">routing_key</span><span class="p">:</span><span class="w"> </span><span class="s">"pipelinewise"</span>
 </pre></div>
 </div>
 <p><code class="docutils literal notranslate"><span class="pre">base_url</span></code> must exclude the routing key. Requests time out after 10 seconds.</p>

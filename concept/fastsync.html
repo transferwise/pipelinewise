@@ -464,11 +464,11 @@ load. Restart the same command after correcting the failure.</p>
 <span id="defined-partial-sync"></span><h2>Configured PartialSync<a class="headerlink" href="#configured-partialsync" title="Link to this heading"></a></h2>
 <p><code class="docutils literal notranslate"><span class="pre">sync_start_from</span></code> makes explicit <code class="docutils literal notranslate"><span class="pre">fast_sync</span></code> use PartialSync for that table:</p>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">tables</span><span class="p">:</span>
-<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;orders&quot;</span>
-<span class="w">    </span><span class="nt">replication_method</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;LOG_BASED&quot;</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">"orders"</span>
+<span class="w">    </span><span class="nt">replication_method</span><span class="p">:</span><span class="w"> </span><span class="s">"LOG_BASED"</span>
 <span class="w">    </span><span class="nt">sync_start_from</span><span class="p">:</span>
-<span class="w">      </span><span class="nt">column</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;updated_at&quot;</span>
-<span class="w">      </span><span class="nt">static_value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;2024-01-01&quot;</span>
+<span class="w">      </span><span class="nt">column</span><span class="p">:</span><span class="w"> </span><span class="s">"updated_at"</span>
+<span class="w">      </span><span class="nt">static_value</span><span class="p">:</span><span class="w"> </span><span class="s">"2024-01-01"</span>
 <span class="w">      </span><span class="nt">drop_target_table</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
 </pre></div>
 </div>

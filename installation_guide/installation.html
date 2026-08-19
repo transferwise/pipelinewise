@@ -424,7 +424,7 @@ docker<span class="w"> </span>tag<span class="w"> </span>transferwiseworkspace/p
 <a class="reference internal" href="../connectors/index.html#connector-support"><span class="std std-ref">Connectors</span></a>.</p>
 <p>Use the wrapper to mount the current project and <code class="docutils literal notranslate"><span class="pre">~/.pipelinewise</span></code> into each
 short-lived container:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">alias</span><span class="w"> </span><span class="nv">pipelinewise</span><span class="o">=</span><span class="s2">&quot;</span><span class="k">$(</span><span class="nb">pwd</span><span class="k">)</span><span class="s2">/bin/pipelinewise-docker&quot;</span>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">alias</span><span class="w"> </span><span class="nv">pipelinewise</span><span class="o">=</span><span class="s2">"</span><span class="k">$(</span><span class="nb">pwd</span><span class="k">)</span><span class="s2">/bin/pipelinewise-docker"</span>
 pipelinewise<span class="w"> </span>status
 </pre></div>
 </div>
@@ -449,7 +449,7 @@ make<span class="w"> </span>connectors<span class="w"> </span>-e<span class="w">
 </div>
 <p>PipelineWise creates an isolated virtual environment per component below
 <code class="docutils literal notranslate"><span class="pre">${PIPELINEWISE_HOME}/.virtualenvs</span></code>. Activate the CLI environment before use:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">export</span><span class="w"> </span><span class="nv">PIPELINEWISE_HOME</span><span class="o">=</span><span class="s2">&quot;</span><span class="k">$(</span><span class="nb">pwd</span><span class="k">)</span><span class="s2">&quot;</span>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">export</span><span class="w"> </span><span class="nv">PIPELINEWISE_HOME</span><span class="o">=</span><span class="s2">"</span><span class="k">$(</span><span class="nb">pwd</span><span class="k">)</span><span class="s2">"</span>
 <span class="nb">source</span><span class="w"> </span>.virtualenvs/pipelinewise/bin/activate
 pipelinewise<span class="w"> </span>status
 </pre></div>

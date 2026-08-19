@@ -480,14 +480,14 @@ other check types in the same run still execute normally</p></li>
 <h3>Backend database<a class="headerlink" href="#backend-database" title="Link to this heading"></a></h3>
 <p>Add to <code class="docutils literal notranslate"><span class="pre">config.yml</span></code>:</p>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">backend_db</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">host</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;backend.example.com&quot;</span>
+<span class="w">  </span><span class="nt">host</span><span class="p">:</span><span class="w"> </span><span class="s">"backend.example.com"</span>
 <span class="w">  </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5432</span>
-<span class="w">  </span><span class="nt">user</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;pipelinewise&quot;</span>
-<span class="w">  </span><span class="nt">password</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;vault</span><span class="nv"> </span><span class="s">encrypted&gt;&quot;</span>
-<span class="w">  </span><span class="nt">dbname</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;pipelinewise&quot;</span>
-<span class="w">  </span><span class="nt">sslmode</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;verify-full&quot;</span>
-<span class="w">  </span><span class="nt">ddl_user</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;pipelinewise_ddl&quot;</span>
-<span class="w">  </span><span class="nt">ddl_password</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&lt;vault</span><span class="nv"> </span><span class="s">encrypted&gt;&quot;</span>
+<span class="w">  </span><span class="nt">user</span><span class="p">:</span><span class="w"> </span><span class="s">"pipelinewise"</span>
+<span class="w">  </span><span class="nt">password</span><span class="p">:</span><span class="w"> </span><span class="s">"&lt;vault</span><span class="nv"> </span><span class="s">encrypted&gt;"</span>
+<span class="w">  </span><span class="nt">dbname</span><span class="p">:</span><span class="w"> </span><span class="s">"pipelinewise"</span>
+<span class="w">  </span><span class="nt">sslmode</span><span class="p">:</span><span class="w"> </span><span class="s">"verify-full"</span>
+<span class="w">  </span><span class="nt">ddl_user</span><span class="p">:</span><span class="w"> </span><span class="s">"pipelinewise_ddl"</span>
+<span class="w">  </span><span class="nt">ddl_password</span><span class="p">:</span><span class="w"> </span><span class="s">"&lt;vault</span><span class="nv"> </span><span class="s">encrypted&gt;"</span>
 </pre></div>
 </div>
 <p>The backend is independent of source and target connections; when PostgreSQL is also
@@ -506,29 +506,29 @@ as the application user instead.</p>
 <h3>Tap YAML<a class="headerlink" href="#tap-yaml" title="Link to this heading"></a></h3>
 <p>The <code class="docutils literal notranslate"><span class="pre">data_diff</span></code> block goes inside <code class="docutils literal notranslate"><span class="pre">schemas[].tables[]</span></code> in the tap YAML:</p>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">data_diff_defaults</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">frequency</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;0</span><span class="nv"> </span><span class="s">*/6</span><span class="nv"> </span><span class="s">*</span><span class="nv"> </span><span class="s">*</span><span class="nv"> </span><span class="s">*&quot;</span>
-<span class="w">  </span><span class="nt">window_start</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;-15h&quot;</span>
-<span class="w">  </span><span class="nt">window_end</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;-3h&quot;</span>
-<span class="w">  </span><span class="nt">statement_timeout</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;20min&quot;</span>
+<span class="w">  </span><span class="nt">frequency</span><span class="p">:</span><span class="w"> </span><span class="s">"0</span><span class="nv"> </span><span class="s">*/6</span><span class="nv"> </span><span class="s">*</span><span class="nv"> </span><span class="s">*</span><span class="nv"> </span><span class="s">*"</span>
+<span class="w">  </span><span class="nt">window_start</span><span class="p">:</span><span class="w"> </span><span class="s">"-15h"</span>
+<span class="w">  </span><span class="nt">window_end</span><span class="p">:</span><span class="w"> </span><span class="s">"-3h"</span>
+<span class="w">  </span><span class="nt">statement_timeout</span><span class="p">:</span><span class="w"> </span><span class="s">"20min"</span>
 
 <span class="nt">schemas</span><span class="p">:</span>
-<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">source_schema</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;public&quot;</span>
-<span class="w">    </span><span class="nt">target_schema</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;repl_payments&quot;</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">source_schema</span><span class="p">:</span><span class="w"> </span><span class="s">"public"</span>
+<span class="w">    </span><span class="nt">target_schema</span><span class="p">:</span><span class="w"> </span><span class="s">"repl_payments"</span>
 <span class="w">    </span><span class="nt">tables</span><span class="p">:</span>
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;transfers&quot;</span>
-<span class="w">        </span><span class="nt">replication_method</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;LOG_BASED&quot;</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">table_name</span><span class="p">:</span><span class="w"> </span><span class="s">"transfers"</span>
+<span class="w">        </span><span class="nt">replication_method</span><span class="p">:</span><span class="w"> </span><span class="s">"LOG_BASED"</span>
 <span class="w">        </span><span class="nt">data_diff</span><span class="p">:</span>
 <span class="w">          </span><span class="nt">checks</span><span class="p">:</span>
 <span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">schema_compatibility</span>
 <span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">row_count</span>
 <span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">row_checksum</span>
-<span class="w">          </span><span class="nt">key_column</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;transfer_id&quot;</span>
-<span class="w">          </span><span class="nt">timestamp_column</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;updated_at&quot;</span>
+<span class="w">          </span><span class="nt">key_column</span><span class="p">:</span><span class="w"> </span><span class="s">"transfer_id"</span>
+<span class="w">          </span><span class="nt">timestamp_column</span><span class="p">:</span><span class="w"> </span><span class="s">"updated_at"</span>
 <span class="w">          </span><span class="nt">compare_columns</span><span class="p">:</span>
-<span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;status&quot;</span>
-<span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;currency&quot;</span>
+<span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">"status"</span>
+<span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">"currency"</span>
 <span class="w">          </span><span class="c1"># Override: this table is checked twice a day rather than four times</span>
-<span class="w">          </span><span class="nt">frequency</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;0</span><span class="nv"> </span><span class="s">*/12</span><span class="nv"> </span><span class="s">*</span><span class="nv"> </span><span class="s">*</span><span class="nv"> </span><span class="s">*&quot;</span>
+<span class="w">          </span><span class="nt">frequency</span><span class="p">:</span><span class="w"> </span><span class="s">"0</span><span class="nv"> </span><span class="s">*/12</span><span class="nv"> </span><span class="s">*</span><span class="nv"> </span><span class="s">*</span><span class="nv"> </span><span class="s">*"</span>
 </pre></div>
 </div>
 <p>Every table must resolve <code class="docutils literal notranslate"><span class="pre">key_column</span></code>, <code class="docutils literal notranslate"><span class="pre">timestamp_column</span></code>, <code class="docutils literal notranslate"><span class="pre">checks</span></code>,
@@ -651,8 +651,8 @@ runs before scheduling because a <code class="docutils literal notranslate"><spa
 which would otherwise advance the scheduler past the slot needing recovery.</p>
 <p>After repairing a failed window, rerun its exact definition and time boundaries:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pipelinewise<span class="w"> </span>rerun_data_diff_check<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--run-id<span class="w"> </span><span class="s2">&quot;2bd3e725-38fc-48c1-b565-b4f20e5bc7dd&quot;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--remediation-ref<span class="w"> </span><span class="s2">&quot;AP-1234&quot;</span>
+<span class="w">  </span>--run-id<span class="w"> </span><span class="s2">"2bd3e725-38fc-48c1-b565-b4f20e5bc7dd"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--remediation-ref<span class="w"> </span><span class="s2">"AP-1234"</span>
 </pre></div>
 </div>
 <p>The original run remains immutable. The rerun gets the next attempt number,

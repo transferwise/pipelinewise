@@ -467,19 +467,19 @@ to override this check.</p>
 <section id="lost-connection-to-mysql-server-errno-104-connection-reset-by-peer">
 <span id="troubleshooting-mysql-lost-connection"></span><h4>Lost connection to MySQL server (Errno 104, Connection reset by peer)<a class="headerlink" href="#lost-connection-to-mysql-server-errno-104-connection-reset-by-peer" title="Link to this heading"></a></h4>
 <p><em>Log message:</em></p>
-<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>pymysql.err.OperationalError: (2013, &#39;Lost connection to MySQL server
-during query ([Errno 104] Connection reset by peer)&#39;)
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>pymysql.err.OperationalError: (2013, 'Lost connection to MySQL server
+during query ([Errno 104] Connection reset by peer)')
 </pre></div>
 </div>
 <p><em>Why it happens:</em>
 Server session defaults are not conducive to PipelineWise type workloads.</p>
 <p><em>How to fix:</em>
 Add the following <code class="docutils literal notranslate"><span class="pre">session_sqls</span></code> block to your <code class="docutils literal notranslate"><span class="pre">tap.yml</span></code>:</p>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">dbname</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;your_database&quot;</span>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">dbname</span><span class="p">:</span><span class="w"> </span><span class="s">"your_database"</span>
 <span class="nt">session_sqls</span><span class="p">:</span>
 <span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">SET SESSION max_statement_time=0</span>
 <span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">SET SESSION net_write_timeout=3600</span>
-<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">SET SESSION time_zone=&quot;+0:00&quot;</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">SET SESSION time_zone="+0:00"</span>
 <span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">SET SESSION wait_timeout=28800</span>
 <span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">SET SESSION net_read_timeout=3600</span>
 <span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">SET SESSION innodb_lock_wait_timeout=3600</span>
@@ -531,7 +531,7 @@ too low. You can check the current binlog files by running <code class="docutils
 on the source.</p></li>
 <li><p>Ask your database administrator to increase the binlog retention period. You can
 check the current setting with:</p>
-<div class="highlight-sql notranslate"><div class="highlight"><pre><span></span><span class="k">SHOW</span><span class="w"> </span><span class="k">GLOBAL</span><span class="w"> </span><span class="n">VARIABLES</span><span class="w"> </span><span class="k">LIKE</span><span class="w"> </span><span class="s1">&#39;expire_logs_days&#39;</span><span class="p">;</span>
+<div class="highlight-sql notranslate"><div class="highlight"><pre><span></span><span class="k">SHOW</span><span class="w"> </span><span class="k">GLOBAL</span><span class="w"> </span><span class="n">VARIABLES</span><span class="w"> </span><span class="k">LIKE</span><span class="w"> </span><span class="s1">'expire_logs_days'</span><span class="p">;</span>
 </pre></div>
 </div>
 </li>
@@ -549,15 +549,15 @@ $<span class="w"> </span>cp<span class="w"> </span>state.json<span class="w"> </
 </pre></div>
 </div>
 <p>The following command previews a binlog filename change without modifying the file:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>sed<span class="w"> </span>-E<span class="w"> </span><span class="s1">&#39;s/(mysql-bin-changelog\.)[0-9]+/\1#####/g&#39;</span><span class="w"> </span>state.json
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>sed<span class="w"> </span>-E<span class="w"> </span><span class="s1">'s/(mysql-bin-changelog\.)[0-9]+/\1#####/g'</span><span class="w"> </span>state.json
 </pre></div>
 </div>
 <p>Replace <code class="docutils literal notranslate"><span class="pre">#####</span></code> with the new binlog number. <code class="docutils literal notranslate"><span class="pre">-E</span></code> works with BSD/macOS and
 modern GNU <code class="docutils literal notranslate"><span class="pre">sed</span></code>. To update both the filename and <code class="docutils literal notranslate"><span class="pre">log_pos</span></code>, write the result
 to a new file rather than editing the state in place:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>sed<span class="w"> </span>-E<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>-e<span class="w"> </span><span class="s1">&#39;s/(mysql-bin-changelog\.)[0-9]+/\1#####/g&#39;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>-e<span class="w"> </span><span class="s1">&#39;s|(&quot;log_pos&quot;: )[0-9]+|\1#####|g&#39;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-e<span class="w"> </span><span class="s1">'s/(mysql-bin-changelog\.)[0-9]+/\1#####/g'</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-e<span class="w"> </span><span class="s1">'s|("log_pos": )[0-9]+|\1#####|g'</span><span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>state.json<span class="w"> </span>&gt;<span class="w"> </span>state.json.new
 </pre></div>
 </div>
@@ -608,7 +608,7 @@ restart the same tap without advancing state.</p></li>
 <li><p><strong>For PostgreSQL versions before 12, consider upgrading.</strong> PostgreSQL 12 and
 later support the session-level <code class="docutils literal notranslate"><span class="pre">wal_sender_timeout</span></code> that PipelineWise sets.</p></li>
 <li><p><strong>If the PostgreSQL log reports a sender timeout,</strong> check the effective value:</p>
-<div class="highlight-sql notranslate"><div class="highlight"><pre><span></span><span class="k">SELECT</span><span class="w"> </span><span class="n">name</span><span class="p">,</span><span class="w"> </span><span class="n">setting</span><span class="p">,</span><span class="w"> </span><span class="n">unit</span><span class="w"> </span><span class="k">FROM</span><span class="w"> </span><span class="n">pg_settings</span><span class="w"> </span><span class="k">WHERE</span><span class="w"> </span><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">&#39;wal_sender_timeout&#39;</span><span class="p">;</span>
+<div class="highlight-sql notranslate"><div class="highlight"><pre><span></span><span class="k">SELECT</span><span class="w"> </span><span class="n">name</span><span class="p">,</span><span class="w"> </span><span class="n">setting</span><span class="p">,</span><span class="w"> </span><span class="n">unit</span><span class="w"> </span><span class="k">FROM</span><span class="w"> </span><span class="n">pg_settings</span><span class="w"> </span><span class="k">WHERE</span><span class="w"> </span><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'wal_sender_timeout'</span><span class="p">;</span>
 </pre></div>
 </div>
 </li>
@@ -634,7 +634,7 @@ Check the configured value. PostgreSQL versions before 13 return no row because
 they do not provide this setting:</p>
 <div class="highlight-sql notranslate"><div class="highlight"><pre><span></span><span class="k">SELECT</span><span class="w"> </span><span class="n">name</span><span class="p">,</span><span class="w"> </span><span class="n">setting</span><span class="p">,</span><span class="w"> </span><span class="n">unit</span><span class="p">,</span><span class="w"> </span><span class="k">source</span>
 <span class="k">FROM</span><span class="w"> </span><span class="n">pg_settings</span>
-<span class="k">WHERE</span><span class="w"> </span><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">&#39;logical_decoding_work_mem&#39;</span><span class="p">;</span>
+<span class="k">WHERE</span><span class="w"> </span><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'logical_decoding_work_mem'</span><span class="p">;</span>
 </pre></div>
 </div>
 <p>On PostgreSQL 14 and later, compare the following counters over the period when
@@ -661,7 +661,7 @@ for each slot:</p>
 <span class="w">           </span><span class="n">pg_wal_lsn_diff</span><span class="p">(</span><span class="n">pg_current_wal_lsn</span><span class="p">(),</span><span class="w"> </span><span class="n">restart_lsn</span><span class="p">)::</span><span class="nb">bigint</span>
 <span class="w">       </span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">retained_wal</span>
 <span class="k">FROM</span><span class="w"> </span><span class="n">pg_replication_slots</span>
-<span class="k">WHERE</span><span class="w"> </span><span class="n">slot_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">&#39;logical&#39;</span>
+<span class="k">WHERE</span><span class="w"> </span><span class="n">slot_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'logical'</span>
 <span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">slot_name</span><span class="p">;</span>
 </pre></div>
 </div>
@@ -678,7 +678,7 @@ Work with the source database administrator to increase the setting incrementall
 for the PipelineWise replication role and database. There is no universal value;
 test against the transaction sizes and concurrency of the source. For example:</p>
 <div class="highlight-sql notranslate"><div class="highlight"><pre><span></span><span class="k">ALTER</span><span class="w"> </span><span class="k">ROLE</span><span class="w"> </span><span class="o">&lt;</span><span class="n">replication_user</span><span class="o">&gt;</span><span class="w"> </span><span class="k">IN</span><span class="w"> </span><span class="k">DATABASE</span><span class="w"> </span><span class="o">&lt;</span><span class="n">source_database</span><span class="o">&gt;</span>
-<span class="k">SET</span><span class="w"> </span><span class="n">logical_decoding_work_mem</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">&#39;&lt;tested_value&gt;&#39;</span><span class="p">;</span>
+<span class="k">SET</span><span class="w"> </span><span class="n">logical_decoding_work_mem</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'&lt;tested_value&gt;'</span><span class="p">;</span>
 </pre></div>
 </div>
 <p>Restart the tap after changing a role or database default so its replication
@@ -703,7 +703,7 @@ The replica has been set up with restrictive replay settings. You can check the 
 values with:</p>
 <div class="highlight-sql notranslate"><div class="highlight"><pre><span></span><span class="k">SELECT</span><span class="w"> </span><span class="n">name</span><span class="p">,</span><span class="w"> </span><span class="n">setting</span><span class="p">,</span><span class="w"> </span><span class="n">unit</span>
 <span class="k">FROM</span><span class="w"> </span><span class="n">pg_settings</span>
-<span class="k">WHERE</span><span class="w"> </span><span class="n">name</span><span class="w"> </span><span class="k">IN</span><span class="w"> </span><span class="p">(</span><span class="s1">&#39;max_standby_archive_delay&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;max_standby_streaming_delay&#39;</span><span class="p">);</span>
+<span class="k">WHERE</span><span class="w"> </span><span class="n">name</span><span class="w"> </span><span class="k">IN</span><span class="w"> </span><span class="p">(</span><span class="s1">'max_standby_archive_delay'</span><span class="p">,</span><span class="w"> </span><span class="s1">'max_standby_streaming_delay'</span><span class="p">);</span>
 </pre></div>
 </div>
 <p><em>How to fix:</em>
@@ -767,7 +767,7 @@ FastSync cannot find the table in the source database. Common causes:</p>
 it from the tap YAML file.</p></li>
 <li><p>Verify user privileges by running:</p>
 <div class="highlight-sql notranslate"><div class="highlight"><pre><span></span><span class="k">SELECT</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="k">FROM</span><span class="w"> </span><span class="n">information_schema</span><span class="p">.</span><span class="n">columns</span>
-<span class="k">WHERE</span><span class="w"> </span><span class="n">table_schema</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">&#39;{SCHEMA_NAME}&#39;</span><span class="w"> </span><span class="k">AND</span><span class="w"> </span><span class="k">table_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">&#39;{TABLE_NAME}&#39;</span><span class="p">;</span>
+<span class="k">WHERE</span><span class="w"> </span><span class="n">table_schema</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'{SCHEMA_NAME}'</span><span class="w"> </span><span class="k">AND</span><span class="w"> </span><span class="k">table_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'{TABLE_NAME}'</span><span class="p">;</span>
 </pre></div>
 </div>
 <p>If this returns no results, the replication user lacks <code class="docutils literal notranslate"><span class="pre">SELECT</span></code> privilege.</p>
@@ -804,12 +804,12 @@ to <code class="docutils literal notranslate"><span class="pre">~/.pipelinewise<
 <code class="docutils literal notranslate"><span class="pre">&lt;target_id&gt;/&lt;tap_id&gt;/log/</span></code> and use <code class="docutils literal notranslate"><span class="pre">.running</span></code>, <code class="docutils literal notranslate"><span class="pre">.success</span></code>, or <code class="docutils literal notranslate"><span class="pre">.failed</span></code>
 suffixes. See <a class="reference internal" href="logging.html#logging"><span class="std std-ref">Logging</span></a> for details.</p>
 <p>To follow the progress of a running sync:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span><span class="nv">pipelinewise_config_dir</span><span class="o">=</span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">PIPELINEWISE_CONFIG_DIRECTORY</span><span class="k">:-</span><span class="nv">$HOME</span><span class="p">/.pipelinewise</span><span class="si">}</span><span class="s2">&quot;</span>
-$<span class="w"> </span>tail<span class="w"> </span>-f<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$pipelinewise_config_dir</span><span class="s2">/&lt;target_id&gt;/&lt;tap_id&gt;/log/&quot;</span>*running
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span><span class="nv">pipelinewise_config_dir</span><span class="o">=</span><span class="s2">"</span><span class="si">${</span><span class="nv">PIPELINEWISE_CONFIG_DIRECTORY</span><span class="k">:-</span><span class="nv">$HOME</span><span class="p">/.pipelinewise</span><span class="si">}</span><span class="s2">"</span>
+$<span class="w"> </span>tail<span class="w"> </span>-f<span class="w"> </span><span class="s2">"</span><span class="nv">$pipelinewise_config_dir</span><span class="s2">/&lt;target_id&gt;/&lt;tap_id&gt;/log/"</span>*running
 </pre></div>
 </div>
 <p>You can also check the temporary files being written during a sync:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>ls<span class="w"> </span>-lah<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$pipelinewise_config_dir</span><span class="s2">/tmp/&quot;</span>*&lt;tap_id&gt;*
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>ls<span class="w"> </span>-lah<span class="w"> </span><span class="s2">"</span><span class="nv">$pipelinewise_config_dir</span><span class="s2">/tmp/"</span>*&lt;tap_id&gt;*
 </pre></div>
 </div>
 </section>
