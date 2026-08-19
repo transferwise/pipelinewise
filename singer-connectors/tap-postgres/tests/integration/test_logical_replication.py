@@ -4,7 +4,7 @@ import unittest
 import unittest.mock
 
 import tap_postgres
-from tap_postgres.sync_strategies import common
+from tap_postgres.sync_strategies import common, logical_replication
 
 from ..utils import get_test_connection_config, ensure_test_table, create_replication_slot, drop_replication_slot, \
     set_replication_method_for_stream, get_test_connection, insert_record, drop_table, SingerOutput
@@ -308,3 +308,153 @@ class TestUnselectedTableSlotAdvancement(unittest.TestCase):
         record_messages = [m for m in messages if m['type'] == 'RECORD']
         self.assertEqual(len(record_messages), 0,
                          "No RECORD messages should be emitted for unselected table activity")
+
+
+class TestWalProgressMessageSlotAdvancement(unittest.TestCase):
+    """Test that a database-local marker advances an otherwise idle slot."""
+    selected_table = 'wal_progress_message_selected_table'
+    tap_id = 'tap_wal_progress_message_test'
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        ensure_test_table({
+            'columns': [
+                {'name': 'id', 'type': 'serial', 'primary_key': True},
+                {'name': 'val', 'type': 'character varying'},
+            ],
+            'name': cls.selected_table,
+        })
+
+        create_replication_slot(tap_id=cls.tap_id)
+        cls.config = get_test_connection_config()
+        cls.config['tap_id'] = cls.tap_id
+        tap_postgres.dump_catalog = lambda catalog: True
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        drop_replication_slot(tap_id=cls.tap_id)
+        drop_table(cls.selected_table)
+
+    def test_progress_messages_advance_state_and_confirmed_flush_lsn(self):
+        """Idle runs emit no records and flush only the previously acknowledged marker."""
+        streams = tap_postgres.do_discovery(self.config)
+        selected_stream = [
+            stream for stream in streams
+            if stream['tap_stream_id'] == f'public-{self.selected_table}'
+        ][0]
+        selected_stream = set_replication_method_for_stream(selected_stream, 'LOG_BASED')
+
+        with get_test_connection() as conn:
+            with conn.cursor() as cur:
+                insert_record(cur, self.selected_table, {'val': 'seed'})
+
+        output = SingerOutput()
+        with contextlib.redirect_stdout(output):
+            state = tap_postgres.do_sync(
+                self.config, {'streams': [selected_stream]}, 'LOG_BASED', {}, None
+            )
+
+        initial_lsn = state['bookmarks'][f'public-{self.selected_table}']['lsn']
+
+        decoded_payloads = []
+        original_consume_message = logical_replication.consume_message
+        original_emit_wal_progress_message = logical_replication.emit_wal_progress_message
+        original_sync_tables = logical_replication.sync_tables
+        emitted_contents = []
+        later_contents = []
+        received_contents = []
+        marker_commit_lsns = []
+        marker_message_seen = False
+
+        def capture_emitted_message(conn_info):
+            content = original_emit_wal_progress_message(conn_info)
+            emitted_contents.append(content)
+            later_contents.append(original_emit_wal_progress_message(conn_info))
+            return content
+
+        def capture_sync_tables(*args, wal_progress_content=None, **kwargs):
+            received_contents.append(wal_progress_content)
+            return original_sync_tables(
+                *args,
+                wal_progress_content=wal_progress_content,
+                **kwargs,
+            )
+
+        def capture_message(streams_arg, state_arg, message, time_extracted, conn_info, *, message_payload=None):
+            nonlocal marker_message_seen
+            payload = json.loads(message.payload)
+            decoded_payloads.append(payload)
+            if payload.get('action') == 'M' and payload.get('content') == emitted_contents[0]:
+                marker_message_seen = True
+            elif marker_message_seen and payload.get('action') == 'C':
+                marker_commit_lsns.append(message.data_start)
+                marker_message_seen = False
+            return original_consume_message(
+                streams_arg,
+                state_arg,
+                message,
+                time_extracted,
+                conn_info,
+                message_payload=message_payload,
+            )
+
+        output.seek(0)
+        output.truncate()
+        with unittest.mock.patch.object(
+                logical_replication,
+                'emit_wal_progress_message',
+                side_effect=capture_emitted_message,
+        ), unittest.mock.patch.object(
+                logical_replication,
+                'sync_tables',
+                side_effect=capture_sync_tables,
+        ), unittest.mock.patch.object(logical_replication, 'consume_message', side_effect=capture_message), \
+                contextlib.redirect_stdout(output):
+            state = tap_postgres.do_sync(
+                self.config, {'streams': [selected_stream]}, 'LOG_BASED', state, None
+            )
+
+        new_lsn = state['bookmarks'][f'public-{self.selected_table}']['lsn']
+        self.assertGreater(new_lsn, initial_lsn)
+        self.assertEqual(1, len(emitted_contents))
+        self.assertEqual(1, len(later_contents))
+        self.assertEqual(emitted_contents, received_contents)
+        self.assertEqual(marker_commit_lsns, [new_lsn])
+        self.assertTrue(any(
+            payload.get('action') == 'M'
+            and payload.get('transactional') is True
+            and payload.get('prefix') == 'pipelinewise'
+            and payload.get('content') == emitted_contents[0]
+            for payload in decoded_payloads
+        ))
+        self.assertFalse(any(
+            payload.get('action') == 'M'
+            and payload.get('content') == later_contents[0]
+            for payload in decoded_payloads
+        ))
+
+        messages = [json.loads(message) for message in output.getvalue().splitlines()]
+        self.assertFalse([message for message in messages if message['type'] == 'RECORD'])
+
+        output.seek(0)
+        output.truncate()
+        with contextlib.redirect_stdout(output):
+            final_state = tap_postgres.do_sync(
+                self.config, {'streams': [selected_stream]}, 'LOG_BASED', state, None
+            )
+
+        final_lsn = final_state['bookmarks'][f'public-{self.selected_table}']['lsn']
+        slot_name = logical_replication.generate_replication_slot_name(self.config['dbname'], self.tap_id)
+        with get_test_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    'SELECT confirmed_flush_lsn::text FROM pg_replication_slots WHERE slot_name = %s',
+                    (slot_name,)
+                )
+                confirmed_flush_lsn = logical_replication.lsn_to_int(cur.fetchone()[0])
+
+        self.assertGreater(final_lsn, new_lsn)
+        self.assertGreaterEqual(confirmed_flush_lsn, new_lsn)
+        self.assertLess(confirmed_flush_lsn, final_lsn)
+        messages = [json.loads(message) for message in output.getvalue().splitlines()]
+        self.assertFalse([message for message in messages if message['type'] == 'RECORD'])

@@ -96,3 +96,85 @@ class TestTraditionalSchemaMessages(TestCase):
             {}, self.stream, {'bookmarks': {}}, 'logical_initial', 42)
 
         send_schema_message.assert_called_once_with(self.stream, [])
+
+
+class TestLogicalProgressMarkers(TestCase):
+    @staticmethod
+    def _stream(stream_id, database_name):
+        return {
+            'tap_stream_id': stream_id,
+            'stream': stream_id,
+            'schema': {'type': 'object', 'properties': {'id': {'type': 'integer'}}},
+            'metadata': [{
+                'breadcrumb': [],
+                'metadata': {
+                    'database-name': database_name,
+                    'schema-name': 'public',
+                    'table-key-properties': ['id'],
+                },
+            }],
+        }
+
+    def test_each_database_gets_its_own_marker_and_boundary(self):
+        initial_stream = self._stream('initial', 'initial_db')
+        logical_streams = [self._stream('logical_b', 'db_b'), self._stream('logical_a', 'db_a')]
+        catalog = {'streams': [initial_stream, *logical_streams]}
+        state = {'currently_syncing': None, 'bookmarks': {}}
+        conn_config = {'dbname': 'configured_db'}
+        fetched_databases = []
+        emitted_databases = []
+        logical_calls = []
+        traditional_boundaries = []
+        events = []
+        lsn_values = iter([100, 210, 310])
+
+        def fetch_current_lsn(config):
+            fetched_databases.append(config['dbname'])
+            events.append(f"fetch:{config['dbname']}")
+            return next(lsn_values)
+
+        def emit_wal_progress_message(config):
+            emitted_databases.append(config['dbname'])
+            events.append(f"emit:{config['dbname']}")
+            return f"marker:{config['dbname']}"
+
+        def sync_traditional_stream(_config, _stream, current_state, _method, end_lsn):
+            traditional_boundaries.append(end_lsn)
+            events.append(f'traditional:{end_lsn}')
+            return current_state
+
+        def sync_logical_streams(config, streams, current_state, end_lsn, _state_file, *, wal_progress_content):
+            logical_calls.append((config['dbname'], [stream['tap_stream_id'] for stream in streams],
+                                  end_lsn, wal_progress_content))
+            events.append(f"sync:{config['dbname']}:{end_lsn}:{wal_progress_content}")
+            return current_state
+
+        with patch('tap_postgres.is_selected_via_metadata', return_value=True), \
+                patch('tap_postgres.any_logical_streams', return_value=True), \
+                patch('tap_postgres.refresh_streams_schema'), \
+                patch('tap_postgres.sync_method_for_streams', return_value=(
+                    {'initial': 'logical_initial'}, [initial_stream], logical_streams)), \
+                patch('tap_postgres.logical_replication.fetch_current_lsn', side_effect=fetch_current_lsn), \
+                patch('tap_postgres.logical_replication.emit_wal_progress_message',
+                      side_effect=emit_wal_progress_message), \
+                patch('tap_postgres.sync_traditional_stream', side_effect=sync_traditional_stream), \
+                patch('tap_postgres.sync_logical_streams', side_effect=sync_logical_streams):
+            tap_postgres.do_sync(conn_config, catalog, 'LOG_BASED', state, 'state.json')
+
+        self.assertEqual(['configured_db', 'db_a', 'db_b'], fetched_databases)
+        self.assertEqual(['db_a', 'db_b'], emitted_databases)
+        self.assertEqual([100], traditional_boundaries)
+        self.assertEqual([
+            ('db_a', ['logical_a'], 210, 'marker:db_a'),
+            ('db_b', ['logical_b'], 310, 'marker:db_b'),
+        ], logical_calls)
+        self.assertEqual([
+            'fetch:configured_db',
+            'traditional:100',
+            'emit:db_a',
+            'fetch:db_a',
+            'sync:db_a:210:marker:db_a',
+            'emit:db_b',
+            'fetch:db_b',
+            'sync:db_b:310:marker:db_b',
+        ], events)

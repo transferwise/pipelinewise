@@ -79,7 +79,12 @@ Branch from `master` and keep diffs task-scoped.
 Create every commit with a cryptographic signature using `git commit -S`; never
 create or push an unsigned commit.
 
-Keep CHANGELOG entries concise and atomic: one independently reviewable change per bullet. Use headings to preserve test categories instead of combining multiple changes in one bullet.
+Keep CHANGELOG bullets concise, outcome-focused, and atomic: one independently
+reviewable behavior per bullet. Start with an action verb, name the affected
+component, and state the operational result. Include implementation details only
+when needed to explain behavior or risk. Use headings to group related changes.
+Use semantic versioning for root releases: patch for fixes only, minor for backward-compatible
+features, and major for breaking changes. Keep `setup.py` aligned with the top CHANGELOG release.
 
 Before completion:
 
