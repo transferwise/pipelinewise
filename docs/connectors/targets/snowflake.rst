@@ -75,7 +75,6 @@ Configuration
      s3_key_prefix: "pipelinewise/"
      stage: "<SCHEMA>.<STAGE>"
      file_format: "<SCHEMA>.<FILE_FORMAT>"
-     iceberg_create: false
 
 .. list-table:: Connector-specific settings
    :header-rows: 1
@@ -130,7 +129,8 @@ Configuration
    * - ``iceberg_create``
      - No
      - ``false``
-     - Creates new Singer-path tables as managed Iceberg tables.
+     - Deprecated target-wide setting for new Singer-path Iceberg tables.
+       Prefer tap-level ``target_table_format`` and ``iceberg_version``.
    * - ``max_parallelism``
      - No
      - ``16``
@@ -154,7 +154,9 @@ schema-wide grant behaviour.
 Iceberg tables
 --------------
 
-Singer-path loads can create new managed Iceberg tables. FastSync and PartialSync
-cannot currently create or load Iceberg tables. Existing native tables can be
-converted with the bundled utility. See :ref:`snowflake_iceberg` for prerequisites,
-cutover, limitations, and recovery.
+The Singer connector can create managed Iceberg v3 tables when the tap selects
+that format. This does not yet enable a complete RDBMS-to-Iceberg route: fresh
+taps normally require FastSync first. FullSync and PartialSync with explicit
+Iceberg configuration fail before changing the target. Existing native tables
+can be converted with the bundled utility. See :ref:`snowflake_iceberg` for
+configuration, prerequisites, and limitations.

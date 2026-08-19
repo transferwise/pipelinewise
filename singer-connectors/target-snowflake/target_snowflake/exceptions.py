@@ -31,3 +31,11 @@ class UnexpectedMessageTypeException(Exception):
 
 class PrimaryKeyNotFoundException(Exception):
     """Exception to raise when primary key not found in the record message"""
+
+
+class TableFormatDiscoveryException(Exception):
+    """Exception to raise when Snowflake table format metadata is incomplete."""
+
+
+class TableFormatMismatchException(Exception):
+    """Exception to raise when the configured and physical table formats differ."""

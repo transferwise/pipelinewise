@@ -147,6 +147,12 @@
       ]
     },
     "db_conn": {
+      "type": "object",
+      "properties": {
+        "iceberg_create": {
+          "type": "boolean"
+        }
+      },
       "anyOf": [
         {
           "$ref": "#/definitions/db_conn_target_snowflake"

@@ -17,7 +17,12 @@ from pipelinewise import cli
 from pipelinewise.cli.constants import ConnectorType
 from pipelinewise.cli.config import Config
 from pipelinewise.cli.pipelinewise import PipelineWise
-from pipelinewise.cli.errors import DuplicateConfigException, InvalidConfigException, InvalidTransformationException
+from pipelinewise.cli.errors import (
+    DuplicateConfigException,
+    InvalidConfigException,
+    InvalidTransformationException,
+    PreRunChecksException,
+)
 
 RESOURCES_DIR = f'{os.path.dirname(__file__)}/resources'
 CONFIG_DIR = f'{RESOURCES_DIR}/sample_json_config'
@@ -626,6 +631,17 @@ class TestCli:
         args = CliArgs(dir=f'{os.path.dirname(__file__)}/resources/test_import_command', taps='tap_one,tap_three')
         self._assert_import_command(args)
 
+    def test_import_rejects_table_format_conflict_before_saving(self):
+        """import_config applies the shared policy before generated config is changed."""
+        args = CliArgs(dir=f'{RESOURCES_DIR}/test_table_format_conflict')
+        pipelinewise = PipelineWise(args, CONFIG_DIR, VIRTUALENVS_DIR)
+
+        with patch.object(Config, 'save') as save:
+            with pytest.raises(InvalidConfigException, match='conflicts'):
+                pipelinewise.import_project()
+
+        save.assert_not_called()
+
     def test_command_status(self, capsys):
         """Test status command output"""
         # Status table should be printed to stdout
@@ -808,6 +824,70 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
 
         assert bookmarks == {'bookmarks': {'tb1': {'foo': 'bar'}}, 'currently_syncing': None}
 
+    def test_do_sync_tables_rejects_iceberg_before_state_or_process_changes(self):
+        """A real fresh-stream selection fails before state cleanup or child launch."""
+        pipelinewise = self._init_for_sync_tables_states_cleanup()
+        pipelinewise.tap['target_table_format'] = 'iceberg'
+
+        with patch.object(
+            pipelinewise, '_reset_state_file_for_partial_sync'
+        ) as reset_state, patch(
+            'pipelinewise.cli.pipelinewise.Process'
+        ) as process:
+            with pytest.raises(PreRunChecksException, match='No target changes'):
+                pipelinewise.do_sync_tables()
+
+        reset_state.assert_not_called()
+        process.assert_not_called()
+
+    def test_do_sync_tables_allows_singer_only_iceberg_run(self):
+        """Explicit Iceberg does not block a launch with no FastSync selection."""
+        pipelinewise = self._init_for_sync_tables_states_cleanup()
+        pipelinewise.tap['target_table_format'] = 'iceberg'
+
+        with patch.object(
+            pipelinewise,
+            '_get_sync_tables_setting_from_selection_file',
+            return_value={'full_sync': [], 'partial_sync': {}},
+        ), patch('pipelinewise.cli.pipelinewise.Process') as process:
+            pipelinewise.do_sync_tables()
+
+        process.assert_not_called()
+
+    def test_direct_fastsync_rejects_iceberg_before_state_cleanup(self):
+        """The defensive FullSync seam rejects Iceberg before bookmark cleanup."""
+        pipelinewise = self._init_for_sync_tables_states_cleanup()
+        pipelinewise.tap['target_table_format'] = 'iceberg'
+
+        with patch.object(pipelinewise, '_cleanup_tap_state_file') as cleanup, patch.object(
+            pipelinewise, 'run_tap_fastsync'
+        ) as run_fastsync:
+            with pytest.raises(PreRunChecksException, match='No target changes'):
+                pipelinewise.sync_tables_fast_sync(['db_test_mysql.table_one'])
+
+        cleanup.assert_not_called()
+        run_fastsync.assert_not_called()
+
+    def test_direct_partial_sync_rejects_iceberg_before_command(self):
+        """The standalone PartialSync command cannot bypass the temporary guard."""
+        pipelinewise = self._init_for_sync_tables_states_cleanup()
+        pipelinewise.tap['target_table_format'] = 'iceberg'
+
+        with patch.object(
+            pipelinewise, '_check_supporting_tap_and_target_for_partial_sync'
+        ) as check_pair, patch.object(
+            pipelinewise, 'run_tap_partialsync'
+        ) as run_partial_sync, patch.object(
+            pipelinewise.logger, 'error'
+        ) as log_error:
+            with pytest.raises(SystemExit) as raised:
+                pipelinewise.sync_tables_partial_sync()
+
+        assert raised.value.code == 1
+        assert 'No target changes were made' in str(log_error.call_args.args[0])
+        check_pair.assert_not_called()
+        run_partial_sync.assert_not_called()
+
     def test_fast_sync_tables_cleanup_state_for_selected_tables(self):
         """Testing sync_tables cleanup state if file exists and there is no table argument"""
         def _assert_state_file(*args, **kwargs):
@@ -929,6 +1009,14 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
         pipelinewise = PipelineWise(args, CONFIG_DIR, VIRTUALENVS_DIR)
 
         with pytest.raises(InvalidTransformationException):
+            pipelinewise.validate()
+
+    def test_validate_rejects_table_format_conflict(self):
+        """validate and import_config share the same cross-config format policy."""
+        args = CliArgs(dir=f'{RESOURCES_DIR}/test_table_format_conflict')
+        pipelinewise = PipelineWise(args, CONFIG_DIR, VIRTUALENVS_DIR)
+
+        with pytest.raises(InvalidConfigException, match='conflicts'):
             pipelinewise.validate()
 
     # pylint: disable=protected-access

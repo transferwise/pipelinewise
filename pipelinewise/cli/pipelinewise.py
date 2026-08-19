@@ -1418,6 +1418,9 @@ class PipelineWise:
         selected_tables = self._get_sync_tables_setting_from_selection_file(
             tables_to_sync, self.args.replication_method_only)
 
+        if selected_tables['partial_sync'] or selected_tables['full_sync']:
+            self._check_target_table_format_supports_fastsync()
+
         processes_list = []
         if selected_tables['partial_sync']:
             self._reset_state_file_for_partial_sync(selected_tables)
@@ -1466,6 +1469,8 @@ class PipelineWise:
 
         cons_target_config = None
         try:
+            self._check_target_table_format_supports_fastsync()
+
             self._check_if_tap_is_enabled()
 
             self._check_if_complete_tap_configuration(fastsync_bin, tap_type, target_type)
@@ -1990,6 +1995,8 @@ class PipelineWise:
 
         # Continue only if tap and target is supported by partial sync
         try:
+            self._check_target_table_format_supports_fastsync()
+
             self._check_supporting_tap_and_target_for_partial_sync()
 
             tap_id = self.tap['id']
@@ -2097,8 +2104,9 @@ class PipelineWise:
         except PartialSyncNotSupportedTypeException as exc:
             self.logger.error(exc)
             raise SystemExit(1) from exc
-        except PreRunChecksException as exp:
-            raise SystemExit(1) from exp
+        except PreRunChecksException as exc:
+            self.logger.error(exc)
+            raise SystemExit(1) from exc
         except Exception as exc:
             self.send_alert(message=f'Failed to sync tables in {tap_id} tap', exc=exc)
             self.logger.exception(exc)
@@ -2198,6 +2206,14 @@ class PipelineWise:
         if ConnectorType(target_type) not in PARTIAL_SYNC_PAIRS.get(ConnectorType(tap_type), {}):
             raise PartialSyncNotSupportedTypeException(
                 f'Error! {tap_id}({tap_type})-{target_id}({target_type}) pair is not supported for the partial sync!'
+            )
+
+    def _check_target_table_format_supports_fastsync(self):
+        """Reject explicit Iceberg FastSync until its publication path is available."""
+        if self.tap.get('target_table_format') == Config.TABLE_FORMAT_ICEBERG:
+            raise PreRunChecksException(
+                'FastSync and PartialSync do not yet support explicit Snowflake Iceberg tables. '
+                'No target changes were made.'
             )
 
     def _check_if_complete_tap_configuration(self, fastsync_bin, tap_type, target_type):

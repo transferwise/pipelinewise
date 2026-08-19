@@ -62,9 +62,13 @@ Supported routes
      - Yes
      - No
 
-Endpoint support status from :ref:`connector_support` still applies. A normal
-``run_tap`` falls back to Singer when FullSync is unavailable. The explicit
-``fast_sync`` command instead fails without loading data.
+The Snowflake rows currently cover native tables only. With explicit
+``target_table_format: iceberg``, FullSync and PartialSync fail before target
+mutation and do not fall back to Singer.
+
+Endpoint support status from :ref:`connector_support` still applies. For a
+route without a FastSync component, a normal ``run_tap`` falls back to Singer.
+The explicit ``fast_sync`` command instead fails without loading data.
 
 
 Automatic selection and handover

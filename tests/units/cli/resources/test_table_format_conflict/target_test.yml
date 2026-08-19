@@ -1,0 +1,14 @@
+id: test_target
+name: Test Snowflake target
+type: target-snowflake
+db_conn:
+  account: account
+  dbname: database
+  user: user
+  private_key: private-key
+  warehouse: warehouse
+  s3_bucket: bucket
+  s3_key_prefix: prefix/
+  stage: schema.stage
+  file_format: file-format
+  iceberg_create: false

@@ -30,4 +30,4 @@ Report unavailable or skipped integration/E2E coverage as unverified.
 - Uppercase and double-quote identifiers; with `QUOTED_IDENTIFIERS_IGNORE_CASE = FALSE`, DDL/DML case must match.
 - Compare generated types with Snowflake's canonical reported types; aliases can round-trip differently and trigger false column replacement.
 - Connector version prints to stderr; E2E must check exit status because `assert_command_success` treats stderr as failure.
-- Existing table type from `SHOW TERSE ICEBERG TABLES` wins; `iceberg_create` applies only to new tables. FastSync/PartialSync do not use this decision.
+- With legacy `iceberg_create`, the existing physical format wins and the flag applies only to missing tables. Explicit tap-level formats must match. Keep `target_table_format: iceberg` and `iceberg_version: 3` for the tap's lifetime; removing both restores legacy TEXT mapping and stops on existing VARIANT columns. FastSync/PartialSync reject explicit Iceberg until supported.
