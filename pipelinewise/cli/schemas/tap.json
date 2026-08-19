@@ -564,6 +564,14 @@
       "minimum": 0,
       "maximum": 2500
     },
+    "target_table_format": {
+      "type": "string",
+      "enum": ["native", "iceberg"]
+    },
+    "iceberg_version": {
+      "type": "integer",
+      "enum": [3]
+    },
     "split_large_files": {
       "type": "boolean"
     },
@@ -590,6 +598,24 @@
     },
     {
       "$ref": "#/definitions/tap_github"
+    },
+    {
+      "if": {
+        "required": ["target_table_format"],
+        "properties": {
+          "target_table_format": {
+            "const": "iceberg"
+          }
+        }
+      },
+      "then": {
+        "required": ["iceberg_version"]
+      },
+      "else": {
+        "not": {
+          "required": ["iceberg_version"]
+        }
+      }
     }
   ],
   "required": [

@@ -54,6 +54,202 @@ class TestConfig:
             'pidfile': '/var/singer-connector/pipelinewise.pid',
         }
 
+    @staticmethod
+    def _table_format_tap(**settings):
+        return {
+            'id': 'test_tap',
+            'name': 'Test tap',
+            'type': 'tap-postgres',
+            'db_conn': {},
+            'target': 'test_target',
+            'schemas': [],
+            **settings,
+        }
+
+    @staticmethod
+    def _table_format_target(**connection_settings):
+        return {
+            'id': 'test_target',
+            'name': 'Test target',
+            'type': 'target-snowflake',
+            'db_conn': {
+                'account': 'account',
+                'dbname': 'database',
+                'user': 'user',
+                'private_key': 'private-key',
+                'warehouse': 'warehouse',
+                's3_bucket': 'bucket',
+                's3_key_prefix': 'prefix/',
+                'stage': 'schema.stage',
+                'file_format': 'file-format',
+                **connection_settings,
+            },
+        }
+
+    @pytest.mark.parametrize(
+        'settings',
+        [
+            {},
+            {'target_table_format': 'native'},
+            {'target_table_format': 'iceberg', 'iceberg_version': 3},
+        ],
+    )
+    def test_target_table_format_schema_accepts_supported_settings(self, settings):
+        """The tap schema accepts omission, native, and explicit Iceberg v3."""
+        cli.utils.validate(
+            self._table_format_tap(**settings),
+            cli.utils.load_schema('tap'),
+        )
+
+    @pytest.mark.parametrize(
+        'settings',
+        [
+            {'target_table_format': 'unsupported'},
+            {'target_table_format': 'iceberg'},
+            {'target_table_format': 'native', 'iceberg_version': 3},
+            {'iceberg_version': 3},
+            {'target_table_format': 'iceberg', 'iceberg_version': 2},
+            {'target_table_format': 'iceberg', 'iceberg_version': '3'},
+        ],
+    )
+    def test_target_table_format_schema_rejects_invalid_settings(self, settings):
+        """Iceberg version 3 is valid only with an explicit Iceberg format."""
+        with pytest.raises(InvalidConfigException):
+            cli.utils.validate(
+                self._table_format_tap(**settings),
+                cli.utils.load_schema('tap'),
+            )
+
+    @pytest.mark.parametrize('iceberg_create', [True, False])
+    def test_target_schema_accepts_boolean_legacy_iceberg_create(self, iceberg_create):
+        """Legacy Iceberg creation remains available as a typed boolean."""
+        cli.utils.validate(
+            self._table_format_target(iceberg_create=iceberg_create),
+            cli.utils.load_schema('target'),
+        )
+
+    @pytest.mark.parametrize('iceberg_create', ['true', 1, None])
+    def test_target_schema_rejects_non_boolean_legacy_iceberg_create(self, iceberg_create):
+        """String, numeric, and null legacy flags must not be interpreted as booleans."""
+        with pytest.raises(InvalidConfigException):
+            cli.utils.validate(
+                self._table_format_target(iceberg_create=iceberg_create),
+                cli.utils.load_schema('target'),
+            )
+
+    @pytest.mark.parametrize(
+        ('tap_settings', 'target_settings'),
+        [
+            ({}, {}),
+            ({}, {'iceberg_create': False}),
+            ({}, {'iceberg_create': True}),
+            ({'target_table_format': 'native'}, {}),
+            ({'target_table_format': 'native'}, {'iceberg_create': False}),
+            (
+                {'target_table_format': 'iceberg', 'iceberg_version': 3},
+                {},
+            ),
+            (
+                {'target_table_format': 'iceberg', 'iceberg_version': 3},
+                {'iceberg_create': True},
+            ),
+        ],
+    )
+    def test_target_table_format_policy_accepts_legacy_compatible_settings(
+        self, tap_settings, target_settings
+    ):
+        """Omitted legacy behavior and explicitly agreeing settings remain valid."""
+        Config.validate_target_table_format(
+            self._table_format_tap(**tap_settings),
+            self._table_format_target(**target_settings),
+        )
+
+    @pytest.mark.parametrize(
+        ('tap_settings', 'target_settings'),
+        [
+            ({'target_table_format': 'native'}, {'iceberg_create': True}),
+            (
+                {'target_table_format': 'iceberg', 'iceberg_version': 3},
+                {'iceberg_create': False},
+            ),
+        ],
+    )
+    def test_target_table_format_policy_rejects_legacy_conflicts(
+        self, tap_settings, target_settings
+    ):
+        """An explicit tap format cannot contradict the legacy target setting."""
+        with pytest.raises(InvalidConfigException, match='conflicts'):
+            Config.validate_target_table_format(
+                self._table_format_tap(**tap_settings),
+                self._table_format_target(**target_settings),
+            )
+
+    def test_target_table_format_policy_rejects_non_snowflake_target(self):
+        """The tap-level destination format is meaningful only for Snowflake."""
+        target = self._table_format_target()
+        target['type'] = 'target-postgres'
+
+        with pytest.raises(InvalidConfigException, match='is not target-snowflake'):
+            Config.validate_target_table_format(
+                self._table_format_tap(target_table_format='native'),
+                target,
+            )
+
+    @pytest.mark.parametrize(
+        ('tap_settings', 'message'),
+        [
+            ({'type': 'tap-mongodb'}, 'does not support'),
+            ({'hard_delete': False}, 'hard_delete: true'),
+            ({'data_flattening_max_level': 1}, 'data_flattening_max_level: 0'),
+        ],
+    )
+    def test_explicit_iceberg_policy_rejects_unsupported_tap_settings(
+        self, tap_settings, message
+    ):
+        """The initial explicit Iceberg route is unflattened RDBMS hard-delete only."""
+        tap = self._table_format_tap(
+            target_table_format='iceberg', iceberg_version=3, **tap_settings
+        )
+
+        with pytest.raises(InvalidConfigException, match=message):
+            Config.validate_target_table_format(tap, self._table_format_target())
+
+    def test_target_table_format_is_isolated_between_taps(self, tmp_path):
+        """Two taps sharing one target get independent generated target settings."""
+        config = Config(str(tmp_path))
+        native_tap = self._table_format_tap(
+            id='native_tap', target_table_format='native'
+        )
+        iceberg_tap = self._table_format_tap(
+            id='iceberg_tap', target_table_format='iceberg', iceberg_version=3
+        )
+        target = self._table_format_target()
+        target['taps'] = [native_tap, iceberg_tap]
+        config.targets = {target['id']: target}
+
+        config.save()
+
+        target_dir = tmp_path / target['id']
+        native_config = cli.utils.load_json(
+            str(target_dir / native_tap['id'] / 'inheritable_config.json')
+        )
+        iceberg_config = cli.utils.load_json(
+            str(target_dir / iceberg_tap['id'] / 'inheritable_config.json')
+        )
+        main_config = cli.utils.load_json(str(tmp_path / 'config.json'))
+        main_taps = {
+            tap['id']: tap for tap in main_config['targets'][0]['taps']
+        }
+
+        assert native_config['target_table_format'] == 'native'
+        assert 'iceberg_version' not in native_config
+        assert iceberg_config['target_table_format'] == 'iceberg'
+        assert iceberg_config['iceberg_version'] == 3
+        assert main_taps['native_tap']['target_table_format'] == 'native'
+        assert 'iceberg_version' not in main_taps['native_tap']
+        assert main_taps['iceberg_tap']['target_table_format'] == 'iceberg'
+        assert main_taps['iceberg_tap']['iceberg_version'] == 3
+
     def test_from_yamls(self):
         """Test creating Config object using YAML configuration directory as the input"""
 

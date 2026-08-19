@@ -1,3 +1,24 @@
+0.80.0 (2026-08-19)
+--------------------
+
+**Snowflake Iceberg groundwork**
+
+- Configure native or managed Iceberg v3 Singer tables per tap
+- Preserve nested Singer values as VARIANT in explicitly configured Iceberg v3 tables
+- Restrict Iceberg v3 configuration to unflattened, hard-delete RDBMS-to-Snowflake taps
+- Reject explicitly configured Iceberg FullSync and PartialSync before target mutation
+- Reject explicit formats that conflict with existing Snowflake tables
+- Preserve deprecated target-level `iceberg_create` behaviour when tap-level format is omitted
+
+**Fixes**
+
+- Execute unparameterized Snowflake SQL containing literal `%` without parameter-binding errors
+
+**Test hardening**
+
+- Cover exact target-snowflake table-format discovery for wildcard-like identifiers
+- Verify nested, null, empty, Unicode, escaped, and large VARIANT values on managed Iceberg v3
+
 0.79.1 (2026-08-18)
 --------------------
 
