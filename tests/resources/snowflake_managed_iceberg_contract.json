@@ -1,0 +1,347 @@
+{
+  "declarative_contract": {
+    "supported_versions": [
+      3
+    ],
+    "versions": {
+      "3": {
+        "version": 3,
+        "physical_format": "managed_iceberg_v3",
+        "logical_to_physical_types": {
+          "binary": "binary(67108864)",
+          "boolean": "boolean",
+          "date": "date",
+          "float": "double",
+          "number": "number(38,0)",
+          "text": "varchar(134217728)",
+          "time": "time(6)",
+          "timestamp_ntz": "timestamp_ntz(6)",
+          "variant": "variant"
+        },
+        "table_options": {
+          "DATA_RETENTION_TIME_IN_DAYS": 1,
+          "TARGET_FILE_SIZE": "16MB",
+          "ENABLE_DATA_COMPACTION": true,
+          "ICEBERG_MERGE_ON_READ_BEHAVIOR": "DISABLED"
+        },
+        "copy_on_write": {
+          "parameter": "ICEBERG_MERGE_ON_READ_BEHAVIOR",
+          "value": "DISABLED",
+          "required_metadata_level": "TABLE"
+        }
+      }
+    }
+  },
+  "behavior_cases": {
+    "3": {
+      "logical_types": [
+        {
+          "logical_type": "binary",
+          "schema": {"type": ["string"], "format": "binary"},
+          "declared_type": "binary(67108864)",
+          "canonical_type": "BINARY(67108864)"
+        },
+        {
+          "logical_type": "boolean",
+          "schema": {"type": ["boolean"]},
+          "declared_type": "boolean",
+          "canonical_type": "BOOLEAN"
+        },
+        {
+          "logical_type": "date",
+          "schema": {"type": ["string"], "format": "date"},
+          "declared_type": "date",
+          "canonical_type": "DATE"
+        },
+        {
+          "logical_type": "float",
+          "schema": {"type": ["number"]},
+          "declared_type": "double",
+          "canonical_type": "DOUBLE"
+        },
+        {
+          "logical_type": "number",
+          "schema": {"type": ["integer"]},
+          "declared_type": "number(38,0)",
+          "canonical_type": "NUMBER(38,0)"
+        },
+        {
+          "logical_type": "text",
+          "schema": {"type": ["string"]},
+          "declared_type": "varchar(134217728)",
+          "canonical_type": "VARCHAR(134217728)"
+        },
+        {
+          "logical_type": "time",
+          "schema": {"type": ["string"], "format": "time"},
+          "declared_type": "time(6)",
+          "canonical_type": "TIME(6)"
+        },
+        {
+          "logical_type": "timestamp_ntz",
+          "schema": {"type": ["string"], "format": "date-time"},
+          "declared_type": "timestamp_ntz(6)",
+          "canonical_type": "TIMESTAMP_NTZ(6)"
+        },
+        {
+          "logical_type": "variant",
+          "schema": {"type": ["object"]},
+          "declared_type": "variant",
+          "canonical_type": "VARIANT"
+        }
+      ],
+      "canonical_types": [
+        {
+          "input": " character varying ( 42 ) ",
+          "accepted": true,
+          "expected": "VARCHAR(134217728)"
+        },
+        {
+          "input": "decimal(27, 9)",
+          "accepted": true,
+          "expected": "NUMBER(27,9)"
+        },
+        {
+          "input": "varbinary(12)",
+          "accepted": true,
+          "expected": "BINARY(67108864)"
+        },
+        {
+          "input": "timestamp_tz(6)",
+          "accepted": true,
+          "expected": "TIMESTAMP_LTZ(6)"
+        },
+        {
+          "input": "object",
+          "accepted": true,
+          "expected": "VARIANT"
+        },
+        {
+          "input": "geography",
+          "accepted": false
+        }
+      ],
+      "existing_columns": [
+        {
+          "row": {
+            "COLUMN_NAME": "BODY",
+            "DATA_TYPE": "TEXT",
+            "CHARACTER_MAXIMUM_LENGTH": 134217728,
+            "IS_NULLABLE": "YES"
+          },
+          "accepted": true,
+          "expected": {"name": "BODY", "data_type": "VARCHAR(134217728)", "nullable": true}
+        },
+        {
+          "row": {
+            "COLUMN_NAME": "AMOUNT",
+            "DATA_TYPE": "NUMBER",
+            "NUMERIC_PRECISION": 27,
+            "NUMERIC_SCALE": 9,
+            "IS_NULLABLE": "NO"
+          },
+          "accepted": true,
+          "expected": {"name": "AMOUNT", "data_type": "NUMBER(27,9)", "nullable": false}
+        },
+        {
+          "row": {
+            "COLUMN_NAME": "EVENT_TIME",
+            "DATA_TYPE": "TIME",
+            "DATETIME_PRECISION": 6,
+            "IS_NULLABLE": "YES"
+          },
+          "accepted": true,
+          "expected": {"name": "EVENT_TIME", "data_type": "TIME(6)", "nullable": true}
+        },
+        {
+          "row": {
+            "COLUMN_NAME": "EVENT_AT",
+            "DATA_TYPE": "TIMESTAMP_TZ",
+            "DATETIME_PRECISION": 6,
+            "IS_NULLABLE": "YES"
+          },
+          "accepted": true,
+          "expected": {"name": "EVENT_AT", "data_type": "TIMESTAMP_LTZ(6)", "nullable": true}
+        },
+        {
+          "row": {
+            "COLUMN_NAME": "PAYLOAD",
+            "DATA_TYPE": "BINARY",
+            "IS_NULLABLE": "YES"
+          },
+          "accepted": true,
+          "expected": {"name": "PAYLOAD", "data_type": "BINARY(67108864)", "nullable": true}
+        },
+        {
+          "row": {
+            "COLUMN_NAME": "BODY",
+            "DATA_TYPE": "TEXT",
+            "CHARACTER_MAXIMUM_LENGTH": 16777216,
+            "IS_NULLABLE": "YES"
+          },
+          "accepted": false
+        },
+        {
+          "row": {
+            "COLUMN_NAME": "EVENT_AT",
+            "DATA_TYPE": "TIMESTAMP_NTZ",
+            "DATETIME_PRECISION": 9,
+            "IS_NULLABLE": "YES"
+          },
+          "accepted": false
+        },
+        {
+          "row": {
+            "COLUMN_NAME": "LOCATION",
+            "DATA_TYPE": "GEOGRAPHY",
+            "IS_NULLABLE": "YES"
+          },
+          "accepted": false
+        },
+        {
+          "row": {"COLUMN_NAME": "BROKEN", "IS_NULLABLE": "YES"},
+          "accepted": false
+        },
+        {
+          "row": {
+            "COLUMN_NAME": "   ",
+            "DATA_TYPE": "TEXT",
+            "CHARACTER_MAXIMUM_LENGTH": 134217728,
+            "IS_NULLABLE": "YES"
+          },
+          "accepted": false
+        },
+        {
+          "row": {
+            "COLUMN_NAME": "BODY",
+            "DATA_TYPE": "   ",
+            "IS_NULLABLE": "YES"
+          },
+          "accepted": false
+        },
+        {
+          "row": {
+            "COLUMN_NAME": "EVENT_AT",
+            "DATA_TYPE": "TIMESTAMP_NTZ",
+            "DATETIME_PRECISION": 6.0,
+            "IS_NULLABLE": "YES"
+          },
+          "accepted": false
+        },
+        {
+          "row": {
+            "COLUMN_NAME": "BODY",
+            "DATA_TYPE": "TEXT",
+            "CHARACTER_MAXIMUM_LENGTH": 134217728,
+            "IS_NULLABLE": "MAYBE"
+          },
+          "accepted": false
+        },
+        {
+          "row": {
+            "COLUMN_NAME": "BODY",
+            "DATA_TYPE": "TEXT",
+            "CHARACTER_MAXIMUM_LENGTH": 134217728
+          },
+          "accepted": false
+        }
+      ],
+      "table_parameters": [
+        {
+          "rows": [{"key": "ICEBERG_MERGE_ON_READ_BEHAVIOR", "value": "DISABLED", "level": "TABLE"}],
+          "accepted": true
+        },
+        {
+          "rows": [{"key": " ICEBERG_MERGE_ON_READ_BEHAVIOR ", "value": " disabled ", "level": " table "}],
+          "accepted": true
+        },
+        {
+          "rows": [{"key": "ICEBERG_MERGE_ON_READ_BEHAVIOR", "value": "ENABLED", "level": "TABLE"}],
+          "accepted": false
+        },
+        {
+          "rows": [{"key": "ICEBERG_MERGE_ON_READ_BEHAVIOR", "value": "DISABLED", "level": "SCHEMA"}],
+          "accepted": false
+        },
+        {
+          "rows": [
+            {"key": "ICEBERG_MERGE_ON_READ_BEHAVIOR", "value": "DISABLED", "level": "TABLE"},
+            {"key": "ICEBERG_MERGE_ON_READ_BEHAVIOR", "value": "DISABLED", "level": "TABLE"}
+          ],
+          "accepted": false
+        },
+        {
+          "rows": [{"key": "ICEBERG_MERGE_ON_READ_BEHAVIOR", "value": true, "level": "TABLE"}],
+          "accepted": false
+        }
+      ],
+      "version_metadata": [
+        {"value": 3, "accepted": true},
+        {"value": "3", "accepted": true},
+        {"value": " 3 ", "accepted": true},
+        {"value": 3.0, "accepted": false},
+        {"value": 3.5, "accepted": false},
+        {"value": true, "accepted": false},
+        {"value": "3.0", "accepted": false},
+        {"value": null, "accepted": false}
+      ],
+      "emitted_columns": [
+        {
+          "logical_type": "binary",
+          "column_name": "PAYLOAD",
+          "schema": {"type": ["string"], "format": "binary"},
+          "fastsync_definition": "\"PAYLOAD\" BINARY",
+          "expected_physical_type": "BINARY(67108864)",
+          "expected_definition": "\"PAYLOAD\" BINARY(67108864)"
+        },
+        {
+          "logical_type": "text",
+          "column_name": "NOTES",
+          "schema": {"type": ["string"]},
+          "fastsync_definition": "\"NOTES\" VARCHAR",
+          "expected_physical_type": "VARCHAR(134217728)",
+          "expected_definition": "\"NOTES\" VARCHAR(134217728)"
+        },
+        {
+          "logical_type": "variant",
+          "column_name": "DOCUMENT",
+          "schema": {
+            "type": ["null", "object", "array", "string", "number", "boolean"],
+            "format": "mariadb-json"
+          },
+          "fastsync_definition": "\"DOCUMENT\" VARIANT",
+          "expected_physical_type": "VARIANT",
+          "expected_definition": "\"DOCUMENT\" VARIANT"
+        }
+      ],
+      "mariadb_json_transport": {
+        "schema": {
+          "type": ["null", "object", "array", "string", "number", "boolean"],
+          "format": "mariadb-json"
+        },
+        "expected_physical_type": "VARIANT",
+        "expected_transform": "parse_json",
+        "serialized_roots": [
+          "{\"nested\":[null,{}],\"unicode\":\"初\"}",
+          "[1,null,{}]",
+          "\"text\"",
+          "42",
+          "1.5",
+          "true",
+          "false",
+          "null"
+        ],
+        "expected_decoded_roots": [
+          {"nested": [null, {}], "unicode": "初"},
+          [1, null, {}],
+          "text",
+          42,
+          1.5,
+          true,
+          false,
+          null
+        ]
+      }
+    }
+  }
+}

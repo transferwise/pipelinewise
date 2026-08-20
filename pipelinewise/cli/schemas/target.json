@@ -125,6 +125,19 @@
     }
   },
   "type": "object",
+  "not": {
+    "anyOf": [
+      {
+        "required": ["iceberg_create"]
+      },
+      {
+        "required": ["iceberg_version"]
+      },
+      {
+        "required": ["target_table_format"]
+      }
+    ]
+  },
   "properties": {
     "id": {
       "type": "string",
@@ -149,9 +162,23 @@
     "db_conn": {
       "type": "object",
       "properties": {
-        "iceberg_create": {
-          "type": "boolean"
+        "role": {
+          "type": "string",
+          "minLength": 1
         }
+      },
+      "not": {
+        "anyOf": [
+          {
+            "required": ["iceberg_create"]
+          },
+          {
+            "required": ["iceberg_version"]
+          },
+          {
+            "required": ["target_table_format"]
+          }
+        ]
       },
       "anyOf": [
         {

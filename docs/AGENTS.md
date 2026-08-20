@@ -1,10 +1,13 @@
 # Documentation Instructions
 
-Read root `AGENTS.md` first and any scoped guidance for the behavior documented.
+Read root `AGENTS.md` and the guidance for the behavior being documented.
 
 ## Build and sources
 
-`docs/Makefile` sets `SPHINXOPTS = -W`; every warning fails. The root test extra omits Sphinx, so the ready container needs the editable package, `sphinx`, and `sphinx-rtd-theme`. `scripts/publish_docs.sh` mutates Git and is not a validation command.
+`docs/Makefile` sets `SPHINXOPTS = -W`; warnings fail. The root test extra omits
+Sphinx, so the ready container needs the editable package, `sphinx`, and
+`sphinx-rtd-theme`. `scripts/publish_docs.sh` mutates Git; do not use it for
+validation.
 
 After changing RST, Sphinx config, or assets:
 
@@ -12,21 +15,29 @@ After changing RST, Sphinx config, or assets:
 cd docs && make check
 ```
 
-``make check`` validates embedded YAML and implementation-backed CLI,
-configuration, and packaged-connector references before the strict clean HTML
-build. Use ``make clean html`` only to isolate a Sphinx failure.
+``make check`` validates embedded YAML and implementation-backed CLI, config,
+and packaged-connector references before a strict clean HTML build. Use
+``make clean html`` only to isolate Sphinx failures.
 
-Verify prose against implementation, CLI help, schemas, example YAML, and runtime—not assumptions or only the diff. Prefer `import_config` (`import` is deprecated); describe FastSync as a FullSync/PartialSync optimization, not Singer replication.
+Verify prose against implementation, CLI help, schemas, example YAML, and
+runtime—not assumptions or only the diff. Prefer `import_config` (`import` is
+deprecated); describe FastSync as a FullSync/PartialSync optimization, not
+Singer replication.
 
 ## Content
 
-- Write concise, authoritative, operations-first public docs for operators/integration engineers; exclude Wise-only hosts, credentials, and runbooks.
-- Lead with support, prerequisites, and defaults, then operational impact, failures, diagnosis, and recovery.
-- Separate defaults from examples and current support from future intent. Avoid repetition unless a standalone section or safety concern requires it.
+- Write concise, authoritative, operations-first public docs for
+  operators/integration engineers; exclude Wise-only hosts, credentials, and
+  runbooks.
+- Order content as support, prerequisites/defaults, operational impact,
+  failures, diagnosis, and recovery.
+- Separate defaults from examples and current support from future intent;
+  repeat only for standalone use or safety.
 
 ## RST
 
-- Preserve established heading levels. For new pages use `=`, `-`, `'`, then `"`, unless the section differs.
+- Preserve heading levels. New pages use `=`, `-`, `'`, then `"` unless their
+  section differs.
 - Place `.. _label:` directly before its heading; link with ``:ref:`label` ``.
 - Declare every code-block language and use Sphinx admonitions.
 - Add pages to the owning toctree, including nested connector indexes; strict builds reject orphans.
@@ -47,4 +58,6 @@ Verify prose against implementation, CLI help, schemas, example YAML, and runtim
 | Alert handlers | `user_guide/alerts.rst` |
 | Operational diagnostics | `user_guide/troubleshooting.rst` |
 
-Backend schema changes also require migration/ERD updates per `pipelinewise/AGENTS.md`. Update scoped guidance only for durable architecture, CI, or workflow changes; otherwise keep docs edits task-scoped.
+Backend schema changes also need migration/ERD updates per
+`pipelinewise/AGENTS.md`. Update scoped guidance only for durable architecture,
+CI, or workflow changes; otherwise keep docs edits task-scoped.

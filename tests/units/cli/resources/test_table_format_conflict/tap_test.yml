@@ -1,8 +1,0 @@
-id: test_tap
-name: Test PostgreSQL tap
-type: tap-postgres
-target: test_target
-target_table_format: iceberg
-iceberg_version: 3
-db_conn: {}
-schemas: []

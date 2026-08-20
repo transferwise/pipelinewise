@@ -1,7 +1,9 @@
-import unittest
-import os
+import csv as csv_module
 import gzip
+import json
+import os
 import tempfile
+import unittest
 
 import target_snowflake.file_formats.csv as csv
 
@@ -114,6 +116,45 @@ class TestCsv(unittest.TestCase):
             csv.record_to_csv_line(record, schema),
             '"","[]","{}",false,',
         )
+
+    def test_record_to_csv_line_preserves_serialized_mariadb_json_roots(self):
+        mariadb_json_schema = {
+            'type': ['null', 'object', 'array', 'string', 'number', 'boolean'],
+            'format': 'mariadb-json',
+        }
+        record = {
+            'object_value': '{"nested":[null,{}],"unicode":"初"}',
+            'array_value': '[1,null,{}]',
+            'string_value': '"text"',
+            'integer_value': '42',
+            'fractional_value': '1.5',
+            'true_value': 'true',
+            'false_value': 'false',
+            'json_null': 'null',
+            'sql_null': None,
+        }
+        schema = {column: mariadb_json_schema for column in record}
+
+        fields = next(csv_module.reader(
+            [csv.record_to_csv_line(record, schema)],
+            escapechar='\\',
+        ))
+
+        self.assertEqual(fields[:-1], list(record.values())[:-1])
+        self.assertEqual(
+            [json.loads(value) for value in fields[:-1]],
+            [
+                {'nested': [None, {}], 'unicode': '初'},
+                [1, None, {}],
+                'text',
+                42,
+                1.5,
+                True,
+                False,
+                None,
+            ],
+        )
+        self.assertEqual(fields[-1], '')
 
     def test_create_copy_sql(self):
         self.assertEqual(csv.create_copy_sql(table_name='foo_table',

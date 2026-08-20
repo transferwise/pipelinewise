@@ -19,10 +19,15 @@ from joblib import Parallel, delayed, parallel_backend
 from tabulate import tabulate
 
 from . import utils
+from . import fastsync_capabilities as fastsync_capability_policy
 from .constants import ConnectorType
 from . import commands
 from .commands import TapParams, TargetParams, TransformParams
 from .config import Config
+from .fastsync_capabilities import (
+    FastSyncOperation,
+    resolve_fastsync_capabilities,
+)
 from .alert_sender import AlertSender
 from .alert_handlers.base_alert_handler import BaseAlertHandler
 from .errors import (
@@ -37,30 +42,11 @@ from pipelinewise.data_diff.repository import DataDiffRepository
 from pipelinewise.data_diff.runner import rerun_failed_check, run_due_checks
 from pipelinewise.data_diff.runtime import RuntimeConnectorConfigLoader
 
-FASTSYNC_PAIRS = {
-    ConnectorType.TAP_MYSQL: {
-        ConnectorType.TARGET_SNOWFLAKE,
-        ConnectorType.TARGET_POSTGRES,
-    },
-    ConnectorType.TAP_POSTGRES: {
-        ConnectorType.TARGET_SNOWFLAKE,
-        ConnectorType.TARGET_POSTGRES,
-    },
-    ConnectorType.TAP_MONGODB: {
-        ConnectorType.TARGET_SNOWFLAKE,
-        ConnectorType.TARGET_POSTGRES,
-    },
-}
 
-PARTIAL_SYNC_PAIRS = {
-    ConnectorType.TAP_MYSQL: {
-        ConnectorType.TARGET_SNOWFLAKE
-    },
-    ConnectorType.TAP_POSTGRES: {
-        ConnectorType.TARGET_SNOWFLAKE
-    }
-
-}
+# Deprecated Python API compatibility views; policy remains in the resolver.
+FASTSYNC_PAIRS = fastsync_capability_policy.FASTSYNC_PAIRS
+ICEBERG_FASTSYNC_PAIRS = fastsync_capability_policy.ICEBERG_FASTSYNC_PAIRS
+PARTIAL_SYNC_PAIRS = fastsync_capability_policy.PARTIAL_SYNC_PAIRS
 
 
 # pylint: disable=too-many-lines,too-many-instance-attributes,too-many-public-methods
@@ -120,8 +106,12 @@ class PipelineWise:
 
         # Catch SIGINT and SIGTERM to exit gracefully
         if not is_data_diff_command:
+            signal_handler = (
+                self.stop_tap if hasattr(self, 'tap')
+                else self._stop_command_on_signal
+            )
             for sig in [signal.SIGINT, signal.SIGTERM]:
-                signal.signal(sig, self.stop_tap)
+                signal.signal(sig, signal_handler)
 
     def send_alert(
         self, message: str, level: str = BaseAlertHandler.ERROR, exc: Exception = None
@@ -210,7 +200,9 @@ class PipelineWise:
         # Get filter conditions with default values from input dictionary
         # Nothing selected by default
         f_selected: bool = filters.get('selected', False)
-        f_tap_target_pairs: Dict = filters.get('tap_target_pairs', {})
+        f_fastsync_supported = self._fastsync_filter_is_supported(
+            target_type, tap_type, filters
+        )
         f_replication_method = filters.get('replication_method', None)
         f_initial_sync_required: bool = filters.get('initial_sync_required', False)
 
@@ -286,10 +278,7 @@ class PipelineWise:
                 # pylint: disable=too-many-boolean-expressions
                 if (
                     (f_selected is None or selected == f_selected)
-                    and (
-                        f_tap_target_pairs is None
-                        or target_type in f_tap_target_pairs.get(tap_type, set())
-                    )
+                    and f_fastsync_supported
                     and (
                         f_replication_method is None
                         or replication_method in f_replication_method
@@ -382,6 +371,20 @@ class PipelineWise:
 
         except Exception as exc:
             raise Exception(f'Cannot create JSON file - {exc}') from exc
+
+    @staticmethod
+    def _fastsync_filter_is_supported(
+        target_type: ConnectorType,
+        tap_type: ConnectorType,
+        filters: Dict[str, Any],
+    ) -> bool:
+        configured_support = filters.get('fastsync_supported')
+        if configured_support is not None:
+            return bool(configured_support)
+        tap_target_pairs = filters.get('tap_target_pairs', {})
+        return tap_target_pairs is None or target_type in tap_target_pairs.get(
+            tap_type, frozenset()
+        )
 
     def load_config(self):
         """
@@ -1190,6 +1193,11 @@ class PipelineWise:
         stream_buffer_size = self.tap.get(
             'stream_buffer_size', commands.DEFAULT_STREAM_BUFFER_SIZE
         )
+        fastsync_capabilities = resolve_fastsync_capabilities(
+            tap_type,
+            target_type,
+            self.tap.get('target_table_format'),
+        )
 
         not_partial_syned_tables = set()
 
@@ -1234,7 +1242,7 @@ class PipelineWise:
             tap_state,
             {
                 'selected': True,
-                'tap_target_pairs': FASTSYNC_PAIRS,
+                'fastsync_supported': fastsync_capabilities.full_sync,
                 'initial_sync_required': True,
             },
             create_fallback=True,
@@ -1333,6 +1341,11 @@ class PipelineWise:
             utils.silentremove(tap_properties_singer)
         self._print_tap_run_summary(self.STATUS_SUCCESS, start_time, datetime.now())
 
+    def _stop_command_on_signal(self, sig=None, frame=None):  # pylint: disable=unused-argument
+        """Exit a target-only or configuration command without resolving a tap."""
+        self.logger.info('Stopping command gracefully...')
+        raise SystemExit(1)
+
     # pylint: disable=unused-argument
     def stop_tap(self, sig=None, frame=None):
         """
@@ -1418,8 +1431,10 @@ class PipelineWise:
         selected_tables = self._get_sync_tables_setting_from_selection_file(
             tables_to_sync, self.args.replication_method_only)
 
-        if selected_tables['partial_sync'] or selected_tables['full_sync']:
-            self._check_target_table_format_supports_fastsync()
+        if selected_tables['partial_sync']:
+            self._check_target_table_format_supports_fastsync('partial_sync')
+        if selected_tables['full_sync']:
+            self._check_target_table_format_supports_fastsync('full_sync')
 
         processes_list = []
         if selected_tables['partial_sync']:
@@ -1469,7 +1484,7 @@ class PipelineWise:
 
         cons_target_config = None
         try:
-            self._check_target_table_format_supports_fastsync()
+            self._check_target_table_format_supports_fastsync('full_sync')
 
             self._check_if_tap_is_enabled()
 
@@ -1614,7 +1629,12 @@ class PipelineWise:
             # The reason being that at the time of writing this, transformations in Fastsync are done on the
             # target side using mostly SQL UPDATE, and transformations on properties in json fields are not
             # implemented due to the need of converting XPATH syntax to SQL which has been deemed as not worth it
-            if self.__does_fastsync_component_exist(targets[tap_yml['target']], tap_yml['type']):
+            fastsync_capabilities = resolve_fastsync_capabilities(
+                tap_yml['type'],
+                targets[tap_yml['target']],
+                tap_yml.get('target_table_format'),
+            )
+            if fastsync_capabilities.available:
                 self.logger.debug('FastSync component found for tap %s', tap_yml['id'])
 
                 # Load the transformations
@@ -1968,6 +1988,34 @@ class PipelineWise:
         print(yaml_text)
         print('Encryption successful')
 
+    def copy_native_to_iceberg(self):
+        """Create or promote a managed Iceberg v3 copy of one native table."""
+        # Local imports avoid a cycle through FastSync state helpers and the CLI package.
+        # pylint: disable=import-outside-toplevel
+        from pipelinewise.fastsync.commons.snowflake_iceberg import (
+            SnowflakeQueryAdapter,
+        )
+        from pipelinewise.fastsync.commons.snowflake_iceberg_converter import (
+            SnowflakeNativeToIcebergConverter,
+        )
+        # pylint: enable=import-outside-toplevel
+
+        if self.target['type'] != ConnectorType.TARGET_SNOWFLAKE.value:
+            raise PreRunChecksException(
+                'copy_native_to_iceberg requires a target-snowflake destination.'
+            )
+
+        target_config = utils.load_json(self.target['files']['config'])
+        converter = SnowflakeNativeToIcebergConverter(
+            SnowflakeQueryAdapter(target_config),
+            runtime_dir=self.get_target_dir(self.target['id']),
+        )
+        converter.convert(
+            self.args.table,
+            eventual=self.args.eventual,
+            iceberg_version=self.args.iceberg_version,
+        )
+
     def partial_sync_table(self):
         """
         This method calls partial sync if partial_sync_table command is chosen
@@ -1995,7 +2043,7 @@ class PipelineWise:
 
         # Continue only if tap and target is supported by partial sync
         try:
-            self._check_target_table_format_supports_fastsync()
+            self._check_target_table_format_supports_fastsync('partial_sync')
 
             self._check_supporting_tap_and_target_for_partial_sync()
 
@@ -2198,23 +2246,45 @@ class PipelineWise:
                 json.dump(state_content, state_file, indent=4)
 
     def _check_supporting_tap_and_target_for_partial_sync(self):
-        tap_type = self.tap['type']
-        tap_id = self.tap['id']
-        target_type = self.target['type']
-        target_id = self.target['id']
+        capabilities = resolve_fastsync_capabilities(
+            self.tap['type'],
+            self.target['type'],
+            self.tap.get('target_table_format'),
+        )
+        if not capabilities.supports('partial_sync'):
+            self._raise_partial_sync_not_supported()
 
-        if ConnectorType(target_type) not in PARTIAL_SYNC_PAIRS.get(ConnectorType(tap_type), {}):
-            raise PartialSyncNotSupportedTypeException(
-                f'Error! {tap_id}({tap_type})-{target_id}({target_type}) pair is not supported for the partial sync!'
-            )
+    def _check_target_table_format_supports_fastsync(
+        self,
+        operation: Optional[FastSyncOperation] = None,
+    ):
+        """Reject direct FastSync operations absent from the capability policy."""
+        capabilities = resolve_fastsync_capabilities(
+            self.tap['type'],
+            self.target['type'],
+            self.tap.get('target_table_format'),
+        )
+        if capabilities.supports(operation):
+            return
 
-    def _check_target_table_format_supports_fastsync(self):
-        """Reject explicit Iceberg FastSync until its publication path is available."""
         if self.tap.get('target_table_format') == Config.TABLE_FORMAT_ICEBERG:
             raise PreRunChecksException(
-                'FastSync and PartialSync do not yet support explicit Snowflake Iceberg tables. '
-                'No target changes were made.'
+                'Snowflake Iceberg FastSync and PartialSync support only '
+                'tap-mysql and tap-postgres sources. No target changes were made.'
             )
+        if operation == 'partial_sync':
+            self._raise_partial_sync_not_supported()
+        raise PreRunChecksException(
+            f'FastSync is not supported for {self.tap["type"]} to '
+            f'{self.target["type"]}. No target changes were made.'
+        )
+
+    def _raise_partial_sync_not_supported(self) -> NoReturn:
+        raise PartialSyncNotSupportedTypeException(
+            f'Error! {self.tap["id"]}({self.tap["type"]})-'
+            f'{self.target["id"]}({self.target["type"]}) pair is not '
+            'supported for the partial sync!'
+        )
 
     def _check_if_complete_tap_configuration(self, fastsync_bin, tap_type, target_type):
         # Tap exists but configuration not completed
@@ -2487,19 +2557,6 @@ TAP RUN SUMMARY
 
             if returncode != 0:
                 return stderr
-
-    @classmethod
-    def __does_fastsync_component_exist(cls, target_type: str, tap_type: str) -> bool:
-        """
-        Checks if the given tap-target combo have FastSync
-        Args:
-            target_type: type of the target
-            tap_type: type of tap
-
-        Returns:
-            Boolean, True if FastSync exists, False otherwise.
-        """
-        return ConnectorType(target_type) in FASTSYNC_PAIRS.get(ConnectorType(tap_type), {})
 
     def cleanup_after_deleted_config(self, old_config: Dict) -> int:
         """

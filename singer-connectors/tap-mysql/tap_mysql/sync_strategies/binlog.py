@@ -26,7 +26,12 @@ from singer import utils, Schema, metadata
 
 from tap_mysql import connection
 from tap_mysql.connection import connect_with_backoff, make_connection_wrapper, MySQLConnection
-from tap_mysql.discover_utils import discover_catalog, desired_columns, should_run_discovery
+from tap_mysql.discover_utils import (
+    discover_catalog,
+    desired_columns,
+    mariadb_json_aliases_enabled,
+    should_run_discovery,
+)
 from tap_mysql.stream_utils import write_schema_message
 from tap_mysql.sync_strategies import common
 
@@ -221,6 +226,9 @@ def row_to_singer_record(catalog_entry, version, db_column_map, row, time_extrac
         property_format = catalog_entry.schema.properties[column_name].format
         db_column_type = db_column_map.get(column_name)
 
+        if property_format == common.MARIADB_JSON_FORMAT:
+            val = common.parse_mariadb_json_alias(val)
+
         if isinstance(val, datetime.datetime):
             if db_column_type in MYSQL_TIMESTAMP_TYPES:
                 # The mysql-replication library creates datetimes from TIMESTAMP columns using fromtimestamp which
@@ -265,7 +273,8 @@ def row_to_singer_record(catalog_entry, version, db_column_map, row, time_extrac
             # encode bytes as hex bytes then to utf8 string
             row_to_persist[column_name] = codecs.encode(val, 'hex').decode('utf-8')
 
-        elif 'boolean' in property_type or property_type == 'boolean':
+        elif property_format != common.MARIADB_JSON_FORMAT and (
+                'boolean' in property_type or property_type == 'boolean'):
             if val is None:
                 boolean_representation = None
             elif val == 0:
@@ -734,9 +743,17 @@ def _run_binlog_sync(
                         LOGGER.info('Stream `%s`: Running discovery ... ', tap_stream_id)
 
                         # run discovery for the current table only
-                        new_catalog_entry = discover_catalog(mysql_conn,
-                                                             config.get('filter_dbs'),
-                                                             catalog_entry.table).streams[0]
+                        discovery_options = (
+                            {'detect_json_aliases': True}
+                            if mariadb_json_aliases_enabled(config)
+                            else {}
+                        )
+                        new_catalog_entry = discover_catalog(
+                            mysql_conn,
+                            config.get('filter_dbs'),
+                            catalog_entry.table,
+                            **discovery_options,
+                        ).streams[0]
 
                         selected = {k for k, v in new_catalog_entry.schema.properties.items()
                                     if common.property_is_selected(new_catalog_entry, k)}

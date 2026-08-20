@@ -41,7 +41,6 @@ setup(name="pipelinewise-target-snowflake",
       entry_points="""
           [console_scripts]
           target-snowflake=target_snowflake:main
-          copy-native-to-iceberg=target_snowflake:copy_native_to_iceberg
       """,
       packages=find_packages(exclude=['tests*']),
       )

@@ -14,13 +14,15 @@ different support status.
 
    * - Source
      - Status
-     - Native transfer
+     - Bulk transfer
    * - MariaDB
      - Available
-     - FullSync to PostgreSQL or Snowflake; PartialSync to Snowflake
+     - FullSync to PostgreSQL or Snowflake; PartialSync to Snowflake, including
+       managed Iceberg v3
    * - MySQL
      - Experimental
-     - FullSync to PostgreSQL or Snowflake; PartialSync to Snowflake
+     - FullSync to PostgreSQL or Snowflake; PartialSync to Snowflake, including
+       managed Iceberg v3
 
 
 Prerequisites
@@ -119,6 +121,14 @@ Operational notes
   required to reconstruct a target row.
 - The connector interprets ``TINYINT`` as Boolean. Values outside ``0`` and ``1``
   can fail when the target column is Boolean.
-- After an initial FastSync, the next normal run continues from the captured
-  binlog or GTID position.
+- After an initial FastSync, LOG_BASED or INCREMENTAL replication continues from
+  the captured bookmark in the Singer portion of the same run.
+- Snowflake Singer, FullSync, and PartialSync can target managed Iceberg v3 with
+  explicit tap-level configuration. See :ref:`snowflake_iceberg`.
+- On an explicit v3 route with ``engine: mariadb``, MariaDB's generated
+  ``JSON_VALID`` constraint identifies its ``JSON``-alias ``LONGTEXT`` columns
+  for ``VARIANT`` loading. Plain ``LONGTEXT`` and native routes remain strings.
+  Object, array, string, number, Boolean, and null JSON roots are carried as
+  validated JSON text and restored as ``VARIANT``. JSON null remains distinct
+  from SQL ``NULL``.
 - Use :ref:`troubleshooting` for missing-binlog and packet-size failures.

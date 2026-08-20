@@ -102,8 +102,8 @@ class TestDBSync(unittest.TestCase):
 
         # Snowflake column types
         sf_types = {
-            'str': 'text',
-            'str_or_null': 'text',
+            'str': 'varchar(134217728)',
+            'str_or_null': 'varchar(134217728)',
             'dt': 'timestamp_ntz',
             'dt_or_null': 'timestamp_ntz',
             'd': 'date',
@@ -113,7 +113,7 @@ class TestDBSync(unittest.TestCase):
             'binary': 'binary',
             'num': 'float',
             'int': 'number',
-            'int_or_str': 'text',
+            'int_or_str': 'varchar(134217728)',
             'bool': 'boolean',
             'obj': 'variant',
             'arr': 'variant',
@@ -149,6 +149,23 @@ class TestDBSync(unittest.TestCase):
         # Getting transformations for every JSON type
         for key, val in self.json_types.items():
             self.assertEqual(trans(val), sf_trans[key])
+
+    def test_mariadb_json_root_union_maps_to_variant(self):
+        """Every MariaDB JSON root type retains VARIANT parsing."""
+        mariadb_json = {
+            'type': ['null', 'object', 'array', 'string', 'number', 'boolean'],
+            'format': 'mariadb-json',
+        }
+
+        self.assertEqual(
+            db_sync.column_type(
+                mariadb_json,
+                is_iceberg_table=True,
+                iceberg_version=3,
+            ),
+            'variant',
+        )
+        self.assertEqual(db_sync.column_trans(mariadb_json), 'parse_json')
 
     def test_create_query_tag(self):
         self.assertIsNone(db_sync.create_query_tag(None))
@@ -721,53 +738,12 @@ class TestDBSync(unittest.TestCase):
                   'alter table dummy-schema."TABLE1" alter column "ID" drop not null;'])
         ])
 
-    # -----------------------------------------------------------------------
-    # Tests for WDL-155: Iceberg column type handling
-    # -----------------------------------------------------------------------
-
-    def test_column_type_mapping_iceberg(self):
-        """With is_iceberg_table=True, variant → text and integer → number(19,0); others unchanged"""
-        mapper = db_sync.column_type
-
-        # variant types (object/array) map to 'text' for Iceberg
-        self.assertEqual(mapper(self.json_types['obj'], is_iceberg_table=True), 'text')
-        self.assertEqual(mapper(self.json_types['arr'], is_iceberg_table=True), 'text')
-
-        # integer maps to 'number(19,0)' for Iceberg
-        self.assertEqual(mapper(self.json_types['int'], is_iceberg_table=True), 'number(19,0)')
-
-        # All other types should be unchanged
-        unchanged = {
-            'str': 'text',
-            'str_or_null': 'text',
-            'dt': 'timestamp_ntz',
-            'dt_or_null': 'timestamp_ntz',
-            'd': 'date',
-            'd_or_null': 'date',
-            'time': 'time',
-            'time_or_null': 'time',
-            'binary': 'binary',
-            'num': 'float',
-            'int_or_str': 'text',
-            'bool': 'boolean',
-        }
-        for key, expected in unchanged.items():
-            self.assertEqual(mapper(self.json_types[key], is_iceberg_table=True), expected,
-                             msg=f"column_type mismatch for '{key}' with is_iceberg_table=True")
-
-    def test_column_clause_iceberg(self):
-        """column_clause should emit Iceberg-compatible types when is_iceberg_table=True"""
-        # variant → text
+    def test_column_clause_native(self):
+        """Native column clauses use maximum-width strings without Iceberg mapping."""
         self.assertEqual(
-            db_sync.column_clause('my_obj', self.json_types['obj'], is_iceberg_table=True),
-            '"MY_OBJ" text'
+            db_sync.column_clause('my_text', self.json_types['str']),
+            '"MY_TEXT" varchar(134217728)'
         )
-        # integer → number(19,0)
-        self.assertEqual(
-            db_sync.column_clause('my_int', self.json_types['int'], is_iceberg_table=True),
-            '"MY_INT" number(19,0)'
-        )
-        # Standard (non-iceberg) path is unchanged
         self.assertEqual(
             db_sync.column_clause('my_obj', self.json_types['obj']),
             '"MY_OBJ" variant'
@@ -778,7 +754,23 @@ class TestDBSync(unittest.TestCase):
         )
 
     def test_column_type_mapping_explicit_iceberg_v3(self):
-        """Only the explicit v3 mapping retains JSON-like values as VARIANT."""
+        """The explicit v3 mapping uses only v3-compatible column types."""
+        self.assertEqual(
+            db_sync.column_type(
+                self.json_types['str'],
+                is_iceberg_table=True,
+                iceberg_version=3,
+            ),
+            'varchar(134217728)',
+        )
+        self.assertEqual(
+            db_sync.column_type(
+                self.json_types['int_or_str'],
+                is_iceberg_table=True,
+                iceberg_version=3,
+            ),
+            'varchar(134217728)',
+        )
         self.assertEqual(
             db_sync.column_type(self.json_types['obj'], is_iceberg_table=True, iceberg_version=3),
             'variant',
@@ -789,7 +781,11 @@ class TestDBSync(unittest.TestCase):
         )
         self.assertEqual(
             db_sync.column_type(self.json_types['int'], is_iceberg_table=True, iceberg_version=3),
-            'number(19,0)',
+            'number(38,0)',
+        )
+        self.assertEqual(
+            db_sync.column_type(self.json_types['num'], is_iceberg_table=True, iceberg_version=3),
+            'double',
         )
         self.assertEqual(
             db_sync.column_type(
@@ -807,22 +803,28 @@ class TestDBSync(unittest.TestCase):
             ),
             'timestamp_ntz(6)',
         )
-        with self.assertRaisesRegex(ValueError, 'only version 3'):
+        self.assertEqual(
             db_sync.column_type(
-                self.json_types['obj'],
+                self.json_types['binary'],
                 is_iceberg_table=True,
-                iceberg_version=2,
-            )
-
-        # Omitted version is the legacy route and retains its original DDL.
-        self.assertEqual(
-            db_sync.column_type(self.json_types['time'], is_iceberg_table=True),
-            'time',
+                iceberg_version=3,
+            ),
+            'binary(67108864)',
         )
         self.assertEqual(
-            db_sync.column_type(self.json_types['dt'], is_iceberg_table=True),
-            'timestamp_ntz',
+            db_sync.column_type(self.json_types['binary']),
+            'binary',
         )
+        for invalid_version in (None, 2, 4, 3.0, True, '3'):
+            with self.subTest(invalid_version=invalid_version), self.assertRaisesRegex(
+                ValueError,
+                'requires integer version 3',
+            ):
+                db_sync.column_type(
+                    self.json_types['obj'],
+                    is_iceberg_table=True,
+                    iceberg_version=invalid_version,
+                )
 
     @staticmethod
     def _format_discovery_sync(query_results):
@@ -947,29 +949,178 @@ class TestDBSync(unittest.TestCase):
             'SHOW TABLES IN SCHEMA "DUMMY-DB"."SCHEMA_1%" STARTS WITH \'TABLE_1%\''
         )
 
-    def test_discover_table_format_managed_v2_and_v3(self):
-        for version, expected in (
-            (2, db_sync.TABLE_FORMAT_MANAGED_ICEBERG_V2),
-            (3, db_sync.TABLE_FORMAT_MANAGED_ICEBERG_V3),
-        ):
-            with self.subTest(version=version):
+    def test_discover_table_format_managed_v3(self):
+        sync = self._format_discovery_sync([
+            [{'name': 'TABLE1', 'is_iceberg': 'Y'}],
+            [
+                {'name': 'TABLE10', 'catalog_name': 'SNOWFLAKE'},
+                {'name': 'TABLE1', 'catalog_name': 'SNOWFLAKE'},
+            ],
+            [{'key': 'ICEBERG_VERSION', 'value': '3'}],
+            [
+                {
+                    'key': 'ICEBERG_MERGE_ON_READ_BEHAVIOR',
+                    'value': 'DISABLED',
+                    'level': 'TABLE',
+                },
+            ],
+            [
+                {
+                    'COLUMN_NAME': 'ID',
+                    'DATA_TYPE': 'NUMBER',
+                    'NUMERIC_PRECISION': 38,
+                    'NUMERIC_SCALE': 0,
+                    'CHARACTER_MAXIMUM_LENGTH': None,
+                    'IS_NULLABLE': 'NO',
+                },
+                {
+                    'COLUMN_NAME': 'BODY',
+                    'DATA_TYPE': 'TEXT',
+                    'CHARACTER_MAXIMUM_LENGTH': 134217728,
+                    'IS_NULLABLE': 'YES',
+                },
+            ],
+        ])
+        self.assertEqual(
+            sync.discover_table_format('dummy_schema', 'table1'),
+            db_sync.TABLE_FORMAT_MANAGED_ICEBERG_V3,
+        )
+        self.assertEqual(
+            sync.query.call_args_list[-2],
+            call(
+                "SHOW PARAMETERS LIKE 'ICEBERG_MERGE_ON_READ_BEHAVIOR' IN TABLE "
+                '"DUMMY-DB"."DUMMY_SCHEMA"."TABLE1"'
+            ),
+        )
+        self.assertEqual(
+            sync.query.call_args_list[-1],
+            call(
+                'SELECT COLUMN_NAME, DATA_TYPE, NUMERIC_PRECISION, NUMERIC_SCALE, '
+                'DATETIME_PRECISION, CHARACTER_MAXIMUM_LENGTH, IS_NULLABLE '
+                'FROM "DUMMY-DB".INFORMATION_SCHEMA.COLUMNS '
+                'WHERE TABLE_SCHEMA = %(schema)s AND TABLE_NAME = %(table)s '
+                'ORDER BY ORDINAL_POSITION',
+                params={'schema': 'DUMMY_SCHEMA', 'table': 'TABLE1'},
+            ),
+        )
+
+    def test_discover_managed_v3_rejects_narrow_varchar_before_mutation(self):
+        """An existing narrow string fails before target-snowflake can evolve it."""
+        sync = self._format_discovery_sync([
+            [{'name': 'TABLE1', 'is_iceberg': 'Y'}],
+            [{'name': 'TABLE1', 'catalog_name': 'SNOWFLAKE'}],
+            [{'key': 'ICEBERG_VERSION', 'value': '3'}],
+            [{
+                'key': 'ICEBERG_MERGE_ON_READ_BEHAVIOR',
+                'value': 'DISABLED',
+                'level': 'TABLE',
+            }],
+            [{
+                'COLUMN_NAME': 'BODY',
+                'DATA_TYPE': 'TEXT',
+                'CHARACTER_MAXIMUM_LENGTH': 16777216,
+            }],
+        ])
+
+        with self.assertRaises(TableFormatMismatchException) as error:
+            sync.discover_table_format('dummy_schema', 'table1')
+
+        self.assertIn('CHARACTER_MAXIMUM_LENGTH 16777216', str(error.exception))
+        self.assertIn('VARCHAR(134217728)', str(error.exception))
+        self.assertIn('ALTER ICEBERG TABLE', str(error.exception))
+        self.assertIn('recreate the table', str(error.exception))
+        self.assertTrue(
+            all(
+                query_call.args[0].startswith(('SELECT', 'SHOW'))
+                for query_call in sync.query.call_args_list
+            )
+        )
+
+    def test_discover_managed_v3_rejects_non_table_copy_on_write_contract(self):
+        invalid_parameters = (
+            (
+                [
+                    {
+                        'key': 'ICEBERG_MERGE_ON_READ_BEHAVIOR',
+                        'value': 'AUTO',
+                        'level': 'ACCOUNT',
+                    },
+                ],
+                "value 'AUTO' at level 'ACCOUNT'",
+            ),
+            (
+                [
+                    {
+                        'key': 'ICEBERG_MERGE_ON_READ_BEHAVIOR',
+                        'value': 'ENABLED',
+                        'level': 'TABLE',
+                    },
+                ],
+                "value 'ENABLED' at level 'TABLE'",
+            ),
+            (
+                [
+                    {
+                        'key': 'ICEBERG_MERGE_ON_READ_BEHAVIOR',
+                        'value': 'DISABLED',
+                        'level': 'ACCOUNT',
+                    },
+                ],
+                "value 'DISABLED' at level 'ACCOUNT'",
+            ),
+            ([], 'did not return exactly one'),
+            (None, 'did not return exactly one'),
+            (
+                [
+                    {
+                        'key': 'ICEBERG_MERGE_ON_READ_BEHAVIOR',
+                        'value': 'DISABLED',
+                        'level': 'TABLE',
+                    },
+                    {
+                        'key': 'ICEBERG_MERGE_ON_READ_BEHAVIOR',
+                        'value': 'DISABLED',
+                        'level': 'TABLE',
+                    },
+                ],
+                'did not return exactly one',
+            ),
+            (
+                [
+                    {
+                        'key': 'ICEBERG_MERGE_ON_READ_BEHAVIOR',
+                        'value': 'DISABLED',
+                    },
+                ],
+                'returned malformed',
+            ),
+            ([None], 'returned malformed'),
+        )
+        for parameter_rows, message in invalid_parameters:
+            with self.subTest(parameter_rows=parameter_rows):
                 sync = self._format_discovery_sync([
                     [{'name': 'TABLE1', 'is_iceberg': 'Y'}],
-                    [
-                        {'name': 'TABLE10', 'catalog_name': 'SNOWFLAKE'},
-                        {'name': 'TABLE1', 'catalog_name': 'SNOWFLAKE'},
-                    ],
-                    [{'key': 'ICEBERG_VERSION', 'value': str(version)}],
+                    [{'name': 'TABLE1', 'catalog_name': 'SNOWFLAKE'}],
+                    [{'key': 'ICEBERG_VERSION', 'value': '3'}],
+                    parameter_rows,
                 ])
-                self.assertEqual(
-                    sync.discover_table_format('dummy_schema', 'table1'),
-                    expected,
+
+                with self.assertRaisesRegex(
+                    TableFormatDiscoveryException,
+                    message,
+                ) as error:
+                    sync.discover_table_format('dummy_schema', 'table1')
+
+                self.assertIn(
+                    'ALTER ICEBERG TABLE "DUMMY-DB"."DUMMY_SCHEMA"."TABLE1" SET '
+                    "ICEBERG_MERGE_ON_READ_BEHAVIOR = 'DISABLED'",
+                    str(error.exception),
                 )
-                self.assertEqual(
-                    sync.query.call_args_list[-1],
-                    call(
-                        "SHOW PARAMETERS LIKE 'ICEBERG_VERSION' IN TABLE "
-                        '"DUMMY-DB"."DUMMY_SCHEMA"."TABLE1"'
+                self.assertNotIn(
+                    'ALTER ICEBERG TABLE',
+                    ' '.join(
+                        query_call.args[0]
+                        for query_call in sync.query.call_args_list
                     ),
                 )
 
@@ -1000,6 +1151,14 @@ class TestDBSync(unittest.TestCase):
                     [{'name': 'TABLE1', 'catalog_name': None}],
                 ],
                 'invalid catalog_name',
+            ),
+            (
+                [
+                    [{'name': 'TABLE1', 'is_iceberg': 'Y'}],
+                    [{'name': 'TABLE1', 'catalog_name': 'SNOWFLAKE'}],
+                    [{'key': 'ICEBERG_VERSION', 'value': '2'}],
+                ],
+                'unsupported ICEBERG_VERSION 2',
             ),
             (
                 [
@@ -1067,30 +1226,95 @@ class TestDBSync(unittest.TestCase):
         }
         dbsync = db_sync.DbSync(minimal_config, stream_schema_message)
 
-        dbsync.add_column('"NEW_COL" text', 'public-table1', is_iceberg_table=False)
+        dbsync.add_column(
+            '"NEW_COL" varchar(134217728)',
+            'public-table1',
+            is_iceberg_table=False,
+        )
         sql = query_patch.call_args[0][0]
         self.assertIn('ALTER TABLE', sql)
         self.assertNotIn('ICEBERG', sql)
         self.assertIn('ADD COLUMN', sql)
 
-        dbsync.add_column('"NEW_COL" text', 'public-table1', is_iceberg_table=True)
+        dbsync.add_column(
+            '"NEW_COL" varchar(134217728)',
+            'public-table1',
+            is_iceberg_table=True,
+        )
         sql = query_patch.call_args[0][0]
         self.assertIn('ALTER ICEBERG TABLE', sql)
         self.assertIn('ADD COLUMN', sql)
 
     @patch('target_snowflake.db_sync.DbSync.query')
-    def test_update_columns_iceberg_adds_new_column(self, query_patch):
-        """update_columns with is_iceberg_table=True should issue ALTER ICEBERG TABLE ADD COLUMN"""
+    def test_update_columns_native_adds_new_string_at_max_width(self, query_patch):
+        """Native Singer evolution creates new string columns at maximum width."""
         query_patch.return_value = [{'type': 'CSV'}]
-        minimal_config = {
-            'account': "dummy-account",
-            'dbname': "dummy-db",
-            'user': "dummy-user",
-            'private_key': "dummy-key",
-            'warehouse': "dummy-wh",
-            'default_target_schema': "dummy-schema",
-            'file_format': "dummy-file-format"
+        stream_schema = {
+            'stream': 'public-table1',
+            'schema': {
+                'properties': {
+                    'id': {'type': ['integer']},
+                    'new_col': {'type': ['null', 'string']},
+                },
+            },
+            'key_properties': ['id'],
         }
+        table_cache = [{
+            'SCHEMA_NAME': 'DUMMY-SCHEMA',
+            'TABLE_NAME': 'TABLE1',
+            'COLUMN_NAME': 'ID',
+            'DATA_TYPE': 'NUMBER',
+        }]
+        dbsync = db_sync.DbSync(
+            self._table_sync_config(),
+            stream_schema,
+            table_cache,
+        )
+        query_patch.reset_mock()
+
+        dbsync.update_columns()
+
+        self.assertIn(
+            call(
+                'ALTER TABLE dummy-schema."TABLE1" '
+                'ADD COLUMN "NEW_COL" varchar(134217728)'
+            ),
+            query_patch.call_args_list,
+        )
+
+    @patch('target_snowflake.db_sync.DbSync.query')
+    def test_update_columns_native_keeps_existing_string_column(self, query_patch):
+        """A pre-existing native string is not widened, renamed, or re-added."""
+        query_patch.return_value = [{'type': 'CSV'}]
+        stream_schema = {
+            'stream': 'public-table1',
+            'schema': {'properties': {'body': {'type': ['string']}}},
+            'key_properties': [],
+        }
+
+        for current_type in ('TEXT', 'VARCHAR', 'VARCHAR(16777216)'):
+            with self.subTest(current_type=current_type):
+                table_cache = [{
+                    'SCHEMA_NAME': 'DUMMY-SCHEMA',
+                    'TABLE_NAME': 'TABLE1',
+                    'COLUMN_NAME': 'BODY',
+                    'DATA_TYPE': current_type,
+                }]
+                dbsync = db_sync.DbSync(
+                    self._table_sync_config(),
+                    stream_schema,
+                    table_cache,
+                )
+                query_patch.reset_mock()
+
+                dbsync.update_columns()
+
+                query_patch.assert_not_called()
+
+    @patch('target_snowflake.db_sync.DbSync.query')
+    def test_update_columns_explicit_v3_adds_new_column(self, query_patch):
+        """Explicit v3 schema evolution issues ALTER ICEBERG TABLE ADD COLUMN."""
+        query_patch.return_value = [{'type': 'CSV'}]
         stream_schema_message = {
             "stream": "public-table1",
             "schema": {
@@ -1105,26 +1329,30 @@ class TestDBSync(unittest.TestCase):
         table_cache = [
             {'SCHEMA_NAME': 'DUMMY-SCHEMA', 'TABLE_NAME': 'TABLE1', 'COLUMN_NAME': 'ID', 'DATA_TYPE': 'NUMBER'}
         ]
-        dbsync = db_sync.DbSync(minimal_config, stream_schema_message, table_cache)
-        dbsync.update_columns(is_iceberg_table=True)
+        dbsync = db_sync.DbSync(
+            self._table_sync_config(target_table_format='iceberg', iceberg_version=3),
+            stream_schema_message,
+            table_cache,
+        )
+        dbsync.update_columns(is_iceberg_table=True, iceberg_version=3)
 
-        add_calls = [str(c) for c in query_patch.call_args_list if 'ADD COLUMN' in str(c)]
-        self.assertEqual(len(add_calls), 1)
-        self.assertIn('ALTER ICEBERG TABLE', add_calls[0])
+        add_column_calls = [
+            query_call
+            for query_call in query_patch.call_args_list
+            if 'ADD COLUMN' in str(query_call)
+        ]
+        self.assertEqual(
+            add_column_calls,
+            [call(
+                'ALTER ICEBERG TABLE dummy-schema."TABLE1" '
+                'ADD COLUMN "NEW_COL" varchar(134217728)'
+            )],
+        )
 
     @patch('target_snowflake.db_sync.DbSync.query')
-    def test_update_columns_iceberg_number_no_spurious_alter(self, query_patch):
-        """Existing NUMBER column in Iceberg table should not be re-altered: number(19,0) base matches NUMBER"""
+    def test_update_columns_explicit_v3_number_no_spurious_alter(self, query_patch):
+        """An existing NUMBER column matches explicit v3 NUMBER(38,0)."""
         query_patch.return_value = [{'type': 'CSV'}]
-        minimal_config = {
-            'account': "dummy-account",
-            'dbname': "dummy-db",
-            'user': "dummy-user",
-            'private_key': "dummy-key",
-            'warehouse': "dummy-wh",
-            'default_target_schema': "dummy-schema",
-            'file_format': "dummy-file-format"
-        }
         stream_schema_message = {
             "stream": "public-table1",
             "schema": {
@@ -1137,49 +1365,43 @@ class TestDBSync(unittest.TestCase):
         table_cache = [
             {'SCHEMA_NAME': 'DUMMY-SCHEMA', 'TABLE_NAME': 'TABLE1', 'COLUMN_NAME': 'ID', 'DATA_TYPE': 'NUMBER'}
         ]
-        dbsync = db_sync.DbSync(minimal_config, stream_schema_message, table_cache)
-        dbsync.update_columns(is_iceberg_table=True)
+        dbsync = db_sync.DbSync(
+            self._table_sync_config(target_table_format='iceberg', iceberg_version=3),
+            stream_schema_message,
+            table_cache,
+        )
+        dbsync.update_columns(is_iceberg_table=True, iceberg_version=3)
 
         alter_calls = [str(c) for c in query_patch.call_args_list
                        if 'ADD COLUMN' in str(c) or 'RENAME COLUMN' in str(c)]
         self.assertEqual(len(alter_calls), 0,
-                         msg="NUMBER should not be re-altered for number(19,0) on Iceberg table")
+                         msg="NUMBER should not be re-altered for NUMBER(38,0) on Iceberg table")
 
     @patch('target_snowflake.db_sync.DbSync.query')
-    def test_update_columns_iceberg_text_not_altered_for_variant_schema(self, query_patch):
-        """Existing TEXT column in Iceberg table is not re-altered when schema type is variant (object/array)"""
+    def test_update_columns_explicit_v3_accepts_reported_text_for_varchar(self, query_patch):
+        """Snowflake's TEXT alias matches a preflight-validated max-width VARCHAR."""
         query_patch.return_value = [{'type': 'CSV'}]
-        minimal_config = {
-            'account': "dummy-account",
-            'dbname': "dummy-db",
-            'user': "dummy-user",
-            'private_key': "dummy-key",
-            'warehouse': "dummy-wh",
-            'default_target_schema': "dummy-schema",
-            'file_format': "dummy-file-format"
+        stream_schema = {
+            'stream': 'public-table1',
+            'schema': {'properties': {'body': {'type': ['string']}}},
+            'key_properties': [],
         }
-        stream_schema_message = {
-            "stream": "public-table1",
-            "schema": {
-                "properties": {
-                    "id": {"type": ["integer"]},
-                    "payload": {"type": ["object"]},
-                }
-            },
-            "key_properties": ["id"]
-        }
-        # 'payload' was previously migrated variant → text; schema still says object/variant
-        table_cache = [
-            {'SCHEMA_NAME': 'DUMMY-SCHEMA', 'TABLE_NAME': 'TABLE1', 'COLUMN_NAME': 'ID', 'DATA_TYPE': 'NUMBER'},
-            {'SCHEMA_NAME': 'DUMMY-SCHEMA', 'TABLE_NAME': 'TABLE1', 'COLUMN_NAME': 'PAYLOAD', 'DATA_TYPE': 'TEXT'},
-        ]
-        dbsync = db_sync.DbSync(minimal_config, stream_schema_message, table_cache)
-        dbsync.update_columns(is_iceberg_table=True)
+        table_cache = [{
+            'SCHEMA_NAME': 'DUMMY-SCHEMA',
+            'TABLE_NAME': 'TABLE1',
+            'COLUMN_NAME': 'BODY',
+            'DATA_TYPE': 'TEXT',
+        }]
+        dbsync = db_sync.DbSync(
+            self._table_sync_config(target_table_format='iceberg', iceberg_version=3),
+            stream_schema,
+            table_cache,
+        )
+        query_patch.reset_mock()
 
-        alter_calls = [str(c) for c in query_patch.call_args_list
-                       if 'ADD COLUMN' in str(c) or 'RENAME COLUMN' in str(c)]
-        self.assertEqual(len(alter_calls), 0,
-                         msg="TEXT should not be re-altered when schema is variant on an Iceberg table")
+        dbsync.update_columns(is_iceberg_table=True, iceberg_version=3)
+
+        query_patch.assert_not_called()
 
     @patch('target_snowflake.db_sync.DbSync.query')
     def test_update_columns_explicit_v3_adds_variant(self, query_patch):
@@ -1212,15 +1434,137 @@ class TestDBSync(unittest.TestCase):
         )
 
     @patch('target_snowflake.db_sync.DbSync.query')
+    def test_update_columns_explicit_v3_accepts_reported_float_for_double(self, query_patch):
+        """Snowflake reports an Iceberg DOUBLE column through the FLOAT alias."""
+        query_patch.return_value = [{'type': 'CSV'}]
+        table_cache = [
+            {
+                'SCHEMA_NAME': 'DUMMY-SCHEMA',
+                'TABLE_NAME': 'TABLE1',
+                'COLUMN_NAME': 'AMOUNT',
+                'DATA_TYPE': 'FLOAT',
+            },
+        ]
+        stream_schema = {
+            'stream': 'public-table1',
+            'schema': {'properties': {'amount': {'type': ['number']}}},
+            'key_properties': [],
+        }
+        dbsync = db_sync.DbSync(
+            self._table_sync_config(target_table_format='iceberg', iceberg_version=3),
+            stream_schema,
+            table_cache,
+        )
+        query_patch.reset_mock()
+
+        dbsync.update_columns(is_iceberg_table=True, iceberg_version=3)
+
+        query_patch.assert_not_called()
+
+    @patch('target_snowflake.db_sync.DbSync.query')
+    def test_update_columns_explicit_v3_preserves_existing_timestamp_family(self, query_patch):
+        """The precision-qualified v3 mapping retains compatible timestamp data."""
+        query_patch.return_value = [{'type': 'CSV'}]
+        stream_schema = {
+            'stream': 'public-table1',
+            'schema': {
+                'properties': {
+                    'created_at': {'type': ['string'], 'format': 'date-time'},
+                },
+            },
+            'key_properties': [],
+        }
+
+        for current_type in ('TIMESTAMP_NTZ(9)', 'TIMESTAMP_LTZ', 'TIMESTAMP_TZ'):
+            with self.subTest(current_type=current_type):
+                table_cache = [
+                    {
+                        'SCHEMA_NAME': 'DUMMY-SCHEMA',
+                        'TABLE_NAME': 'TABLE1',
+                        'COLUMN_NAME': 'CREATED_AT',
+                        'DATA_TYPE': current_type,
+                    },
+                ]
+                dbsync = db_sync.DbSync(
+                    self._table_sync_config(
+                        target_table_format='iceberg',
+                        iceberg_version=3,
+                    ),
+                    stream_schema,
+                    table_cache,
+                )
+                query_patch.reset_mock()
+
+                dbsync.update_columns(is_iceberg_table=True, iceberg_version=3)
+
+                query_patch.assert_not_called()
+
+    @patch('target_snowflake.db_sync.DbSync.query')
+    def test_update_columns_explicit_v3_replaces_non_timestamp_with_timestamp(self, query_patch):
+        """A date-time schema does not preserve an unrelated existing type."""
+        query_patch.return_value = [{'type': 'CSV'}]
+        stream_schema = {
+            'stream': 'public-table1',
+            'schema': {
+                'properties': {
+                    'created_at': {'type': ['string'], 'format': 'date-time'},
+                },
+            },
+            'key_properties': [],
+        }
+
+        for current_type in ('DATE', 'NUMBER', 'TEXT', 'BOOLEAN', 'VARIANT'):
+            with self.subTest(current_type=current_type):
+                table_cache = [
+                    {
+                        'SCHEMA_NAME': 'DUMMY-SCHEMA',
+                        'TABLE_NAME': 'TABLE1',
+                        'COLUMN_NAME': 'CREATED_AT',
+                        'DATA_TYPE': current_type,
+                    },
+                ]
+                dbsync = db_sync.DbSync(
+                    self._table_sync_config(
+                        target_table_format='iceberg',
+                        iceberg_version=3,
+                    ),
+                    stream_schema,
+                    table_cache,
+                )
+                query_patch.reset_mock()
+
+                dbsync.update_columns(is_iceberg_table=True, iceberg_version=3)
+
+                alter_queries = [
+                    query_call.args[0]
+                    for query_call in query_patch.call_args_list
+                    if (
+                        query_call.args
+                        and isinstance(query_call.args[0], str)
+                        and query_call.args[0].startswith('ALTER ICEBERG TABLE')
+                    )
+                ]
+                self.assertEqual(len(alter_queries), 2)
+                self.assertIn('RENAME COLUMN "CREATED_AT"', alter_queries[0])
+                self.assertEqual(
+                    alter_queries[1],
+                    'ALTER ICEBERG TABLE dummy-schema."TABLE1" '
+                    'ADD COLUMN "CREATED_AT" timestamp_ntz(6)',
+                )
+
+    @patch('target_snowflake.db_sync.DbSync.query')
     def test_update_columns_does_not_implicitly_convert_text_and_variant(self, query_patch):
         query_patch.return_value = [{'type': 'CSV'}]
 
-        for current_type, iceberg_version, property_schema, expected_message in (
-            ('TEXT', 3, {'type': ['object']}, 'explicit Iceberg v3 mapping requires VARIANT'),
-            ('VARIANT', None, {'type': ['object']}, 'target_table_format is omitted'),
-            ('VARIANT', 3, {'type': ['string']}, 'current Singer schema requires TEXT'),
+        for current_type, property_schema, expected_message in (
+            ('TEXT', {'type': ['object']}, 'explicit Iceberg v3 mapping requires VARIANT'),
+            (
+                'VARIANT',
+                {'type': ['string']},
+                r'current Singer schema requires VARCHAR\(134217728\)',
+            ),
         ):
-            with self.subTest(current_type=current_type, iceberg_version=iceberg_version):
+            with self.subTest(current_type=current_type):
                 table_cache = [
                     {
                         'SCHEMA_NAME': 'DUMMY-SCHEMA',
@@ -1238,7 +1582,9 @@ class TestDBSync(unittest.TestCase):
                 stream_schema = self._table_sync_schema()
                 stream_schema['schema']['properties']['payload'] = property_schema
                 dbsync = db_sync.DbSync(
-                    self._table_sync_config(),
+                    self._table_sync_config(
+                        target_table_format='iceberg', iceberg_version=3
+                    ),
                     stream_schema,
                     table_cache,
                 )
@@ -1250,27 +1596,15 @@ class TestDBSync(unittest.TestCase):
                 ):
                     dbsync.update_columns(
                         is_iceberg_table=True,
-                        iceberg_version=iceberg_version,
+                        iceberg_version=3,
                     )
 
                 query_patch.assert_not_called()
-
-        with self.assertRaisesRegex(ValueError, 'Unsupported Iceberg TEXT/VARIANT mismatch'):
-            db_sync._iceberg_text_variant_mismatch_reason('TEXT', None)
 
     @patch('target_snowflake.db_sync.DbSync.query')
     def test_update_columns_iceberg_type_change_versions_and_re_adds(self, query_patch):
         """A type mismatch on Iceberg renames the old column then adds the new one via ICEBERG DDL"""
         query_patch.return_value = [{'type': 'CSV'}]
-        minimal_config = {
-            'account': "dummy-account",
-            'dbname': "dummy-db",
-            'user': "dummy-user",
-            'private_key': "dummy-key",
-            'warehouse': "dummy-wh",
-            'default_target_schema': "dummy-schema",
-            'file_format': "dummy-file-format"
-        }
         stream_schema_message = {
             "stream": "public-table1",
             "schema": {
@@ -1285,8 +1619,12 @@ class TestDBSync(unittest.TestCase):
             {'SCHEMA_NAME': 'DUMMY-SCHEMA', 'TABLE_NAME': 'TABLE1', 'COLUMN_NAME': 'ID', 'DATA_TYPE': 'NUMBER'},
             {'SCHEMA_NAME': 'DUMMY-SCHEMA', 'TABLE_NAME': 'TABLE1', 'COLUMN_NAME': 'AMOUNT', 'DATA_TYPE': 'TEXT'},
         ]
-        dbsync = db_sync.DbSync(minimal_config, stream_schema_message, table_cache)
-        dbsync.update_columns(is_iceberg_table=True)
+        dbsync = db_sync.DbSync(
+            self._table_sync_config(target_table_format='iceberg', iceberg_version=3),
+            stream_schema_message,
+            table_cache,
+        )
+        dbsync.update_columns(is_iceberg_table=True, iceberg_version=3)
 
         all_calls = [str(c) for c in query_patch.call_args_list]
         rename_calls = [s for s in all_calls if 'RENAME COLUMN' in s]
@@ -1297,41 +1635,22 @@ class TestDBSync(unittest.TestCase):
         self.assertEqual(len(add_calls), 1, msg="Expected exactly one ADD COLUMN after versioning")
         self.assertIn('ALTER ICEBERG TABLE', add_calls[0])
 
-    # -----------------------------------------------------------------------
-    # Tests for iceberg_create config option
-    # -----------------------------------------------------------------------
+    def test_config_validation_rejects_removed_iceberg_create(self):
+        base = self._table_sync_config()
 
-    def test_config_validation_iceberg_create(self):
-        """iceberg_create=True; config is self-contained"""
-        base = {
-            'account': "dummy-value",
-            'dbname': "dummy-value",
-            'user': "dummy-value",
-            'private_key': "dummy-key",
-            'warehouse': "dummy-value",
-            'default_target_schema': "dummy-value",
-            'file_format': "dummy-value",
-        }
-
-        # iceberg_create=False → no error
-        self.assertEqual(len(db_sync.validate_config({**base, 'iceberg_create': False})), 0)
-
-        # iceberg_create=True → also no error (external volume is not required in config)
-        self.assertEqual(len(db_sync.validate_config({**base, 'iceberg_create': True})), 0)
+        for value in (True, False, 'true', None):
+            with self.subTest(value=value):
+                errors = db_sync.validate_config({**base, 'iceberg_create': value})
+                self.assertTrue(
+                    any("'iceberg_create' is no longer supported" in error for error in errors)
+                )
 
     def test_config_validation_explicit_table_format(self):
         base = self._table_sync_config()
 
         valid_configs = (
             {'target_table_format': 'native'},
-            {'target_table_format': 'native', 'iceberg_create': False},
             {'target_table_format': 'iceberg', 'iceberg_version': 3},
-            {
-                'target_table_format': 'iceberg',
-                'iceberg_version': 3,
-                'iceberg_create': True,
-                'hard_delete': True,
-            },
         )
         for extra_config in valid_configs:
             with self.subTest(extra_config=extra_config):
@@ -1351,16 +1670,15 @@ class TestDBSync(unittest.TestCase):
             ({'target_table_format': None}, "'target_table_format'"),
             ({'target_table_format': 'parquet'}, "'target_table_format'"),
             ({'target_table_format': 'iceberg'}, "'iceberg_version'"),
+            ({'target_table_format': 'iceberg', 'iceberg_version': 2}, "'iceberg_version'"),
+            ({'target_table_format': 'iceberg', 'iceberg_version': 3.0}, "'iceberg_version'"),
             ({'target_table_format': 'iceberg', 'iceberg_version': '3'}, "'iceberg_version'"),
+            ({'target_table_format': 'iceberg', 'iceberg_version': 4}, "'iceberg_version'"),
+            ({'target_table_format': 'iceberg', 'iceberg_version': True}, "'iceberg_version'"),
             ({'target_table_format': 'native', 'iceberg_version': 3}, "'iceberg_version'"),
             ({'target_table_format': 'native', 'iceberg_version': None}, "'iceberg_version'"),
             ({'iceberg_version': 3}, "'iceberg_version'"),
             ({'iceberg_version': None}, "'iceberg_version'"),
-            ({'target_table_format': 'native', 'iceberg_create': True}, 'conflicts'),
-            (
-                {'target_table_format': 'iceberg', 'iceberg_version': 3, 'iceberg_create': False},
-                'conflicts',
-            ),
             (
                 {'target_table_format': 'iceberg', 'iceberg_version': 3, 'hard_delete': False},
                 "'hard_delete'",
@@ -1369,7 +1687,6 @@ class TestDBSync(unittest.TestCase):
                 {'target_table_format': 'iceberg', 'iceberg_version': 3, 'hard_delete': 'true'},
                 "'hard_delete'",
             ),
-            ({'iceberg_create': 'true'}, "'iceberg_create'"),
         )
         for extra_config, expected_error in invalid_configs:
             with self.subTest(extra_config=extra_config):
@@ -1382,16 +1699,9 @@ class TestDBSync(unittest.TestCase):
 
     def test_create_iceberg_table_query_ddl(self):
         """create_iceberg_table_query generates correct Iceberg DDL with Iceberg column types"""
-        minimal_config = {
-            'account': "dummy-account",
-            'dbname': "dummy-db",
-            'user': "dummy-user",
-            'private_key': "dummy-key",
-            'warehouse': "dummy-wh",
-            'default_target_schema': "dummy-schema",
-            'file_format': "dummy-file-format",
-            'iceberg_create': True,
-        }
+        config = self._table_sync_config(
+            target_table_format='iceberg', iceberg_version=3
+        )
         stream_schema_message = {
             "stream": "public-table1",
             "schema": {
@@ -1405,29 +1715,44 @@ class TestDBSync(unittest.TestCase):
         }
 
         with patch('target_snowflake.db_sync.DbSync.query', return_value=[{'type': 'CSV'}]):
-            dbsync = db_sync.DbSync(minimal_config, stream_schema_message)
+            dbsync = db_sync.DbSync(config, stream_schema_message)
 
-        ddl = dbsync.create_iceberg_table_query()
+        ddl = dbsync.create_iceberg_table_query(iceberg_version=3)
 
         self.assertEqual(
             ddl,
             'CREATE ICEBERG TABLE IF NOT EXISTS dummy-schema."TABLE1" '
-            '("ID" number(19,0), "NAME" text, "PAYLOAD" text, PRIMARY KEY("ID")) '
-            " DATA_RETENTION_TIME_IN_DAYS=1 TARGET_FILE_SIZE='16MB' ENABLE_DATA_COMPACTION=TRUE",
+            '("ID" number(38,0), "NAME" varchar(134217728), "PAYLOAD" variant, PRIMARY KEY("ID")) '
+            "CATALOG='SNOWFLAKE' ICEBERG_VERSION=3 DATA_RETENTION_TIME_IN_DAYS=1 "
+            "TARGET_FILE_SIZE='16MB' ENABLE_DATA_COMPACTION=TRUE "
+            "ICEBERG_MERGE_ON_READ_BEHAVIOR='DISABLED'",
         )
         self.assertIn('CREATE ICEBERG TABLE IF NOT EXISTS', ddl)
         self.assertIn('DATA_RETENTION_TIME_IN_DAYS', ddl)
         self.assertIn('TARGET_FILE_SIZE', ddl)
         self.assertIn('ENABLE_DATA_COMPACTION', ddl)
-        # Iceberg column types: integer → number(19,0), object → text
-        self.assertIn('number(19,0)', ddl)
-        self.assertIn('"PAYLOAD" text', ddl)
+        self.assertIn("ICEBERG_MERGE_ON_READ_BEHAVIOR='DISABLED'", ddl)
+        self.assertEqual(
+            ddl.count("ICEBERG_MERGE_ON_READ_BEHAVIOR='DISABLED'"),
+            1,
+        )
+        self.assertNotIn('ENABLE_ICEBERG_MERGE_ON_READ', ddl)
+        self.assertIn('number(38,0)', ddl)
+        self.assertIn('"NAME" varchar(134217728)', ddl)
+        self.assertIn('"PAYLOAD" variant', ddl)
         # PRIMARY KEY is included
         self.assertIn('PRIMARY KEY', ddl)
-        # Snowflake-external managed keywords must NOT appear — external volume is configured in Snowflake directly
         self.assertNotIn('EXTERNAL_VOLUME', ddl)
-        self.assertNotIn('CATALOG', ddl)
+        self.assertIn("CATALOG='SNOWFLAKE'", ddl)
+        self.assertIn('ICEBERG_VERSION=3', ddl)
         self.assertNotIn('BASE_LOCATION', ddl)
+
+        for invalid_version in (None, 2, 4, 3.0, True, '3'):
+            with self.subTest(invalid_version=invalid_version), self.assertRaisesRegex(
+                ValueError,
+                'creation requires integer version 3',
+            ):
+                dbsync.create_iceberg_table_query(iceberg_version=invalid_version)
 
     def test_create_iceberg_table_query_explicit_v3_uses_variant(self):
         config = self._table_sync_config(target_table_format='iceberg', iceberg_version=3)
@@ -1443,6 +1768,7 @@ class TestDBSync(unittest.TestCase):
         ddl = dbsync.create_iceberg_table_query(iceberg_version=3)
 
         self.assertIn('"PAYLOAD" variant', ddl)
+        self.assertIn('"ID" number(38,0)', ddl)
         self.assertIn('"EVENT_TIME" time(6)', ddl)
         self.assertIn('"CREATED_AT" timestamp_ntz(6)', ddl)
         self.assertIn("CATALOG='SNOWFLAKE'", ddl)
@@ -1452,123 +1778,160 @@ class TestDBSync(unittest.TestCase):
 
     def test_create_iceberg_table_query_no_pk_when_no_key_properties(self):
         """create_iceberg_table_query omits PRIMARY KEY when stream has no key_properties"""
-        minimal_config = {
-            'account': "dummy-account",
-            'dbname': "dummy-db",
-            'user': "dummy-user",
-            'private_key': "dummy-key",
-            'warehouse': "dummy-wh",
-            'default_target_schema': "dummy-schema",
-            'file_format': "dummy-file-format",
-            'iceberg_create': True,
-        }
+        config = self._table_sync_config(
+            target_table_format='iceberg', iceberg_version=3
+        )
         stream_schema_message = {
             "stream": "public-table1",
             "schema": {"properties": {"id": {"type": ["integer"]}}},
             "key_properties": []
         }
         with patch('target_snowflake.db_sync.DbSync.query', return_value=[{'type': 'CSV'}]):
-            dbsync = db_sync.DbSync(minimal_config, stream_schema_message)
+            dbsync = db_sync.DbSync(config, stream_schema_message)
 
-        ddl = dbsync.create_iceberg_table_query()
+        ddl = dbsync.create_iceberg_table_query(iceberg_version=3)
         self.assertNotIn('PRIMARY KEY', ddl)
 
+    def test_create_table_query_native_uses_maximum_varchar(self):
+        """New native strings are wide and Iceberg settings do not leak."""
+        stream_schema = self._table_sync_schema()
+        stream_schema['schema']['properties']['name'] = {'type': ['string']}
+        with patch('target_snowflake.db_sync.DbSync.query', return_value=[{'type': 'CSV'}]):
+            dbsync = db_sync.DbSync(
+                self._table_sync_config(),
+                stream_schema,
+            )
+
+        ddl = dbsync.create_table_query()
+
+        self.assertEqual(
+            ddl,
+            'CREATE TABLE IF NOT EXISTS dummy-schema."TABLE1" '
+            '("ID" number, "NAME" varchar(134217728), "PAYLOAD" variant, '
+            'PRIMARY KEY("ID")) '
+            'data_retention_time_in_days = 1 ',
+        )
+        self.assertNotIn('ICEBERG_MERGE_ON_READ_BEHAVIOR', ddl)
+        self.assertNotIn('ENABLE_ICEBERG_MERGE_ON_READ', ddl)
+
     @patch('target_snowflake.db_sync.DbSync.grant_privilege')
     @patch('target_snowflake.db_sync.DbSync.query')
-    def test_sync_table_creates_iceberg_when_iceberg_create_true(self, query_patch, grant_patch):
-        """sync_table issues CREATE ICEBERG TABLE DDL when iceberg_create=True and table does not exist"""
-        minimal_config = {
-            'account': "dummy-account",
-            'dbname': "dummy-db",
-            'user': "dummy-user",
-            'private_key': "dummy-key",
-            'warehouse': "dummy-wh",
-            'default_target_schema': "dummy-schema",
-            'file_format': "dummy-file-format",
-            'iceberg_create': True,
-        }
-        stream_schema_message = {
-            "stream": "public-table1",
-            "schema": {"properties": {"id": {"type": ["integer"]}}},
-            "key_properties": ["id"]
-        }
+    def test_sync_table_explicit_create_rejects_concurrent_v2_table(self, query_patch, grant_patch):
+        query_patch.return_value = [{'type': 'CSV'}]
+        dbsync = db_sync.DbSync(
+            self._table_sync_config(
+                target_table_format='iceberg', iceberg_version=3
+            ),
+            self._table_sync_schema(),
+        )
         query_patch.side_effect = [
-            [{'type': 'CSV'}],    # SHOW FILE FORMATS (during __init__)
-            [],                    # SHOW TABLES (missing)
-            None,                  # CREATE ICEBERG TABLE
+            [],
+            None,
+            [{'name': 'TABLE1', 'is_iceberg': 'Y'}],
+            [{'name': 'TABLE1', 'catalog_name': 'SNOWFLAKE'}],
+            [{'key': 'ICEBERG_VERSION', 'value': '2'}],
         ]
-        dbsync = db_sync.DbSync(minimal_config, stream_schema_message)
-        dbsync.sync_table()
 
-        create_calls = [str(c) for c in query_patch.call_args_list if 'CREATE ICEBERG TABLE' in str(c)]
-        self.assertEqual(len(create_calls), 1, msg="Expected exactly one CREATE ICEBERG TABLE call")
-
-    def test_sync_table_does_not_recreate_existing_iceberg_table(self):
-        """sync_table skips CREATE when table already exists as Iceberg; goes to update_columns path"""
-        minimal_config = {
-            'account': "dummy-account",
-            'dbname': "dummy-db",
-            'user': "dummy-user",
-            'private_key': "dummy-key",
-            'warehouse': "dummy-wh",
-            'default_target_schema': "dummy-schema",
-            'file_format': "dummy-file-format",
-            'iceberg_create': True,
-        }
-        stream_schema_message = {
-            "stream": "public-table1",
-            "schema": {"properties": {"id": {"type": ["integer"]}}},
-            "key_properties": ["id"]
-        }
-        # table_cache provides the existing table so found_tables is non-empty
-        table_cache = [
-            {'SCHEMA_NAME': 'DUMMY-SCHEMA', 'TABLE_NAME': 'TABLE1', 'COLUMN_NAME': 'ID', 'DATA_TYPE': 'NUMBER'}
-        ]
-        with patch('target_snowflake.db_sync.DbSync.query') as query_patch:
-            query_patch.side_effect = [
-                [{'type': 'CSV'}],               # SHOW FILE FORMATS (__init__)
-                [{'name': 'TABLE1', 'is_iceberg': 'Y'}],
-                [{'name': 'TABLE1', 'catalog_name': 'SNOWFLAKE'}],
-                [{'key': 'ICEBERG_VERSION', 'value': '2'}],
-            ]
-            dbsync = db_sync.DbSync(minimal_config, stream_schema_message, table_cache)
+        with self.assertRaisesRegex(TableFormatDiscoveryException, 'unsupported ICEBERG_VERSION 2'):
             dbsync.sync_table()
 
-        create_calls = [str(c) for c in query_patch.call_args_list if 'CREATE' in str(c)]
-        self.assertEqual(len(create_calls), 0, msg="CREATE must not be issued for an already-existing Iceberg table")
+        grant_patch.assert_not_called()
+
+    def test_sync_table_existing_explicit_v3_adds_column_with_v3_mapping(self):
+        """An existing explicit-v3 table uses Iceberg DDL and the v3 mapping."""
+        config = self._table_sync_config(
+            target_table_format='iceberg', iceberg_version=3
+        )
+        table_cache = [
+            {
+                'SCHEMA_NAME': 'DUMMY-SCHEMA',
+                'TABLE_NAME': 'TABLE1',
+                'COLUMN_NAME': 'ID',
+                'DATA_TYPE': 'NUMBER',
+            },
+        ]
+        with patch('target_snowflake.db_sync.DbSync.query') as query_patch:
+            query_patch.return_value = [{'type': 'CSV'}]
+            dbsync = db_sync.DbSync(config, self._table_sync_schema(), table_cache)
+            query_patch.reset_mock()
+
+            with patch.object(
+                dbsync,
+                'discover_table_format',
+                return_value=db_sync.TABLE_FORMAT_MANAGED_ICEBERG_V3,
+            ), patch.object(dbsync, 'get_table_columns', return_value=table_cache):
+                dbsync.sync_table()
+
+        query_patch.assert_called_once_with(
+            'ALTER ICEBERG TABLE dummy-schema."TABLE1" ADD COLUMN "PAYLOAD" variant'
+        )
 
     @patch('target_snowflake.db_sync.DbSync.grant_privilege')
     @patch('target_snowflake.db_sync.DbSync.query')
-    def test_sync_table_creates_regular_table_when_iceberg_create_false(self, query_patch, grant_patch):
-        """sync_table issues a regular CREATE TABLE when iceberg_create is False and table does not exist"""
-        minimal_config = {
-            'account': "dummy-account",
-            'dbname': "dummy-db",
-            'user': "dummy-user",
-            'private_key': "dummy-key",
-            'warehouse': "dummy-wh",
-            'default_target_schema': "dummy-schema",
-            'file_format': "dummy-file-format",
-            'iceberg_create': False,
-        }
-        stream_schema_message = {
-            "stream": "public-table1",
-            "schema": {"properties": {"id": {"type": ["integer"]}}},
-            "key_properties": ["id"]
-        }
+    def test_sync_table_rejects_existing_v3_without_table_copy_on_write_before_mutation(
+        self,
+        query_patch,
+        grant_patch,
+    ):
+        query_patch.return_value = [{'type': 'CSV'}]
+        dbsync = db_sync.DbSync(
+            self._table_sync_config(target_table_format='iceberg', iceberg_version=3),
+            self._table_sync_schema(),
+        )
+        query_patch.reset_mock()
         query_patch.side_effect = [
-            [{'type': 'CSV'}],    # SHOW FILE FORMATS (during __init__)
-            [],     # SHOW TABLES (missing)
-            None,   # CREATE TABLE
-            [],     # show primary keys
-            None,   # ALTER TABLE
+            [{'name': 'TABLE1', 'is_iceberg': 'Y'}],
+            [{'name': 'TABLE1', 'catalog_name': 'SNOWFLAKE'}],
+            [{'key': 'ICEBERG_VERSION', 'value': '3'}],
+            [
+                {
+                    'key': 'ICEBERG_MERGE_ON_READ_BEHAVIOR',
+                    'value': 'AUTO',
+                    'level': 'ACCOUNT',
+                },
+            ],
         ]
-        dbsync = db_sync.DbSync(minimal_config, stream_schema_message)
-        dbsync.sync_table()
 
-        create_calls = [str(c) for c in query_patch.call_args_list if 'CREATE' in str(c)]
-        self.assertEqual(len(create_calls), 1)
-        self.assertNotIn('ICEBERG', create_calls[0])
+        with patch.object(dbsync, 'update_columns') as update_columns, self.assertRaisesRegex(
+            TableFormatDiscoveryException,
+            "requires value 'DISABLED' at level 'TABLE'",
+        ):
+            dbsync.sync_table()
+
+        update_columns.assert_not_called()
+        grant_patch.assert_not_called()
+        self.assertEqual(query_patch.call_count, 4)
+        self.assertTrue(
+            all(query_call.args[0].startswith('SHOW ') for query_call in query_patch.call_args_list)
+        )
+
+    @patch('target_snowflake.db_sync.DbSync.grant_privilege')
+    @patch('target_snowflake.db_sync.DbSync.query')
+    def test_sync_table_omitted_format_creates_and_verifies_native_table(
+        self, query_patch, grant_patch
+    ):
+        query_patch.return_value = [{'type': 'CSV'}]
+        dbsync = db_sync.DbSync(
+            self._table_sync_config(),
+            self._table_sync_schema(),
+        )
+        query_patch.reset_mock()
+
+        with patch.object(
+            dbsync,
+            'discover_table_format',
+            side_effect=(db_sync.TABLE_FORMAT_MISSING, db_sync.TABLE_FORMAT_NATIVE),
+        ) as discover_format, patch.object(dbsync, '_refresh_table_pks'):
+            dbsync.sync_table()
+
+        discover_format.assert_has_calls([
+            call('dummy-schema', 'TABLE1'),
+            call('dummy-schema', 'TABLE1'),
+        ])
+        self.assertEqual(query_patch.call_count, 1)
+        self.assertIn('CREATE TABLE IF NOT EXISTS', query_patch.call_args.args[0])
+        self.assertNotIn('ICEBERG', query_patch.call_args.args[0])
+        grant_patch.assert_called_once()
 
     @patch('target_snowflake.db_sync.DbSync.grant_privilege')
     @patch('target_snowflake.db_sync.DbSync.query')
@@ -1579,27 +1942,111 @@ class TestDBSync(unittest.TestCase):
             self._table_sync_schema(),
         )
         query_patch.reset_mock()
+        query_patch.side_effect = [
+            [],
+            None,
+            [{'name': 'TABLE1', 'is_iceberg': 'Y'}],
+            [{'name': 'TABLE1', 'catalog_name': 'SNOWFLAKE'}],
+            [{'key': 'ICEBERG_VERSION', 'value': '3'}],
+            [
+                {
+                    'key': 'ICEBERG_MERGE_ON_READ_BEHAVIOR',
+                    'value': 'DISABLED',
+                    'level': 'TABLE',
+                },
+            ],
+            [
+                {
+                    'COLUMN_NAME': 'ID',
+                    'DATA_TYPE': 'NUMBER',
+                    'NUMERIC_PRECISION': 38,
+                    'NUMERIC_SCALE': 0,
+                    'CHARACTER_MAXIMUM_LENGTH': None,
+                    'IS_NULLABLE': 'NO',
+                },
+                {
+                    'COLUMN_NAME': 'PAYLOAD',
+                    'DATA_TYPE': 'VARIANT',
+                    'CHARACTER_MAXIMUM_LENGTH': None,
+                    'IS_NULLABLE': 'YES',
+                },
+            ],
+        ]
+        grant_patch.side_effect = (
+            lambda *args, **kwargs: self.assertEqual(query_patch.call_count, 7)
+        )
 
-        with patch.object(
-            dbsync,
-            'discover_table_format',
-            side_effect=(db_sync.TABLE_FORMAT_MISSING, db_sync.TABLE_FORMAT_MANAGED_ICEBERG_V3),
-        ) as discover_format:
-            grant_patch.side_effect = (
-                lambda *args, **kwargs: self.assertEqual(discover_format.call_count, 2)
-            )
-            dbsync.sync_table()
+        dbsync.sync_table()
 
-        discover_format.assert_has_calls([
-            call('dummy-schema', 'TABLE1'),
-            call('dummy-schema', 'TABLE1'),
-        ])
-        create_query = query_patch.call_args_list[0].args[0]
+        create_query = query_patch.call_args_list[1].args[0]
         self.assertIn('CREATE ICEBERG TABLE IF NOT EXISTS', create_query)
         self.assertIn('"PAYLOAD" variant', create_query)
         self.assertIn("CATALOG='SNOWFLAKE'", create_query)
         self.assertIn('ICEBERG_VERSION=3', create_query)
+        self.assertEqual(
+            query_patch.call_args_list[-2],
+            call(
+                "SHOW PARAMETERS LIKE 'ICEBERG_MERGE_ON_READ_BEHAVIOR' IN TABLE "
+                '"DUMMY-DB"."DUMMY-SCHEMA"."TABLE1"'
+            ),
+        )
+        self.assertEqual(
+            query_patch.call_args_list[-1],
+            call(
+                'SELECT COLUMN_NAME, DATA_TYPE, NUMERIC_PRECISION, NUMERIC_SCALE, '
+                'DATETIME_PRECISION, CHARACTER_MAXIMUM_LENGTH, IS_NULLABLE '
+                'FROM "DUMMY-DB".INFORMATION_SCHEMA.COLUMNS '
+                'WHERE TABLE_SCHEMA = %(schema)s AND TABLE_NAME = %(table)s '
+                'ORDER BY ORDINAL_POSITION',
+                params={'schema': 'DUMMY-SCHEMA', 'table': 'TABLE1'},
+            ),
+        )
         grant_patch.assert_called_once()
+
+    @patch('target_snowflake.db_sync.DbSync.grant_privilege')
+    @patch('target_snowflake.db_sync.DbSync.query')
+    def test_sync_table_new_v3_rejects_if_not_exists_race_without_copy_on_write(
+        self,
+        query_patch,
+        grant_patch,
+    ):
+        query_patch.return_value = [{'type': 'CSV'}]
+        dbsync = db_sync.DbSync(
+            self._table_sync_config(target_table_format='iceberg', iceberg_version=3),
+            self._table_sync_schema(),
+        )
+        query_patch.reset_mock()
+        query_patch.side_effect = [
+            [],
+            None,
+            [{'name': 'TABLE1', 'is_iceberg': 'Y'}],
+            [{'name': 'TABLE1', 'catalog_name': 'SNOWFLAKE'}],
+            [{'key': 'ICEBERG_VERSION', 'value': '3'}],
+            [
+                {
+                    'key': 'ICEBERG_MERGE_ON_READ_BEHAVIOR',
+                    'value': 'AUTO',
+                    'level': 'ACCOUNT',
+                },
+            ],
+        ]
+
+        with self.assertRaisesRegex(
+            TableFormatDiscoveryException,
+            "requires value 'DISABLED' at level 'TABLE'",
+        ):
+            dbsync.sync_table()
+
+        grant_patch.assert_not_called()
+        self.assertEqual(query_patch.call_count, 6)
+        mutation_queries = [
+            query_call.args[0]
+            for query_call in query_patch.call_args_list
+            if not query_call.args[0].startswith('SHOW ')
+        ]
+        self.assertEqual(len(mutation_queries), 1)
+        self.assertIn('CREATE ICEBERG TABLE IF NOT EXISTS', mutation_queries[0])
+        self.assertNotIn('ALTER ICEBERG TABLE', mutation_queries[0])
 
     @patch('target_snowflake.db_sync.DbSync.grant_privilege')
     @patch('target_snowflake.db_sync.DbSync.query')
@@ -1630,7 +2077,6 @@ class TestDBSync(unittest.TestCase):
     def test_sync_table_explicit_format_must_match_existing_table(self, query_patch):
         cases = (
             ('iceberg', db_sync.TABLE_FORMAT_NATIVE),
-            ('iceberg', db_sync.TABLE_FORMAT_MANAGED_ICEBERG_V2),
             ('iceberg', db_sync.TABLE_FORMAT_UNSUPPORTED_EXTERNAL_ICEBERG),
             ('native', db_sync.TABLE_FORMAT_MANAGED_ICEBERG_V3),
         )
@@ -1652,56 +2098,14 @@ class TestDBSync(unittest.TestCase):
                 update_columns.assert_not_called()
 
     @patch('target_snowflake.db_sync.DbSync.query')
-    def test_sync_table_legacy_config_uses_existing_physical_format(self, query_patch):
-        cases = (
-            (True, db_sync.TABLE_FORMAT_NATIVE, False),
-            (False, db_sync.TABLE_FORMAT_MANAGED_ICEBERG_V2, True),
-            (False, db_sync.TABLE_FORMAT_MANAGED_ICEBERG_V3, True),
-            (False, db_sync.TABLE_FORMAT_UNSUPPORTED_EXTERNAL_ICEBERG, True),
-        )
-        for iceberg_create, physical_format, is_iceberg in cases:
-            with self.subTest(iceberg_create=iceberg_create, physical_format=physical_format):
-                query_patch.return_value = [{'type': 'CSV'}]
-                dbsync = db_sync.DbSync(
-                    self._table_sync_config(iceberg_create=iceberg_create),
-                    self._table_sync_schema(),
-                )
-                query_patch.reset_mock()
-
-                with patch.object(dbsync, 'discover_table_format', return_value=physical_format), \
-                        patch.object(dbsync, 'update_columns') as update_columns, \
-                        patch.object(dbsync, '_refresh_table_pks') as refresh_table_pks:
-                    dbsync.sync_table()
-
-                update_columns.assert_called_once_with(is_iceberg, None)
-                if is_iceberg:
-                    refresh_table_pks.assert_not_called()
-                else:
-                    refresh_table_pks.assert_called_once_with()
-                query_patch.assert_not_called()
-
-    @patch('target_snowflake.db_sync.DbSync.query')
-    def test_sync_table_v3_variant_requires_explicit_configuration(self, query_patch):
-        """An omitted v3 format reports the missing configuration before mutation."""
+    def test_sync_table_omitted_format_rejects_existing_iceberg_before_mutation(
+        self, query_patch
+    ):
+        """Omitted format means native and cannot load an existing Iceberg table."""
         query_patch.return_value = [{'type': 'CSV'}]
-        table_cache = [
-            {
-                'SCHEMA_NAME': 'DUMMY-SCHEMA',
-                'TABLE_NAME': 'TABLE1',
-                'COLUMN_NAME': 'ID',
-                'DATA_TYPE': 'NUMBER',
-            },
-            {
-                'SCHEMA_NAME': 'DUMMY-SCHEMA',
-                'TABLE_NAME': 'TABLE1',
-                'COLUMN_NAME': 'PAYLOAD',
-                'DATA_TYPE': 'VARIANT',
-            },
-        ]
         dbsync = db_sync.DbSync(
             self._table_sync_config(),
             self._table_sync_schema(),
-            table_cache,
         )
         query_patch.reset_mock()
 
@@ -1711,7 +2115,7 @@ class TestDBSync(unittest.TestCase):
             return_value=db_sync.TABLE_FORMAT_MANAGED_ICEBERG_V3,
         ), self.assertRaisesRegex(
             TableFormatMismatchException,
-            'target_table_format is omitted.*restore target_table_format: iceberg',
+            'the default target format requires native',
         ):
             dbsync.sync_table()
 

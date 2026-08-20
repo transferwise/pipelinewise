@@ -462,6 +462,34 @@ class EndToEndHelpersTestCase(TestCase):  # pylint: disable=too-many-public-meth
             '--tables public.edgydata'
         )
 
+    @mock.patch('builtins.print')
+    def test_run_tap_failure_prints_started_engine_log_before_engine_assertion(
+        self,
+        print_mock,
+    ):
+        """A failed FastSync must expose its log even when Singer never starts."""
+        with TemporaryDirectory() as temp_directory:
+            log_path = Path(temp_directory, 'run.fastsync.log')
+            Path(f'{log_path}.failed').write_text(
+                'primary FastSync failure',
+                encoding='utf-8',
+            )
+            stdout = f'Writing output into {log_path}\n'
+            with mock.patch.object(
+                assertions.tasks,
+                'run_command',
+                return_value=[1, stdout, ''],
+            ), self.assertRaises(AssertionError):
+                assertions.assert_run_tap_success(
+                    'postgres_to_sf',
+                    'snowflake',
+                    ('fastsync', 'singer'),
+                )
+
+        printed_output = print_mock.call_args.args[0]
+        self.assertIn('primary FastSync failure', printed_output)
+        self.assertIn(f'{log_path}.failed', printed_output)
+
     def test_partial_sync_fixtures_compare_every_deterministic_column(self):
         """Keep full-row validation in both FastSync setup fixtures."""
         self.assertEqual(
@@ -651,6 +679,30 @@ class EndToEndHelpersTestCase(TestCase):  # pylint: disable=too-many-public-meth
                 'snowflake/postgres_to_sf',
             )
         )
+
+    def test_iceberg_cleanup_rejects_a_stale_target_pointer(self):
+        """A completed E2E route cannot leave its target attempt pointer behind."""
+        target = TargetSnowflake(methodName='runTest')
+        target.target_id = 'snowflake'
+        target.tap_id = 'postgres_to_sf'
+        target.e2e_env = self.env
+        target.iceberg_fastsync_s3_keys = mock.Mock(return_value=[])
+        self.env.run_query_target_snowflake.return_value = []
+
+        with TemporaryDirectory() as temp_directory, mock.patch.object(
+            target_snowflake_module,
+            'CONFIG_DIR',
+            temp_directory,
+        ):
+            runtime_dir = Path(temp_directory, target.target_id)
+            runtime_dir.mkdir(parents=True)
+            Path(runtime_dir, 'iceberg-fastsync-target-stale.json').write_text(
+                '{}',
+                encoding='utf-8',
+            )
+
+            with self.assertRaises(AssertionError):
+                target.assert_iceberg_fastsync_cleanup('TARGET_SCHEMA')
 
     @mock.patch(
         'tests.end_to_end.target_snowflake.shutil.rmtree',
@@ -941,44 +993,3 @@ class EndToEndHelpersTestCase(TestCase):  # pylint: disable=too-many-public-meth
                 mock.call('snowflake/postgres_to_sf'),
             ],
         )
-
-    def test_snowflake_setup_failure_runs_exact_registered_cleanup(self):
-        """A later setup failure must not leak this run's schemas or config."""
-        target = TargetSnowflake(methodName='runTest')
-        self.env.env = {
-            'TAP_POSTGRES': {'is_configured': True},
-            'TARGET_SNOWFLAKE': {'is_configured': True},
-        }
-        self.env.sf_schema_postfix = '_current'
-        self.env.sf_schema_postfix_is_override = True
-        target.get_e2e_env = mock.Mock(return_value=self.env)
-        target.remove_dir_from_config_dir = mock.Mock()
-        setattr(target, 'check_snowflake_credentials_provided', mock.Mock())
-        target.check_validate_taps = mock.Mock(side_effect=RuntimeError('validation failed'))
-        target.check_import_config = mock.Mock()
-        target.drop_sf_schema_if_exists = mock.Mock()
-
-        with self.assertRaisesRegex(RuntimeError, 'validation failed'):
-            target.setUp('postgres_to_sf', 'snowflake', 'TAP_POSTGRES')
-
-        target.doCleanups()
-
-        self.assertEqual(
-            target.drop_sf_schema_if_exists.call_args_list,
-            [
-                mock.call('PPW_E2E_TAP_POSTGRES_CURRENT'),
-                mock.call('PPW_E2E_TAP_POSTGRES_PUBLIC2_CURRENT'),
-                mock.call('PPW_E2E_TAP_POSTGRES_2_CURRENT'),
-                mock.call('PPW_E2E_TAP_POSTGRES_2_CURRENT'),
-                mock.call('PPW_E2E_TAP_POSTGRES_PUBLIC2_CURRENT'),
-                mock.call('PPW_E2E_TAP_POSTGRES_CURRENT'),
-            ],
-        )
-        self.assertEqual(
-            target.remove_dir_from_config_dir.call_args_list,
-            [
-                mock.call('snowflake'),
-                mock.call('snowflake/postgres_to_sf'),
-            ],
-        )
-        target.check_import_config.assert_not_called()

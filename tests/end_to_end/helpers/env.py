@@ -105,6 +105,35 @@ class E2EEnv:
                 },
             },
             # ------------------------------------------------------------------
+            # Genuine Oracle MySQL is a REQUIRED source for engine-specific
+            # tap-mysql compatibility coverage.
+            # ------------------------------------------------------------------
+            'TAP_ORACLE_MYSQL': {
+                'template_patterns': ['tap_oracle_mysql'],
+                'vars': {
+                    'HOST': {
+                        'value': os.environ.get('TAP_ORACLE_MYSQL_HOST'),
+                        'required': True,
+                    },
+                    'PORT': {
+                        'value': os.environ.get('TAP_ORACLE_MYSQL_PORT'),
+                        'required': True,
+                    },
+                    'USER': {
+                        'value': os.environ.get('TAP_ORACLE_MYSQL_USER'),
+                        'required': True,
+                    },
+                    'PASSWORD': {
+                        'value': os.environ.get('TAP_ORACLE_MYSQL_PASSWORD'),
+                        'required': True,
+                    },
+                    'DB': {
+                        'value': os.environ.get('TAP_ORACLE_MYSQL_DB'),
+                        'required': True,
+                    },
+                },
+            },
+            # ------------------------------------------------------------------
             # Tap MongoDB is a REQUIRED test connector and test database with test data available
             # in the docker environment
             # ------------------------------------------------------------------
@@ -262,6 +291,9 @@ class E2EEnv:
         )
         self.env['TAP_MYSQL']['is_configured'] = self._is_env_connector_configured(
             'TAP_MYSQL'
+        )
+        self.env['TAP_ORACLE_MYSQL']['is_configured'] = self._is_env_connector_configured(
+            'TAP_ORACLE_MYSQL'
         )
         self.env['TAP_S3_CSV']['is_configured'] = self._is_env_connector_configured(
             'TAP_S3_CSV'
@@ -488,6 +520,18 @@ class E2EEnv:
             database=self.get_conn_env_var('TAP_MYSQL', 'DB_2'),
         )
 
+    def run_query_tap_oracle_mysql(self, query, params=None):
+        """Run a query against the genuine Oracle MySQL source."""
+        return db.run_query_mysql(
+            query,
+            host=self.get_conn_env_var('TAP_ORACLE_MYSQL', 'HOST'),
+            port=int(self.get_conn_env_var('TAP_ORACLE_MYSQL', 'PORT')),
+            user=self.get_conn_env_var('TAP_ORACLE_MYSQL', 'USER'),
+            password=self.get_conn_env_var('TAP_ORACLE_MYSQL', 'PASSWORD'),
+            database=self.get_conn_env_var('TAP_ORACLE_MYSQL', 'DB'),
+            params=params,
+        )
+
     def run_query_target_snowflake(self, query):
         """Run and SQL query in target snowflake database"""
         return db.run_query_snowflake(
@@ -508,6 +552,11 @@ class E2EEnv:
         """Clean mysql source database and prepare for test run
         Creating initial tables is defined in Docker entrypoint.sh"""
         db_script = os.path.join(DIR, '..', '..', 'db', 'tap_mysql_db.sh')
+        self._run_command(db_script)
+
+    def setup_tap_oracle_mysql(self):
+        """Reset the genuine Oracle MySQL source before discovery."""
+        db_script = os.path.join(DIR, '..', '..', 'db', 'tap_oracle_mysql_db.sh')
         self._run_command(db_script)
 
     # pylint: disable=unnecessary-pass

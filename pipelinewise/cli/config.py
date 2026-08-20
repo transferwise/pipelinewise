@@ -12,15 +12,24 @@ from pipelinewise.data_diff.config import extract_check_definitions
 from pipelinewise.utils import safe_column_name
 from . import utils
 from .errors import InvalidConfigException
+from .fastsync_capabilities import (
+    TABLE_FORMAT_ICEBERG as ICEBERG_TABLE_FORMAT,
+    TABLE_FORMAT_NATIVE as NATIVE_TABLE_FORMAT,
+    resolve_fastsync_capabilities,
+)
 
 
 class Config:
     """PipelineWise Configuration Class"""
 
-    TABLE_FORMAT_NATIVE = 'native'
-    TABLE_FORMAT_ICEBERG = 'iceberg'
+    TABLE_FORMAT_NATIVE = NATIVE_TABLE_FORMAT
+    TABLE_FORMAT_ICEBERG = ICEBERG_TABLE_FORMAT
     ICEBERG_VERSION = 3
-    ICEBERG_RDBMS_TAPS = {'tap-mysql', 'tap-postgres'}
+    TARGET_FORMAT_KEYS = {
+        'iceberg_create',
+        'iceberg_version',
+        'target_table_format',
+    }
 
     def __init__(self, config_dir):
         """
@@ -70,6 +79,7 @@ class Config:
             target_data = utils.load_yaml(
                 os.path.join(yaml_dir, yaml_file), vault_secret
             )
+            cls.validate_target_table_format_placement(target_data)
             utils.validate(instance=target_data, schema=target_schema)
 
             # Add generated extra keys that not available in the YAML
@@ -93,6 +103,7 @@ class Config:
         for yaml_file in tap_yamls:
             config.logger.info('LOADING TAP: %s', yaml_file)
             tap_data = utils.load_yaml(os.path.join(yaml_dir, yaml_file), vault_secret)
+            cls.validate_tap_table_format_placement(tap_data)
             utils.validate(instance=tap_data, schema=tap_schema)
 
             tap_id = tap_data['id']
@@ -334,7 +345,16 @@ class Config:
             extra_config_keys:  extra keys to add to the db conn config
         Returns: Dictionary of tap connection config
         """
-        return {**tap.get('db_conn'), **extra_config_keys}
+        tap_config = {**tap.get('db_conn'), **extra_config_keys}
+        if (
+            tap.get('type') == 'tap-mysql'
+            and tap.get('target_table_format') == cls.TABLE_FORMAT_ICEBERG
+        ):
+            tap_config.update(
+                target_table_format=tap['target_table_format'],
+                iceberg_version=tap['iceberg_version'],
+            )
+        return tap_config
 
     @classmethod
     def generate_selection(cls, tap: Dict) -> List[Dict]:
@@ -505,8 +525,82 @@ class Config:
         return tap_inheritable_config
 
     @classmethod
+    def validate_target_table_format_placement(cls, target: Dict) -> None:
+        """Reject table-format settings from a shared target definition."""
+        if not isinstance(target, dict):
+            return
+
+        root_settings = sorted(cls.TARGET_FORMAT_KEYS.intersection(target))
+        target_connection = target.get('db_conn')
+        connection_settings = sorted(
+            cls.TARGET_FORMAT_KEYS.intersection(target_connection)
+            if isinstance(target_connection, dict)
+            else []
+        )
+        if not root_settings and not connection_settings:
+            return
+
+        placements = []
+        if root_settings:
+            placements.append(
+                'target root: ' + ', '.join(f'"{key}"' for key in root_settings)
+            )
+        if connection_settings:
+            placements.append(
+                'db_conn: ' + ', '.join(
+                    f'"{key}"' for key in connection_settings
+                )
+            )
+        guidance = (
+            'Configure target_table_format and iceberg_version on each tap.'
+        )
+        if 'iceberg_create' in root_settings + connection_settings:
+            guidance += ' iceberg_create is no longer supported.'
+        raise InvalidConfigException(
+            f'Target "{target.get("id")}" cannot set table-format settings at '
+            f'{"; ".join(placements)}. {guidance}'
+        )
+
+    @classmethod
+    def validate_tap_table_format_placement(cls, tap: Dict) -> None:
+        """Reject legacy or misplaced table-format settings from a tap definition."""
+        if not isinstance(tap, dict):
+            return
+
+        root_settings = ['iceberg_create'] if 'iceberg_create' in tap else []
+        tap_connection = tap.get('db_conn')
+        connection_settings = sorted(
+            cls.TARGET_FORMAT_KEYS.intersection(tap_connection)
+            if isinstance(tap_connection, dict)
+            else []
+        )
+        if not root_settings and not connection_settings:
+            return
+
+        placements = []
+        if root_settings:
+            placements.append('tap root: "iceberg_create"')
+        if connection_settings:
+            placements.append(
+                'db_conn: ' + ', '.join(
+                    f'"{key}"' for key in connection_settings
+                )
+            )
+        guidance = (
+            'Configure target_table_format and iceberg_version at the tap root.'
+        )
+        if 'iceberg_create' in root_settings + connection_settings:
+            guidance += ' iceberg_create is no longer supported.'
+        raise InvalidConfigException(
+            f'Tap "{tap.get("id")}" cannot set table-format settings at '
+            f'{"; ".join(placements)}. {guidance}'
+        )
+
+    @classmethod
     def validate_target_table_format(cls, tap: Dict, target: Dict) -> None:
         """Validate tap-level table format against its target configuration."""
+        cls.validate_tap_table_format_placement(tap)
+
         table_format = tap.get('target_table_format')
         iceberg_version_is_set = 'iceberg_version' in tap
         iceberg_version = tap.get('iceberg_version')
@@ -524,7 +618,11 @@ class Config:
             )
 
         if table_format == cls.TABLE_FORMAT_ICEBERG:
-            if iceberg_version != cls.ICEBERG_VERSION or isinstance(iceberg_version, bool):
+            if (
+                not isinstance(iceberg_version, int)
+                or isinstance(iceberg_version, bool)
+                or iceberg_version != cls.ICEBERG_VERSION
+            ):
                 raise InvalidConfigException(
                     f'Tap "{tap.get("id")}" must set iceberg_version to integer 3 '
                     'with target_table_format "iceberg".'
@@ -542,34 +640,24 @@ class Config:
             )
 
         if table_format == cls.TABLE_FORMAT_ICEBERG:
-            cls._validate_iceberg_tap_settings(tap)
-
-        target_connection = target.get('db_conn') or {}
-        if 'iceberg_create' not in target_connection:
-            return
-
-        legacy_requests_iceberg = target_connection['iceberg_create']
-        new_setting_requests_iceberg = table_format == cls.TABLE_FORMAT_ICEBERG
-        if legacy_requests_iceberg != new_setting_requests_iceberg:
-            raise InvalidConfigException(
-                f'Tap "{tap.get("id")}" target_table_format conflicts with '
-                f'target "{target.get("id")}" iceberg_create.'
-            )
+            cls._validate_iceberg_tap_settings(tap, target)
 
     @classmethod
-    def _validate_iceberg_tap_settings(cls, tap: Dict) -> None:
-        """Validate tap settings supported by the initial explicit Iceberg route."""
-        if tap.get('type') not in cls.ICEBERG_RDBMS_TAPS:
-            raise InvalidConfigException(
-                f'Tap "{tap.get("id")}" type "{tap.get("type")}" does not '
-                'support target_table_format "iceberg".'
-            )
-
+    def _validate_iceberg_tap_settings(cls, tap: Dict, target: Dict) -> None:
+        """Validate tap settings supported by explicit Singer and FastSync Iceberg routes."""
         if tap.get('hard_delete', True) is not True:
             raise InvalidConfigException(
                 f'Tap "{tap.get("id")}" must use hard_delete: true with '
                 'target_table_format "iceberg".'
             )
+
+        capabilities = resolve_fastsync_capabilities(
+            tap['type'],
+            target['type'],
+            tap.get('target_table_format'),
+        )
+        if not capabilities.available:
+            return
 
         flattening_level = tap.get('data_flattening_max_level')
         if flattening_level is None:

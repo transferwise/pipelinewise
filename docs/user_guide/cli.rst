@@ -49,6 +49,9 @@ Command summary
    * - ``partial_sync_table``
      - Repair one bounded source range.
      - Merges target data; can update state.
+   * - ``copy_native_to_iceberg``
+     - Build or promote one managed Iceberg v3 copy.
+     - Creates companion tables; can rename the live table.
    * - ``reset_state``
      - Move CDC state after a controlled switchover.
      - Changes bookmarks without copying data.
@@ -274,6 +277,43 @@ copying rows; an incorrect mapping can skip data permanently.
 For MariaDB/MySQL, ``switch_over_data_file`` in ``config.yml`` points to JSON
 that maps the new host to the old/new identifiers, hosts, timestamp, and binlog
 positions. Back up state and verify target continuity after the first run.
+
+
+Target maintenance
+------------------
+
+.. _cli_copy_native_to_iceberg:
+
+``copy_native_to_iceberg``
+''''''''''''''''''''''''''
+
+.. code-block:: bash
+
+   pipelinewise copy_native_to_iceberg \
+     --target <target_id> \
+     --table <database.schema.table> \
+     --eventual native \
+     --iceberg-version 3
+
+Creates and validates a managed Iceberg v3 copy using an imported
+``target-snowflake`` configuration. ``--iceberg-version`` is required and accepts
+only ``3``. ``--eventual native`` is the default and leaves the original table
+live with an ``_ICEBERG`` companion. Selecting ``--eventual iceberg`` renames the
+original to ``_NATIVE`` and promotes the Iceberg table with a second statement.
+
+Stop PipelineWise and every other writer to the table before either mode, then
+keep them stopped until data and metadata are validated. ``--eventual iceberg``
+also requires a controlled reader outage: stop dashboards, transformations,
+ad-hoc queries, and other readers before cutover. The primary table name is
+temporarily absent between the two promotion statements and between the two
+rollback statements. An interruption can leave it absent until the identical
+command completes recovery.
+
+Retry from the same imported target runtime directory with the same table,
+``--eventual`` value, target account/database/user, and account role before
+resuming readers or writers. Do not delete its recovery manifest or companion
+tables. See :ref:`snowflake_iceberg` for preflight, unsupported metadata, and
+rollback behaviour.
 
 
 Data-diff

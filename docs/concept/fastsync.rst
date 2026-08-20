@@ -30,41 +30,44 @@ Supported routes
 
 .. list-table::
    :header-rows: 1
-   :widths: 28 28 22 22
+   :widths: 23 22 25 15 15
    :width: 100%
 
    * - Source
      - Target
+     - Table formats
      - FullSync
      - PartialSync
    * - MariaDB / MySQL
      - Snowflake
+     - Native, managed Iceberg v3
      - Yes
      - Yes
    * - PostgreSQL
      - Snowflake
+     - Native, managed Iceberg v3
      - Yes
      - Yes
    * - MongoDB
      - Snowflake
+     - Native
      - Yes
      - No
    * - MariaDB / MySQL
      - PostgreSQL
+     - Native
      - Yes
      - No
    * - PostgreSQL
      - PostgreSQL
+     - Native
      - Yes
      - No
    * - MongoDB
      - PostgreSQL
+     - Native
      - Yes
      - No
-
-The Snowflake rows currently cover native tables only. With explicit
-``target_table_format: iceberg``, FullSync and PartialSync fail before target
-mutation and do not fall back to Singer.
 
 Endpoint support status from :ref:`connector_support` still applies. For a
 route without a FastSync component, a normal ``run_tap`` falls back to Singer.
@@ -86,6 +89,54 @@ or log-based tables. It does not wait for the next scheduled launch.
 
 If FullSync fails, Singer does not advance that table past an incomplete initial
 load. Restart the same command after correcting the failure.
+
+
+Snowflake Iceberg publication
+-----------------------------
+
+MariaDB/MySQL and PostgreSQL FastSync use native staging for managed Iceberg v3.
+A missing table is created through explicit-schema CTAS. An exactly compatible
+FullSync target uses ``INSERT OVERWRITE``; a compatible new nullable column is
+added first. Other FullSync mismatches require guarded replacement. PartialSync
+uses transactional range DML and requires a primary key.
+
+The route requires explicit ``target_table_format: iceberg``,
+``iceberg_version: 3``, ``data_flattening_max_level: 0``, and
+``hard_delete: true``. Native remains the default. See
+:ref:`snowflake_iceberg` for metadata limits, writer exclusion, and recovery.
+After an eligible initial load, Singer continues LOG_BASED or INCREMENTAL
+replication against the same managed-v3 table in the same run.
+FastSync availability and its zero-flattening requirement are specific to these
+routes. A compatible Singer-only source such as Salesforce can load managed v3
+through ``target-snowflake`` without gaining a FastSync component; it retains
+its normal flattening setting, still requires ``hard_delete: true``, and sends
+``FULL_TABLE`` streams through Singer.
+
+
+Snowflake string widths
+-----------------------
+
+MariaDB/MySQL and PostgreSQL FastSync declare string staging and new-target
+columns as ``VARCHAR(134217728)`` for both native and managed Iceberg v3 routes.
+This applies to character and text families, MariaDB/MySQL blob and enum types,
+and the fallback for an otherwise unmapped source type. It avoids Snowflake's
+narrower 16,777,216-character default for a bare ``VARCHAR``.
+
+The declared limit does not remove Snowflake's 128 MB encoded-value limit, so a
+value can reach the byte limit before the character limit when it contains
+multi-byte characters. Values above Snowflake's maximum still fail while loading
+the native staging table, before publication or state advancement.
+See Snowflake's `string and binary data type reference
+<https://docs.snowflake.com/en/sql-reference/data-types-text>`_.
+
+An existing native PartialSync target whose compatible text column is narrower
+is widened before the merge. Existing managed Iceberg v3 string columns must
+already use the maximum width; see :ref:`snowflake_iceberg`.
+
+Singer schema evolution has a different existing-native policy:
+``target-snowflake`` uses the maximum width for new string columns but does not
+widen or version a compatible existing native string column solely because of
+its declared width. See :ref:`target-snowflake`.
 
 
 Explicit FullSync

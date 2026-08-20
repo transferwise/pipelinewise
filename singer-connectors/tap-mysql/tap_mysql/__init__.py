@@ -9,7 +9,11 @@ from singer import metrics
 from singer.catalog import Catalog
 
 from tap_mysql.connection import connect_with_backoff, MySQLConnection, fetch_server_id, MYSQL_ENGINE
-from tap_mysql.discover_utils import discover_catalog, resolve_catalog
+from tap_mysql.discover_utils import (
+    discover_catalog,
+    mariadb_json_aliases_enabled,
+    resolve_catalog,
+)
 from tap_mysql.stream_utils import write_schema_message
 from tap_mysql.sync_strategies import binlog
 from tap_mysql.sync_strategies import common
@@ -26,8 +30,19 @@ REQUIRED_CONFIG_KEYS = [
 ]
 
 
+def _discover_catalog(mysql_conn, config):
+    discovery_options = (
+        {'detect_json_aliases': True}
+        if mariadb_json_aliases_enabled(config)
+        else {}
+    )
+    return discover_catalog(
+        mysql_conn, config.get('filter_dbs'), **discovery_options
+    )
+
+
 def do_discover(mysql_conn, config):
-    discover_catalog(mysql_conn, config.get('filter_dbs')).dump()
+    _discover_catalog(mysql_conn, config).dump()
 
 
 def log_engine(mysql_conn, catalog_entry):
@@ -116,7 +131,7 @@ def get_non_binlog_streams(mysql_conn, catalog, config, state):
       3. any streams that do not have a replication method of LOG_BASED
 
     """
-    discovered = discover_catalog(mysql_conn, config.get('filter_dbs'))
+    discovered = _discover_catalog(mysql_conn, config)
 
     # Filter catalog to include only selected streams
     selected_streams = list(filter(common.stream_is_selected, catalog.streams))
@@ -170,7 +185,7 @@ def get_non_binlog_streams(mysql_conn, catalog, config, state):
 
 
 def get_binlog_streams(mysql_conn, catalog, config, state):
-    discovered = discover_catalog(mysql_conn, config.get('filter_dbs'))
+    discovered = _discover_catalog(mysql_conn, config)
 
     selected_streams = list(filter(common.stream_is_selected, catalog.streams))
     binlog_streams = []

@@ -3,8 +3,9 @@
 Snowflake target
 ================
 
-``target-snowflake`` loads Singer records through staged CSV files and supports
-native FastSync for selected database sources.
+``target-snowflake`` loads Singer records from compatible taps through staged
+CSV files into native or managed Iceberg v3 tables. It also supports FastSync
+for selected database sources.
 
 .. list-table:: Support
    :header-rows: 1
@@ -13,11 +14,12 @@ native FastSync for selected database sources.
 
    * - Target
      - Status
-     - Native transfer
+     - FastSync
    * - Snowflake
      - Available
-     - FullSync from MariaDB/MySQL, PostgreSQL, or MongoDB; PartialSync from
-       MariaDB/MySQL or PostgreSQL
+     - Native FullSync from MariaDB/MySQL, PostgreSQL, or MongoDB; native or
+       managed Iceberg v3 FullSync and PartialSync from MariaDB/MySQL or
+       PostgreSQL
 
 
 Prerequisites
@@ -71,6 +73,7 @@ Configuration
      user: "<USER>"
      private_key: "/run/secrets/snowflake-key.pem"
      warehouse: "<WAREHOUSE>"
+     role: "<ROLE>"
      s3_bucket: "<STAGING_BUCKET>"
      s3_key_prefix: "pipelinewise/"
      stage: "<SCHEMA>.<STAGE>"
@@ -97,6 +100,11 @@ Configuration
      - Yes
      - —
      - Warehouse used for load and merge statements.
+   * - ``role``
+     - No
+     - User default role
+     - Pins Singer, FastSync, recovery, and conversion to one Snowflake role.
+       Set it explicitly when ownership or metadata visibility matters.
    * - ``s3_bucket`` / ``s3_key_prefix``
      - Yes
      - —
@@ -126,11 +134,6 @@ Configuration
      - No
      - None
      - Encrypts staged files using the stage's matching master key.
-   * - ``iceberg_create``
-     - No
-     - ``false``
-     - Deprecated target-wide setting for new Singer-path Iceberg tables.
-       Prefer tap-level ``target_table_format`` and ``iceberg_version``.
    * - ``max_parallelism``
      - No
      - ``16``
@@ -139,6 +142,26 @@ Configuration
 
 Generate the full template with ``pipelinewise init``. Common target and tap-side
 batch settings are documented in :ref:`yaml_configuration`.
+
+Managed Iceberg selection is tap-level. Target YAML rejects the removed
+``iceberg_create`` setting and tap format/version keys. See
+:ref:`snowflake_iceberg`.
+
+
+String columns
+--------------
+
+``target-snowflake`` declares every new string column as
+``VARCHAR(134217728)`` for native and managed Iceberg v3 tables. This applies
+both when Singer creates a table and when it adds a column during schema
+evolution. Snowflake's 128 MB encoded-value limit still applies, so a multi-byte
+value can reach the byte limit before the declared character limit.
+
+For an existing native table, ``target-snowflake`` leaves a compatible string
+column at its current width. It does not widen or version that column solely
+because its declared width is narrower. Existing managed Iceberg v3 strings are
+different: every string column must already have the exact maximum width before
+PipelineWise writes the table. See :ref:`snowflake_iceberg`.
 
 
 Publication and grants
@@ -154,9 +177,10 @@ schema-wide grant behaviour.
 Iceberg tables
 --------------
 
-The Singer connector can create managed Iceberg v3 tables when the tap selects
-that format. This does not yet enable a complete RDBMS-to-Iceberg route: fresh
-taps normally require FastSync first. FullSync and PartialSync with explicit
-Iceberg configuration fail before changing the target. Existing native tables
-can be converted with the bundled utility. See :ref:`snowflake_iceberg` for
-configuration, prerequisites, and limitations.
+Any compatible Singer tap can load managed Iceberg v3 when it explicitly
+selects that format. MariaDB/MySQL and PostgreSQL additionally support FastSync
+FullSync and PartialSync for managed v3. Native tables remain the default.
+PipelineWise can also build or promote one Iceberg copy of an existing native
+table with ``copy_native_to_iceberg``. See :ref:`snowflake_iceberg` for
+configuration, publication methods, metadata limits, writer exclusion, and
+recovery.

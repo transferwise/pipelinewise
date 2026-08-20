@@ -63,3 +63,22 @@ the table list:
 
 Test API quotas, deleted-record handling, schema changes, and large objects
 before production use.
+
+
+Snowflake Iceberg tables
+------------------------
+
+When the destination is ``target-snowflake``, Salesforce can select managed
+Iceberg v3 at tap level:
+
+.. code-block:: yaml
+
+   target_table_format: iceberg
+   iceberg_version: 3
+   hard_delete: true
+
+This route remains Singer-only, including ``FULL_TABLE`` streams; it does not
+enable FastSync FullSync or PartialSync. ``hard_delete: true`` is required and is
+the default. Salesforce's default ``data_flattening_max_level: 10`` remains
+valid. Set the level to ``0`` only when nested values should remain unflattened
+and use the explicit-v3 ``VARIANT`` mapping. See :ref:`snowflake_iceberg`.

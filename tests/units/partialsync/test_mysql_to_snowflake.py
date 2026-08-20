@@ -6,7 +6,16 @@ from unittest import TestCase, mock
 from pipelinewise.fastsync.partialsync import mysql_to_snowflake
 from pipelinewise.fastsync.partialsync.utils import parse_args_for_partial_sync
 from pipelinewise.fastsync.commons.tap_mysql import FastSyncTapMySql
-from tests.units.partialsync.utils import PartialSync2SFArgs, get_argv_list
+from pipelinewise.fastsync.commons.snowflake_iceberg import (
+    QueryHistoryLookupError,
+    TABLE_FORMAT_MANAGED_ICEBERG_V3,
+)
+from pipelinewise.fastsync.commons import snowflake_iceberg_routes
+from tests.units.partialsync.utils import (
+    PartialSync2SFArgs,
+    assert_iceberg_partial_sync_workflow,
+    get_argv_list,
+)
 
 
 class PartialSyncTestCase(TestCase):
@@ -15,6 +24,84 @@ class PartialSyncTestCase(TestCase):
         resources_dir = f'{os.path.dirname(__file__)}/resources'
         self.config_dir = f'{resources_dir}/test_partial_sync'
         self.maxDiff = None  # pylint: disable=invalid-name
+
+    def test_mysql_partial_sync_rejects_removed_iceberg_create_before_connectors(self):
+        """Reject legacy routing before creating source or target connectors."""
+        args = PartialSync2SFArgs(temp_test_dir='FOO_DIR')
+        args.target = {'iceberg_create': False}
+        table = ('foo', {'column': 'id'})
+
+        with mock.patch.object(
+            mysql_to_snowflake, 'FastSyncTapMySql'
+        ) as source, mock.patch.object(
+            mysql_to_snowflake, 'FastSyncTargetSnowflake'
+        ) as target:
+            with self.assertRaisesRegex(ValueError, 'iceberg_create'):
+                mysql_to_snowflake.partial_sync_table(table, args)
+
+        source.assert_not_called()
+        target.assert_not_called()
+
+    def test_mysql_main_rejects_removed_iceberg_create_before_pool_or_connectors(self):
+        """Reject legacy routing before starting workers or connectors."""
+        args = PartialSync2SFArgs(temp_test_dir='FOO_DIR')
+        args.target = {'iceberg_create': False}
+
+        with mock.patch.object(
+            mysql_to_snowflake.utils,
+            'parse_args_for_partial_sync',
+            return_value=args,
+        ), mock.patch.object(
+            mysql_to_snowflake.common_utils, 'get_pool_size'
+        ) as get_pool_size, mock.patch.object(
+            mysql_to_snowflake, 'FastSyncTapMySql'
+        ) as source, mock.patch.object(
+            mysql_to_snowflake, 'FastSyncTargetSnowflake'
+        ) as target, mock.patch.object(
+            mysql_to_snowflake.multiprocessing, 'Pool'
+        ) as pool:
+            with self.assertRaisesRegex(ValueError, 'iceberg_create'):
+                mysql_to_snowflake.main_impl()
+
+        get_pool_size.assert_not_called()
+        source.assert_not_called()
+        target.assert_not_called()
+        pool.assert_not_called()
+
+    def test_native_contract_rejects_existing_iceberg_before_source_or_mutation(self):
+        """Reject an existing Iceberg target before static native source work."""
+        table = ('foo', {
+            'column': 'id',
+            'start_value': '<S>1',
+            'end_value': '<S>2',
+            'drop_target_table': False,
+        })
+
+        for table_format in (None, 'native'):
+            with self.subTest(table_format=table_format):
+                args = PartialSync2SFArgs(
+                    temp_test_dir='FOO_DIR',
+                    target_table_format=table_format,
+                )
+                publisher = mock.Mock()
+                publisher.discover_table_format.return_value = (
+                    TABLE_FORMAT_MANAGED_ICEBERG_V3
+                )
+
+                with mock.patch.object(
+                    mysql_to_snowflake, 'FastSyncTapMySql'
+                ) as source, mock.patch.object(
+                    mysql_to_snowflake, 'FastSyncTargetSnowflake'
+                ) as target, mock.patch.object(
+                    snowflake_iceberg_routes,
+                    'create_publisher',
+                    return_value=publisher,
+                ):
+                    result = mysql_to_snowflake.partial_sync_table(table, args)
+
+                self.assertIn('found managed_iceberg_v3', result)
+                source.assert_not_called()
+                self.assertEqual(target.return_value.method_calls, [])
 
     def test_mysql_to_snowflake_partial_sync_table_if_exception_happens(self):
         """Test partial sync if an exception raises"""
@@ -28,12 +115,17 @@ class PartialSyncTestCase(TestCase):
             'drop_target_table': False,
         })
         with mock.patch(
-                'pipelinewise.fastsync.partialsync.mysql_to_snowflake.FastSyncTapMySql.open_connections'
-        ) as mocked_mysql_connection:
+            'pipelinewise.fastsync.partialsync.mysql_to_snowflake.'
+            'FastSyncTapMySql.open_connections'
+        ) as mocked_mysql_connection, mock.patch.object(
+            mysql_to_snowflake.iceberg_routes,
+            'require_native_target_format',
+        ):
             mocked_mysql_connection.side_effect = Exception(exception_message)
             actual_return = mysql_to_snowflake.partial_sync_table(test_table, args)
 
-        self.assertEqual(f'{args.table}: {exception_message}', actual_return)
+        self.assertEqual(f'{test_table[0]}: {exception_message}', actual_return)
+        self.assertEqual(args.table, 'mysql_source_db.email')
 
     @mock.patch('pipelinewise.fastsync.commons.utils.save_state_file')
     @mock.patch('pipelinewise.fastsync.commons.utils.get_bookmark_for_table', return_value='bookmark')
@@ -43,8 +135,18 @@ class PartialSyncTestCase(TestCase):
     )
     @mock.patch('pipelinewise.fastsync.partialsync.mysql_to_snowflake.FastSyncTapMySql')
     @mock.patch('pipelinewise.fastsync.partialsync.mysql_to_snowflake.FastSyncTargetSnowflake')
+    @mock.patch.object(
+        mysql_to_snowflake.iceberg_routes,
+        'require_native_target_format',
+    )
     def test_mysql_partial_sync_failure_state_semantics(
-        self, mocked_fastsync_sf, mocked_fastsyncmysql, _mocked_upload, _mocked_bookmark, mocked_save_state
+        self,
+        _mocked_native_format,
+        mocked_fastsync_sf,
+        mocked_fastsyncmysql,
+        _mocked_upload,
+        _mocked_bookmark,
+        mocked_save_state,
     ):
         """Publication and staging-cleanup failures all withhold state."""
         for failure_method, error_message in (
@@ -118,8 +220,13 @@ class PartialSyncTestCase(TestCase):
     )
     @mock.patch('pipelinewise.fastsync.partialsync.mysql_to_snowflake.FastSyncTapMySql')
     @mock.patch('pipelinewise.fastsync.partialsync.mysql_to_snowflake.FastSyncTargetSnowflake')
+    @mock.patch.object(
+        mysql_to_snowflake.iceberg_routes,
+        'require_native_target_format',
+    )
     def test_mysql_empty_unbounded_sync_publishes_and_advances_state(
         self,
+        _mocked_native_format,
         mocked_fastsync_sf,
         mocked_fastsyncmysql,
         _mocked_bookmark,
@@ -151,6 +258,91 @@ class PartialSyncTestCase(TestCase):
         snowflake.publish_partial_sync.assert_called_once()
         snowflake.s3.delete_object.assert_not_called()
         mocked_save_state.assert_called_once_with(args.state, 'foo', 'bookmark')
+
+    def test_mysql_iceberg_partial_sync_supports_replacement(self):
+        """Iceberg PartialSync can replace the target when explicitly requested."""
+        assert_iceberg_partial_sync_workflow(
+            mysql_to_snowflake,
+            'FastSyncTapMySql',
+            drop_target=True,
+        )
+
+    def test_mysql_iceberg_partial_sync_failure_withholds_state(self):
+        """A failed Iceberg publication must not advance source state."""
+        assert_iceberg_partial_sync_workflow(
+            mysql_to_snowflake,
+            'FastSyncTapMySql',
+            publish_error=RuntimeError('publish failed'),
+        )
+
+    def test_mysql_finalized_iceberg_partial_sync_recovers_without_the_source(self):
+        """A finalized attempt hands off state without opening the source."""
+        assert_iceberg_partial_sync_workflow(
+            mysql_to_snowflake,
+            'FastSyncTapMySql',
+            recovery_action='state_handoff',
+            source_open_error=RuntimeError('source unavailable'),
+        )
+
+    def test_mysql_published_iceberg_partial_sync_recovers_without_the_source(self):
+        """A published attempt finalizes without opening the source."""
+        assert_iceberg_partial_sync_workflow(
+            mysql_to_snowflake,
+            'FastSyncTapMySql',
+            recovery_action='finalize',
+            source_open_error=RuntimeError('source unavailable'),
+        )
+
+    def test_mysql_query_history_lookup_failure_requires_unchanged_retry(self):
+        """Ambiguous recovery stops before opening the source or publishing."""
+        error = QueryHistoryLookupError('attempt-1', 0.25, 1)
+        self.assertIn('retry the same FastSync command unchanged', str(error))
+        assert_iceberg_partial_sync_workflow(
+            mysql_to_snowflake,
+            'FastSyncTapMySql',
+            recovery_error=error,
+        )
+
+    def test_mysql_iceberg_partial_sync_publishes_the_persisted_contract(self):
+        """A staged recovery publishes its persisted schema contract."""
+        assert_iceberg_partial_sync_workflow(
+            mysql_to_snowflake,
+            'FastSyncTapMySql',
+            recovery_action='publish',
+        )
+
+    def test_mysql_iceberg_partial_sync_restarts_the_saved_range(self):
+        """A staging restart reuses its persisted source range."""
+        assert_iceberg_partial_sync_workflow(
+            mysql_to_snowflake,
+            'FastSyncTapMySql',
+            recovery_action='restart_staging',
+        )
+
+    def test_mysql_iceberg_partial_sync_schema_mismatch_stops_before_publish(self):
+        """An incompatible re-export cannot reach publication."""
+        assert_iceberg_partial_sync_workflow(
+            mysql_to_snowflake,
+            'FastSyncTapMySql',
+            recovery_action='restart_staging',
+            recovery_source_error=ValueError('persisted schema mismatch'),
+        )
+
+    def test_mysql_iceberg_partial_sync_persists_upload_cleanup_debt(self):
+        """A failed upload cleanup remains represented by the attempt."""
+        assert_iceberg_partial_sync_workflow(
+            mysql_to_snowflake,
+            'FastSyncTapMySql',
+            upload_cleanup_debt=True,
+        )
+
+    def test_mysql_iceberg_partial_sync_requires_primary_key_before_export(self):
+        """A new PartialSync attempt requires a key before source export."""
+        assert_iceberg_partial_sync_workflow(
+            mysql_to_snowflake,
+            'FastSyncTapMySql',
+            missing_primary_key=True,
+        )
 
     def test_export_source_table_data(self):
         """Test export_source_table_data method"""
@@ -296,7 +488,12 @@ class PartialSyncTestCase(TestCase):
     @mock.patch('pipelinewise.fastsync.partialsync.mysql_to_snowflake.FastSyncTapMySql')
     @mock.patch('pipelinewise.fastsync.commons.utils.get_bookmark_for_table')
     @mock.patch('pipelinewise.fastsync.partialsync.mysql_to_snowflake.FastSyncTargetSnowflake')
+    @mock.patch.object(
+        mysql_to_snowflake.iceberg_routes,
+        'require_native_target_format',
+    )
     def test_mysql_to_snowflake_partial_sync_table(self,
+                                                   _mocked_native_format,
                                                    mocked_fastsync_sf, mocked_bookmark, mocked_fastsyncmysql,
                                                    mocked_save_state, mocked_upload_to_s3, mocked_load_into_sf):
         """Test mysql to sf partial sync table"""
@@ -354,8 +551,12 @@ class PartialSyncTestCase(TestCase):
                     'foo_schema', 'foo', ['foo type1', 'bar type2'], 'foo_primary', is_temporary=True)
                 mocked_fastsync_sf.return_value.query.assert_not_called()
                 mocked_fastsyncmysql.return_value.close_connections.assert_called_once_with(silent=True)
+                runtime_args = mocked_load_into_sf.call_args.args[1]
+                self.assertIsNot(runtime_args, args)
+                self.assertEqual(args.table, 'mysql_source_db.email')
+                self.assertEqual(runtime_args.table, table_name)
                 mocked_load_into_sf.assert_called_with(
-                    target, args, maped_column_types_to_target['columns'],
+                    target, runtime_args, maped_column_types_to_target['columns'],
                     maped_column_types_to_target['primary_key'],
                     s3_key_pattern, file_size,
                     f" WHERE {test_table[1]['column']} >= '{test_table[1]['start_value'][3:]}'",

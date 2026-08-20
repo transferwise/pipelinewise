@@ -87,7 +87,7 @@ therefore leave permanent gaps.
 Full-table replication
 ----------------------
 
-FULL_TABLE reads every selected row on every run. Supported native routes use
+FULL_TABLE reads every selected row on every run. Supported FastSync routes use
 FullSync; other routes use the Singer path. Account for a full source scan,
 staging space, target replacement/merge work, and a longer recovery window.
 

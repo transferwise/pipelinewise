@@ -55,7 +55,7 @@ contains an experimental endpoint inherits experimental status.
      - Available
      - Available
 
-FastSync is a separate native-transfer capability and supports fewer routes.
+FastSync is a separate bulk-transfer capability and supports fewer routes.
 See :ref:`fast_sync_main` for the FullSync and PartialSync matrix.
 
 

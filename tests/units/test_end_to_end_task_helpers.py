@@ -39,6 +39,18 @@ class EndToEndTaskHelpersTestCase(TestCase):
         ):
             tasks.find_run_tap_log_file(stdout, 'fastsync')
 
+    def test_find_run_tap_log_files_returns_every_started_engine(self):
+        """Return available logs even when a later expected engine never starts."""
+        stdout = (
+            'Writing output into /tmp/run.fastsync.log\n'
+            'Writing output into /tmp/run.partialsync.log\n'
+        )
+
+        self.assertEqual(
+            tasks.find_run_tap_log_files(stdout),
+            ['/tmp/run.fastsync.log', '/tmp/run.partialsync.log'],
+        )
+
     def test_log_engines_reject_extra(self):
         """Reject an unrequested different sync engine."""
         stdout = (

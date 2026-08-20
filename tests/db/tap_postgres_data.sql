@@ -11,6 +11,8 @@
 BEGIN;
 SET client_encoding = 'UTF8';
 
+DROP TABLE IF EXISTS public.iceberg_hstore CASCADE;
+DROP TABLE IF EXISTS public.iceberg_composite_key CASCADE;
 DROP TABLE IF EXISTS public.edgyData CASCADE;
 
 CREATE TABLE edgydata(

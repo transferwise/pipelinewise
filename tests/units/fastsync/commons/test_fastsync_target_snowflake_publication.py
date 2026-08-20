@@ -26,6 +26,7 @@ class TestFastSyncTargetSnowflakePartialSync(TestCase):
             'account': 'test_account',
             'dbname': 'test_database',
             'warehouse': 'test_warehouse',
+            'role': 'test_role',
             'tap_id': 'test_tap',
         })
 
@@ -39,6 +40,7 @@ class TestFastSyncTargetSnowflakePartialSync(TestCase):
             account='test_account',
             database='test_database',
             warehouse='test_warehouse',
+            role='test_role',
             authenticator='SNOWFLAKE_JWT',
             autocommit=False,
             session_parameters={

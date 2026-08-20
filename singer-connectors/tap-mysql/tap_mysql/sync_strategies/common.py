@@ -2,6 +2,7 @@
 # pylint: disable=missing-function-docstring,too-many-arguments,too-many-locals
 import copy
 import datetime
+import json
 import singer
 import time
 
@@ -10,6 +11,34 @@ from singer import metadata, utils, metrics
 from tap_mysql.stream_utils import get_key_properties
 
 LOGGER = singer.get_logger('tap_mysql')
+MARIADB_JSON_FORMAT = 'mariadb-json'
+MARIADB_JSON_ROOT_TYPES = (
+    'null',
+    'object',
+    'array',
+    'string',
+    'number',
+    'boolean',
+)
+
+
+def parse_mariadb_json_alias(value):
+    """Validate and retain serialized JSON so JSON null differs from SQL NULL."""
+    if value is None:
+        return None
+    if isinstance(value, (bytes, bytearray)):
+        value = value.decode('utf-8')
+    if isinstance(value, str):
+        json.loads(value)
+        return value
+    return json.dumps(value, ensure_ascii=False)
+
+
+def parse_formatted_value(value, property_format):
+    """Decode formats that need conversion before generic value handling."""
+    if property_format == MARIADB_JSON_FORMAT:
+        return parse_mariadb_json_alias(value)
+    return value
 
 
 def is_invalid_mysql_datetime(value):
@@ -110,6 +139,8 @@ def row_to_singer_record(catalog_entry, version, row, columns, time_extracted):
         property_type = catalog_entry.schema.properties[columns[idx]].type
         property_format = catalog_entry.schema.properties[columns[idx]].format
 
+        elem = parse_formatted_value(elem, property_format)
+
         if isinstance(elem, datetime.datetime):
             row_to_persist += (elem.isoformat() + '+00:00',)
 
@@ -121,13 +152,17 @@ def row_to_singer_record(catalog_entry, version, row, columns, time_extracted):
                 _total_seconds = int(elem.total_seconds())
                 _hours, _remainder = divmod(_total_seconds, 3600)
                 _minutes, _seconds = divmod(_remainder, 60)
-                row_to_persist += (f"{_hours:02}:{_minutes:02}:{_seconds:02}",) # this should convert time column into 'HH:MM:SS' formatted string
+                # Convert time columns to the MySQL-compatible HH:MM:SS form.
+                row_to_persist += (
+                    f"{_hours:02}:{_minutes:02}:{_seconds:02}",
+                )
             else:
                 epoch = datetime.datetime.utcfromtimestamp(0)
                 timedelta_from_epoch = epoch + elem
                 row_to_persist += (timedelta_from_epoch.isoformat() + '+00:00',)
 
-        elif 'boolean' in property_type or property_type == 'boolean':
+        elif property_format != MARIADB_JSON_FORMAT and (
+                'boolean' in property_type or property_type == 'boolean'):
             if elem is None:
                 boolean_representation = None
             elif elem in (0, b'\x00'):
