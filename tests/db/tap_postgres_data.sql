@@ -59,6 +59,26 @@ Maatjies', DATE '2021-01-30'),
 COMMIT;
 
 BEGIN;
+SET client_encoding = 'UTF8';
+
+CREATE EXTENSION IF NOT EXISTS hstore;
+
+DROP TABLE IF EXISTS public.special_data_types;
+
+CREATE TABLE public.special_data_types(
+    id serial PRIMARY KEY,
+    cHstore hstore
+);
+
+INSERt INTO public.special_data_types
+    (cHstore)
+VALUES
+    ('"key" => "some value"'),
+    ('"spaced key" => "another value"');
+COMMIT;
+
+
+BEGIN;
 SET client_encoding = 'LATIN1';
 
 DROP SCHEMA IF EXISTS public2 CASCADE;
