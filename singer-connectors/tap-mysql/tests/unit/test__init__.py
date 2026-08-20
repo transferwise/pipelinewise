@@ -1,12 +1,47 @@
 import unittest
-from unittest.mock import patch
+from unittest.mock import ANY, Mock, patch
 
 from singer import Catalog, CatalogEntry, Schema
 
-from tap_mysql import binlog_stream_requires_historical, sync_binlog_streams
+from tap_mysql import binlog_stream_requires_historical, do_discover, sync_binlog_streams
 
 
 class TestTapMysql(unittest.TestCase):
+
+    @patch('tap_mysql.discover_catalog')
+    def test_discovery_enables_mariadb_json_aliases_only_for_iceberg(
+        self, discover_catalog_mock
+    ):
+        discovered = Mock()
+        discover_catalog_mock.return_value = discovered
+
+        do_discover(
+            Mock(),
+            {
+                'engine': 'mariadb',
+                'target_table_format': 'iceberg',
+                'iceberg_version': 3,
+                'filter_dbs': 'source_db',
+            },
+        )
+
+        discover_catalog_mock.assert_called_once_with(
+            ANY,
+            'source_db',
+            detect_json_aliases=True,
+        )
+        discovered.dump.assert_called_once_with()
+
+    @patch('tap_mysql.discover_catalog')
+    def test_native_discovery_keeps_existing_catalog_call(
+        self, discover_catalog_mock
+    ):
+        do_discover(
+            Mock(),
+            {'engine': 'mariadb', 'target_table_format': 'native'},
+        )
+
+        discover_catalog_mock.assert_called_once_with(ANY, None)
 
     @patch('tap_mysql.metrics.job_timer')
     @patch('tap_mysql.binlog.sync_binlog_stream')

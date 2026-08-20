@@ -16,11 +16,13 @@ from tests.units.cli.cli_args import CliArgs
 from pipelinewise import cli
 from pipelinewise.cli.constants import ConnectorType
 from pipelinewise.cli.config import Config
-from pipelinewise.cli.pipelinewise import PipelineWise
+from pipelinewise.cli.fastsync_capabilities import FastSyncCapabilities
+from pipelinewise.cli.pipelinewise import FASTSYNC_PAIRS, PipelineWise
 from pipelinewise.cli.errors import (
     DuplicateConfigException,
     InvalidConfigException,
     InvalidTransformationException,
+    PartialSyncNotSupportedTypeException,
     PreRunChecksException,
 )
 
@@ -130,6 +132,14 @@ class TestCli:
                 assert mocked_parallel.call_count == len(expected_taps)
                 for call_arg in mocked_parallel.call_args_list:
                     assert call_arg[1]['tap']['id'] in expected_taps
+
+    @staticmethod
+    def _import_salesforce_iceberg(config_dir: Path) -> PipelineWise:
+        args = CliArgs(dir=f'{RESOURCES_DIR}/test_salesforce_iceberg_config')
+        pipelinewise = PipelineWise(args, str(config_dir), VIRTUALENVS_DIR)
+        with patch.object(pipelinewise, '_discover_tap', return_value=None):
+            pipelinewise.import_project()
+        return pipelinewise
 
     def _assert_run_command_exit_with_error_1(self, command):
         with patch('pipelinewise.cli.pipelinewise.PipelineWise.run_tap_singer'):
@@ -296,19 +306,16 @@ class TestCli:
             tap_properties_singer,
             singer_stream_ids,
         ) = self.pipelinewise.create_filtered_tap_properties(
-            target_type=ConnectorType('target-snowflake'),
-            tap_type=ConnectorType('tap-mysql'),
-            tap_properties=f'{os.path.dirname(__file__)}/resources/sample_json_config/target_one/tap_one/properties.json',  # pylint: disable=line-too-long
-            tap_state=f'{os.path.dirname(__file__)}/resources/sample_json_config/target_one/tap_one/state.json',
-            filters={
+            ConnectorType.TARGET_SNOWFLAKE,
+            ConnectorType.TAP_MYSQL,
+            f'{os.path.dirname(__file__)}/resources/sample_json_config/target_one/tap_one/properties.json',  # pylint: disable=line-too-long
+            f'{os.path.dirname(__file__)}/resources/sample_json_config/target_one/tap_one/state.json',
+            {
                 'selected': True,
-                'tap_target_pairs': {
-                    ConnectorType.TAP_MYSQL: {ConnectorType.TARGET_SNOWFLAKE},
-                    ConnectorType.TAP_POSTGRES: {ConnectorType.TARGET_SNOWFLAKE},
-                },
+                'tap_target_pairs': FASTSYNC_PAIRS,
                 'initial_sync_required': True,
             },
-            create_fallback=True,
+            True,
         )
 
         # Fastsync and singer properties should be created
@@ -337,16 +344,13 @@ class TestCli:
             tap_properties_singer,
             singer_stream_ids,
         ) = self.pipelinewise.create_filtered_tap_properties(
-            target_type=ConnectorType('target-snowflake'),
-            tap_type=ConnectorType('tap-mysql'),
+            target_type=ConnectorType.TARGET_SNOWFLAKE,
+            tap_type=ConnectorType.TAP_MYSQL,
             tap_properties=f'{os.path.dirname(__file__)}/resources/sample_json_config/target_one/tap_one/properties.json', # pylint: disable=line-too-long
             tap_state=f'{os.path.dirname(__file__)}/resources/sample_json_config/target_one/tap_one/state.json',
             filters={
                 'selected': True,
-                'tap_target_pairs': {
-                    ConnectorType.TAP_MYSQL: {ConnectorType.TARGET_S3_CSV},
-                    ConnectorType.TAP_POSTGRES: {ConnectorType.TARGET_SNOWFLAKE},
-                },
+                'tap_target_pairs': {},
                 'initial_sync_required': True,
             },
             create_fallback=True,
@@ -379,8 +383,8 @@ class TestCli:
             ),
         ):
             self.pipelinewise.create_filtered_tap_properties(
-                target_type=ConnectorType('target-snowflake'),
-                tap_type=ConnectorType('tap-mysql'),
+                target_type=ConnectorType.TARGET_SNOWFLAKE,
+                tap_type=ConnectorType.TAP_MYSQL,
                 tap_properties=str(missing_catalog),
                 tap_state=f'{RESOURCES_DIR}/sample_json_config/target_one/tap_one/state.json',
                 filters={},
@@ -399,8 +403,8 @@ class TestCli:
             ),
         ):
             self.pipelinewise.create_filtered_tap_properties(
-                target_type=ConnectorType('target-snowflake'),
-                tap_type=ConnectorType('tap-mysql'),
+                target_type=ConnectorType.TARGET_SNOWFLAKE,
+                tap_type=ConnectorType.TAP_MYSQL,
                 tap_properties=str(invalid_catalog),
                 tap_state=f'{RESOURCES_DIR}/sample_json_config/target_one/tap_one/state.json',
                 filters={},
@@ -631,13 +635,44 @@ class TestCli:
         args = CliArgs(dir=f'{os.path.dirname(__file__)}/resources/test_import_command', taps='tap_one,tap_three')
         self._assert_import_command(args)
 
-    def test_import_rejects_table_format_conflict_before_saving(self):
-        """import_config applies the shared policy before generated config is changed."""
-        args = CliArgs(dir=f'{RESOURCES_DIR}/test_table_format_conflict')
+    def test_import_accepts_salesforce_iceberg_and_generates_target_runtime(self, tmp_path):
+        """Singer-only Iceberg settings are generated for target-snowflake, not the tap."""
+        config_dir = tmp_path / 'runtime'
+        self._import_salesforce_iceberg(config_dir)
+
+        tap_dir = config_dir / 'test_snowflake_target' / 'salesforce_iceberg'
+        source_config = cli.utils.load_json(str(tap_dir / 'config.json'))
+        target_runtime = cli.utils.load_json(str(tap_dir / 'inheritable_config.json'))
+        main_config = cli.utils.load_json(str(config_dir / 'config.json'))
+        imported_tap = main_config['targets'][0]['taps'][0]
+
+        assert 'target_table_format' not in source_config
+        assert 'iceberg_version' not in source_config
+        assert target_runtime['target_table_format'] == 'iceberg'
+        assert target_runtime['iceberg_version'] == 3
+        assert target_runtime['data_flattening_max_level'] == 10
+        assert target_runtime['hard_delete'] is True
+        assert imported_tap['target_table_format'] == 'iceberg'
+        assert imported_tap['iceberg_version'] == 3
+
+    @pytest.mark.parametrize(
+        ('fixture_name', 'reserved_key'),
+        [
+            ('test_removed_iceberg_create', 'iceberg_create'),
+            ('test_removed_target_root_format', 'target_table_format'),
+            ('test_removed_tap_iceberg_create', 'iceberg_create'),
+            ('test_removed_tap_db_conn_format', 'iceberg_version'),
+        ],
+    )
+    def test_import_rejects_reserved_format_placements_before_saving(
+        self, fixture_name, reserved_key
+    ):
+        """import_config rejects shared, misplaced, and removed format settings."""
+        args = CliArgs(dir=f'{RESOURCES_DIR}/{fixture_name}')
         pipelinewise = PipelineWise(args, CONFIG_DIR, VIRTUALENVS_DIR)
 
         with patch.object(Config, 'save') as save:
-            with pytest.raises(InvalidConfigException, match='conflicts'):
+            with pytest.raises(InvalidConfigException, match=reserved_key):
                 pipelinewise.import_project()
 
         save.assert_not_called()
@@ -711,6 +746,66 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
             pipelinewise.run_tap()
         assert pytest_wrapped_e.type == SystemExit
         assert pytest_wrapped_e.value.code == 1
+
+    def test_run_tap_routes_full_table_salesforce_iceberg_to_singer(self, tmp_path):
+        """A FULL_TABLE Singer-only source must not enter the Iceberg FastSync path."""
+        config_dir = tmp_path / 'runtime'
+        self._import_salesforce_iceberg(config_dir)
+        tap_dir = config_dir / 'test_snowflake_target' / 'salesforce_iceberg'
+        cli.utils.save_json(
+            {
+                'streams': [
+                    {
+                        'tap_stream_id': 'Account',
+                        'table_name': 'Account',
+                        'schema': {
+                            'type': 'object',
+                            'properties': {'Id': {'type': ['null', 'string']}},
+                        },
+                        'metadata': [
+                            {
+                                'breadcrumb': [],
+                                'metadata': {
+                                    'selected': True,
+                                    'replication-method': 'FULL_TABLE',
+                                    'table-key-properties': ['Id'],
+                                },
+                            }
+                        ],
+                    }
+                ]
+            },
+            str(tap_dir / 'properties.json'),
+        )
+        cli.utils.save_json({}, str(tap_dir / 'state.json'))
+
+        runner = PipelineWise(
+            CliArgs(target='test_snowflake_target', tap='salesforce_iceberg'),
+            str(config_dir),
+            VIRTUALENVS_DIR,
+        )
+        captured = {}
+
+        def capture_singer(*, tap, target, **_kwargs):
+            captured['properties'] = cli.utils.load_json(tap.properties)
+            captured['target_config'] = cli.utils.load_json(target.config)
+
+        with patch(
+            'pipelinewise.cli.pipelinewise.pidfile.PIDFile'
+        ), patch.object(
+            runner, 'do_sync_tables'
+        ) as fastsync, patch.object(
+            runner, 'run_tap_singer', side_effect=capture_singer
+        ) as singer:
+            runner.run_tap()
+
+        fastsync.assert_not_called()
+        singer.assert_called_once()
+        stream_metadata = captured['properties']['streams'][0]['metadata'][0]['metadata']
+        assert stream_metadata['selected'] is True
+        assert captured['target_config']['target_table_format'] == 'iceberg'
+        assert captured['target_config']['iceberg_version'] == 3
+        assert captured['target_config']['data_flattening_max_level'] == 10
 
     def test_command_stop_tap(self, tmp_path):
         """Test stop tap command"""
@@ -824,10 +919,34 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
 
         assert bookmarks == {'bookmarks': {'tb1': {'foo': 'bar'}}, 'currently_syncing': None}
 
-    def test_do_sync_tables_rejects_iceberg_before_state_or_process_changes(self):
-        """A real fresh-stream selection fails before state cleanup or child launch."""
+    def test_do_sync_tables_allows_supported_iceberg_routes(self):
+        """Supported RDBMS-to-Snowflake Iceberg selections launch their workers."""
         pipelinewise = self._init_for_sync_tables_states_cleanup()
         pipelinewise.tap['target_table_format'] = 'iceberg'
+        pipelinewise.tap['iceberg_version'] = 3
+
+        with patch.object(
+            pipelinewise, '_reset_state_file_for_partial_sync'
+        ) as reset_state, patch(
+            'pipelinewise.cli.pipelinewise.Process'
+        ) as process:
+            process.return_value.exception = None
+            process.return_value.exitcode = 0
+            pipelinewise.do_sync_tables()
+
+        reset_state.assert_called_once()
+        assert process.call_count == 2
+
+    @pytest.mark.parametrize(
+        'tap_type',
+        [ConnectorType.TAP_MONGODB.value, ConnectorType.TAP_SALESFORCE.value],
+    )
+    def test_do_sync_tables_rejects_unsupported_iceberg_before_mutation(self, tap_type):
+        """Unsupported Iceberg routes fail before state cleanup or child launch."""
+        pipelinewise = self._init_for_sync_tables_states_cleanup()
+        pipelinewise.tap['target_table_format'] = 'iceberg'
+        pipelinewise.tap['iceberg_version'] = 3
+        pipelinewise.tap['type'] = tap_type
 
         with patch.object(
             pipelinewise, '_reset_state_file_for_partial_sync'
@@ -844,6 +963,7 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
         """Explicit Iceberg does not block a launch with no FastSync selection."""
         pipelinewise = self._init_for_sync_tables_states_cleanup()
         pipelinewise.tap['target_table_format'] = 'iceberg'
+        pipelinewise.tap['iceberg_version'] = 3
 
         with patch.object(
             pipelinewise,
@@ -854,39 +974,78 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
 
         process.assert_not_called()
 
-    def test_direct_fastsync_rejects_iceberg_before_state_cleanup(self):
-        """The defensive FullSync seam rejects Iceberg before bookmark cleanup."""
+    def test_direct_fastsync_allows_supported_iceberg_route(self):
+        """The defensive FullSync seam accepts an implemented Iceberg route."""
         pipelinewise = self._init_for_sync_tables_states_cleanup()
         pipelinewise.tap['target_table_format'] = 'iceberg'
+        pipelinewise.tap['iceberg_version'] = 3
 
         with patch.object(pipelinewise, '_cleanup_tap_state_file') as cleanup, patch.object(
             pipelinewise, 'run_tap_fastsync'
         ) as run_fastsync:
-            with pytest.raises(PreRunChecksException, match='No target changes'):
-                pipelinewise.sync_tables_fast_sync(['db_test_mysql.table_one'])
+            pipelinewise.sync_tables_fast_sync(['db_test_mysql.table_one'])
 
+        cleanup.assert_called_once()
+        run_fastsync.assert_called_once()
+
+    def test_direct_fastsync_rejects_unsupported_native_route_before_mutation(self):
+        """A synthetic native executable cannot bypass the capability policy."""
+        pipelinewise = self._init_for_sync_tables_states_cleanup()
+        pipelinewise.tap['type'] = ConnectorType.TAP_SALESFORCE.value
+
+        with patch.object(
+            pipelinewise, '_check_if_tap_is_enabled'
+        ) as check_enabled, patch.object(
+            pipelinewise, '_check_if_complete_tap_configuration'
+        ) as check_configuration, patch.object(
+            pipelinewise, '_cleanup_tap_state_file'
+        ) as cleanup, patch.object(
+            pipelinewise, 'run_tap_fastsync'
+        ) as run_fastsync:
+            with pytest.raises(PreRunChecksException, match='No target changes'):
+                pipelinewise.sync_tables_fast_sync(['source.table'])
+
+        check_enabled.assert_not_called()
+        check_configuration.assert_not_called()
         cleanup.assert_not_called()
         run_fastsync.assert_not_called()
 
-    def test_direct_partial_sync_rejects_iceberg_before_command(self):
-        """The standalone PartialSync command cannot bypass the temporary guard."""
+    def test_direct_partial_sync_allows_supported_iceberg_route(self):
+        """The standalone PartialSync seam accepts an implemented Iceberg route."""
         pipelinewise = self._init_for_sync_tables_states_cleanup()
         pipelinewise.tap['target_table_format'] = 'iceberg'
+        pipelinewise.tap['iceberg_version'] = 3
 
-        with patch.object(
-            pipelinewise, '_check_supporting_tap_and_target_for_partial_sync'
-        ) as check_pair, patch.object(
-            pipelinewise, 'run_tap_partialsync'
-        ) as run_partial_sync, patch.object(
-            pipelinewise.logger, 'error'
-        ) as log_error:
-            with pytest.raises(SystemExit) as raised:
-                pipelinewise.sync_tables_partial_sync()
+        pipelinewise._check_target_table_format_supports_fastsync()  # pylint: disable=protected-access
+        pipelinewise._check_supporting_tap_and_target_for_partial_sync()  # pylint: disable=protected-access
 
-        assert raised.value.code == 1
-        assert 'No target changes were made' in str(log_error.call_args.args[0])
-        check_pair.assert_not_called()
-        run_partial_sync.assert_not_called()
+    def test_iceberg_format_guard_requires_the_requested_operation(self):
+        """An asymmetric future capability cannot enter the wrong lifecycle."""
+        pipelinewise = self._init_for_sync_tables_states_cleanup()
+        pipelinewise.tap['target_table_format'] = 'iceberg'
+        capabilities = FastSyncCapabilities(partial_sync=True)
+
+        with patch(
+            'pipelinewise.cli.pipelinewise.resolve_fastsync_capabilities',
+            return_value=capabilities,
+        ):
+            pipelinewise._check_target_table_format_supports_fastsync(  # pylint: disable=protected-access
+                'partial_sync'
+            )
+            with pytest.raises(PreRunChecksException, match='No target changes'):
+                pipelinewise._check_target_table_format_supports_fastsync(  # pylint: disable=protected-access
+                    'full_sync'
+                )
+
+    def test_partial_sync_guard_rejects_singer_only_iceberg_route(self):
+        """Singer-only Iceberg routes cannot enter PartialSync directly."""
+        pipelinewise = self._init_for_sync_tables_states_cleanup()
+        pipelinewise.tap['target_table_format'] = 'iceberg'
+        pipelinewise.tap['iceberg_version'] = 3
+        pipelinewise.tap['type'] = ConnectorType.TAP_MONGODB.value
+
+        with pytest.raises(PartialSyncNotSupportedTypeException):
+            pipelinewise._check_supporting_tap_and_target_for_partial_sync()  # pylint: disable=protected-access
 
     def test_fast_sync_tables_cleanup_state_for_selected_tables(self):
         """Testing sync_tables cleanup state if file exists and there is no table argument"""
@@ -1011,12 +1170,34 @@ tap_three  tap-mysql     target_two   target-s3-csv     True       not-configure
         with pytest.raises(InvalidTransformationException):
             pipelinewise.validate()
 
-    def test_validate_rejects_table_format_conflict(self):
-        """validate and import_config share the same cross-config format policy."""
-        args = CliArgs(dir=f'{RESOURCES_DIR}/test_table_format_conflict')
+    def test_validate_allows_json_transformation_for_singer_only_iceberg(
+        self, tmp_path
+    ):
+        """A Singer-only Iceberg route must not inherit FastSync restrictions."""
+        source_dir = Path(
+            f'{RESOURCES_DIR}/test_validate_command/json_transformation_in_fastsync'
+        )
+        yaml_dir = tmp_path / 'json_transformation_in_singer_only_iceberg'
+        shutil.copytree(source_dir, yaml_dir)
+        tap_path = yaml_dir / 'tap_test.yml'
+        tap_yaml = tap_path.read_text(encoding='utf-8').replace(
+            'type: "tap-postgres"',
+            'type: "tap-mongodb"\ntarget_table_format: iceberg\niceberg_version: 3',
+        )
+        tap_path.write_text(tap_yaml, encoding='utf-8')
+
+        pipelinewise = PipelineWise(
+            CliArgs(dir=str(yaml_dir)), CONFIG_DIR, VIRTUALENVS_DIR
+        )
+
+        pipelinewise.validate()
+
+    def test_validate_rejects_removed_iceberg_create(self):
+        """validate rejects the removed flag even when the target has no taps."""
+        args = CliArgs(dir=f'{RESOURCES_DIR}/test_removed_iceberg_create')
         pipelinewise = PipelineWise(args, CONFIG_DIR, VIRTUALENVS_DIR)
 
-        with pytest.raises(InvalidConfigException, match='conflicts'):
+        with pytest.raises(InvalidConfigException, match='iceberg_create'):
             pipelinewise.validate()
 
     # pylint: disable=protected-access

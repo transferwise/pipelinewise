@@ -94,6 +94,17 @@ class JsonFixturesTestCase(TestCase):
         cursor.execute.assert_called_once_with(
             'INSERT INTO fixture VALUES (%s)', params
         )
+        connect_mock.assert_called_once_with(
+            host='mysql',
+            port=3306,
+            user='user',
+            password='password',
+            database='database',
+            charset='utf8mb4',
+            cursorclass=db_module.pymysql.cursors.Cursor,
+            ssl={'': True},
+            autocommit=True,
+        )
 
     @mock.patch('tests.end_to_end.helpers.db.psycopg2.connect')
     def test_postgres_query_helper_passes_fixture_as_a_parameter(self, connect_mock):

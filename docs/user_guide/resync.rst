@@ -68,6 +68,14 @@ A table with ``sync_start_from`` uses PartialSync instead of FullSync. MariaDB,
 MySQL, and PostgreSQL sources can use ``replica_host`` for the FastSync read while
 ongoing LOG_BASED replication remains on the primary.
 
+For a managed Iceberg v3 target, an exactly compatible table uses
+``INSERT OVERWRITE`` and retains its object identity. A new nullable column is
+added before overwrite. Other mismatches require guarded replacement by the
+table's current owning account role; database-role ownership is not supported.
+Ownership is retained, but the new object resets history and can change its base
+location; visible unsupported dependencies stop the operation first. See
+:ref:`snowflake_iceberg`.
+
 
 Partial repair
 --------------
@@ -91,9 +99,13 @@ schema and delete behaviour.
 Failure and validation
 ----------------------
 
-If a resync fails, preserve the log, generated staging objects, target object
-names, and state backup until the target publication state is understood. Do not
-advance state past an unpublished table.
+If a managed-Iceberg resync fails, preserve the log, generated staging objects,
+``iceberg-recovery-<hash>.json`` stream manifest,
+``iceberg-fastsync-target-<hash>.json`` target pointer, target object names, and
+state backup until the publication state is understood. Retry the same operation
+from the same generated target runtime directory and with unchanged source,
+target, staging, role, and transformation identity before editing state or
+removing recovery evidence. Do not advance state past an unpublished table.
 
 After success, verify exact primary keys or a deterministic reconciliation,
 critical values, target grants, and the next Singer run. Keep the state backup

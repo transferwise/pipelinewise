@@ -42,6 +42,7 @@ COMMANDS = [
     'validate',
     'encrypt_string',
     'partial_sync_table',
+    'copy_native_to_iceberg',
     'reset_state',
     'list_data_diff_checks',
     'run_data_diff_checks',
@@ -149,7 +150,6 @@ def __disable_profiler(
         profiler.clear()
 
 
-# pylint: disable=too-many-branches
 def _validate_command_specific_arguments(args):
     # Command specific argument validations
     if args.command == 'init' and args.name == '*':
@@ -186,7 +186,30 @@ def _validate_command_specific_arguments(args):
     if args.command == 'partial_sync_table':
         _validate_partial_sync_arguments(args)
 
+    if args.command == 'copy_native_to_iceberg':
+        _validate_iceberg_copy_arguments(args)
+
     _validate_data_diff_arguments(args)
+
+
+def _validate_iceberg_copy_arguments(args):
+    """Require one explicit Snowflake destination, table, and Iceberg version."""
+    if args.target == '*':
+        raise CommandSpecificArgumentsException(
+            'You must specify a destination name using the argument --target'
+        )
+    if args.table == '*':
+        raise CommandSpecificArgumentsException(
+            'You must specify a fully qualified Snowflake table using the argument --table'
+        )
+    if (
+        not isinstance(args.iceberg_version, int)
+        or isinstance(args.iceberg_version, bool)
+        or args.iceberg_version != 3
+    ):
+        raise CommandSpecificArgumentsException(
+            'You must explicitly specify Iceberg version 3 using --iceberg-version 3'
+        )
 
 
 def _validate_data_diff_arguments(args):
@@ -284,7 +307,27 @@ def main():
         'The stats will be dumped into a folder in .pipelinewise/profiling',
         action='store_true',
     )
-    parser.add_argument('--table', type=str, default='*', help='Name of the table to partial sync')
+    parser.add_argument(
+        '--table',
+        type=str,
+        default='*',
+        help='Table name for commands that operate on one table',
+    )
+    parser.add_argument(
+        '--eventual',
+        choices=['native', 'iceberg'],
+        default='native',
+        help=(
+            'Final format after native-to-Iceberg conversion; iceberg requires '
+            'a controlled reader-and-writer outage'
+        ),
+    )
+    parser.add_argument(
+        '--iceberg-version',
+        type=int,
+        default=None,
+        help='Managed Iceberg version for native-to-Iceberg conversion',
+    )
     parser.add_argument('--column', type=str, default='*', help='Name of the column to use as sync key in partial sync')
     parser.add_argument('--start_value', type=str, default='*', help='Start value of the column to partial sync')
     parser.add_argument('--end_value', type=str, default=None, help='End value of the column to partial sync')

@@ -46,6 +46,18 @@ Symptom index
        :ref:`zero discovered tables <troubleshooting_discovery_zero_tables>`
      - Discovery / FastSync
      - Source name and replication-user permissions.
+   * - :ref:`Iceberg publication remains ambiguous
+       <troubleshooting_iceberg_publication>`
+     - Snowflake FastSync
+     - Recovery manifest, query tag, and Snowflake query history.
+   * - :ref:`Snowflake VARCHAR width is incompatible
+       <troubleshooting_snowflake_varchar_width>`
+     - Snowflake FastSync / Singer
+     - Physical column width and target-role DDL privileges.
+   * - :ref:`Native-to-Iceberg primary name is absent
+       <troubleshooting_iceberg_conversion_missing_primary>`
+     - Snowflake conversion
+     - Conversion manifest and ``_NATIVE`` / ``_ICEBERG`` companions.
    * - :ref:`Stale running log <troubleshooting_logging>`
      - Process lifecycle
      - PID file and complete process tree.
@@ -493,6 +505,88 @@ tap and recreate the replication slot. See :ref:`resync` before proceeding.
 
 FastSync Errors
 '''''''''''''''
+
+.. _troubleshooting_snowflake_varchar_width:
+
+Snowflake VARCHAR width is incompatible
+"""""""""""""""""""""""""""""""""""""""
+
+Snowflake FastSync stages MariaDB/MySQL and PostgreSQL string-like and fallback
+types as ``VARCHAR(134217728)``. Managed Iceberg v3 also requires every existing
+string column to have ``CHARACTER_MAXIMUM_LENGTH`` 134217728.
+
+For a managed Iceberg v3 target, widen the reported column with ``ALTER ICEBERG
+TABLE ... ALTER COLUMN ... SET DATA TYPE VARCHAR(134217728)`` or recreate the
+table, then retry. PipelineWise does not change existing Iceberg widths.
+
+For a native PartialSync target, PipelineWise widens a compatible narrow text
+column before the merge. If that DDL fails, use a role authorized to alter the
+table or widen it manually, then retry. The failed attempt does not run the merge
+or advance state. A non-text target type requires a FullSync or an explicit,
+reviewed schema migration.
+
+``VARCHAR(134217728)`` remains subject to Snowflake's 128 MB encoded-value limit.
+If the maximum-width column still rejects a value, measure its encoded byte size
+and reduce, split, or exclude it at the source.
+
+.. _troubleshooting_iceberg_publication:
+
+Iceberg publication remains ambiguous
+""""""""""""""""""""""""""""""""""""""""
+
+A Snowflake connection can fail after a publication statement commits but before
+the client receives its response. PipelineWise keeps the source state unchanged
+and records the attempt in an ``iceberg-recovery-<hash>.json`` stream manifest
+and ``iceberg-fastsync-target-<hash>.json`` target pointer under the generated
+target runtime directory at ``$PIPELINEWISE_CONFIG_DIRECTORY/<target_id>/``.
+
+Stop other writers to the target table and retry the same command without editing
+state, dropping staging objects, or deleting either recovery file. Use the same
+generated target runtime directory, tap/source identity, target mapping and role,
+staging configuration, and transformations. For CTAS or ``INSERT OVERWRITE``,
+PipelineWise polls query history every five seconds for up to 900 seconds by
+default. Each lookup scans at most 10,000 visible queries from five minutes
+before the persisted submission time and can observe the publication while it
+is active. Snowflake connector timeouts are best-effort, so a call can make the
+observed wall-clock duration exceed the nominal budget. PipelineWise requires
+the exact query tag, verifies the target, and resumes finalization. For
+PartialSync, it replays the persisted range transaction deterministically.
+Query-history visibility can lag, so a later retry may be required while
+Snowflake retains the Information Schema query history.
+
+Set the positive integer ``iceberg_query_history_poll_timeout_seconds`` in the
+Snowflake target's ``db_conn`` when 900 seconds is insufficient. The setting is
+not part of recovery identity, so it can be increased before retrying the same
+command unchanged.
+
+Query-history visibility timeouts and lookup failures are reported as retryable
+publication ambiguity. Their failure message confirms that the recovery files
+and staging table were preserved and instructs the operator to retry the same
+FastSync command unchanged; PipelineWise does not automatically republish or
+advance state.
+
+If reconciliation remains ambiguous, preserve the stream manifest, target
+pointer, staging table, S3 keys, query tag, target identity, and logs. Inspect
+them with a role that can see all relevant table metadata and query history
+before changing target objects. See :ref:`snowflake_iceberg_recovery`.
+
+.. _troubleshooting_iceberg_conversion_missing_primary:
+
+Native-to-Iceberg primary name is absent
+""""""""""""""""""""""""""""""""""""""""
+
+``copy_native_to_iceberg --eventual iceberg`` uses one statement to rename the
+native table to ``<table>_NATIVE`` and another to promote
+``<table>_ICEBERG``. Rollback likewise uses two statements. The primary name is
+absent between them, and an interruption can extend that reader outage until
+recovery runs.
+
+Keep every reader and writer stopped. Retry the identical command from the same
+imported target runtime directory with the same table, ``--eventual`` value,
+target identity, and account role. Do not rename or drop companion tables and do
+not delete or edit the recovery manifest. If PipelineWise cannot prove one safe
+table state, inspect the primary, ``_NATIVE``, ``_ICEBERG``, and manifest before
+making a manual change. See :ref:`snowflake_iceberg`.
 
 .. _troubleshooting_fastsync_table_not_found:
 

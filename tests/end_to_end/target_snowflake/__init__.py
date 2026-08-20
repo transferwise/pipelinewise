@@ -27,9 +27,8 @@ class TargetSnowflake(unittest.TestCase):
         if self.e2e_env.env[tap_type]['is_configured'] is False:
             self.skipTest(f'{tap_type} is not configured properly')
 
-        # import_config processes every Snowflake tap in the E2E project. Reset
-        # the whole generated target tree so stale sibling files cannot make
-        # discovery depend on a previous test's outcome.
+        # Recovery is target-scoped. Reset the whole generated target tree so
+        # stale sibling files cannot make this tap depend on a previous test.
         self.remove_dir_from_config_dir(self.target_id)
 
         self.check_snowflake_credentials_provided()
@@ -92,9 +91,52 @@ class TargetSnowflake(unittest.TestCase):
         run `pipelinewise import_config`
         """
         return_code, stdout, stderr = tasks.run_command(
-            f'pipelinewise import_config --dir {TEST_PROJECTS_DIR_PATH}'
+            f'pipelinewise import_config --dir {TEST_PROJECTS_DIR_PATH} '
+            f'--taps {self.tap_id}'
         )
         assertions.assert_command_success(return_code, stdout, stderr)
+
+    def iceberg_fastsync_s3_keys(self):
+        """Return current route-owned FastSync staging keys."""
+        bucket = self.e2e_env.get_conn_env_var(
+            'TARGET_SNOWFLAKE', 'S3_BUCKET'
+        )
+        key_prefix = self.e2e_env.get_conn_env_var(
+            'TARGET_SNOWFLAKE', 'S3_KEY_PREFIX'
+        )
+        route_prefix = f'{key_prefix}pipelinewise_{self.tap_id}_'
+        response = self.e2e_env.get_aws_session().client('s3').list_objects_v2(
+            Bucket=bucket,
+            Prefix=route_prefix,
+        )
+        return sorted(item['Key'] for item in response.get('Contents', []))
+
+    def assert_iceberg_fastsync_cleanup(
+        self,
+        target_schema,
+        expected_s3_keys=(),
+    ):
+        """Assert a successful Iceberg route leaves no recoverable staging debt."""
+        runtime_dir = Path(CONFIG_DIR) / self.target_id
+        manifests = sorted(runtime_dir.glob('iceberg-recovery-*.json'))
+        target_pointers = sorted(
+            runtime_dir.glob('iceberg-fastsync-target-*.json')
+        )
+        self.assertEqual(manifests, [])
+        self.assertEqual(target_pointers, [])
+
+        table_rows = self.e2e_env.run_query_target_snowflake(
+            f'SHOW TABLES IN SCHEMA "{target_schema}"'
+        )
+        staging_tables = [
+            row[1] for row in table_rows if '_PW_ICEBERG_' in row[1]
+        ]
+        self.assertEqual(staging_tables, [])
+
+        self.assertEqual(
+            self.iceberg_fastsync_s3_keys(),
+            sorted(expected_s3_keys),
+        )
 
     def drop_sf_schema_if_exists(self, schema: str):
         """

@@ -91,8 +91,9 @@ class PartialSyncUploadOrderTestCase(TestCase):
                 sync_module, tap_class_name, return_value=source
             ), mock.patch.object(
                 sync_module, 'FastSyncTargetSnowflake', return_value=snowflake
-            ), mock.patch.object(
-                sync_module.os.path, 'getsize', side_effect=getsize
+            ), mock.patch(
+                'pipelinewise.fastsync.partialsync.rdbms_to_snowflake.os.path.getsize',
+                side_effect=getsize,
             ), mock.patch.object(
                 sync_module.utils, 'load_into_snowflake', side_effect=publish
             ) as load_into_snowflake, mock.patch.object(
@@ -107,7 +108,10 @@ class PartialSyncUploadOrderTestCase(TestCase):
                 sync_module.common_utils,
                 'apply_snowflake_table_grants',
                 side_effect=apply_grants,
-            ) as apply_grants_mock:
+            ) as apply_grants_mock, mock.patch.object(
+                sync_module.iceberg_routes,
+                'require_native_target_format',
+            ) as native_format_guard:
                 result = sync_module.partial_sync_table(table, args)
 
             return {
@@ -121,6 +125,7 @@ class PartialSyncUploadOrderTestCase(TestCase):
                 'grants': apply_grants_mock,
                 'bookmark': get_bookmark,
                 'target_schema': get_target_schema,
+                'native_format_guard': native_format_guard,
                 'timeline': timeline,
             }
 
@@ -244,8 +249,11 @@ class PartialSyncUploadOrderTestCase(TestCase):
         self.assertIs(actual['result'], True)
         self.assertEqual(actual['load'].call_args.args[6], expected_where_clause)
         actual['state'].assert_not_called()
+        runtime_args = actual['source'].export_source_table_data.call_args.args[0]
+        self.assertIsNot(runtime_args, actual['args'])
+        self.assertNotEqual(runtime_args.table, actual['args'].table)
         actual['source'].export_source_table_data.assert_called_once_with(
-            actual['args'],
+            runtime_args,
             actual['args'].target.get('tap_id'),
             expected_where_clause,
         )
@@ -272,6 +280,7 @@ class PartialSyncUploadOrderTestCase(TestCase):
                     actual['source'].map_column_types_to_target.assert_not_called()
                     actual['source'].export_source_table_data.assert_not_called()
                     actual['target_schema'].assert_not_called()
+                    actual['native_format_guard'].assert_not_called()
                     actual['snowflake'].create_schema.assert_not_called()
                     actual['snowflake'].create_table.assert_not_called()
                     actual['snowflake'].upload_to_s3.assert_not_called()

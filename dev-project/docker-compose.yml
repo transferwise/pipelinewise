@@ -19,6 +19,13 @@ services:
       PIPELINEWISE_BACKEND_USER: ${PIPELINEWISE_BACKEND_USER:-pipelinewise_backend}
       PIPELINEWISE_BACKEND_PASSWORD: ${PIPELINEWISE_BACKEND_PASSWORD:-backend-secret}
       PIPELINEWISE_BACKEND_DB: ${PIPELINEWISE_BACKEND_DB:-pipelinewise_backend}
+      TAP_ORACLE_MYSQL_HOST: ${TAP_ORACLE_MYSQL_HOST:-pipelinewise-oracle-mysql-source}
+      TAP_ORACLE_MYSQL_PORT: ${TAP_ORACLE_MYSQL_PORT:-3306}
+      TAP_ORACLE_MYSQL_PORT_ON_HOST: ${TAP_ORACLE_MYSQL_PORT_ON_HOST:-13307}
+      TAP_ORACLE_MYSQL_ROOT_PASSWORD: ${TAP_ORACLE_MYSQL_ROOT_PASSWORD:-secret}
+      TAP_ORACLE_MYSQL_USER: ${TAP_ORACLE_MYSQL_USER:-pipelinewise}
+      TAP_ORACLE_MYSQL_PASSWORD: ${TAP_ORACLE_MYSQL_PASSWORD:-secret}
+      TAP_ORACLE_MYSQL_DB: ${TAP_ORACLE_MYSQL_DB:-mysql8_source_db}
     volumes:
       - ../:/opt/pipelinewise
       # don't create container specific .virtualenvs files on host
@@ -32,6 +39,8 @@ services:
       pipelinewise-postgres-source:
         condition: service_healthy
       pipelinewise-mysql-source:
+        condition: service_healthy
+      pipelinewise-oracle-mysql-source:
         condition: service_healthy
       pipelinewise-postgres-target:
         condition: service_healthy
@@ -130,6 +139,7 @@ services:
       --binlog-format=ROW
       --binlog-do-db=${TAP_MYSQL_DB}
       --binlog-do-db=${TAP_MYSQL_REPLICA_DB}
+      --max-allowed-packet=64M
       --tls_version=TLSv1.2
       --require_secure_transport=ON
       --ssl_cert=/etc/my.cnf.d/certificates/server-cert.pem
@@ -163,6 +173,44 @@ services:
       MYSQL_USER: ${TAP_MYSQL_REPLICA_USER}
       MYSQL_PASSWORD: ${TAP_MYSQL_REPLICA_PASSWORD}
       MYSQL_DATABASE: ${TAP_MYSQL_REPLICA_DB}
+    networks:
+      - pipelinewise_network
+
+  # Genuine Oracle MySQL service, kept separate from MariaDB so engine-specific
+  # compatibility claims are backed by the named database.
+  pipelinewise-oracle-mysql-source:
+    image: mysql:8.0.39
+    container_name: pipelinewise-oracle-mysql-source
+    ports:
+      - ${TAP_ORACLE_MYSQL_PORT_ON_HOST:-13307}:${TAP_ORACLE_MYSQL_PORT:-3306}
+    volumes:
+      - ./my/server-cert.pem:/etc/mysql/certificates/server-cert.pem
+      - ./my/server-key.pem:/etc/mysql/certificates/server-key.pem
+      - ./my/ca-cert.pem:/etc/mysql/certificates/ca-cert.pem
+    command: >
+      --default-authentication-plugin=mysql_native_password
+      --performance-schema=ON
+      --server-id=3
+      --log-bin=mysql-bin
+      --binlog-format=ROW
+      --binlog-row-image=FULL
+      --binlog-do-db=${TAP_ORACLE_MYSQL_DB:-mysql8_source_db}
+      --require-secure-transport=ON
+      --ssl-cert=/etc/mysql/certificates/server-cert.pem
+      --ssl-key=/etc/mysql/certificates/server-key.pem
+      --ssl-ca=/etc/mysql/certificates/ca-cert.pem
+    environment:
+      MYSQL_ROOT_PASSWORD: ${TAP_ORACLE_MYSQL_ROOT_PASSWORD:-secret}
+      MYSQL_USER: ${TAP_ORACLE_MYSQL_USER:-pipelinewise}
+      MYSQL_PASSWORD: ${TAP_ORACLE_MYSQL_PASSWORD:-secret}
+      MYSQL_DATABASE: ${TAP_ORACLE_MYSQL_DB:-mysql8_source_db}
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - mysqladmin ping -h 127.0.0.1 -u root -p"$$MYSQL_ROOT_PASSWORD" --silent
+      interval: 5s
+      timeout: 5s
+      retries: 20
     networks:
       - pipelinewise_network
 

@@ -1160,23 +1160,35 @@ class TestIntegration(unittest.TestCase):
         self.persist_lines_with_cache(tap_lines)
 
         # Get query tags from QUERY_HISTORY
-        result = snowflake.query(f"""SELECT query_tag, count(*) queries
+        result = snowflake.query(f"""SELECT query_tag, query_type
                                  FROM table(information_schema.query_history_by_user('{self.config['user']}'))
                                  WHERE query_tag like '%%PPW test tap run at {current_time}%%'
-                                 GROUP BY query_tag
-                                 ORDER BY 1""")
+                                 GROUP BY query_tag, query_type
+                                 ORDER BY 1, 2""")
 
         target_db = self.config['dbname']
         target_schema = self.config['default_target_schema']
-        expected_minimum_queries = {
-            f'PPW test tap run at {current_time}. Loading into {target_db}..': 4,
-            f'PPW test tap run at {current_time}. Loading into {target_db}.{target_schema}.TEST_TABLE_ONE': 10,
-            f'PPW test tap run at {current_time}. Loading into {target_db}.{target_schema}.TEST_TABLE_THREE': 9,
-            f'PPW test tap run at {current_time}. Loading into {target_db}.{target_schema}.TEST_TABLE_TWO': 9,
+        root_tag = f'PPW test tap run at {current_time}. Loading into {target_db}..'
+        table_tags = {
+            f'PPW test tap run at {current_time}. Loading into {target_db}.{target_schema}.TEST_TABLE_ONE',
+            f'PPW test tap run at {current_time}. Loading into {target_db}.{target_schema}.TEST_TABLE_THREE',
+            f'PPW test tap run at {current_time}. Loading into {target_db}.{target_schema}.TEST_TABLE_TWO',
         }
-        self.assertEqual({row['QUERY_TAG'] for row in result}, set(expected_minimum_queries))
+        query_types_by_tag = {}
         for row in result:
-            self.assertGreaterEqual(row['QUERIES'], expected_minimum_queries[row['QUERY_TAG']])
+            query_types_by_tag.setdefault(row['QUERY_TAG'], set()).add(row['QUERY_TYPE'])
+
+        self.assertEqual(set(query_types_by_tag), table_tags | {root_tag})
+        self.assertTrue({'BEGIN', 'SELECT', 'SHOW'}.issubset(query_types_by_tag[root_tag]))
+        required_table_query_types = {
+            'ALTER_TABLE_MODIFY_COLUMN',
+            'BEGIN',
+            'CREATE_TABLE',
+            'MERGE',
+            'SHOW',
+        }
+        for table_tag in table_tags:
+            self.assertTrue(required_table_query_types.issubset(query_types_by_tag[table_tag]))
 
         # Detecting file format type should run only once
         result = snowflake.query(f"""SELECT count(*) show_file_format_queries

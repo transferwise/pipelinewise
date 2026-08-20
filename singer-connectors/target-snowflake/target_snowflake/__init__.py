@@ -26,8 +26,6 @@ from target_snowflake.exceptions import (
     InvalidValidationOperationException
 )
 
-from target_snowflake.convert_table_to_iceberg import CopyNativeToIceberg
-
 LOGGER = get_logger('target_snowflake')
 
 # Tone down snowflake.connector log noise by only outputting warnings and higher level messages
@@ -568,35 +566,6 @@ def main():
 
     LOGGER.debug("Exiting normally")
 
-
-def copy_native_to_iceberg():
-    """Convert existing table to Iceberg table"""
-    arg_parser = argparse.ArgumentParser()
-    arg_parser.add_argument('-c', '--config', help='target-snowflake config file')
-    arg_parser.add_argument('-t', '--fqtn', help='Snowflake fully qualified table name (fqtn) in format database.schema.table')
-    arg_parser.add_argument('-e', '--eventual', help='EVENTUAL type of fqtn : NATIVE (Default) or ICEBERG. The other table type will still exist as a copy', default='NATIVE')
-
-    args = arg_parser.parse_args()
-
-    if not args.config:
-        LOGGER.error('Config file is required')
-        sys.exit(1)
-    else:
-        with open(args.config, encoding="utf8") as config_input:
-            config = json.load(config_input)
-
-    if not args.fqtn:
-        LOGGER.error('Fully qualified table name (fqtn) is required')
-        sys.exit(1)
-    else:
-        fqtn = args.fqtn
-
-    if args.eventual.upper() not in ['NATIVE', 'ICEBERG']:
-        LOGGER.error('EVENTUAL type of fqtn must be NATIVE or ICEBERG')
-        sys.exit(1)
-
-    CopyNativeToIceberg(connection_config=config, fqtn=fqtn, eventual=args.eventual.upper())
-    LOGGER.debug("Exiting normally")
 
 if __name__ == '__main__':
     main()

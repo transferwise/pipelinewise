@@ -1,0 +1,46 @@
+---
+
+id: "postgres_to_sf_iceberg"
+name: "PostgreSQL managed Iceberg v3 test source"
+type: "tap-postgres"
+owner: "test-runner"
+
+db_conn:
+  host: "${TAP_POSTGRES_HOST}"
+  logical_poll_total_seconds: 3
+  port: ${TAP_POSTGRES_PORT}
+  user: "${TAP_POSTGRES_USER}"
+  password: "${TAP_POSTGRES_PASSWORD}"
+  dbname: "${TAP_POSTGRES_DB}"
+  limit: 1000
+
+target: "snowflake"
+target_table_format: iceberg
+iceberg_version: 3
+data_flattening_max_level: 0
+hard_delete: true
+batch_size_rows: 1000
+stream_buffer_size: 0
+
+schemas:
+  - source_schema: "public"
+    target_schema: "ppw_e2e_tap_postgres${TARGET_SNOWFLAKE_SCHEMA_POSTFIX}"
+    tables:
+      - table_name: "edgydata"
+        replication_method: "INCREMENTAL"
+        replication_key: "cid"
+
+      - table_name: "table_with_space and UPPERCase"
+        replication_method: "LOG_BASED"
+
+      - table_name: "country"
+        replication_method: "FULL_TABLE"
+
+      - table_name: "no_pk_table"
+        replication_method: "FULL_TABLE"
+
+      - table_name: "iceberg_hstore"
+        replication_method: "LOG_BASED"
+
+      - table_name: "iceberg_composite_key"
+        replication_method: "FULL_TABLE"

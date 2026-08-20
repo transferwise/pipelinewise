@@ -9,12 +9,12 @@ from cryptography.hazmat.primitives import serialization
 
 from singer import get_logger
 from target_snowflake import flattening
+from target_snowflake import managed_iceberg
 from target_snowflake import stream_utils
 from target_snowflake.file_format import FileFormat, FileFormatTypes
 
 from target_snowflake.exceptions import (
     PrimaryKeyNotFoundException,
-    TableFormatDiscoveryException,
     TableFormatMismatchException,
     TooManyRecordsException,
 )
@@ -24,109 +24,16 @@ from target_snowflake.upload_clients.snowflake_upload_client import SnowflakeUpl
 
 RECORD_UPDATE_MODE_SCHEMA_KEY = 'x-pipelinewise-record-update-mode'
 RECORD_UPDATE_MODE_PATCH = 'PATCH'
-
-TABLE_FORMAT_MISSING = 'missing'
-TABLE_FORMAT_NATIVE = 'native'
-TABLE_FORMAT_MANAGED_ICEBERG_V2 = 'managed_iceberg_v2'
-TABLE_FORMAT_MANAGED_ICEBERG_V3 = 'managed_iceberg_v3'
-TABLE_FORMAT_UNSUPPORTED_EXTERNAL_ICEBERG = 'unsupported_external_iceberg'
-
-ICEBERG_TABLE_FORMATS = {
-    TABLE_FORMAT_MANAGED_ICEBERG_V2,
-    TABLE_FORMAT_MANAGED_ICEBERG_V3,
-    TABLE_FORMAT_UNSUPPORTED_EXTERNAL_ICEBERG,
-}
-
-
-def _quote_identifier(identifier):
-    return '"' + identifier.replace('"', '""') + '"'
-
-
-def _sql_string_literal(value):
-    return "'" + value.replace("'", "''") + "'"
-
-
-def _row_value(row, name):
-    """Return a SHOW result value without assuming DictCursor key casing."""
-    for key in (name, name.upper()):
-        if key in row:
-            return row[key]
-    raise TableFormatDiscoveryException(f"Snowflake metadata did not return '{name}'")
-
-
-def _snowflake_boolean(value, field_name):
-    if value is True or str(value).upper() in ('Y', 'YES', 'TRUE'):
-        return True
-    if value is False or str(value).upper() in ('N', 'NO', 'FALSE'):
-        return False
-    raise TableFormatDiscoveryException(
-        f"Snowflake metadata returned invalid '{field_name}' value: {value!r}"
-    )
-
-
-def _exact_name_rows(rows, name):
-    return [row for row in rows if _row_value(row, 'name') == name]
-
-
-def _managed_iceberg_format(parameter_rows, table_fqtn):
-    version_rows = [
-        row for row in parameter_rows
-        if str(_row_value(row, 'key')).upper() == 'ICEBERG_VERSION'
-    ]
-    if len(version_rows) != 1:
-        raise TableFormatDiscoveryException(
-            f'Snowflake did not return one ICEBERG_VERSION for {table_fqtn}'
-        )
-    try:
-        iceberg_version = int(_row_value(version_rows[0], 'value'))
-    except (TypeError, ValueError) as exc:
-        raise TableFormatDiscoveryException(
-            f'Snowflake returned an invalid ICEBERG_VERSION for {table_fqtn}'
-        ) from exc
-
-    if iceberg_version == 2:
-        return TABLE_FORMAT_MANAGED_ICEBERG_V2
-    if iceberg_version == 3:
-        return TABLE_FORMAT_MANAGED_ICEBERG_V3
-    raise TableFormatDiscoveryException(
-        f'Snowflake returned unsupported ICEBERG_VERSION {iceberg_version} for {table_fqtn}'
-    )
-
-
-def _validate_table_format_config(config):
-    """Validate target-visible settings; PipelineWise owns source-route policy."""
-    errors = []
-    legacy_iceberg_create = config.get('iceberg_create')
-    if 'iceberg_create' in config and not isinstance(legacy_iceberg_create, bool):
-        errors.append("'iceberg_create' must be a boolean")
-
-    target_table_format_is_set = 'target_table_format' in config
-    target_table_format = config.get('target_table_format')
-    iceberg_version_is_set = 'iceberg_version' in config
-    iceberg_version = config.get('iceberg_version')
-    valid_iceberg_version = (
-        isinstance(iceberg_version, int)
-        and not isinstance(iceberg_version, bool)
-        and iceberg_version == 3
-    )
-    if target_table_format_is_set and target_table_format not in ('native', 'iceberg'):
-        errors.append("'target_table_format' must be either 'native' or 'iceberg'")
-    elif target_table_format == 'iceberg' and not valid_iceberg_version:
-        errors.append("'iceberg_version' must be integer 3 when 'target_table_format' is 'iceberg'")
-    elif target_table_format != 'iceberg' and iceberg_version_is_set:
-        errors.append("'iceberg_version' is only valid when 'target_table_format' is 'iceberg'")
-
-    if (
-        target_table_format in ('native', 'iceberg')
-        and isinstance(legacy_iceberg_create, bool)
-        and legacy_iceberg_create != (target_table_format == 'iceberg')
-    ):
-        errors.append("'iceberg_create' conflicts with 'target_table_format'")
-
-    if target_table_format == 'iceberg' and config.get('hard_delete') is not True:
-        errors.append("'hard_delete' must be true when 'target_table_format' is 'iceberg'")
-
-    return errors
+ICEBERG_TABLE_FORMATS = managed_iceberg.ICEBERG_TABLE_FORMATS
+TABLE_FORMAT_MANAGED_ICEBERG_V3 = managed_iceberg.TABLE_FORMAT_MANAGED_ICEBERG_V3
+TABLE_FORMAT_MISSING = managed_iceberg.TABLE_FORMAT_MISSING
+TABLE_FORMAT_NATIVE = managed_iceberg.TABLE_FORMAT_NATIVE
+TABLE_FORMAT_UNSUPPORTED_EXTERNAL_ICEBERG = (
+    managed_iceberg.TABLE_FORMAT_UNSUPPORTED_EXTERNAL_ICEBERG
+)
+column_type = managed_iceberg.column_type
+column_clause = managed_iceberg.column_clause
+safe_column_name = managed_iceberg.safe_column_name
 
 
 def validate_config(config):
@@ -181,83 +88,9 @@ def validate_config(config):
     if archive_load_files and not config.get('s3_bucket', None):
         errors.append('Archive load files option can be used only with external s3 stages. Please define s3_bucket.')
 
-    errors.extend(_validate_table_format_config(config))
+    errors.extend(managed_iceberg.validate_table_format_config(config))
 
     return errors
-
-
-def _native_column_type(schema_property):
-    property_type = schema_property['type']
-    property_format = schema_property['format'] if 'format' in schema_property else None
-    col_type = 'text'
-    if 'object' in property_type or 'array' in property_type:
-        col_type = 'variant'
-
-    # Every date-time JSON value is currently mapped to TIMESTAMP_NTZ
-    elif property_format == 'date-time':
-        col_type = 'timestamp_ntz'
-    elif property_format == 'date':
-        col_type = 'date'
-    elif property_format == 'time':
-        col_type = 'time'
-    elif property_format == 'binary':
-        col_type = 'binary'
-    elif 'number' in property_type:
-        col_type = 'float'
-    elif 'integer' in property_type and 'string' in property_type:
-        col_type = 'text'
-    elif 'integer' in property_type:
-        col_type = 'number'
-    elif 'boolean' in property_type:
-        col_type = 'boolean'
-
-    return col_type
-
-
-def _iceberg_column_type(col_type, iceberg_version):
-    if iceberg_version == 3 and col_type == 'time':
-        return 'time(6)'
-    if iceberg_version == 3 and col_type == 'timestamp_ntz':
-        return 'timestamp_ntz(6)'
-    if col_type == 'variant' and iceberg_version is None:
-        return 'text'
-    if col_type == 'number':
-        return 'number(19,0)'
-    return col_type
-
-
-def column_type(schema_property, is_iceberg_table=False, iceberg_version=None):
-    """Return a native, legacy Iceberg, or explicit Iceberg v3 column type."""
-    if iceberg_version not in (None, 3):
-        raise ValueError('Explicit Iceberg type mapping supports only version 3')
-    if iceberg_version is not None and not is_iceberg_table:
-        raise ValueError('An Iceberg version cannot be used for a native table')
-
-    if is_iceberg_table:
-        return _iceberg_column_type(_native_column_type(schema_property), iceberg_version)
-    return _native_column_type(schema_property)
-
-
-def _iceberg_text_variant_mismatch_reason(current_type, iceberg_version):
-    if current_type == 'VARIANT' and iceberg_version is None:
-        return (
-            'target_table_format is omitted, so the legacy mapping requires TEXT; '
-            'restore target_table_format: iceberg with iceberg_version: 3, or migrate '
-            'the column explicitly'
-        )
-    if current_type == 'TEXT' and iceberg_version == 3:
-        return (
-            'the explicit Iceberg v3 mapping requires VARIANT; '
-            'migrate the column explicitly before replication'
-        )
-    if current_type == 'VARIANT' and iceberg_version == 3:
-        return (
-            'the current Singer schema requires TEXT; '
-            'migrate the column explicitly before replication'
-        )
-    raise ValueError(
-        f'Unsupported Iceberg TEXT/VARIANT mismatch: {current_type}, version {iceberg_version}'
-    )
 
 
 def column_trans(schema_property):
@@ -272,19 +105,9 @@ def column_trans(schema_property):
     return col_trans
 
 
-def safe_column_name(name):
-    """Generate SQL friendly column name"""
-    return f'"{name}"'.upper()
-
-
 def json_element_name(name):
     """Generate SQL friendly semi structured element reference name"""
     return f'"{name}"'
-
-
-def column_clause(name, schema_property, is_iceberg_table=False, iceberg_version=None):
-    """Generate DDL column name with column type string"""
-    return f'{safe_column_name(name)} {column_type(schema_property, is_iceberg_table, iceberg_version)}'
 
 
 def primary_column_names(stream_schema_message):
@@ -759,8 +582,11 @@ class DbSync:
         p_extra = 'data_retention_time_in_days = 0 ' if is_temporary else 'data_retention_time_in_days = 1 '
         return f'CREATE {p_temp}TABLE IF NOT EXISTS {p_table_name} ({p_columns}) {p_extra}'
 
-    def create_iceberg_table_query(self, iceberg_version=None):
-        """Generate CREATE ICEBERG TABLE SQL (Snowflake-managed Iceberg)"""
+    def create_iceberg_table_query(self, iceberg_version):
+        """Generate managed-version DDL for an explicit Iceberg configuration."""
+        if not managed_iceberg.is_supported_iceberg_version(iceberg_version):
+            raise ValueError('Iceberg table creation requires integer version 3')
+
         stream_schema_message = self.stream_schema_message
         columns = [
             column_clause(
@@ -778,24 +604,12 @@ class DbSync:
             primary_key = [f"PRIMARY KEY({pk_list})"]
 
         p_table_name = self.table_name(stream_schema_message['stream'], is_temporary=False)
-        p_columns = ', '.join(columns + primary_key)
-
-        if iceberg_version is None:
-            return (
-                f"CREATE ICEBERG TABLE IF NOT EXISTS {p_table_name} ({p_columns}) "
-                f" DATA_RETENTION_TIME_IN_DAYS=1"
-                f" TARGET_FILE_SIZE='16MB'"
-                f" ENABLE_DATA_COMPACTION=TRUE"
-            )
-
-        query = f"CREATE ICEBERG TABLE IF NOT EXISTS {p_table_name} ({p_columns})"
-        query += f" CATALOG='SNOWFLAKE' ICEBERG_VERSION={iceberg_version}"
-        query += (
-            ' DATA_RETENTION_TIME_IN_DAYS=1'
-            " TARGET_FILE_SIZE='16MB'"
-            ' ENABLE_DATA_COMPACTION=TRUE'
+        return managed_iceberg.create_iceberg_table_query(
+            p_table_name,
+            columns,
+            primary_key,
+            iceberg_version,
         )
-        return query
 
     def grant_usage_on_schema(self, schema_name, grantee):
         """Grant usage on schema"""
@@ -886,51 +700,11 @@ class DbSync:
 
     def discover_table_format(self, schema_name, table_name):
         """Return the exact physical Snowflake format of a PipelineWise table."""
-        database_name = self.connection_config['dbname'].upper()
-        schema_name = schema_name.upper()
-        table_name = table_name.upper()
-        schema_fqtn = '.'.join(
-            _quote_identifier(identifier) for identifier in (database_name, schema_name)
-        )
-        table_literal = _sql_string_literal(table_name)
-
-        exact_tables = _exact_name_rows(
-            self.query(f'SHOW TABLES IN SCHEMA {schema_fqtn} STARTS WITH {table_literal}'),
+        return managed_iceberg.discover_table_format(
+            self.query,
+            self.connection_config['dbname'],
+            schema_name,
             table_name,
-        )
-        if not exact_tables:
-            return TABLE_FORMAT_MISSING
-        if len(exact_tables) != 1:
-            raise TableFormatDiscoveryException(
-                f'Snowflake returned multiple exact matches for {schema_fqtn}.{_quote_identifier(table_name)}'
-            )
-        if not _snowflake_boolean(_row_value(exact_tables[0], 'is_iceberg'), 'is_iceberg'):
-            return TABLE_FORMAT_NATIVE
-
-        exact_iceberg_tables = _exact_name_rows(
-            self.query(f'SHOW ICEBERG TABLES IN SCHEMA {schema_fqtn} STARTS WITH {table_literal}'),
-            table_name,
-        )
-        if len(exact_iceberg_tables) != 1:
-            raise TableFormatDiscoveryException(
-                f'Snowflake Iceberg metadata is incomplete for {schema_fqtn}.{_quote_identifier(table_name)}'
-            )
-
-        catalog_name = _row_value(exact_iceberg_tables[0], 'catalog_name')
-        if not isinstance(catalog_name, str) or not catalog_name.strip():
-            raise TableFormatDiscoveryException(
-                f'Snowflake returned an invalid catalog_name for {schema_fqtn}.{_quote_identifier(table_name)}'
-            )
-        if catalog_name.upper() != 'SNOWFLAKE':
-            return TABLE_FORMAT_UNSUPPORTED_EXTERNAL_ICEBERG
-
-        table_fqtn = '.'.join(
-            _quote_identifier(identifier)
-            for identifier in (database_name, schema_name, table_name)
-        )
-        return _managed_iceberg_format(
-            self.query(f"SHOW PARAMETERS LIKE 'ICEBERG_VERSION' IN TABLE {table_fqtn}"),
-            table_fqtn,
         )
 
     def check_iceberg(self, schema_name, table_name) -> bool:
@@ -1013,70 +787,31 @@ class DbSync:
                                         f'"{x["TABLE_NAME"].upper()}"' == table_name,
                               all_table_columns))
 
-        columns_dict = {column['COLUMN_NAME'].upper(): column for column in columns}
-
-        columns_to_add = [
-            column_clause(
-                name,
-                properties_schema,
-                is_iceberg_table,
-                iceberg_version,
-            )
-            for (name, properties_schema) in self.flatten_schema.items()
-            if name.upper() not in columns_dict
-        ]
-
-        columns_to_replace = []
-        for name, properties_schema in self.flatten_schema.items():
-            name_upper = name.upper()
-
-            # Skip if column doesn't exist in the table
-            if name_upper not in columns_dict:
-                continue
-
-            current_type = columns_dict[name_upper]['DATA_TYPE'].upper()
-            new_type = column_type(properties_schema, is_iceberg_table, iceberg_version).upper()
-            base_new_type = re.sub(r'\(.*\)', '', new_type).strip()
-
-            # Skip if types match
-            if current_type == base_new_type:
-                continue
-
-            # Don't alter table if TIMESTAMP_NTZ detected as the new required column type
-            #
-            # Target-snowflake maps every data-time JSON types to TIMESTAMP_NTZ but sometimes
-            # a TIMESTAMP_TZ column is already available in the target table (i.e. created by fastsync initial load)
-            # We need to exclude this conversion otherwise we lose the data that is already populated
-            # in the column
-            if new_type == 'TIMESTAMP_NTZ':
-                continue
-
-            if is_iceberg_table and {current_type, base_new_type} == {'TEXT', 'VARIANT'}:
-                raise TableFormatMismatchException(
-                    f'Iceberg column {name_upper} is {current_type}, but '
-                    f'{_iceberg_text_variant_mismatch_reason(current_type, iceberg_version)}'
-                )
-
-            columns_to_replace.append((
-                safe_column_name(name),
-                column_clause(name, properties_schema, is_iceberg_table, iceberg_version)
-            ))
+        plan = managed_iceberg.plan_column_changes(
+            self.flatten_schema,
+            {
+                column['COLUMN_NAME']: column['DATA_TYPE']
+                for column in columns
+            },
+            is_iceberg_table,
+            iceberg_version,
+        )
 
         # Note: Iceberg tables may still have column type changes automatically applied via
         # versioning (self.version_column) and re-adding the column. The previous logic that
         # blocked all automatic type changes for Iceberg tables has been intentionally removed.
         # If stricter handling is required in the future, it should be reintroduced explicitly.
 
-        for column in columns_to_add:
+        for column in plan.additions:
             self.add_column(column, stream, is_iceberg_table)
 
-        for (column_name, column) in columns_to_replace:
+        for (column_name, column) in plan.replacements:
             # self.drop_column(column_name, stream)
             self.version_column(column_name, stream, is_iceberg_table)
             self.add_column(column, stream, is_iceberg_table)
 
         # Refresh table cache if required
-        if self.table_cache and (columns_to_add or columns_to_replace):
+        if self.table_cache and (plan.additions or plan.replacements):
             self.table_cache = self.get_table_columns(table_schemas=[self.schema_name])
 
     def drop_column(self, column_name, stream):
@@ -1092,10 +827,22 @@ class DbSync:
         p_ver_time = time.strftime("%Y%m%d_%H%M")
 
         if is_iceberg_table:
-            version_column = f"ALTER ICEBERG TABLE {p_table_name} RENAME COLUMN {column_name} TO \"{p_column_name}_{p_ver_time}\""
+            version_column = (
+                f'ALTER ICEBERG TABLE {p_table_name} RENAME COLUMN '
+                f'{column_name} TO "{p_column_name}_{p_ver_time}"'
+            )
         else:
-            version_column = f"ALTER TABLE {p_table_name} RENAME COLUMN {column_name} TO \"{p_column_name}_{p_ver_time}\""
-        self.logger.warning('Column "%s" in table "%s" has been renamed to "%s_%s"', column_name, p_table_name, p_column_name, p_ver_time)
+            version_column = (
+                f'ALTER TABLE {p_table_name} RENAME COLUMN {column_name} '
+                f'TO "{p_column_name}_{p_ver_time}"'
+            )
+        self.logger.warning(
+            'Column "%s" in table "%s" has been renamed to "%s_%s"',
+            column_name,
+            p_table_name,
+            p_column_name,
+            p_ver_time,
+        )
         self.query(version_column)
 
     def add_column(self, column, stream, is_iceberg_table=False):
@@ -1118,29 +865,18 @@ class DbSync:
         iceberg_table_name = iceberg_stream_dict['table_name']
         iceberg_table_name = iceberg_table_name.replace('.', '_').replace('-', '_').upper()
         physical_format = self.discover_table_format(self.schema_name, iceberg_table_name)
-        requested_format = self.connection_config.get('target_table_format')
+        requested = managed_iceberg.requested_table_format(self.connection_config)
+        expected_format = requested.expected_physical_format
 
-        expected_format = None
-        if requested_format == 'iceberg':
-            expected_format = TABLE_FORMAT_MANAGED_ICEBERG_V3
-        elif requested_format == 'native':
-            expected_format = TABLE_FORMAT_NATIVE
-
-        if physical_format != TABLE_FORMAT_MISSING and expected_format is not None:
-            if physical_format != expected_format:
-                raise TableFormatMismatchException(
-                    f'Table {table_name_with_schema} is {physical_format}, but target_table_format '
-                    f'requires {expected_format}'
-                )
+        if physical_format not in (TABLE_FORMAT_MISSING, expected_format):
+            raise TableFormatMismatchException(
+                f'Table {table_name_with_schema} is {physical_format}, but {requested.config_source} '
+                f'requires {expected_format}'
+            )
 
         if physical_format == TABLE_FORMAT_MISSING:
-            create_iceberg = (
-                requested_format == 'iceberg'
-                if requested_format is not None
-                else self.connection_config.get('iceberg_create', False)
-            )
-            if create_iceberg:
-                iceberg_version = 3 if requested_format == 'iceberg' else None
+            if requested.is_iceberg:
+                iceberg_version = requested.iceberg_version
                 query = self.create_iceberg_table_query(iceberg_version)
                 is_iceberg_table = True
                 self.logger.info('Table %s does not exist. Creating as Iceberg table...', table_name_with_schema)
@@ -1151,15 +887,11 @@ class DbSync:
                 self.logger.info('Table %s does not exist. Creating...', table_name_with_schema)
             self.query(query)
 
-            # IF NOT EXISTS can lose a race to a table created in another format.
-            # Re-check explicit requests before granting or loading into the object.
-            if expected_format is not None:
-                created_format = self.discover_table_format(self.schema_name, iceberg_table_name)
-                if created_format != expected_format:
-                    raise TableFormatMismatchException(
-                        f'Table {table_name_with_schema} is {created_format} after creation, but '
-                        f'target_table_format requires {expected_format}'
-                    )
+            self._verify_created_table_format(
+                table_name_with_schema,
+                iceberg_table_name,
+                expected_format,
+            )
 
             self.grant_privilege(self.schema_name, self.grantees, self.grant_select_on_all_tables_in_schema)
 
@@ -1169,11 +901,30 @@ class DbSync:
         else:
             self.logger.info('Table %s exists', table_name_with_schema)
             is_iceberg_table = physical_format in ICEBERG_TABLE_FORMATS
-            iceberg_version = 3 if requested_format == 'iceberg' else None
+            iceberg_version = requested.iceberg_version
             self.update_columns(is_iceberg_table, iceberg_version)
 
         if not is_iceberg_table:
             self._refresh_table_pks()
+
+    def _verify_created_table_format(
+        self,
+        table_name_with_schema,
+        iceberg_table_name,
+        expected_format,
+    ):
+        # IF NOT EXISTS can lose a race to a table created in another format.
+        created_format = self.discover_table_format(self.schema_name, iceberg_table_name)
+        if created_format != expected_format:
+            config_source = (
+                'target_table_format'
+                if 'target_table_format' in self.connection_config
+                else 'the default target format'
+            )
+            raise TableFormatMismatchException(
+                f'Table {table_name_with_schema} is {created_format} after creation, but '
+                f'{config_source} requires {expected_format}'
+            )
 
     def _refresh_table_pks(self):
         """
@@ -1246,5 +997,4 @@ class DbSync:
             encoding=serialization.Encoding.DER,
             format=serialization.PrivateFormat.PKCS8,
             encryption_algorithm=serialization.NoEncryption())
-
         return der_key

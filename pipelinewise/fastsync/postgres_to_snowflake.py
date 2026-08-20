@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
-import os
 import sys
-import glob
 import multiprocessing
 
 from argparse import Namespace
@@ -11,6 +9,10 @@ from datetime import datetime
 
 from ..logger import Logger
 from .commons import utils
+from .commons import rdbms_to_snowflake
+from .commons import snowflake_iceberg_routes as iceberg_routes
+from .commons.snowflake_types import SNOWFLAKE_MAX_VARCHAR
+from .commons.rdbms_source import RdbmsSnowflakeSource
 from .commons.tap_postgres import FastSyncTapPostgres
 from .commons.target_snowflake import FastSyncTargetSnowflake
 from pipelinewise.utils import (get_tables_size,
@@ -45,11 +47,11 @@ REQUIRED_CONFIG_KEYS = {
 def tap_type_to_target_type(pg_type, *_):
     """Data type mapping from Postgres to Snowflake"""
     return {
-        'char': 'VARCHAR',
-        'character': 'VARCHAR',
-        'varchar': 'VARCHAR',
-        'character varying': 'VARCHAR',
-        'text': 'VARCHAR',
+        'char': SNOWFLAKE_MAX_VARCHAR,
+        'character': SNOWFLAKE_MAX_VARCHAR,
+        'varchar': SNOWFLAKE_MAX_VARCHAR,
+        'character varying': SNOWFLAKE_MAX_VARCHAR,
+        'text': SNOWFLAKE_MAX_VARCHAR,
         'bit': 'BOOLEAN',
         'varbit': 'NUMBER',
         'bit varying': 'NUMBER',
@@ -76,142 +78,31 @@ def tap_type_to_target_type(pg_type, *_):
         'ARRAY': 'VARIANT',
         'json': 'VARIANT',
         'jsonb': 'VARIANT',
-    }.get(pg_type, 'VARCHAR')
+    }.get(pg_type, SNOWFLAKE_MAX_VARCHAR)
 
 
-# pylint: disable=too-many-locals
+def _source_adapter():
+    return RdbmsSnowflakeSource.postgres(
+        FastSyncTapPostgres, tap_type_to_target_type
+    )
+
+
 def sync_table(table: str, args: Namespace) -> Union[bool, str]:
-    """Sync one table"""
-    postgres = FastSyncTapPostgres(args.tap, tap_type_to_target_type)
-    snowflake = FastSyncTargetSnowflake(args.target, args.transform)
-    tap_id = args.target.get('tap_id')
-    archive_load_files = args.target.get('archive_load_files', False)
-    s3_keys = []
-    target_schema = None
-    temp_created = False
-
-    try:
-        dbname = args.tap.get('dbname')
-        filename = utils.gen_export_filename(tap_id=tap_id, table=table)
-        filepath = os.path.join(args.temp_dir, filename)
-        target_schema = utils.get_target_schema(args.target, table)
-
-        # Open connection
-        postgres.open_connection()
-
-        # Get bookmark - LSN position or Incremental Key value
-        bookmark = utils.get_bookmark_for_table(
-            table, args.properties, postgres, dbname=dbname
-        )
-
-        # Exporting table data, get table definitions and close connection to avoid timeouts
-        postgres.copy_table(
-            table,
-            filepath,
-            split_large_files=args.target.get('split_large_files'),
-            split_file_chunk_size_mb=args.target.get('split_file_chunk_size_mb'),
-            split_file_max_chunks=args.target.get('split_file_max_chunks'),
-        )
-        file_exist = os.path.exists(filepath)
-        file_parts = glob.glob(f'{filepath}*')
-        if len(file_parts) == 0 and file_exist:
-            LOGGER.warning('DATA LOSS! -> %s', filepath)
-
-        size_bytes = sum([os.path.getsize(file_part) for file_part in file_parts])
-        snowflake_types = postgres.map_column_types_to_target(table)
-        snowflake_columns = snowflake_types.get('columns', [])
-        primary_key = snowflake_types.get('primary_key')
-        postgres.close_connection()
-
-        s3_keys, s3_key_pattern = utils.upload_files_to_s3(
-            snowflake,
-            file_parts,
-            args.temp_dir,
-            args.target.get('s3_bucket'),
-        )
-
-        # Creating temp table in Snowflake
-        snowflake.create_schema(target_schema)
-        temp_created = True
-        snowflake.create_table(
-            target_schema, table, snowflake_columns, primary_key, is_temporary=True
-        )
-
-        # Load into Snowflake table
-        snowflake.copy_to_table(
-            s3_key_pattern, target_schema, table, size_bytes, is_temporary=True
-        )
-
-        for s3_key in s3_keys:
-            if archive_load_files:
-                # Copy load file to archive
-                snowflake.copy_to_archive(s3_key, tap_id, table)
-
-        # Obfuscate columns
-        snowflake.obfuscate_columns(target_schema, table)
-
-        # Create target table and swap with the temp table in Snowflake
-        snowflake.create_table(
-            target_schema,
-            table,
-            snowflake_columns,
-            primary_key,
-            allow_replace_table=False,
-            normalize_primary_keys=False,
-        )
-        utils.apply_snowflake_table_grants(
-            snowflake,
-            args.target,
-            target_schema,
-            table,
-            is_temporary=True,
-        )
-        publication_error = None
-        try:
-            snowflake.swap_tables(
-                target_schema, table, cleanup_old_table=False
-            )
-        except Exception as exc:
-            publication_error = exc
-
-        utils.finalize_snowflake_fullsync(
-            snowflake,
-            s3_keys,
-            args.target.get('s3_bucket'),
-            args.target,
-            target_schema,
-            table,
-            publication_error=publication_error,
-        )
-        s3_keys = []
-        temp_created = False
-
-        if publication_error:
-            raise publication_error
-
-        utils.save_state_file(args.state, table, bookmark)
-
-        return True
-
-    except Exception as exc:
-        LOGGER.exception(exc)
-        return utils.staging_failure_result(
-            snowflake,
-            getattr(exc, 's3_keys', s3_keys),
-            args.target.get('s3_bucket'),
-            target_schema,
-            table,
-            temp_created,
-            exc,
-        )
-
-    finally:
-        postgres.close_connection(silent=True)
+    """Sync one PostgreSQL table to Snowflake."""
+    return rdbms_to_snowflake.sync_table(
+        table,
+        args,
+        _source_adapter(),
+        FastSyncTargetSnowflake,
+        LOGGER,
+        utils,
+    )
 
 
 def main_impl():
     """Main sync logic"""
     args = utils.parse_args(REQUIRED_CONFIG_KEYS)
+    iceberg_routes.validate_route_config(args.target)
     pool_size = utils.get_pool_size(args.tap)
     start_time = datetime.now()
     table_sync_excs = []

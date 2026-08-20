@@ -66,6 +66,7 @@ class FastSyncTapMySql:
         self.conn = None
         self.conn_unbuffered = None
         self.is_replica = False
+        self._mariadb_json_aliases_enabled = False
 
     @property
     def is_mariadb(self) -> bool:
@@ -74,6 +75,26 @@ class FastSyncTapMySql:
         Returns: bool
         """
         return self.connection_config['engine'] == MARIADB_ENGINE
+
+    @property
+    def uses_mariadb_json_aliases(self) -> bool:
+        """Return whether MariaDB JSON aliases should map to Iceberg VARIANT."""
+        iceberg_version = self.connection_config.get('iceberg_version')
+        return (
+            self.connection_config['engine'].lower() == MARIADB_ENGINE
+            and (
+                self._mariadb_json_aliases_enabled
+                or (
+                    self.connection_config.get('target_table_format') == 'iceberg'
+                    and iceberg_version == 3
+                    and not isinstance(iceberg_version, bool)
+                )
+            )
+        )
+
+    def set_mariadb_json_aliases_enabled(self, enabled: bool) -> None:
+        """Set JSON-alias mapping from the route's validated target format."""
+        self._mariadb_json_aliases_enabled = bool(enabled)
 
     def get_connection_parameters(self, prioritize_primary: bool = False) -> Tuple[dict, bool]:
         """
@@ -366,10 +387,34 @@ class FastSyncTapMySql:
         schema_name = table_dict.get('schema_name')
         table_name = table_dict.get('table_name')
 
+        data_type_projection = 'data_type'
+        json_alias_projection = ''
+        columns_relation = 'information_schema.columns'
+        if self.uses_mariadb_json_aliases:
+            data_type_projection = (
+                "CASE WHEN is_json_alias THEN 'json' ELSE data_type END"
+            )
+            json_alias_projection = """,
+                            (c.data_type = 'longtext' AND EXISTS (
+                                SELECT 1
+                                FROM information_schema.table_constraints AS tc
+                                JOIN information_schema.check_constraints AS cc
+                                  ON cc.constraint_schema = tc.constraint_schema
+                                 AND cc.constraint_name = tc.constraint_name
+                                WHERE tc.table_schema = c.table_schema
+                                  AND tc.table_name = c.table_name
+                                  AND tc.constraint_type = 'CHECK'
+                                  AND REPLACE(LOWER(cc.check_clause), ' ', '') =
+                                      CONCAT('json_valid(`',
+                                             REPLACE(LOWER(c.column_name), '`', '``'),
+                                             '`)')
+                            )) AS is_json_alias"""
+            columns_relation += ' AS c'
+
         # pylint: disable=line-too-long
         sql = f"""
                 SELECT column_name AS column_name,
-                    data_type AS data_type,
+                    {data_type_projection} AS data_type,
                     column_type AS column_type,
                     safe_sql_value AS safe_sql_value
                 FROM (SELECT column_name,
@@ -397,9 +442,9 @@ class FastSyncTapMySql:
                             WHEN data_type IN ('smallint', 'integer', 'bigint', 'mediumint', 'int')
                                     THEN {integer_format}
                             ELSE concat('REPLACE(REPLACE(REPLACE(cast(`', column_name, '` AS char CHARACTER SET utf8)', ", '\n', ' '), '\r', ''), '\0', '')")
-                                END AS safe_sql_value,
+                                END AS safe_sql_value{json_alias_projection},
                             ordinal_position
-                    FROM information_schema.columns
+                    FROM {columns_relation}
                     WHERE table_schema = '{schema_name}'
                         AND table_name = '{table_name}') x
                 ORDER BY

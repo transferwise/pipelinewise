@@ -7,11 +7,12 @@ import target_snowflake
 
 from target_snowflake.db_sync import (
     DbSync,
-    TABLE_FORMAT_MANAGED_ICEBERG_V2,
     TABLE_FORMAT_MANAGED_ICEBERG_V3,
     TABLE_FORMAT_MISSING,
     TABLE_FORMAT_NATIVE,
+    column_type,
 )
+from target_snowflake.exceptions import TableFormatDiscoveryException
 from target_snowflake.upload_clients.s3_upload_client import S3UploadClient
 
 try:
@@ -101,9 +102,14 @@ class TestManagedIcebergV3Integration(unittest.TestCase):
     def _create_table(self, table_name, table_format=None, iceberg_version=None):
         table_fqtn = self._qualified_name(self.database, self.schema, table_name)
         if table_format == 'iceberg':
+            copy_on_write = (
+                " ICEBERG_MERGE_ON_READ_BEHAVIOR='DISABLED'"
+                if iceberg_version == 3
+                else ''
+            )
             self.snowflake.query(
                 f'CREATE ICEBERG TABLE {table_fqtn} ("ID" NUMBER(19,0)) '
-                f"CATALOG='SNOWFLAKE' ICEBERG_VERSION={iceberg_version}"
+                f"CATALOG='SNOWFLAKE' ICEBERG_VERSION={iceberg_version}{copy_on_write}"
             )
         else:
             self.snowflake.query(f'CREATE TABLE {table_fqtn} ("ID" NUMBER(19,0))')
@@ -127,14 +133,82 @@ class TestManagedIcebergV3Integration(unittest.TestCase):
             self.snowflake.discover_table_format(self.schema, native_name),
             TABLE_FORMAT_NATIVE,
         )
-        self.assertEqual(
-            self.snowflake.discover_table_format(self.schema, iceberg_v2_name),
-            TABLE_FORMAT_MANAGED_ICEBERG_V2,
-        )
+        with self.assertRaisesRegex(
+            TableFormatDiscoveryException,
+            'unsupported ICEBERG_VERSION 2',
+        ):
+            self.snowflake.discover_table_format(self.schema, iceberg_v2_name)
         self.assertEqual(
             self.snowflake.discover_table_format(self.schema, iceberg_v3_name),
             TABLE_FORMAT_MANAGED_ICEBERG_V3,
         )
+
+    def test_update_columns_preserves_existing_zoned_timestamp_value(self):
+        stream = 'zoned_timestamp_preservation'
+        table_name = stream.upper()
+        table_fqtn = self._qualified_name(self.database, self.schema, table_name)
+        timestamp_value = '2026-08-21 14:35:42.123456 +05:45'
+        timestamp_expression = (
+            f"TO_TIMESTAMP_TZ('{timestamp_value}', "
+            "'YYYY-MM-DD HH24:MI:SS.FF6 TZH:TZM')::TIMESTAMP_LTZ(6)"
+        )
+        self.snowflake.query(
+            f'CREATE ICEBERG TABLE {table_fqtn} ("CREATED_AT" TIMESTAMP_LTZ(6)) '
+            "CATALOG='SNOWFLAKE' ICEBERG_VERSION=3 "
+            "ICEBERG_MERGE_ON_READ_BEHAVIOR='DISABLED'"
+        )
+        self.snowflake.query(
+            f'INSERT INTO {table_fqtn} ("CREATED_AT") SELECT {timestamp_expression}'
+        )
+        self.assertEqual(
+            self.snowflake.discover_table_format(self.schema, table_name),
+            TABLE_FORMAT_MANAGED_ICEBERG_V3,
+        )
+
+        stream_schema_message = {
+            'stream': stream,
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'created_at': {'type': ['null', 'string'], 'format': 'date-time'},
+                },
+            },
+            'key_properties': [],
+            'bookmark_properties': [],
+        }
+        stream_sync = DbSync(self.config, stream_schema_message)
+        self.assertEqual(
+            column_type(
+                stream_sync.flatten_schema['created_at'],
+                is_iceberg_table=True,
+                iceberg_version=3,
+            ).upper(),
+            'TIMESTAMP_NTZ(6)',
+        )
+
+        stream_sync.update_columns(is_iceberg_table=True, iceberg_version=3)
+
+        column_rows = self.snowflake.query(
+            'SELECT "COLUMN_NAME", "DATA_TYPE", "DATETIME_PRECISION" '
+            f'FROM {self._quote_identifier(self.database)}."INFORMATION_SCHEMA"."COLUMNS" '
+            f"WHERE \"TABLE_SCHEMA\" = '{self.schema}' "
+            f"AND \"TABLE_NAME\" = '{table_name}' "
+            "AND \"COLUMN_NAME\" LIKE 'CREATED_AT%' "
+            'ORDER BY "ORDINAL_POSITION"'
+        )
+        self.assertEqual(
+            column_rows,
+            [{
+                'COLUMN_NAME': 'CREATED_AT',
+                'DATA_TYPE': 'TIMESTAMP_LTZ',
+                'DATETIME_PRECISION': 6,
+            }],
+        )
+        value_rows = self.snowflake.query(
+            f'SELECT "CREATED_AT" = {timestamp_expression} AS "VALUE_PRESERVED" '
+            f'FROM {table_fqtn}'
+        )
+        self.assertEqual(value_rows, [{'VALUE_PRESERVED': True}])
 
     def test_singer_loads_variant_values_into_explicit_managed_iceberg_v3(self):
         stream = 'source-variant__payload'
@@ -208,6 +282,13 @@ class TestManagedIcebergV3Integration(unittest.TestCase):
             self.snowflake.discover_table_format(self.schema, table_name),
             TABLE_FORMAT_MANAGED_ICEBERG_V3,
         )
+        merge_on_read_rows = self.snowflake.query(
+            "SHOW PARAMETERS LIKE 'ICEBERG_MERGE_ON_READ_BEHAVIOR' "
+            f'IN TABLE {table_fqtn}'
+        )
+        self.assertEqual(len(merge_on_read_rows), 1)
+        self.assertEqual(str(merge_on_read_rows[0]['value']).upper(), 'DISABLED')
+        self.assertEqual(str(merge_on_read_rows[0]['level']).upper(), 'TABLE')
         column_types = self.snowflake.query(
             'SELECT "COLUMN_NAME", "DATA_TYPE" '
             f'FROM {self._quote_identifier(self.database)}."INFORMATION_SCHEMA"."COLUMNS" '

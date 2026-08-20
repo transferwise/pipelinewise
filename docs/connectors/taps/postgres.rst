@@ -13,10 +13,11 @@ wal2json logical replication.
 
    * - Source
      - Status
-     - Native transfer
+     - Bulk transfer
    * - PostgreSQL
      - Available
-     - FullSync to PostgreSQL or Snowflake; PartialSync to Snowflake
+     - FullSync to PostgreSQL or Snowflake; PartialSync to Snowflake, including
+       managed Iceberg v3
 
 
 Prerequisites
@@ -109,6 +110,11 @@ Configuration
 
 Common tap settings are documented in :ref:`yaml_configuration`. Generate the
 full template with ``pipelinewise init``.
+
+Snowflake Singer, FullSync, and PartialSync can target managed Iceberg v3 with
+explicit tap-level configuration. See :ref:`snowflake_iceberg`.
+PostgreSQL ``hstore`` values map to Snowflake ``VARIANT`` only on that explicit
+v3 route; native mappings remain unchanged.
 
 
 Acknowledgement and recovery

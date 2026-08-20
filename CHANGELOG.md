@@ -1,23 +1,156 @@
-0.80.0 (2026-08-19)
---------------------
+0.81.0 (2026-08-24)
+-------------------
 
-**Snowflake Iceberg groundwork**
+**Breaking compatibility**
 
-- Configure native or managed Iceberg v3 Singer tables per tap
-- Preserve nested Singer values as VARIANT in explicitly configured Iceberg v3 tables
-- Restrict Iceberg v3 configuration to unflattened, hard-delete RDBMS-to-Snowflake taps
-- Reject explicitly configured Iceberg FullSync and PartialSync before target mutation
-- Reject explicit formats that conflict with existing Snowflake tables
-- Preserve deprecated target-level `iceberg_create` behaviour when tap-level format is omitted
+- Stop loading existing managed Iceberg v2 tables; only managed Iceberg v3 is
+  supported and every other managed version is rejected before mutation
+- Remove the deprecated target-level `iceberg_create` setting; select native or
+  managed Iceberg v3 tables per tap with `target_table_format`, and require
+  `iceberg_version: 3` for Iceberg
+- Remove the connector-local `copy-native-to-iceberg` command; use the
+  PipelineWise-owned `copy_native_to_iceberg` command instead
+- Require existing PipelineWise-created managed Iceberg v3 targets to set
+  `ICEBERG_MERGE_ON_READ_BEHAVIOR = 'DISABLED'` at table level before writes
+- Require every string column in existing PipelineWise-created managed Iceberg
+  v3 targets to use
+  `VARCHAR(134217728)` before writes
+- Require PipelineWise to remain the sole writer for managed Iceberg v3 targets;
+  external systems may read them but must not write them
+
+**Snowflake Iceberg**
+
+- Enable managed Iceberg v3 Singer loading from any target-snowflake-compatible source
+- Enable managed Iceberg v3 FullSync from MariaDB, MySQL, and PostgreSQL sources
+- Enable managed Iceberg v3 PartialSync from MariaDB, MySQL, and PostgreSQL sources
+- Require `hard_delete: true` for every managed Iceberg v3 tap
+- Require `data_flattening_max_level: 0` for MariaDB, MySQL, and PostgreSQL
+  managed Iceberg v3 taps
+- Preserve nested Singer values as `VARIANT` on explicit managed Iceberg v3 routes
+- Reject existing Snowflake tables whose physical format conflicts with the
+  tap's selected or default format before mutation
+- Create managed Iceberg v3 tables with table-level
+  `ICEBERG_MERGE_ON_READ_BEHAVIOR = 'DISABLED'` so Snowflake DML uses copy-on-write
+- Retain explicit Iceberg version selection across configuration, publication,
+  recovery, and conversion
+- Hand successful Iceberg initial loads to Singer within the same run
+- Preserve compatible Iceberg table objects with `INSERT OVERWRITE`
+- Add nullable columns before compatible Iceberg publication
+- Reject guarded Iceberg replacement when unsupported dependencies are visible
+- Preserve explicit grants during guarded Iceberg replacement
+- Preserve direct table tags during guarded Iceberg replacement
+- Preserve table and column comments during guarded Iceberg replacement
+- Require the current owning account role for guarded Iceberg replacement
+- Bind recovery attempts to the source, target, staging, role, and transformation contract
+- Recover ambiguous Iceberg CTAS and overwrite responses through exact query history
+- Poll active Iceberg publications every five seconds for up to 900 seconds by
+  default and accept a positive target-level
+  `db_conn.iceberg_query_history_poll_timeout_seconds` override
+- Report query-history visibility and lookup failures as retryable ambiguity while
+  preserving publication recovery state
+- Replay ambiguous PartialSync transactions with the persisted range
+- Reject transformed PartialSync staging rows with NULL or duplicate primary keys
+  before publication
+- Verify staged and published contents with row counts and deterministic fingerprints
+- Advance replication state only after publication, metadata, grants, and cleanup finish
+- Serialize Iceberg source streams, physical targets, and native conversion in
+  one target-scoped recovery directory
+- Apply the configured Snowflake role to FastSync connections
+- Preserve every MariaDB JSON-alias root type, including arrays, scalars, and
+  the distinction between JSON null and SQL `NULL`, as VARIANT on explicit
+  Iceberg v3 routes
+- Preserve PostgreSQL `hstore` values as VARIANT on explicit Iceberg v3 routes
+- Preserve PostgreSQL composite primary-key order in Iceberg identifier fields
+- Map Singer integer columns to `NUMBER(38,0)` on explicit Iceberg v3 routes
+- Create and add managed Iceberg v3 approximate numeric columns as `DOUBLE` to
+  preserve 64-bit range without changing native or fixed-point mappings
+- Create and add managed Iceberg v3 string columns as `VARCHAR(134217728)`
+- Create and add managed Iceberg v3 binary columns as `BINARY(67108864)`
+- Preserve the existing native Snowflake FastSync publication path
+
+**Native-to-Iceberg conversion**
+
+- Add the `copy_native_to_iceberg` command for one imported Snowflake target table
+- Create and recover conversion companions only as physical managed Iceberg v3
+- Validate converted contents before optional Iceberg cutover
+- Preserve supported grants during conversion
+- Preserve direct table tags during conversion
+- Preserve table and column comments during conversion
+- Preserve nullability and primary-key order during conversion
+- Preserve every representable source row during conversion, including
+  duplicate primary-key values, without filtering, deduplication, or repair
+- Require the current owning account role during conversion
+- Retain the native table as a rollback point after Iceberg cutover
+- Restore the native table name when Iceberg promotion fails safely
+- Warn that Iceberg cutover and rollback require a controlled reader-and-writer
+  outage while the primary table name is temporarily absent
+- Reject conversion before copying when visible dependent streams, policies,
+  direct column tags, secondary constraints, inbound foreign keys, defaults,
+  identity columns, clustering, NULL primary-key values, or unsupported Iceberg
+  types are present
 
 **Fixes**
 
-- Execute unparameterized Snowflake SQL containing literal `%` without parameter-binding errors
+- Execute unparameterized target-snowflake SQL containing literal `%` without parameter-binding errors
+- Escape backslashes when re-emitting Snowflake comments and tag values during
+  Iceberg replacement and conversion
+- Preserve existing `TIMESTAMP_NTZ`, `TIMESTAMP_LTZ`, and `TIMESTAMP_TZ` columns
+  when Singer schema evolution requests precision-qualified `TIMESTAMP_NTZ(6)`
+  without suppressing replacement of non-timestamp columns
+- Map PostgreSQL character, text, and fallback FastSync types to
+  `VARCHAR(134217728)` for Snowflake staging and new targets
+- Map MariaDB/MySQL character, text, blob, enum, and fallback FastSync types to
+  `VARCHAR(134217728)` for Snowflake staging and new targets
+- Widen compatible narrow native Snowflake PartialSync text columns to
+  `VARCHAR(134217728)` before merge
+- Create and add native target-snowflake string columns as
+  `VARCHAR(134217728)`
+- Leave compatible existing native target-snowflake string columns unchanged
+  when only their declared width differs
+- Escape backslashes in target-snowflake table-discovery string literals
+- Quote Snowflake database and schema identifiers independently during managed
+  Iceberg table discovery
+- Reject unsupported direct FullSync and PartialSync source-target-format
+  combinations before dispatch
+- Validate a configured Snowflake role as a non-empty string during target
+  import
+- Reject missing, malformed, incomplete, or unknown Iceberg recovery state
+  before cleanup or replication-state handoff can be skipped
+- Report expected and actual row counts and non-sensitive fingerprints when
+  Iceberg publication or conversion content verification fails
 
 **Test hardening**
 
+- Add a genuine MySQL 8 development source and Snowflake Iceberg CI route
 - Cover exact target-snowflake table-format discovery for wildcard-like identifiers
+- Cover Salesforce Iceberg configuration, Singer routing, and generated target runtime settings
+- Cover MariaDB, MySQL, and PostgreSQL Singer, FullSync, and PartialSync into managed Iceberg v3
+- Cover Iceberg publication selection and metadata safety
+- Cover publication interruption recovery and state ordering
+- Cover committed missing-target CTAS response loss without source replay
+- Cover active-to-terminal CTAS recovery beyond the former 60-second
+  query-history polling limit
+- Cover transformed PartialSync key-integrity rejection before DML and across
+  staged and submitted recovery boundaries
+- Cover actionable query-history failure reporting without source replay,
+  publication, finalization, or state handover
+- Verify raw Iceberg primary-key identifier fields through Horizon metadata
+- Cover native-to-Iceberg validation and cutover
+- Cover native-to-Iceberg rollback and retry recovery, including interruption
+  while the primary table name is absent
 - Verify nested, null, empty, Unicode, escaped, and large VARIANT values on managed Iceberg v3
+- Verify managed Iceberg v3 FullSync and PartialSync values larger than
+  16,777,216 characters from PostgreSQL `TEXT` and MariaDB `LONGTEXT`
+- Run Snowflake E2E groups serially, continue after an earlier test failure, and
+  stop the remaining chain when the workflow is cancelled
+- Fail the RDBMS Snowflake E2E jobs when required credentials are absent
+- Trigger E2E when its workflow or validation scripts change
+
+0.80.0 (2026-08-19; deleted)
+----------------------------
+
+The 0.80.0 release and tag were deleted. Every still-supported change from
+0.80.0 is included in 0.81.0.
 
 0.79.1 (2026-08-18)
 --------------------

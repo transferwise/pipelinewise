@@ -553,3 +553,77 @@ class TestFastSyncTapMySql(TestCase):
         sql = query_mock.call_args.args[0]
         assert "LOWER(column_type) REGEXP '^tinyint[(]1[)]( unsigned)?( zerofill)?$'" in sql
         assert "THEN concat('CASE WHEN `' , column_name , '` is null THEN null" in sql
+
+    def test_explicit_mariadb_iceberg_v3_detects_exact_json_aliases(self):
+        """MariaDB JSON aliases become semantic JSON only on the v3 route."""
+        connection_config = {
+            **self.connection_config,
+            'engine': 'mariadb',
+            'target_table_format': 'iceberg',
+            'iceberg_version': 3,
+        }
+        self.mysql = FastSyncTapMySqlMock(connection_config=connection_config)
+
+        with patch.object(self.mysql, 'query', return_value=[]) as query_mock:
+            self.mysql.get_table_columns('my_db.my_table')
+
+        sql = query_mock.call_args.args[0]
+        assert "CASE WHEN is_json_alias THEN 'json' ELSE data_type END" in sql
+        assert 'information_schema.check_constraints' in sql
+        assert "c.data_type = 'longtext'" in sql
+        assert "REPLACE(LOWER(cc.check_clause), ' ', '') =" in sql
+        assert "CONCAT('json_valid(`'" in sql
+        assert ' LIKE ' not in sql
+
+    def test_json_alias_detection_does_not_change_other_routes(self):
+        """Native MariaDB and genuine MySQL keep their existing discovery query."""
+        configs = (
+            {**self.connection_config, 'engine': 'mariadb'},
+            {
+                **self.connection_config,
+                'engine': 'mariadb',
+                'target_table_format': 'native',
+            },
+            {
+                **self.connection_config,
+                'engine': 'mysql',
+                'target_table_format': 'iceberg',
+                'iceberg_version': 3,
+            },
+        )
+
+        for connection_config in configs:
+            with self.subTest(connection_config=connection_config):
+                self.mysql = FastSyncTapMySqlMock(
+                    connection_config=connection_config
+                )
+                with patch.object(
+                    self.mysql, 'query', return_value=[]
+                ) as query_mock:
+                    self.mysql.get_table_columns('my_db.my_table')
+
+                sql = query_mock.call_args.args[0]
+                assert 'information_schema.check_constraints' not in sql
+                assert 'is_json_alias' not in sql
+
+    def test_semantic_json_alias_maps_to_target_variant(self):
+        """The alias marker returned by discovery reaches the JSON type mapper."""
+        mapper = Mock(return_value='VARIANT')
+        self.mysql = FastSyncTapMySql(self.connection_config, mapper)
+
+        with patch.object(
+            self.mysql,
+            'get_table_columns',
+            return_value=[{
+                'column_name': 'payload',
+                'data_type': 'json',
+                'column_type': 'longtext',
+            }],
+        ), patch.object(self.mysql, 'get_primary_keys', return_value=['ID']):
+            result = self.mysql.map_column_types_to_target('my_db.my_table')
+
+        assert result == {
+            'columns': ['"PAYLOAD" VARIANT'],
+            'primary_key': ['ID'],
+        }
+        mapper.assert_called_once_with('json', 'longtext')

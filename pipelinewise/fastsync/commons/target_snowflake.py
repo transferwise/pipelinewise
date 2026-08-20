@@ -9,6 +9,8 @@ from snowflake.connector.encryption_util import SnowflakeEncryptionUtil
 from snowflake.connector.storage_client import SnowflakeFileEncryptionMaterial
 
 from . import utils
+from .snowflake_sql_client import SnowflakeSqlClient
+from .snowflake_types import SNOWFLAKE_MAX_VARCHAR
 from .transform_utils import TransformationHelper, SQLFlavor
 from pipelinewise.utils import pem2der
 
@@ -19,14 +21,14 @@ logging.getLogger('snowflake.connector').setLevel(logging.WARNING)
 
 
 # pylint: disable=missing-function-docstring,too-many-arguments
-class FastSyncTargetSnowflake:
+class FastSyncTargetSnowflake(SnowflakeSqlClient):  # pylint: disable=too-many-public-methods
     """
     Common functions for fastsync to Snowflake
     """
 
     # pylint: disable=invalid-name
     def __init__(self, connection_config, transformation_config=None):
-        self.connection_config = connection_config
+        super().__init__(connection_config)
         self.transformation_config = transformation_config
 
         # Get the required parameters from config file and/or environment variables
@@ -62,78 +64,36 @@ class FastSyncTargetSnowflake:
         )
 
     def create_query_tag(self, query_tag_props: dict = None) -> str:
-        schema = None
-        table = None
-
+        query_tag = {
+            'ppw_component': 'fastsync',
+            'tap_id': self.connection_config.get('tap_id'),
+            'database': self.connection_config['dbname'],
+            'schema': None,
+            'table': None,
+        }
         if isinstance(query_tag_props, dict):
-            schema = query_tag_props.get('schema')
-            table = query_tag_props.get('table')
+            for key in (
+                'schema',
+                'table',
+                'load_id',
+                'attempt_id',
+                'phase',
+                'publication_method',
+                'target',
+            ):
+                if key in query_tag_props:
+                    query_tag[key] = query_tag_props[key]
 
-        return json.dumps(
-            {
-                'ppw_component': 'fastsync',
-                'tap_id': self.connection_config.get('tap_id'),
-                'database': self.connection_config['dbname'],
-                'schema': schema,
-                'table': table,
-            }
-        )
+        return json.dumps(query_tag)
 
-    def open_connection(self, query_tag_props=None, autocommit=True):
-        return snowflake.connector.connect(
-            user=self.connection_config['user'],
-            private_key=pem2der(self.connection_config['private_key']),
-            account=self.connection_config['account'],
-            database=self.connection_config['dbname'],
-            warehouse=self.connection_config['warehouse'],
-            authenticator='SNOWFLAKE_JWT',
-            autocommit=autocommit,
-            session_parameters={
-                # Quoted identifiers should be case sensitive
-                'QUOTED_IDENTIFIERS_IGNORE_CASE': 'FALSE',
-                'QUERY_TAG': self.create_query_tag(query_tag_props),
-            },
-        )
+    sql_logger = LOGGER
+    ignore_cleanup_errors = True
 
-    def query(self, query, params=None, query_tag_props=None):
-        LOGGER.debug('Running query: %s', query)
-        with self.open_connection(query_tag_props) as connection:
-            with connection.cursor(snowflake.connector.DictCursor) as cur:
-                cur.execute(query, params)
+    def _connect(self, **kwargs):
+        return snowflake.connector.connect(**kwargs)
 
-                if cur.rowcount > 0:
-                    return cur.fetchall()
-
-                return []
-
-    def execute_transaction(self, queries, query_tag_props=None):
-        """Execute a sequence of statements atomically on one connection."""
-        connection = self.open_connection(query_tag_props, autocommit=False)
-        try:
-            with connection.cursor() as cur:
-                for query in queries:
-                    LOGGER.debug('Running transaction query: %s', query)
-                    cur.execute(query)
-            connection.commit()
-        except Exception:
-            try:
-                connection.rollback()
-            except Exception:  # pragma: no cover - driver-specific cleanup failure
-                LOGGER.warning(
-                    'Failed to roll back Snowflake publication transaction',
-                    exc_info=True,
-                )
-            raise
-        finally:
-            try:
-                connection.close()
-            except Exception:  # pragma: no cover - driver-specific cleanup failure
-                # Publication may already be committed, so a close failure must not
-                # turn a successful sync into an ambiguous retry.
-                LOGGER.warning(
-                    'Failed to close Snowflake publication connection',
-                    exc_info=True,
-                )
+    def _private_key(self):
+        return pem2der(self.connection_config['private_key'])
 
     def _get_s3_key(self, file):
         """Return the deterministic staging key before an upload is attempted."""
@@ -251,12 +211,13 @@ class FastSyncTargetSnowflake:
         table_name,
         is_temporary=False,
         max_attempts=1,
+        staging_table_name=None,
     ):
         table_dict = utils.tablename_to_dict(table_name)
         target_table = (
             table_dict.get('table_name')
             if not is_temporary
-            else table_dict.get('temp_table_name')
+            else staging_table_name or table_dict.get('temp_table_name')
         )
 
         sql = 'DROP TABLE IF EXISTS {}."{}"'.format(target_schema, target_table.upper())
@@ -290,13 +251,13 @@ class FastSyncTargetSnowflake:
         sort_columns=False,
         allow_replace_table=True,
         normalize_primary_keys=True,
+        staging_table_name=None,
     ):
 
-        table_dict = utils.tablename_to_dict(table_name)
-        target_table = (
-            table_dict.get('table_name')
-            if not is_temporary
-            else table_dict.get('temp_table_name')
+        target_table = self._target_table_name(
+            table_name,
+            is_temporary,
+            staging_table_name,
         )
         target_existed = (
             self.table_exists(target_schema, table_name, is_temporary)
@@ -343,6 +304,13 @@ class FastSyncTargetSnowflake:
 
         if normalize_primary_keys and not target_existed:
             self._drop_pk_non_nullability(target_schema, target_table, primary_key)
+
+    @staticmethod
+    def _target_table_name(table_name, is_temporary, staging_table_name=None):
+        table_dict = utils.tablename_to_dict(table_name)
+        if is_temporary:
+            return staging_table_name or table_dict.get('temp_table_name')
+        return table_dict.get('table_name')
 
     def table_exists(self, target_schema, table_name, is_temporary=False):
         """Return whether the exact standard or staging table already exists."""
@@ -403,13 +371,14 @@ class FastSyncTargetSnowflake:
         size_bytes,
         is_temporary,
         skip_csv_header=False,
+        staging_table_name=None,
     ):
         LOGGER.info('Loading %s into Snowflake...', s3_key)
         table_dict = utils.tablename_to_dict(table_name)
         target_table = (
             table_dict.get('table_name')
             if not is_temporary
-            else table_dict.get('temp_table_name')
+            else staging_table_name or table_dict.get('temp_table_name')
         )
         inserts = 0
 
@@ -444,6 +413,7 @@ class FastSyncTargetSnowflake:
                 }
             ),
         )
+        return inserts
 
     # grant_... functions are common functions called by utils.py: grant_privilege function
     # "to_group" is not used here but exists for compatibility reasons with other database types
@@ -482,7 +452,12 @@ class FastSyncTargetSnowflake:
             )
             self.query(sql, query_tag_props={'schema': target_schema})
 
-    def obfuscate_columns(self, target_schema: str, table_name: str):
+    def obfuscate_columns(
+        self,
+        target_schema: str,
+        table_name: str,
+        staging_table_name=None,
+    ):
         """
         Apply any configured transformations to the given table
         Args:
@@ -492,7 +467,7 @@ class FastSyncTargetSnowflake:
         LOGGER.info('Starting obfuscation rules...')
 
         table_dict = utils.tablename_to_dict(table_name)
-        temp_table = table_dict.get('temp_table_name')
+        temp_table = staging_table_name or table_dict.get('temp_table_name')
         transformations = self.transformation_config.get('transformations', [])
 
         # Input table_name is formatted as {{schema}}.{{table}}
@@ -598,6 +573,23 @@ class FastSyncTargetSnowflake:
             add_clause = ', '.join(add_columns_list)
             query = f'ALTER TABLE {schema}."{table_name.upper()}" ADD {add_clause}'
             self.query(query)
+
+    def widen_varchar_columns(
+        self,
+        schema: str,
+        table_name: str,
+        column_names: List[str],
+    ) -> None:
+        """Widen existing native text columns before PartialSync publication."""
+        full_table_name = self._get_full_qualified_table_name(schema, table_name)
+        for column_name in column_names:
+            escaped_column_name = column_name.replace('"', '""')
+            quoted_column = f'"{escaped_column_name}"'
+            self.query(
+                f'ALTER TABLE {full_table_name} ALTER COLUMN {quoted_column} '
+                f'SET DATA TYPE {SNOWFLAKE_MAX_VARCHAR}',
+                query_tag_props={'schema': schema, 'table': table_name},
+            )
 
     def __apply_transformations(
         self, transformations: List[Dict], target_schema: str, table_name: str

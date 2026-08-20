@@ -41,6 +41,12 @@ def find_run_tap_log_file(stdout, sync_engine=None):
     return log_files[0]
 
 
+def find_run_tap_log_files(stdout):
+    """Return every engine log path advertised by one run_tap command."""
+    pattern = re.compile(r'Writing output into (.+\.(?:fastsync|partialsync|singer)\.log)')
+    return pattern.findall(stdout)
+
+
 def assert_run_tap_log_engines(stdout, expected_engines):
     """Require exactly the requested engine logs and reject hidden extra runs."""
     actual_engines = Counter()

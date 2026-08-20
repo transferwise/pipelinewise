@@ -210,17 +210,20 @@ Tap configuration
    * - ``data_flattening_max_level``
      - Tap-specific or ``0``
      - Expands nested objects into columns. ``0`` keeps flattening disabled;
-       higher values can create wide and changing target schemas.
+       higher values can create wide and changing target schemas. Managed
+       Iceberg FastSync requires ``0``; Singer-only Iceberg routes retain the
+       tap's normal setting.
    * - ``target_table_format``
      - Omitted
      - Selects ``native`` or managed ``iceberg`` Snowflake tables for the
-       Singer target path. When omitted, missing tables are native unless the
-       deprecated target-level ``iceberg_create`` setting applies. The setting
-       applies to every table in the tap.
+       Singer target and supported FastSync routes. An omitted value or
+       ``native`` creates native tables; managed Iceberg creation requires
+       explicit ``iceberg``. The setting applies to every table in the tap.
    * - ``iceberg_version``
      - None
-     - Must be integer ``3`` with ``target_table_format: iceberg`` and is
-       invalid otherwise.
+     - Managed-Iceberg version discriminator. Its only supported value is integer
+       ``3``; it is required with ``target_table_format: iceberg`` and invalid
+       otherwise.
    * - ``validate_records``
      - ``false``
      - Validates Singer records against their emitted schema before loading.
@@ -242,15 +245,19 @@ Tap configuration
 
 .. important::
 
-   Tap-level Iceberg configuration currently provides Singer connector
-   groundwork only; it does not enable a complete RDBMS route. FullSync and
-   PartialSync with explicit Iceberg configuration fail before changing the
-   target. Explicit Iceberg v3 configuration is limited to
-   ``tap-mysql`` (MariaDB/MySQL) and ``tap-postgres`` with
-   ``target-snowflake``. It requires ``data_flattening_max_level: 0`` and
-   ``hard_delete: true``; deprecated ``hard_delete: false`` is rejected.
-   Omitting ``target_table_format`` creates native tables unless the deprecated
-   target-level ``iceberg_create`` setting applies.
+   Any tap whose Singer output is compatible with ``target-snowflake`` can
+   select managed Iceberg v3. FastSync FullSync and PartialSync for managed v3
+   remain limited to ``tap-mysql`` (MariaDB/MySQL) and ``tap-postgres``. Every
+   explicit v3 route requires ``hard_delete: true``; those two FastSync-capable
+   taps also require ``data_flattening_max_level: 0``. Singer-only sources retain
+   their normal flattening setting, including Salesforce's default level ``10``.
+   Native remains the default, and PipelineWise does not convert an existing
+   table when the requested format conflicts. Every managed Iceberg version
+   other than v3 is rejected before mutation. See :ref:`snowflake_iceberg`.
+
+   Managed Iceberg selection is tap-level. Target YAML rejects these keys and
+   the removed ``iceberg_create`` setting. Remove ``iceberg_create`` and
+   configure each managed Iceberg tap before upgrading.
 
 .. warning::
 
@@ -315,7 +322,10 @@ Target configuration
      file_format: "<SCHEMA>.<FILE_FORMAT>"
 
 ``id``, ``name``, ``type``, and ``db_conn`` are required. Connection fields are
-target-specific; see :ref:`targets_list`.
+target-specific; see :ref:`targets_list`. A Snowflake target can set the optional
+positive integer ``iceberg_query_history_poll_timeout_seconds`` in ``db_conn``.
+It defaults to ``900`` seconds and bounds query-history recovery after an
+ambiguous FastSync Iceberg publication response.
 
 
 Secrets and validation

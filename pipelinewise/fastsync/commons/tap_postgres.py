@@ -27,10 +27,10 @@ class FastSyncTapPostgres:
         self.connection_config = connection_config
         self.tap_type_to_target_type = tap_type_to_target_type
         self.target_quote = target_quote
+        self.hstore_as_json = False
         self.conn = None
         self.curr = None
         self.primary_host_conn = None
-        self.primary_host_curr = None
 
     @staticmethod
     def generate_replication_slot_name(dbname, tap_id=None, prefix='pipelinewise'):
@@ -213,7 +213,6 @@ class FastSyncTapPostgres:
         """Close and clear the dedicated primary-host connection."""
         connection = self.primary_host_conn
         self.primary_host_conn = None
-        self.primary_host_curr = None
 
         if connection is None:
             return
@@ -299,8 +298,6 @@ class FastSyncTapPostgres:
             self.connection_config, prioritize_primary=True
         )
         try:
-            self.primary_host_curr = self.primary_host_conn.cursor()
-
             # Make sure PostgreSQL version is 9.4 or higher
             # pylint: disable=assignment-from-no-return
             result = self.primary_host_query(
@@ -402,18 +399,24 @@ class FastSyncTapPostgres:
         """
         schema_name, table_name = table.split('.')
 
-        sql = """SELECT pg_attribute.attname
-                    FROM pg_index, pg_class, pg_attribute, pg_namespace
-                    WHERE
-                        pg_class.oid = '{}."{}"'::regclass AND
-                        indrelid = pg_class.oid AND
-                        pg_class.relnamespace = pg_namespace.oid AND
-                        pg_attribute.attrelid = pg_class.oid AND
-                        pg_attribute.attnum = any(pg_index.indkey)
-                    AND indisprimary""".format(
-            schema_name, table_name
-        )
-        pk_specs = self.query(sql)
+        sql = """
+            SELECT attribute.attname
+            FROM pg_catalog.pg_index AS index_def
+            JOIN pg_catalog.pg_class AS table_class
+              ON table_class.oid = index_def.indrelid
+            JOIN pg_catalog.pg_namespace AS namespace
+              ON namespace.oid = table_class.relnamespace
+            CROSS JOIN LATERAL unnest(index_def.indkey)
+              WITH ORDINALITY AS key_column(attnum, key_ordinality)
+            JOIN pg_catalog.pg_attribute AS attribute
+              ON attribute.attrelid = table_class.oid
+             AND attribute.attnum = key_column.attnum
+            WHERE namespace.nspname = %s
+              AND table_class.relname = %s
+              AND index_def.indisprimary
+            ORDER BY key_column.key_ordinality
+        """
+        pk_specs = self.query(sql, (schema_name, table_name))
         if len(pk_specs) > 0:
             return [safe_column_name(k[0], self.target_quote) for k in pk_specs]
 
@@ -442,19 +445,26 @@ class FastSyncTapPostgres:
 
         schema_name = table_dict.get('schema_name')
         table_name = table_dict.get('table_name')
+        hstore_projection = (
+            "WHEN udt_name = 'hstore' THEN 'hstore_to_json(\"' || "
+            "column_name || '\") AS \"' || column_name || '\"'"
+            if self.hstore_as_json else ''
+        )
 
         # pylint: disable = line-too-long
         sql = f"""
                 SELECT
                     column_name
-                    ,data_type
+                    ,CASE WHEN udt_name = 'hstore' THEN 'hstore' ELSE data_type END AS data_type
                     ,safe_sql_value
                     ,character_maximum_length
                 FROM (SELECT
                 column_name,
                 data_type,
+                udt_name,
                 CASE
                     WHEN data_type = 'ARRAY' THEN 'array_to_json("' || column_name || '") AS ' || column_name
+                    {hstore_projection}
                     WHEN data_type = 'date' THEN
                        'CASE WHEN "' ||column_name|| E'" < \\'0001-01-01\\' '
                             'OR "' ||column_name|| E'" > \\'9999-12-31\\' THEN \\'9999-12-31\\' '
@@ -487,7 +497,11 @@ class FastSyncTapPostgres:
         postgres_columns = self.get_table_columns(table_name)
         mapped_columns = []
         for pc in postgres_columns:
-            column_type = self.tap_type_to_target_type(pc[1])
+            column_type = (
+                'VARIANT'
+                if pc[1] == 'hstore' and self.hstore_as_json
+                else self.tap_type_to_target_type(pc[1])
+            )
             # postgres bit type can have length greater than 1
             # most targets would want to map length 1 to boolean and the rest to number
             if isinstance(column_type, list):

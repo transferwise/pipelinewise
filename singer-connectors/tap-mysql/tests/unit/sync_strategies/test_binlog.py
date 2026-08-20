@@ -2189,6 +2189,52 @@ class TestBinlogSyncStrategy(TestCase):
         assert message.record == {'time': '08:30:00'}
         assert message.time_extracted is not None
 
+    def test_row_to_singer_record_preserves_every_mariadb_json_root_as_text(self):
+        encoded_values = {
+            'object_value': b'{"unicode":"\xe5\x88\x9d"}',
+            'array_value': b'[1, null, {}]',
+            'string_value': b'"text"',
+            'integer_value': b'42',
+            'fractional_value': b'1.5',
+            'true_value': b'true',
+            'false_value': b'false',
+            'json_null': b'null',
+            'sql_null': None,
+        }
+        catalog_entry = CatalogEntry(
+            stream='stream',
+            schema=Schema.from_dict({
+                'type': 'object',
+                'properties': {
+                    column: {
+                        'type': list(binlog.common.MARIADB_JSON_ROOT_TYPES),
+                        'format': 'mariadb-json',
+                    }
+                    for column in encoded_values
+                },
+            }),
+        )
+
+        message = binlog.row_to_singer_record(
+            catalog_entry,
+            version=1,
+            row=encoded_values,
+            db_column_map={column: FIELD_TYPE.BLOB for column in encoded_values},
+            time_extracted=datetime.datetime.now(datetime.timezone.utc),
+        )
+
+        assert message.record == {
+            'object_value': '{"unicode":"初"}',
+            'array_value': '[1, null, {}]',
+            'string_value': '"text"',
+            'integer_value': '42',
+            'fractional_value': '1.5',
+            'true_value': 'true',
+            'false_value': 'false',
+            'json_null': 'null',
+            'sql_null': None,
+        }
+
     def test_row_to_singer_record_only_nulls_invalid_datetime_values(self):
         row = {
             '_sdc_deleted_at': '2024-02-29T12:00:00+00:00',

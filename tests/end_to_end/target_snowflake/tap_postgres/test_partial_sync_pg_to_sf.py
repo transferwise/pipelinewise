@@ -2,6 +2,9 @@ from tests.end_to_end.helpers import assertions
 from tests.end_to_end.target_snowflake.tap_postgres import TapPostgres
 
 
+LARGE_VARCHAR_LENGTH = 16_777_217
+
+
 POSTGRES_FASTSYNC_COMPARISON_COLUMNS = [
     {
         'name': 'cid',
@@ -82,6 +85,64 @@ class TestPartialSyncPGToSF(TapPostgres):
         assertions.assert_resync_populates_target(
             self.tap_parameters, primary_key=self.column
         )
+
+    def prepare_source(self):
+        """Add a large-text column before catalog discovery and initial FullSync."""
+        super().prepare_source()
+        self.e2e_env.run_query_tap_postgres(
+            'ALTER TABLE public.edgydata ADD COLUMN large_text text'
+        )
+
+    def test_partial_sync_widens_existing_native_varchar(self):
+        """A legacy native target is widened before a large-value MERGE."""
+        target_schema = (
+            f'PPW_E2E_TAP_POSTGRES{self.e2e_env.sf_schema_postfix}'
+        ).upper()
+        legacy_table = 'EDGYDATA_LEGACY_WIDTH'
+        self.e2e_env.run_query_target_snowflake(
+            f'DROP TABLE IF EXISTS "{target_schema}"."{legacy_table}"'
+        )
+        self.e2e_env.run_query_target_snowflake(
+            f'CREATE TABLE "{target_schema}"."{legacy_table}" AS SELECT * '
+            'REPLACE (CAST("LARGE_TEXT" AS VARCHAR(16777216)) AS "LARGE_TEXT") '
+            f'FROM "{target_schema}"."EDGYDATA"'
+        )
+        self.e2e_env.run_query_target_snowflake(
+            f'DROP TABLE "{target_schema}"."EDGYDATA"'
+        )
+        self.e2e_env.run_query_target_snowflake(
+            f'ALTER TABLE "{target_schema}"."{legacy_table}" '
+            f'RENAME TO "{target_schema}"."EDGYDATA"'
+        )
+        initial_width_rows = self.e2e_env.run_query_target_snowflake(
+            'SELECT CHARACTER_MAXIMUM_LENGTH FROM INFORMATION_SCHEMA.COLUMNS '
+            f"WHERE TABLE_SCHEMA = '{target_schema}' AND TABLE_NAME = 'EDGYDATA' "
+            "AND COLUMN_NAME = 'LARGE_TEXT'"
+        )
+        self.assertEqual(initial_width_rows, [(16777216,)])
+        self.e2e_env.run_query_tap_postgres(
+            'UPDATE public.edgydata SET large_text = repeat(%s, %s) '
+            'WHERE cid = 1',
+            ('p', LARGE_VARCHAR_LENGTH),
+        )
+
+        assertions.assert_partial_sync_table_success(
+            self.tap_parameters,
+            start_value=1,
+            end_value=1,
+        )
+
+        length_rows = self.e2e_env.run_query_target_snowflake(
+            f'SELECT LENGTH("LARGE_TEXT") FROM "{target_schema}"."EDGYDATA" '
+            'WHERE "CID" = 1'
+        )
+        width_rows = self.e2e_env.run_query_target_snowflake(
+            'SELECT CHARACTER_MAXIMUM_LENGTH FROM INFORMATION_SCHEMA.COLUMNS '
+            f"WHERE TABLE_SCHEMA = '{target_schema}' AND TABLE_NAME = 'EDGYDATA' "
+            "AND COLUMN_NAME = 'LARGE_TEXT'"
+        )
+        self.assertEqual(length_rows, [(LARGE_VARCHAR_LENGTH,)])
+        self.assertEqual(width_rows, [(134217728,)])
 
     def test_partial_sync_pg_to_sf(self):
         """

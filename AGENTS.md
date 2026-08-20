@@ -2,9 +2,9 @@
 
 ## Scope
 
-PipelineWise is a Python 3.12 Singer ELT framework. Write for senior engineers; prioritize operational precision, edge cases, and rationale.
-
-Read every scoped file relevant to the task:
+PipelineWise is a Python 3.12 Singer ELT framework. Write for senior engineers;
+prioritize operational precision, edge cases, and rationale. Read each relevant
+guide:
 
 - `pipelinewise/AGENTS.md`: orchestration, FastSync, backend migrations, data-diff.
 - `singer-connectors/AGENTS.md`: vendored taps and targets.
@@ -12,7 +12,9 @@ Read every scoped file relevant to the task:
 - `tests/end_to_end/AGENTS.md`: databases, connectors, E2E, `dev-project/`.
 - `docs/AGENTS.md`: documentation.
 
-More-specific guidance adds to this file; explicit user instructions win. Each `CLAUDE.md` symlinks to its adjacent `AGENTS.md`; edit the latter and preserve the link.
+Scoped guidance adds to this file; explicit user instructions win. Each
+`CLAUDE.md` symlinks to its adjacent `AGENTS.md`; edit the latter and preserve
+the link.
 
 ## Architecture
 
@@ -22,13 +24,21 @@ More-specific guidance adds to this file; explicit user instructions win. Each `
 
 ## Environment
 
-- Prefer the `dev-project` Docker stack for supported development and verification. Its Linux runtime best approximates production; use the host only to manage Docker or when the container cannot run a check. Report host-only verification and its compatibility gap.
-- The repo is mounted at `/opt/pipelinewise`; run commands there in the `pipelinewise` container. `PIPELINEWISE_HOME` keeps its environments under `dev-project/.virtualenvs/`, which is on `PATH`.
-- `make pipelinewise` installs the editable root package with test extras. Connector runtime environments use `.virtualenvs/<name>/`; connector-local Makefiles may use `venv/`. Never mix interpreters or reuse environments across host and container. Never use repository `.venv/`.
+- Prefer the `dev-project` Docker stack; its Linux runtime best matches
+  production. Use the host only to manage Docker or when a check cannot run in
+  the container, and report the compatibility gap.
+- The repo is mounted at `/opt/pipelinewise` in the `pipelinewise` container.
+  `PIPELINEWISE_HOME` environments live under `dev-project/.virtualenvs/` and
+  are on `PATH`.
+- `make pipelinewise` installs the editable root plus test extras. Connector
+  runtimes use `.virtualenvs/<name>/`; connector Makefiles may use `venv/`.
+  Never mix host, container, root, runtime-connector, or connector-test
+  interpreters, and never use repository `.venv/`.
 
 ## Validation
 
-For implementation changes, run the four lint gates verbatim and in order, then the unit gate, from the repo root—preferably in the ready container:
+For implementation changes, run these root gates verbatim and in order,
+preferably in the ready container:
 
 ```bash
 ruff check pipelinewise tests
@@ -38,7 +48,11 @@ flake8 pipelinewise --count --max-complexity=15 --max-line-length=120 --statisti
 pytest --cov=pipelinewise --cov-fail-under=77 -v tests/units
 ```
 
-On an unavoidable host run, first activate `.virtualenvs/pipelinewise/`. Do not alter paths or flags: Ruff/Pylint inspect `pipelinewise tests`; Flake8 inspects `pipelinewise`. Never run bare `pytest tests/` because it collects credentialed E2E. For nested data-diff/backend-db tests, collect from `tests/units` and narrow with `-k` to avoid import failures.
+For an unavoidable host run, activate `.virtualenvs/pipelinewise/`. Do not alter
+paths or flags: Ruff/Pylint inspect `pipelinewise tests`; Flake8 inspects
+`pipelinewise`. Never run bare `pytest tests/`; it collects credentialed E2E.
+Collect nested data-diff/backend-db selections from `tests/units` and narrow
+with `-k` to avoid import failures.
 
 For config-affecting changes, validate in Docker, where Compose loads `dev-project/.env`:
 
@@ -55,7 +69,8 @@ set +a
 .virtualenvs/pipelinewise/bin/pipelinewise validate --dir dev-project/pipelinewise-config
 ```
 
-Validate after implementation, schema, example-config, or connector-config changes.
+Run this after implementation, schema, example-config, or connector-config
+changes.
 
 Also follow scoped checks:
 
@@ -65,26 +80,32 @@ Also follow scoped checks:
 
 ## Style and safety
 
-- Python: 120 columns, complexity 15, four spaces, Google docstrings, consistent single quotes, `snake_case` names/JSON keys, `PascalCase` classes.
-- Snowflake FastSync identifiers are uppercase. Scope Pylint disables to a line/function, never a module.
-- Comments should explain a non-obvious constraint or consequence in at most two lines; do not restate code, narrate edits, argue choices, or add walkthroughs.
-- Do not run `pre-commit run --all-files`, reformat unrelated files, or broaden lint fixes. Preserve dirty-worktree changes.
-- Declare third-party imports in the owning `setup.py`; never rely on transitive installs.
-- Never commit secrets, `.tfvars`, private keys, or populated environment files.
-- Use `import_config` in docs, examples, tests, and comments; `import` is deprecated.
+- Python: 120 columns, complexity 15, four spaces, Google docstrings, consistent
+  single quotes, `snake_case` names/JSON keys, and `PascalCase` classes.
+- Uppercase Snowflake FastSync identifiers. Scope Pylint disables to a
+  line/function, never a module.
+- Comments explain a non-obvious constraint or consequence in at most two
+  lines; do not restate code, narrate edits, argue choices, or add walkthroughs.
+- Preserve dirty-worktree changes. Do not run `pre-commit run --all-files`,
+  reformat unrelated files, or broaden lint fixes.
+- Declare third-party imports in the owning `setup.py`; never rely on
+  transitive installs.
+- Never commit secrets, `.tfvars`, private keys, or populated environment
+  files.
+- Use `import_config` in docs, examples, tests, and comments; `import` is
+  deprecated.
 
 ## Git and completion
 
-Branch from `master` and keep diffs task-scoped.
-Create every commit with a cryptographic signature using `git commit -S`; never
-create or push an unsigned commit.
-
-Keep CHANGELOG bullets concise, outcome-focused, and atomic: one independently
-reviewable behavior per bullet. Start with an action verb, name the affected
-component, and state the operational result. Include implementation details only
-when needed to explain behavior or risk. Use headings to group related changes.
-Use semantic versioning for root releases: patch for fixes only, minor for backward-compatible
-features, and major for breaking changes. Keep `setup.py` aligned with the top CHANGELOG release.
+- Branch from `master`; keep diffs task-scoped. Sign every commit with
+  `git commit -S`; never create or push an unsigned commit.
+- CHANGELOG bullets are atomic and outcome-focused: start with an action verb,
+  name the component and operational result, and include implementation detail
+  only to explain risk. Group related bullets under headings.
+- PipelineWise stays in `0.x` and must never publish `1.0.0` or above. Use a
+  patch for compatible fixes and the next `0.x` minor for features or intentional
+  compatibility changes. Document material operator impact and keep `setup.py`
+  aligned with the top CHANGELOG release.
 
 Before completion:
 

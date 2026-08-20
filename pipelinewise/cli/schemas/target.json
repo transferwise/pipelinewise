@@ -47,6 +47,10 @@
         },
         "client_side_encryption_master_key": {
           "type": "string"
+        },
+        "iceberg_query_history_poll_timeout_seconds": {
+          "type": "integer",
+          "minimum": 1
         }
       },
       "required": [
@@ -125,6 +129,19 @@
     }
   },
   "type": "object",
+  "not": {
+    "anyOf": [
+      {
+        "required": ["iceberg_create"]
+      },
+      {
+        "required": ["iceberg_version"]
+      },
+      {
+        "required": ["target_table_format"]
+      }
+    ]
+  },
   "properties": {
     "id": {
       "type": "string",
@@ -149,9 +166,23 @@
     "db_conn": {
       "type": "object",
       "properties": {
-        "iceberg_create": {
-          "type": "boolean"
+        "role": {
+          "type": "string",
+          "minLength": 1
         }
+      },
+      "not": {
+        "anyOf": [
+          {
+            "required": ["iceberg_create"]
+          },
+          {
+            "required": ["iceberg_version"]
+          },
+          {
+            "required": ["target_table_format"]
+          }
+        ]
       },
       "anyOf": [
         {

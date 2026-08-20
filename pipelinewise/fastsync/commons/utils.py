@@ -10,7 +10,7 @@ import re
 import stat
 import tempfile
 
-from typing import Callable, Dict, List, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
 from pipelinewise.cli.utils import generate_random_string
 
 LOGGER = logging.getLogger(__name__)
@@ -284,21 +284,43 @@ def get_expected_s3_key(snowflake, file_part):
     return expected_key if isinstance(expected_key, str) else None
 
 
+def get_expected_s3_keys(snowflake, file_parts: List[str]) -> List[str]:
+    """Resolve and validate every deterministic staging key before upload."""
+    s3_keys = [get_expected_s3_key(snowflake, file_part) for file_part in file_parts]
+    if any(not s3_key for s3_key in s3_keys):
+        raise ValueError('Iceberg staging requires deterministic S3 keys')
+    if len(set(s3_keys)) != len(s3_keys):
+        raise ValueError('Iceberg staging S3 keys must be unique')
+    return s3_keys
+
+
 def upload_files_to_s3(
     snowflake,
     file_parts: List[str],
     temp_dir: str,
     bucket: str,
+    planned_s3_keys: Optional[List[str]] = None,
 ) -> Tuple[List[str], str]:
     """Upload every part before removing local files and roll back failed staging."""
-    s3_keys = []
+    if planned_s3_keys is None:
+        s3_keys = []
+    else:
+        s3_keys = list(planned_s3_keys)
+        if s3_keys != get_expected_s3_keys(snowflake, file_parts):
+            raise ValueError('Planned Iceberg staging S3 keys changed before upload')
+
     try:
-        for file_part in file_parts:
+        for index, file_part in enumerate(file_parts):
             expected_key = get_expected_s3_key(snowflake, file_part)
-            if expected_key:
+            if planned_s3_keys is None and expected_key:
                 s3_keys.append(expected_key)
             uploaded_key = snowflake.upload_to_s3(file_part, tmp_dir=temp_dir)
-            if expected_key:
+            if planned_s3_keys is not None:
+                if uploaded_key != s3_keys[index]:
+                    raise RuntimeError(
+                        'Uploaded Iceberg staging key does not match its persisted plan'
+                    )
+            elif expected_key:
                 s3_keys[-1] = uploaded_key
             else:
                 s3_keys.append(uploaded_key)

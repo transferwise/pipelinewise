@@ -1,0 +1,20 @@
+---
+id: "salesforce_iceberg"
+name: "Salesforce to Snowflake Iceberg"
+type: "tap-salesforce"
+owner: "data-platform@example.com"
+db_conn:
+  client_id: "client-id"
+  client_secret: "client-secret"
+  refresh_token: "refresh-token"
+  start_date: "2026-01-01T00:00:00Z"
+  api_type: "BULK"
+target: "test_snowflake_target"
+target_table_format: iceberg
+iceberg_version: 3
+schemas:
+  - source_schema: "salesforce"
+    target_schema: "salesforce"
+    tables:
+      - table_name: "Account"
+        replication_method: "FULL_TABLE"
