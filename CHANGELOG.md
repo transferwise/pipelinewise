@@ -13,6 +13,7 @@
 **Fixes**
 
 - Execute unparameterized Snowflake SQL containing literal `%` without parameter-binding errors
+- Preserve configured S3 ACLs when archiving Snowflake load files through `target-snowflake`
 
 **Test hardening**
 
