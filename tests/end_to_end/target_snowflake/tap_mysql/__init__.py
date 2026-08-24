@@ -5,6 +5,7 @@ MYSQL_FASTSYNC_TABLES = {
     'iceberg_events': True,
     'iceberg_incremental': True,
     'iceberg_full_reload': False,
+    'multiline_values': True,
 }
 
 

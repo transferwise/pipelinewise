@@ -67,6 +67,10 @@ Read root `AGENTS.md` first; also use scoped connector, test, E2E, and docs guid
   before DML. target-snowflake uses that width for new native/v3 Singer strings,
   leaves compatible existing native strings unchanged, and requires exact width
   on existing v3 strings without implicit widening.
+- Preserve LF, CR, CRLF, tabs, CSV punctuation, and literal backslash sequences
+  through Snowflake FullSync and PartialSync. MySQL/MariaDB export may remove
+  only NUL and remains limited to its three-byte `utf8` projection; PostgreSQL
+  COPY retains Unicode and the same remaining value set.
 - Exceptional DBA repair must preserve v3, copy-on-write, width, metadata, and
   recovery invariants before replication resumes.
 - Key recovery by stable source stream, index the active attempt by physical

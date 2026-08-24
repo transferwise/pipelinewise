@@ -35,3 +35,7 @@ schemas:
 
       - table_name: "no_pk_table"
         replication_method: "FULL_TABLE"
+
+      - table_name: "multiline_values"
+        replication_method: "INCREMENTAL"
+        replication_key: "id"

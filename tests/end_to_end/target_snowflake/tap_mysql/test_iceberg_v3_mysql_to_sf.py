@@ -1,6 +1,10 @@
 import json
 
 from tests.end_to_end.helpers import assertions
+from tests.end_to_end.target_snowflake.multiline_values import (
+    exercise_multiline_fastsync,
+    prepare_mysql_multiline_table,
+)
 from tests.end_to_end.target_snowflake.tap_mysql import (
     TapMySQL,
     mysql_initial_state_expectations,
@@ -23,6 +27,17 @@ class TestIcebergV3MySQLToSnowflake(TapMySQL):
             f'PPW_E2E_TAP_ORACLE_MYSQL{self.e2e_env.sf_schema_postfix}'
         ).upper()
         self.initial_s3_keys = self.iceberg_fastsync_s3_keys()
+
+    def prepare_source(self):
+        """Create the multiline table before catalog discovery."""
+        super().prepare_source()
+        self.addCleanup(
+            self.e2e_env.run_query_tap_oracle_mysql,
+            'DROP TABLE IF EXISTS multiline_values',
+        )
+        prepare_mysql_multiline_table(
+            self.e2e_env.run_query_tap_oracle_mysql
+        )
 
     def _assert_managed_v3(self, table_name):
         rows = self.e2e_env.run_query_target_snowflake(
@@ -72,6 +87,7 @@ class TestIcebergV3MySQLToSnowflake(TapMySQL):
             'iceberg_events',
             'iceberg_incremental',
             'iceberg_full_reload',
+            'multiline_values',
         ):
             self._assert_managed_v3(table_name)
 
@@ -167,6 +183,21 @@ class TestIcebergV3MySQLToSnowflake(TapMySQL):
         self.assertEqual(
             self._target_value_rows('iceberg_full_reload'),
             [(2, 'full-two-updated'), (3, 'full-three')],
+        )
+        self.assert_iceberg_fastsync_cleanup(
+            self.target_schema,
+            self.initial_s3_keys,
+        )
+
+    def test_full_and_bounded_partial_sync_preserve_multiline_bytes(self):
+        """MySQL FastSync retains controls, escapes, text, empty, and NULL."""
+        exercise_multiline_fastsync(
+            self,
+            self.e2e_env.run_query_tap_oracle_mysql,
+            self.source_db,
+            'oracle_mysql',
+            self.target_schema,
+            lambda: self._assert_managed_v3('multiline_values'),
         )
         self.assert_iceberg_fastsync_cleanup(
             self.target_schema,

@@ -138,6 +138,17 @@ Singer schema evolution has a different existing-native policy:
 widen or version a compatible existing native string column solely because of
 its declared width. See :ref:`target-snowflake`.
 
+MariaDB/MySQL and PostgreSQL Snowflake FullSync and PartialSync preserve LF, CR,
+CRLF, tab, CSV punctuation, and literal backslash sequences in string values.
+PostgreSQL preserves Unicode; MariaDB/MySQL remains limited to characters
+representable by its legacy three-byte ``utf8`` FastSync projection and
+continues to remove NUL characters. This preservation applies to native and
+managed Iceberg v3 publication; the table format does not change the staged
+string representation. SQL ``NULL`` and a literal ``\N`` string remain distinct.
+
+This behavior does not repair values normalized by an earlier run. Resync each
+affected table from its source after upgrading.
+
 
 Explicit FullSync
 -----------------

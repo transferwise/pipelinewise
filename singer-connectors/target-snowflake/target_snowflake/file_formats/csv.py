@@ -9,6 +9,23 @@ from tempfile import mkstemp
 from target_snowflake import flattening
 
 
+REQUIRED_FILE_FORMAT_OPTIONS = {
+    'TYPE': 'CSV',
+    'RECORD_DELIMITER': '\n',
+    'FIELD_DELIMITER': ',',
+    'SKIP_HEADER': 0,
+    'PARSE_HEADER': False,
+    'ESCAPE': '\\',
+    'TRIM_SPACE': False,
+    'FIELD_OPTIONALLY_ENCLOSED_BY': '"',
+    'NULL_IF': [],
+    'SKIP_BLANK_LINES': False,
+    'EMPTY_FIELD_AS_NULL': True,
+    'ENCODING': 'UTF8',
+    'MULTI_LINE': True,
+}
+
+
 def create_copy_sql(table_name: str,
                     stage_name: str,
                     s3_key: str,
@@ -67,15 +84,18 @@ def record_to_csv_line(record: dict,
         string of csv line
     """
     flatten_record = flattening.flatten_record(record, schema, max_level=data_flattening_max_level)
+    values = []
+    for column in schema:
+        value = flatten_record.get(column)
+        if value is None:
+            values.append('')
+        elif isinstance(value, str):
+            escaped_value = value.replace('\\', '\\\\').replace('"', '\\"')
+            values.append(f'"{escaped_value}"')
+        else:
+            values.append(json.dumps(value, ensure_ascii=False))
 
-    return ','.join(
-        [
-            json.dumps(flatten_record[column], ensure_ascii=False)
-            if column in flatten_record and flatten_record[column] is not None
-            else ''
-            for column in schema
-        ]
-    )
+    return ','.join(values)
 
 
 def write_records_to_file(outfile,

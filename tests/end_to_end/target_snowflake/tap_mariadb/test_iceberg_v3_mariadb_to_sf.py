@@ -1,6 +1,10 @@
 import json
 
 from tests.end_to_end.helpers import assertions
+from tests.end_to_end.target_snowflake.multiline_values import (
+    exercise_multiline_fastsync,
+    prepare_mysql_multiline_table,
+)
 from tests.end_to_end.target_snowflake.tap_mariadb import TapMariaDB
 
 
@@ -24,6 +28,11 @@ class TestIcebergV3MariaDBToSnowflake(TapMariaDB):
     def prepare_source(self):
         """Add large text columns before catalog discovery."""
         super().prepare_source()
+        self.addCleanup(
+            self.e2e_env.run_query_tap_mysql,
+            'DROP TABLE IF EXISTS multiline_values',
+        )
+        prepare_mysql_multiline_table(self.e2e_env.run_query_tap_mysql)
         self.e2e_env.run_query_tap_mysql(
             'ALTER TABLE edgydata ADD COLUMN large_text LONGTEXT'
         )
@@ -96,11 +105,17 @@ class TestIcebergV3MariaDBToSnowflake(TapMariaDB):
                     f'{self.source_db}-edgydata': True,
                     f'{self.source_db}-address': True,
                     f'{self.source_db}-no_pk_table': False,
+                    f'{self.source_db}-multiline_values': True,
                 }
             },
         )
 
-        for table_name in ('edgydata', 'address', 'no_pk_table'):
+        for table_name in (
+            'edgydata',
+            'address',
+            'no_pk_table',
+            'multiline_values',
+        ):
             self._assert_managed_v3(table_name)
         column_type_rows = self.e2e_env.run_query_target_snowflake(
             'SELECT DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS '
@@ -143,6 +158,21 @@ class TestIcebergV3MariaDBToSnowflake(TapMariaDB):
             f'SELECT "ID" FROM "{self.target_schema}"."NO_PK_TABLE" ORDER BY "ID"'
         )
         self.assertEqual([row[0] for row in full_rows], list(range(1, 11)))
+        self.assert_iceberg_fastsync_cleanup(
+            self.target_schema,
+            self.initial_s3_keys,
+        )
+
+    def test_full_and_bounded_partial_sync_preserve_multiline_bytes(self):
+        """MariaDB FastSync retains controls, escapes, text, empty, and NULL."""
+        exercise_multiline_fastsync(
+            self,
+            self.e2e_env.run_query_tap_mysql,
+            self.source_db,
+            'mysql',
+            self.target_schema,
+            lambda: self._assert_managed_v3('multiline_values'),
+        )
         self.assert_iceberg_fastsync_cleanup(
             self.target_schema,
             self.initial_s3_keys,

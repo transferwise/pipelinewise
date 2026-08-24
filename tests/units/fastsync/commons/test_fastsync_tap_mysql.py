@@ -1,3 +1,4 @@
+import csv
 import io
 
 import pymysql
@@ -115,6 +116,47 @@ class TestFastSyncTapMySql(TestCase):
         writer.writerow([None, '', 'text', 0])
 
         self.assertEqual(output.getvalue(), ',"","text","0"\r\n')
+
+    def test_csv_export_preserves_multiline_text_and_csv_syntax(self):
+        """Quoted CSV preserves text controls and syntax-sensitive characters."""
+        value = (
+            'line one\nline two\rline three\r\n'
+            '\tliteral \\n and \\t, "Unicode: 雪"\\'
+        )
+        output = io.StringIO()
+        writer = tap_mysql._create_csv_writer(output)  # pylint: disable=protected-access
+
+        writer.writerow([value])
+
+        expected = '"' + value.replace('"', '""') + '"\r\n'
+        self.assertEqual(output.getvalue(), expected)
+        self.assertEqual(next(csv.reader(io.StringIO(output.getvalue()))), [value])
+
+    def test_text_projection_preserves_multiline_for_mysql_and_mariadb(self):
+        """Both engines remove only NUL before quoted CSV serialization."""
+        expected_projection = (
+            "ELSE concat('REPLACE(cast(`', column_name, "
+            "'` AS char CHARACTER SET utf8)', \", CHAR(0), '')\")"
+        )
+
+        for engine in ('mysql', MARIADB_ENGINE):
+            with self.subTest(engine=engine):
+                self.mysql = FastSyncTapMySqlMock(
+                    connection_config={
+                        **self.connection_config,
+                        'engine': engine,
+                    }
+                )
+                with patch.object(
+                    self.mysql, 'query', return_value=[]
+                ) as query_mock:
+                    self.mysql.get_table_columns('my_db.my_table')
+
+                sql = query_mock.call_args.args[0]
+                self.assertIn(expected_projection, sql)
+                self.assertNotIn(
+                    "ELSE concat('REPLACE(REPLACE(REPLACE(cast(`'", sql
+                )
 
     def test_get_connection_to_primary(self):
         """

@@ -45,8 +45,50 @@ Example stage and file format:
 
    CREATE FILE FORMAT <database>.<schema>.<file_format>
      TYPE = 'CSV'
-     ESCAPE = '\\'
-     FIELD_OPTIONALLY_ENCLOSED_BY = '"';
+     RECORD_DELIMITER = '0x0A'
+     FIELD_DELIMITER = '0x2C'
+     ESCAPE = '0x5C'
+     FIELD_OPTIONALLY_ENCLOSED_BY = '0x22'
+     SKIP_HEADER = 0
+     PARSE_HEADER = FALSE
+     SKIP_BLANK_LINES = FALSE
+     TRIM_SPACE = FALSE
+     EMPTY_FIELD_AS_NULL = TRUE
+     ENCODING = 'UTF8'
+     MULTI_LINE = TRUE
+     NULL_IF = ();
+
+``target-snowflake`` validates the effective options of a named CSV format
+before loading. The settings above let it distinguish SQL ``NULL``, an empty
+string, actual line breaks and tabs, and literal backslash sequences. It rejects
+an incompatible format without writing rows.
+
+FastSync does not use this named object; it supplies its own inline CSV options.
+Changing the named format therefore affects Singer ``target-snowflake`` loads,
+not FastSync loads.
+
+To migrate an existing CSV format, stop its PipelineWise loads and apply the
+same settings before retrying:
+
+.. code-block:: sql
+
+   ALTER FILE FORMAT <database>.<schema>.<file_format> SET
+     RECORD_DELIMITER = '0x0A'
+     FIELD_DELIMITER = '0x2C'
+     ESCAPE = '0x5C'
+     FIELD_OPTIONALLY_ENCLOSED_BY = '0x22'
+     SKIP_HEADER = 0
+     PARSE_HEADER = FALSE
+     SKIP_BLANK_LINES = FALSE
+     TRIM_SPACE = FALSE
+     EMPTY_FIELD_AS_NULL = TRUE
+     ENCODING = 'UTF8'
+     MULTI_LINE = TRUE
+     NULL_IF = ();
+
+Changing the format affects later loads only. If earlier replication normalized
+or removed control characters, run a source resync for each affected table;
+PipelineWise cannot reconstruct the original value from Snowflake.
 
 Use a storage integration, instance role, or AWS profile where possible. If the
 stage uses client-side encryption, configure the same master key in PipelineWise.
@@ -162,6 +204,16 @@ column at its current width. It does not widen or version that column solely
 because its declared width is narrower. Existing managed Iceberg v3 strings are
 different: every string column must already have the exact maximum width before
 PipelineWise writes the table. See :ref:`snowflake_iceberg`.
+
+
+String contents
+---------------
+
+Singer CSV loading preserves LF, CR, CRLF, tab, CSV punctuation, Unicode, and
+literal backslash sequences in string values. This applies to new and existing
+native and managed Iceberg v3 string columns. The named CSV file format must use
+the required options in the prerequisites above; otherwise the target stops
+before loading.
 
 
 Publication and grants

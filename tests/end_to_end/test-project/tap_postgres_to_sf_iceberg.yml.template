@@ -44,3 +44,7 @@ schemas:
 
       - table_name: "iceberg_composite_key"
         replication_method: "FULL_TABLE"
+
+      - table_name: "multiline_values"
+        replication_method: "INCREMENTAL"
+        replication_key: "id"

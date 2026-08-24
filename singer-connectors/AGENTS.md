@@ -48,7 +48,7 @@ CSV suite needs standard Snowflake/S3 variables plus
 `TARGET_SNOWFLAKE_SCHEMA` and `TARGET_SNOWFLAKE_FILE_FORMAT_CSV` (which may
 reuse `TARGET_SNOWFLAKE_FILE_FORMAT`); verify the private key is readable.
 
-Run the supported 46-test subset with plaintext upload explicitly selected:
+Run the supported 48-test subset with plaintext upload explicitly selected:
 
 ```bash
 docker exec -t -e CLIENT_SIDE_ENCRYPTION_MASTER_KEY= pipelinewise bash -lc '
@@ -61,7 +61,7 @@ docker exec -t -e CLIENT_SIDE_ENCRYPTION_MASTER_KEY= pipelinewise bash -lc '
 ```
 
 This excludes Parquet, mixed CSV/Parquet table-stage, and successful client-side
-encryption, but retains wrong-key rejection. Expect 46 passes and zero skips;
+encryption, but retains wrong-key rejection. Expect 48 passes and zero skips;
 anything else is non-green. Full `make integration_test` separately requires
 Parquet and a real client-side encryption master key.
 
@@ -102,6 +102,10 @@ Parquet and a real client-side encryption master key.
 - Emit new native/v3 strings as `VARCHAR(134217728)`. Keep compatible existing
   native widths; require exact v3 width and never widen existing Iceberg
   implicitly. Emit v3 binary explicitly as `BINARY(67108864)` in CREATE/ADD.
+- Keep target-snowflake's quote-aware CSV writer and named-format validation in
+  lockstep. Preserve SQL NULL, empty strings, controls, Unicode, punctuation,
+  and literal escapes; require the documented comma/LF, escape, enclosure,
+  whitespace, empty-field, multiline, UTF-8, header, and empty `NULL_IF` options.
 - PipelineWise is the sole automated writer; external reads are allowed. DBA
   writes/DDL require a maintenance window with replication stopped and no
   recovery, followed by v3 revalidation. Replicated tables/columns must come

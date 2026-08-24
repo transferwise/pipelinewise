@@ -485,6 +485,59 @@ class TestIntegration(unittest.TestCase):
                 {'C_INT': 6, 'C_PK': 6, 'C_VARCHAR': 'Special Characters: [",\'!@£$%^&*()]'}
             ])
 
+    def test_loading_multiline_and_literal_escape_strings(self):
+        """COPY and MERGE keep control characters distinct from literal escapes."""
+        self.config['primary_key_required'] = False
+        record = {
+            'id': 1,
+            'script': 'def value = "初雪, ok"\r\n\tprintln(value)\nreturn value',
+            'lf': 'left\nright',
+            'cr': 'left\rright',
+            'crlf': 'left\r\nright',
+            'tab': 'left\tright',
+            'literal_escapes': r'left\nright\tend\N',
+            'literal_null_marker': r'\N',
+            'quoted_comma': 'say "hello", world',
+            'unicode': '初雪',
+            'trailing_backslash': 'C:\\data\\',
+            'empty_value': '',
+            'null_value': None,
+        }
+        properties = {'id': {'type': ['integer']}}
+        properties.update({
+            column: {'type': ['null', 'string']}
+            for column in record
+            if column != 'id'
+        })
+        singer_lines = []
+        for stream, key_properties in (
+            ('tap_postgres_test-multiline_merge', ['id']),
+            ('tap_postgres_test-multiline_copy', []),
+        ):
+            singer_lines.extend((
+                json.dumps({
+                    'type': 'SCHEMA',
+                    'stream': stream,
+                    'schema': {'type': 'object', 'properties': properties},
+                    'key_properties': key_properties,
+                }),
+                json.dumps({
+                    'type': 'RECORD',
+                    'stream': stream,
+                    'record': record,
+                    'time_extracted': '2026-08-24T12:00:00Z',
+                }, ensure_ascii=False),
+            ))
+
+        self.persist_lines_with_cache(singer_lines)
+
+        target_schema = self.config.get('default_target_schema', '')
+        expected_rows = [{column.upper(): value for column, value in record.items()}]
+        for table in ('multiline_merge', 'multiline_copy'):
+            with self.subTest(table=table):
+                rows = self.snowflake.query(f'SELECT * FROM {target_schema}.{table}')
+                self.assertEqual(rows, expected_rows)
+
     def test_non_db_friendly_columns(self):
         """Loading non-db friendly columns like, camelcase, minus signs, etc."""
         tap_lines = test_utils.get_test_tap_lines('messages-with-non-db-friendly-columns.json')

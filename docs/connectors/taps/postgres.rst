@@ -113,6 +113,8 @@ full template with ``pipelinewise init``.
 
 Snowflake Singer, FullSync, and PartialSync can target managed Iceberg v3 with
 explicit tap-level configuration. See :ref:`snowflake_iceberg`.
+Snowflake Singer loading, FullSync, and PartialSync preserve line breaks, tabs,
+CSV punctuation, Unicode, and literal backslash sequences in string values.
 PostgreSQL ``hstore`` values map to Snowflake ``VARIANT`` only on that explicit
 v3 route; native mappings remain unchanged.
 

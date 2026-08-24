@@ -341,3 +341,70 @@ class TestManagedIcebergV3Integration(unittest.TestCase):
         self.assertIsNone(loaded_rows[2]['LARGE_OBJECT'])
         self.assertTrue(loaded_rows[2]['OBJECT_SQL_NULL'])
         self.assertTrue(loaded_rows[2]['ARRAY_SQL_NULL'])
+
+    def test_singer_preserves_multiline_varchar_in_managed_iceberg_v3(self):
+        stream = 'source-multiline__iceberg'
+        record = {
+            'id': 1,
+            'script': 'def value = "初雪, ok"\r\n\tprintln(value)\nreturn value',
+            'lf': 'left\nright',
+            'cr': 'left\rright',
+            'crlf': 'left\r\nright',
+            'tab': 'left\tright',
+            'literal_escapes': r'left\nright\tend\N',
+            'literal_null_marker': r'\N',
+            'quoted_comma': 'say "hello", world',
+            'unicode': '初雪',
+            'trailing_backslash': 'C:\\data\\',
+            'empty_value': '',
+            'null_value': None,
+        }
+        properties = {'id': {'type': ['integer']}}
+        properties.update({
+            column: {'type': ['null', 'string']}
+            for column in record
+            if column != 'id'
+        })
+        singer_lines = [
+            json.dumps({
+                'type': 'SCHEMA',
+                'stream': stream,
+                'schema': {'type': 'object', 'properties': properties},
+                'key_properties': ['id'],
+                'bookmark_properties': [],
+            }),
+            json.dumps({
+                'type': 'RECORD',
+                'stream': stream,
+                'record': record,
+                'time_extracted': '2026-08-24T12:00:00Z',
+            }, ensure_ascii=False),
+        ]
+
+        target_snowflake.persist_lines(self.config, singer_lines)
+
+        table_name = 'MULTILINE__ICEBERG'
+        table_fqtn = self._qualified_name(self.database, self.schema, table_name)
+        self.assertEqual(
+            self.snowflake.discover_table_format(self.schema, table_name),
+            TABLE_FORMAT_MANAGED_ICEBERG_V3,
+        )
+        selected_columns = ', '.join(
+            self._quote_identifier(column.upper())
+            for column in record
+        )
+        self.assertEqual(
+            self.snowflake.query(f'SELECT {selected_columns} FROM {table_fqtn}'),
+            [{column.upper(): value for column, value in record.items()}],
+        )
+        script_column = self.snowflake.query(
+            'SELECT "DATA_TYPE", "CHARACTER_MAXIMUM_LENGTH" '
+            f'FROM {self._quote_identifier(self.database)}."INFORMATION_SCHEMA"."COLUMNS" '
+            f"WHERE \"TABLE_SCHEMA\" = '{self.schema}' "
+            f"AND \"TABLE_NAME\" = '{table_name}' "
+            "AND \"COLUMN_NAME\" = 'SCRIPT'"
+        )
+        self.assertEqual(
+            script_column,
+            [{'DATA_TYPE': 'TEXT', 'CHARACTER_MAXIMUM_LENGTH': 134217728}],
+        )

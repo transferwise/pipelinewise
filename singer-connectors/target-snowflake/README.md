@@ -57,10 +57,54 @@ You need to create a few objects in snowflake in one schema before start using t
 1. Create a named file format. This will be used by the MERGE/COPY commands to parse the files correctly from S3. You can use CSV or Parquet file formats.
 
 To use CSV files:
-```
+
+```sql
 CREATE FILE FORMAT {database}.{schema}.{file_format_name}
-TYPE = 'CSV' ESCAPE='\\' FIELD_OPTIONALLY_ENCLOSED_BY='"';
+TYPE = 'CSV'
+RECORD_DELIMITER = '0x0A'
+FIELD_DELIMITER = '0x2C'
+ESCAPE = '0x5C'
+FIELD_OPTIONALLY_ENCLOSED_BY = '0x22'
+SKIP_HEADER = 0
+PARSE_HEADER = FALSE
+SKIP_BLANK_LINES = FALSE
+TRIM_SPACE = FALSE
+EMPTY_FIELD_AS_NULL = TRUE
+ENCODING = 'UTF8'
+MULTI_LINE = TRUE
+NULL_IF = ();
 ```
+
+The target validates these effective CSV options before loading. They preserve
+SQL `NULL`, empty strings, LF, CR, CRLF, tabs, CSV punctuation, Unicode, and
+literal backslash sequences as distinct values. An incompatible named CSV
+format is rejected before rows are written.
+
+PipelineWise FastSync does not use this named object; its Snowflake loader
+supplies inline CSV options. This prerequisite applies to Singer
+`target-snowflake` loads.
+
+Migrate an existing CSV format while its loads are stopped:
+
+```sql
+ALTER FILE FORMAT {database}.{schema}.{file_format_name} SET
+RECORD_DELIMITER = '0x0A'
+FIELD_DELIMITER = '0x2C'
+ESCAPE = '0x5C'
+FIELD_OPTIONALLY_ENCLOSED_BY = '0x22'
+SKIP_HEADER = 0
+PARSE_HEADER = FALSE
+SKIP_BLANK_LINES = FALSE
+TRIM_SPACE = FALSE
+EMPTY_FIELD_AS_NULL = TRUE
+ENCODING = 'UTF8'
+MULTI_LINE = TRUE
+NULL_IF = ();
+```
+
+The change applies only to later loads. Resync affected tables from their source
+if an earlier target version normalized or removed control characters; the
+original values cannot be reconstructed from Snowflake.
 
 To use Parquet files (experimental):
 

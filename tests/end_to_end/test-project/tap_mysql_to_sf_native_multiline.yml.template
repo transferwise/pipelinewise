@@ -1,0 +1,27 @@
+---
+
+id: "mariadb_to_sf_native_multiline"
+name: "MariaDB native multiline FastSync source"
+type: "tap-mysql"
+owner: "test-runner"
+
+db_conn:
+  host: "${TAP_MYSQL_HOST}"
+  port: ${TAP_MYSQL_PORT}
+  user: "${TAP_MYSQL_USER}"
+  password: "${TAP_MYSQL_PASSWORD}"
+  dbname: "${TAP_MYSQL_DB}"
+  use_gtid: true
+  engine: mariadb
+
+target: "snowflake"
+batch_size_rows: 1000
+stream_buffer_size: 0
+
+schemas:
+  - source_schema: "${TAP_MYSQL_DB}"
+    target_schema: "ppw_e2e_tap_mysql_2${TARGET_SNOWFLAKE_SCHEMA_POSTFIX}"
+    tables:
+      - table_name: "multiline_values"
+        replication_method: "INCREMENTAL"
+        replication_key: "id"

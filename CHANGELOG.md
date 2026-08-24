@@ -18,6 +18,9 @@
   `VARCHAR(134217728)` before writes
 - Require PipelineWise to remain the sole writer for managed Iceberg v3 targets;
   external systems may read them but must not write them
+- Require target-snowflake named CSV formats to use the required multiline-safe
+  options, including `NULL_IF = ()`, and reject incompatible formats before
+  loading
 
 **Snowflake Iceberg**
 
@@ -110,6 +113,11 @@
   before cleanup or replication-state handoff can be skipped
 - Report expected and actual row counts and non-sensitive fingerprints when
   Iceberg publication or conversion content verification fails
+- Preserve LF, CR, CRLF, tabs, CSV punctuation, three-byte Unicode, and literal
+  backslash sequences in MariaDB/MySQL Snowflake FastSync strings while
+  continuing to remove NUL characters
+- Preserve actual control characters and literal backslash sequences in
+  target-snowflake Singer CSV string fields
 
 **Test hardening**
 
@@ -135,6 +143,8 @@
   stop the remaining chain when the workflow is cancelled
 - Fail the RDBMS Snowflake E2E jobs when required credentials are absent
 - Trigger E2E when its workflow or validation scripts change
+- Verify PostgreSQL Snowflake FastSync and target-snowflake retain multiline
+  strings and literal escape sequences
 
 0.80.0 (2026-08-19; deleted)
 ---------------------------------

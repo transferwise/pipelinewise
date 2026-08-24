@@ -62,10 +62,10 @@ run_e2e tests/end_to_end/target_snowflake/tap_mongodb
 run_e2e tests/end_to_end/target_snowflake/tap_s3
 ```
 
-Run all six only for a full suite; otherwise run every affected group. MariaDB
-and PostgreSQL cover native and explicit v3; genuine MySQL covers explicit v3.
-Do not infer one format from the other. `SHOW PRIMARY KEYS` does not prove
-Iceberg identifier fields; inspect raw metadata and compare
+Run all six only for a full suite; otherwise run every affected group. MariaDB,
+MySQL, and PostgreSQL cover native and explicit v3; do not infer one format
+from the other. `SHOW PRIMARY KEYS` does not prove Iceberg identifier fields;
+inspect raw metadata and compare
 `identifier-field-ids` with current schema field IDs.
 
 ## Credentials and destructive scope

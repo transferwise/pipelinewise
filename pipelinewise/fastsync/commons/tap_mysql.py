@@ -411,6 +411,8 @@ class FastSyncTapMySql:
                             )) AS is_json_alias"""
             columns_relation += ' AS c'
 
+        # Keep the legacy NUL removal separate from CSV quoting; every other
+        # text character must reach csv.writer unchanged.
         # pylint: disable=line-too-long
         sql = f"""
                 SELECT column_name AS column_name,
@@ -441,7 +443,7 @@ class FastSyncTapMySql:
                                     THEN {decimal_format}
                             WHEN data_type IN ('smallint', 'integer', 'bigint', 'mediumint', 'int')
                                     THEN {integer_format}
-                            ELSE concat('REPLACE(REPLACE(REPLACE(cast(`', column_name, '` AS char CHARACTER SET utf8)', ", '\n', ' '), '\r', ''), '\0', '')")
+                            ELSE concat('REPLACE(cast(`', column_name, '` AS char CHARACTER SET utf8)', ", CHAR(0), '')")
                                 END AS safe_sql_value{json_alias_projection},
                             ordinal_position
                     FROM {columns_relation}
