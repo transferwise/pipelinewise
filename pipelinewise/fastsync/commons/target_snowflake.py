@@ -383,12 +383,12 @@ class FastSyncTargetSnowflake(SnowflakeSqlClient):  # pylint: disable=too-many-p
         inserts = 0
 
         stage = self.connection_config['stage']
-        # Keep Snowflake's default explicit: unquoted empty fields are NULL, while
-        # quoted empty fields remain empty strings.
+        # Empty unquoted fields are the only SQL NULL representation. An empty
+        # NULL_IF keeps literal source values such as ``\N`` intact.
         sql = (
             f'COPY INTO {target_schema}."{target_table.upper()}" FROM \'@{stage}/{s3_key}\''
             f' FILE_FORMAT = (type=CSV escape=NONE escape_unenclosed_field=\'\\x1e\''
-            f' field_optionally_enclosed_by=\'\"\' empty_field_as_null=TRUE'
+            f' field_optionally_enclosed_by=\'\"\' null_if=() empty_field_as_null=TRUE'
             f' skip_header={int(skip_csv_header)}'
             f' compression=GZIP binary_format=HEX)'
         )

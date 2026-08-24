@@ -93,6 +93,23 @@ Do not infer one format from another. `SHOW PRIMARY KEYS` does not prove Iceberg
 identifier fields; compare raw-metadata `identifier-field-ids` with current
 schema field IDs.
 
+### Multiline coverage
+
+Verify exact UTF-8 bytes, SQL NULL versus empty strings, and literal escapes
+through native and explicit-v3 FullSync/PartialSync for MariaDB, MySQL, and
+PostgreSQL. Reuse `target_snowflake/multiline_values.py`; do not normalize values
+in assertions. Connector integration separately covers Singer CSV loading.
+
+The native multiline files below are not yet included in the CI groups above;
+run them additionally, serially, until they are assigned to CI shards:
+
+```bash
+run_e2e \
+  tests/end_to_end/target_snowflake/tap_mariadb/test_multiline_native_mariadb_to_sf.py \
+  tests/end_to_end/target_snowflake/tap_mysql/test_multiline_native_mysql_to_sf.py \
+  tests/end_to_end/target_snowflake/tap_postgres/test_multiline_native_pg_to_sf.py
+```
+
 ## Credentials and destructive scope
 
 - Snowflake E2E requires a dedicated database/role, `dev-project/snowflake.pem`,

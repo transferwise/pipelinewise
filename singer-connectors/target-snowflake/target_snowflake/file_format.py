@@ -1,10 +1,13 @@
 """Enums used by pipelinewise-target-snowflake"""
+import json
+
 from enum import Enum, unique
 from types import ModuleType
 from typing import Callable
 
 import target_snowflake.file_formats
 from target_snowflake.exceptions import FileFormatNotFoundException, InvalidFileFormatException
+from target_snowflake.file_formats.csv import REQUIRED_FILE_FORMAT_OPTIONS
 
 # Supported types for file formats.
 @unique
@@ -72,15 +75,56 @@ class FileFormat:
         file_formats_in_sf = query_fn(f"SHOW FILE FORMATS LIKE '{file_format_name}'")
 
         if len(file_formats_in_sf) == 1:
-            file_format = file_formats_in_sf[0]
+            file_format_metadata = file_formats_in_sf[0]
             try:
-                file_format_type = FileFormatTypes(file_format['type'].lower())
+                file_format_type = FileFormatTypes(file_format_metadata['type'].lower())
             except ValueError as ex:
                 raise InvalidFileFormatException(
                     f"Not supported named file format {file_format_name}. Supported file formats: {FileFormatTypes}") \
                     from ex
+
+            if file_format_type == FileFormatTypes.CSV:
+                cls._validate_csv_options(file_format_name, file_format_metadata)
         else:
             raise FileFormatNotFoundException(
                 f"Named file format not found: {file_format}")
 
         return file_format_type
+
+    @staticmethod
+    def _validate_csv_options(file_format_name: str, file_format_metadata: dict) -> None:
+        """Require the Snowflake CSV dialect emitted by the connector."""
+        raw_options = next(
+            (
+                value
+                for key, value in file_format_metadata.items()
+                if key.lower() == 'format_options'
+            ),
+            None,
+        )
+
+        try:
+            options = json.loads(raw_options) if isinstance(raw_options, str) else raw_options
+        except json.JSONDecodeError as ex:
+            raise InvalidFileFormatException(
+                f"Named CSV file format {file_format_name} returned invalid format_options metadata"
+            ) from ex
+
+        if not isinstance(options, dict):
+            raise InvalidFileFormatException(
+                f"Named CSV file format {file_format_name} did not return format_options metadata"
+            )
+
+        normalized_options = {str(key).upper(): value for key, value in options.items()}
+        mismatches = [
+            f'{name}={normalized_options.get(name)!r} (expected {expected!r})'
+            for name, expected in REQUIRED_FILE_FORMAT_OPTIONS.items()
+            if normalized_options.get(name) != expected
+        ]
+        if mismatches:
+            raise InvalidFileFormatException(
+                f"Named CSV file format {file_format_name} is incompatible with target-snowflake: "
+                f"{'; '.join(mismatches)}. Configure the named format with NULL_IF=(), "
+                "ESCAPE='\\\\', FIELD_OPTIONALLY_ENCLOSED_BY='\"', MULTI_LINE=TRUE, "
+                'EMPTY_FIELD_AS_NULL=TRUE, and the standard comma/LF delimiters.'
+            )

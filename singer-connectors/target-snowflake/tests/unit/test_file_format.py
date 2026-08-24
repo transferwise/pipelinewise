@@ -1,9 +1,19 @@
+import json
 import unittest
 from unittest.mock import patch
 
 from target_snowflake.exceptions import InvalidFileFormatException, FileFormatNotFoundException
 from target_snowflake.file_format import FileFormat, FileFormatTypes
 from target_snowflake.file_formats import csv, parquet
+
+
+def _csv_file_format_result(**overrides):
+    options = dict(csv.REQUIRED_FILE_FORMAT_OPTIONS)
+    options.update(overrides)
+    return [{
+        'type': 'CSV',
+        'format_options': json.dumps(options),
+    }]
 
 
 class TestFileFormat(unittest.TestCase):
@@ -20,23 +30,11 @@ class TestFileFormat(unittest.TestCase):
 
     @patch('target_snowflake.db_sync.DbSync.query')
     def test_detect_file_format_type(self, query_patch):
-        minimal_config = {
-            'account': 'foo',
-            'dbname': 'foo',
-            'user': 'foo',
-            'password': 'foo',
-            'warehouse': 'foo',
-            'default_target_schema': 'foo',
-            'file_format': 'foo',
-            's3_bucket': 'foo',
-            'stage': 'foo.foo'
-        }
-
         # List method should return values as list
         self.assertEqual(FileFormatTypes.list(), ['csv', 'parquet'])
 
         # CSV should be supported
-        query_patch.return_value = [{ 'type': 'CSV' }]
+        query_patch.return_value = _csv_file_format_result()
         file_format = FileFormat('foo', query_patch)
         self.assertEqual(file_format.file_format_type, FileFormatTypes.CSV)
 
@@ -68,4 +66,31 @@ class TestFileFormat(unittest.TestCase):
         # Not supported file format type should raise exception
         query_patch.return_value = [{ 'type': 'NOT_SUPPORTED_TYPE' }]
         with self.assertRaises(InvalidFileFormatException):
+            FileFormat('foo', query_patch)
+
+    @patch('target_snowflake.db_sync.DbSync.query')
+    def test_rejects_incompatible_csv_options(self, query_patch):
+        for option, expected in csv.REQUIRED_FILE_FORMAT_OPTIONS.items():
+            if isinstance(expected, bool):
+                incompatible = not expected
+            elif isinstance(expected, int):
+                incompatible = expected + 1
+            elif isinstance(expected, list):
+                incompatible = ['\\N']
+            else:
+                incompatible = f'{expected}-invalid'
+
+            with self.subTest(option=option):
+                query_patch.return_value = _csv_file_format_result(**{option: incompatible})
+                with self.assertRaisesRegex(InvalidFileFormatException, option):
+                    FileFormat('foo', query_patch)
+
+    @patch('target_snowflake.db_sync.DbSync.query')
+    def test_rejects_missing_or_malformed_csv_options(self, query_patch):
+        query_patch.return_value = [{'type': 'CSV'}]
+        with self.assertRaisesRegex(InvalidFileFormatException, 'did not return format_options'):
+            FileFormat('foo', query_patch)
+
+        query_patch.return_value = [{'type': 'CSV', 'format_options': '{not-json'}]
+        with self.assertRaisesRegex(InvalidFileFormatException, 'invalid format_options'):
             FileFormat('foo', query_patch)

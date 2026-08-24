@@ -329,7 +329,7 @@ class TestFastSyncTargetSnowflake(TestCase):  # pylint: disable=too-many-public-
         assert self.snowflake.executed_queries == [
             'COPY INTO test_schema."TEST_TABLE" FROM \'@dummy_stage/s3_key\''
             ' FILE_FORMAT = (type=CSV escape=NONE escape_unenclosed_field=\'\\x1e\''
-            ' field_optionally_enclosed_by=\'\"\' empty_field_as_null=TRUE skip_header=0'
+            ' field_optionally_enclosed_by=\'\"\' null_if=() empty_field_as_null=TRUE skip_header=0'
             ' compression=GZIP binary_format=HEX)'
         ]
         assert inserted_rows == 0
@@ -347,7 +347,7 @@ class TestFastSyncTargetSnowflake(TestCase):  # pylint: disable=too-many-public-
         assert self.snowflake.executed_queries == [
             'COPY INTO test_schema."FULL_TEMP" FROM \'@dummy_stage/s3_key\''
             ' FILE_FORMAT = (type=CSV escape=NONE escape_unenclosed_field=\'\\x1e\''
-            ' field_optionally_enclosed_by=\'\"\' empty_field_as_null=TRUE skip_header=0'
+            ' field_optionally_enclosed_by=\'\"\' null_if=() empty_field_as_null=TRUE skip_header=0'
             ' compression=GZIP binary_format=HEX)'
         ]
 
@@ -363,7 +363,7 @@ class TestFastSyncTargetSnowflake(TestCase):  # pylint: disable=too-many-public-
         assert self.snowflake.executed_queries == [
             'COPY INTO test_schema."PW_STAGE_123" FROM \'@dummy_stage/s3_key\''
             ' FILE_FORMAT = (type=CSV escape=NONE escape_unenclosed_field=\'\\x1e\''
-            ' field_optionally_enclosed_by=\'"\' empty_field_as_null=TRUE skip_header=0'
+            ' field_optionally_enclosed_by=\'"\' null_if=() empty_field_as_null=TRUE skip_header=0'
             ' compression=GZIP binary_format=HEX)'
         ]
 
@@ -380,7 +380,7 @@ class TestFastSyncTargetSnowflake(TestCase):  # pylint: disable=too-many-public-
         assert self.snowflake.executed_queries == [
             'COPY INTO test_schema."TABLE WITH SPACE AND UPPERCASE_TEMP" FROM \'@dummy_stage/s3 key with space\''
             ' FILE_FORMAT = (type=CSV escape=NONE escape_unenclosed_field=\'\\x1e\''
-            ' field_optionally_enclosed_by=\'\"\' empty_field_as_null=TRUE skip_header=0'
+            ' field_optionally_enclosed_by=\'\"\' null_if=() empty_field_as_null=TRUE skip_header=0'
             ' compression=GZIP binary_format=HEX)'
         ]
 

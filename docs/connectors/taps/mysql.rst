@@ -123,6 +123,11 @@ Operational notes
   can fail when the target column is Boolean.
 - After an initial FastSync, LOG_BASED or INCREMENTAL replication continues from
   the captured bookmark in the Singer portion of the same run.
+- Snowflake Singer loading, FullSync, and PartialSync preserve line breaks,
+  tabs, CSV punctuation, and literal backslash sequences in string values.
+  The MySQL/MariaDB source connection and FastSync projection remain limited
+  to the legacy three-byte ``utf8`` character set; FastSync also removes NUL
+  characters.
 - Snowflake Singer, FullSync, and PartialSync can target managed Iceberg v3 with
   explicit tap-level configuration. See :ref:`snowflake_iceberg`.
 - On an explicit v3 route with ``engine: mariadb``, MariaDB's generated

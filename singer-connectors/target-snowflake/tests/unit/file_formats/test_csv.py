@@ -12,11 +12,36 @@ def _mock_record_to_csv_line(record, schema, data_flattening_max_level=0):
     return record
 
 
+def _read_csv_row(csv_line):
+    return next(csv_module.reader(
+        [csv_line],
+        escapechar='\\',
+        doublequote=False,
+    ))
+
+
 class TestCsv(unittest.TestCase):
 
     def setUp(self):
         self.maxDiff = None
         self.config = {}
+
+    def test_required_file_format_options(self):
+        self.assertEqual(csv.REQUIRED_FILE_FORMAT_OPTIONS, {
+            'TYPE': 'CSV',
+            'RECORD_DELIMITER': '\n',
+            'FIELD_DELIMITER': ',',
+            'SKIP_HEADER': 0,
+            'PARSE_HEADER': False,
+            'ESCAPE': '\\',
+            'TRIM_SPACE': False,
+            'FIELD_OPTIONALLY_ENCLOSED_BY': '"',
+            'NULL_IF': [],
+            'SKIP_BLANK_LINES': False,
+            'EMPTY_FIELD_AS_NULL': True,
+            'ENCODING': 'UTF8',
+            'MULTI_LINE': True,
+        })
 
     def test_write_record_to_uncompressed_file(self):
         records = {
@@ -117,6 +142,55 @@ class TestCsv(unittest.TestCase):
             '"","[]","{}",false,',
         )
 
+    def test_record_to_csv_line_keeps_non_string_scalars_unquoted(self):
+        record = {
+            'integer': 1,
+            'number': 1.5,
+            'boolean': False,
+        }
+        schema = {
+            'integer': {'type': ['null', 'integer']},
+            'number': {'type': ['null', 'number']},
+            'boolean': {'type': ['null', 'boolean']},
+        }
+
+        self.assertEqual(
+            csv.record_to_csv_line(record, schema),
+            '1,1.5,false',
+        )
+
+    def test_record_to_csv_line_preserves_multiline_and_escaped_characters(self):
+        record = {
+            'lf': 'line one\nline two',
+            'cr': 'line one\rline two',
+            'crlf': 'line one\r\nline two',
+            'tab': 'left\tright',
+            'literal_escapes': r'left\nright\tend',
+            'literal_null_marker': r'\N',
+            'quoted_comma': 'say "hello", world',
+            'unicode': '初雪',
+            'trailing_backslash': 'C:\\data\\',
+            'empty_string': '',
+            'sql_null': None,
+        }
+        schema = {
+            column: {'type': ['null', 'string']}
+            for column in record
+        }
+
+        csv_line = csv.record_to_csv_line(record, schema)
+
+        self.assertEqual(_read_csv_row(csv_line)[:-1], list(record.values())[:-1])
+        self.assertEqual(_read_csv_row(csv_line)[-1], '')
+        self.assertIn('line one\nline two', csv_line)
+        self.assertIn('line one\rline two', csv_line)
+        self.assertIn('line one\r\nline two', csv_line)
+        self.assertIn('left\tright', csv_line)
+        self.assertIn(r'left\\nright\\tend', csv_line)
+        self.assertIn(r'"\\N"', csv_line)
+        self.assertIn('C:\\\\data\\\\', csv_line)
+        self.assertTrue(csv_line.endswith(',"",'))
+
     def test_record_to_csv_line_preserves_serialized_mariadb_json_roots(self):
         mariadb_json_schema = {
             'type': ['null', 'object', 'array', 'string', 'number', 'boolean'],
@@ -135,10 +209,7 @@ class TestCsv(unittest.TestCase):
         }
         schema = {column: mariadb_json_schema for column in record}
 
-        fields = next(csv_module.reader(
-            [csv.record_to_csv_line(record, schema)],
-            escapechar='\\',
-        ))
+        fields = _read_csv_row(csv.record_to_csv_line(record, schema))
 
         self.assertEqual(fields[:-1], list(record.values())[:-1])
         self.assertEqual(

@@ -1,3 +1,25 @@
+Unreleased (AP-3290: Preserve multiline text)
+-------------------------------------------
+
+**Breaking compatibility**
+
+- Require target-snowflake named CSV formats to use the required multiline-safe
+  options, including `NULL_IF = ()`, and reject incompatible formats before
+  loading
+
+**Fixes**
+
+- Preserve LF, CR, CRLF, tabs, CSV punctuation, three-byte Unicode, and literal
+  backslash sequences in MariaDB/MySQL Snowflake FastSync strings while
+  continuing to remove NUL characters
+- Preserve actual control characters and literal backslash sequences in
+  target-snowflake Singer CSV string fields
+
+**Tests**
+
+- Verify PostgreSQL Snowflake FastSync and target-snowflake retain multiline
+  strings and literal escape sequences
+
 0.85.1 (2026-09-12)
 -------------------
 
