@@ -194,11 +194,19 @@ def _validate_command_specific_arguments(args):
 
 def _validate_iceberg_copy_arguments(args):
     """Require one explicit Snowflake destination, table, and Iceberg version."""
-    if args.target == '*':
+    if (
+        not isinstance(args.target, str)
+        or not args.target.strip()
+        or args.target == '*'
+    ):
         raise CommandSpecificArgumentsException(
             'You must specify a destination name using the argument --target'
         )
-    if args.table == '*':
+    if (
+        not isinstance(args.table, str)
+        or not args.table.strip()
+        or args.table == '*'
+    ):
         raise CommandSpecificArgumentsException(
             'You must specify a fully qualified Snowflake table using the argument --table'
         )

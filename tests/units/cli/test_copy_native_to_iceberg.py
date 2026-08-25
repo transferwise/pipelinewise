@@ -39,7 +39,23 @@ def test_accepts_valid_conversion_args():
             'You must specify a destination name using the argument --target',
         ),
         (
+            {'target': ''},
+            'You must specify a destination name using the argument --target',
+        ),
+        (
+            {'target': '   '},
+            'You must specify a destination name using the argument --target',
+        ),
+        (
             {'table': '*'},
+            'You must specify a fully qualified Snowflake table using the argument --table',
+        ),
+        (
+            {'table': ''},
+            'You must specify a fully qualified Snowflake table using the argument --table',
+        ),
+        (
+            {'table': '\t '},
             'You must specify a fully qualified Snowflake table using the argument --table',
         ),
         (

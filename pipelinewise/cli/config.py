@@ -10,20 +10,15 @@ from typing import Dict, List, Union
 
 from pipelinewise.data_diff.config import extract_check_definitions
 from pipelinewise.utils import safe_column_name
-from . import utils
+from . import fastsync_capabilities, utils
 from .errors import InvalidConfigException
-from .fastsync_capabilities import (
-    TABLE_FORMAT_ICEBERG as ICEBERG_TABLE_FORMAT,
-    TABLE_FORMAT_NATIVE as NATIVE_TABLE_FORMAT,
-    resolve_fastsync_capabilities,
-)
 
 
 class Config:
     """PipelineWise Configuration Class"""
 
-    TABLE_FORMAT_NATIVE = NATIVE_TABLE_FORMAT
-    TABLE_FORMAT_ICEBERG = ICEBERG_TABLE_FORMAT
+    TABLE_FORMAT_NATIVE = fastsync_capabilities.TABLE_FORMAT_NATIVE
+    TABLE_FORMAT_ICEBERG = fastsync_capabilities.TABLE_FORMAT_ICEBERG
     ICEBERG_VERSION = 3
     TARGET_FORMAT_KEYS = {
         'iceberg_create',
@@ -700,7 +695,7 @@ class Config:
                 'target_table_format "iceberg".'
             )
 
-        capabilities = resolve_fastsync_capabilities(
+        capabilities = fastsync_capabilities.resolve_fastsync_capabilities(
             tap['type'],
             target['type'],
             tap.get('target_table_format'),
