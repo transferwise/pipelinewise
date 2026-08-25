@@ -1,3 +1,18 @@
+0.82.0 (TBD)
+------------
+
+**Fixes**
+
+- Emit PostgreSQL LOG_BASED progress markers only after replication starts,
+  using a three-argument call compatible with PostgreSQL 11 through 18
+- Use the LSN returned by PostgreSQL logical-message emission and the first
+  decoded commit at or beyond it as the idle-WAL bookmark boundary
+
+**Test hardening**
+
+- Verify PostgreSQL LOG_BASED progress from the returned marker LSN without
+  marker UUID or payload matching
+
 0.81.0 (2026-08-24)
 -------------------
 
