@@ -136,14 +136,11 @@ class PostgresSnowflakeSource(RdbmsSnowflakeSource):
         validate_types: TypeValidator,
         inspect_export: ExportInspection,
     ) -> Tuple[Dict[str, Any], List[str], int]:
-        snowflake_types = None
+        snowflake_types = source.map_column_types_to_target(table)
         if iceberg_requested:
-            snowflake_types = source.map_column_types_to_target(table)
             validate_types(snowflake_types)
 
         file_parts, size_bytes = inspect_export()
-        if snowflake_types is None:
-            snowflake_types = source.map_column_types_to_target(table)
         source.close_connection()
         return snowflake_types, file_parts, size_bytes
 
