@@ -295,8 +295,8 @@ def assert_snowflake_sync_table_native_workflow(
             call.close_connection(silent=True),
         ]
         source_timeline = [
-            'source.open', 'bookmark', 'source.copy', 'getsize', 'getsize',
-            'source.map', 'source.close',
+            'source.open', 'bookmark', 'source.copy', 'source.map', 'getsize',
+            'getsize', 'source.close',
         ]
         expected_bookmark_call = call.get_bookmark_for_table(
             table, args.properties, tap, dbname='source_db'
