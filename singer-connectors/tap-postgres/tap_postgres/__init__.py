@@ -194,8 +194,7 @@ def sync_traditional_stream(conn_config, stream, state, sync_method, end_lsn):
     return state
 
 
-# pylint: disable-next=too-many-arguments
-def sync_logical_streams(conn_config, logical_streams, state, end_lsn, state_file, *, wal_progress_content=None):
+def sync_logical_streams(conn_config, logical_streams, state, end_lsn, state_file):
     """
     Sync streams that use LOG_BASED method
     """
@@ -225,7 +224,6 @@ def sync_logical_streams(conn_config, logical_streams, state, end_lsn, state_fil
             state,
             end_lsn,
             state_file,
-            wal_progress_content=wal_progress_content,
         )
 
     return state
@@ -328,17 +326,12 @@ def do_sync(conn_config, catalog, default_replication_method, state, state_file=
     for dbname, streams in itertools.groupby(
             logical_streams, lambda s: metadata.to_map(s['metadata']).get(()).get('database-name')):
         conn_config['dbname'] = dbname
-        # Logical messages are decoded only by slots in the same database.
-        wal_progress_content = logical_replication.emit_wal_progress_message(conn_config)
-        logical_end_lsn = (logical_replication.fetch_current_lsn(conn_config)
-                           if wal_progress_content is not None else end_lsn)
         state = sync_logical_streams(
             conn_config,
             list(streams),
             state,
-            logical_end_lsn,
+            end_lsn,
             state_file,
-            wal_progress_content=wal_progress_content,
         )
     return state
 

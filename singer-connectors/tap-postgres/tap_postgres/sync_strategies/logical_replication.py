@@ -6,7 +6,6 @@ import copy
 import json
 import re
 import singer
-import uuid
 import warnings
 
 from select import select
@@ -26,7 +25,7 @@ FEEDBACK_POLL_INTERVAL = 10
 FALLBACK_DATETIME = '9999-12-31T23:59:59.999+00:00'
 FALLBACK_DATE = '9999-12-31T00:00:00+00:00'
 WAL_PROGRESS_MESSAGE_PREFIX = 'pipelinewise'
-WAL_PROGRESS_MESSAGE_CONTENT_PREFIX = 'wal_progress:'
+WAL_PROGRESS_MESSAGE_CONTENT = 'wal_progress'
 
 
 class ReplicationSlotNotFoundError(Exception):
@@ -114,43 +113,22 @@ def fetch_current_lsn(conn_config):
             return lsn_to_int(current_lsn)
 
 
-def wal_progress_message_content(conn_info, marker_id):
-    """Return content unique to one tap invocation."""
-    return f"{WAL_PROGRESS_MESSAGE_CONTENT_PREFIX}{conn_info['tap_id']}:{marker_id}"
-
-
 def emit_wal_progress_message(conn_info):
-    """Emit a source-database marker when logical messages are available."""
-    availability_query = """
-        WITH function_check AS (
-            SELECT to_regprocedure(
-                'pg_catalog.pg_logical_emit_message(boolean,text,text)'
-            ) AS function_oid
-        )
-        SELECT CASE
-                   WHEN function_oid IS NULL THEN FALSE
-                   ELSE has_function_privilege(current_user, function_oid, 'EXECUTE')
-               END
-          FROM function_check
-    """
-
-    message_content = wal_progress_message_content(conn_info, uuid.uuid4().hex)
+    """Emit a transactional marker through the portable three-argument API."""
     conn = None
     try:
         conn = post_db.open_connection(conn_info, False, True)
         with conn:
             with conn.cursor() as cur:
-                cur.execute(availability_query)
-                available = cur.fetchone()
-                if not available or available[0] is not True:
-                    LOGGER.debug('Logical WAL progress messages are unavailable')
-                    return None
-
                 cur.execute(
                     'SELECT pg_catalog.pg_logical_emit_message(TRUE, %s, %s)',
-                    (WAL_PROGRESS_MESSAGE_PREFIX, message_content)
+                    (WAL_PROGRESS_MESSAGE_PREFIX, WAL_PROGRESS_MESSAGE_CONTENT)
                 )
-        return message_content
+                emitted_lsn = cur.fetchone()
+        return lsn_to_int(emitted_lsn[0]) if emitted_lsn else None
+    except (psycopg2.errors.InsufficientPrivilege, psycopg2.errors.UndefinedFunction):
+        LOGGER.debug('Logical WAL progress messages are unavailable')
+        return None
     except psycopg2.Error as ex:
         LOGGER.warning('Unable to emit a logical WAL progress message; continuing without it: %s', ex)
         return None
@@ -662,7 +640,7 @@ def _write_lsn_state(state, logical_streams, lsn):
     return state
 
 
-def sync_tables(conn_info, logical_streams, state, end_lsn, state_file, *, wal_progress_content=None):
+def sync_tables(conn_info, logical_streams, state, end_lsn, state_file):
     target_acknowledged_lsn = _minimum_acknowledged_lsn(state, logical_streams)
     start_lsn = target_acknowledged_lsn
     lsn_to_flush = None
@@ -696,10 +674,6 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file, *, wal_p
         cur.execute(f"SET SESSION wal_sender_timeout = {wal_sender_timeout}")
 
     try:
-        LOGGER.info('Request wal streaming from %s to %s (slot %s)',
-                    int_to_lsn(start_lsn),
-                    int_to_lsn(end_lsn),
-                    slot)
         # psycopg2 2.8.4 will send a keep-alive message to postgres every status_interval
         cur.start_replication(slot_name=slot,
                               decode=True,
@@ -717,10 +691,18 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file, *, wal_p
     except psycopg2.ProgrammingError as ex:
         raise Exception(f"Unable to start replication with logical replication (slot {ex})") from ex
 
+    marker_lsn = emit_wal_progress_message(conn_info)
+    if marker_lsn is not None:
+        end_lsn = marker_lsn
+
+    LOGGER.info('Request wal streaming from %s to %s (slot %s)',
+                int_to_lsn(start_lsn),
+                int_to_lsn(end_lsn),
+                slot)
+
     lsn_received_timestamp = datetime.datetime.utcnow()
     poll_timestamp = datetime.datetime.utcnow()
 
-    wal_progress_message_seen = False
     completed_wal_progress_lsn = None
     try:
         while True:
@@ -742,7 +724,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file, *, wal_p
                 raise
 
             if msg:
-                if (break_at_end_lsn) and (msg.data_start > end_lsn):
+                if marker_lsn is None and break_at_end_lsn and msg.data_start > end_lsn:
                     LOGGER.info('Breaking - latest wal message %s is past end_lsn %s',
                                 int_to_lsn(msg.data_start),
                                 int_to_lsn(end_lsn))
@@ -752,13 +734,6 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file, *, wal_p
                     message_payload = json.loads(msg.payload)
                 except (TypeError, ValueError):
                     message_payload = {}
-
-                if (wal_progress_content is not None
-                        and message_payload.get('action') == 'M'
-                        and message_payload.get('transactional') is True
-                        and message_payload.get('prefix') == WAL_PROGRESS_MESSAGE_PREFIX
-                        and message_payload.get('content') == wal_progress_content):
-                    wal_progress_message_seen = True
 
                 state = consume_message(
                     logical_streams,
@@ -796,10 +771,13 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file, *, wal_p
                         state = _write_lsn_state(state, logical_streams, lsn_last_processed)
                         lsn_processed_count = 0
 
-                if wal_progress_message_seen and message_payload.get('action') == 'C':
+                # The returned marker LSN is inside its transaction. Only a decoded
+                # commit at or beyond it proves a complete, restart-safe boundary.
+                if (marker_lsn is not None
+                        and message_payload.get('action') == 'C'
+                        and msg.data_start >= marker_lsn):
                     lsn_last_processed = msg.data_start
                     completed_wal_progress_lsn = lsn_last_processed
-                    wal_progress_message_seen = False
                     if break_at_end_lsn:
                         LOGGER.info('Breaking - reached PipelineWise WAL progress message at %s',
                                     int_to_lsn(lsn_last_processed))

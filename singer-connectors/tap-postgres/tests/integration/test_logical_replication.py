@@ -357,34 +357,24 @@ class TestWalProgressMessageSlotAdvancement(unittest.TestCase):
         initial_lsn = state['bookmarks'][f'public-{self.selected_table}']['lsn']
 
         decoded_payloads = []
+        decoded_lsns = []
         original_consume_message = logical_replication.consume_message
         original_emit_wal_progress_message = logical_replication.emit_wal_progress_message
-        original_sync_tables = logical_replication.sync_tables
-        emitted_contents = []
-        later_contents = []
-        received_contents = []
+        emitted_lsns = []
         marker_commit_lsns = []
         marker_message_seen = False
 
         def capture_emitted_message(conn_info):
-            content = original_emit_wal_progress_message(conn_info)
-            emitted_contents.append(content)
-            later_contents.append(original_emit_wal_progress_message(conn_info))
-            return content
-
-        def capture_sync_tables(*args, wal_progress_content=None, **kwargs):
-            received_contents.append(wal_progress_content)
-            return original_sync_tables(
-                *args,
-                wal_progress_content=wal_progress_content,
-                **kwargs,
-            )
+            marker_lsn = original_emit_wal_progress_message(conn_info)
+            emitted_lsns.append(marker_lsn)
+            return marker_lsn
 
         def capture_message(streams_arg, state_arg, message, time_extracted, conn_info, *, message_payload=None):
             nonlocal marker_message_seen
             payload = json.loads(message.payload)
             decoded_payloads.append(payload)
-            if payload.get('action') == 'M' and payload.get('content') == emitted_contents[0]:
+            decoded_lsns.append(message.data_start)
+            if payload.get('action') == 'M' and message.data_start == emitted_lsns[0]:
                 marker_message_seen = True
             elif marker_message_seen and payload.get('action') == 'C':
                 marker_commit_lsns.append(message.data_start)
@@ -404,10 +394,6 @@ class TestWalProgressMessageSlotAdvancement(unittest.TestCase):
                 logical_replication,
                 'emit_wal_progress_message',
                 side_effect=capture_emitted_message,
-        ), unittest.mock.patch.object(
-                logical_replication,
-                'sync_tables',
-                side_effect=capture_sync_tables,
         ), unittest.mock.patch.object(logical_replication, 'consume_message', side_effect=capture_message), \
                 contextlib.redirect_stdout(output):
             state = tap_postgres.do_sync(
@@ -416,21 +402,15 @@ class TestWalProgressMessageSlotAdvancement(unittest.TestCase):
 
         new_lsn = state['bookmarks'][f'public-{self.selected_table}']['lsn']
         self.assertGreater(new_lsn, initial_lsn)
-        self.assertEqual(1, len(emitted_contents))
-        self.assertEqual(1, len(later_contents))
-        self.assertEqual(emitted_contents, received_contents)
+        self.assertEqual(1, len(emitted_lsns))
         self.assertEqual(marker_commit_lsns, [new_lsn])
         self.assertTrue(any(
             payload.get('action') == 'M'
             and payload.get('transactional') is True
             and payload.get('prefix') == 'pipelinewise'
-            and payload.get('content') == emitted_contents[0]
-            for payload in decoded_payloads
-        ))
-        self.assertFalse(any(
-            payload.get('action') == 'M'
-            and payload.get('content') == later_contents[0]
-            for payload in decoded_payloads
+            and payload.get('content') == 'wal_progress'
+            and message_lsn == emitted_lsns[0]
+            for payload, message_lsn in zip(decoded_payloads, decoded_lsns)
         ))
 
         messages = [json.loads(message) for message in output.getvalue().splitlines()]

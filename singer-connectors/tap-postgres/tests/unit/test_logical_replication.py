@@ -657,40 +657,51 @@ class TestLogicalReplication(unittest.TestCase):
                     call(lsn_query),
                 ], cursor.execute.call_args_list)
 
-    @patch('tap_postgres.sync_strategies.logical_replication.uuid.uuid4')
     @patch('tap_postgres.sync_strategies.logical_replication.post_db.open_connection')
-    def test_emit_wal_progress_message(self, mocked_open_connection, mocked_uuid):
-        """Emit a transactional marker through a primary connection when permitted."""
+    def test_emit_wal_progress_message(self, mocked_open_connection):
+        """Return the WAL position of a transactional marker."""
         connection = mocked_open_connection.return_value
         cursor = connection.cursor.return_value.__enter__.return_value
-        cursor.fetchone.return_value = (True,)
-        mocked_uuid.return_value.hex = 'unique_marker'
+        cursor.fetchone.return_value = ('1/2',)
 
         self.assertEqual(
-            'wal_progress:tap_id_value:unique_marker',
+            4294967298,
             logical_replication.emit_wal_progress_message(self.conn_info),
         )
 
         mocked_open_connection.assert_called_once_with(self.conn_info, False, True)
-        self.assertEqual(cursor.execute.call_count, 2)
+        self.assertEqual(cursor.execute.call_count, 1)
         self.assertEqual(
-            cursor.execute.call_args_list[-1],
+            cursor.execute.call_args,
             call(
                 'SELECT pg_catalog.pg_logical_emit_message(TRUE, %s, %s)',
-                ('pipelinewise', 'wal_progress:tap_id_value:unique_marker')
+                ('pipelinewise', 'wal_progress')
             )
         )
         connection.close.assert_called_once_with()
 
     @patch('tap_postgres.sync_strategies.logical_replication.post_db.open_connection')
-    def test_emit_wal_progress_message_skips_unavailable_function(self, mocked_open_connection):
-        """Old or restricted PostgreSQL sources retain the existing behavior."""
+    def test_emit_wal_progress_message_ignores_an_empty_result(self, mocked_open_connection):
+        """An empty result retains the existing fallback boundary."""
         connection = mocked_open_connection.return_value
         cursor = connection.cursor.return_value.__enter__.return_value
-        cursor.fetchone.return_value = (False,)
+        cursor.fetchone.return_value = None
 
         self.assertIsNone(logical_replication.emit_wal_progress_message(self.conn_info))
         self.assertEqual(cursor.execute.call_count, 1)
+        connection.close.assert_called_once_with()
+
+    @patch('tap_postgres.sync_strategies.logical_replication.post_db.open_connection')
+    def test_emit_wal_progress_message_skips_unavailable_function(self, mocked_open_connection):
+        """Missing function access retains the existing quiet fallback."""
+        connection = mocked_open_connection.return_value
+        cursor = connection.cursor.return_value.__enter__.return_value
+        cursor.execute.side_effect = psycopg2.errors.InsufficientPrivilege('permission denied')
+
+        with self.assertLogs('tap_postgres', level='DEBUG') as logs:
+            self.assertIsNone(logical_replication.emit_wal_progress_message(self.conn_info))
+
+        self.assertIn('Logical WAL progress messages are unavailable', logs.output[0])
         connection.close.assert_called_once_with()
 
     @patch('tap_postgres.sync_strategies.logical_replication.post_db.open_connection')
@@ -1164,9 +1175,11 @@ class TestLogicalReplication(unittest.TestCase):
         mocked_start_replication.side_effect = psycopg2.ProgrammingError(test_replication_slot)
         mocked_locate_rep_slot.return_value = test_replication_slot
 
-        with self.assertRaises(Exception) as exp:
+        with patch('tap_postgres.sync_strategies.logical_replication.emit_wal_progress_message') as emit_marker, \
+                self.assertRaises(Exception) as exp:
             logical_replication.sync_tables(self.conn_info, self.logical_streams, state, end_lsn, state_file)
         self.assertEqual(expected_message, str(exp.exception))
+        emit_marker.assert_not_called()
         send_schema_message.assert_called_once_with(
             self.logical_streams[0],
             ['lsn'],
@@ -1195,9 +1208,10 @@ class TestLogicalReplication(unittest.TestCase):
         mocked_datetime.utcnow().__sub__().total_seconds.return_value = test_poll_duration
         mocked_start_replication = mocked_connect.return_value.cursor.return_value.start_replication
 
-        actual_output = logical_replication.sync_tables(self.conn_info,
-                                                        self.logical_streams,
-                                                        state, end_lsn, state_file)
+        with patch('tap_postgres.sync_strategies.logical_replication.emit_wal_progress_message', return_value=None):
+            actual_output = logical_replication.sync_tables(self.conn_info,
+                                                            self.logical_streams,
+                                                            state, end_lsn, state_file)
 
         self.assertDictEqual(state, actual_output)
         mocked_start_replication.assert_called_with(
@@ -1236,9 +1250,10 @@ class TestLogicalReplication(unittest.TestCase):
 
         mocked_start_replication = mocked_connect.return_value.cursor.return_value.start_replication
         mocked_locate_rep_slot.return_value = rep_slot
-        actual_output = logical_replication.sync_tables(self.conn_info,
-                                                        self.logical_streams,
-                                                        state, end_lsn, state_file)
+        with patch('tap_postgres.sync_strategies.logical_replication.emit_wal_progress_message', return_value=None):
+            actual_output = logical_replication.sync_tables(self.conn_info,
+                                                            self.logical_streams,
+                                                            state, end_lsn, state_file)
 
         self.assertDictEqual(state, actual_output)
         mocked_start_replication.assert_called_with(
@@ -1272,7 +1287,8 @@ class TestLogicalReplication(unittest.TestCase):
         expected_message = 'FOO'
         mocked_connect.return_value.cursor.return_value.read_message.side_effect = Exception(expected_message)
 
-        with self.assertRaises(Exception) as exp:
+        with patch('tap_postgres.sync_strategies.logical_replication.emit_wal_progress_message', return_value=None), \
+                self.assertRaises(Exception) as exp:
             logical_replication.sync_tables(self.conn_info, self.logical_streams, state, end_lsn, state_file)
         self.assertEqual(expected_message, str(exp.exception))
 
@@ -1302,7 +1318,8 @@ class TestLogicalReplication(unittest.TestCase):
         expected_log_message = 'INFO:tap_postgres:Breaking - latest wal message ' \
                                f'{logical_replication.int_to_lsn(msg_data_start)} is' \
                                f' past end_lsn {logical_replication.int_to_lsn(end_lsn)}'
-        with self.assertLogs() as captured_log:
+        with patch('tap_postgres.sync_strategies.logical_replication.emit_wal_progress_message', return_value=None), \
+                self.assertLogs() as captured_log:
             actual_output = logical_replication.sync_tables(self.conn_info, self.logical_streams, state, end_lsn,
                                                             state_file)
             self.assertIn(expected_log_message, captured_log.output)
@@ -1329,8 +1346,9 @@ class TestLogicalReplication(unittest.TestCase):
         mocked_connect.return_value.cursor.return_value.read_message.return_value = None
         mocked_locate_rep_slot.return_value = 'mocked_value_for_replication_slot'
 
-        actual_output = logical_replication.sync_tables(self.conn_info, self.logical_streams, state, end_lsn,
-                                                        state_file)
+        with patch('tap_postgres.sync_strategies.logical_replication.emit_wal_progress_message', return_value=None):
+            actual_output = logical_replication.sync_tables(self.conn_info, self.logical_streams, state, end_lsn,
+                                                            state_file)
         self.assertEqual(state, actual_output)
 
     @patch('tap_postgres.sync_strategies.logical_replication.locate_replication_slot')
@@ -1358,9 +1376,10 @@ class TestLogicalReplication(unittest.TestCase):
         mocked_connect.return_value.cursor.return_value.read_message.return_value = test_message()
 
         mocked_locate_rep_slot.return_value = 'mocked_value_for_replication_slot'
-        actual_output = logical_replication.sync_tables(self.conn_info,
-                                                        self.logical_streams,
-                                                        state, end_lsn, state_file)
+        with patch('tap_postgres.sync_strategies.logical_replication.emit_wal_progress_message', return_value=None):
+            actual_output = logical_replication.sync_tables(self.conn_info,
+                                                            self.logical_streams,
+                                                            state, end_lsn, state_file)
 
         self.assertEqual(state, actual_output)
         mocked_send_feedback = mocked_connect.return_value.cursor.return_value.send_feedback
@@ -1453,8 +1472,7 @@ class TestLogicalReplicationFeedback(unittest.TestCase):
 
         self.assertEqual(150, acknowledged_lsn)
 
-    def _run_sync(self, state, messages, state_reader, logical_streams=None,
-                  wal_progress_content='wal_progress:tap_id_value:current'):
+    def _run_sync(self, state, messages, state_reader, logical_streams=None, marker_lsn=None):
         termination = RuntimeError('unexpected replication termination')
         streams = self.logical_streams if logical_streams is None else logical_streams
 
@@ -1466,6 +1484,8 @@ class TestLogicalReplicationFeedback(unittest.TestCase):
                 patch('tap_postgres.sync_strategies.logical_replication.locate_replication_slot',
                       return_value='replication_slot'), \
                 patch('tap_postgres.sync_strategies.logical_replication.get_pg_version', return_value=150000), \
+                patch('tap_postgres.sync_strategies.logical_replication.emit_wal_progress_message',
+                      return_value=marker_lsn) as mocked_emit_marker, \
                 patch('builtins.open', state_reader), \
                 patch('psycopg2.connect') as mocked_connect:
             cursor = mocked_connect.return_value.cursor.return_value
@@ -1479,11 +1499,11 @@ class TestLogicalReplicationFeedback(unittest.TestCase):
                     state,
                     1000,
                     'state.json',
-                    wal_progress_content=wal_progress_content,
                 )
             except Exception as exc:  # The harness captures the intentional termination or regression failure.
                 error = exc
 
+        mocked_emit_marker.assert_called_once_with(self.conn_info)
         return list(cursor.send_feedback.call_args_list), error, termination, list(mocked_write.call_args_list)
 
     def test_consuming_wal_does_not_advance_feedback_past_target_state(self):
@@ -1523,14 +1543,14 @@ class TestLogicalReplicationFeedback(unittest.TestCase):
             self._message('C', 220),
         ]
 
-        feedback, error, _, _ = self._run_sync(state, messages, state_reader)
+        feedback, error, _, _ = self._run_sync(state, messages, state_reader, marker_lsn=210)
 
         self.assertIsNone(error)
         self.assertEqual(220, state['bookmarks']['foo-bar']['lsn'])
         self.assertEqual(self._expected_feedback(100), feedback)
 
-    def test_stale_progress_message_does_not_end_current_sync(self):
-        """A marker from an earlier invocation cannot satisfy the current boundary."""
+    def test_commit_before_marker_position_does_not_end_current_sync(self):
+        """A commit older than the emitted marker cannot satisfy the boundary."""
         state = self._state({'foo-bar': 100})
         self.conn_info['break_at_end_lsn'] = True
         state_reader = mock_open(read_data=json.dumps(state))
@@ -1555,7 +1575,7 @@ class TestLogicalReplicationFeedback(unittest.TestCase):
             self._message('C', 320),
         ]
 
-        feedback, error, _, _ = self._run_sync(state, messages, state_reader)
+        feedback, error, _, _ = self._run_sync(state, messages, state_reader, marker_lsn=310)
 
         self.assertIsNone(error)
         self.assertEqual(320, state['bookmarks']['foo-bar']['lsn'])
@@ -1583,7 +1603,8 @@ class TestLogicalReplicationFeedback(unittest.TestCase):
             self._message('C', 220),
         ]
 
-        feedback, error, termination, written_messages = self._run_sync(state, messages, state_reader)
+        feedback, error, termination, written_messages = self._run_sync(
+            state, messages, state_reader, marker_lsn=210)
 
         self.assertIs(error, termination)
         self.assertEqual(220, state['bookmarks']['foo-bar']['lsn'])
@@ -1591,8 +1612,8 @@ class TestLogicalReplicationFeedback(unittest.TestCase):
         self.assertEqual(2, len(written_messages))
         self.assertEqual(220, written_messages[0].args[0].value['bookmarks']['foo-bar']['lsn'])
 
-    def test_only_own_committed_progress_message_creates_boundary(self):
-        """Incomplete, foreign, and non-transactional messages are not safe boundaries."""
+    def test_only_commit_at_or_after_marker_position_creates_boundary(self):
+        """Marker content is irrelevant, but a qualifying commit remains mandatory."""
         cases = {
             'interrupted_before_commit': ([
                 self._message('B', 200),
@@ -1604,7 +1625,7 @@ class TestLogicalReplicationFeedback(unittest.TestCase):
                     content='wal_progress:tap_id_value:current',
                 ),
             ], 200),
-            'foreign_tap': ([
+            'commit_before_marker': ([
                 self._message('B', 200),
                 self._message(
                     'M',
@@ -1612,17 +1633,6 @@ class TestLogicalReplicationFeedback(unittest.TestCase):
                     transactional=True,
                     prefix='pipelinewise',
                     content='wal_progress:another_tap:current',
-                ),
-                self._message('C', 220),
-            ], 210),
-            'non_transactional': ([
-                self._message('B', 200),
-                self._message(
-                    'M',
-                    210,
-                    transactional=False,
-                    prefix='pipelinewise',
-                    content='wal_progress:tap_id_value:current',
                 ),
                 self._message('C', 220),
             ], 210),
@@ -1634,7 +1644,8 @@ class TestLogicalReplicationFeedback(unittest.TestCase):
                 state = self._state({'foo-bar': 100})
                 state_reader = mock_open(read_data=json.dumps(state))
 
-                feedback, error, termination, _ = self._run_sync(state, messages, state_reader)
+                feedback, error, termination, _ = self._run_sync(
+                    state, messages, state_reader, marker_lsn=310)
 
                 self.assertIs(error, termination)
                 self.assertEqual(expected_lsn, state['bookmarks']['foo-bar']['lsn'])
