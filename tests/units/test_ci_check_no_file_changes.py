@@ -183,67 +183,135 @@ def test_e2e_workflow_triggers_checks(tmp_path):
     assert 'Detected changes in following file: .github/workflows/e2e_tests.yml' in result.stdout
 
 
-def test_snowflake_e2e_jobs_are_serial():
-    """Credentialed routes run serially even after an earlier route fails."""
+def test_snowflake_e2e_matrix_contract():
+    """Snowflake shards cover every route with bounded parallelism."""
     workflow = yaml.safe_load(E2E_WORKFLOW.read_text(encoding='utf-8'))
     jobs = workflow['jobs']
-    chain = (
-        (
-            'e2e_tests_mariadb_to_sf',
-            None,
-            'tests/end_to_end/target_snowflake/tap_mariadb',
+    job = jobs['e2e_tests_snowflake']
+    strategy = job['strategy']
+    shards = strategy['matrix']['include']
+
+    assert 'needs' not in job
+    assert job['name'] == '${{ matrix.check_name }}'
+    assert strategy['fail-fast'] is False
+    assert strategy['max-parallel'] == 4
+    assert len(shards) == 4
+
+    expected_shards = {
+        'pg-core': (
+            'e2e_tests_sf_pg_core',
+            (
+                'tests/end_to_end/target_snowflake/tap_postgres/test_partial_sync_pg_to_sf.py',
+                'tests/end_to_end/target_snowflake/tap_postgres/test_replicate_pg_to_sf.py',
+                'tests/end_to_end/target_snowflake/tap_postgres/test_resync_pg_to_sf_table_size_check.py',
+                'tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_replica_to_sf.py',
+                'tests/end_to_end/data_diff/test_postgres_to_snowflake.py',
+                'tests/end_to_end/target_snowflake/tap_s3/test_replicate_s3_to_sf.py',
+            ),
         ),
-        (
-            'e2e_tests_mysql_to_sf',
-            'e2e_tests_mariadb_to_sf',
-            'tests/end_to_end/target_snowflake/tap_mysql',
+        'mariadb-core': (
+            'e2e_tests_sf_mariadb_core',
+            (
+                'tests/end_to_end/target_snowflake/tap_mariadb/test_partial_sync_mariadb_to_sf.py',
+                'tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_to_sf.py',
+                'tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_to_sf_soft_delete.py',
+                'tests/end_to_end/target_snowflake/tap_mariadb/test_resync_mariadb_to_sf.py',
+                'tests/end_to_end/target_snowflake/tap_mariadb/test_resync_mariadb_to_sf_table_size_check.py',
+                'tests/end_to_end/target_snowflake/tap_mysql/test_iceberg_v3_mysql_to_sf.py',
+            ),
         ),
-        (
-            'e2e_tests_pg_to_sf',
-            'e2e_tests_mysql_to_sf',
-            'tests/end_to_end/target_snowflake/tap_postgres',
+        'publication-conversion': (
+            'e2e_tests_sf_publication_conversion',
+            (
+                'tests/end_to_end/target_snowflake/test_native_to_iceberg_converter.py',
+                'tests/end_to_end/target_snowflake/tap_postgres/test_snowflake_iceberg_publisher.py',
+                'tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_to_sf_with_custom_buffer_size.py',
+            ),
         ),
-        (
-            'e2e_tests_mg_to_sf',
-            'e2e_tests_pg_to_sf',
-            'tests/end_to_end/target_snowflake/tap_mongodb',
+        'formats-aux': (
+            'e2e_tests_sf_formats_aux',
+            (
+                'tests/end_to_end/target_snowflake/tap_postgres/test_iceberg_v3_postgres_to_sf.py',
+                'tests/end_to_end/target_snowflake/tap_mariadb/test_iceberg_v3_mariadb_to_sf.py',
+                'tests/end_to_end/target_snowflake/tap_postgres/test_defined_partial_sync_pg_to_sf.py',
+                'tests/end_to_end/target_snowflake/tap_mariadb/test_defined_partial_sync_mariadb_to_sf.py',
+                'tests/end_to_end/target_snowflake/tap_postgres/test_replicate_pg_to_sf_with_archive_load_files.py',
+                'tests/end_to_end/target_snowflake/tap_postgres/test_resync_pg_to_sf_with_split_large_files.py',
+                'tests/end_to_end/target_snowflake/tap_mariadb/test_resync_mariadb_to_sf_with_split_large_files.py',
+                'tests/end_to_end/data_diff/test_mysql_to_snowflake.py',
+                'tests/end_to_end/target_snowflake/tap_mongodb/test_replicate_mongodb_to_sf.py',
+            ),
         ),
-        (
-            'e2e_tests_s3_to_sf',
-            'e2e_tests_mg_to_sf',
-            'tests/end_to_end/target_snowflake/tap_s3',
-        ),
+    }
+    actual_shards = {
+        shard['shard']: (shard['check_name'], tuple(shard['test_paths'].split()))
+        for shard in shards
+    }
+    assert actual_shards == expected_shards
+
+    configured_paths = [
+        test_path
+        for _, test_paths in actual_shards.values()
+        for test_path in test_paths
+    ]
+    expected_paths = {
+        str(path.relative_to(REPOSITORY_ROOT))
+        for path in (
+            REPOSITORY_ROOT / 'tests' / 'end_to_end' / 'target_snowflake'
+        ).rglob('test_*.py')
+    }
+    expected_paths.update(
+        {
+            'tests/end_to_end/data_diff/test_mysql_to_snowflake.py',
+            'tests/end_to_end/data_diff/test_postgres_to_snowflake.py',
+        }
     )
+    assert len(configured_paths) == len(set(configured_paths))
+    assert set(configured_paths) == expected_paths
 
-    for job_name, dependency, route_path in chain:
-        job = jobs[job_name]
-        if dependency is None:
-            assert 'needs' not in job
-        else:
-            assert job['needs'] == dependency
-            assert job['if'] == '${{ !cancelled() }}'
-        commands = '\n'.join(step.get('run', '') for step in job['steps'])
-        assert route_path in commands
+    commands = '\n'.join(step.get('run', '') for step in job['steps'])
+    assert job['env']['E2E_TEST_PATHS'] == '${{ matrix.test_paths }}'
+    assert 'pipelinewise pytest $E2E_TEST_PATHS' in commands
+    assert '-e PIPELINEWISE_E2E_NAMESPACE=$PIPELINEWISE_E2E_NAMESPACE' in commands
+    assert '${{ github.run_id }}' in job['env']['PIPELINEWISE_E2E_NAMESPACE']
+    assert '${{ github.run_attempt }}' in job['env']['PIPELINEWISE_E2E_NAMESPACE']
+    assert '${{ matrix.shard }}' in job['env']['PIPELINEWISE_E2E_NAMESPACE']
 
-
-def test_rdbms_snowflake_preflight_once():
-    """Each credentialed RDBMS route runs one complete preflight command."""
-    workflow = yaml.safe_load(E2E_WORKFLOW.read_text(encoding='utf-8'))
-    jobs = workflow['jobs']
-
-    for job_name in (
+    retired_jobs = {
         'e2e_tests_mariadb_to_sf',
         'e2e_tests_mysql_to_sf',
         'e2e_tests_pg_to_sf',
-    ):
-        preflight_steps = [
-            step
-            for step in jobs[job_name]['steps']
-            if step.get('name')
-            == 'Validate required Snowflake end-to-end configuration'
-        ]
-        assert len(preflight_steps) == 1
-        assert preflight_steps[0]['run'].count('./scripts/ci_require_env.sh') == 1
+        'e2e_tests_mg_to_sf',
+        'e2e_tests_s3_to_sf',
+    }
+    assert retired_jobs.isdisjoint(jobs)
+
+    target_pg_job = jobs['e2e_tests_target_pg']
+    target_pg_commands = '\n'.join(
+        step.get('run', '') for step in target_pg_job['steps']
+    )
+    assert '${{ github.run_id }}' in target_pg_job['env']['PIPELINEWISE_E2E_NAMESPACE']
+    assert '${{ github.run_attempt }}' in target_pg_job['env']['PIPELINEWISE_E2E_NAMESPACE']
+    assert (
+        '-e PIPELINEWISE_E2E_NAMESPACE=$PIPELINEWISE_E2E_NAMESPACE'
+        in target_pg_commands
+    )
+
+
+def test_snowflake_e2e_matrix_preflight_once():
+    """Every Snowflake shard runs one complete preflight command."""
+    workflow = yaml.safe_load(E2E_WORKFLOW.read_text(encoding='utf-8'))
+    job = workflow['jobs']['e2e_tests_snowflake']
+    preflight_steps = [
+        step
+        for step in job['steps']
+        if step.get('name')
+        == 'Validate required Snowflake end-to-end configuration'
+    ]
+
+    assert len(preflight_steps) == 1
+    assert preflight_steps[0]['if'] == "steps.check.outcome == 'failure'"
+    assert preflight_steps[0]['run'].count('./scripts/ci_require_env.sh') == 1
 
 
 def test_api_failure_triggers_checks(tmp_path):
