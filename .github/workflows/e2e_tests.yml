@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: e2e_tests-${{ github.head_ref }}
+  group: e2e_tests-${{ github.event.pull_request.number || github.ref_name }}
   cancel-in-progress: true
 
 env:
@@ -59,11 +59,17 @@ jobs:
         if: steps.check.outcome == 'failure'
         run: |
           readiness_started_at=$(date +%s)
-          until docker logs pipelinewise 2>&1 | grep -Fq "PipelineWise Dev environment is ready"
+          until docker logs --tail 50 pipelinewise 2>&1 | grep -Fq "PipelineWise Dev environment is ready"
           do
+            container_status=$(docker inspect --format '{{.State.Status}}' pipelinewise)
+            if [ "$container_status" != "running" ]; then
+              echo "PipelineWise container stopped with status ${container_status}"
+              docker logs pipelinewise
+              exit 1
+            fi
             elapsed_seconds=$(($(date +%s) - readiness_started_at))
             echo "Waiting for PipelineWise dev environment (${elapsed_seconds}s elapsed)"
-            sleep 30
+            sleep 5
           done
           elapsed_seconds=$(($(date +%s) - readiness_started_at))
           echo "PipelineWise dev environment became ready after ${elapsed_seconds}s"
@@ -175,11 +181,17 @@ jobs:
         timeout-minutes: 10
         run: |
           readiness_started_at=$(date +%s)
-          until docker logs pipelinewise 2>&1 | grep -Fq "PipelineWise Dev environment is ready"
+          until docker logs --tail 50 pipelinewise 2>&1 | grep -Fq "PipelineWise Dev environment is ready"
           do
+            container_status=$(docker inspect --format '{{.State.Status}}' pipelinewise)
+            if [ "$container_status" != "running" ]; then
+              echo "PipelineWise container stopped with status ${container_status}"
+              docker logs pipelinewise
+              exit 1
+            fi
             elapsed_seconds=$(($(date +%s) - readiness_started_at))
             echo "Waiting for PipelineWise dev environment (${elapsed_seconds}s elapsed)"
-            sleep 30
+            sleep 5
           done
           elapsed_seconds=$(($(date +%s) - readiness_started_at))
           echo "PipelineWise dev environment became ready after ${elapsed_seconds}s"

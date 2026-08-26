@@ -191,6 +191,9 @@ def test_snowflake_e2e_matrix_contract():
     strategy = job['strategy']
     shards = strategy['matrix']['include']
 
+    assert workflow['concurrency']['group'] == (
+        'e2e_tests-${{ github.event.pull_request.number || github.ref_name }}'
+    )
     assert 'needs' not in job
     assert job['name'] == '${{ matrix.check_name }}'
     assert strategy['fail-fast'] is False
@@ -296,6 +299,23 @@ def test_snowflake_e2e_matrix_contract():
         '-e PIPELINEWISE_E2E_NAMESPACE=$PIPELINEWISE_E2E_NAMESPACE'
         in target_pg_commands
     )
+    readiness_steps = [
+        step
+        for configured_job in jobs.values()
+        for step in configured_job['steps']
+        if step.get('name') == 'Wait for test containers to be ready'
+    ]
+    assert len(readiness_steps) == 2
+    for readiness_step in readiness_steps:
+        assert 'docker logs --tail 50 pipelinewise' in readiness_step['run']
+        assert 'sleep 5' in readiness_step['run']
+        assert 'sleep 30' not in readiness_step['run']
+        assert (
+            "container_status=$(docker inspect --format '{{.State.Status}}' pipelinewise)"
+            in readiness_step['run']
+        )
+        assert 'PipelineWise container stopped with status' in readiness_step['run']
+        assert 'exit 1' in readiness_step['run']
 
 
 def test_snowflake_e2e_matrix_preflight_once():
