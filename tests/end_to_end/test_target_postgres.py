@@ -29,6 +29,8 @@ class TestTargetPostgres:
     End to end tests for Target Postgres
     """
 
+    tap_s3_cleanup_env = None
+
     def setup_method(self):
         """Initialise test project by generating YAML files from
         templates for all the configured connectors"""
@@ -36,14 +38,20 @@ class TestTargetPostgres:
 
         # Init query runner methods
         self.e2e = E2EEnv(self.project_dir)
+        type(self).tap_s3_cleanup_env = self.e2e
         self.run_query_tap_mysql = self.e2e.run_query_tap_mysql
         self.run_query_tap_mysql_2 = self.e2e.run_query_tap_mysql_2
         self.run_query_tap_postgres = self.e2e.run_query_tap_postgres
         self.run_query_target_postgres = self.e2e.run_query_target_postgres
         self.mongodb_con = self.e2e.get_tap_mongodb_connection()
 
-    def teardown_method(self):
-        """Delete test directories and database objects"""
+    @classmethod
+    def teardown_class(cls):
+        """Delete namespaced tap S3 fixtures after dependent tests finish."""
+        e2e = cls.tap_s3_cleanup_env
+        cls.tap_s3_cleanup_env = None
+        if e2e and e2e.env['TAP_S3_CSV']['is_configured']:
+            e2e.cleanup_tap_s3_csv()
 
     @pytest.mark.dependency(name='validate')
     def test_validate(self):

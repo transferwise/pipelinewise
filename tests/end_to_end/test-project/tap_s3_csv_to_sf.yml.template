@@ -50,7 +50,7 @@ schemas:
       - table_name: "people"
         replication_method: "FULL_TABLE"
         s3_csv_mapping:
-          search_pattern: "^ppw_e2e_tap_s3_csv/mock_data_1.csv$"
+          search_pattern: "^${TAP_S3_CSV_KEY_PREFIX}/mock_data_1.csv$"
           date_overrides:
             - birth_date
         transformations:
@@ -63,5 +63,5 @@ schemas:
 
       - table_name: "countries"
         s3_csv_mapping:
-          search_pattern: "^ppw_e2e_tap_s3_csv/mock_data_2.csv$"
+          search_pattern: "^${TAP_S3_CSV_KEY_PREFIX}/mock_data_2.csv$"
           key_properties: ["id"]
