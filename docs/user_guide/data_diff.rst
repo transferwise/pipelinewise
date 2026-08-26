@@ -92,39 +92,11 @@ Check types
      other check types in the same run still execute normally
 
 
-Configuration
--------------
+Check configuration
+-------------------
 
-Backend database
-''''''''''''''''
-
-Add to ``config.yml``:
-
-.. code-block:: yaml
-
-    backend_db:
-      host: "backend.example.com"
-      port: 5432
-      user: "pipelinewise"
-      password: "<vault encrypted>"
-      dbname: "pipelinewise"
-      sslmode: "verify-full"
-      ddl_user: "pipelinewise_ddl"
-      ddl_password: "<vault encrypted>"
-
-The backend is independent of source and target connections; when PostgreSQL is also
-the target, give the backend its own service or database.
-
-``backend_db`` is what turns data-diff on. Without it, ``import_config`` warns and
-ignores every ``data_diff`` block. Replication never reads the backend, so an outage
-there pauses reconciliation only — though ``import_config`` does fail while it is
-unreachable, since persisting definitions is its final step.
-
-``ddl_user`` runs the Alembic migrations and owns the schema, so the application user
-can hold DML grants only and a compromised pipeline cannot alter the schema. The
-migration grants ``user`` what it needs, so that role requires nothing beyond
-``CONNECT``. Point ``ddl_user`` at the same credentials as ``user`` to run migrations
-as the application user instead.
+Configure the :ref:`data_diff_backend` once for the PipelineWise installation
+before importing check definitions.
 
 Tap YAML
 ''''''''
@@ -156,6 +128,8 @@ The ``data_diff`` block goes inside ``schemas[].tables[]`` in the tap YAML:
                 - "status"
                 - "currency"
               # Override: this table is checked twice a day rather than four times
+              window_start: "-16h"
+              window_end: "-4h"
               frequency: "0 */12 * * *"
 
 Every table must resolve ``key_column``, ``timestamp_column``, ``checks``,
@@ -307,28 +281,8 @@ The original run remains immutable. The rerun gets the next attempt number,
 ``trigger = REMEDIATION``, and a ``rerun_of_run_id`` link. When it passes,
 the effective attempt for that scheduled slot changes and the watermark advances.
 
-PipelineWise keeps every attempt in ``dd_runs`` and every coverage transition in
-``dd_coverage_events``. ``dd_effective_attempts`` materializes only the highest
-terminal attempt for each scheduled slot, while ``dd_coverage_state`` stores the
-current watermark. A new chronological slot updates that state directly. A
-replacement or out-of-order slot recalculates it from the effective rows, without
-rescanning superseded attempts.
-
-Monitoring views
-''''''''''''''''
-
-.. code-block:: sql
-
-    -- Coverage watermarks
-    SELECT full_check_name, coverage_start, verified_through,
-           coverage_status, blocking_run_id, verified_at
-      FROM public.dd_current_coverage;
-
-    -- Remediation history
-    SELECT full_check_name, failed_run_id, failed_status,
-           window_start, window_end, remediation_status,
-           remediation_reference, recovered
-      FROM public.dd_remediation_history;
+The backend retains every run attempt and coverage transition. See
+:ref:`data_diff_backend` for the schema, persistence model, and reporting queries.
 
 
 Source safety

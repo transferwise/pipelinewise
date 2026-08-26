@@ -94,7 +94,7 @@ Global configuration
 
 The backend is a control-plane database, not a replication target. Separate its
 service, database, runtime role, DDL role, credentials, and storage from every
-target. See :ref:`data_diff`.
+target. See :ref:`data_diff_backend`.
 
 
 Tap configuration
