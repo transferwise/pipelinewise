@@ -140,7 +140,6 @@ class TestDiscoveryPlanning:
         """Return exact metadata responses for one existing managed-v3 table."""
         return [
             [{"name": "ORDERS", "is_iceberg": True, "id": "target-id"}],
-            [{"name": "ORDERS", "is_iceberg": True}],
             [{"name": "ORDERS", "catalog_name": "SNOWFLAKE"}],
             [{"key": "ICEBERG_VERSION", "value": "3"}],
             [{
@@ -165,6 +164,10 @@ class TestDiscoveryPlanning:
         snapshot = publisher.inspect_table(spec.name)
 
         assert snapshot.spec.columns == (IcebergColumn("BODY", "VARCHAR"),)
+        assert sum(
+            query.startswith('SHOW TABLES IN SCHEMA')
+            for query, _, _ in snowflake.queries
+        ) == 1
         assert 'CHARACTER_MAXIMUM_LENGTH' in snowflake.queries[-2][0]
 
     def test_inspection_rejects_narrow_varchar_before_mutation(self, tmp_path, spec):

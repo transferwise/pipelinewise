@@ -79,7 +79,25 @@ def sync_table(
             if run.source is not None:
                 run.source_adapter.close_finally(run.source)
         finally:
-            run.iceberg_operation.close()
+            try:
+                _cleanup_full_export(run)
+            finally:
+                run.iceberg_operation.close()
+
+
+def _cleanup_full_export(run: _FullSyncRun) -> None:
+    """Best-effort removal of local parts after the FullSync attempt ends."""
+    for file_part in run.file_parts:
+        try:
+            os.remove(file_part)
+        except FileNotFoundError:
+            pass
+        except OSError as exc:
+            run.logger.warning(
+                'Failed to remove local FastSync export %s: %s',
+                file_part,
+                exc,
+            )
 
 
 def _prepare_full_run(run: _FullSyncRun) -> bool:

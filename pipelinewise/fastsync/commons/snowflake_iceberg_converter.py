@@ -108,13 +108,6 @@ class SnowflakeNativeToIcebergConverter:  # pylint: disable=too-few-public-metho
             self._manual_recovery_error,
         )
 
-    def _content_evidence(self, table, columns, project):
-        return self.evidence_service._content_evidence(  # pylint: disable=protected-access
-            table,
-            columns,
-            project,
-        )
-
     def _assert_equal_contents(self, source, destination, columns):
         return self.evidence_service._assert_equal_contents(  # pylint: disable=protected-access
             source,

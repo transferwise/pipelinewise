@@ -65,6 +65,14 @@ class SnowflakeTableInspector:
             table_name.upper(),
         )
         table_row = self.discover_table_row(target)
+        return self._table_format_from_row(target, table_row)
+
+    def _table_format_from_row(
+        self,
+        target: SnowflakeObjectName,
+        table_row: Optional[Dict[str, Any]],
+    ) -> str:
+        """Classify a target from an already-discovered SHOW TABLES row."""
         if table_row is None:
             return TABLE_FORMAT_MISSING
         physical_format = physical_table_format(
@@ -161,7 +169,7 @@ class SnowflakeTableInspector:
         table_row = self.discover_table_row(target)
         if table_row is None:
             return SnowflakeTableSnapshot(TABLE_FORMAT_MISSING, None, None)
-        table_format = self.discover_table_format(target.schema, target.table)
+        table_format = self._table_format_from_row(target, table_row)
         identity = str(
             _row_value(table_row, 'id', _row_value(table_row, 'created_on', target.key))
         )

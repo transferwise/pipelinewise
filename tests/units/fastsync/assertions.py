@@ -794,7 +794,7 @@ def assert_snowflake_sync_table_rolls_back_later_upload_failure(
     source_type: str,
     rollback_cleanup_error: Exception = None,
 ) -> None:
-    """A failed later part upload must retain local files and remove earlier S3 parts."""
+    """A failed later upload removes local files and rolls back earlier S3 parts."""
     # pylint: disable=too-many-locals
     objects_to_mock = _create_object_names_to_mock(
         package_nm, tap_class_nm, 'FastSyncTargetSnowflake'
@@ -864,7 +864,7 @@ def assert_snowflake_sync_table_rolls_back_later_upload_failure(
         target.create_schema.assert_not_called()
         target.copy_to_table.assert_not_called()
         target.swap_tables.assert_not_called()
-        assert all(Path(file_part).exists() for file_part in file_parts)
+        assert all(not Path(file_part).exists() for file_part in file_parts)
         save_state_file_mock.assert_not_called()
         get_grantees_mock.assert_not_called()
 

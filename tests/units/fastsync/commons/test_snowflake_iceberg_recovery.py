@@ -743,6 +743,45 @@ class TestRouteRecovery:
 class TestStagingRecovery:
     """Validate durable staging progress."""
 
+    @pytest.mark.parametrize(
+        ("s3_keys", "message"),
+        (
+            (["part-1", ""], "must be non-empty strings"),
+            (["part-1", 1], "must be non-empty strings"),
+            (["part-1", "part-1"], "must be unique"),
+            (
+                ["part-1", "part-1", ""],
+                "must be non-empty strings",
+            ),
+        ),
+    )
+    def test_planned_upload_keys_are_validated_before_persistence(
+        self,
+        tmp_path,
+        spec,
+        s3_keys,
+        message,
+    ):
+        """Invalid or duplicate upload plans never reach durable state."""
+        publisher = SnowflakeIcebergPublisher(FakeSnowflake(), str(tmp_path))
+        publisher.inspect_table = MagicMock(return_value=missing_snapshot())
+        attempt = publisher.prepare_full_sync(
+            spec,
+            {"lsn": "1/2"},
+            recovery_identity=RECOVERY_IDENTITY,
+        )
+
+        with pytest.raises(RecoveryManifestError, match=message):
+            publisher.record_planned_uploads(attempt, s3_keys)
+
+        recovered = publisher.load_attempt(
+            spec,
+            expected_kind="full",
+            recovery_identity=RECOVERY_IDENTITY,
+        )
+        assert recovered.phase == PHASE_PREPARED
+        assert recovered.s3_keys == []
+
     def test_staging_progress_is_durable_and_only_prepublication_can_abort(self, tmp_path, spec):
         """Staging progress is durable and only prepublication can abort."""
         publisher = SnowflakeIcebergPublisher(FakeSnowflake(), str(tmp_path))

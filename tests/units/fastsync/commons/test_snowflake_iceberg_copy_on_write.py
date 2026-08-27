@@ -123,7 +123,6 @@ def test_prepare_rejects_inherited_value(tmp_path, spec):
     table_row = {'name': spec.name.table, 'is_iceberg': True, 'id': 'target-id'}
     snowflake = FakeSnowflake([
         [table_row],
-        [table_row],
         [{'name': spec.name.table, 'catalog_name': 'SNOWFLAKE'}],
         [{'key': 'ICEBERG_VERSION', 'value': 3}],
         [{

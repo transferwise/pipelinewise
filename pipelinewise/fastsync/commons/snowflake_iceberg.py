@@ -609,9 +609,17 @@ class SnowflakeIcebergPublisher:  # pylint: disable=too-many-public-methods,too-
                 f'Cannot plan Iceberg uploads in phase {attempt.phase}'
             )
         planned_s3_keys = list(s3_keys)
-        if any(not isinstance(s3_key, str) or not s3_key for s3_key in planned_s3_keys):
-            raise RecoveryManifestError('Iceberg staging S3 keys must be non-empty strings')
-        if len(set(planned_s3_keys)) != len(planned_s3_keys):
+        seen_s3_keys = set()
+        has_duplicate = False
+        for s3_key in planned_s3_keys:
+            if not isinstance(s3_key, str) or not s3_key:
+                raise RecoveryManifestError(
+                    'Iceberg staging S3 keys must be non-empty strings'
+                )
+            if s3_key in seen_s3_keys:
+                has_duplicate = True
+            seen_s3_keys.add(s3_key)
+        if has_duplicate:
             raise RecoveryManifestError('Iceberg staging S3 keys must be unique')
         self._transition(attempt, PHASE_PREPARED, s3_keys=planned_s3_keys)
 
