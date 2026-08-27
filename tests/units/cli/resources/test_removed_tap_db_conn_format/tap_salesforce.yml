@@ -1,0 +1,19 @@
+---
+id: "salesforce_misplaced_iceberg"
+name: "Salesforce misplaced Iceberg configuration"
+type: "tap-salesforce"
+owner: "data-platform@example.com"
+db_conn:
+  client_id: "client-id"
+  client_secret: "client-secret"
+  refresh_token: "refresh-token"
+  start_date: "2026-01-01T00:00:00Z"
+  api_type: "BULK"
+  iceberg_version: 3
+target: "test_snowflake_target"
+schemas:
+  - source_schema: "salesforce"
+    target_schema: "salesforce"
+    tables:
+      - table_name: "Account"
+        replication_method: "FULL_TABLE"

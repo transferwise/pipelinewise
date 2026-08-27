@@ -10,6 +10,7 @@ from datetime import datetime
 
 from ..logger import Logger
 from .commons import utils
+from .commons import snowflake_iceberg_routes as iceberg_routes
 from .commons.tap_mongodb import FastSyncTapMongoDB
 from .commons.target_snowflake import FastSyncTargetSnowflake
 
@@ -39,6 +40,19 @@ REQUIRED_CONFIG_KEYS = {
 LOCK = multiprocessing.Lock()
 
 
+def _reject_iceberg_target(target_config):
+    """Keep MongoDB Iceberg replication on the Singer execution path."""
+    if (
+        isinstance(target_config, dict)
+        and target_config.get('target_table_format') == 'iceberg'
+    ):
+        raise ValueError(
+            'MongoDB-to-Snowflake FastSync does not support Iceberg targets; '
+            'use Singer replication instead'
+        )
+    iceberg_routes.validate_route_config(target_config)
+
+
 def tap_type_to_target_type(mongo_type, *_):
     """Data type mapping from MongoDB to Snowflake"""
     return {
@@ -54,7 +68,8 @@ def tap_type_to_target_type(mongo_type, *_):
 # pylint: disable=too-many-locals
 def sync_table(table: str, args: Namespace) -> Union[bool, str]:
     """Sync one table"""
-    mongodb = FastSyncTapMongoDB(args.tap, tap_type_to_target_type)
+    _reject_iceberg_target(args.target)
+    mongodb = None
     snowflake = FastSyncTargetSnowflake(args.target, args.transform)
     tap_id = args.target.get('tap_id')
     archive_load_files = args.target.get('archive_load_files', False)
@@ -64,8 +79,12 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
         filename = utils.gen_export_filename(tap_id=tap_id, table=table)
         filepath = os.path.join(args.temp_dir, filename)
         target_schema = utils.get_target_schema(args.target, table)
+        iceberg_routes.require_native_target_format(
+            snowflake, args, target_schema, table, allow_missing=True
+        )
 
         # Open connection
+        mongodb = FastSyncTapMongoDB(args.tap, tap_type_to_target_type)
         mongodb.open_connection()
 
         # Get bookmark - LSN position or Incremental Key value
@@ -112,7 +131,17 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
         snowflake.obfuscate_columns(target_schema, table)
 
         # Create target table and swap with the temp table in Snowflake
-        snowflake.create_table(target_schema, table, snowflake_columns, primary_key)
+        snowflake.create_table(
+            target_schema,
+            table,
+            snowflake_columns,
+            primary_key,
+            allow_replace_table=False,
+            normalize_primary_keys=False,
+        )
+        iceberg_routes.require_native_target_format(
+            snowflake, args, target_schema, table, allow_missing=False
+        )
         snowflake.swap_tables(target_schema, table)
 
         # Save bookmark to singer state file
@@ -138,6 +167,7 @@ def sync_table(table: str, args: Namespace) -> Union[bool, str]:
 def main_impl():
     """Main sync logic"""
     args = utils.parse_args(REQUIRED_CONFIG_KEYS)
+    _reject_iceberg_target(args.target)
     pool_size = utils.get_pool_size(args.tap)
     start_time = datetime.now()
     table_sync_excs = []

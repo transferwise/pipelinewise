@@ -24,6 +24,19 @@
     },
     "db_conn": {
       "type": "object",
+      "not": {
+        "anyOf": [
+          {
+            "required": ["iceberg_create"]
+          },
+          {
+            "required": ["iceberg_version"]
+          },
+          {
+            "required": ["target_table_format"]
+          }
+        ]
+      },
       "properties": {
         "use_gtid": {
           "type": "boolean"
@@ -593,6 +606,11 @@
     }
   },
   "allOf": [
+    {
+      "not": {
+        "required": ["iceberg_create"]
+      }
+    },
     {
       "$ref": "#/definitions/tap_mongo_implies_ft_and_lb"
     },

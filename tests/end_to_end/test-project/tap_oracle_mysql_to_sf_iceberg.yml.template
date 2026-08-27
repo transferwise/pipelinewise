@@ -1,0 +1,37 @@
+---
+
+id: "mysql_to_sf_iceberg"
+name: "MySQL Iceberg source test database"
+type: "tap-mysql"
+owner: "test-runner"
+
+db_conn:
+  host: "${TAP_ORACLE_MYSQL_HOST}"
+  port: ${TAP_ORACLE_MYSQL_PORT}
+  user: "${TAP_ORACLE_MYSQL_USER}"
+  password: "${TAP_ORACLE_MYSQL_PASSWORD}"
+  dbname: "${TAP_ORACLE_MYSQL_DB}"
+  engine: mysql
+  use_gtid: false
+
+target: "snowflake"
+target_table_format: iceberg
+iceberg_version: 3
+data_flattening_max_level: 0
+hard_delete: true
+batch_size_rows: 1000
+stream_buffer_size: 0
+
+schemas:
+  - source_schema: "${TAP_ORACLE_MYSQL_DB}"
+    target_schema: "ppw_e2e_tap_oracle_mysql${TARGET_SNOWFLAKE_SCHEMA_POSTFIX}"
+    tables:
+      - table_name: "iceberg_events"
+        replication_method: "LOG_BASED"
+
+      - table_name: "iceberg_incremental"
+        replication_method: "INCREMENTAL"
+        replication_key: "updated_at"
+
+      - table_name: "iceberg_full_reload"
+        replication_method: "FULL_TABLE"

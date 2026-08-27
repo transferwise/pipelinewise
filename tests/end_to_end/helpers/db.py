@@ -36,7 +36,8 @@ def run_query_mysql(query, host, port, user, password, database, params=None):
         database=database,
         charset='utf8mb4',
         cursorclass=pymysql.cursors.Cursor,
-        ssl={'': True}
+        ssl={'': True},
+        autocommit=True,
     ) as conn:
         with conn.cursor() as cur:
             cur.execute(query, params)
@@ -110,7 +111,22 @@ def sql_get_columns_snowflake(schemas: list) -> str:
     in a specific schema from a snowflake database"""
     sql_schemas = ', '.join(f"'{schema.upper()}'" for schema in schemas)
     return f"""
-    SELECT table_name, LISTAGG(CONCAT(column_name, ':', REPLACE(data_type, 'TEXT', 'VARCHAR'), ':'), ';')
+    SELECT table_name,
+           LISTAGG(
+             CONCAT(
+               column_name,
+               ':',
+               CASE
+                 WHEN data_type IN ('TEXT', 'VARCHAR')
+                   THEN CONCAT(
+                     'VARCHAR(', TO_VARCHAR(character_maximum_length), ')'
+                   )
+                 ELSE REPLACE(data_type, 'TEXT', 'VARCHAR')
+               END,
+               ':'
+             ),
+             ';'
+           )
                        WITHIN GROUP (ORDER BY column_name)
      FROM information_schema.columns
     WHERE table_schema IN ({sql_schemas})

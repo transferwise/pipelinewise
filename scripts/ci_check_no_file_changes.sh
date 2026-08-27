@@ -22,7 +22,8 @@
 # to check for python changes, run with CHECKS=python
 # To check for doc changes, run with CHECKS=doc
 # To check for sample/dev config changes, run with CHECKS=config
-# To check for several kinds at once, run with CHECKS="python doc config"
+# To check for E2E workflow changes, run with CHECKS=e2e
+# To check for several kinds at once, run with CHECKS="python doc config e2e"
 if [[ (-z ${PR_NUMBER}) && (-z ${CIRCLE_PULL_REQUEST}) ]]; then
   echo "Not a PR; Exiting with FAILURE code"
   exit 1
@@ -94,7 +95,7 @@ REGEXES=()
 for CHECK in "$@"
 do
   if [[ ${CHECK} == "python" ]]; then
-    REGEX="(^tests\/|^pipelinewise\/|^singer-connectors\/|^scripts\/ci_check_no_file_changes\.sh$|^setup\.py|^Makefile)"
+    REGEX="(^tests\/|^pipelinewise\/|^singer-connectors\/|^scripts\/ci_(check_no_file_changes|require_env)\.sh$|^setup\.py|^Makefile)"
     echo "Searching for changes in python files"
 
   elif [[ ${CHECK} == "doc" ]]; then
@@ -106,6 +107,10 @@ do
     # python regex, so without this a config-only change skips every test job.
     REGEX="(^dev-project\/)"
     echo "Searching for changes in dev-project configuration files"
+
+  elif [[ ${CHECK} == "e2e" ]]; then
+    REGEX="(^\.github\/workflows\/e2e_tests\.yml$|^scripts\/ci_require_env\.sh$)"
+    echo "Searching for changes in end-to-end CI files"
 
   else
     echo "Invalid check: \"${CHECK}\". Falling back to exiting with FAILURE code"

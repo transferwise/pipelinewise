@@ -23,7 +23,8 @@ Column = collections.namedtuple('Column', [
     "numeric_precision",
     "numeric_scale",
     "column_type",
-    "column_key"])
+    "column_key",
+    "is_json_alias"], defaults=[False])
 
 pymysql.converters.conversions[pendulum.DateTime] = pymysql.converters.escape_datetime
 
@@ -83,6 +84,17 @@ def is_supported_column_type(column_datatype: str) -> bool:
     return column_datatype in SUPPORTED_COLUMN_TYPES_AGGREGATED
 
 
+def mariadb_json_aliases_enabled(config: Dict) -> bool:
+    """Return whether MariaDB JSON aliases should use Iceberg v3 semantics."""
+    iceberg_version = config.get('iceberg_version')
+    return (
+        str(config.get('engine', '')).lower() == 'mariadb'
+        and config.get('target_table_format') == 'iceberg'
+        and isinstance(iceberg_version, int)
+        and iceberg_version == 3
+    )
+
+
 def should_run_discovery(column_names: Set[str], md_map: Dict[Tuple, Dict]) -> bool:
     """
     Checks if we need to run discovery using a given metadata mapping.
@@ -120,7 +132,11 @@ def should_run_discovery(column_names: Set[str], md_map: Dict[Tuple, Dict]) -> b
     return False
 
 
-def discover_catalog(mysql_conn: MySQLConnection, dbs: str = None, tables: Optional[str] = None):
+def discover_catalog(
+        mysql_conn: MySQLConnection,
+        dbs: str = None,
+        tables: Optional[str] = None,
+        detect_json_aliases: bool = False):
     """Returns a Catalog describing the structure of the database."""
 
     if dbs:
@@ -140,6 +156,26 @@ def discover_catalog(mysql_conn: MySQLConnection, dbs: str = None, tables: Optio
     if tables is not None and tables != '':
         filter_tables_clause = ",".join([f"'{table_name}'" for table_name in tables.split(",")])
         tables_clause = f" AND table_name IN ({filter_tables_clause})"
+
+    json_alias_projection = ''
+    columns_relation = 'information_schema.columns'
+    if detect_json_aliases:
+        json_alias_projection = """,
+                       (c.data_type = 'longtext' AND EXISTS (
+                           SELECT 1
+                           FROM information_schema.table_constraints AS tc
+                           JOIN information_schema.check_constraints AS cc
+                             ON cc.constraint_schema = tc.constraint_schema
+                            AND cc.constraint_name = tc.constraint_name
+                           WHERE tc.table_schema = c.table_schema
+                             AND tc.table_name = c.table_name
+                             AND tc.constraint_type = 'CHECK'
+                             AND REPLACE(LOWER(cc.check_clause), ' ', '') =
+                                 CONCAT('json_valid(`',
+                                        REPLACE(LOWER(c.column_name), '`', '``'),
+                                        '`)')
+                       )) AS is_json_alias"""
+        columns_relation += ' AS c'
 
     with connect_with_backoff(mysql_conn) as open_conn:
         with open_conn.cursor() as cur:
@@ -172,8 +208,8 @@ def discover_catalog(mysql_conn: MySQLConnection, dbs: str = None, tables: Optio
                        numeric_precision,
                        numeric_scale,
                        column_type,
-                       column_key
-                    FROM information_schema.columns
+                       column_key{json_alias_projection}
+                    FROM {columns_relation}
                     {table_schema_clause}{tables_clause}
                     ORDER BY table_schema, table_name
             """)
@@ -270,6 +306,10 @@ def schema_for_column(column):  # pylint: disable=too-many-branches
         if data_type == 'decimal':
             result.multipleOf = 10 ** (0 - column.numeric_scale)
 
+    elif column.is_json_alias:
+        result.type = list(common.MARIADB_JSON_ROOT_TYPES)
+        result.format = common.MARIADB_JSON_FORMAT
+
     elif data_type in JSON_TYPES:
         result.type = ['null', 'object']
 
@@ -314,9 +354,10 @@ def create_column_metadata(cols: List[Column]):
                                'sql-datatype', col.column_type.lower())
 
 
+        data_type = 'json' if col.is_json_alias else col.data_type.lower()
         mdata = metadata.write(mdata,
                                ('properties', col.column_name),
-                               'datatype', col.data_type.lower()
+                               'datatype', data_type
                                )
 
     return metadata.to_list(mdata)

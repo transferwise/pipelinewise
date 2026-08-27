@@ -13,6 +13,7 @@ from pymysql import InterfaceError, OperationalError, Connection
 
 from ...utils import safe_column_name
 from . import split_gzip, utils
+from .partial_sync_boundary import PartialSyncBoundary
 
 LOGGER = logging.getLogger(__name__)
 
@@ -66,6 +67,7 @@ class FastSyncTapMySql:
         self.conn = None
         self.conn_unbuffered = None
         self.is_replica = False
+        self._mariadb_json_aliases_enabled = False
 
     @property
     def is_mariadb(self) -> bool:
@@ -74,6 +76,26 @@ class FastSyncTapMySql:
         Returns: bool
         """
         return self.connection_config['engine'] == MARIADB_ENGINE
+
+    @property
+    def uses_mariadb_json_aliases(self) -> bool:
+        """Return whether MariaDB JSON aliases should map to Iceberg VARIANT."""
+        iceberg_version = self.connection_config.get('iceberg_version')
+        return (
+            self.connection_config['engine'].lower() == MARIADB_ENGINE
+            and (
+                self._mariadb_json_aliases_enabled
+                or (
+                    self.connection_config.get('target_table_format') == 'iceberg'
+                    and isinstance(iceberg_version, int)
+                    and iceberg_version == 3
+                )
+            )
+        )
+
+    def set_mariadb_json_aliases_enabled(self, enabled: bool) -> None:
+        """Set JSON-alias mapping from the route's validated target format."""
+        self._mariadb_json_aliases_enabled = bool(enabled)
 
     def get_connection_parameters(self, prioritize_primary: bool = False) -> Tuple[dict, bool]:
         """
@@ -366,10 +388,34 @@ class FastSyncTapMySql:
         schema_name = table_dict.get('schema_name')
         table_name = table_dict.get('table_name')
 
+        data_type_projection = 'data_type'
+        json_alias_projection = ''
+        columns_relation = 'information_schema.columns'
+        if self.uses_mariadb_json_aliases:
+            data_type_projection = (
+                "CASE WHEN is_json_alias THEN 'json' ELSE data_type END"
+            )
+            json_alias_projection = """,
+                            (c.data_type = 'longtext' AND EXISTS (
+                                SELECT 1
+                                FROM information_schema.table_constraints AS tc
+                                JOIN information_schema.check_constraints AS cc
+                                  ON cc.constraint_schema = tc.constraint_schema
+                                 AND cc.constraint_name = tc.constraint_name
+                                WHERE tc.table_schema = c.table_schema
+                                  AND tc.table_name = c.table_name
+                                  AND tc.constraint_type = 'CHECK'
+                                  AND REPLACE(LOWER(cc.check_clause), ' ', '') =
+                                      CONCAT('json_valid(`',
+                                             REPLACE(LOWER(c.column_name), '`', '``'),
+                                             '`)')
+                            )) AS is_json_alias"""
+            columns_relation += ' AS c'
+
         # pylint: disable=line-too-long
         sql = f"""
                 SELECT column_name AS column_name,
-                    data_type AS data_type,
+                    {data_type_projection} AS data_type,
                     column_type AS column_type,
                     safe_sql_value AS safe_sql_value
                 FROM (SELECT column_name,
@@ -397,9 +443,9 @@ class FastSyncTapMySql:
                             WHEN data_type IN ('smallint', 'integer', 'bigint', 'mediumint', 'int')
                                     THEN {integer_format}
                             ELSE concat('REPLACE(REPLACE(REPLACE(cast(`', column_name, '` AS char CHARACTER SET utf8)', ", '\n', ' '), '\r', ''), '\0', '')")
-                                END AS safe_sql_value,
+                                END AS safe_sql_value{json_alias_projection},
                             ordinal_position
-                    FROM information_schema.columns
+                    FROM {columns_relation}
                     WHERE table_schema = '{schema_name}'
                         AND table_name = '{table_name}') x
                 ORDER BY
@@ -426,6 +472,9 @@ class FastSyncTapMySql:
         return {
             'columns': mapped_columns,
             'primary_key': self.get_primary_keys(table_name),
+            'source_column_names': [
+                column.get('column_name') for column in mysql_columns
+            ],
         }
 
     # pylint: disable=too-many-locals, too-many-positional-arguments
@@ -439,7 +488,7 @@ class FastSyncTapMySql:
             split_file_chunk_size_mb=1000,
             split_file_max_chunks=20,
             compress=True,
-            where_clause_sql='',
+            boundary=None,
     ):
         """
         Export data from table to a zipped csv
@@ -458,6 +507,15 @@ class FastSyncTapMySql:
         if len(column_safe_sql_values) == 0:
             raise Exception('{} table not found.'.format(table_name))
 
+        source_boundary = (
+            boundary.source_sql(
+                'mysql',
+                [column.get('column_name') for column in table_columns],
+            )
+            if boundary is not None
+            else None
+        )
+
         table_dict = utils.tablename_to_dict(table_name)
 
         column_safe_sql_values = column_safe_sql_values + [
@@ -466,17 +524,26 @@ class FastSyncTapMySql:
             'null AS `_SDC_DELETED_AT`'
         ]
 
-        sql = """SELECT {}
+        sql_template = """SELECT {}
         FROM `{}`.`{}` {}
-        """.format(
-            ','.join(column_safe_sql_values),
-            table_dict['schema_name'],
-            table_dict['table_name'],
-            where_clause_sql
-        )
+        """
         export_batch_rows = self.connection_config['export_batch_rows']
         exported_rows = 0
         with self.conn_unbuffered.cursor() as cur:
+            where_clause = (
+                cur.mogrify(
+                    source_boundary.statement,
+                    source_boundary.parameters,
+                )
+                if source_boundary is not None
+                else ''
+            )
+            sql = sql_template.format(
+                ','.join(column_safe_sql_values),
+                table_dict['schema_name'],
+                table_dict['table_name'],
+                where_clause,
+            )
             cur.execute(sql)
             gzip_splitter = split_gzip.open(
                 path,
@@ -515,7 +582,8 @@ class FastSyncTapMySql:
                 )
 
     def export_source_table_data(
-            self, args: Namespace, tap_id: str, where_clause_sql: str = '') -> list:
+            self, args: Namespace, tap_id: str,
+            boundary: PartialSyncBoundary = None) -> list:
         """Export source table data"""
         filename = utils.gen_export_filename(tap_id=tap_id, table=args.table, sync_type='partialsync')
         filepath = os.path.join(args.temp_dir, filename)
@@ -528,7 +596,7 @@ class FastSyncTapMySql:
             split_large_files=args.target.get('split_large_files'),
             split_file_chunk_size_mb=args.target.get('split_file_chunk_size_mb'),
             split_file_max_chunks=args.target.get('split_file_max_chunks'),
-            where_clause_sql=where_clause_sql,
+            boundary=boundary,
         )
         file_parts = glob.glob(f'{filepath}*')
         return file_parts

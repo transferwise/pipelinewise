@@ -27,6 +27,7 @@ def assert_run_tap_success(
         command = f'{command} --profiler'
 
     [return_code, stdout, stderr] = tasks.run_command(command)
+    _assert_run_tap_command_success(return_code, stdout, stderr)
     tasks.assert_run_tap_log_engines(stdout, sync_engines)
 
     for sync_engine in sync_engines:
@@ -55,6 +56,26 @@ def assert_run_tap_success(
         assert_profiling_stats_files_created(
             stdout, 'run_tap', sync_engines, tap, target
         )
+
+
+def _assert_run_tap_command_success(return_code, stdout, stderr):
+    """Expose all failed engine logs before asserting the expected engine set."""
+    if return_code == 0 and stderr == '':
+        return
+
+    failed_logs = []
+    for log_path in tasks.find_run_tap_log_files(stdout):
+        failed_log_path = Path(f'{log_path}.failed')
+        if failed_log_path.is_file():
+            failed_logs.append(
+                f'{failed_log_path}:\n{failed_log_path.read_text(encoding="utf-8")}'
+            )
+
+    print(
+        f'STDOUT: {stdout}\nSTDERR: {stderr}\nFAILED LOGS: '
+        + ('\n'.join(failed_logs) or '<none found>')
+    )
+    assert False
 
 
 def assert_resync_tables_success(

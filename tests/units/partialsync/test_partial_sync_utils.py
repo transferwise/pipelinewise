@@ -7,11 +7,27 @@ from tempfile import TemporaryDirectory
 from pipelinewise.fastsync.partialsync.utils import (
     DYNAMIC_BOUNDARY_NOT_READY, delete_s3_objects, load_into_snowflake, upload_to_s3,
     update_state_file, diff_source_target_columns, validate_boundary_value, get_sync_tables,
-    quote_tag_to_char)
+    NativePartialSyncCompatibilityError, quote_tag_to_char)
 from pipelinewise.cli.errors import InvalidConfigException
+from pipelinewise.fastsync.commons.snowflake_types import SNOWFLAKE_MAX_VARCHAR
+from pipelinewise.fastsync.commons.snowflake_iceberg import (
+    TABLE_FORMAT_MANAGED_ICEBERG_V3,
+    TABLE_FORMAT_MISSING,
+    TableCompatibilityError,
+)
 
 from tests.units.partialsync.utils import PartialSync2SFArgs
 from tests.units.partialsync.resources.test_partial_sync_utils.sample_sf_columns import SAMPLE_OUTPUT_FROM_SF
+
+
+def _snowflake_column(name, data_type, length=None):
+    type_metadata = {'type': data_type, 'nullable': True}
+    if length is not None:
+        type_metadata['length'] = length
+    return {
+        'column_name': name,
+        'data_type': json.dumps(type_metadata),
+    }
 
 
 class PartialSyncUtilsTestCase(TestCase):  # pylint: disable=too-many-public-methods
@@ -222,8 +238,27 @@ class PartialSyncUtilsTestCase(TestCase):  # pylint: disable=too-many-public-met
         s3_key_pattern = 'FOO_PATTERN'
         size_bytes = 3
         where_clause_sql = 'test'
-        load_into_snowflake(target, args, source_columns, primary_keys, s3_key_pattern, size_bytes,
-                            where_clause_sql)
+        with mock.patch(
+            'pipelinewise.fastsync.partialsync.utils.iceberg_routes.'
+            'require_native_target_format'
+        ) as native_format_guard:
+            load_into_snowflake(
+                target,
+                args,
+                source_columns,
+                primary_keys,
+                s3_key_pattern,
+                size_bytes,
+                where_clause_sql,
+            )
+
+        native_format_guard.assert_called_once_with(
+            snowflake,
+            args,
+            target['schema'],
+            args.table,
+            allow_missing=False,
+        )
 
         self.assertEqual(snowflake.method_calls, [
             mock.call.copy_to_table(s3_key_pattern, target['schema'], args.table, size_bytes, is_temporary=True),
@@ -267,8 +302,27 @@ class PartialSyncUtilsTestCase(TestCase):  # pylint: disable=too-many-public-met
         s3_key_pattern = 'FOO_PATTERN'
         size_bytes = 3
         where_clause_sql = 'test'
-        load_into_snowflake(target, args, source_columns, primary_keys, s3_key_pattern, size_bytes,
-                            where_clause_sql)
+        with mock.patch(
+            'pipelinewise.fastsync.partialsync.utils.iceberg_routes.'
+            'require_native_target_format'
+        ) as native_format_guard:
+            load_into_snowflake(
+                target,
+                args,
+                source_columns,
+                primary_keys,
+                s3_key_pattern,
+                size_bytes,
+                where_clause_sql,
+            )
+
+        native_format_guard.assert_called_once_with(
+            snowflake,
+            args,
+            target['schema'],
+            args.table,
+            allow_missing=False,
+        )
 
         self.assertEqual(snowflake.method_calls, [
             mock.call.copy_to_table(s3_key_pattern, target['schema'], args.table, size_bytes, is_temporary=True),
@@ -320,7 +374,10 @@ class PartialSyncUtilsTestCase(TestCase):  # pylint: disable=too-many-public-met
             'pipelinewise.fastsync.partialsync.utils.common_utils.'
             'apply_snowflake_table_grants',
             side_effect=lambda *_args, **_kwargs: timeline.append('staging grant'),
-        ) as grant_mock:
+        ) as grant_mock, mock.patch(
+            'pipelinewise.fastsync.partialsync.utils.iceberg_routes.'
+            'require_native_target_format'
+        ) as native_format_guard:
             load_into_snowflake(
                 target,
                 args,
@@ -331,6 +388,13 @@ class PartialSyncUtilsTestCase(TestCase):  # pylint: disable=too-many-public-met
                 where_clause_sql,
             )
 
+        native_format_guard.assert_called_once_with(
+            snowflake,
+            args,
+            target['schema'],
+            args.table,
+            allow_missing=False,
+        )
         grant_mock.assert_called_once_with(
             snowflake,
             args.target,
@@ -379,6 +443,79 @@ class PartialSyncUtilsTestCase(TestCase):  # pylint: disable=too-many-public-met
             mock.call.copy_to_table('FOO_PATTERN', 'FOO_SCHEMA', args.table, 3, is_temporary=True)
         ])
 
+    def test_load_into_snowflake_stops_if_created_target_is_not_native(self):
+        """A missing or Iceberg post-create result stops before publication."""
+        for table_format in (
+            TABLE_FORMAT_MISSING,
+            TABLE_FORMAT_MANAGED_ICEBERG_V3,
+        ):
+            with self.subTest(table_format=table_format):
+                snowflake = mock.MagicMock()
+                target = {
+                    'sf_object': snowflake,
+                    'schema': 'FOO_SCHEMA',
+                    'table': 'FOO_TABLE',
+                    'temp': 'FOO_TEMP',
+                    'publication_status': {'attempted': False},
+                }
+                args = PartialSync2SFArgs(
+                    temp_test_dir='temp_test_dir',
+                    start_value='20',
+                    end_value='30',
+                )
+                format_error = TableCompatibilityError(
+                    f'native target format check found {table_format}'
+                )
+
+                with mock.patch(
+                    'pipelinewise.fastsync.partialsync.utils.iceberg_routes.'
+                    'require_native_target_format',
+                    side_effect=format_error,
+                ) as native_format_guard, self.assertRaisesRegex(
+                    TableCompatibilityError, f'found {table_format}'
+                ):
+                    load_into_snowflake(
+                        target,
+                        args,
+                        ['"FOO_SOURCE_COLUMN" FOO_TYPE'],
+                        ['FOO_PRIMARY'],
+                        'FOO_PATTERN',
+                        3,
+                        'test',
+                    )
+
+                native_format_guard.assert_called_once_with(
+                    snowflake,
+                    args,
+                    target['schema'],
+                    args.table,
+                    allow_missing=False,
+                )
+                self.assertFalse(target['publication_status']['attempted'])
+                snowflake.add_columns.assert_not_called()
+                snowflake.swap_tables.assert_not_called()
+                snowflake.publish_partial_sync.assert_not_called()
+                self.assertEqual(snowflake.method_calls, [
+                    mock.call.copy_to_table(
+                        'FOO_PATTERN',
+                        'FOO_SCHEMA',
+                        args.table,
+                        3,
+                        is_temporary=True,
+                    ),
+                    mock.call.obfuscate_columns('FOO_SCHEMA', args.table),
+                    mock.call.create_table(
+                        target_schema='FOO_SCHEMA',
+                        table_name='FOO_TABLE',
+                        columns=['"FOO_SOURCE_COLUMN" FOO_TYPE'],
+                        primary_key=['FOO_PRIMARY'],
+                        is_temporary=False,
+                        sort_columns=False,
+                        allow_replace_table=False,
+                        normalize_primary_keys='if_created',
+                    ),
+                ])
+
     def test_load_into_snowflake_stops_if_publication_fails(self):
         """A publication failure must preserve staging and propagate to the caller."""
         snowflake = mock.MagicMock()
@@ -398,10 +535,23 @@ class PartialSyncUtilsTestCase(TestCase):  # pylint: disable=too-many-public-met
         merge_columns = [
             '"FOO_SOURCE_COLUMN"', '_SDC_EXTRACTED_AT', '_SDC_BATCHED_AT', '_SDC_DELETED_AT'
         ]
-        with self.assertRaisesRegex(RuntimeError, 'publication failed'):
+        with mock.patch(
+            'pipelinewise.fastsync.partialsync.utils.iceberg_routes.'
+            'require_native_target_format'
+        ) as native_format_guard, self.assertRaisesRegex(
+            RuntimeError, 'publication failed'
+        ):
             load_into_snowflake(
                 target, args, source_columns, ['FOO_PRIMARY'], 'FOO_PATTERN', 3, 'test'
             )
+
+        native_format_guard.assert_called_once_with(
+            snowflake,
+            args,
+            target['schema'],
+            args.table,
+            allow_missing=False,
+        )
 
         self.assertTrue(target['publication_status']['attempted'])
         self.assertEqual(snowflake.method_calls, [
@@ -418,6 +568,104 @@ class PartialSyncUtilsTestCase(TestCase):  # pylint: disable=too-many-public-met
                 'FOO_SCHEMA', 'FOO_TEMP', 'FOO_TABLE', merge_columns, ['FOO_PRIMARY'], 'test', hard_delete=True,
             ),
         ])
+
+    def test_load_into_snowflake_widens_native_text_before_publication(self):
+        """A compatible narrow target is widened before additive DDL and MERGE."""
+        snowflake = mock.MagicMock()
+        snowflake.query.return_value = [
+            _snowflake_column('BODY TEXT', 'TEXT', 16777216),
+        ]
+        target = {
+            'sf_object': snowflake,
+            'schema': 'FOO_SCHEMA',
+            'table': 'TABLE WITH SPACE',
+            'temp': 'FOO_TEMP',
+            'publication_status': {'attempted': False},
+        }
+        args = PartialSync2SFArgs(
+            temp_test_dir='temp_test_dir', start_value='20', end_value='30'
+        )
+        source_columns = [
+            f'"BODY TEXT" {SNOWFLAKE_MAX_VARCHAR}',
+            f'"NEW BODY" {SNOWFLAKE_MAX_VARCHAR}',
+        ]
+
+        with mock.patch(
+            'pipelinewise.fastsync.partialsync.utils.iceberg_routes.'
+            'require_native_target_format'
+        ):
+            load_into_snowflake(
+                target,
+                args,
+                source_columns,
+                ['"BODY TEXT"'],
+                'FOO_PATTERN',
+                3,
+                ' WHERE 1=1',
+            )
+
+        snowflake.widen_varchar_columns.assert_called_once_with(
+            'FOO_SCHEMA', 'TABLE WITH SPACE', ['BODY TEXT']
+        )
+        snowflake.add_columns.assert_called_once_with(
+            'FOO_SCHEMA',
+            'TABLE WITH SPACE',
+            {'"NEW BODY"': SNOWFLAKE_MAX_VARCHAR},
+        )
+        self.assertLess(
+            snowflake.method_calls.index(
+                mock.call.widen_varchar_columns(
+                    'FOO_SCHEMA', 'TABLE WITH SPACE', ['BODY TEXT']
+                )
+            ),
+            next(
+                index
+                for index, method_call in enumerate(snowflake.method_calls)
+                if method_call[0] == 'publish_partial_sync'
+            ),
+        )
+        self.assertTrue(target['publication_status']['attempted'])
+
+    def test_load_into_snowflake_reports_widening_failure_before_publication(self):
+        """A Snowflake DDL error remains actionable and cannot advance publication."""
+        snowflake = mock.MagicMock()
+        snowflake.query.return_value = [
+            _snowflake_column('BODY', 'TEXT', 16777216),
+        ]
+        snowflake.widen_varchar_columns.side_effect = RuntimeError(
+            'insufficient privileges'
+        )
+        target = {
+            'sf_object': snowflake,
+            'schema': 'FOO_SCHEMA',
+            'table': 'FOO_TABLE',
+            'temp': 'FOO_TEMP',
+            'publication_status': {'attempted': False},
+        }
+        args = PartialSync2SFArgs(
+            temp_test_dir='temp_test_dir', start_value='20', end_value='30'
+        )
+
+        with mock.patch(
+            'pipelinewise.fastsync.partialsync.utils.iceberg_routes.'
+            'require_native_target_format'
+        ), self.assertRaisesRegex(
+            NativePartialSyncCompatibilityError,
+            'insufficient privileges.*MERGE and state advancement did not run',
+        ):
+            load_into_snowflake(
+                target,
+                args,
+                [f'"BODY" {SNOWFLAKE_MAX_VARCHAR}'],
+                ['"BODY"'],
+                'FOO_PATTERN',
+                3,
+                ' WHERE 1=1',
+            )
+
+        self.assertFalse(target['publication_status']['attempted'])
+        snowflake.add_columns.assert_not_called()
+        snowflake.publish_partial_sync.assert_not_called()
 
     def test_update_state_file(self):
         """Test state file updating with and without end value"""
@@ -507,9 +755,100 @@ class PartialSyncUtilsTestCase(TestCase):  # pylint: disable=too-many-public-met
             'target_columns': ['FOO_COLUMN_1', 'FOO_COLUMN_2',
                                'FOO_COLUMN_3', 'FOO_COLUMN_4',
                                '_SDC_EXTRACTED_AT', '_SDC_BATCHED_AT', '_SDC_DELETED_AT', '_SDC_FOO_BAR'],
+            'varchar_columns_to_widen': [],
         }
         actual_output = diff_source_target_columns(target_sf=sample_target_sf, source_columns=sample_source_columns)
         self.assertDictEqual(actual_output, expected_output)
+
+    def test_varchar_width_diff_covers_missing_wide_and_narrow_columns(self):
+        """Only existing compatible text columns below the source width need DDL."""
+        snowflake = mock.MagicMock()
+        snowflake.query.return_value = [
+            _snowflake_column('NARROW BODY', 'TEXT', 16777216),
+            _snowflake_column('WIDE_BODY', 'TEXT', 134217728),
+            _snowflake_column('COUNT', 'FIXED'),
+        ]
+        target = {
+            'sf_object': snowflake,
+            'schema': 'FOO_SCHEMA',
+            'table': 'FOO_TABLE',
+        }
+
+        result = diff_source_target_columns(
+            target,
+            [
+                f'"NARROW BODY" {SNOWFLAKE_MAX_VARCHAR}',
+                f'"WIDE_BODY" {SNOWFLAKE_MAX_VARCHAR}',
+                f'"MISSING_BODY" {SNOWFLAKE_MAX_VARCHAR}',
+                '"COUNT" NUMBER',
+            ],
+        )
+
+        self.assertEqual(result['varchar_columns_to_widen'], ['NARROW BODY'])
+        self.assertEqual(
+            result['added_columns'],
+            {'"MISSING_BODY"': SNOWFLAKE_MAX_VARCHAR},
+        )
+
+    def test_varchar_width_diff_rejects_existing_non_text_column(self):
+        """Automatic widening never converts an incompatible target data type."""
+        snowflake = mock.MagicMock()
+        snowflake.query.return_value = [_snowflake_column('BODY', 'FIXED')]
+        target = {
+            'sf_object': snowflake,
+            'schema': 'FOO_SCHEMA',
+            'table': 'FOO_TABLE',
+        }
+
+        with self.assertRaisesRegex(
+            NativePartialSyncCompatibilityError,
+            r'existing target FOO_SCHEMA\."FOO_TABLE" has type FIXED.*FullSync',
+        ):
+            diff_source_target_columns(
+                target,
+                [f'"BODY" {SNOWFLAKE_MAX_VARCHAR}'],
+            )
+
+    def test_varchar_width_diff_rejects_missing_length_metadata(self):
+        """An unprovable existing string width fails closed before target DML."""
+        snowflake = mock.MagicMock()
+        snowflake.query.return_value = [_snowflake_column('BODY', 'TEXT')]
+        target = {
+            'sf_object': snowflake,
+            'schema': 'FOO_SCHEMA',
+            'table': 'FOO_TABLE',
+        }
+
+        with self.assertRaisesRegex(
+            NativePartialSyncCompatibilityError,
+            'cannot verify CHARACTER_MAXIMUM_LENGTH.*Widen.*manually',
+        ):
+            diff_source_target_columns(
+                target,
+                [f'"BODY" {SNOWFLAKE_MAX_VARCHAR}'],
+            )
+
+    def test_varchar_width_diff_accepts_snowflake_text_type_aliases(self):
+        """Snowflake text aliases are all eligible for monotonic widening."""
+        target = {
+            'schema': 'FOO_SCHEMA',
+            'table': 'FOO_TABLE',
+        }
+
+        for target_type in ('CHAR', 'CHARACTER', 'CHARACTER VARYING', 'STRING', 'TEXT', 'VARCHAR'):
+            with self.subTest(target_type=target_type):
+                snowflake = mock.MagicMock()
+                snowflake.query.return_value = [
+                    _snowflake_column('BODY', target_type, 16777216)
+                ]
+                target['sf_object'] = snowflake
+
+                result = diff_source_target_columns(
+                    target,
+                    [f'"BODY" {SNOWFLAKE_MAX_VARCHAR}'],
+                )
+
+                self.assertEqual(result['varchar_columns_to_widen'], ['BODY'])
 
     def test_valiodate_boundary_value_return_none_if_value_is_none(self):
         """Test if validate_boundary_value method returns none with none as input"""

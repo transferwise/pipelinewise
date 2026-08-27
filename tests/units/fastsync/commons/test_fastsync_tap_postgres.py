@@ -1,13 +1,18 @@
 import datetime
+import io
 
 from decimal import Decimal
 from unittest import TestCase
 from unittest.mock import MagicMock, Mock, PropertyMock, patch
 
 from pipelinewise.fastsync.commons.tap_postgres import FastSyncTapPostgres
+from pipelinewise.fastsync.commons import tap_postgres
+from pipelinewise.fastsync.commons.partial_sync_boundary import (
+    PartialSyncBoundary,
+)
 
 
-class TestFastSyncTapPostgres(TestCase):
+class TestFastSyncTapPostgres(TestCase):  # pylint: disable=too-many-public-methods
     """
     Unit tests for fastsync tap postgres
     """
@@ -25,6 +30,41 @@ class TestFastSyncTapPostgres(TestCase):
             self.postgres.executed_queries_primary_host.append(query)
 
         self.postgres.primary_host_query = primary_host_query_mock
+
+    def test_copy_table_mogrifies_only_the_structured_boundary(self):
+        """COPY keeps projection percent signs outside placeholder parsing."""
+        table_columns = [{
+            0: 'rate%s',
+            1: 'text',
+            2: 'to_char("event_date", \'%Y-%m-01\')',
+            3: None,
+            'safe_sql_value': 'to_char("event_date", \'%Y-%m-01\')',
+        }]
+        self.postgres.curr = MagicMock()
+        self.postgres.curr.connection.encoding = 'UTF8'
+        self.postgres.curr.mogrify.return_value = (
+            b' WHERE "rate%s" >= \'x\\\'\' OR 1=1 --\''
+        )
+        boundary = PartialSyncBoundary('rate%s', "x' OR 1=1 --")
+
+        with patch.object(
+            self.postgres, 'get_table_columns', return_value=table_columns
+        ), patch.object(
+            tap_postgres.split_gzip, 'open', return_value=io.BytesIO()
+        ):
+            self.postgres.copy_table(
+                'public.my_table', 'unused.csv', boundary=boundary
+            )
+
+        self.postgres.curr.mogrify.assert_called_once_with(
+            ' WHERE "rate%%s" >= %s',
+            ("x' OR 1=1 --",),
+        )
+        export_sql = self.postgres.curr.copy_expert.call_args.args[0]
+        self.assertIn('to_char("event_date", \'%Y-%m-01\')', export_sql)
+        self.assertIn(
+            ' WHERE "rate%s" >= \'x\\\'\' OR 1=1 --\'', export_sql
+        )
 
     def test_generate_repl_slot_name(self):
         """Validate if the replication slot name generated correctly"""
@@ -72,7 +112,6 @@ class TestFastSyncTapPostgres(TestCase):
         self.postgres.conn = connection
         self.postgres.curr = Mock()
         self.postgres.primary_host_conn = primary_connection
-        self.postgres.primary_host_curr = Mock()
 
         self.postgres.close_connection()
         self.postgres.close_connection()
@@ -82,7 +121,6 @@ class TestFastSyncTapPostgres(TestCase):
         self.assertIsNone(self.postgres.conn)
         self.assertIsNone(self.postgres.curr)
         self.assertIsNone(self.postgres.primary_host_conn)
-        self.assertIsNone(self.postgres.primary_host_curr)
 
     def test_close_connection_silences_driver_failure(self):
         """Cleanup failures must not replace the original sync exception."""
@@ -114,11 +152,10 @@ class TestFastSyncTapPostgres(TestCase):
         create_replication_slot.assert_called_once_with()
         primary_connection.close.assert_called_once_with()
         self.assertIsNone(self.postgres.primary_host_conn)
-        self.assertIsNone(self.postgres.primary_host_curr)
 
     def test_fetch_current_log_pos_closes_primary_connection_on_failure(self):
         """Primary setup, metadata, and replication-slot failures cannot leak their connection."""
-        failures = ('cursor', 'metadata', 'replication_slot')
+        failures = ('metadata', 'replication_slot')
 
         for failure in failures:
             with self.subTest(failure=failure):
@@ -144,7 +181,6 @@ class TestFastSyncTapPostgres(TestCase):
 
                 primary_connection.close.assert_called_once_with()
                 self.assertIsNone(self.postgres.primary_host_conn)
-                self.assertIsNone(self.postgres.primary_host_curr)
 
     def test_create_replication_slot_1(self):
         """
@@ -398,6 +434,44 @@ class TestFastSyncTapPostgres(TestCase):
                 self.postgres.fetch_current_incremental_key_pos('schema.table1', 'id')
 
             self.assertEqual('Cannot get replication key value for table: schema.table1', str(context.exception))
+
+    def test_primary_keys_preserve_declared_order(self):
+        """Composite keys follow index order rather than physical column order."""
+        with patch.object(
+            self.postgres,
+            'query',
+            return_value=[('second_key',), ('first_key',)],
+        ) as query_mock:
+            keys = self.postgres.get_primary_keys('public.composite_key')
+
+        self.assertEqual(keys, ['"SECOND_KEY"', '"FIRST_KEY"'])
+        query_mock.assert_called_once()
+        self.assertEqual(query_mock.call_args.args[1], ('public', 'composite_key'))
+        self.assertIn('WITH ORDINALITY', query_mock.call_args.args[0])
+        self.assertIn(
+            'ORDER BY key_column.key_ordinality', query_mock.call_args.args[0]
+        )
+
+    def test_hstore_is_exported_as_json(self):
+        """FastSync and Singer must share object semantics for hstore."""
+        self.postgres.hstore_as_json = True
+        with patch.object(self.postgres, 'query', return_value=[]) as query_mock:
+            self.postgres.get_table_columns('public.hstore_table', max_num='1')
+
+        query = query_mock.call_args.args[0]
+        self.assertIn("WHEN udt_name = 'hstore' THEN 'hstore'", query)
+        self.assertIn(
+            "WHEN udt_name = 'hstore' THEN 'hstore_to_json(\"'",
+            query,
+        )
+
+    def test_hstore_export_is_unchanged_for_native_routes(self):
+        """Native routes retain the existing textual hstore export."""
+        with patch.object(self.postgres, 'query', return_value=[]) as query_mock:
+            self.postgres.get_table_columns('public.hstore_table', max_num='1')
+
+        query = query_mock.call_args.args[0]
+        self.assertNotIn('hstore_to_json', query)
 
     def test_fetch_current_incremental_key_pos_empty_key_value_return_empty_state(self):
         """

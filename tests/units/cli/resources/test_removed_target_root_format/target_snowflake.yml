@@ -1,0 +1,15 @@
+---
+id: "test_snowflake_target"
+name: "Test Snowflake target"
+type: "target-snowflake"
+target_table_format: native
+db_conn:
+  account: "account"
+  dbname: "database"
+  user: "user"
+  private_key: "private-key"
+  warehouse: "warehouse"
+  s3_bucket: "bucket"
+  s3_key_prefix: "prefix/"
+  stage: "schema.stage"
+  file_format: "schema.file_format"

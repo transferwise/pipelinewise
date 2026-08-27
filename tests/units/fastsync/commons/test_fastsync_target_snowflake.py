@@ -1,8 +1,11 @@
 import json
 from unittest import TestCase
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from pipelinewise.fastsync.commons.target_snowflake import FastSyncTargetSnowflake
+from tests.units.fastsync.commons.snowflake_iceberg_test_helpers import (
+    assert_native_ddl_omits_iceberg_mode,
+)
 
 
 # pylint: disable=too-few-public-methods
@@ -43,7 +46,7 @@ class FastSyncTargetSnowflakeMock(FastSyncTargetSnowflake):
         return []
 
 
-class TestFastSyncTargetSnowflake(TestCase):
+class TestFastSyncTargetSnowflake(TestCase):  # pylint: disable=too-many-public-methods
     """
     Unit tests for fastsync target snowflake
     """
@@ -54,6 +57,32 @@ class TestFastSyncTargetSnowflake(TestCase):
             connection_config={'s3_bucket': 'dummy_bucket', 'stage': 'dummy_stage'},
             transformation_config={},
         )
+
+    def test_open_connection_honors_configured_role(self):
+        """FastSync uses the configured Snowflake role for every connection."""
+        snowflake = object.__new__(FastSyncTargetSnowflake)
+        snowflake.connection_config = {
+            'user': 'test_user',
+            'private_key': 'test_private_key',
+            'account': 'test_account',
+            'dbname': 'test_database',
+            'warehouse': 'test_warehouse',
+            'role': 'test_role',
+            'tap_id': 'test_tap',
+        }
+
+        with patch(
+            'pipelinewise.fastsync.commons.target_snowflake.pem2der',
+            return_value='test_der_key',
+        ) as pem2der_mock, patch(
+            'pipelinewise.fastsync.commons.target_snowflake.snowflake.connector.connect'
+        ) as connect_mock:
+            connection = snowflake.open_connection(autocommit=False)
+
+        self.assertIs(connection, connect_mock.return_value)
+        pem2der_mock.assert_called_once_with('test_private_key')
+        self.assertEqual(connect_mock.call_args.kwargs['role'], 'test_role')
+        self.assertEqual(connect_mock.call_args.kwargs['autocommit'], False)
 
     def test_create_schema(self):
         """Validate if create schema queries generated correctly"""
@@ -80,6 +109,20 @@ class TestFastSyncTargetSnowflake(TestCase):
             'DROP TABLE IF EXISTS test_schema."TEST TABLE WITH SPACE"',
             'DROP TABLE IF EXISTS test_schema."TEST TABLE WITH SPACE_TEMP"',
         ])
+
+    def test_drop_table_accepts_an_explicit_staging_table(self):
+        """Recovery cleanup targets the attempt-specific staging object."""
+        self.snowflake.drop_table(
+            'test_schema',
+            'test_table',
+            is_temporary=True,
+            staging_table_name='PW_STAGE_123',
+        )
+
+        self.assertListEqual(
+            self.snowflake.executed_queries,
+            ['DROP TABLE IF EXISTS test_schema."PW_STAGE_123"'],
+        )
 
     def test_merge_tables(self):
         """Validate if merge tables query is generated correctly"""
@@ -118,6 +161,21 @@ class TestFastSyncTargetSnowflake(TestCase):
         self.snowflake.add_columns(schema, table, adding_columns)
         self.assertListEqual(self.snowflake.executed_queries, [expected_query])
 
+    def test_widen_varchar_columns_quotes_identifiers(self):
+        """Native PartialSync widening safely quotes tables and columns."""
+        self.snowflake.widen_varchar_columns(
+            'test schema',
+            'table with space',
+            ['BODY TEXT', 'QUOTE"COLUMN'],
+        )
+
+        self.assertEqual(self.snowflake.executed_queries, [
+            'ALTER TABLE "TEST SCHEMA"."TABLE WITH SPACE" ALTER COLUMN '
+            '"BODY TEXT" SET DATA TYPE VARCHAR(134217728)',
+            'ALTER TABLE "TEST SCHEMA"."TABLE WITH SPACE" ALTER COLUMN '
+            '"QUOTE""COLUMN" SET DATA TYPE VARCHAR(134217728)',
+        ])
+
     def test_create_table(self):
         """Validate if create table queries generated correctly"""
         # Create table with standard table and column names
@@ -137,6 +195,29 @@ class TestFastSyncTargetSnowflake(TestCase):
             ', PRIMARY KEY ("ID"))',
             'alter table "TEST_SCHEMA"."TEST_TABLE" alter column "ID" drop not null;'
         ])
+        assert_native_ddl_omits_iceberg_mode(
+            self.snowflake.executed_queries[0]
+        )
+
+    def test_create_table_accepts_an_explicit_staging_table(self):
+        """Each Iceberg publication attempt can own a unique native stage."""
+        self.snowflake.create_table(
+            target_schema='test_schema',
+            table_name='test_table',
+            columns=['"ID" INTEGER'],
+            primary_key=['"ID"'],
+            is_temporary=True,
+            staging_table_name='PW_STAGE_123',
+        )
+
+        self.assertEqual(
+            self.snowflake.executed_queries[0],
+            'CREATE OR REPLACE TABLE "TEST_SCHEMA"."PW_STAGE_123" ('
+            '"ID" INTEGER,'
+            '_SDC_EXTRACTED_AT TIMESTAMP_NTZ,'
+            '_SDC_BATCHED_AT TIMESTAMP_NTZ,'
+            '_SDC_DELETED_AT VARCHAR, PRIMARY KEY ("ID"))',
+        )
 
         # Create table with reserved words in table and column names
         self.snowflake.executed_queries = []
@@ -237,7 +318,7 @@ class TestFastSyncTargetSnowflake(TestCase):
         """Validate if COPY command generated correctly"""
         # COPY table with standard table and column names
         self.snowflake.executed_queries = []
-        self.snowflake.copy_to_table(
+        inserted_rows = self.snowflake.copy_to_table(
             s3_key='s3_key',
             target_schema='test_schema',
             table_name='test_table',
@@ -251,6 +332,7 @@ class TestFastSyncTargetSnowflake(TestCase):
             ' field_optionally_enclosed_by=\'\"\' empty_field_as_null=TRUE skip_header=0'
             ' compression=GZIP binary_format=HEX)'
         ]
+        assert inserted_rows == 0
 
         # COPY table with reserved word in table and column names in temp table
         self.snowflake.executed_queries = []
@@ -266,6 +348,22 @@ class TestFastSyncTargetSnowflake(TestCase):
             'COPY INTO test_schema."FULL_TEMP" FROM \'@dummy_stage/s3_key\''
             ' FILE_FORMAT = (type=CSV escape=NONE escape_unenclosed_field=\'\\x1e\''
             ' field_optionally_enclosed_by=\'\"\' empty_field_as_null=TRUE skip_header=0'
+            ' compression=GZIP binary_format=HEX)'
+        ]
+
+        self.snowflake.executed_queries = []
+        self.snowflake.copy_to_table(
+            s3_key='s3_key',
+            target_schema='test_schema',
+            table_name='full',
+            size_bytes=1000,
+            is_temporary=True,
+            staging_table_name='PW_STAGE_123',
+        )
+        assert self.snowflake.executed_queries == [
+            'COPY INTO test_schema."PW_STAGE_123" FROM \'@dummy_stage/s3_key\''
+            ' FILE_FORMAT = (type=CSV escape=NONE escape_unenclosed_field=\'\\x1e\''
+            ' field_optionally_enclosed_by=\'"\' empty_field_as_null=TRUE skip_header=0'
             ' compression=GZIP binary_format=HEX)'
         ]
 
@@ -485,6 +583,25 @@ class TestFastSyncTargetSnowflake(TestCase):
             'table': None,
         }
 
+        assert json.loads(self.snowflake.create_query_tag({
+            'load_id': 'load-1',
+            'attempt_id': 'attempt-1',
+            'phase': 'published',
+            'publication_method': 'insert_overwrite',
+            'target': 'fake_db.fake_schema.fake_table',
+        })) == {
+            'ppw_component': 'fastsync',
+            'tap_id': 'fake_tap',
+            'database': 'fake_db',
+            'schema': None,
+            'table': None,
+            'load_id': 'load-1',
+            'attempt_id': 'attempt-1',
+            'phase': 'published',
+            'publication_method': 'insert_overwrite',
+            'target': 'fake_db.fake_schema.fake_table',
+        }
+
     def test_obfuscate_columns_case1(self):
         """
         Test obfuscation where given transformations are emtpy
@@ -587,6 +704,27 @@ class TestFastSyncTargetSnowflake(TestCase):
                 'SUBSTRING("COL_7", LENGTH("COL_7")-3+1, 3)) '
                 'ELSE REPEAT(\'*\', LENGTH("COL_7")) END;'
             ],
+        )
+
+    def test_obfuscate_columns_accepts_an_explicit_staging_table(self):
+        """Transform lookup uses the source stream while DML uses its unique stage."""
+        self.snowflake.transformation_config = {
+            'transformations': [{
+                'field_id': 'col_1',
+                'tap_stream_name': 'public-my_table',
+                'type': 'SET-NULL',
+            }]
+        }
+
+        self.snowflake.obfuscate_columns(
+            'my_schema',
+            'public.my_table',
+            staging_table_name='PW_STAGE_123',
+        )
+
+        self.assertEqual(
+            self.snowflake.executed_queries,
+            ['UPDATE "MY_SCHEMA"."PW_STAGE_123" SET "COL_1" = NULL;'],
         )
 
     def test_obfuscate_columns_case4(self):

@@ -33,6 +33,8 @@ class CliArgs:
         column='*',
         start_value='*',
         end_value=None,
+        eventual='native',
+        iceberg_version=None,
         command=None,
     ):
         self.target = target
@@ -58,6 +60,8 @@ class CliArgs:
         self.column = column
         self.start_value = start_value
         self.end_value = end_value
+        self.eventual = eventual
+        self.iceberg_version = iceberg_version
         self.command = command
 
     # "log" Getters and setters

@@ -9,6 +9,33 @@ from pipelinewise.fastsync.commons import utils
 from pipelinewise.fastsync.commons.target_snowflake import FastSyncTargetSnowflake
 
 
+@pytest.mark.parametrize(
+    ('resolved_keys', 'message'),
+    (
+        (['loads/part-0', 'loads/part-0'], 'must be unique'),
+        (
+            ['loads/part-0', 'loads/part-0', None],
+            'requires deterministic S3 keys',
+        ),
+    ),
+)
+def test_s3_key_error_precedence(
+    resolved_keys,
+    message,
+):
+    """A missing key remains more important than an earlier duplicate."""
+    snowflake = mock.MagicMock()
+    snowflake._get_s3_key.side_effect = resolved_keys  # pylint: disable=protected-access
+    file_parts = [f'part-{index}' for index in range(len(resolved_keys))]
+
+    with pytest.raises(ValueError, match=message):
+        utils.get_expected_s3_keys(snowflake, file_parts)
+
+    assert snowflake._get_s3_key.call_args_list == [  # pylint: disable=protected-access
+        mock.call(file_part) for file_part in file_parts
+    ]
+
+
 def test_later_upload_failure_rolls_back():
     """A failed later part removes prior uploads and preserves local exports."""
     with TemporaryDirectory() as temp_directory:

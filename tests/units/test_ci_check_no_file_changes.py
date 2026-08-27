@@ -2,9 +2,12 @@ import os
 import subprocess
 from pathlib import Path
 
+import yaml
+
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 DETECTOR = REPOSITORY_ROOT / 'scripts' / 'ci_check_no_file_changes.sh'
+E2E_WORKFLOW = REPOSITORY_ROOT / '.github' / 'workflows' / 'e2e_tests.yml'
 
 FAKE_CURL = r'''#!/usr/bin/env bash
 set -u
@@ -52,6 +55,9 @@ case "${FAKE_CURL_SCENARIO}:${page}" in
     ;;
   detector_only:1)
     printf '[{"filename":"scripts/ci_check_no_file_changes.sh"}]'
+    ;;
+  e2e_workflow:1)
+    printf '[{"filename":".github/workflows/e2e_tests.yml"}]'
     ;;
   api_failure:1)
     printf 'API unavailable\n' >&2
@@ -166,6 +172,78 @@ def test_detector_change_triggers_checks(tmp_path):
     assert result.returncode == 1
     assert pages == ['1']
     assert 'Detected changes in following file: scripts/ci_check_no_file_changes.sh' in result.stdout
+
+
+def test_e2e_workflow_triggers_checks(tmp_path):
+    """An E2E workflow-only change must run the E2E jobs it defines."""
+    result, pages = run_detector(tmp_path, 'e2e_workflow', 'python', 'config', 'e2e')
+
+    assert result.returncode == 1
+    assert pages == ['1']
+    assert 'Detected changes in following file: .github/workflows/e2e_tests.yml' in result.stdout
+
+
+def test_snowflake_e2e_jobs_are_serial():
+    """Credentialed routes run serially even after an earlier route fails."""
+    workflow = yaml.safe_load(E2E_WORKFLOW.read_text(encoding='utf-8'))
+    jobs = workflow['jobs']
+    chain = (
+        (
+            'e2e_tests_mariadb_to_sf',
+            None,
+            'tests/end_to_end/target_snowflake/tap_mariadb',
+        ),
+        (
+            'e2e_tests_mysql_to_sf',
+            'e2e_tests_mariadb_to_sf',
+            'tests/end_to_end/target_snowflake/tap_mysql',
+        ),
+        (
+            'e2e_tests_pg_to_sf',
+            'e2e_tests_mysql_to_sf',
+            'tests/end_to_end/target_snowflake/tap_postgres',
+        ),
+        (
+            'e2e_tests_mg_to_sf',
+            'e2e_tests_pg_to_sf',
+            'tests/end_to_end/target_snowflake/tap_mongodb',
+        ),
+        (
+            'e2e_tests_s3_to_sf',
+            'e2e_tests_mg_to_sf',
+            'tests/end_to_end/target_snowflake/tap_s3',
+        ),
+    )
+
+    for job_name, dependency, route_path in chain:
+        job = jobs[job_name]
+        if dependency is None:
+            assert 'needs' not in job
+        else:
+            assert job['needs'] == dependency
+            assert job['if'] == '${{ !cancelled() }}'
+        commands = '\n'.join(step.get('run', '') for step in job['steps'])
+        assert route_path in commands
+
+
+def test_rdbms_snowflake_preflight_once():
+    """Each credentialed RDBMS route runs one complete preflight command."""
+    workflow = yaml.safe_load(E2E_WORKFLOW.read_text(encoding='utf-8'))
+    jobs = workflow['jobs']
+
+    for job_name in (
+        'e2e_tests_mariadb_to_sf',
+        'e2e_tests_mysql_to_sf',
+        'e2e_tests_pg_to_sf',
+    ):
+        preflight_steps = [
+            step
+            for step in jobs[job_name]['steps']
+            if step.get('name')
+            == 'Validate required Snowflake end-to-end configuration'
+        ]
+        assert len(preflight_steps) == 1
+        assert preflight_steps[0]['run'].count('./scripts/ci_require_env.sh') == 1
 
 
 def test_api_failure_triggers_checks(tmp_path):

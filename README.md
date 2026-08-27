@@ -3,7 +3,7 @@
 PipelineWise is a Python 3.12 framework for configuring, running, and operating
 [Singer](https://github.com/singer-io/getting-started/blob/master/docs/SPEC.md)
 ELT pipelines. It supports log-based, incremental, and full-table replication,
-plus native FastSync transfers for selected database routes.
+plus FastSync transfers for selected database routes.
 
 [Documentation](https://transferwise.github.io/pipelinewise/) ·
 [Issues](https://github.com/transferwise/pipelinewise/issues) ·

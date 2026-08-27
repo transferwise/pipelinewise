@@ -6,6 +6,7 @@ provided by this repository.
 The local development environment comes with the following containers and components:
 * PipelineWise CLI with every supported tap and target connectors
 * MariaDB test source database with test data (for tap-mysql)
+* MySQL 8 test source database with test data (for tap-mysql)
 * Postgres test source database with test data (for tap-postgres)
 * MongoDB replicaSet test source database with test data (for tap-mongodb)
 * Postgres test target data warehouse (for target-postgres)
