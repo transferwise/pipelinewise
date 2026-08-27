@@ -286,16 +286,6 @@ def stream_references_table(
     )
 
 
-def _boolean(value: Any) -> bool:
-    if value is True or str(value).upper() in ('Y', 'YES', 'TRUE'):
-        return True
-    if value is False or str(value).upper() in ('N', 'NO', 'FALSE'):
-        return False
-    raise NativeToIcebergConversionError(
-        f'Snowflake returned invalid boolean metadata: {value!r}'
-    )
-
-
 def _inspect_iceberg_table_spec(
     query: Callable,
     table: SnowflakeObjectName,
@@ -358,7 +348,7 @@ def _grant_signature(grant: Dict[str, Any]) -> Optional[Tuple[Any, ...]]:
         privilege.upper(),
         grantee_type.upper(),
         grantee,
-        _boolean(_value(grant, 'grant_option', False)),
+        snowflake_boolean(_value(grant, 'grant_option', False)),
     )
 
 

@@ -9,7 +9,10 @@ from typing import Any, Dict, List, Optional, Union
 from pipelinewise.fastsync.commons import snowflake_iceberg_routes as iceberg_routes
 from pipelinewise.fastsync.commons import utils as common_utils
 from pipelinewise.fastsync.commons.rdbms_source import RdbmsSnowflakeSource
-from pipelinewise.fastsync.commons.snowflake_iceberg import PartialSyncBoundary
+from pipelinewise.fastsync.commons.partial_sync_boundary import (
+    PartialSyncBoundary,
+    PartialSyncBoundaryError,
+)
 from pipelinewise.fastsync.partialsync import utils
 
 
@@ -38,6 +41,7 @@ class _PartialSyncRun:  # pylint: disable=too-many-instance-attributes
     staging_config: Any = None
     recovery_identity: Any = None
     bookmark: Any = None
+    boundary: Optional[PartialSyncBoundary] = None
     where_clause_sql: Optional[str] = None
     source_columns: Any = None
     primary_keys: Any = None
@@ -102,13 +106,19 @@ def _prepare_partial_run(run: _PartialSyncRun) -> bool:
             source_engine=run.source_adapter.source_engine(run.args),
             staging_config=run.staging_config,
             iceberg_version=run.iceberg_version,
+            partial_boundary={
+                'column_name': run.table[1]['column'],
+                'start_value': run.table[1]['start_value'],
+                'end_value': run.table[1]['end_value'],
+                'drop_target': run.table[1]['drop_target_table'] is True,
+            },
         )
         if run.iceberg_requested
         else None
     )
     run.column_name = run.table[1]['column']
     run.args = copy.copy(run.args)
-    run.args.drop_target_table = run.table[1]['drop_target_table']
+    run.args.drop_target_table = run.table[1]['drop_target_table'] is True
     run.args.table = run.table_name
     run.has_dynamic_boundary = any(
         isinstance(value, str) and value.startswith('<D>')
@@ -209,7 +219,7 @@ def _export_partial_source(run: _PartialSyncRun) -> bool:
         run.file_parts = run.source.export_source_table_data(
             run.args,
             run.args.target.get('tap_id'),
-            run.where_clause_sql,
+            boundary=run.boundary,
         )
         if run.iceberg_requested:
             _validate_partial_export(run)
@@ -233,7 +243,14 @@ def _prepare_iceberg_partial_export(run: _PartialSyncRun) -> bool:
         run.spec = run.attempt.table_spec
         iceberg_routes.validate_recovery_source_spec(run.spec, current_spec)
         run.bookmark = run.attempt.source_bookmark
-        run.where_clause_sql = run.attempt.manifest_payload.where_clause_sql
+        run.boundary = PartialSyncBoundary.from_manifest_payload(
+            run.attempt.manifest_payload
+        )
+        run.boundary.require_exact_column(
+            _source_column_names(snowflake_types)
+        )
+        run.column_name = run.boundary.column_name
+        run.where_clause_sql = run.boundary.snowflake_where_clause()
         run.publisher.plan_partial_sync(run.attempt, run.spec)
         return True
 
@@ -245,24 +262,21 @@ def _prepare_iceberg_partial_export(run: _PartialSyncRun) -> bool:
     if boundary_values is None:
         return False
     start_value, end_value = boundary_values
+    run.boundary = _resolved_boundary(
+        run, snowflake_types, start_value, end_value
+    )
+    run.column_name = run.boundary.column_name
     run.bookmark = common_utils.get_bookmark_for_table(
         run.table_name,
         run.args.properties,
         run.source,
         **run.source_adapter.bookmark_kwargs(run.args),
     )
-    run.where_clause_sql = _where_clause(
-        run.column_name, start_value, end_value
-    )
+    run.where_clause_sql = run.boundary.snowflake_where_clause()
     run.attempt = run.publisher.prepare_partial_sync(
         run.spec,
         run.bookmark,
-        PartialSyncBoundary(
-            run.where_clause_sql,
-            start_value=start_value,
-            end_value=end_value,
-            drop_target=run.args.drop_target_table,
-        ),
+        run.boundary,
         recovery_identity=run.recovery_identity,
         staging_config=run.staging_config,
     )
@@ -275,6 +289,13 @@ def _prepare_native_partial_export(run: _PartialSyncRun) -> bool:
     if boundary_values is None:
         return False
     start_value, end_value = boundary_values
+    snowflake_types = run.source.map_column_types_to_target(run.table_name)
+    run.source_columns = snowflake_types.get('columns', [])
+    run.primary_keys = snowflake_types.get('primary_key')
+    run.boundary = _resolved_boundary(
+        run, snowflake_types, start_value, end_value
+    )
+    run.column_name = run.boundary.column_name
 
     if run.has_dynamic_boundary:
         _resolve_partial_target(run)
@@ -286,12 +307,7 @@ def _prepare_native_partial_export(run: _PartialSyncRun) -> bool:
         run.source,
         **run.source_adapter.bookmark_kwargs(run.args),
     )
-    snowflake_types = run.source.map_column_types_to_target(run.table_name)
-    run.source_columns = snowflake_types.get('columns', [])
-    run.primary_keys = snowflake_types.get('primary_key')
-    run.where_clause_sql = _where_clause(
-        run.column_name, start_value, end_value
-    )
+    run.where_clause_sql = run.boundary.snowflake_where_clause()
     return True
 
 
@@ -316,6 +332,7 @@ def _resolve_partial_boundary(run: _PartialSyncRun):
 
 def _validate_partial_export(run: _PartialSyncRun) -> None:
     exported_types = run.source.map_column_types_to_target(run.table_name)
+    run.boundary.require_exact_column(_source_column_names(exported_types))
     exported_spec = iceberg_routes.create_spec(
         run.args,
         run.target_schema,
@@ -474,11 +491,24 @@ def _partial_failure_result(run: _PartialSyncRun, exc: Exception) -> str:
     )
 
 
-def _where_clause(column_name, start_value, end_value) -> str:
-    start_value_for_query = (
-        start_value if start_value == 'NULL' else f'\'{start_value}\''
-    )
-    where_clause_sql = f' WHERE {column_name} >= {start_value_for_query}'
-    if end_value is not None:
-        where_clause_sql += f' AND {column_name} <= \'{end_value}\''
-    return where_clause_sql
+def _source_column_names(mapped_types) -> list:
+    source_column_names = mapped_types.get('source_column_names')
+    if not isinstance(source_column_names, list):
+        raise PartialSyncBoundaryError(
+            'PartialSync source mapping did not return source column names'
+        )
+    return source_column_names
+
+
+def _resolved_boundary(
+    run: _PartialSyncRun,
+    mapped_types,
+    start_value,
+    end_value,
+) -> PartialSyncBoundary:
+    return PartialSyncBoundary(
+        run.column_name,
+        start_value,
+        end_value,
+        drop_target=run.args.drop_target_table,
+    ).resolved(_source_column_names(mapped_types))

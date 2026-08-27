@@ -1,5 +1,7 @@
 """Tests for Snowflake Iceberg durable recovery state."""
 
+# pylint: disable=too-many-lines
+
 import json
 import os
 from datetime import date, datetime, time
@@ -512,6 +514,59 @@ class TestManifestRecovery:
 class TestRouteRecovery:
     """Validate route-specific recovery identity."""
 
+    def test_partial_boundary_drift_finds_manifest_and_rejects_replay(
+        self, tmp_path, spec
+    ):
+        """A stable stream key finds, then rejects, a changed range contract."""
+        stream_identity = {
+            'tap_id': 'unit-test',
+            'route': 'unit-test',
+            'table': 'source.table',
+        }
+        original_identity = build_recovery_identity(
+            'fastsync',
+            {'route': 'unit-test', 'partial_boundary': {'end': '<S>10'}},
+            transformation_config={},
+            stream_identity=stream_identity,
+            target_table_format='iceberg',
+            iceberg_version=3,
+        )
+        changed_identity = build_recovery_identity(
+            'fastsync',
+            {'route': 'unit-test', 'partial_boundary': {'end': '<S>11'}},
+            transformation_config={},
+            stream_identity=stream_identity,
+            target_table_format='iceberg',
+            iceberg_version=3,
+        )
+        publisher = SnowflakeIcebergPublisher(FakeSnowflake(), str(tmp_path))
+        publisher.inspect_table = MagicMock(return_value=missing_snapshot())
+        attempt = publisher.prepare_partial_sync(
+            spec,
+            {'lsn': '1/2'},
+            PartialSyncBoundary('ID', 1, 10),
+            recovery_identity=original_identity,
+        )
+
+        assert (
+            publisher.recovery_store(spec.name, original_identity).path
+            == publisher.recovery_store(spec.name, changed_identity).path
+        )
+        with pytest.raises(
+            RecoveryManifestError, match='different source, target'
+        ):
+            publisher.load_attempt(
+                spec,
+                expected_kind='partial',
+                recovery_identity=changed_identity,
+            )
+        assert (
+            publisher.recovery_store(spec.name, original_identity)
+            .load()
+            .attempt_id
+            == attempt.attempt_id
+        )
+
     def test_recovery_rejects_staging_configuration_drift(self, tmp_path, spec):
         """Recovery rejects staging configuration drift."""
         publisher = SnowflakeIcebergPublisher(FakeSnowflake(), str(tmp_path))
@@ -577,9 +632,8 @@ class TestRouteRecovery:
             spec,
             {"boundary": "saved"},
             PartialSyncBoundary(
-                ' WHERE "ID" >= 1',
-                start_value=value,
-                end_value=None,
+                'ID',
+                value,
             ),
             recovery_identity=RECOVERY_IDENTITY,
         )
@@ -599,7 +653,7 @@ class TestRouteRecovery:
             publisher.prepare_partial_sync(
                 no_key,
                 {},
-                PartialSyncBoundary(" WHERE 1=1"),
+                PartialSyncBoundary("ID", 1),
                 recovery_identity=RECOVERY_IDENTITY,
             )
 
@@ -642,7 +696,7 @@ class TestRouteRecovery:
                 "full",
                 PUBLICATION_PARTIAL_REPLACEMENT_CTAS,
                 {
-                    "where_clause_sql": ' WHERE "ID" BETWEEN 1 AND 10',
+                    "column_name": "ID",
                     "start_value": 1,
                     "end_value": 10,
                     "end_is_unbounded": False,
@@ -705,7 +759,9 @@ class TestRouteRecovery:
             kind="partial",
             method=PUBLICATION_PARTIAL_REPLACEMENT_CTAS,
             context={
-                "where_clause_sql": ' WHERE "ID" >= 1',
+                "column_name": "ID",
+                "start_value": 1,
+                "end_value": None,
                 "end_is_unbounded": True,
                 "drop_target": True,
                 "delete_mode": "hard",

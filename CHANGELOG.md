@@ -91,6 +91,10 @@
 
 **Fixes**
 
+- Build PartialSync source and Snowflake predicates from structured, dialect-safe
+  boundaries so dynamic values cannot alter the selected range
+- Fetch Snowflake query results from result-set metadata when the connector
+  cannot report a row count
 - Execute unparameterized target-snowflake SQL containing literal `%` without parameter-binding errors
 - Escape backslashes when re-emitting Snowflake comments and tag values during
   Iceberg replacement and conversion

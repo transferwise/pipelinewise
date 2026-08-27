@@ -383,7 +383,7 @@ def _reject_transformed_key_collisions(connection_config, tmp_path, spec):
         spec,
         {"boundary": "transformed-duplicate-keys"},
         PartialSyncBoundary(
-            ' WHERE "ID" BETWEEN 2 AND 5',
+            'ID',
             start_value=2,
             end_value=5,
         ),
@@ -448,7 +448,7 @@ def _recover_partial_response_loss(adapter, tmp_path, spec):
         spec,
         {"boundary": "partial-lost-response"},
         PartialSyncBoundary(
-            ' WHERE "ID" BETWEEN 2 AND 4',
+            'ID',
             start_value=2,
             end_value=4,
         ),

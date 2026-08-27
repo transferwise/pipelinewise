@@ -129,9 +129,11 @@ def assert_iceberg_partial_sync_workflow(
         source_bookmark=bookmark,
         s3_keys=s3_keys,
         manifest_payload=SimpleNamespace(
-            where_clause_sql=" WHERE foo_column >= '1'",
+            column_name='foo_column',
+            start_value='1',
             end_value=None,
             end_is_unbounded=True,
+            drop_target=drop_target,
         ),
         table_spec=None,
     )
@@ -160,6 +162,12 @@ def assert_iceberg_partial_sync_workflow(
         source_engine=source_engine,
         staging_config=staging_config,
         iceberg_version=3,
+        partial_boundary={
+            'column_name': table[1]['column'],
+            'start_value': table[1]['start_value'],
+            'end_value': table[1]['end_value'],
+            'drop_target': table[1]['drop_target_table'],
+        },
     )
     attempt.table_spec = persisted_spec
     timeline = []
@@ -252,7 +260,11 @@ def assert_iceberg_partial_sync_workflow(
         publisher = create_publisher_mock.return_value
         source.map_column_types_to_target.side_effect = record(
             'source.map',
-            {'columns': columns, 'primary_key': primary_keys},
+            {
+                'columns': columns,
+                'primary_key': primary_keys,
+                'source_column_names': ['foo_column'],
+            },
         )
         source.export_source_table_data.side_effect = record(
             'source.export', file_parts
@@ -411,7 +423,6 @@ def assert_iceberg_partial_sync_workflow(
         source.map_column_types_to_target.assert_not_called()
         assert timeline.index('load_attempt') < timeline.index('reconcile')
     else:
-        where_clause = " WHERE foo_column >= '1'"
         if restarting:
             bookmark_mock.assert_not_called()
             publisher.prepare_partial_sync.assert_not_called()
@@ -432,9 +443,8 @@ def assert_iceberg_partial_sync_workflow(
                 current_spec,
                 bookmark,
                 PartialSyncBoundary(
-                    where_clause,
-                    start_value='1',
-                    end_value=None,
+                    'foo_column',
+                    '1',
                     drop_target=drop_target,
                 ),
                 recovery_identity=recovery_identity,

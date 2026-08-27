@@ -1,10 +1,15 @@
 import datetime
+import io
 
 from decimal import Decimal
 from unittest import TestCase
 from unittest.mock import MagicMock, Mock, PropertyMock, patch
 
 from pipelinewise.fastsync.commons.tap_postgres import FastSyncTapPostgres
+from pipelinewise.fastsync.commons import tap_postgres
+from pipelinewise.fastsync.commons.partial_sync_boundary import (
+    PartialSyncBoundary,
+)
 
 
 class TestFastSyncTapPostgres(TestCase):  # pylint: disable=too-many-public-methods
@@ -25,6 +30,41 @@ class TestFastSyncTapPostgres(TestCase):  # pylint: disable=too-many-public-meth
             self.postgres.executed_queries_primary_host.append(query)
 
         self.postgres.primary_host_query = primary_host_query_mock
+
+    def test_copy_table_mogrifies_only_the_structured_boundary(self):
+        """COPY keeps projection percent signs outside placeholder parsing."""
+        table_columns = [{
+            0: 'rate%s',
+            1: 'text',
+            2: 'to_char("event_date", \'%Y-%m-01\')',
+            3: None,
+            'safe_sql_value': 'to_char("event_date", \'%Y-%m-01\')',
+        }]
+        self.postgres.curr = MagicMock()
+        self.postgres.curr.connection.encoding = 'UTF8'
+        self.postgres.curr.mogrify.return_value = (
+            b' WHERE "rate%s" >= \'x\\\'\' OR 1=1 --\''
+        )
+        boundary = PartialSyncBoundary('rate%s', "x' OR 1=1 --")
+
+        with patch.object(
+            self.postgres, 'get_table_columns', return_value=table_columns
+        ), patch.object(
+            tap_postgres.split_gzip, 'open', return_value=io.BytesIO()
+        ):
+            self.postgres.copy_table(
+                'public.my_table', 'unused.csv', boundary=boundary
+            )
+
+        self.postgres.curr.mogrify.assert_called_once_with(
+            ' WHERE "rate%%s" >= %s',
+            ("x' OR 1=1 --",),
+        )
+        export_sql = self.postgres.curr.copy_expert.call_args.args[0]
+        self.assertIn('to_char("event_date", \'%Y-%m-01\')', export_sql)
+        self.assertIn(
+            ' WHERE "rate%s" >= \'x\\\'\' OR 1=1 --\'', export_sql
+        )
 
     def test_generate_repl_slot_name(self):
         """Validate if the replication slot name generated correctly"""

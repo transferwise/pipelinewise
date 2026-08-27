@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import json
 import re
 import time
@@ -55,12 +54,14 @@ from pipelinewise.fastsync.commons.snowflake_iceberg_model import (
     SnowflakeTableMetadata,
     SnowflakeTableSnapshot,
     TableFormatDiscoveryError,
-    _json_safe_boundary,
     _sql_hash,
     canonical_iceberg_type as _canonical_iceberg_type,
     quote_identifier,
     sql_string_literal,
     validate_recovery_identity,
+)
+from pipelinewise.fastsync.commons.partial_sync_boundary import (
+    PartialSyncBoundary,
 )
 from pipelinewise.fastsync.commons.snowflake_iceberg_recovery import (
     AmbiguousPublicationError,
@@ -166,27 +167,6 @@ __all__ = (
     'sql_string_literal',
     'validate_recovery_identity',
 )
-
-
-@dataclass(frozen=True)
-class PartialSyncBoundary:
-    """Resolved PartialSync range and replacement intent for recovery."""
-
-    where_clause_sql: str
-    start_value: Any = None
-    end_value: Any = None
-    drop_target: bool = False
-
-    def as_context(self) -> Dict[str, Any]:
-        """Return stable manifest evidence for the resolved range."""
-        return {
-            'where_clause_sql': self.where_clause_sql,
-            'start_value': _json_safe_boundary(self.start_value),
-            'end_value': _json_safe_boundary(self.end_value),
-            'end_is_unbounded': self.end_value is None,
-            'drop_target': self.drop_target,
-            'delete_mode': 'hard',
-        }
 
 
 class SnowflakeQueryAdapter(SnowflakeSqlClient):
@@ -460,12 +440,19 @@ class SnowflakeIcebergPublisher:  # pylint: disable=too-many-public-methods,too-
         if attempt.kind == 'partial':
             payload = attempt.manifest_payload
             if (
-                not isinstance(payload.where_clause_sql, str)
-                or not payload.where_clause_sql.strip()
+                not isinstance(payload.column_name, str)
+                or not payload.column_name
                 or not isinstance(payload.end_is_unbounded, bool)
+                or payload.end_is_unbounded != (payload.end_value is None)
                 or payload.delete_mode != 'hard'
             ):
                 raise RecoveryManifestError('Iceberg PartialSync recovery context is invalid')
+            try:
+                PartialSyncBoundary.from_manifest_payload(payload)
+            except (TypeError, ValueError) as exc:
+                raise RecoveryManifestError(
+                    'Iceberg PartialSync recovery context is invalid'
+                ) from exc
 
     def discover_table_format(self, schema_name: str, table_name: str) -> str:
         """Return the exact physical format of a table in the configured database."""

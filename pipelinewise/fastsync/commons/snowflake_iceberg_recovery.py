@@ -103,7 +103,7 @@ def validate_required_finalization_actions(
         attempt.finalization if finalization is None else finalization
     )
     required = required_finalization_actions(attempt)
-    if set(completed) != set(required):
+    if set(completed) != required:
         missing = ', '.join(sorted(required.difference(completed))) or 'none'
         unexpected = ', '.join(sorted(set(completed).difference(required))) or 'none'
         raise RecoveryManifestError(

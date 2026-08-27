@@ -38,8 +38,11 @@ def test_current_manifest_round_trips_typed_payload(spec):
         spec,
         kind='partial',
         context={
-            'where_clause_sql': ' WHERE "ID" >= 1',
+            'column_name': 'ID',
+            'start_value': 1,
+            'end_value': None,
             'end_is_unbounded': True,
+            'drop_target': False,
             'delete_mode': 'hard',
             'extension': 'preserved',
         },
@@ -54,7 +57,7 @@ def test_current_manifest_round_trips_typed_payload(spec):
         'values': serialized['context'],
     }
     assert isinstance(recovered.manifest_payload, PartialSyncManifestPayload)
-    assert recovered.manifest_payload.where_clause_sql == ' WHERE "ID" >= 1'
+    assert recovered.manifest_payload.column_name == 'ID'
     assert recovered.manifest_payload.extensions == {'extension': 'preserved'}
 
 
@@ -277,6 +280,26 @@ def test_payload_must_match_legacy_projection(spec):
         IcebergPublicationAttempt.from_dict(serialized)
 
 
+def test_partial_manifest_with_only_legacy_raw_sql_fails_closed(spec):
+    """Recovery never executes an unstructured predicate from durable state."""
+    serialized = make_attempt(spec, kind='partial').as_dict()
+    for field_name in (
+        'column_name',
+        'start_value',
+        'end_value',
+        'end_is_unbounded',
+        'drop_target',
+        'delete_mode',
+    ):
+        serialized['context'].pop(field_name)
+        serialized['payload']['values'].pop(field_name)
+    serialized['context']['where_clause_sql'] = ' WHERE 1=1'
+    serialized['payload']['values']['where_clause_sql'] = ' WHERE 1=1'
+
+    with pytest.raises(RecoveryManifestError, match='payload is invalid'):
+        IcebergPublicationAttempt.from_dict(serialized)
+
+
 @pytest.mark.parametrize(
     ('kind', 'field_name', 'invalid_value'),
     (
@@ -286,7 +309,8 @@ def test_payload_must_match_legacy_projection(spec):
         ('full', 'publication_query_hash', 'not-a-hash'),
         ('full', 'publication_query_type', ''),
         ('full', 'publication_submitted_at', float('inf')),
-        ('partial', 'where_clause_sql', ''),
+        ('partial', 'column_name', ''),
+        ('partial', 'start_value', None),
         ('partial', 'delete_mode', 'soft'),
         ('partial', 'end_is_unbounded', 1),
         ('partial', 'drop_target', 'false'),

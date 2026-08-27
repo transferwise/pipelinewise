@@ -3,9 +3,12 @@ import io
 import pymysql
 
 from unittest import TestCase
-from unittest.mock import patch, call, Mock
+from unittest.mock import patch, call, MagicMock, Mock
 
 from pipelinewise.fastsync.commons import tap_mysql
+from pipelinewise.fastsync.commons.partial_sync_boundary import (
+    PartialSyncBoundary,
+)
 from pipelinewise.fastsync.commons.tap_mysql import FastSyncTapMySql, MARIADB_ENGINE
 
 
@@ -50,6 +53,42 @@ class TestFastSyncTapMySql(TestCase):
             'dbname': 'my_db',
         }
         self.mysql = None
+
+    def test_copy_table_mogrifies_only_the_structured_boundary(self):
+        """Driver binding cannot reinterpret percent signs in export SQL."""
+        self.mysql = FastSyncTapMySql(
+            self.connection_config, lambda value, *_args: value
+        )
+        table_columns = [{
+            'column_name': 'rate%s',
+            'safe_sql_value': 'DATE_FORMAT(`event_date`, "%Y-%m-01")',
+        }]
+        cursor = MagicMock()
+        cursor.mogrify.return_value = (
+            " WHERE `rate%s` >= 'x\\\\'' OR 1=1 --'"
+        )
+        cursor.fetchmany.return_value = []
+        self.mysql.conn_unbuffered = MagicMock()
+        self.mysql.conn_unbuffered.cursor.return_value.__enter__.return_value = (
+            cursor
+        )
+        boundary = PartialSyncBoundary('rate%s', "x\\' OR 1=1 --")
+
+        with patch.object(
+            self.mysql, 'get_table_columns', return_value=table_columns
+        ), patch.object(tap_mysql.split_gzip, 'open', return_value=io.StringIO()):
+            self.mysql.copy_table(
+                'my_db.my_table', 'unused.csv', boundary=boundary
+            )
+
+        cursor.mogrify.assert_called_once_with(
+            ' WHERE `rate%%s` >= %s',
+            ("x\\' OR 1=1 --",),
+        )
+        export_sql = cursor.execute.call_args.args[0]
+        self.assertIn('DATE_FORMAT(`event_date`, "%Y-%m-01")', export_sql)
+        self.assertIn(" WHERE `rate%s` >= 'x\\\\'' OR 1=1 --'", export_sql)
+        self.assertEqual(len(cursor.execute.call_args.args), 1)
 
     def test_open_connections_with_default_session_sqls(self):
         """Default session parameters should be applied if no custom session SQLs"""
@@ -590,6 +629,18 @@ class TestFastSyncTapMySql(TestCase):
                 'target_table_format': 'iceberg',
                 'iceberg_version': 3,
             },
+            {
+                **self.connection_config,
+                'engine': 'mariadb',
+                'target_table_format': 'iceberg',
+                'iceberg_version': True,
+            },
+            {
+                **self.connection_config,
+                'engine': 'mariadb',
+                'target_table_format': 'iceberg',
+                'iceberg_version': 3.0,
+            },
         )
 
         for connection_config in configs:
@@ -625,5 +676,6 @@ class TestFastSyncTapMySql(TestCase):
         assert result == {
             'columns': ['"PAYLOAD" VARIANT'],
             'primary_key': ['ID'],
+            'source_column_names': ['payload'],
         }
         mapper.assert_called_once_with('json', 'longtext')

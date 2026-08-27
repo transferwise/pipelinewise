@@ -12,6 +12,9 @@ from typing import Any, Dict, Optional, Tuple
 from uuid import uuid4
 
 from pipelinewise.fastsync.commons import utils
+from pipelinewise.fastsync.commons.partial_sync_boundary import (
+    PartialSyncBoundary,
+)
 from pipelinewise.fastsync.commons.snowflake_iceberg_model import (
     PHASE_FINALIZED,
     PHASE_PREPARED,
@@ -78,6 +81,13 @@ _QUERY_HISTORY_SQL = (
     'RESULT_LIMIT => 10000)) '
     'WHERE QUERY_TAG = %(query_tag)s ORDER BY START_TIME'
 )
+
+
+def _partial_where_clause(attempt: IcebergPublicationAttempt) -> str:
+    """Regenerate executable SQL from the typed recovery boundary."""
+    return PartialSyncBoundary.from_manifest_payload(
+        attempt.manifest_payload
+    ).snowflake_where_clause()
 
 
 @dataclass(frozen=True)
@@ -765,7 +775,7 @@ class SnowflakeIcebergPublicationService:
         if compatibility != 'exact' or additions:
             raise RecoveryManifestError('Published Iceberg target schema does not match the staged schema')
         where_clause = (
-            attempt.manifest_payload.where_clause_sql
+            _partial_where_clause(attempt)
             if attempt.method == PUBLICATION_PARTIAL_MERGE
             else ''
         )
@@ -1038,7 +1048,7 @@ class SnowflakeIcebergPublicationService:
         source = source_name.quoted
         source_alias = 'SOURCE'
         target_alias = 'TARGET'
-        where_clause = attempt.manifest_payload.where_clause_sql
+        where_clause = _partial_where_clause(attempt)
         join = ' AND '.join(
             f'{quote_identifier(source_alias)}.{quote_identifier(key)} = '
             f'{quote_identifier(target_alias)}.{quote_identifier(key)}'

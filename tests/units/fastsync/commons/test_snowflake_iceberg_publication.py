@@ -263,14 +263,18 @@ class TestPublication:
             phase=PHASE_PUBLISHED,
             kind="partial",
             method=PUBLICATION_PARTIAL_MERGE,
-            context={"where_clause_sql": ' WHERE "ID" BETWEEN 2 AND 8'},
+            context={
+                "start_value": 2,
+                "end_value": 8,
+                "end_is_unbounded": False,
+            },
         )
         attempt.expected_row_count = 7
         attempt.expected_row_fingerprint = "staged-hash"
 
         publisher._verify_published(attempt, spec)  # pylint: disable=protected-access
 
-        assert 'WHERE "ID" BETWEEN 2 AND 8' in snowflake.queries[0][0]
+        assert 'WHERE "ID" >= \'2\' AND "ID" <= \'8\'' in snowflake.queries[0][0]
 
     def test_staging_evidence_hashes_the_canonical_projection(self, tmp_path, spec):
         """Staging evidence hashes the canonical projection."""
@@ -814,7 +818,6 @@ class TestQueryHistoryRecovery:
             kind="partial",
             method=PUBLICATION_PARTIAL_BOOTSTRAP_CTAS,
             context={
-                "where_clause_sql": ' WHERE "ID" >= 1',
                 "end_is_unbounded": True,
                 "delete_mode": "hard",
                 "publication_query_hash": _sql_hash(statement),

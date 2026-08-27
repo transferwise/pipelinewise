@@ -169,6 +169,7 @@ def fastsync_recovery_identity(
     source_engine,
     staging_config,
     iceberg_version,
+    partial_boundary=None,
 ):
     """Bind recovery to one credential-free FastSync execution identity."""
     source_config = args.tap
@@ -221,6 +222,8 @@ def fastsync_recovery_identity(
         },
         'staging': dict(staging_config),
     }
+    if partial_boundary is not None:
+        identity['partial_boundary'] = dict(partial_boundary)
     return build_recovery_identity(
         'fastsync',
         identity,

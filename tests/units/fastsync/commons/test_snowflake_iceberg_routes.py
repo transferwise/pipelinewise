@@ -259,7 +259,7 @@ def _recovery_args(tap_override=None, target_override=None, transform=None):
     )
 
 
-def _recovery_identity(args, table='source.table'):
+def _recovery_identity(args, table='source.table', partial_boundary=None):
     return routes.fastsync_recovery_identity(
         args,
         table,
@@ -267,6 +267,7 @@ def _recovery_identity(args, table='source.table'):
         source_engine=args.tap['engine'],
         staging_config={'s3_bucket': 'staging'},
         iceberg_version=args.target['iceberg_version'],
+        partial_boundary=partial_boundary,
     )
 
 
@@ -318,6 +319,84 @@ def test_fastsync_recovery_identity_excludes_query_history_budget():
     }))
 
     assert changed == original
+
+
+@pytest.mark.parametrize(
+    'changed_boundary',
+    (
+        {
+            'column_name': 'other_id',
+            'start_value': '<S>1',
+            'end_value': '<S>10',
+            'drop_target': False,
+        },
+        {
+            'column_name': 'id',
+            'start_value': '<S>2',
+            'end_value': '<S>10',
+            'drop_target': False,
+        },
+        {
+            'column_name': 'id',
+            'start_value': '<D>SELECT MIN(id) FROM source.table',
+            'end_value': '<D>SELECT MAX(id) + 1 FROM source.table',
+            'drop_target': False,
+        },
+        {
+            'column_name': 'id',
+            'start_value': '<S>1',
+            'end_value': '<S>11',
+            'drop_target': False,
+        },
+        {
+            'column_name': 'id',
+            'start_value': '<S>1',
+            'end_value': '<S>10',
+            'drop_target': True,
+        },
+    ),
+)
+def test_partial_boundary_drift_keeps_stream_key_but_changes_recovery_identity(
+    changed_boundary,
+):
+    """A retry finds the stream manifest but cannot replay a changed range."""
+    original_boundary = {
+        'column_name': 'id',
+        'start_value': '<S>1',
+        'end_value': '<S>10',
+        'drop_target': False,
+    }
+    args = _recovery_args()
+    original = _recovery_identity(
+        args, partial_boundary=original_boundary
+    )
+    changed = _recovery_identity(args, partial_boundary=changed_boundary)
+
+    assert changed['stream_fingerprint'] == original['stream_fingerprint']
+    assert changed['fingerprint'] != original['fingerprint']
+
+
+def test_dynamic_partial_boundary_query_text_is_recovery_identity():
+    """Recovery binds query text without executing the dynamic boundary again."""
+    args = _recovery_args()
+    original_boundary = {
+        'column_name': 'id',
+        'start_value': '<S>1',
+        'end_value': '<D>SELECT MAX(id) FROM source.table',
+        'drop_target': False,
+    }
+    changed_boundary = {
+        **original_boundary,
+        'end_value': '<D>SELECT MAX(id) + 1 FROM source.table',
+    }
+
+    original = _recovery_identity(
+        args, partial_boundary=original_boundary
+    )
+    changed = _recovery_identity(args, partial_boundary=changed_boundary)
+
+    assert changed['stream_fingerprint'] == original['stream_fingerprint']
+    assert changed['fingerprint'] != original['fingerprint']
 
 
 def test_create_publisher_uses_target_directory(tmp_path):

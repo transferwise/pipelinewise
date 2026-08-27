@@ -13,6 +13,7 @@ from typing import Dict
 
 
 from . import utils, split_gzip
+from .partial_sync_boundary import PartialSyncBoundary
 from ...utils import safe_column_name
 
 LOGGER = logging.getLogger(__name__)
@@ -514,6 +515,7 @@ class FastSyncTapPostgres:
         return {
             'columns': mapped_columns,
             'primary_key': self.get_primary_keys(table_name),
+            'source_column_names': [column[0] for column in postgres_columns],
         }
 
     # pylint: disable=too-many-arguments, too-many-locals, too-many-positional-arguments
@@ -527,7 +529,7 @@ class FastSyncTapPostgres:
         split_file_chunk_size_mb=1000,
         split_file_max_chunks=20,
         compress=True,
-        where_clause_sql='',
+        boundary=None,
     ):
         """
         Export data from table to a zipped csv
@@ -546,6 +548,15 @@ class FastSyncTapPostgres:
         if len(column_safe_sql_values) == 0:
             raise Exception(f'{table_name} table not found.')
 
+        source_boundary = (
+            boundary.source_sql(
+                'postgres',
+                [column[0] for column in table_columns],
+            )
+            if boundary is not None
+            else None
+        )
+
         schema_name, table_name = table_name.split('.')
 
         column_safe_sql_values = column_safe_sql_values + [
@@ -554,8 +565,22 @@ class FastSyncTapPostgres:
             'null _SDC_DELETED_AT'
         ]
 
+        if source_boundary is not None:
+            where_clause = self.curr.mogrify(
+                source_boundary.statement,
+                source_boundary.parameters,
+            )
+            if isinstance(where_clause, bytes):
+                connection_encoding = self.curr.connection.encoding
+                python_encoding = psycopg2.extensions.encodings.get(
+                    connection_encoding, connection_encoding
+                )
+                where_clause = where_clause.decode(python_encoding)
+        else:
+            where_clause = ''
+
         sql = f"""COPY (SELECT {','.join(column_safe_sql_values)}
-        FROM {schema_name}."{table_name}"{where_clause_sql}) TO STDOUT with CSV DELIMITER ','
+        FROM {schema_name}."{table_name}"{where_clause}) TO STDOUT with CSV DELIMITER ','
         """
 
         LOGGER.info('Exporting data: %s', sql)
@@ -572,7 +597,8 @@ class FastSyncTapPostgres:
             self.curr.copy_expert(sql, split_gzip_files, size=131072)
 
     def export_source_table_data(
-            self, args: Namespace, tap_id: str, where_clause_sql: str = '') -> list:
+            self, args: Namespace, tap_id: str,
+            boundary: PartialSyncBoundary = None) -> list:
         """Exporting data from the source table"""
         filename = utils.gen_export_filename(tap_id=tap_id, table=args.table, sync_type='partialsync')
         filepath = os.path.join(args.temp_dir, filename)
@@ -583,7 +609,7 @@ class FastSyncTapPostgres:
             split_large_files=args.target.get('split_large_files'),
             split_file_chunk_size_mb=args.target.get('split_file_chunk_size_mb'),
             split_file_max_chunks=args.target.get('split_file_max_chunks'),
-            where_clause_sql=where_clause_sql
+            boundary=boundary
         )
         file_parts = glob.glob(f'{filepath}*')
         return file_parts

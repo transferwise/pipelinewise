@@ -50,6 +50,14 @@ def _column(is_json_alias=False):
             },
             False,
         ),
+        (
+            {
+                'engine': 'mariadb',
+                'target_table_format': 'iceberg',
+                'iceberg_version': 3.0,
+            },
+            False,
+        ),
     ],
 )
 def test_mariadb_json_aliases_require_explicit_iceberg_v3(config, expected):

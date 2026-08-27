@@ -6,6 +6,9 @@ from unittest import TestCase, mock
 from pipelinewise.fastsync.partialsync import mysql_to_snowflake
 from pipelinewise.fastsync.partialsync.utils import parse_args_for_partial_sync
 from pipelinewise.fastsync.commons.tap_mysql import FastSyncTapMySql
+from pipelinewise.fastsync.commons.partial_sync_boundary import (
+    PartialSyncBoundary,
+)
 from pipelinewise.fastsync.commons.snowflake_iceberg import (
     QueryHistoryLookupError,
     TABLE_FORMAT_MANAGED_ICEBERG_V3,
@@ -171,6 +174,7 @@ class PartialSyncTestCase(TestCase):
                 source.map_column_types_to_target.return_value = {
                     'columns': ['"ID" NUMBER'],
                     'primary_key': ['"ID"'],
+                    'source_column_names': ['foo_column'],
                 }
                 mocked_fastsyncmysql.return_value = source
 
@@ -245,6 +249,7 @@ class PartialSyncTestCase(TestCase):
         source.map_column_types_to_target.return_value = {
             'columns': ['"ID" NUMBER'],
             'primary_key': ['"ID"'],
+            'source_column_names': ['foo_column'],
         }
         snowflake = mocked_fastsync_sf.return_value
         snowflake.query.return_value = []
@@ -364,9 +369,9 @@ class PartialSyncTestCase(TestCase):
 
                 test_fast_sync = FastSyncTapMySql({}, {})
 
-                where_clause = 'FOO WHERE'
+                boundary = PartialSyncBoundary('foo_column', '1', '2')
                 actual_file_parts = test_fast_sync.export_source_table_data(
-                    args, tap_id, where_clause)
+                    args, tap_id, boundary)
 
                 call_args = mocked_copy_table.call_args[0]
                 call_kwargs = mocked_copy_table.call_args[1]
@@ -375,7 +380,7 @@ class PartialSyncTestCase(TestCase):
                     'split_large_files': False,
                     'split_file_chunk_size_mb': args.target['split_file_chunk_size_mb'],
                     'split_file_max_chunks': args.target['split_file_max_chunks'],
-                    'where_clause_sql': where_clause
+                    'boundary': boundary,
                 }
 
         self.assertEqual(2, len(call_args))
@@ -516,7 +521,8 @@ class PartialSyncTestCase(TestCase):
                 bookmark = 'foo_bookmark'
                 maped_column_types_to_target = {
                     'columns': ['foo type1', 'bar type2'],
-                    'primary_key': 'foo_primary'
+                    'primary_key': 'foo_primary',
+                    'source_column_names': ['foo_column'],
                 }
 
                 # pylint: disable=cell-var-from-loop
@@ -559,7 +565,7 @@ class PartialSyncTestCase(TestCase):
                     target, runtime_args, maped_column_types_to_target['columns'],
                     maped_column_types_to_target['primary_key'],
                     s3_key_pattern, file_size,
-                    f" WHERE {test_table[1]['column']} >= '{test_table[1]['start_value'][3:]}'",
+                    ' WHERE "FOO_COLUMN" >= \'1\'',
                 )
                 mocked_fastsync_sf.return_value.s3.delete_object.assert_called_once_with(
                     Bucket=args.target['s3_bucket'], Key='FOO_S3_KEYS'

@@ -73,7 +73,7 @@ class SnowflakeSqlClient:
         with self.open_connection(query_tag_props) as connection:
             with connection.cursor(snowflake.connector.DictCursor) as cursor:
                 cursor.execute(query, params)
-                return cursor.fetchall() if cursor.rowcount > 0 else []
+                return cursor.fetchall() if cursor.description else []
 
     def query_with_timeout(self, query, params, timeout_seconds):
         """Execute one lookup within connector and statement deadlines."""
@@ -92,7 +92,7 @@ class SnowflakeSqlClient:
             statement_timeout = max(1, math.ceil(remaining_seconds))
             with connection.cursor(snowflake.connector.DictCursor) as cursor:
                 cursor.execute(query, params, timeout=statement_timeout)
-                return cursor.fetchall() if cursor.rowcount > 0 else []
+                return cursor.fetchall() if cursor.description else []
 
     def execute_transaction(self, queries, query_tag_props=None):
         """Execute all statements in one explicit transaction."""

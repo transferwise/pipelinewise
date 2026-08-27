@@ -379,7 +379,7 @@ class TestDiscoveryPlanning:
             method=method,
             snapshot=v3_snapshot(original),
             context={
-                "where_clause_sql": ' WHERE "ID" >= 10',
+                "start_value": 10,
                 "drop_target": False,
             },
         )
@@ -479,7 +479,6 @@ class TestDiscoveryPlanning:
             method=(PUBLICATION_REPLACEMENT_CTAS if kind == "full" else PUBLICATION_PARTIAL_REPLACEMENT_CTAS),
             snapshot=snapshot,
             context={
-                "where_clause_sql": ' WHERE "ID" >= 1',
                 "drop_target": drop_target,
                 "end_is_unbounded": True,
                 "delete_mode": "hard",
@@ -947,7 +946,7 @@ class TestReplacementSafety:
         attempt = make_attempt(
             spec,
             kind="partial",
-            context={"where_clause_sql": ' WHERE "ID" >= 10', "drop_target": False},
+            context={"start_value": 10, "drop_target": False},
             method=PUBLICATION_PARTIAL_MERGE,
             snapshot=v3_snapshot(spec),
         )
@@ -959,7 +958,13 @@ class TestReplacementSafety:
         assert plan.publication_statements[0].startswith("UPDATE ")
         assert plan.publication_statements[1].startswith("MERGE INTO ")
         assert plan.publication_statements[2].startswith("DELETE FROM ")
-        assert all('"ID" >= 10' in query for query in (plan.publication_statements[0], plan.publication_statements[2]))
+        assert all(
+            '"ID" >= \'10\'' in query
+            for query in (
+                plan.publication_statements[0],
+                plan.publication_statements[2],
+            )
+        )
 
     def test_partial_sync_without_primary_key_fails_before_dml(self, tmp_path, spec):
         """Partial sync without primary key fails before dml."""
@@ -969,7 +974,6 @@ class TestReplacementSafety:
         attempt = make_attempt(
             no_key,
             kind="partial",
-            context={"where_clause_sql": " WHERE 1=1"},
             method=PUBLICATION_PARTIAL_MERGE,
             snapshot=v3_snapshot(no_key),
         )

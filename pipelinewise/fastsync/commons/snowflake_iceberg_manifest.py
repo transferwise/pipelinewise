@@ -27,12 +27,12 @@ _PUBLICATION_FIELDS = frozenset({
     'staging_config',
 })
 _PARTIAL_FIELDS = _PUBLICATION_FIELDS | frozenset({
+    'column_name',
     'delete_mode',
     'drop_target',
     'end_is_unbounded',
     'end_value',
     'start_value',
-    'where_clause_sql',
 })
 _CONVERSION_FIELDS = frozenset({
     'backup_table',
@@ -93,9 +93,19 @@ def _valid_boundary(value: Any) -> bool:
 
 def _validate_partial_fields(value: Dict[str, Any]) -> None:
     _validate_publication_fields(value)
-    if 'where_clause_sql' in value and (
-        not isinstance(value['where_clause_sql'], str)
-        or not value['where_clause_sql'].strip()
+    required_fields = {
+        'column_name',
+        'delete_mode',
+        'drop_target',
+        'end_is_unbounded',
+        'end_value',
+        'start_value',
+    }
+    if not required_fields.issubset(value):
+        raise _invalid_payload()
+    if (
+        not isinstance(value['column_name'], str)
+        or not value['column_name']
     ):
         raise _invalid_payload()
     for name in ('end_is_unbounded', 'drop_target'):
@@ -106,6 +116,10 @@ def _validate_partial_fields(value: Dict[str, Any]) -> None:
     if any(
         name in value and not _valid_boundary(value[name])
         for name in ('start_value', 'end_value')
+    ):
+        raise _invalid_payload()
+    if value['start_value'] is None or value['end_is_unbounded'] != (
+        value['end_value'] is None
     ):
         raise _invalid_payload()
 
@@ -200,7 +214,7 @@ class FullSyncManifestPayload:  # pylint: disable=too-many-instance-attributes
 class PartialSyncManifestPayload(FullSyncManifestPayload):
     """Typed PartialSync boundary and publication context."""
 
-    where_clause_sql: Optional[str] = None
+    column_name: Optional[str] = None
     start_value: Any = None
     end_value: Any = None
     end_is_unbounded: Optional[bool] = None
@@ -220,7 +234,7 @@ class PartialSyncManifestPayload(FullSyncManifestPayload):
             publication_submitted_at=_field(value, 'publication_submitted_at'),
             extensions=_extensions(value, _PARTIAL_FIELDS),
             present_fields=frozenset(value).intersection(_PARTIAL_FIELDS),
-            where_clause_sql=_field(value, 'where_clause_sql'),
+            column_name=_field(value, 'column_name'),
             start_value=_field(value, 'start_value'),
             end_value=_field(value, 'end_value'),
             end_is_unbounded=_field(value, 'end_is_unbounded'),
@@ -239,7 +253,7 @@ class PartialSyncManifestPayload(FullSyncManifestPayload):
                 'publication_query_hash': self.publication_query_hash,
                 'publication_query_type': self.publication_query_type,
                 'publication_submitted_at': self.publication_submitted_at,
-                'where_clause_sql': self.where_clause_sql,
+                'column_name': self.column_name,
                 'start_value': self.start_value,
                 'end_value': self.end_value,
                 'end_is_unbounded': self.end_is_unbounded,

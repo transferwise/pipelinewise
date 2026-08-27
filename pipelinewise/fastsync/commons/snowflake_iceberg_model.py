@@ -7,8 +7,6 @@ from __future__ import annotations
 from copy import deepcopy
 from contextlib import contextmanager
 from dataclasses import dataclass, field, replace
-from datetime import date, datetime, time as datetime_time
-from decimal import Decimal
 from hashlib import sha256
 import fcntl
 import json
@@ -43,6 +41,14 @@ from pipelinewise.fastsync.commons.snowflake_iceberg_versions import (
     is_supported_managed_iceberg_version,
     managed_iceberg_version_spec,
 )
+from pipelinewise.fastsync.commons.snowflake_sql_utils import (
+    quote_identifier,
+    sql_string_literal as _sql_string_literal,
+)
+
+# Preserve the established import surface while keeping the implementation in
+# the dependency-light module used by PartialSync boundary rendering.
+sql_string_literal = _sql_string_literal
 
 
 TABLE_FORMAT_MISSING = 'missing'
@@ -86,16 +92,6 @@ _VALID_PHASES = {
 _IDENTIFIER = r'\s*(?:"((?:""|[^"])*)"|([A-Za-z_][A-Za-z0-9_$]*))\s*'
 _FQTN_PATTERN = re.compile(rf'^{_IDENTIFIER}\.{_IDENTIFIER}\.{_IDENTIFIER}$')
 _COLUMN_PATTERN = re.compile(rf'^{_IDENTIFIER}(.+?)\s*$')
-
-
-def quote_identifier(identifier: str) -> str:
-    """Quote one exact Snowflake identifier."""
-    return '"' + identifier.replace('"', '""') + '"'
-
-
-def sql_string_literal(value: str) -> str:
-    """Quote a Snowflake string literal."""
-    return "'" + value.replace('\\', '\\\\').replace("'", "''") + "'"
 
 
 def _sql_hash(statement: str) -> str:
@@ -201,23 +197,6 @@ def _identifier_from_match(groups: Sequence[Optional[str]]) -> str:
     if quoted is not None:
         return quoted.replace('""', '"')
     return unquoted.upper()
-
-
-def _json_safe_boundary(value: Any) -> Any:
-    """Return stable JSON evidence for a resolved PartialSync boundary."""
-    if value is None or isinstance(value, (bool, int, float, str)):
-        return value
-    if isinstance(value, Decimal):
-        return {'type': 'decimal', 'value': str(value)}
-    if isinstance(value, datetime):
-        return {'type': 'datetime', 'value': value.isoformat()}
-    if isinstance(value, date):
-        return {'type': 'date', 'value': value.isoformat()}
-    if isinstance(value, datetime_time):
-        return {'type': 'time', 'value': value.isoformat()}
-    raise RecoveryManifestError(
-        f'Unsupported PartialSync boundary evidence type: {type(value).__name__}'
-    )
 
 
 @dataclass(frozen=True)

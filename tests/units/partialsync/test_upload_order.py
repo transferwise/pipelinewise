@@ -4,6 +4,9 @@ from unittest import TestCase, mock
 
 from pipelinewise.fastsync.partialsync import mysql_to_snowflake
 from pipelinewise.fastsync.partialsync import postgres_to_snowflake
+from pipelinewise.fastsync.commons.partial_sync_boundary import (
+    PartialSyncBoundary,
+)
 from tests.units.partialsync.utils import PartialSync2SFArgs
 
 
@@ -23,6 +26,7 @@ class PartialSyncUploadOrderTestCase(TestCase):
         grant_error = scenario.get('grant_error')
         table_start_value = scenario.get('table_start_value', '<S>1')
         table_end_value = scenario.get('table_end_value')
+        drop_target_table = scenario.get('drop_target_table', False)
         source_query_result = scenario.get('source_query_result', ((0,),))
         with TemporaryDirectory() as temp_directory:
             file_part = Path(temp_directory, 'part.csv.gz')
@@ -35,7 +39,7 @@ class PartialSyncUploadOrderTestCase(TestCase):
                 'column': 'foo_column',
                 'start_value': table_start_value,
                 'end_value': table_end_value,
-                'drop_target_table': False,
+                'drop_target_table': drop_target_table,
             })
             timeline = []
 
@@ -45,6 +49,7 @@ class PartialSyncUploadOrderTestCase(TestCase):
             source.map_column_types_to_target.return_value = {
                 'columns': ['"ID" NUMBER'],
                 'primary_key': ['"ID"'],
+                'source_column_names': ['foo_column'],
             }
             snowflake = mock.MagicMock()
 
@@ -244,7 +249,9 @@ class PartialSyncUploadOrderTestCase(TestCase):
             tap_class_name,
             table_end_value='<D>SELECT 0',
         )
-        expected_where_clause = " WHERE foo_column >= '1' AND foo_column <= '0'"
+        expected_where_clause = (
+            ' WHERE "FOO_COLUMN" >= \'1\' AND "FOO_COLUMN" <= \'0\''
+        )
 
         self.assertIs(actual['result'], True)
         self.assertEqual(actual['load'].call_args.args[6], expected_where_clause)
@@ -255,7 +262,7 @@ class PartialSyncUploadOrderTestCase(TestCase):
         actual['source'].export_source_table_data.assert_called_once_with(
             runtime_args,
             actual['args'].target.get('tap_id'),
-            expected_where_clause,
+            boundary=PartialSyncBoundary('foo_column', '1', 0),
         )
 
     def _assert_empty_dynamic_boundary_is_successful_noop(self, sync_module, tap_class_name):
@@ -434,6 +441,17 @@ class PartialSyncUploadOrderTestCase(TestCase):
         self._assert_dynamic_zero_end_boundary_is_retained(
             postgres_to_snowflake, 'FastSyncTapPostgres'
         )
+
+    def test_omitted_drop_target_setting_keeps_native_partial_sync_additive(self):
+        """An optional None setting retains the historical False default."""
+        actual = self._run_route(
+            postgres_to_snowflake,
+            'FastSyncTapPostgres',
+            drop_target_table=None,
+        )
+
+        self.assertIs(actual['result'], True)
+        self.assertIs(actual['load'].call_args.args[1].drop_target_table, False)
 
     def test_mariadb_empty_dynamic_boundary_is_successful_noop(self):
         """MariaDB treats a missing dynamic boundary as side-effect-free success."""

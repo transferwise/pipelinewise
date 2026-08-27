@@ -172,8 +172,13 @@ def make_attempt(
     load_id = "1" * 32
     attempt_context = dict(context or {})
     if kind == "partial":
-        attempt_context.setdefault("where_clause_sql", ' WHERE "ID" >= 1')
-        attempt_context.setdefault("end_is_unbounded", True)
+        attempt_context.setdefault("column_name", "ID")
+        attempt_context.setdefault("start_value", 1)
+        attempt_context.setdefault("end_value", None)
+        attempt_context.setdefault(
+            "end_is_unbounded", attempt_context["end_value"] is None
+        )
+        attempt_context.setdefault("drop_target", False)
         attempt_context.setdefault("delete_mode", "hard")
     if phase == PHASE_SUBMITTED:
         attempt_context.setdefault("publication_submitted_at", 1_700_000_000.0)

@@ -90,8 +90,8 @@ def mariadb_json_aliases_enabled(config: Dict) -> bool:
     return (
         str(config.get('engine', '')).lower() == 'mariadb'
         and config.get('target_table_format') == 'iceberg'
+        and isinstance(iceberg_version, int)
         and iceberg_version == 3
-        and not isinstance(iceberg_version, bool)
     )
 
 

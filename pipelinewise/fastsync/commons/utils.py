@@ -286,10 +286,23 @@ def get_expected_s3_key(snowflake, file_part):
 
 def get_expected_s3_keys(snowflake, file_parts: List[str]) -> List[str]:
     """Resolve and validate every deterministic staging key before upload."""
-    s3_keys = [get_expected_s3_key(snowflake, file_part) for file_part in file_parts]
-    if any(not s3_key for s3_key in s3_keys):
+    s3_keys = []
+    seen = set()
+    has_missing = False
+    has_duplicate = False
+    for file_part in file_parts:
+        s3_key = get_expected_s3_key(snowflake, file_part)
+        s3_keys.append(s3_key)
+        if not s3_key:
+            has_missing = True
+        elif s3_key in seen:
+            has_duplicate = True
+        else:
+            seen.add(s3_key)
+
+    if has_missing:
         raise ValueError('Iceberg staging requires deterministic S3 keys')
-    if len(set(s3_keys)) != len(s3_keys):
+    if has_duplicate:
         raise ValueError('Iceberg staging S3 keys must be unique')
     return s3_keys
 
