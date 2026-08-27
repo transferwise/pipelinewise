@@ -91,6 +91,8 @@
 <li class="toctree-l1"><a class="reference internal" href="../concept/fastsync.html">FastSync</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#supported-routes">Supported routes</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#automatic-selection-and-handover">Automatic selection and handover</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#snowflake-iceberg-publication">Snowflake Iceberg publication</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#snowflake-string-widths">Snowflake string widths</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#explicit-fullsync">Explicit FullSync</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#configured-partialsync">Configured PartialSync</a></li>
 </ul>
@@ -141,6 +143,10 @@
 <li class="toctree-l3"><a class="reference internal" href="cli.html#fast-sync"><code class="docutils literal notranslate"><span class="pre">fast_sync</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="cli.html#partial-sync-table"><code class="docutils literal notranslate"><span class="pre">partial_sync_table</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="cli.html#reset-state"><code class="docutils literal notranslate"><span class="pre">reset_state</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="cli.html#target-maintenance">Target maintenance</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="cli.html#copy-native-to-iceberg"><code class="docutils literal notranslate"><span class="pre">copy_native_to_iceberg</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="cli.html#data-diff">Data-diff</a><ul>
@@ -215,7 +221,8 @@
 </li>
 <li class="toctree-l1"><a class="reference internal" href="partial_sync.html">PartialSync behaviour</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="partial_sync.html#range-semantics">Range semantics</a></li>
-<li class="toctree-l2"><a class="reference internal" href="partial_sync.html#merge-outcomes">Merge outcomes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="partial_sync.html#native-table-merge-outcomes">Native-table merge outcomes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="partial_sync.html#managed-iceberg-v3-outcomes">Managed Iceberg v3 outcomes</a></li>
 <li class="toctree-l2"><a class="reference internal" href="partial_sync.html#visual-examples">Visual examples</a></li>
 <li class="toctree-l2"><a class="reference internal" href="partial_sync.html#safety-and-validation">Safety and validation</a></li>
 </ul>
@@ -267,6 +274,9 @@
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="troubleshooting.html#fastsync-errors">FastSync Errors</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="troubleshooting.html#snowflake-varchar-width-is-incompatible">Snowflake VARCHAR width is incompatible</a></li>
+<li class="toctree-l4"><a class="reference internal" href="troubleshooting.html#iceberg-publication-remains-ambiguous">Iceberg publication remains ambiguous</a></li>
+<li class="toctree-l4"><a class="reference internal" href="troubleshooting.html#native-to-iceberg-primary-name-is-absent">Native-to-Iceberg primary name is absent</a></li>
 <li class="toctree-l4"><a class="reference internal" href="troubleshooting.html#table-not-found">Table not found</a></li>
 <li class="toctree-l4"><a class="reference internal" href="troubleshooting.html#failure-to-import-tap-0-tables-discovered">Failure to import tap (0 tables discovered)</a></li>
 </ul>
@@ -604,19 +614,22 @@ and Snowflake targets read <code class="docutils literal notranslate"><span clas
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">data_flattening_max_level</span></code></p></td>
 <td><p>Tap-specific or <code class="docutils literal notranslate"><span class="pre">0</span></code></p></td>
 <td><p>Expands nested objects into columns. <code class="docutils literal notranslate"><span class="pre">0</span></code> keeps flattening disabled;
-higher values can create wide and changing target schemas.</p></td>
+higher values can create wide and changing target schemas. Managed
+Iceberg FastSync requires <code class="docutils literal notranslate"><span class="pre">0</span></code>; Singer-only Iceberg routes retain the
+tap’s normal setting.</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">target_table_format</span></code></p></td>
 <td><p>Omitted</p></td>
 <td><p>Selects <code class="docutils literal notranslate"><span class="pre">native</span></code> or managed <code class="docutils literal notranslate"><span class="pre">iceberg</span></code> Snowflake tables for the
-Singer target path. When omitted, missing tables are native unless the
-deprecated target-level <code class="docutils literal notranslate"><span class="pre">iceberg_create</span></code> setting applies. The setting
-applies to every table in the tap.</p></td>
+Singer target and supported FastSync routes. An omitted value or
+<code class="docutils literal notranslate"><span class="pre">native</span></code> creates native tables; managed Iceberg creation requires
+explicit <code class="docutils literal notranslate"><span class="pre">iceberg</span></code>. The setting applies to every table in the tap.</p></td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">iceberg_version</span></code></p></td>
 <td><p>None</p></td>
-<td><p>Must be integer <code class="docutils literal notranslate"><span class="pre">3</span></code> with <code class="docutils literal notranslate"><span class="pre">target_table_format:</span> <span class="pre">iceberg</span></code> and is
-invalid otherwise.</p></td>
+<td><p>Managed-Iceberg version discriminator. Its only supported value is integer
+<code class="docutils literal notranslate"><span class="pre">3</span></code>; it is required with <code class="docutils literal notranslate"><span class="pre">target_table_format:</span> <span class="pre">iceberg</span></code> and invalid
+otherwise.</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">validate_records</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">false</span></code></p></td>
@@ -646,15 +659,18 @@ invalid otherwise.</p></td>
 </table>
 <div class="admonition important">
 <p class="admonition-title">Important</p>
-<p>Tap-level Iceberg configuration currently provides Singer connector
-groundwork only; it does not enable a complete RDBMS route. FullSync and
-PartialSync with explicit Iceberg configuration fail before changing the
-target. Explicit Iceberg v3 configuration is limited to
-<code class="docutils literal notranslate"><span class="pre">tap-mysql</span></code> (MariaDB/MySQL) and <code class="docutils literal notranslate"><span class="pre">tap-postgres</span></code> with
-<code class="docutils literal notranslate"><span class="pre">target-snowflake</span></code>. It requires <code class="docutils literal notranslate"><span class="pre">data_flattening_max_level:</span> <span class="pre">0</span></code> and
-<code class="docutils literal notranslate"><span class="pre">hard_delete:</span> <span class="pre">true</span></code>; deprecated <code class="docutils literal notranslate"><span class="pre">hard_delete:</span> <span class="pre">false</span></code> is rejected.
-Omitting <code class="docutils literal notranslate"><span class="pre">target_table_format</span></code> creates native tables unless the deprecated
-target-level <code class="docutils literal notranslate"><span class="pre">iceberg_create</span></code> setting applies.</p>
+<p>Any tap whose Singer output is compatible with <code class="docutils literal notranslate"><span class="pre">target-snowflake</span></code> can
+select managed Iceberg v3. FastSync FullSync and PartialSync for managed v3
+remain limited to <code class="docutils literal notranslate"><span class="pre">tap-mysql</span></code> (MariaDB/MySQL) and <code class="docutils literal notranslate"><span class="pre">tap-postgres</span></code>. Every
+explicit v3 route requires <code class="docutils literal notranslate"><span class="pre">hard_delete:</span> <span class="pre">true</span></code>; those two FastSync-capable
+taps also require <code class="docutils literal notranslate"><span class="pre">data_flattening_max_level:</span> <span class="pre">0</span></code>. Singer-only sources retain
+their normal flattening setting, including Salesforce’s default level <code class="docutils literal notranslate"><span class="pre">10</span></code>.
+Native remains the default, and PipelineWise does not convert an existing
+table when the requested format conflicts. Every managed Iceberg version
+other than v3 is rejected before mutation. See <a class="reference internal" href="../connectors/targets/snowflake_iceberg.html#snowflake-iceberg"><span class="std std-ref">Snowflake Iceberg tables</span></a>.</p>
+<p>Managed Iceberg selection is tap-level. Target YAML rejects these keys and
+the removed <code class="docutils literal notranslate"><span class="pre">iceberg_create</span></code> setting. Remove <code class="docutils literal notranslate"><span class="pre">iceberg_create</span></code> and
+configure each managed Iceberg tap before upgrading.</p>
 </div>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
@@ -726,7 +742,10 @@ documented on their connector page.</p>
 </pre></div>
 </div>
 <p><code class="docutils literal notranslate"><span class="pre">id</span></code>, <code class="docutils literal notranslate"><span class="pre">name</span></code>, <code class="docutils literal notranslate"><span class="pre">type</span></code>, and <code class="docutils literal notranslate"><span class="pre">db_conn</span></code> are required. Connection fields are
-target-specific; see <a class="reference internal" href="../connectors/targets.html#targets-list"><span class="std std-ref">Targets (Destinations)</span></a>.</p>
+target-specific; see <a class="reference internal" href="../connectors/targets.html#targets-list"><span class="std std-ref">Targets (Destinations)</span></a>. A Snowflake target can set the optional
+positive integer <code class="docutils literal notranslate"><span class="pre">iceberg_query_history_poll_timeout_seconds</span></code> in <code class="docutils literal notranslate"><span class="pre">db_conn</span></code>.
+It defaults to <code class="docutils literal notranslate"><span class="pre">900</span></code> seconds and bounds query-history recovery after an
+ambiguous FastSync Iceberg publication response.</p>
 </section>
 <section id="secrets-and-validation">
 <h2>Secrets and validation<a class="headerlink" href="#secrets-and-validation" title="Link to this heading"></a></h2>

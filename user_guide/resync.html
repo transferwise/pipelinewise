@@ -91,6 +91,8 @@
 <li class="toctree-l1"><a class="reference internal" href="../concept/fastsync.html">FastSync</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#supported-routes">Supported routes</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#automatic-selection-and-handover">Automatic selection and handover</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#snowflake-iceberg-publication">Snowflake Iceberg publication</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#snowflake-string-widths">Snowflake string widths</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#explicit-fullsync">Explicit FullSync</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#configured-partialsync">Configured PartialSync</a></li>
 </ul>
@@ -141,6 +143,10 @@
 <li class="toctree-l3"><a class="reference internal" href="cli.html#fast-sync"><code class="docutils literal notranslate"><span class="pre">fast_sync</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="cli.html#partial-sync-table"><code class="docutils literal notranslate"><span class="pre">partial_sync_table</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="cli.html#reset-state"><code class="docutils literal notranslate"><span class="pre">reset_state</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="cli.html#target-maintenance">Target maintenance</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="cli.html#copy-native-to-iceberg"><code class="docutils literal notranslate"><span class="pre">copy_native_to_iceberg</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="cli.html#data-diff">Data-diff</a><ul>
@@ -215,7 +221,8 @@
 </li>
 <li class="toctree-l1"><a class="reference internal" href="partial_sync.html">PartialSync behaviour</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="partial_sync.html#range-semantics">Range semantics</a></li>
-<li class="toctree-l2"><a class="reference internal" href="partial_sync.html#merge-outcomes">Merge outcomes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="partial_sync.html#native-table-merge-outcomes">Native-table merge outcomes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="partial_sync.html#managed-iceberg-v3-outcomes">Managed Iceberg v3 outcomes</a></li>
 <li class="toctree-l2"><a class="reference internal" href="partial_sync.html#visual-examples">Visual examples</a></li>
 <li class="toctree-l2"><a class="reference internal" href="partial_sync.html#safety-and-validation">Safety and validation</a></li>
 </ul>
@@ -267,6 +274,9 @@
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="troubleshooting.html#fastsync-errors">FastSync Errors</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="troubleshooting.html#snowflake-varchar-width-is-incompatible">Snowflake VARCHAR width is incompatible</a></li>
+<li class="toctree-l4"><a class="reference internal" href="troubleshooting.html#iceberg-publication-remains-ambiguous">Iceberg publication remains ambiguous</a></li>
+<li class="toctree-l4"><a class="reference internal" href="troubleshooting.html#native-to-iceberg-primary-name-is-absent">Native-to-Iceberg primary name is absent</a></li>
 <li class="toctree-l4"><a class="reference internal" href="troubleshooting.html#table-not-found">Table not found</a></li>
 <li class="toctree-l4"><a class="reference internal" href="troubleshooting.html#failure-to-import-tap-0-tables-discovered">Failure to import tap (0 tables discovered)</a></li>
 </ul>
@@ -421,6 +431,13 @@ source and target impact.</p>
 <p>A table with <code class="docutils literal notranslate"><span class="pre">sync_start_from</span></code> uses PartialSync instead of FullSync. MariaDB,
 MySQL, and PostgreSQL sources can use <code class="docutils literal notranslate"><span class="pre">replica_host</span></code> for the FastSync read while
 ongoing LOG_BASED replication remains on the primary.</p>
+<p>For a managed Iceberg v3 target, an exactly compatible table uses
+<code class="docutils literal notranslate"><span class="pre">INSERT</span> <span class="pre">OVERWRITE</span></code> and retains its object identity. A new nullable column is
+added before overwrite. Other mismatches require guarded replacement by the
+table’s current owning account role; database-role ownership is not supported.
+Ownership is retained, but the new object resets history and can change its base
+location; visible unsupported dependencies stop the operation first. See
+<a class="reference internal" href="../connectors/targets/snowflake_iceberg.html#snowflake-iceberg"><span class="std std-ref">Snowflake Iceberg tables</span></a>.</p>
 </section>
 <section id="partial-repair">
 <h2>Partial repair<a class="headerlink" href="#partial-repair" title="Link to this heading"></a></h2>
@@ -440,9 +457,13 @@ schema and delete behaviour.</p>
 </section>
 <section id="failure-and-validation">
 <h2>Failure and validation<a class="headerlink" href="#failure-and-validation" title="Link to this heading"></a></h2>
-<p>If a resync fails, preserve the log, generated staging objects, target object
-names, and state backup until the target publication state is understood. Do not
-advance state past an unpublished table.</p>
+<p>If a managed-Iceberg resync fails, preserve the log, generated staging objects,
+<code class="docutils literal notranslate"><span class="pre">iceberg-recovery-&lt;hash&gt;.json</span></code> stream manifest,
+<code class="docutils literal notranslate"><span class="pre">iceberg-fastsync-target-&lt;hash&gt;.json</span></code> target pointer, target object names, and
+state backup until the publication state is understood. Retry the same operation
+from the same generated target runtime directory and with unchanged source,
+target, staging, role, and transformation identity before editing state or
+removing recovery evidence. Do not advance state past an unpublished table.</p>
 <p>After success, verify exact primary keys or a deterministic reconciliation,
 critical values, target grants, and the next Singer run. Keep the state backup
 until ongoing replication advances normally.</p>

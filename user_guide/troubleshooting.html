@@ -91,6 +91,8 @@
 <li class="toctree-l1"><a class="reference internal" href="../concept/fastsync.html">FastSync</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#supported-routes">Supported routes</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#automatic-selection-and-handover">Automatic selection and handover</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#snowflake-iceberg-publication">Snowflake Iceberg publication</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#snowflake-string-widths">Snowflake string widths</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#explicit-fullsync">Explicit FullSync</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#configured-partialsync">Configured PartialSync</a></li>
 </ul>
@@ -141,6 +143,10 @@
 <li class="toctree-l3"><a class="reference internal" href="cli.html#fast-sync"><code class="docutils literal notranslate"><span class="pre">fast_sync</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="cli.html#partial-sync-table"><code class="docutils literal notranslate"><span class="pre">partial_sync_table</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="cli.html#reset-state"><code class="docutils literal notranslate"><span class="pre">reset_state</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="cli.html#target-maintenance">Target maintenance</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="cli.html#copy-native-to-iceberg"><code class="docutils literal notranslate"><span class="pre">copy_native_to_iceberg</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="cli.html#data-diff">Data-diff</a><ul>
@@ -215,7 +221,8 @@
 </li>
 <li class="toctree-l1"><a class="reference internal" href="partial_sync.html">PartialSync behaviour</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="partial_sync.html#range-semantics">Range semantics</a></li>
-<li class="toctree-l2"><a class="reference internal" href="partial_sync.html#merge-outcomes">Merge outcomes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="partial_sync.html#native-table-merge-outcomes">Native-table merge outcomes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="partial_sync.html#managed-iceberg-v3-outcomes">Managed Iceberg v3 outcomes</a></li>
 <li class="toctree-l2"><a class="reference internal" href="partial_sync.html#visual-examples">Visual examples</a></li>
 <li class="toctree-l2"><a class="reference internal" href="partial_sync.html#safety-and-validation">Safety and validation</a></li>
 </ul>
@@ -267,6 +274,9 @@
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="#fastsync-errors">FastSync Errors</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#snowflake-varchar-width-is-incompatible">Snowflake VARCHAR width is incompatible</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#iceberg-publication-remains-ambiguous">Iceberg publication remains ambiguous</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#native-to-iceberg-primary-name-is-absent">Native-to-Iceberg primary name is absent</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#table-not-found">Table not found</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#failure-to-import-tap-0-tables-discovered">Failure to import tap (0 tables discovered)</a></li>
 </ul>
@@ -404,7 +414,19 @@ state until the unavailable boundary has been identified.</p>
 <td><p>Discovery / FastSync</p></td>
 <td><p>Source name and replication-user permissions.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#troubleshooting-logging"><span class="std std-ref">Stale running log</span></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#troubleshooting-iceberg-publication"><span class="std std-ref">Iceberg publication remains ambiguous</span></a></p></td>
+<td><p>Snowflake FastSync</p></td>
+<td><p>Recovery manifest, query tag, and Snowflake query history.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#troubleshooting-snowflake-varchar-width"><span class="std std-ref">Snowflake VARCHAR width is incompatible</span></a></p></td>
+<td><p>Snowflake FastSync / Singer</p></td>
+<td><p>Physical column width and target-role DDL privileges.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#troubleshooting-iceberg-conversion-missing-primary"><span class="std std-ref">Native-to-Iceberg primary name is absent</span></a></p></td>
+<td><p>Snowflake conversion</p></td>
+<td><p>Conversion manifest and <code class="docutils literal notranslate"><span class="pre">_NATIVE</span></code> / <code class="docutils literal notranslate"><span class="pre">_ICEBERG</span></code> companions.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#troubleshooting-logging"><span class="std std-ref">Stale running log</span></a></p></td>
 <td><p>Process lifecycle</p></td>
 <td><p>PID file and complete process tree.</p></td>
 </tr>
@@ -747,6 +769,71 @@ replication slot.</p>
 </section>
 <section id="fastsync-errors">
 <h3>FastSync Errors<a class="headerlink" href="#fastsync-errors" title="Link to this heading"></a></h3>
+<section id="snowflake-varchar-width-is-incompatible">
+<span id="troubleshooting-snowflake-varchar-width"></span><h4>Snowflake VARCHAR width is incompatible<a class="headerlink" href="#snowflake-varchar-width-is-incompatible" title="Link to this heading"></a></h4>
+<p>Snowflake FastSync stages MariaDB/MySQL and PostgreSQL string-like and fallback
+types as <code class="docutils literal notranslate"><span class="pre">VARCHAR(134217728)</span></code>. Managed Iceberg v3 also requires every existing
+string column to have <code class="docutils literal notranslate"><span class="pre">CHARACTER_MAXIMUM_LENGTH</span></code> 134217728.</p>
+<p>For a managed Iceberg v3 target, widen the reported column with <code class="docutils literal notranslate"><span class="pre">ALTER</span> <span class="pre">ICEBERG</span>
+<span class="pre">TABLE</span> <span class="pre">...</span> <span class="pre">ALTER</span> <span class="pre">COLUMN</span> <span class="pre">...</span> <span class="pre">SET</span> <span class="pre">DATA</span> <span class="pre">TYPE</span> <span class="pre">VARCHAR(134217728)</span></code> or recreate the
+table, then retry. PipelineWise does not change existing Iceberg widths.</p>
+<p>For a native PartialSync target, PipelineWise widens a compatible narrow text
+column before the merge. If that DDL fails, use a role authorized to alter the
+table or widen it manually, then retry. The failed attempt does not run the merge
+or advance state. A non-text target type requires a FullSync or an explicit,
+reviewed schema migration.</p>
+<p><code class="docutils literal notranslate"><span class="pre">VARCHAR(134217728)</span></code> remains subject to Snowflake’s 128 MB encoded-value limit.
+If the maximum-width column still rejects a value, measure its encoded byte size
+and reduce, split, or exclude it at the source.</p>
+</section>
+<section id="iceberg-publication-remains-ambiguous">
+<span id="troubleshooting-iceberg-publication"></span><h4>Iceberg publication remains ambiguous<a class="headerlink" href="#iceberg-publication-remains-ambiguous" title="Link to this heading"></a></h4>
+<p>A Snowflake connection can fail after a publication statement commits but before
+the client receives its response. PipelineWise keeps the source state unchanged
+and records the attempt in an <code class="docutils literal notranslate"><span class="pre">iceberg-recovery-&lt;hash&gt;.json</span></code> stream manifest
+and <code class="docutils literal notranslate"><span class="pre">iceberg-fastsync-target-&lt;hash&gt;.json</span></code> target pointer under the generated
+target runtime directory at <code class="docutils literal notranslate"><span class="pre">$PIPELINEWISE_CONFIG_DIRECTORY/&lt;target_id&gt;/</span></code>.</p>
+<p>Stop other writers to the target table and retry the same command without editing
+state, dropping staging objects, or deleting either recovery file. Use the same
+generated target runtime directory, tap/source identity, target mapping and role,
+staging configuration, and transformations. For CTAS or <code class="docutils literal notranslate"><span class="pre">INSERT</span> <span class="pre">OVERWRITE</span></code>,
+PipelineWise polls query history every five seconds for up to 900 seconds by
+default. Each lookup scans at most 10,000 visible queries from five minutes
+before the persisted submission time and can observe the publication while it
+is active. Snowflake connector timeouts are best-effort, so a call can make the
+observed wall-clock duration exceed the nominal budget. PipelineWise requires
+the exact query tag, verifies the target, and resumes finalization. For
+PartialSync, it replays the persisted range transaction deterministically.
+Query-history visibility can lag, so a later retry may be required while
+Snowflake retains the Information Schema query history.</p>
+<p>Set the positive integer <code class="docutils literal notranslate"><span class="pre">iceberg_query_history_poll_timeout_seconds</span></code> in the
+Snowflake target’s <code class="docutils literal notranslate"><span class="pre">db_conn</span></code> when 900 seconds is insufficient. The setting is
+not part of recovery identity, so it can be increased before retrying the same
+command unchanged.</p>
+<p>Query-history visibility timeouts and lookup failures are reported as retryable
+publication ambiguity. Their failure message confirms that the recovery files
+and staging table were preserved and instructs the operator to retry the same
+FastSync command unchanged; PipelineWise does not automatically republish or
+advance state.</p>
+<p>If reconciliation remains ambiguous, preserve the stream manifest, target
+pointer, staging table, S3 keys, query tag, target identity, and logs. Inspect
+them with a role that can see all relevant table metadata and query history
+before changing target objects. See <a class="reference internal" href="../connectors/targets/snowflake_iceberg.html#snowflake-iceberg-recovery"><span class="std std-ref">Concurrency and recovery</span></a>.</p>
+</section>
+<section id="native-to-iceberg-primary-name-is-absent">
+<span id="troubleshooting-iceberg-conversion-missing-primary"></span><h4>Native-to-Iceberg primary name is absent<a class="headerlink" href="#native-to-iceberg-primary-name-is-absent" title="Link to this heading"></a></h4>
+<p><code class="docutils literal notranslate"><span class="pre">copy_native_to_iceberg</span> <span class="pre">--eventual</span> <span class="pre">iceberg</span></code> uses one statement to rename the
+native table to <code class="docutils literal notranslate"><span class="pre">&lt;table&gt;_NATIVE</span></code> and another to promote
+<code class="docutils literal notranslate"><span class="pre">&lt;table&gt;_ICEBERG</span></code>. Rollback likewise uses two statements. The primary name is
+absent between them, and an interruption can extend that reader outage until
+recovery runs.</p>
+<p>Keep every reader and writer stopped. Retry the identical command from the same
+imported target runtime directory with the same table, <code class="docutils literal notranslate"><span class="pre">--eventual</span></code> value,
+target identity, and account role. Do not rename or drop companion tables and do
+not delete or edit the recovery manifest. If PipelineWise cannot prove one safe
+table state, inspect the primary, <code class="docutils literal notranslate"><span class="pre">_NATIVE</span></code>, <code class="docutils literal notranslate"><span class="pre">_ICEBERG</span></code>, and manifest before
+making a manual change. See <a class="reference internal" href="../connectors/targets/snowflake_iceberg.html#snowflake-iceberg"><span class="std std-ref">Snowflake Iceberg tables</span></a>.</p>
+</section>
 <section id="table-not-found">
 <span id="troubleshooting-fastsync-table-not-found"></span><h4>Table not found<a class="headerlink" href="#table-not-found" title="Link to this heading"></a></h4>
 <p><em>Log message:</em></p>

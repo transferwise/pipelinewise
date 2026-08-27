@@ -91,6 +91,8 @@
 <li class="toctree-l1"><a class="reference internal" href="../concept/fastsync.html">FastSync</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#supported-routes">Supported routes</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#automatic-selection-and-handover">Automatic selection and handover</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#snowflake-iceberg-publication">Snowflake Iceberg publication</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#snowflake-string-widths">Snowflake string widths</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#explicit-fullsync">Explicit FullSync</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#configured-partialsync">Configured PartialSync</a></li>
 </ul>
@@ -141,6 +143,10 @@
 <li class="toctree-l3"><a class="reference internal" href="#fast-sync"><code class="docutils literal notranslate"><span class="pre">fast_sync</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#partial-sync-table"><code class="docutils literal notranslate"><span class="pre">partial_sync_table</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#reset-state"><code class="docutils literal notranslate"><span class="pre">reset_state</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#target-maintenance">Target maintenance</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#copy-native-to-iceberg"><code class="docutils literal notranslate"><span class="pre">copy_native_to_iceberg</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="#data-diff">Data-diff</a><ul>
@@ -215,7 +221,8 @@
 </li>
 <li class="toctree-l1"><a class="reference internal" href="partial_sync.html">PartialSync behaviour</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="partial_sync.html#range-semantics">Range semantics</a></li>
-<li class="toctree-l2"><a class="reference internal" href="partial_sync.html#merge-outcomes">Merge outcomes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="partial_sync.html#native-table-merge-outcomes">Native-table merge outcomes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="partial_sync.html#managed-iceberg-v3-outcomes">Managed Iceberg v3 outcomes</a></li>
 <li class="toctree-l2"><a class="reference internal" href="partial_sync.html#visual-examples">Visual examples</a></li>
 <li class="toctree-l2"><a class="reference internal" href="partial_sync.html#safety-and-validation">Safety and validation</a></li>
 </ul>
@@ -267,6 +274,9 @@
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="troubleshooting.html#fastsync-errors">FastSync Errors</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="troubleshooting.html#snowflake-varchar-width-is-incompatible">Snowflake VARCHAR width is incompatible</a></li>
+<li class="toctree-l4"><a class="reference internal" href="troubleshooting.html#iceberg-publication-remains-ambiguous">Iceberg publication remains ambiguous</a></li>
+<li class="toctree-l4"><a class="reference internal" href="troubleshooting.html#native-to-iceberg-primary-name-is-absent">Native-to-Iceberg primary name is absent</a></li>
 <li class="toctree-l4"><a class="reference internal" href="troubleshooting.html#table-not-found">Table not found</a></li>
 <li class="toctree-l4"><a class="reference internal" href="troubleshooting.html#failure-to-import-tap-0-tables-discovered">Failure to import tap (0 tables discovered)</a></li>
 </ul>
@@ -412,23 +422,27 @@ reconciliation failure; automation must retain that exit status and the run log.
 <td><p>Repair one bounded source range.</p></td>
 <td><p>Merges target data; can update state.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">reset_state</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">copy_native_to_iceberg</span></code></p></td>
+<td><p>Build or promote one managed Iceberg v3 copy.</p></td>
+<td><p>Creates companion tables; can rename the live table.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">reset_state</span></code></p></td>
 <td><p>Move CDC state after a controlled switchover.</p></td>
 <td><p>Changes bookmarks without copying data.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">encrypt_string</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">encrypt_string</span></code></p></td>
 <td><p>Produce an Ansible Vault YAML value.</p></td>
 <td><p>No pipeline state.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">list_data_diff_checks</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">list_data_diff_checks</span></code></p></td>
 <td><p>Inspect persisted data-diff definitions and coverage.</p></td>
 <td><p>No.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">run_data_diff_checks</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">run_data_diff_checks</span></code></p></td>
 <td><p>Run due data-diff checks.</p></td>
 <td><p>Persists attempts and coverage.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">rerun_data_diff_check</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">rerun_data_diff_check</span></code></p></td>
 <td><p>Re-run one failed immutable window.</p></td>
 <td><p>Persists a remediation attempt.</p></td>
 </tr>
@@ -601,6 +615,36 @@ copying rows; an incorrect mapping can skip data permanently.</p>
 <p>For MariaDB/MySQL, <code class="docutils literal notranslate"><span class="pre">switch_over_data_file</span></code> in <code class="docutils literal notranslate"><span class="pre">config.yml</span></code> points to JSON
 that maps the new host to the old/new identifiers, hosts, timestamp, and binlog
 positions. Back up state and verify target continuity after the first run.</p>
+</section>
+</section>
+<section id="target-maintenance">
+<h2>Target maintenance<a class="headerlink" href="#target-maintenance" title="Link to this heading"></a></h2>
+<section id="copy-native-to-iceberg">
+<span id="cli-copy-native-to-iceberg"></span><h3><code class="docutils literal notranslate"><span class="pre">copy_native_to_iceberg</span></code><a class="headerlink" href="#copy-native-to-iceberg" title="Link to this heading"></a></h3>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pipelinewise<span class="w"> </span>copy_native_to_iceberg<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--target<span class="w"> </span>&lt;target_id&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--table<span class="w"> </span>&lt;database.schema.table&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--eventual<span class="w"> </span>native<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iceberg-version<span class="w"> </span><span class="m">3</span>
+</pre></div>
+</div>
+<p>Creates and validates a managed Iceberg v3 copy using an imported
+<code class="docutils literal notranslate"><span class="pre">target-snowflake</span></code> configuration. <code class="docutils literal notranslate"><span class="pre">--iceberg-version</span></code> is required and accepts
+only <code class="docutils literal notranslate"><span class="pre">3</span></code>. <code class="docutils literal notranslate"><span class="pre">--eventual</span> <span class="pre">native</span></code> is the default and leaves the original table
+live with an <code class="docutils literal notranslate"><span class="pre">_ICEBERG</span></code> companion. Selecting <code class="docutils literal notranslate"><span class="pre">--eventual</span> <span class="pre">iceberg</span></code> renames the
+original to <code class="docutils literal notranslate"><span class="pre">_NATIVE</span></code> and promotes the Iceberg table with a second statement.</p>
+<p>Stop PipelineWise and every other writer to the table before either mode, then
+keep them stopped until data and metadata are validated. <code class="docutils literal notranslate"><span class="pre">--eventual</span> <span class="pre">iceberg</span></code>
+also requires a controlled reader outage: stop dashboards, transformations,
+ad-hoc queries, and other readers before cutover. The primary table name is
+temporarily absent between the two promotion statements and between the two
+rollback statements. An interruption can leave it absent until the identical
+command completes recovery.</p>
+<p>Retry from the same imported target runtime directory with the same table,
+<code class="docutils literal notranslate"><span class="pre">--eventual</span></code> value, target account/database/user, and account role before
+resuming readers or writers. Do not delete its recovery manifest or companion
+tables. See <a class="reference internal" href="../connectors/targets/snowflake_iceberg.html#snowflake-iceberg"><span class="std std-ref">Snowflake Iceberg tables</span></a> for preflight, unsupported metadata, and
+rollback behaviour.</p>
 </section>
 </section>
 <section id="data-diff">

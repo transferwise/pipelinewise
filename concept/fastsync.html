@@ -91,6 +91,8 @@
 <li class="toctree-l1 current"><a class="current reference internal" href="#">FastSync</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#supported-routes">Supported routes</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#automatic-selection-and-handover">Automatic selection and handover</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#snowflake-iceberg-publication">Snowflake Iceberg publication</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#snowflake-string-widths">Snowflake string widths</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#explicit-fullsync">Explicit FullSync</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#configured-partialsync">Configured PartialSync</a></li>
 </ul>
@@ -141,6 +143,10 @@
 <li class="toctree-l3"><a class="reference internal" href="../user_guide/cli.html#fast-sync"><code class="docutils literal notranslate"><span class="pre">fast_sync</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../user_guide/cli.html#partial-sync-table"><code class="docutils literal notranslate"><span class="pre">partial_sync_table</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../user_guide/cli.html#reset-state"><code class="docutils literal notranslate"><span class="pre">reset_state</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/cli.html#target-maintenance">Target maintenance</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../user_guide/cli.html#copy-native-to-iceberg"><code class="docutils literal notranslate"><span class="pre">copy_native_to_iceberg</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="../user_guide/cli.html#data-diff">Data-diff</a><ul>
@@ -215,7 +221,8 @@
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/partial_sync.html">PartialSync behaviour</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="../user_guide/partial_sync.html#range-semantics">Range semantics</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../user_guide/partial_sync.html#merge-outcomes">Merge outcomes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/partial_sync.html#native-table-merge-outcomes">Native-table merge outcomes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/partial_sync.html#managed-iceberg-v3-outcomes">Managed Iceberg v3 outcomes</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../user_guide/partial_sync.html#visual-examples">Visual examples</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../user_guide/partial_sync.html#safety-and-validation">Safety and validation</a></li>
 </ul>
@@ -267,6 +274,9 @@
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="../user_guide/troubleshooting.html#fastsync-errors">FastSync Errors</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../user_guide/troubleshooting.html#snowflake-varchar-width-is-incompatible">Snowflake VARCHAR width is incompatible</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../user_guide/troubleshooting.html#iceberg-publication-remains-ambiguous">Iceberg publication remains ambiguous</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../user_guide/troubleshooting.html#native-to-iceberg-primary-name-is-absent">Native-to-Iceberg primary name is absent</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../user_guide/troubleshooting.html#table-not-found">Table not found</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../user_guide/troubleshooting.html#failure-to-import-tap-0-tables-discovered">Failure to import tap (0 tables discovered)</a></li>
 </ul>
@@ -385,14 +395,16 @@ database export, staging, copy, and merge operations. It has two components:</p>
 <h2>Supported routes<a class="headerlink" href="#supported-routes" title="Link to this heading"></a></h2>
 <table class="docutils align-default" style="width: 100%">
 <colgroup>
-<col style="width: 28.0%" />
-<col style="width: 28.0%" />
+<col style="width: 23.0%" />
 <col style="width: 22.0%" />
-<col style="width: 22.0%" />
+<col style="width: 25.0%" />
+<col style="width: 15.0%" />
+<col style="width: 15.0%" />
 </colgroup>
 <thead>
 <tr class="row-odd"><th class="head"><p>Source</p></th>
 <th class="head"><p>Target</p></th>
+<th class="head"><p>Table formats</p></th>
 <th class="head"><p>FullSync</p></th>
 <th class="head"><p>PartialSync</p></th>
 </tr>
@@ -400,39 +412,42 @@ database export, staging, copy, and merge operations. It has two components:</p>
 <tbody>
 <tr class="row-even"><td><p>MariaDB / MySQL</p></td>
 <td><p>Snowflake</p></td>
+<td><p>Native, managed Iceberg v3</p></td>
 <td><p>Yes</p></td>
 <td><p>Yes</p></td>
 </tr>
 <tr class="row-odd"><td><p>PostgreSQL</p></td>
 <td><p>Snowflake</p></td>
+<td><p>Native, managed Iceberg v3</p></td>
 <td><p>Yes</p></td>
 <td><p>Yes</p></td>
 </tr>
 <tr class="row-even"><td><p>MongoDB</p></td>
 <td><p>Snowflake</p></td>
+<td><p>Native</p></td>
 <td><p>Yes</p></td>
 <td><p>No</p></td>
 </tr>
 <tr class="row-odd"><td><p>MariaDB / MySQL</p></td>
 <td><p>PostgreSQL</p></td>
+<td><p>Native</p></td>
 <td><p>Yes</p></td>
 <td><p>No</p></td>
 </tr>
 <tr class="row-even"><td><p>PostgreSQL</p></td>
 <td><p>PostgreSQL</p></td>
+<td><p>Native</p></td>
 <td><p>Yes</p></td>
 <td><p>No</p></td>
 </tr>
 <tr class="row-odd"><td><p>MongoDB</p></td>
 <td><p>PostgreSQL</p></td>
+<td><p>Native</p></td>
 <td><p>Yes</p></td>
 <td><p>No</p></td>
 </tr>
 </tbody>
 </table>
-<p>The Snowflake rows currently cover native tables only. With explicit
-<code class="docutils literal notranslate"><span class="pre">target_table_format:</span> <span class="pre">iceberg</span></code>, FullSync and PartialSync fail before target
-mutation and do not fall back to Singer.</p>
 <p>Endpoint support status from <a class="reference internal" href="../connectors/index.html#connector-support"><span class="std std-ref">Connectors</span></a> still applies. For a
 route without a FastSync component, a normal <code class="docutils literal notranslate"><span class="pre">run_tap</span></code> falls back to Singer.
 The explicit <code class="docutils literal notranslate"><span class="pre">fast_sync</span></code> command instead fails without loading data.</p>
@@ -450,6 +465,45 @@ and starts the Singer portion of the same <code class="docutils literal notransl
 or log-based tables. It does not wait for the next scheduled launch.</p>
 <p>If FullSync fails, Singer does not advance that table past an incomplete initial
 load. Restart the same command after correcting the failure.</p>
+</section>
+<section id="snowflake-iceberg-publication">
+<h2>Snowflake Iceberg publication<a class="headerlink" href="#snowflake-iceberg-publication" title="Link to this heading"></a></h2>
+<p>MariaDB/MySQL and PostgreSQL FastSync use native staging for managed Iceberg v3.
+A missing table is created through explicit-schema CTAS. An exactly compatible
+FullSync target uses <code class="docutils literal notranslate"><span class="pre">INSERT</span> <span class="pre">OVERWRITE</span></code>; a compatible new nullable column is
+added first. Other FullSync mismatches require guarded replacement. PartialSync
+uses transactional range DML and requires a primary key.</p>
+<p>The route requires explicit <code class="docutils literal notranslate"><span class="pre">target_table_format:</span> <span class="pre">iceberg</span></code>,
+<code class="docutils literal notranslate"><span class="pre">iceberg_version:</span> <span class="pre">3</span></code>, <code class="docutils literal notranslate"><span class="pre">data_flattening_max_level:</span> <span class="pre">0</span></code>, and
+<code class="docutils literal notranslate"><span class="pre">hard_delete:</span> <span class="pre">true</span></code>. Native remains the default. See
+<a class="reference internal" href="../connectors/targets/snowflake_iceberg.html#snowflake-iceberg"><span class="std std-ref">Snowflake Iceberg tables</span></a> for metadata limits, writer exclusion, and recovery.
+After an eligible initial load, Singer continues LOG_BASED or INCREMENTAL
+replication against the same managed-v3 table in the same run.
+FastSync availability and its zero-flattening requirement are specific to these
+routes. A compatible Singer-only source such as Salesforce can load managed v3
+through <code class="docutils literal notranslate"><span class="pre">target-snowflake</span></code> without gaining a FastSync component; it retains
+its normal flattening setting, still requires <code class="docutils literal notranslate"><span class="pre">hard_delete:</span> <span class="pre">true</span></code>, and sends
+<code class="docutils literal notranslate"><span class="pre">FULL_TABLE</span></code> streams through Singer.</p>
+</section>
+<section id="snowflake-string-widths">
+<h2>Snowflake string widths<a class="headerlink" href="#snowflake-string-widths" title="Link to this heading"></a></h2>
+<p>MariaDB/MySQL and PostgreSQL FastSync declare string staging and new-target
+columns as <code class="docutils literal notranslate"><span class="pre">VARCHAR(134217728)</span></code> for both native and managed Iceberg v3 routes.
+This applies to character and text families, MariaDB/MySQL blob and enum types,
+and the fallback for an otherwise unmapped source type. It avoids Snowflake’s
+narrower 16,777,216-character default for a bare <code class="docutils literal notranslate"><span class="pre">VARCHAR</span></code>.</p>
+<p>The declared limit does not remove Snowflake’s 128 MB encoded-value limit, so a
+value can reach the byte limit before the character limit when it contains
+multi-byte characters. Values above Snowflake’s maximum still fail while loading
+the native staging table, before publication or state advancement.
+See Snowflake’s <a class="reference external" href="https://docs.snowflake.com/en/sql-reference/data-types-text">string and binary data type reference</a>.</p>
+<p>An existing native PartialSync target whose compatible text column is narrower
+is widened before the merge. Existing managed Iceberg v3 string columns must
+already use the maximum width; see <a class="reference internal" href="../connectors/targets/snowflake_iceberg.html#snowflake-iceberg"><span class="std std-ref">Snowflake Iceberg tables</span></a>.</p>
+<p>Singer schema evolution has a different existing-native policy:
+<code class="docutils literal notranslate"><span class="pre">target-snowflake</span></code> uses the maximum width for new string columns but does not
+widen or version a compatible existing native string column solely because of
+its declared width. See <a class="reference internal" href="../connectors/targets/snowflake.html#target-snowflake"><span class="std std-ref">Snowflake target</span></a>.</p>
 </section>
 <section id="explicit-fullsync">
 <h2>Explicit FullSync<a class="headerlink" href="#explicit-fullsync" title="Link to this heading"></a></h2>

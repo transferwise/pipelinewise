@@ -91,6 +91,8 @@
 <li class="toctree-l1"><a class="reference internal" href="../../concept/fastsync.html">FastSync</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="../../concept/fastsync.html#supported-routes">Supported routes</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../concept/fastsync.html#automatic-selection-and-handover">Automatic selection and handover</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../concept/fastsync.html#snowflake-iceberg-publication">Snowflake Iceberg publication</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../concept/fastsync.html#snowflake-string-widths">Snowflake string widths</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../concept/fastsync.html#explicit-fullsync">Explicit FullSync</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../concept/fastsync.html#configured-partialsync">Configured PartialSync</a></li>
 </ul>
@@ -141,6 +143,10 @@
 <li class="toctree-l3"><a class="reference internal" href="../../user_guide/cli.html#fast-sync"><code class="docutils literal notranslate"><span class="pre">fast_sync</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../user_guide/cli.html#partial-sync-table"><code class="docutils literal notranslate"><span class="pre">partial_sync_table</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../user_guide/cli.html#reset-state"><code class="docutils literal notranslate"><span class="pre">reset_state</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/cli.html#target-maintenance">Target maintenance</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/cli.html#copy-native-to-iceberg"><code class="docutils literal notranslate"><span class="pre">copy_native_to_iceberg</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/cli.html#data-diff">Data-diff</a><ul>
@@ -215,7 +221,8 @@
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/partial_sync.html">PartialSync behaviour</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/partial_sync.html#range-semantics">Range semantics</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../../user_guide/partial_sync.html#merge-outcomes">Merge outcomes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/partial_sync.html#native-table-merge-outcomes">Native-table merge outcomes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/partial_sync.html#managed-iceberg-v3-outcomes">Managed Iceberg v3 outcomes</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/partial_sync.html#visual-examples">Visual examples</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/partial_sync.html#safety-and-validation">Safety and validation</a></li>
 </ul>
@@ -267,6 +274,9 @@
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="../../user_guide/troubleshooting.html#fastsync-errors">FastSync Errors</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../user_guide/troubleshooting.html#snowflake-varchar-width-is-incompatible">Snowflake VARCHAR width is incompatible</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../user_guide/troubleshooting.html#iceberg-publication-remains-ambiguous">Iceberg publication remains ambiguous</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../user_guide/troubleshooting.html#native-to-iceberg-primary-name-is-absent">Native-to-Iceberg primary name is absent</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../user_guide/troubleshooting.html#table-not-found">Table not found</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../user_guide/troubleshooting.html#failure-to-import-tap-0-tables-discovered">Failure to import tap (0 tables discovered)</a></li>
 </ul>
@@ -367,13 +377,14 @@ wal2json logical replication.</p>
 <thead>
 <tr class="row-odd"><th class="head"><p>Source</p></th>
 <th class="head"><p>Status</p></th>
-<th class="head"><p>Native transfer</p></th>
+<th class="head"><p>Bulk transfer</p></th>
 </tr>
 </thead>
 <tbody>
 <tr class="row-even"><td><p>PostgreSQL</p></td>
 <td><p>Available</p></td>
-<td><p>FullSync to PostgreSQL or Snowflake; PartialSync to Snowflake</p></td>
+<td><p>FullSync to PostgreSQL or Snowflake; PartialSync to Snowflake, including
+managed Iceberg v3</p></td>
 </tr>
 </tbody>
 </table>
@@ -478,6 +489,10 @@ active.</p>
 </table>
 <p>Common tap settings are documented in <a class="reference internal" href="../../user_guide/yaml_config.html#yaml-configuration"><span class="std std-ref">YAML configuration</span></a>. Generate the
 full template with <code class="docutils literal notranslate"><span class="pre">pipelinewise</span> <span class="pre">init</span></code>.</p>
+<p>Snowflake Singer, FullSync, and PartialSync can target managed Iceberg v3 with
+explicit tap-level configuration. See <a class="reference internal" href="../targets/snowflake_iceberg.html#snowflake-iceberg"><span class="std std-ref">Snowflake Iceberg tables</span></a>.
+PostgreSQL <code class="docutils literal notranslate"><span class="pre">hstore</span></code> values map to Snowflake <code class="docutils literal notranslate"><span class="pre">VARIANT</span></code> only on that explicit
+v3 route; native mappings remain unchanged.</p>
 </section>
 <section id="acknowledgement-and-recovery">
 <h2>Acknowledgement and recovery<a class="headerlink" href="#acknowledgement-and-recovery" title="Link to this heading"></a></h2>

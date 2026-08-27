@@ -91,6 +91,8 @@
 <li class="toctree-l1"><a class="reference internal" href="fastsync.html">FastSync</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="fastsync.html#supported-routes">Supported routes</a></li>
 <li class="toctree-l2"><a class="reference internal" href="fastsync.html#automatic-selection-and-handover">Automatic selection and handover</a></li>
+<li class="toctree-l2"><a class="reference internal" href="fastsync.html#snowflake-iceberg-publication">Snowflake Iceberg publication</a></li>
+<li class="toctree-l2"><a class="reference internal" href="fastsync.html#snowflake-string-widths">Snowflake string widths</a></li>
 <li class="toctree-l2"><a class="reference internal" href="fastsync.html#explicit-fullsync">Explicit FullSync</a></li>
 <li class="toctree-l2"><a class="reference internal" href="fastsync.html#configured-partialsync">Configured PartialSync</a></li>
 </ul>
@@ -141,6 +143,10 @@
 <li class="toctree-l3"><a class="reference internal" href="../user_guide/cli.html#fast-sync"><code class="docutils literal notranslate"><span class="pre">fast_sync</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../user_guide/cli.html#partial-sync-table"><code class="docutils literal notranslate"><span class="pre">partial_sync_table</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../user_guide/cli.html#reset-state"><code class="docutils literal notranslate"><span class="pre">reset_state</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/cli.html#target-maintenance">Target maintenance</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../user_guide/cli.html#copy-native-to-iceberg"><code class="docutils literal notranslate"><span class="pre">copy_native_to_iceberg</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="../user_guide/cli.html#data-diff">Data-diff</a><ul>
@@ -215,7 +221,8 @@
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../user_guide/partial_sync.html">PartialSync behaviour</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="../user_guide/partial_sync.html#range-semantics">Range semantics</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../user_guide/partial_sync.html#merge-outcomes">Merge outcomes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/partial_sync.html#native-table-merge-outcomes">Native-table merge outcomes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../user_guide/partial_sync.html#managed-iceberg-v3-outcomes">Managed Iceberg v3 outcomes</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../user_guide/partial_sync.html#visual-examples">Visual examples</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../user_guide/partial_sync.html#safety-and-validation">Safety and validation</a></li>
 </ul>
@@ -267,6 +274,9 @@
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="../user_guide/troubleshooting.html#fastsync-errors">FastSync Errors</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../user_guide/troubleshooting.html#snowflake-varchar-width-is-incompatible">Snowflake VARCHAR width is incompatible</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../user_guide/troubleshooting.html#iceberg-publication-remains-ambiguous">Iceberg publication remains ambiguous</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../user_guide/troubleshooting.html#native-to-iceberg-primary-name-is-absent">Native-to-Iceberg primary name is absent</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../user_guide/troubleshooting.html#table-not-found">Table not found</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../user_guide/troubleshooting.html#failure-to-import-tap-0-tables-discovered">Failure to import tap (0 tables discovered)</a></li>
 </ul>
@@ -359,7 +369,7 @@ record protocol between source taps and targets:</p>
 <div class="highlight-text notranslate"><div class="highlight"><pre><span></span>tap | optional transform-field | optional mbuffer | target
 </pre></div>
 </div>
-<p>FastSync bypasses this protocol for supported native bulk-transfer routes. See
+<p>FastSync bypasses this protocol for supported bulk-transfer routes. See
 <a class="reference internal" href="fastsync.html#fast-sync-main"><span class="std std-ref">FastSync</span></a>.</p>
 <section id="messages">
 <h2>Messages<a class="headerlink" href="#messages" title="Link to this heading"></a></h2>
@@ -404,6 +414,16 @@ not edit generated catalog or state while a tap is running.</p>
 <p>A target consumes Singer messages, creates or evolves destination tables, loads
 records, and emits acknowledged state. PipelineWise persists target-emitted
 state only after the target process has accepted the corresponding data.</p>
+<p><code class="docutils literal notranslate"><span class="pre">target-snowflake</span></code> can create and load managed Iceberg v3 through this Singer
+path for any compatible tap. That capability does not add a FastSync component;
+managed-v3 FastSync FullSync and PartialSync remain limited to MariaDB/MySQL
+and PostgreSQL sources.</p>
+<p>For both native and managed Iceberg v3 tables, <code class="docutils literal notranslate"><span class="pre">target-snowflake</span></code> declares
+every newly created or added string column as <code class="docutils literal notranslate"><span class="pre">VARCHAR(134217728)</span></code>. It leaves
+a compatible existing native string column at its current width, but requires
+an existing managed-v3 string column to have the exact maximum width before
+writing. See <a class="reference internal" href="../connectors/targets/snowflake.html#target-snowflake"><span class="std std-ref">Snowflake target</span></a> for target behavior and
+<a class="reference internal" href="../connectors/targets/snowflake_iceberg.html#snowflake-iceberg"><span class="std std-ref">Snowflake Iceberg tables</span></a> for the managed-v3 compatibility contract.</p>
 <p>Singer interoperability does not guarantee that every packaged tap-target pair
 has production support. Use <a class="reference internal" href="../connectors/index.html#connector-support"><span class="std std-ref">Connectors</span></a> for endpoint and route
 status.</p>

@@ -91,6 +91,8 @@
 <li class="toctree-l1"><a class="reference internal" href="../../concept/fastsync.html">FastSync</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="../../concept/fastsync.html#supported-routes">Supported routes</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../concept/fastsync.html#automatic-selection-and-handover">Automatic selection and handover</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../concept/fastsync.html#snowflake-iceberg-publication">Snowflake Iceberg publication</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../concept/fastsync.html#snowflake-string-widths">Snowflake string widths</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../concept/fastsync.html#explicit-fullsync">Explicit FullSync</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../concept/fastsync.html#configured-partialsync">Configured PartialSync</a></li>
 </ul>
@@ -141,6 +143,10 @@
 <li class="toctree-l3"><a class="reference internal" href="../../user_guide/cli.html#fast-sync"><code class="docutils literal notranslate"><span class="pre">fast_sync</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../user_guide/cli.html#partial-sync-table"><code class="docutils literal notranslate"><span class="pre">partial_sync_table</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../user_guide/cli.html#reset-state"><code class="docutils literal notranslate"><span class="pre">reset_state</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/cli.html#target-maintenance">Target maintenance</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/cli.html#copy-native-to-iceberg"><code class="docutils literal notranslate"><span class="pre">copy_native_to_iceberg</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/cli.html#data-diff">Data-diff</a><ul>
@@ -215,7 +221,8 @@
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/partial_sync.html">PartialSync behaviour</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/partial_sync.html#range-semantics">Range semantics</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../../user_guide/partial_sync.html#merge-outcomes">Merge outcomes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/partial_sync.html#native-table-merge-outcomes">Native-table merge outcomes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/partial_sync.html#managed-iceberg-v3-outcomes">Managed Iceberg v3 outcomes</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/partial_sync.html#visual-examples">Visual examples</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/partial_sync.html#safety-and-validation">Safety and validation</a></li>
 </ul>
@@ -267,6 +274,9 @@
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="../../user_guide/troubleshooting.html#fastsync-errors">FastSync Errors</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../user_guide/troubleshooting.html#snowflake-varchar-width-is-incompatible">Snowflake VARCHAR width is incompatible</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../user_guide/troubleshooting.html#iceberg-publication-remains-ambiguous">Iceberg publication remains ambiguous</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../user_guide/troubleshooting.html#native-to-iceberg-primary-name-is-absent">Native-to-Iceberg primary name is absent</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../user_guide/troubleshooting.html#table-not-found">Table not found</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../user_guide/troubleshooting.html#failure-to-import-tap-0-tables-discovered">Failure to import tap (0 tables discovered)</a></li>
 </ul>
@@ -355,54 +365,88 @@
              
   <section id="snowflake-iceberg-tables">
 <span id="snowflake-iceberg"></span><h1>Snowflake Iceberg tables<a class="headerlink" href="#snowflake-iceberg-tables" title="Link to this heading"></a></h1>
-<p>The target-snowflake Singer connector can create managed Snowflake Iceberg v3
-tables. This is connector groundwork for later FastSync support, not a complete
-RDBMS-to-Iceberg route. Fresh RDBMS taps normally require FullSync before Singer,
-and that path remains unavailable. The existing <code class="docutils literal notranslate"><span class="pre">copy-native-to-iceberg</span></code>
-utility can copy a native table separately.</p>
+<p>PipelineWise supports a Snowflake Iceberg table only when all conditions hold:</p>
+<ul class="simple">
+<li><p>The table is Snowflake-managed Iceberg version 3.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ICEBERG_MERGE_ON_READ_BEHAVIOR</span> <span class="pre">=</span> <span class="pre">'DISABLED'</span></code> is set explicitly at table
+level, so Snowflake uses copy-on-write.</p></li>
+<li><p>Every string column has physical <code class="docutils literal notranslate"><span class="pre">CHARACTER_MAXIMUM_LENGTH</span></code> 134,217,728.</p></li>
+<li><p>The table and every replicated column were created by PipelineWise FullSync,
+PartialSync, <code class="docutils literal notranslate"><span class="pre">target-snowflake</span></code>, or the supported native-to-Iceberg converter.</p></li>
+</ul>
+<p>PipelineWise rejects other Iceberg versions, external catalogs, and tables that
+do not meet the copy-on-write or string-width requirement before writing.</p>
+<p>Singer can load managed v3 from any source compatible with
+<code class="docutils literal notranslate"><span class="pre">target-snowflake</span></code>. MariaDB, MySQL, and PostgreSQL also support FastSync
+FullSync and PartialSync. Native Snowflake tables remain the default.</p>
 <section id="support">
 <h2>Support<a class="headerlink" href="#support" title="Link to this heading"></a></h2>
-<table class="docutils align-default" style="width: 100%">
+<table class="docutils align-default" id="id1" style="width: 100%">
+<caption><span class="caption-text">Supported paths to managed Iceberg v3</span><a class="headerlink" href="#id1" title="Link to this table"></a></caption>
 <colgroup>
-<col style="width: 38.0%" />
-<col style="width: 24.0%" />
-<col style="width: 38.0%" />
+<col style="width: 31.0%" />
+<col style="width: 23.0%" />
+<col style="width: 23.0%" />
+<col style="width: 23.0%" />
 </colgroup>
 <thead>
-<tr class="row-odd"><th class="head"><p>Operation</p></th>
-<th class="head"><p>Status</p></th>
-<th class="head"><p>Behaviour</p></th>
+<tr class="row-odd"><th class="head"><p>Source</p></th>
+<th class="head"><p>Singer</p></th>
+<th class="head"><p>FastSync FullSync</p></th>
+<th class="head"><p>FastSync PartialSync</p></th>
 </tr>
 </thead>
 <tbody>
-<tr class="row-even"><td><p>Singer with explicit v3 tap configuration</p></td>
-<td><p>Connector groundwork</p></td>
-<td><p>When Singer runs without a FastSync selection, creates a managed Iceberg
-v3 table and stores objects and arrays as <code class="docutils literal notranslate"><span class="pre">VARIANT</span></code>.</p></td>
+<tr class="row-even"><td><p>MariaDB</p></td>
+<td><p>Yes</p></td>
+<td><p>Yes</p></td>
+<td><p>Yes</p></td>
 </tr>
-<tr class="row-odd"><td><p>Singer with target-level <code class="docutils literal notranslate"><span class="pre">iceberg_create</span></code></p></td>
-<td><p>Deprecated compatibility</p></td>
-<td><p>Preserves the existing Iceberg mapping, including objects and arrays as
-<code class="docutils literal notranslate"><span class="pre">TEXT</span></code>.</p></td>
+<tr class="row-odd"><td><p>MySQL</p></td>
+<td><p>Yes</p></td>
+<td><p>Yes</p></td>
+<td><p>Yes</p></td>
 </tr>
-<tr class="row-even"><td><p>FastSync or PartialSync</p></td>
-<td><p>Unavailable</p></td>
-<td><p>Explicit tap-level Iceberg configuration fails before creating or
-changing a target table.</p></td>
+<tr class="row-even"><td><p>PostgreSQL</p></td>
+<td><p>Yes</p></td>
+<td><p>Yes</p></td>
+<td><p>Yes</p></td>
 </tr>
-<tr class="row-odd"><td><p>Convert an existing native table</p></td>
-<td><p>Available utility</p></td>
-<td><p>Copies data into a companion table, then optionally promotes it.</p></td>
+<tr class="row-odd"><td><p>Other compatible Singer sources, for example Salesforce</p></td>
+<td><p>Yes</p></td>
+<td><p>No</p></td>
+<td><p>No</p></td>
 </tr>
 </tbody>
 </table>
+<p>Connector support levels still apply and are listed in
+<a class="reference internal" href="../index.html#connector-support"><span class="std std-ref">Connectors</span></a>. A source outside MariaDB, MySQL, and PostgreSQL can use
+managed Iceberg v3 only when PipelineWise routes the selected streams through
+Singer. Any Iceberg selection that would invoke another source’s FastSync
+component is rejected before mutation.</p>
 </section>
 <section id="snowflake-prerequisites">
 <h2>Snowflake prerequisites<a class="headerlink" href="#snowflake-prerequisites" title="Link to this heading"></a></h2>
-<p>Explicit v3 creation sets <code class="docutils literal notranslate"><span class="pre">CATALOG</span> <span class="pre">=</span> <span class="pre">'SNOWFLAKE'</span></code> and leaves
-<code class="docutils literal notranslate"><span class="pre">EXTERNAL_VOLUME</span></code> unset. Snowflake uses the effective schema, database, or
-account default. If no different default is configured, Snowflake-managed
-storage is used.</p>
+<p>PipelineWise creates explicit v3 tables with <code class="docutils literal notranslate"><span class="pre">CATALOG</span> <span class="pre">=</span> <span class="pre">'SNOWFLAKE'</span></code> and no
+<code class="docutils literal notranslate"><span class="pre">EXTERNAL_VOLUME</span></code> clause. Snowflake therefore uses the effective schema,
+database, or account default, or Snowflake-managed storage when no other default
+is set. New tables use one day of data retention, a 16 MB target file size, and
+automatic data compaction; these values are not configurable per tap.</p>
+<p>PipelineWise sets the required table parameter on every managed v3 table it
+creates or replaces. Snowflake <code class="docutils literal notranslate"><span class="pre">UPDATE</span></code>, <code class="docutils literal notranslate"><span class="pre">DELETE</span></code>, and <code class="docutils literal notranslate"><span class="pre">MERGE</span></code> therefore
+use copy-on-write and do not create deletion vectors. PipelineWise does not use
+the deprecated <code class="docutils literal notranslate"><span class="pre">ENABLE_ICEBERG_MERGE_ON_READ</span></code> parameter.</p>
+<p>PipelineWise creates and adds managed-v3 string columns explicitly as
+<code class="docutils literal notranslate"><span class="pre">VARCHAR(134217728)</span></code>. This is Snowflake’s maximum declared character width;
+the 128 MB encoded-value limit still applies, so multi-byte values can reach the
+byte limit with fewer characters. Existing managed-v3 strings must have the same
+physical width before PipelineWise writes them.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>PipelineWise must be the only writer. External reads are allowed, but an
+external writer can choose a write mode or delete representation outside the
+Snowflake parameter and break the copy-on-write contract.</p>
+</div>
 <p>To use your own cloud storage, create an external volume and configure it as a
 default on the schema, database, or account. For example:</p>
 <div class="highlight-sql notranslate"><div class="highlight"><pre><span></span><span class="k">CREATE</span><span class="w"> </span><span class="k">OR</span><span class="w"> </span><span class="k">REPLACE</span><span class="w"> </span><span class="k">EXTERNAL</span><span class="w"> </span><span class="n">VOLUME</span><span class="w"> </span><span class="o">&lt;</span><span class="n">external_volume</span><span class="o">&gt;</span><span class="w"> </span><span class="p">...;</span>
@@ -410,78 +454,221 @@ default on the schema, database, or account. For example:</p>
 <span class="w">  </span><span class="k">SET</span><span class="w"> </span><span class="n">EXTERNAL_VOLUME</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;</span><span class="n">external_volume</span><span class="o">&gt;</span><span class="p">;</span>
 </pre></div>
 </div>
-<p>The target role needs the parent-object, warehouse, and <code class="docutils literal notranslate"><span class="pre">CREATE</span> <span class="pre">ICEBERG</span> <span class="pre">TABLE</span></code>
-privileges required by Snowflake. A custom external volume also requires its
-applicable privileges. PipelineWise does not preflight these privileges; a
-failed <code class="docutils literal notranslate"><span class="pre">CREATE</span> <span class="pre">ICEBERG</span> <span class="pre">TABLE</span></code> reports the Snowflake error. Follow Snowflake’s
-<a class="reference external" href="https://docs.snowflake.com/en/user-guide/tables-iceberg">managed Iceberg table documentation</a> for the account-level
-setup.</p>
+<p>The target role needs the parent-object, warehouse, staging, and table privileges
+required by the selected operation, including <code class="docutils literal notranslate"><span class="pre">CREATE</span> <span class="pre">ICEBERG</span> <span class="pre">TABLE</span></code>. A custom
+external volume also requires its applicable privileges. PipelineWise reports
+Snowflake privilege and storage errors rather than attempting to reconfigure the
+account. See Snowflake’s <a class="reference external" href="https://docs.snowflake.com/en/user-guide/tables-iceberg">managed Iceberg table documentation</a>.</p>
+<p>Metadata preflight can inspect only objects visible to the target role. Use a role
+that can see dependent streams, policies, tags, grants, and comments before an
+operation that might replace a table.</p>
 </section>
-<section id="create-new-singer-tables">
-<h2>Create new Singer tables<a class="headerlink" href="#create-new-singer-tables" title="Link to this heading"></a></h2>
-<p>Set the desired format in the tap YAML. It applies to every selected table in
-that tap:</p>
+<section id="configure-a-tap">
+<h2>Configure a tap<a class="headerlink" href="#configure-a-tap" title="Link to this heading"></a></h2>
+<p>Set the desired format in any tap whose Singer output is compatible with
+<code class="docutils literal notranslate"><span class="pre">target-snowflake</span></code>. The setting applies to every selected table in that tap:</p>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">target</span><span class="p">:</span><span class="w"> </span><span class="s">"snowflake"</span>
 <span class="nt">target_table_format</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">iceberg</span>
 <span class="nt">iceberg_version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span>
+<span class="nt">hard_delete</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
 </pre></div>
 </div>
-<p>When tap-level format and the legacy target flag are omitted, new tables are
-native. <code class="docutils literal notranslate"><span class="pre">target_table_format</span></code> accepts only <code class="docutils literal notranslate"><span class="pre">native</span></code> or <code class="docutils literal notranslate"><span class="pre">iceberg</span></code>. Iceberg
-requires integer version <code class="docutils literal notranslate"><span class="pre">3</span></code>; a version is invalid when the format is native
-or omitted.</p>
-<p>Explicit Iceberg v3 configuration is limited to <code class="docutils literal notranslate"><span class="pre">tap-mysql</span></code> (MariaDB/MySQL)
-and <code class="docutils literal notranslate"><span class="pre">tap-postgres</span></code> with <code class="docutils literal notranslate"><span class="pre">target-snowflake</span></code>. It requires
-<code class="docutils literal notranslate"><span class="pre">data_flattening_max_level:</span> <span class="pre">0</span></code> and <code class="docutils literal notranslate"><span class="pre">hard_delete:</span> <span class="pre">true</span></code>. The deprecated
-<code class="docutils literal notranslate"><span class="pre">hard_delete:</span> <span class="pre">false</span></code> behaviour is rejected for this route.</p>
-<p>An explicit setting must match an existing table. PipelineWise does not convert
-a native table, change an Iceberg table’s catalog, or upgrade Iceberg v2. Nested
-objects and arrays use <code class="docutils literal notranslate"><span class="pre">VARIANT</span></code> only with the explicit v3 configuration.
-Keep both settings while replicating to a v3 table. Removing them restores the
-legacy <code class="docutils literal notranslate"><span class="pre">TEXT</span></code> mapping; PipelineWise stops on existing <code class="docutils literal notranslate"><span class="pre">VARIANT</span></code> columns and
-asks the operator to restore the explicit v3 configuration rather than changing
-the columns automatically.</p>
-<p>Fresh LOG_BASED and INCREMENTAL RDBMS taps normally select FullSync before
-Singer. With explicit tap-level Iceberg configuration, that FullSync fails
-before target mutation and does not fall back to Singer. <code class="docutils literal notranslate"><span class="pre">fast_sync</span></code> and
-<code class="docutils literal notranslate"><span class="pre">partial_sync_table</span></code> are also unavailable for that configuration in this
-release.</p>
+<p>These tap-level settings are the only valid Iceberg selection. Omitting
+<code class="docutils literal notranslate"><span class="pre">target_table_format</span></code> or selecting <code class="docutils literal notranslate"><span class="pre">native</span></code> creates native tables. Target
+configuration rejects these keys and the removed <code class="docutils literal notranslate"><span class="pre">iceberg_create</span></code> setting;
+remove <code class="docutils literal notranslate"><span class="pre">iceberg_create</span></code> and configure each Iceberg tap before upgrading.</p>
+<p>Every explicit managed Iceberg v3 tap requires <code class="docutils literal notranslate"><span class="pre">hard_delete:</span> <span class="pre">true</span></code>. MariaDB,
+MySQL, and PostgreSQL taps also require <code class="docutils literal notranslate"><span class="pre">data_flattening_max_level:</span> <span class="pre">0</span></code> because
+their initial load can use FastSync before handing the stream to Singer.
+Singer-only sources retain their normal flattening setting; for example,
+Salesforce’s default level <code class="docutils literal notranslate"><span class="pre">10</span></code> is valid. A physical format mismatch fails
+before mutation. PipelineWise does not upgrade or automatically convert tables;
+use the manual command below during a controlled outage.</p>
+<p>With flattening disabled, nested objects and arrays use <code class="docutils literal notranslate"><span class="pre">VARIANT</span></code> only with
+explicit v3 configuration. A Singer-only tap with a non-zero flattening level
+continues to apply its normal target flattening behavior. Keep
+<code class="docutils literal notranslate"><span class="pre">target_table_format</span></code> and <code class="docutils literal notranslate"><span class="pre">iceberg_version</span></code> for the tap’s lifetime. Removing
+them selects the native contract and fails on an existing Iceberg table rather
+than converting it silently.</p>
+<p>Explicit v3 maps integer Singer fields to <code class="docutils literal notranslate"><span class="pre">NUMBER(38,0)</span></code> and approximate
+numeric fields to Iceberg <code class="docutils literal notranslate"><span class="pre">DOUBLE</span></code>. The latter preserves 64-bit floating-point
+range instead of narrowing to Iceberg <code class="docutils literal notranslate"><span class="pre">FLOAT</span></code>. Native and fixed-point
+<code class="docutils literal notranslate"><span class="pre">NUMBER(precision,</span> <span class="pre">scale)</span></code> mappings are unchanged. PostgreSQL
+<code class="docutils literal notranslate"><span class="pre">hstore</span></code> maps to <code class="docutils literal notranslate"><span class="pre">VARIANT</span></code> on this route. For <code class="docutils literal notranslate"><span class="pre">engine:</span> <span class="pre">mariadb</span></code>, a
+<code class="docutils literal notranslate"><span class="pre">LONGTEXT</span></code> column with MariaDB’s exact generated <code class="docutils literal notranslate"><span class="pre">JSON_VALID</span></code> constraint is
+treated as the <code class="docutils literal notranslate"><span class="pre">JSON</span></code> alias and maps to <code class="docutils literal notranslate"><span class="pre">VARIANT</span></code>; ordinary <code class="docutils literal notranslate"><span class="pre">LONGTEXT</span></code> and
+native routes remain strings. Object, array, string, number, Boolean, and null
+JSON roots are carried as validated JSON text and restored as <code class="docutils literal notranslate"><span class="pre">VARIANT</span></code>;
+JSON null remains distinct from SQL <code class="docutils literal notranslate"><span class="pre">NULL</span></code>.</p>
 </section>
-<section id="legacy-target-setting">
-<h2>Legacy target setting<a class="headerlink" href="#legacy-target-setting" title="Link to this heading"></a></h2>
-<p>The deprecated target-level setting remains available during migration:</p>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">db_conn</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">iceberg_create</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<section id="repair-a-pipelinewise-created-managed-v3-table">
+<h2>Repair a PipelineWise-created managed v3 table<a class="headerlink" href="#repair-a-pipelinewise-created-managed-v3-table" title="Link to this heading"></a></h2>
+<p>PipelineWise does not adopt arbitrary externally created tables or columns.
+Before upgrading a managed v3 table created by an earlier PipelineWise version,
+or after a coordinated DBA repair to such a table, inspect its parameter and
+column widths:</p>
+<div class="highlight-sql notranslate"><div class="highlight"><pre><span></span><span class="k">SHOW</span><span class="w"> </span><span class="k">PARAMETERS</span><span class="w"> </span><span class="k">LIKE</span><span class="w"> </span><span class="s1">'ICEBERG_MERGE_ON_READ_BEHAVIOR'</span>
+<span class="w">  </span><span class="k">IN</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="o">&lt;</span><span class="k">database</span><span class="o">&gt;</span><span class="p">.</span><span class="o">&lt;</span><span class="k">schema</span><span class="o">&gt;</span><span class="p">.</span><span class="o">&lt;</span><span class="k">table</span><span class="o">&gt;</span><span class="p">;</span>
+
+<span class="k">SELECT</span><span class="w"> </span><span class="k">COLUMN_NAME</span><span class="p">,</span><span class="w"> </span><span class="n">DATA_TYPE</span><span class="p">,</span><span class="w"> </span><span class="n">CHARACTER_MAXIMUM_LENGTH</span>
+<span class="w">  </span><span class="k">FROM</span><span class="w"> </span><span class="o">&lt;</span><span class="k">database</span><span class="o">&gt;</span><span class="p">.</span><span class="n">INFORMATION_SCHEMA</span><span class="p">.</span><span class="n">COLUMNS</span>
+<span class="w"> </span><span class="k">WHERE</span><span class="w"> </span><span class="n">TABLE_SCHEMA</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'&lt;schema&gt;'</span>
+<span class="w">   </span><span class="k">AND</span><span class="w"> </span><span class="k">TABLE_NAME</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'&lt;table&gt;'</span>
+<span class="w"> </span><span class="k">ORDER</span><span class="w"> </span><span class="k">BY</span><span class="w"> </span><span class="n">ORDINAL_POSITION</span><span class="p">;</span>
 </pre></div>
 </div>
-<p>When tap-level format is omitted, PipelineWise preserves this setting’s current
-new-table and type-mapping behaviour. The legacy setting affects missing tables;
-an existing physical table continues to win. When both settings are present,
-they must agree. Only an explicit tap-level format must match an existing table;
-neither setting converts it.</p>
+<p>PipelineWise requires value <code class="docutils literal notranslate"><span class="pre">DISABLED</span></code> at level <code class="docutils literal notranslate"><span class="pre">TABLE</span></code>; inherited values do
+not qualify. Every string row must also report <code class="docutils literal notranslate"><span class="pre">CHARACTER_MAXIMUM_LENGTH</span></code>
+134217728. Singer and FastSync reject the table before writing when either
+contract fails. Set the parameter and widen each narrower string column before
+starting PipelineWise:</p>
+<div class="highlight-sql notranslate"><div class="highlight"><pre><span></span><span class="k">ALTER</span><span class="w"> </span><span class="n">ICEBERG</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="o">&lt;</span><span class="k">database</span><span class="o">&gt;</span><span class="p">.</span><span class="o">&lt;</span><span class="k">schema</span><span class="o">&gt;</span><span class="p">.</span><span class="o">&lt;</span><span class="k">table</span><span class="o">&gt;</span>
+<span class="w">  </span><span class="k">SET</span><span class="w"> </span><span class="n">ICEBERG_MERGE_ON_READ_BEHAVIOR</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'DISABLED'</span><span class="p">;</span>
+
+<span class="k">ALTER</span><span class="w"> </span><span class="n">ICEBERG</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="o">&lt;</span><span class="k">database</span><span class="o">&gt;</span><span class="p">.</span><span class="o">&lt;</span><span class="k">schema</span><span class="o">&gt;</span><span class="p">.</span><span class="o">&lt;</span><span class="k">table</span><span class="o">&gt;</span>
+<span class="w">  </span><span class="k">ALTER</span><span class="w"> </span><span class="k">COLUMN</span><span class="w"> </span><span class="o">&lt;</span><span class="k">column</span><span class="o">&gt;</span><span class="w"> </span><span class="k">SET</span><span class="w"> </span><span class="k">DATA</span><span class="w"> </span><span class="k">TYPE</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">134217728</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>PipelineWise does not widen existing Iceberg columns automatically. Use a role
+authorized to repair the existing PipelineWise-created table, or recreate it
+through PipelineWise FullSync or the supported native-to-Iceberg converter, then
+retry the same operation. Do not introduce a new table or column through DBA DDL.</p>
+<p>The change affects future Snowflake DML only; it does not rewrite the current
+snapshot or remove deletion vectors already referenced there. If the current
+snapshot must be deletion-vector-free, follow the change with a complete
+FullSync or controlled full-table replacement. PartialSync is insufficient.
+Historical snapshots and files can remain until retention cleanup. See
+Snowflake’s <a class="reference external" href="https://docs.snowflake.com/en/sql-reference/sql/alter-iceberg-table">ALTER ICEBERG TABLE reference</a>.</p>
+</section>
+<section id="fullsync-publication">
+<h2>FullSync publication<a class="headerlink" href="#fullsync-publication" title="Link to this heading"></a></h2>
+<p>FastSync always exports into a uniquely named native staging table. PipelineWise
+then chooses one Iceberg publication method:</p>
+<table class="docutils align-default" id="id2" style="width: 100%">
+<caption><span class="caption-text">FullSync publication</span><a class="headerlink" href="#id2" title="Link to this table"></a></caption>
+<colgroup>
+<col style="width: 35.0%" />
+<col style="width: 30.0%" />
+<col style="width: 35.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Target state</p></th>
+<th class="head"><p>Method</p></th>
+<th class="head"><p>Effect</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Missing</p></td>
+<td><p>Explicit-schema CTAS</p></td>
+<td><p>Creates a managed Iceberg v3 table from staging.</p></td>
+</tr>
+<tr class="row-odd"><td><p>Exactly compatible</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">INSERT</span> <span class="pre">OVERWRITE</span></code></p></td>
+<td><p>Preserves the existing table object and its metadata.</p></td>
+</tr>
+<tr class="row-even"><td><p>New nullable columns only</p></td>
+<td><p>Add columns, then <code class="docutils literal notranslate"><span class="pre">INSERT</span> <span class="pre">OVERWRITE</span></code></p></td>
+<td><p>Preserves the object and adds the compatible schema.</p></td>
+</tr>
+<tr class="row-odd"><td><p>Other compatible-format mismatch</p></td>
+<td><p>Guarded replacement CTAS</p></td>
+<td><p>Replaces the table only after metadata safety checks.</p></td>
+</tr>
+</tbody>
+</table>
+<p>FullSync supports tables without a primary key. Where one exists, PipelineWise
+preserves composite primary-key order and its Iceberg identifier fields, and
+rejects NULL key values.
+After a successful initial load, LOG_BASED and INCREMENTAL tables continue with
+Singer in the same <code class="docutils literal notranslate"><span class="pre">run_tap</span></code> invocation, using the same managed-v3 contract.</p>
+<p>A guarded replacement preserves explicit grants and table tags through Snowflake
+copy clauses, then restores table and column comments. It fails before replacement
+when visible dependent streams, secondary constraints, inbound foreign keys,
+masking or row-access policies, direct column tags, defaults, identity columns,
+or clustering are present. The current owning account role must run the
+replacement, so ownership is retained; database-role ownership is not supported.
+The new object resets table history and can change its base location. Account-wide
+stream inspection is limited to dependencies visible to that role, so the role
+must be able to see every relevant dependency.</p>
+</section>
+<section id="partialsync-publication">
+<h2>PartialSync publication<a class="headerlink" href="#partialsync-publication" title="Link to this heading"></a></h2>
+<p>A missing Iceberg target is created from the selected range. An existing
+compatible target is updated through one transaction. PartialSync requires a
+primary key and supports only <code class="docutils literal notranslate"><span class="pre">hard_delete:</span> <span class="pre">true</span></code>.</p>
+<p>Compatible nullable columns are added before the merge. Any other schema or key
+mismatch fails before DML. Setting <code class="docutils literal notranslate"><span class="pre">drop_target_table:</span> <span class="pre">true</span></code> explicitly selects
+replacement CTAS and leaves the table containing only the selected range.</p>
+<p>Before normal or recovered publication, PipelineWise validates the canonical
+post-transformation staging projection. Every composite primary-key component
+must be non-NULL and every composite key group must be unique. A violation
+blocks new publication DML; PipelineWise does not deduplicate staging or choose
+a winning row. If an already-submitted attempt fails this recheck, its outcome
+remains ambiguous and PipelineWise preserves the manifest and staging table for
+manual recovery.</p>
+<p>See <a class="reference internal" href="../../user_guide/partial_sync.html#partial-sync-cases"><span class="std std-ref">PartialSync behaviour</span></a> for boundaries, delete behaviour, and operational
+checks.</p>
+</section>
+<section id="concurrency-and-recovery">
+<span id="snowflake-iceberg-recovery"></span><h2>Concurrency and recovery<a class="headerlink" href="#concurrency-and-recovery" title="Link to this heading"></a></h2>
+<p>PipelineWise holds a process lock for the complete Iceberg attempt and rejects a
+changed target before publication. The lock coordinates only processes sharing
+the generated runtime directory; enforce the sole-writer requirement across
+other deployments and systems operationally.</p>
+<p>Each FastSync attempt has a credential-free
+<code class="docutils literal notranslate"><span class="pre">iceberg-recovery-&lt;hash&gt;.json</span></code> stream manifest and
+<code class="docutils literal notranslate"><span class="pre">iceberg-fastsync-target-&lt;hash&gt;.json</span></code> target pointer in the generated target
+runtime directory at <code class="docutils literal notranslate"><span class="pre">$PIPELINEWISE_CONFIG_DIRECTORY/&lt;target_id&gt;/</span></code>. A stable
+source-stream identity finds the attempt after target-mapping changes, while the
+target pointer prevents another source from starting against the same physical
+table. PipelineWise also holds a physical-target lock. Recovery is bound to the
+tap ID, source route and table, source endpoint and extraction settings, target
+mapping and account/user/role, staging configuration, and transformation
+contract. Passwords, private keys, and raw transformation rules are not stored.</p>
+<p>The manifest records <code class="docutils literal notranslate"><span class="pre">prepared</span></code>, <code class="docutils literal notranslate"><span class="pre">uploaded</span></code>, <code class="docutils literal notranslate"><span class="pre">staging_created</span></code>, <code class="docutils literal notranslate"><span class="pre">staged</span></code>,
+<code class="docutils literal notranslate"><span class="pre">submitted</span></code>, <code class="docutils literal notranslate"><span class="pre">published</span></code>, and <code class="docutils literal notranslate"><span class="pre">finalized</span></code> progress, including the saved
+source boundary, staging identity, expected schema and content fingerprint,
+publication identity, and completed finalization actions. PipelineWise advances
+Singer state only after publication, metadata and grants, S3 cleanup, and staging
+cleanup succeed. An interrupted additive change can leave a retry-safe nullable
+column while target data and state remain unchanged.</p>
+<p>If a connection fails after submission, new target data may be visible while
+state remains unchanged. Restart the same command without editing state, removing
+staging, or deleting either recovery file. Use the same generated runtime
+directory, tap ID, route, source table, target mapping, account/user/role,
+staging configuration, and transformation contract.</p>
+<p>For CTAS and <code class="docutils literal notranslate"><span class="pre">INSERT</span> <span class="pre">OVERWRITE</span></code>, PipelineWise polls query history every five
+seconds for up to 900 seconds by default. Set the positive integer
+<code class="docutils literal notranslate"><span class="pre">iceberg_query_history_poll_timeout_seconds</span></code> in the Snowflake target’s
+<code class="docutils literal notranslate"><span class="pre">db_conn</span></code> to change that budget. Each lookup scans at most 10,000 visible
+queries from five minutes before the persisted submission time, including an
+active publication. Connector timeouts are best-effort, so an individual
+Snowflake call can make the observed wall-clock duration exceed the nominal
+budget. PipelineWise requires the exact attempt, verifies the target, resumes
+unfinished finalization, and then performs the saved state handover.</p>
+<p>Query-history visibility can lag. For an ambiguous PartialSync commit,
+PipelineWise replays the persisted range transaction deterministically instead
+of resolving its boundaries again. Retry the same command if evidence is not
+yet terminal and while Snowflake retains the Information Schema query history.
+The polling budget is not part of recovery identity, so it can be increased for
+that unchanged retry. If the result remains ambiguous, PipelineWise preserves
+the evidence and fails for operator inspection.</p>
 </section>
 <section id="convert-a-native-table">
 <h2>Convert a native table<a class="headerlink" href="#convert-a-native-table" title="Link to this heading"></a></h2>
-<p>Before conversion:</p>
-<ol class="arabic simple">
-<li><p>stop PipelineWise replication and every other writer to the source table;</p></li>
-<li><p>record row counts, primary-key coverage, ownership, grants, policies, tags,
-comments, constraints, defaults, clustering, and other metadata;</p></li>
-<li><p>choose whether the native or Iceberg name should be primary after the copy;</p></li>
-<li><p>use a role that can read every row and see unmasked values; and</p></li>
-<li><p>keep writers stopped until the copied table and metadata are validated.</p></li>
-</ol>
-<p>Writes during copy or cutover can be absent from the Iceberg result. Row-access
-or masking policies applied to <code class="docutils literal notranslate"><span class="pre">INSERT</span> <span class="pre">...</span> <span class="pre">SELECT</span></code> can copy an incomplete or
-permanently masked result.</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>copy-native-to-iceberg<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--config<span class="w"> </span>&lt;target-snowflake-config.json&gt;<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--fqtn<span class="w"> </span>&lt;database.schema.table&gt;<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--eventual<span class="w"> </span>NATIVE
+<p>The PipelineWise-owned command builds and validates one managed Iceberg v3 copy
+using an imported Snowflake target:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pipelinewise<span class="w"> </span>copy_native_to_iceberg<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--target<span class="w"> </span>&lt;target_id&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--table<span class="w"> </span>&lt;database.schema.table&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--eventual<span class="w"> </span>native<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iceberg-version<span class="w"> </span><span class="m">3</span>
 </pre></div>
 </div>
-<table class="docutils align-default" id="id1" style="width: 100%">
-<caption><span class="caption-text">Cutover modes</span><a class="headerlink" href="#id1" title="Link to this table"></a></caption>
+<p><code class="docutils literal notranslate"><span class="pre">--eventual</span></code> defaults to <code class="docutils literal notranslate"><span class="pre">native</span></code>. The command has no tap argument and only
+accepts a table in the target’s configured database.</p>
+<table class="docutils align-default" id="id3" style="width: 100%">
+<caption><span class="caption-text">Conversion outcomes</span><a class="headerlink" href="#id3" title="Link to this table"></a></caption>
 <colgroup>
 <col style="width: 24.0%" />
 <col style="width: 38.0%" />
@@ -494,82 +681,86 @@ permanently masked result.</p>
 </tr>
 </thead>
 <tbody>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">NATIVE</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">native</span></code></p></td>
 <td><p>Original native <code class="docutils literal notranslate"><span class="pre">&lt;table&gt;</span></code></p></td>
-<td><p>Copied <code class="docutils literal notranslate"><span class="pre">&lt;table&gt;_ICEBERG</span></code></p></td>
+<td><p>Validated <code class="docutils literal notranslate"><span class="pre">&lt;table&gt;_ICEBERG</span></code></p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">ICEBERG</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">iceberg</span></code></p></td>
 <td><p>Promoted Iceberg <code class="docutils literal notranslate"><span class="pre">&lt;table&gt;</span></code></p></td>
-<td><p>Original <code class="docutils literal notranslate"><span class="pre">&lt;table&gt;_NATIVE</span></code></p></td>
+<td><p>Original <code class="docutils literal notranslate"><span class="pre">&lt;table&gt;_NATIVE</span></code> rollback point</p></td>
 </tr>
 </tbody>
 </table>
-<p>The <code class="docutils literal notranslate"><span class="pre">&lt;table&gt;_NATIVE</span></code> and <code class="docutils literal notranslate"><span class="pre">&lt;table&gt;_ICEBERG</span></code> names are reserved. Rename
-independently managed objects with those names before running the utility.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">_NATIVE</span></code> and <code class="docutils literal notranslate"><span class="pre">_ICEBERG</span></code> suffixes are reserved. Rename independently
+managed objects with those names before conversion. The PipelineWise-owned
+command is the only supported native-to-Iceberg converter; the old connector-local
+<code class="docutils literal notranslate"><span class="pre">copy-native-to-iceberg</span></code> executable has been removed.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Complete or manually reconcile any interrupted connector-local conversion
+before upgrading. The PipelineWise-owned command cannot adopt the old
+unmanifested state when the primary name is absent and <code class="docutils literal notranslate"><span class="pre">_NATIVE</span></code> plus
+<code class="docutils literal notranslate"><span class="pre">_ICEBERG</span></code> objects remain. Reinstall or recreate the target-snowflake
+environment during deployment; a source-only update can leave a stale
+generated console wrapper that no longer has a Python implementation.</p>
+</div>
 </section>
-<section id="copied-data-and-metadata">
-<h2>Copied data and metadata<a class="headerlink" href="#copied-data-and-metadata" title="Link to this heading"></a></h2>
-<p>The utility copies rows, column names, compatible types, and primary-key column
-order. It applies these type conversions:</p>
-<table class="docutils align-default" style="width: 100%">
-<colgroup>
-<col style="width: 42.0%" />
-<col style="width: 58.0%" />
-</colgroup>
-<thead>
-<tr class="row-odd"><th class="head"><p>Native type</p></th>
-<th class="head"><p>Iceberg type</p></th>
-</tr>
-</thead>
-<tbody>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">TEXT</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">VARCHAR</span></code></p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">VARIANT</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">TEXT</span></code> representation</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">TIMESTAMP_TZ</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">TIMESTAMP_LTZ(6)</span></code></p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">TIMESTAMP_NTZ</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">TIMESTAMP_NTZ(6)</span></code></p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">TIMESTAMP_LTZ</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">TIMESTAMP_LTZ(6)</span></code></p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">TIME</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">TIME(6)</span></code></p></td>
-</tr>
-</tbody>
-</table>
-<p>Timezone offsets and precision finer than microseconds are not retained. The
-utility does not copy ownership, grants, masking or row-access policies, tags,
-comments, nullability, default or autoincrement expressions, clustering,
-secondary constraints, or other table metadata. Reapply and validate required
-metadata before consumers or replication resume.</p>
+<section id="conversion-preflight-and-metadata">
+<h2>Conversion preflight and metadata<a class="headerlink" href="#conversion-preflight-and-metadata" title="Link to this heading"></a></h2>
+<p>Before conversion:</p>
+<ol class="arabic simple">
+<li><p>stop PipelineWise replication and every other writer to the table;</p></li>
+<li><p>record source and target evidence plus required metadata;</p></li>
+<li><p>use the current owning account role, with access to unmasked source rows and
+all relevant metadata;</p></li>
+<li><p>confirm the role can create, alter, rename, grant, tag, and comment; and</p></li>
+<li><p>for <code class="docutils literal notranslate"><span class="pre">eventual=iceberg</span></code>, also stop every reader, including dashboards,
+transformations, and ad-hoc queries, before cutover; and</p></li>
+<li><p>keep readers and writers stopped until the result is independently validated.</p></li>
+</ol>
+<p>The command compares row count and <code class="docutils literal notranslate"><span class="pre">HASH_AGG</span></code> evidence before cutover. It
+copies every row through the required type projection, including duplicate-key
+and other representable flawed data, without filtering, deduplication, or
+repair. It preserves supported types, nullability, primary-key order, table and
+column comments, explicit non-ownership grants to account roles and qualified
+database roles, grant options, and direct table tags. The current account role
+must own the native source; database-role ownership is not supported.</p>
+<p>Conversion fails before copying when the table has visible dependent streams,
+policies, direct column tags, secondary constraints, inbound foreign keys,
+defaults, identity columns, a clustering key, NULL primary-key values, or an
+unsupported Iceberg type. Account-wide stream inspection is limited to objects
+visible to the current role. Time and timestamp precision is normalized to
+microseconds. Snowflake <code class="docutils literal notranslate"><span class="pre">VARIANT</span></code> remains <code class="docutils literal notranslate"><span class="pre">VARIANT</span></code>.</p>
+<p>Writes during the copy or cutover can be absent from the Iceberg result. The
+local manifest lock does not replace the required external writer exclusion.
+For <code class="docutils literal notranslate"><span class="pre">eventual=iceberg</span></code>, promotion renames <code class="docutils literal notranslate"><span class="pre">&lt;table&gt;</span></code> to <code class="docutils literal notranslate"><span class="pre">&lt;table&gt;_NATIVE</span></code>
+and then renames <code class="docutils literal notranslate"><span class="pre">&lt;table&gt;_ICEBERG</span></code> to <code class="docutils literal notranslate"><span class="pre">&lt;table&gt;</span></code>. These are independent
+statements: the primary table name is absent between them, so concurrent readers
+fail instead of seeing stale data. Rollback has the same availability gap in
+reverse. Use <code class="docutils literal notranslate"><span class="pre">eventual=native</span></code> when a reader outage is not acceptable.</p>
 </section>
-<section id="interrupted-conversion-recovery">
-<h2>Interrupted conversion recovery<a class="headerlink" href="#interrupted-conversion-recovery" title="Link to this heading"></a></h2>
-<p>The utility fails safely when it cannot confirm a rename. A retry handles these
-identifiable states:</p>
-<ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">&lt;table&gt;</span></code> is already Iceberg: return successfully.</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">&lt;table&gt;</span></code> is absent and both companions exist: promote the loaded Iceberg
-table for <code class="docutils literal notranslate"><span class="pre">ICEBERG</span></code> mode, or restore the native name for <code class="docutils literal notranslate"><span class="pre">NATIVE</span></code> mode.</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">&lt;table&gt;</span></code> is absent and only <code class="docutils literal notranslate"><span class="pre">&lt;table&gt;_NATIVE</span></code> exists: restore the native
-name before copying again.</p></li>
-</ul>
-<p>For any other state, inspect all three object names and recover the intended
-<code class="docutils literal notranslate"><span class="pre">&lt;table&gt;</span></code> manually before retrying. The utility removes a stale
-<code class="docutils literal notranslate"><span class="pre">&lt;table&gt;_ICEBERG</span></code> before a new copy but never deletes <code class="docutils literal notranslate"><span class="pre">&lt;table&gt;_NATIVE</span></code>.</p>
+<section id="interrupted-conversion">
+<h2>Interrupted conversion<a class="headerlink" href="#interrupted-conversion" title="Link to this heading"></a></h2>
+<p>Retry from the same imported target runtime directory with the same table,
+<code class="docutils literal notranslate"><span class="pre">--eventual</span></code> value, target account/database/user, and account role. The command
+reuses its durable manifest, verifies companion-table state and contents, and
+resumes a committed rename. If validation or Iceberg promotion fails, PipelineWise
+records rollback intent before renaming and restores the native table name across
+retries. It never deletes the <code class="docutils literal notranslate"><span class="pre">_NATIVE</span></code> rollback table.</p>
+<p>An interruption after the first promotion or rollback rename can leave the
+primary name absent until recovery runs. Keep the reader-and-writer outage in
+place and retry the identical command immediately. Do not resume readers merely
+because writers are stopped.</p>
+<p>If the primary and companion names cannot prove one safe state, the command fails.
+Inspect all three tables and the manifest before changing anything manually.</p>
 </section>
 <section id="validation">
 <h2>Validation<a class="headerlink" href="#validation" title="Link to this heading"></a></h2>
-<p>Before resuming writers, compare exact primary-key coverage, row counts, critical
-values, and required metadata. Confirm downstream roles can query the promoted
-table and that PipelineWise uses the Singer path. Retain the native companion
-until the Iceberg cutover has been observed through at least one successful
-replication and reconciliation cycle.</p>
+<p>Before resuming readers or writers, compare exact primary-key coverage or a
+deterministic checksum, critical values, physical format and version, ownership,
+grants, tags, comments, and downstream access. For <code class="docutils literal notranslate"><span class="pre">eventual=iceberg</span></code>, retain
+<code class="docutils literal notranslate"><span class="pre">_NATIVE</span></code> until at least one Singer or FastSync cycle and independent
+reconciliation have succeeded.</p>
 </section>
 </section>
 

@@ -3,7 +3,7 @@ PipelineWise
 
 PipelineWise is a Python framework for configuring, running, and operating
 Singer-based ELT pipelines. It moves source data into analytical destinations
-with log-based, incremental, or full-table replication and optional native bulk
+with log-based, incremental, or full-table replication and optional bulk
 transfer through :ref:`fast_sync_main`.
 
 .. important:: Project scope
@@ -42,7 +42,7 @@ Core capabilities
      - Log-based change capture, key-based incremental loads, and full-table
        snapshots.
    * - FastSync
-     - Native FullSync and PartialSync transfers for supported database routes.
+     - FullSync and PartialSync transfers for supported routes and table formats.
    * - Schema evolution
      - Detects source schema changes and applies compatible target changes.
    * - Load-time protection

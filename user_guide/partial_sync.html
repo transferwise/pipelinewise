@@ -91,6 +91,8 @@
 <li class="toctree-l1"><a class="reference internal" href="../concept/fastsync.html">FastSync</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#supported-routes">Supported routes</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#automatic-selection-and-handover">Automatic selection and handover</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#snowflake-iceberg-publication">Snowflake Iceberg publication</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#snowflake-string-widths">Snowflake string widths</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#explicit-fullsync">Explicit FullSync</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#configured-partialsync">Configured PartialSync</a></li>
 </ul>
@@ -141,6 +143,10 @@
 <li class="toctree-l3"><a class="reference internal" href="cli.html#fast-sync"><code class="docutils literal notranslate"><span class="pre">fast_sync</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="cli.html#partial-sync-table"><code class="docutils literal notranslate"><span class="pre">partial_sync_table</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="cli.html#reset-state"><code class="docutils literal notranslate"><span class="pre">reset_state</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="cli.html#target-maintenance">Target maintenance</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="cli.html#copy-native-to-iceberg"><code class="docutils literal notranslate"><span class="pre">copy_native_to_iceberg</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="cli.html#data-diff">Data-diff</a><ul>
@@ -215,7 +221,8 @@
 </li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">PartialSync behaviour</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#range-semantics">Range semantics</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#merge-outcomes">Merge outcomes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#native-table-merge-outcomes">Native-table merge outcomes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#managed-iceberg-v3-outcomes">Managed Iceberg v3 outcomes</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#visual-examples">Visual examples</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#safety-and-validation">Safety and validation</a></li>
 </ul>
@@ -267,6 +274,9 @@
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="troubleshooting.html#fastsync-errors">FastSync Errors</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="troubleshooting.html#snowflake-varchar-width-is-incompatible">Snowflake VARCHAR width is incompatible</a></li>
+<li class="toctree-l4"><a class="reference internal" href="troubleshooting.html#iceberg-publication-remains-ambiguous">Iceberg publication remains ambiguous</a></li>
+<li class="toctree-l4"><a class="reference internal" href="troubleshooting.html#native-to-iceberg-primary-name-is-absent">Native-to-Iceberg primary name is absent</a></li>
 <li class="toctree-l4"><a class="reference internal" href="troubleshooting.html#table-not-found">Table not found</a></li>
 <li class="toctree-l4"><a class="reference internal" href="troubleshooting.html#failure-to-import-tap-0-tables-discovered">Failure to import tap (0 tables discovered)</a></li>
 </ul>
@@ -373,8 +383,8 @@ Choose a stable, comparable column and a range that can be verified independentl
 <p>Without an end value, PipelineWise captures a replication position at the start
 and can hand ongoing replication over from that position after the merge.</p>
 </section>
-<section id="merge-outcomes">
-<h2>Merge outcomes<a class="headerlink" href="#merge-outcomes" title="Link to this heading"></a></h2>
+<section id="native-table-merge-outcomes">
+<h2>Native-table merge outcomes<a class="headerlink" href="#native-table-merge-outcomes" title="Link to this heading"></a></h2>
 <table class="docutils align-default" style="width: 100%">
 <colgroup>
 <col style="width: 28.0%" />
@@ -400,11 +410,15 @@ and can hand ongoing replication over from that position after the merge.</p>
 <td><p>Merged target values become <code class="docutils literal notranslate"><span class="pre">NULL</span></code> for that column.</p></td>
 <td><p>Existing values remain unchanged.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">hard_delete:</span> <span class="pre">true</span></code></p></td>
+<tr class="row-odd"><td><p>Compatible text column is narrower than <code class="docutils literal notranslate"><span class="pre">VARCHAR(134217728)</span></code></p></td>
+<td><p>PipelineWise widens the target column before applying the merge.</p></td>
+<td><p>Values are unchanged; the wider column definition applies to the table.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">hard_delete:</span> <span class="pre">true</span></code></p></td>
 <td><p>Target rows absent from the source range are deleted.</p></td>
 <td><p>Unchanged.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">hard_delete:</span> <span class="pre">false</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">hard_delete:</span> <span class="pre">false</span></code></p></td>
 <td><p>Missing source rows are retained and marked in <code class="docutils literal notranslate"><span class="pre">_SDC_DELETED_AT</span></code>.</p></td>
 <td><p>Unchanged.</p></td>
 </tr>
@@ -414,6 +428,63 @@ and can hand ongoing replication over from that position after the merge.</p>
 <p><span class="versionmodified deprecated">Deprecated since version 0.79.0: </span>Soft delete (<code class="docutils literal notranslate"><span class="pre">hard_delete:</span> <span class="pre">false</span></code>) is scheduled for removal. New pipelines
 should use <code class="docutils literal notranslate"><span class="pre">hard_delete:</span> <span class="pre">true</span></code>.</p>
 </div>
+<p>Snowflake commits schema changes independently from the merge transaction.
+PipelineWise therefore widens compatible native text columns and adds missing
+columns before starting DML. If the existing target type is not text, its width
+cannot be verified, or the target role cannot alter it, PartialSync fails before
+the merge and state advancement. Run a FullSync or alter the column to
+<code class="docutils literal notranslate"><span class="pre">VARCHAR(134217728)</span></code> with an authorized role, then retry PartialSync.</p>
+</section>
+<section id="managed-iceberg-v3-outcomes">
+<h2>Managed Iceberg v3 outcomes<a class="headerlink" href="#managed-iceberg-v3-outcomes" title="Link to this heading"></a></h2>
+<p>MariaDB/MySQL and PostgreSQL taps can select managed Iceberg v3 through
+<code class="docutils literal notranslate"><span class="pre">target_table_format:</span> <span class="pre">iceberg</span></code>. This route requires a primary key,
+<code class="docutils literal notranslate"><span class="pre">hard_delete:</span> <span class="pre">true</span></code>, and <code class="docutils literal notranslate"><span class="pre">data_flattening_max_level:</span> <span class="pre">0</span></code>.</p>
+<table class="docutils align-default" style="width: 100%">
+<colgroup>
+<col style="width: 34.0%" />
+<col style="width: 66.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Target state</p></th>
+<th class="head"><p>Outcome</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Missing</p></td>
+<td><p>Creates a managed Iceberg v3 table containing the selected range.</p></td>
+</tr>
+<tr class="row-odd"><td><p>Exactly compatible</p></td>
+<td><p>Updates, inserts, and hard-deletes the range in one transaction.</p></td>
+</tr>
+<tr class="row-even"><td><p>New nullable source column</p></td>
+<td><p>Adds the column, then applies the range transaction.</p></td>
+</tr>
+<tr class="row-odd"><td><p>Other schema or primary-key mismatch</p></td>
+<td><p>Fails before DML.</p></td>
+</tr>
+<tr class="row-even"><td><p>Existing string column is not <code class="docutils literal notranslate"><span class="pre">VARCHAR(134217728)</span></code></p></td>
+<td><p>Fails before DML; PipelineWise does not widen existing Iceberg columns.</p></td>
+</tr>
+<tr class="row-odd"><td><p>NULL or duplicate transformed staging key</p></td>
+<td><p>Fails before new publication DML; an already-submitted recovery remains
+ambiguous and preserves its evidence.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">drop_target_table:</span> <span class="pre">true</span></code></p></td>
+<td><p>Replaces the table with only the selected range.</p></td>
+</tr>
+</tbody>
+</table>
+<p>PipelineWise persists the resolved range before export. An interrupted retry
+reuses and deterministically replays that range after an ambiguous commit; it
+does not resolve a dynamic boundary again. State changes only after publication
+and finalization succeed. See <a class="reference internal" href="../connectors/targets/snowflake_iceberg.html#snowflake-iceberg-recovery"><span class="std std-ref">Concurrency and recovery</span></a>.</p>
+<p>After staging transformations, PipelineWise checks the canonical primary-key
+projection for NULL components and duplicate composite-key groups before it
+starts the range transaction. It does not choose or deduplicate conflicting
+rows. An invalid staged attempt is kept for cleanup and re-export; if an attempt
+was already submitted, its outcome remains ambiguous and requires manual
+recovery because the transaction may have committed.</p>
 </section>
 <section id="visual-examples">
 <h2>Visual examples<a class="headerlink" href="#visual-examples" title="Link to this heading"></a></h2>
@@ -437,10 +508,15 @@ during export and merge.</p></li>
 <li><p>Estimate the source range and target merge cost before running.</p></li>
 <li><p>Confirm the boundary query returns the intended rows; an empty range is a
 successful no-op.</p></li>
+<li><p>Ensure transformations and canonical casts preserve non-NULL, unique
+composite primary keys; PipelineWise rejects rather than deduplicates an
+invalid staging result.</p></li>
 <li><p>After completion, compare exact primary keys and critical values inside the
 range, then confirm the next normal Singer run advances state.</p></li>
-<li><p>On failure, retain staging objects and state until target publication is
-understood. Do not mark the range repaired from row count alone.</p></li>
+<li><p>On managed-Iceberg failure, retain staging objects, the
+<code class="docutils literal notranslate"><span class="pre">iceberg-recovery-&lt;hash&gt;.json</span></code> stream manifest, the
+<code class="docutils literal notranslate"><span class="pre">iceberg-fastsync-target-&lt;hash&gt;.json</span></code> target pointer, and state until target
+publication is understood. Do not mark the range repaired from row count alone.</p></li>
 </ul>
 </section>
 </section>

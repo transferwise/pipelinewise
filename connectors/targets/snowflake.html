@@ -91,6 +91,8 @@
 <li class="toctree-l1"><a class="reference internal" href="../../concept/fastsync.html">FastSync</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="../../concept/fastsync.html#supported-routes">Supported routes</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../concept/fastsync.html#automatic-selection-and-handover">Automatic selection and handover</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../concept/fastsync.html#snowflake-iceberg-publication">Snowflake Iceberg publication</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../concept/fastsync.html#snowflake-string-widths">Snowflake string widths</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../concept/fastsync.html#explicit-fullsync">Explicit FullSync</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../concept/fastsync.html#configured-partialsync">Configured PartialSync</a></li>
 </ul>
@@ -141,6 +143,10 @@
 <li class="toctree-l3"><a class="reference internal" href="../../user_guide/cli.html#fast-sync"><code class="docutils literal notranslate"><span class="pre">fast_sync</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../user_guide/cli.html#partial-sync-table"><code class="docutils literal notranslate"><span class="pre">partial_sync_table</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../user_guide/cli.html#reset-state"><code class="docutils literal notranslate"><span class="pre">reset_state</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/cli.html#target-maintenance">Target maintenance</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/cli.html#copy-native-to-iceberg"><code class="docutils literal notranslate"><span class="pre">copy_native_to_iceberg</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/cli.html#data-diff">Data-diff</a><ul>
@@ -215,7 +221,8 @@
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/partial_sync.html">PartialSync behaviour</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/partial_sync.html#range-semantics">Range semantics</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../../user_guide/partial_sync.html#merge-outcomes">Merge outcomes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/partial_sync.html#native-table-merge-outcomes">Native-table merge outcomes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/partial_sync.html#managed-iceberg-v3-outcomes">Managed Iceberg v3 outcomes</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/partial_sync.html#visual-examples">Visual examples</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/partial_sync.html#safety-and-validation">Safety and validation</a></li>
 </ul>
@@ -267,6 +274,9 @@
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="../../user_guide/troubleshooting.html#fastsync-errors">FastSync Errors</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../user_guide/troubleshooting.html#snowflake-varchar-width-is-incompatible">Snowflake VARCHAR width is incompatible</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../user_guide/troubleshooting.html#iceberg-publication-remains-ambiguous">Iceberg publication remains ambiguous</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../user_guide/troubleshooting.html#native-to-iceberg-primary-name-is-absent">Native-to-Iceberg primary name is absent</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../user_guide/troubleshooting.html#table-not-found">Table not found</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../user_guide/troubleshooting.html#failure-to-import-tap-0-tables-discovered">Failure to import tap (0 tables discovered)</a></li>
 </ul>
@@ -355,8 +365,9 @@
              
   <section id="snowflake-target">
 <span id="target-snowflake"></span><h1>Snowflake target<a class="headerlink" href="#snowflake-target" title="Link to this heading"></a></h1>
-<p><code class="docutils literal notranslate"><span class="pre">target-snowflake</span></code> loads Singer records through staged CSV files and supports
-native FastSync for selected database sources.</p>
+<p><code class="docutils literal notranslate"><span class="pre">target-snowflake</span></code> loads Singer records from compatible taps through staged
+CSV files into native or managed Iceberg v3 tables. It also supports FastSync
+for selected database sources.</p>
 <table class="docutils align-default" id="id1" style="width: 100%">
 <caption><span class="caption-text">Support</span><a class="headerlink" href="#id1" title="Link to this table"></a></caption>
 <colgroup>
@@ -367,14 +378,15 @@ native FastSync for selected database sources.</p>
 <thead>
 <tr class="row-odd"><th class="head"><p>Target</p></th>
 <th class="head"><p>Status</p></th>
-<th class="head"><p>Native transfer</p></th>
+<th class="head"><p>FastSync</p></th>
 </tr>
 </thead>
 <tbody>
 <tr class="row-even"><td><p>Snowflake</p></td>
 <td><p>Available</p></td>
-<td><p>FullSync from MariaDB/MySQL, PostgreSQL, or MongoDB; PartialSync from
-MariaDB/MySQL or PostgreSQL</p></td>
+<td><p>Native FullSync from MariaDB/MySQL, PostgreSQL, or MongoDB; native or
+managed Iceberg v3 FullSync and PartialSync from MariaDB/MySQL or
+PostgreSQL</p></td>
 </tr>
 </tbody>
 </table>
@@ -420,6 +432,7 @@ chain.</p>
 <span class="w">  </span><span class="nt">user</span><span class="p">:</span><span class="w"> </span><span class="s">"&lt;USER&gt;"</span>
 <span class="w">  </span><span class="nt">private_key</span><span class="p">:</span><span class="w"> </span><span class="s">"/run/secrets/snowflake-key.pem"</span>
 <span class="w">  </span><span class="nt">warehouse</span><span class="p">:</span><span class="w"> </span><span class="s">"&lt;WAREHOUSE&gt;"</span>
+<span class="w">  </span><span class="nt">role</span><span class="p">:</span><span class="w"> </span><span class="s">"&lt;ROLE&gt;"</span>
 <span class="w">  </span><span class="nt">s3_bucket</span><span class="p">:</span><span class="w"> </span><span class="s">"&lt;STAGING_BUCKET&gt;"</span>
 <span class="w">  </span><span class="nt">s3_key_prefix</span><span class="p">:</span><span class="w"> </span><span class="s">"pipelinewise/"</span>
 <span class="w">  </span><span class="nt">stage</span><span class="p">:</span><span class="w"> </span><span class="s">"&lt;SCHEMA&gt;.&lt;STAGE&gt;"</span>
@@ -457,6 +470,18 @@ chain.</p>
 <td><p>—</p></td>
 <td><p>Warehouse used for load and merge statements.</p></td>
 </tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">role</span></code></p></td>
+<td><p>No</p></td>
+<td><p>User default role</p></td>
+<td><p>Pins Singer, FastSync, recovery, and conversion to one Snowflake role.
+Set it explicitly when ownership or metadata visibility matters.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">iceberg_query_history_poll_timeout_seconds</span></code></p></td>
+<td><p>No</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">900</span></code></p></td>
+<td><p>Sets the positive-integer FastSync recovery budget for an ambiguous
+Iceberg CTAS or <code class="docutils literal notranslate"><span class="pre">INSERT</span> <span class="pre">OVERWRITE</span></code> submission.</p></td>
+</tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">s3_bucket</span></code> / <code class="docutils literal notranslate"><span class="pre">s3_key_prefix</span></code></p></td>
 <td><p>Yes</p></td>
 <td><p>—</p></td>
@@ -493,13 +518,7 @@ bucket-owner-enforced buckets.</p></td>
 <td><p>None</p></td>
 <td><p>Encrypts staged files using the stage’s matching master key.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">iceberg_create</span></code></p></td>
-<td><p>No</p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">false</span></code></p></td>
-<td><p>Deprecated target-wide setting for new Singer-path Iceberg tables.
-Prefer tap-level <code class="docutils literal notranslate"><span class="pre">target_table_format</span></code> and <code class="docutils literal notranslate"><span class="pre">iceberg_version</span></code>.</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">max_parallelism</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">max_parallelism</span></code></p></td>
 <td><p>No</p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">16</span></code></p></td>
 <td><p>Caps automatic Singer stream-flush threads. Configure this in the target
@@ -509,6 +528,22 @@ Prefer tap-level <code class="docutils literal notranslate"><span class="pre">ta
 </table>
 <p>Generate the full template with <code class="docutils literal notranslate"><span class="pre">pipelinewise</span> <span class="pre">init</span></code>. Common target and tap-side
 batch settings are documented in <a class="reference internal" href="../../user_guide/yaml_config.html#yaml-configuration"><span class="std std-ref">YAML configuration</span></a>.</p>
+<p>Managed Iceberg selection is tap-level. Target YAML rejects the removed
+<code class="docutils literal notranslate"><span class="pre">iceberg_create</span></code> setting and tap format/version keys. See
+<a class="reference internal" href="snowflake_iceberg.html#snowflake-iceberg"><span class="std std-ref">Snowflake Iceberg tables</span></a>.</p>
+</section>
+<section id="string-columns">
+<h2>String columns<a class="headerlink" href="#string-columns" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">target-snowflake</span></code> declares every new string column as
+<code class="docutils literal notranslate"><span class="pre">VARCHAR(134217728)</span></code> for native and managed Iceberg v3 tables. This applies
+both when Singer creates a table and when it adds a column during schema
+evolution. Snowflake’s 128 MB encoded-value limit still applies, so a multi-byte
+value can reach the byte limit before the declared character limit.</p>
+<p>For an existing native table, <code class="docutils literal notranslate"><span class="pre">target-snowflake</span></code> leaves a compatible string
+column at its current width. It does not widen or version that column solely
+because its declared width is narrower. Existing managed Iceberg v3 strings are
+different: every string column must already have the exact maximum width before
+PipelineWise writes the table. See <a class="reference internal" href="snowflake_iceberg.html#snowflake-iceberg"><span class="std std-ref">Snowflake Iceberg tables</span></a>.</p>
 </section>
 <section id="publication-and-grants">
 <h2>Publication and grants<a class="headerlink" href="#publication-and-grants" title="Link to this heading"></a></h2>
@@ -520,12 +555,13 @@ schema-wide grant behaviour.</p>
 </section>
 <section id="iceberg-tables">
 <h2>Iceberg tables<a class="headerlink" href="#iceberg-tables" title="Link to this heading"></a></h2>
-<p>The Singer connector can create managed Iceberg v3 tables when the tap selects
-that format. This does not yet enable a complete RDBMS-to-Iceberg route: fresh
-taps normally require FastSync first. FullSync and PartialSync with explicit
-Iceberg configuration fail before changing the target. Existing native tables
-can be converted with the bundled utility. See <a class="reference internal" href="snowflake_iceberg.html#snowflake-iceberg"><span class="std std-ref">Snowflake Iceberg tables</span></a> for
-configuration, prerequisites, and limitations.</p>
+<p>Any compatible Singer tap can load managed Iceberg v3 when it explicitly
+selects that format. MariaDB/MySQL and PostgreSQL additionally support FastSync
+FullSync and PartialSync for managed v3. Native tables remain the default.
+PipelineWise can also build or promote one Iceberg copy of an existing native
+table with <code class="docutils literal notranslate"><span class="pre">copy_native_to_iceberg</span></code>. See <a class="reference internal" href="snowflake_iceberg.html#snowflake-iceberg"><span class="std std-ref">Snowflake Iceberg tables</span></a> for
+configuration, publication methods, metadata limits, writer exclusion, and
+recovery.</p>
 </section>
 </section>
 

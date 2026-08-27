@@ -87,6 +87,14 @@ Do not advance or edit state merely to make a failed run start. Instead:
 3. restart the same ``run_tap`` command; and
 4. verify target contents and the new acknowledged state.
 
+For managed Iceberg v3, retain the ``iceberg-recovery-<hash>.json`` stream
+manifest, ``iceberg-fastsync-target-<hash>.json`` target pointer, and native
+staging objects. Retry from the same generated target runtime directory with the
+same tap, source route, target mapping, Snowflake role, staging configuration,
+and transformations. A retry reconciles CTAS or overwrite through exact query
+history, replays a saved PartialSync range deterministically, and resumes
+finalization before state advances. See :ref:`snowflake_iceberg_recovery`.
+
 Use :ref:`troubleshooting` for known errors. Use :ref:`resync` only when the
 required source log or replication slot is no longer available, or when target
 data must be rebuilt deliberately.

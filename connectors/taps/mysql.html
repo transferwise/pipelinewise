@@ -91,6 +91,8 @@
 <li class="toctree-l1"><a class="reference internal" href="../../concept/fastsync.html">FastSync</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="../../concept/fastsync.html#supported-routes">Supported routes</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../concept/fastsync.html#automatic-selection-and-handover">Automatic selection and handover</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../concept/fastsync.html#snowflake-iceberg-publication">Snowflake Iceberg publication</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../concept/fastsync.html#snowflake-string-widths">Snowflake string widths</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../concept/fastsync.html#explicit-fullsync">Explicit FullSync</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../concept/fastsync.html#configured-partialsync">Configured PartialSync</a></li>
 </ul>
@@ -141,6 +143,10 @@
 <li class="toctree-l3"><a class="reference internal" href="../../user_guide/cli.html#fast-sync"><code class="docutils literal notranslate"><span class="pre">fast_sync</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../user_guide/cli.html#partial-sync-table"><code class="docutils literal notranslate"><span class="pre">partial_sync_table</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="../../user_guide/cli.html#reset-state"><code class="docutils literal notranslate"><span class="pre">reset_state</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/cli.html#target-maintenance">Target maintenance</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../user_guide/cli.html#copy-native-to-iceberg"><code class="docutils literal notranslate"><span class="pre">copy_native_to_iceberg</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/cli.html#data-diff">Data-diff</a><ul>
@@ -215,7 +221,8 @@
 </li>
 <li class="toctree-l1"><a class="reference internal" href="../../user_guide/partial_sync.html">PartialSync behaviour</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/partial_sync.html#range-semantics">Range semantics</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../../user_guide/partial_sync.html#merge-outcomes">Merge outcomes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/partial_sync.html#native-table-merge-outcomes">Native-table merge outcomes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../user_guide/partial_sync.html#managed-iceberg-v3-outcomes">Managed Iceberg v3 outcomes</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/partial_sync.html#visual-examples">Visual examples</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../user_guide/partial_sync.html#safety-and-validation">Safety and validation</a></li>
 </ul>
@@ -267,6 +274,9 @@
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="../../user_guide/troubleshooting.html#fastsync-errors">FastSync Errors</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../user_guide/troubleshooting.html#snowflake-varchar-width-is-incompatible">Snowflake VARCHAR width is incompatible</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../user_guide/troubleshooting.html#iceberg-publication-remains-ambiguous">Iceberg publication remains ambiguous</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../user_guide/troubleshooting.html#native-to-iceberg-primary-name-is-absent">Native-to-Iceberg primary name is absent</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../user_guide/troubleshooting.html#table-not-found">Table not found</a></li>
 <li class="toctree-l4"><a class="reference internal" href="../../user_guide/troubleshooting.html#failure-to-import-tap-0-tables-discovered">Failure to import tap (0 tables discovered)</a></li>
 </ul>
@@ -368,17 +378,19 @@ different support status.</p>
 <thead>
 <tr class="row-odd"><th class="head"><p>Source</p></th>
 <th class="head"><p>Status</p></th>
-<th class="head"><p>Native transfer</p></th>
+<th class="head"><p>Bulk transfer</p></th>
 </tr>
 </thead>
 <tbody>
 <tr class="row-even"><td><p>MariaDB</p></td>
 <td><p>Available</p></td>
-<td><p>FullSync to PostgreSQL or Snowflake; PartialSync to Snowflake</p></td>
+<td><p>FullSync to PostgreSQL or Snowflake; PartialSync to Snowflake, including
+managed Iceberg v3</p></td>
 </tr>
 <tr class="row-odd"><td><p>MySQL</p></td>
 <td><p>Experimental</p></td>
-<td><p>FullSync to PostgreSQL or Snowflake; PartialSync to Snowflake</p></td>
+<td><p>FullSync to PostgreSQL or Snowflake; PartialSync to Snowflake, including
+managed Iceberg v3</p></td>
 </tr>
 </tbody>
 </table>
@@ -485,8 +497,16 @@ full template with <code class="docutils literal notranslate"><span class="pre">
 required to reconstruct a target row.</p></li>
 <li><p>The connector interprets <code class="docutils literal notranslate"><span class="pre">TINYINT</span></code> as Boolean. Values outside <code class="docutils literal notranslate"><span class="pre">0</span></code> and <code class="docutils literal notranslate"><span class="pre">1</span></code>
 can fail when the target column is Boolean.</p></li>
-<li><p>After an initial FastSync, the next normal run continues from the captured
-binlog or GTID position.</p></li>
+<li><p>After an initial FastSync, LOG_BASED or INCREMENTAL replication continues from
+the captured bookmark in the Singer portion of the same run.</p></li>
+<li><p>Snowflake Singer, FullSync, and PartialSync can target managed Iceberg v3 with
+explicit tap-level configuration. See <a class="reference internal" href="../targets/snowflake_iceberg.html#snowflake-iceberg"><span class="std std-ref">Snowflake Iceberg tables</span></a>.</p></li>
+<li><p>On an explicit v3 route with <code class="docutils literal notranslate"><span class="pre">engine:</span> <span class="pre">mariadb</span></code>, MariaDB’s generated
+<code class="docutils literal notranslate"><span class="pre">JSON_VALID</span></code> constraint identifies its <code class="docutils literal notranslate"><span class="pre">JSON</span></code>-alias <code class="docutils literal notranslate"><span class="pre">LONGTEXT</span></code> columns
+for <code class="docutils literal notranslate"><span class="pre">VARIANT</span></code> loading. Plain <code class="docutils literal notranslate"><span class="pre">LONGTEXT</span></code> and native routes remain strings.
+Object, array, string, number, Boolean, and null JSON roots are carried as
+validated JSON text and restored as <code class="docutils literal notranslate"><span class="pre">VARIANT</span></code>. JSON null remains distinct
+from SQL <code class="docutils literal notranslate"><span class="pre">NULL</span></code>.</p></li>
 <li><p>Use <a class="reference internal" href="../../user_guide/troubleshooting.html#troubleshooting"><span class="std std-ref">Troubleshooting</span></a> for missing-binlog and packet-size failures.</p></li>
 </ul>
 </section>
