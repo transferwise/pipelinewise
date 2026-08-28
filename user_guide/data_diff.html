@@ -24,7 +24,7 @@
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="Scheduling" href="scheduling.html" />
-    <link rel="prev" title="Command-line interface" href="cli.html" /> 
+    <link rel="prev" title="Data-diff backend database" href="data_diff_backend.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -162,11 +162,16 @@
 <li class="toctree-l2"><a class="reference internal" href="cli.html#common-options-and-environment">Common options and environment</a></li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="data_diff_backend.html">Data-diff backend database</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="data_diff_backend.html#configuration">Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="data_diff_backend.html#schema">Schema</a></li>
+<li class="toctree-l2"><a class="reference internal" href="data_diff_backend.html#reporting-queries">Reporting queries</a></li>
+</ul>
+</li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Data-diff checks</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#supported-routes">Supported routes</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#check-types">Check types</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#configuration">Configuration</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#backend-database">Backend database</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#check-configuration">Check configuration</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#tap-yaml">Tap YAML</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#choosing-a-frequency-and-window">Choosing a frequency and window</a></li>
 </ul>
@@ -177,7 +182,6 @@
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="#coverage-and-remediation">Coverage and remediation</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#monitoring-views">Monitoring views</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#source-safety">Source safety</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#preflight">Preflight</a></li>
 </ul>
@@ -484,34 +488,10 @@ other check types in the same run still execute normally</p></li>
 </ul>
 </div>
 </section>
-<section id="configuration">
-<h2>Configuration<a class="headerlink" href="#configuration" title="Link to this heading"></a></h2>
-<section id="backend-database">
-<h3>Backend database<a class="headerlink" href="#backend-database" title="Link to this heading"></a></h3>
-<p>Add to <code class="docutils literal notranslate"><span class="pre">config.yml</span></code>:</p>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">backend_db</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">host</span><span class="p">:</span><span class="w"> </span><span class="s">"backend.example.com"</span>
-<span class="w">  </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5432</span>
-<span class="w">  </span><span class="nt">user</span><span class="p">:</span><span class="w"> </span><span class="s">"pipelinewise"</span>
-<span class="w">  </span><span class="nt">password</span><span class="p">:</span><span class="w"> </span><span class="s">"&lt;vault</span><span class="nv"> </span><span class="s">encrypted&gt;"</span>
-<span class="w">  </span><span class="nt">dbname</span><span class="p">:</span><span class="w"> </span><span class="s">"pipelinewise"</span>
-<span class="w">  </span><span class="nt">sslmode</span><span class="p">:</span><span class="w"> </span><span class="s">"verify-full"</span>
-<span class="w">  </span><span class="nt">ddl_user</span><span class="p">:</span><span class="w"> </span><span class="s">"pipelinewise_ddl"</span>
-<span class="w">  </span><span class="nt">ddl_password</span><span class="p">:</span><span class="w"> </span><span class="s">"&lt;vault</span><span class="nv"> </span><span class="s">encrypted&gt;"</span>
-</pre></div>
-</div>
-<p>The backend is independent of source and target connections; when PostgreSQL is also
-the target, give the backend its own service or database.</p>
-<p><code class="docutils literal notranslate"><span class="pre">backend_db</span></code> is what turns data-diff on. Without it, <code class="docutils literal notranslate"><span class="pre">import_config</span></code> warns and
-ignores every <code class="docutils literal notranslate"><span class="pre">data_diff</span></code> block. Replication never reads the backend, so an outage
-there pauses reconciliation only — though <code class="docutils literal notranslate"><span class="pre">import_config</span></code> does fail while it is
-unreachable, since persisting definitions is its final step.</p>
-<p><code class="docutils literal notranslate"><span class="pre">ddl_user</span></code> runs the Alembic migrations and owns the schema, so the application user
-can hold DML grants only and a compromised pipeline cannot alter the schema. The
-migration grants <code class="docutils literal notranslate"><span class="pre">user</span></code> what it needs, so that role requires nothing beyond
-<code class="docutils literal notranslate"><span class="pre">CONNECT</span></code>. Point <code class="docutils literal notranslate"><span class="pre">ddl_user</span></code> at the same credentials as <code class="docutils literal notranslate"><span class="pre">user</span></code> to run migrations
-as the application user instead.</p>
-</section>
+<section id="check-configuration">
+<h2>Check configuration<a class="headerlink" href="#check-configuration" title="Link to this heading"></a></h2>
+<p>Configure the <a class="reference internal" href="data_diff_backend.html#data-diff-backend"><span class="std std-ref">Data-diff backend database</span></a> once for the PipelineWise installation
+before importing check definitions.</p>
 <section id="tap-yaml">
 <h3>Tap YAML<a class="headerlink" href="#tap-yaml" title="Link to this heading"></a></h3>
 <p>The <code class="docutils literal notranslate"><span class="pre">data_diff</span></code> block goes inside <code class="docutils literal notranslate"><span class="pre">schemas[].tables[]</span></code> in the tap YAML:</p>
@@ -538,6 +518,8 @@ as the application user instead.</p>
 <span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">"status"</span>
 <span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">"currency"</span>
 <span class="w">          </span><span class="c1"># Override: this table is checked twice a day rather than four times</span>
+<span class="w">          </span><span class="nt">window_start</span><span class="p">:</span><span class="w"> </span><span class="s">"-16h"</span>
+<span class="w">          </span><span class="nt">window_end</span><span class="p">:</span><span class="w"> </span><span class="s">"-4h"</span>
 <span class="w">          </span><span class="nt">frequency</span><span class="p">:</span><span class="w"> </span><span class="s">"0</span><span class="nv"> </span><span class="s">*/12</span><span class="nv"> </span><span class="s">*</span><span class="nv"> </span><span class="s">*</span><span class="nv"> </span><span class="s">*"</span>
 </pre></div>
 </div>
@@ -668,27 +650,8 @@ which would otherwise advance the scheduler past the slot needing recovery.</p>
 <p>The original run remains immutable. The rerun gets the next attempt number,
 <code class="docutils literal notranslate"><span class="pre">trigger</span> <span class="pre">=</span> <span class="pre">REMEDIATION</span></code>, and a <code class="docutils literal notranslate"><span class="pre">rerun_of_run_id</span></code> link. When it passes,
 the effective attempt for that scheduled slot changes and the watermark advances.</p>
-<p>PipelineWise keeps every attempt in <code class="docutils literal notranslate"><span class="pre">dd_runs</span></code> and every coverage transition in
-<code class="docutils literal notranslate"><span class="pre">dd_coverage_events</span></code>. <code class="docutils literal notranslate"><span class="pre">dd_effective_attempts</span></code> materializes only the highest
-terminal attempt for each scheduled slot, while <code class="docutils literal notranslate"><span class="pre">dd_coverage_state</span></code> stores the
-current watermark. A new chronological slot updates that state directly. A
-replacement or out-of-order slot recalculates it from the effective rows, without
-rescanning superseded attempts.</p>
-<section id="monitoring-views">
-<h3>Monitoring views<a class="headerlink" href="#monitoring-views" title="Link to this heading"></a></h3>
-<div class="highlight-sql notranslate"><div class="highlight"><pre><span></span><span class="c1">-- Coverage watermarks</span>
-<span class="k">SELECT</span><span class="w"> </span><span class="n">full_check_name</span><span class="p">,</span><span class="w"> </span><span class="n">coverage_start</span><span class="p">,</span><span class="w"> </span><span class="n">verified_through</span><span class="p">,</span>
-<span class="w">       </span><span class="n">coverage_status</span><span class="p">,</span><span class="w"> </span><span class="n">blocking_run_id</span><span class="p">,</span><span class="w"> </span><span class="n">verified_at</span>
-<span class="w">  </span><span class="k">FROM</span><span class="w"> </span><span class="k">public</span><span class="p">.</span><span class="n">dd_current_coverage</span><span class="p">;</span>
-
-<span class="c1">-- Remediation history</span>
-<span class="k">SELECT</span><span class="w"> </span><span class="n">full_check_name</span><span class="p">,</span><span class="w"> </span><span class="n">failed_run_id</span><span class="p">,</span><span class="w"> </span><span class="n">failed_status</span><span class="p">,</span>
-<span class="w">       </span><span class="n">window_start</span><span class="p">,</span><span class="w"> </span><span class="n">window_end</span><span class="p">,</span><span class="w"> </span><span class="n">remediation_status</span><span class="p">,</span>
-<span class="w">       </span><span class="n">remediation_reference</span><span class="p">,</span><span class="w"> </span><span class="n">recovered</span>
-<span class="w">  </span><span class="k">FROM</span><span class="w"> </span><span class="k">public</span><span class="p">.</span><span class="n">dd_remediation_history</span><span class="p">;</span>
-</pre></div>
-</div>
-</section>
+<p>The backend retains every run attempt and coverage transition. See
+<a class="reference internal" href="data_diff_backend.html#data-diff-backend"><span class="std std-ref">Data-diff backend database</span></a> for the schema, persistence model, and reporting queries.</p>
 <section id="source-safety">
 <h3>Source safety<a class="headerlink" href="#source-safety" title="Link to this heading"></a></h3>
 <ul class="simple">
@@ -733,7 +696,7 @@ the limit changes.</p>
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="cli.html" class="btn btn-neutral float-left" title="Command-line interface" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="data_diff_backend.html" class="btn btn-neutral float-left" title="Data-diff backend database" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
         <a href="scheduling.html" class="btn btn-neutral float-right" title="Scheduling" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 

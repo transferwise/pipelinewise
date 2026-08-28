@@ -1,0 +1,972 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Data-diff backend database &mdash; PipelineWise  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/custom.css?v=1fecaf93" />
+
+  
+    <link rel="shortcut icon" href="../_static/pipelinewise.png"/>
+    <link rel="canonical" href="https://transferwise.github.io/pipelinewise/user_guide/data_diff_backend.html"/>
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../_static/js/navigation.js?v=f8c789d3"></script>
+      <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+      <script type="module">import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11.12.1/dist/mermaid.esm.min.mjs";
+
+
+
+const initStyles = () => {
+    const defaultStyle = document.createElement('style');
+    defaultStyle.textContent = "pre.mermaid {\n    /* Same as .mermaid-container > pre */\n    display: block;\n    width: 100%;\n}\n\npre.mermaid > svg {\n    /* Same as .mermaid-container > pre > svg */\n    height: 500px;\n    width: 100%;\n    max-width: 100% !important;\n}";
+    document.head.appendChild(defaultStyle);
+
+    const fullscreenStyle = document.createElement('style');
+    fullscreenStyle.textContent = ".mermaid-container {\n    position: relative;\n    display: flex;\n    flex-direction: row;\n    width: 100%;\n}\n\n.mermaid-container > pre {\n    display: block;\n    width: 100%;\n}\n\n.mermaid-container > pre > svg {\n    height: 500px;\n    width: 100%;\n    max-width: 100% !important;\n}\n\n.mermaid-fullscreen-btn {\n    position: absolute;\n    width: 28px;\n    height: 28px;\n    background: rgba(255, 255, 255, 0.95);\n    border: 1px solid rgba(0, 0, 0, 0.3);\n    border-radius: 4px;\n    cursor: pointer;\n    display: flex;\n    align-items: center;\n    justify-content: center;\n    transition: all 0.2s;\n    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);\n    font-size: 14px;\n    line-height: 1;\n    padding: 0;\n    color: #333;\n}\n\n.mermaid-fullscreen-btn:hover {\n    opacity: 100% !important;\n    background: rgba(255, 255, 255, 1);\n    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);\n    transform: scale(1.1);\n}\n\n.mermaid-fullscreen-btn.dark-theme {\n    background: rgba(50, 50, 50, 0.95);\n    border: 1px solid rgba(255, 255, 255, 0.3);\n    color: #e0e0e0;\n}\n\n.mermaid-fullscreen-btn.dark-theme:hover {\n    background: rgba(60, 60, 60, 1);\n    box-shadow: 0 3px 10px rgba(255, 255, 255, 0.2);\n}\n\n.mermaid-fullscreen-modal {\n    display: none;\n    position: fixed !important;\n    top: 0 !important;\n    left: 0 !important;\n    width: 95vw;\n    height: 100vh;\n    background: rgba(255, 255, 255, 0.98);\n    z-index: 9999;\n    padding: 20px;\n    overflow: auto;\n}\n\n.mermaid-fullscreen-modal.dark-theme {\n    background: rgba(0, 0, 0, 0.98);\n}\n\n.mermaid-fullscreen-modal.active {\n    display: flex;\n    align-items: center;\n    justify-content: center;\n}\n\n.mermaid-container-fullscreen {\n    position: relative;\n    width: 95vw;\n    height: 90vh;\n    max-width: 95vw;\n    max-height: 90vh;\n    background: white;\n    border-radius: 8px;\n    padding: 20px;\n    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);\n    overflow: auto;\n    display: flex;\n    align-items: center;\n    justify-content: center;\n}\n\n.mermaid-container-fullscreen.dark-theme {\n    background: #1a1a1a;\n    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);\n}\n\n.mermaid-container-fullscreen pre.mermaid {\n    width: 100%;\n    height: 100%;\n    display: flex;\n    align-items: center;\n    justify-content: center;\n}\n\n.mermaid-container-fullscreen .mermaid svg {\n    height: 100% !important;\n    width: 100% !important;\n    cursor: grab;\n}\n\n.mermaid-fullscreen-close {\n    position: fixed !important;\n    top: 20px !important;\n    right: 20px !important;\n    width: 40px;\n    height: 40px;\n    background: rgba(255, 255, 255, 0.95);\n    border: 1px solid rgba(0, 0, 0, 0.2);\n    border-radius: 50%;\n    cursor: pointer;\n    z-index: 10000;\n    display: flex;\n    align-items: center;\n    justify-content: center;\n    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);\n    transition: all 0.2s;\n    font-size: 24px;\n    line-height: 1;\n    color: #333;\n}\n\n.mermaid-fullscreen-close:hover {\n    background: white;\n    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);\n    transform: scale(1.1);\n}\n\n.mermaid-fullscreen-close.dark-theme {\n    background: rgba(50, 50, 50, 0.95);\n    border: 1px solid rgba(255, 255, 255, 0.2);\n    color: #e0e0e0;\n}\n\n.mermaid-fullscreen-close.dark-theme:hover {\n    background: rgba(60, 60, 60, 1);\n    box-shadow: 0 6px 16px rgba(255, 255, 255, 0.2);\n}\n\n.mermaid-fullscreen-modal .mermaid-fullscreen-btn {\n    display: none !important;\n}";
+    document.head.appendChild(fullscreenStyle);
+}
+
+// Detect if page has dark background
+const isDarkTheme = () => {
+    // We use a set of heuristics:
+    // 1. Check for common dark mode classes or attributes
+    // 2. Check computed background color brightness
+    if (document.documentElement.classList.contains('dark') ||
+        document.documentElement.getAttribute('data-theme') === 'dark' ||
+        document.body.classList.contains('dark') ||
+        document.body.getAttribute('data-theme') === 'dark') {
+        // console.log("Dark theme detected via class/attribute");
+        return true;
+    }
+    if (document.documentElement.classList.contains('light') ||
+        document.documentElement.getAttribute('data-theme') === 'light' ||
+        document.body.classList.contains('light') ||
+        document.body.getAttribute('data-theme') === 'light') {
+        // console.log("Light theme detected via class/attribute");
+        return false;
+    }
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        // console.log("Dark theme detected via prefers-color-scheme");
+        return true;
+    }
+    const bgColor = window.getComputedStyle(document.body).backgroundColor;
+    const match = bgColor.match(/rgb\((\d+),\s*(\d+),\s*(\d+)/);
+    if (match) {
+        const r = parseInt(match[1]);
+        const g = parseInt(match[2]);
+        const b = parseInt(match[3]);
+        const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+        // console.log("Background color brightness:", brightness);
+        return brightness < 128;
+    }
+    // console.log("No dark or light theme detected, defaulting to light theme");
+    return false;
+};
+
+let darkTheme = isDarkTheme();
+let modal = null;
+let modalContent = null;
+let previousScrollOffset = [window.scrollX, window.scrollY];
+let _lazyObserver = null;
+let _renderQueue = Promise.resolve();
+let closeModal = () => {};
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && modal?.classList.contains('active')) {
+        closeModal();
+    }
+});
+
+// Apply d3 zoom to each SVG. Idempotent: an SVG already wrapped is skipped,
+// so this is safe to call both for the initial batch and for diagrams that
+// render lazily once they become visible.
+const addZoomToSvgs = (svgs) => {
+    svgs.each(function() {
+        if (this.getAttribute('data-zoom-applied') === 'true') return;
+        var svg = d3.select(this);
+        svg.html("<g class='wrapper'>" + svg.html() + "</g>");
+        var inner = svg.select("g");
+        var zoom = d3.zoom().on("zoom", function(event) {
+            inner.attr("transform", event.transform);
+        });
+        svg.call(zoom);
+        this.setAttribute('data-zoom-applied', 'true');
+    });
+};
+
+const runMermaid = async (rerun) => {
+    console.log("Running mermaid diagrams, rerun =", rerun);
+    // clear all existing mermaid charts
+    let all_mermaids = document.querySelectorAll(".mermaid");
+
+    if (rerun) {
+        // Disconnect any previous lazy rendering observer
+        if (_lazyObserver) {
+            _lazyObserver.disconnect();
+            _lazyObserver = null;
+        }
+
+        all_mermaids.forEach((el) => {
+            el.removeAttribute('data-mermaid-deferred');
+            el.removeAttribute('data-mermaid-render-failed');
+            if(!el.hasAttribute("data-original-code")) {
+                // store original code
+                // console.log(`Storing original code for first run: `, el.innerHTML);
+                el.setAttribute('data-original-code', el.innerHTML);
+            }
+            if(el.getAttribute("data-processed") === "true") {
+                // remove and restore original
+                el.removeAttribute("data-processed");
+                // console.log(`Restoring original code for re-run: `, el.getAttribute('data-original-code'));
+                el.innerHTML = el.getAttribute('data-original-code');
+            } else {
+                // store original code
+                // console.log(`Storing original code for re-run: `, el.innerHTML);
+                el.setAttribute('data-original-code', el.innerHTML);
+            }
+        });
+
+        // Separate visible and hidden elements. Mermaid's layout engine measures
+        // text dimensions via the DOM, which fails for elements hidden by a parent
+        // (e.g., Reveal.js non-active slides, sphinx-design unopened tabs),
+        // producing broken SVGs. Render visible elements now, defer hidden ones.
+        const visible = [];
+        const hidden = [];
+        all_mermaids.forEach((el) => {
+            // offsetParent is null for display:none ancestors.
+            // getClientRects().length > 0 catches position:fixed elements
+            // (which also have null offsetParent but are still visible).
+            if (el.offsetParent !== null || el.getClientRects().length > 0) {
+                visible.push(el);
+            } else {
+                hidden.push(el);
+                el.setAttribute('data-mermaid-deferred', 'true');
+            }
+        });
+
+        if (visible.length > 0) {
+            try {
+                await mermaid.run({ nodes: visible });
+            } catch (e) {
+                console.error("Mermaid rendering failed:", e);
+            }
+        }
+
+        // Lazily render hidden elements when they become visible.
+        // Uses a promise chain (_renderQueue) to serialize rendering,
+        // since IntersectionObserver may report multiple entries at once
+        // and mermaid.run() is not safe to call concurrently.
+        if (hidden.length > 0) {
+            if (typeof IntersectionObserver === 'undefined') {
+                console.warn("IntersectionObserver not available; hidden mermaid diagrams will not render.");
+            } else {
+                _renderQueue = Promise.resolve();
+                _lazyObserver = new IntersectionObserver((entries) => {
+                    for (const entry of entries) {
+                        if (entry.isIntersecting && entry.target.getAttribute("data-processed") !== "true") {
+                            _lazyObserver.unobserve(entry.target);
+                            const el = entry.target;
+                            _renderQueue = _renderQueue.then(async () => {
+                                try {
+                                    await mermaid.run({ nodes: [el] });
+                                    el.removeAttribute('data-mermaid-deferred');
+                                    // Apply zoom to the now-rendered diagram, matching
+                                    // the decoration visible diagrams receive.
+                                    if (true) {
+                                        addZoomToSvgs(d3.selectAll(".mermaid[data-zoom-id=id-b53ecbe9-ebc0-40e0-83e7-f862f08212ca]").select(function() {
+                                            return this.querySelector("svg");
+                                        }));
+                                    }
+                                } catch (e) {
+                                    console.error("Mermaid deferred rendering failed:", e);
+                                    el.removeAttribute('data-mermaid-deferred');
+                                    el.setAttribute('data-mermaid-render-failed', 'true');
+                                }
+                            });
+                        }
+                    }
+                });
+                hidden.forEach((el) => _lazyObserver.observe(el));
+            }
+        }
+    }
+
+    all_mermaids = document.querySelectorAll(".mermaid");
+    // Exclude deferred (hidden) and render-failed elements from completion checks
+    const mermaids_active = document.querySelectorAll(".mermaid:not([data-mermaid-deferred]):not([data-mermaid-render-failed])");
+    const mermaids_processed = document.querySelectorAll(".mermaid:not([data-mermaid-deferred]):not([data-mermaid-render-failed])[data-processed='true']");
+
+    if (true) {
+        const mermaids_to_add_zoom = 1 === -1 ? mermaids_active.length : 1;
+        if(mermaids_to_add_zoom > 0) {
+            var svgs = d3.selectAll(".mermaid[data-zoom-id=id-b53ecbe9-ebc0-40e0-83e7-f862f08212ca]").select(function() {
+                return this.querySelector("svg");
+            });
+            // Wait until every active (visible) diagram has rendered. Deferred
+            // diagrams are excluded, so a fixed d3_node_count that counts a
+            // hidden diagram no longer loops forever waiting for its SVG.
+            if(mermaids_active.length !== mermaids_processed.length) {
+                setTimeout(() => runMermaid(false), 200);
+                return;
+            }
+            addZoomToSvgs(svgs);
+        }
+    } else if(mermaids_active.length !== mermaids_processed.length) {
+        // Wait for mermaid to process all diagrams
+        setTimeout(() => runMermaid(false), 200);
+        return;
+    }
+
+    // Stop here if not adding fullscreen capability
+    if (!true) return;
+
+    if (modal !== null ) {
+        // Destroy existing modal
+        modal.remove();
+        modal = null;
+        modalContent = null;
+    }
+
+    modal = document.createElement('div');
+    modal.className = 'mermaid-fullscreen-modal' + (darkTheme ? ' dark-theme' : '');
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-label', 'Fullscreen diagram viewer');
+    modal.innerHTML = `
+        <button class="mermaid-fullscreen-close${darkTheme ? ' dark-theme' : ''}" aria-label="Close fullscreen">✕</button>
+        <div class="mermaid-container-fullscreen${darkTheme ? ' dark-theme' : ''}"></div>
+    `;
+    document.body.appendChild(modal);
+
+    modalContent = modal.querySelector('.mermaid-container-fullscreen');
+    const closeBtn = modal.querySelector('.mermaid-fullscreen-close');
+
+    closeModal = () => {
+        modal.classList.remove('active');
+        modalContent.innerHTML = '';
+        document.body.style.overflow = ''
+        window.scrollTo({left: previousScrollOffset[0], top: previousScrollOffset[1], behavior: 'instant'});
+    };
+
+    closeBtn.addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeModal();
+    });
+    document.querySelectorAll('.mermaid').forEach((mermaidDiv) => {
+        if (mermaidDiv.parentNode.classList.contains('mermaid-container') ||
+            mermaidDiv.closest('.mermaid-fullscreen-modal')) {
+            // Already processed, adjust button class if needed
+            const existingBtn = mermaidDiv.parentNode.querySelector('.mermaid-fullscreen-btn');
+            if (existingBtn) {
+                existingBtn.className = 'mermaid-fullscreen-btn' + (darkTheme ? ' dark-theme' : '');
+            }
+            return;
+        }
+
+        const container = document.createElement('div');
+        container.className = 'mermaid-container';
+        mermaidDiv.parentNode.insertBefore(container, mermaidDiv);
+        container.appendChild(mermaidDiv);
+
+        const fullscreenBtn = document.createElement('button');
+        fullscreenBtn.className = 'mermaid-fullscreen-btn' + (darkTheme ? ' dark-theme' : '');
+        fullscreenBtn.setAttribute('aria-label', 'View diagram in fullscreen');
+        fullscreenBtn.textContent = "\u26f6";
+        fullscreenBtn.style.opacity = "50%";
+
+        // Calculate dynamic position based on diagram's margin and padding
+        const diagramStyle = window.getComputedStyle(mermaidDiv);
+        const marginTop = parseFloat(diagramStyle.marginTop) || 0;
+        const marginRight = parseFloat(diagramStyle.marginRight) || 0;
+        const paddingTop = parseFloat(diagramStyle.paddingTop) || 0;
+        const paddingRight = parseFloat(diagramStyle.paddingRight) || 0;
+        fullscreenBtn.style.top = `${marginTop + paddingTop + 4}px`;
+        fullscreenBtn.style.right = `${marginRight + paddingRight + 4}px`;
+
+        fullscreenBtn.addEventListener('click', () => {
+            previousScrollOffset = [window.scrollX, window.scrollY];
+            const clone = mermaidDiv.cloneNode(true);
+            modalContent.innerHTML = '';
+            modalContent.appendChild(clone);
+
+            const svg = clone.querySelector('svg');
+            if (svg) {
+                svg.removeAttribute('width');
+                svg.removeAttribute('height');
+                svg.style.width = '100%';
+                svg.style.height = 'auto';
+                svg.style.maxWidth = '100%';
+                svg.style.display = 'block';
+
+                if (true) {
+                    setTimeout(() => {
+                        const g = svg.querySelector('g');
+                        if (g) {
+                            var svgD3 = d3.select(svg);
+                            svgD3.html("<g class='wrapper'>" + svgD3.html() + "</g>");
+                            var inner = svgD3.select("g");
+                            var zoom = d3.zoom().on("zoom", function(event) {
+                                inner.attr("transform", event.transform);
+                            });
+                            svgD3.call(zoom);
+                        }
+                    }, 100);
+                }
+            }
+
+            modal.classList.add('active');
+            document.body.style.overflow = 'hidden';
+        });
+        container.appendChild(fullscreenBtn);
+    });
+};
+
+
+
+const load = async () => {
+    initStyles();
+
+
+    await runMermaid(true);
+
+    const reRunIfThemeChanges = async () => {
+        const newDarkTheme = isDarkTheme();
+        if (newDarkTheme !== darkTheme) {
+            darkTheme = newDarkTheme;
+            console.log("Theme change detected, re-running mermaid with", darkTheme ? "dark" : "default", "theme");
+            await mermaid.initialize(
+                {...{"startOnLoad": false},
+                ...{ darkMode: darkTheme, theme: darkTheme ? "dark" : "default" },
+                }
+            );
+            await runMermaid(true);
+        }
+    };
+
+    // Update theme classes when theme changes
+    const themeObserver = new MutationObserver(reRunIfThemeChanges);
+    themeObserver.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ['class', 'style', 'data-theme']
+    });
+    themeObserver.observe(document.body, {
+        attributes: true,
+        attributeFilter: ['class', 'style', 'data-theme']
+    });
+};
+
+
+
+
+
+console.log("Initializing mermaid with", darkTheme ? "dark" : "default", "theme");
+mermaid.initialize(
+    {...{"startOnLoad": false},
+    ...{ darkMode: darkTheme, theme: darkTheme ? "dark" : "default" },
+    }
+);
+
+window.addEventListener("load", load);
+window.runMermaid = runMermaid;</script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Data-diff checks" href="data_diff.html" />
+    <link rel="prev" title="Command-line interface" href="cli.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            PipelineWise
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Installation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../installation_guide/installation.html">Installation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../installation_guide/installation.html#choose-an-installation-method">Choose an installation method</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation_guide/installation.html#docker-installation">Docker installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation_guide/installation.html#source-installation">Source installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation_guide/installation.html#packaged-connectors">Packaged connectors</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../installation_guide/creating_pipelines.html">Create a pipeline</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../installation_guide/creating_pipelines.html#generate-a-project">Generate a project</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation_guide/creating_pipelines.html#configure-snowflake">Configure Snowflake</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation_guide/creating_pipelines.html#configure-postgresql">Configure PostgreSQL</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation_guide/creating_pipelines.html#provide-secrets">Provide secrets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation_guide/creating_pipelines.html#validate-and-import">Validate and import</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../installation_guide/running_pipelines.html">Run a pipeline</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../installation_guide/running_pipelines.html#preflight">Preflight</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation_guide/running_pipelines.html#start-and-observe">Start and observe</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation_guide/running_pipelines.html#stop-safely">Stop safely</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation_guide/running_pipelines.html#confirm-success">Confirm success</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation_guide/running_pipelines.html#recover-from-failure">Recover from failure</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Concepts</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../concept/singer.html">Singer data flow</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../concept/singer.html#messages">Messages</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../concept/singer.html#taps">Taps</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../concept/singer.html#targets">Targets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../concept/singer.html#acknowledgement-boundary">Acknowledgement boundary</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../concept/replication_methods.html">Replication methods</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../concept/replication_methods.html#choose-a-method">Choose a method</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../concept/replication_methods.html#log-based-replication">Log-based replication</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../concept/replication_methods.html#key-based-incremental-replication">Key-based incremental replication</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../concept/replication_methods.html#full-table-replication">Full-table replication</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../concept/fastsync.html">FastSync</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#supported-routes">Supported routes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#automatic-selection-and-handover">Automatic selection and handover</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#snowflake-iceberg-publication">Snowflake Iceberg publication</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#snowflake-string-widths">Snowflake string widths</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#explicit-fullsync">Explicit FullSync</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../concept/fastsync.html#configured-partialsync">Configured PartialSync</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../concept/linux_pipes.html">Stream buffering and acknowledgement</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../concept/linux_pipes.html#configuration">Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../concept/linux_pipes.html#acknowledgement-boundary">Acknowledgement boundary</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../concept/linux_pipes.html#termination-and-restart">Termination and restart</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../concept/linux_pipes.html#operational-guidance">Operational guidance</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Operations</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="yaml_config.html">YAML configuration</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="yaml_config.html#project-files">Project files</a></li>
+<li class="toctree-l2"><a class="reference internal" href="yaml_config.html#global-configuration">Global configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="yaml_config.html#tap-configuration">Tap configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="yaml_config.html#schemas-and-tables">Schemas and tables</a></li>
+<li class="toctree-l2"><a class="reference internal" href="yaml_config.html#target-configuration">Target configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="yaml_config.html#secrets-and-validation">Secrets and validation</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="encrypting_passwords.html">Encrypt configuration values</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="encrypting_passwords.html#create-the-vault-password-file">Create the vault password file</a></li>
+<li class="toctree-l2"><a class="reference internal" href="encrypting_passwords.html#encrypt-a-value">Encrypt a value</a></li>
+<li class="toctree-l2"><a class="reference internal" href="encrypting_passwords.html#import-encrypted-yaml">Import encrypted YAML</a></li>
+<li class="toctree-l2"><a class="reference internal" href="encrypting_passwords.html#rotation-and-recovery">Rotation and recovery</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="cli.html">Command-line interface</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="cli.html#command-summary">Command summary</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cli.html#project-lifecycle">Project lifecycle</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="cli.html#init"><code class="docutils literal notranslate"><span class="pre">init</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli.html#validate"><code class="docutils literal notranslate"><span class="pre">validate</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli.html#import-config"><code class="docutils literal notranslate"><span class="pre">import_config</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="cli.html#inspect-and-test">Inspect and test</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="cli.html#status"><code class="docutils literal notranslate"><span class="pre">status</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli.html#test-tap-connection"><code class="docutils literal notranslate"><span class="pre">test_tap_connection</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli.html#discover-tap"><code class="docutils literal notranslate"><span class="pre">discover_tap</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="cli.html#replication">Replication</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="cli.html#run-tap"><code class="docutils literal notranslate"><span class="pre">run_tap</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli.html#stop-tap"><code class="docutils literal notranslate"><span class="pre">stop_tap</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli.html#fast-sync"><code class="docutils literal notranslate"><span class="pre">fast_sync</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli.html#partial-sync-table"><code class="docutils literal notranslate"><span class="pre">partial_sync_table</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli.html#reset-state"><code class="docutils literal notranslate"><span class="pre">reset_state</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="cli.html#target-maintenance">Target maintenance</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="cli.html#copy-native-to-iceberg"><code class="docutils literal notranslate"><span class="pre">copy_native_to_iceberg</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="cli.html#data-diff">Data-diff</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="cli.html#list-data-diff-checks"><code class="docutils literal notranslate"><span class="pre">list_data_diff_checks</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli.html#run-data-diff-checks"><code class="docutils literal notranslate"><span class="pre">run_data_diff_checks</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli.html#rerun-data-diff-check"><code class="docutils literal notranslate"><span class="pre">rerun_data_diff_check</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="cli.html#secrets">Secrets</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="cli.html#encrypt-string"><code class="docutils literal notranslate"><span class="pre">encrypt_string</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="cli.html#common-options-and-environment">Common options and environment</a></li>
+</ul>
+</li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Data-diff backend database</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#configuration">Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#schema">Schema</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#reporting-queries">Reporting queries</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="data_diff.html">Data-diff checks</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="data_diff.html#supported-routes">Supported routes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="data_diff.html#check-types">Check types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="data_diff.html#check-configuration">Check configuration</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="data_diff.html#tap-yaml">Tap YAML</a></li>
+<li class="toctree-l3"><a class="reference internal" href="data_diff.html#choosing-a-frequency-and-window">Choosing a frequency and window</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="data_diff.html#cli-commands">CLI commands</a></li>
+<li class="toctree-l2"><a class="reference internal" href="data_diff.html#alerts">Alerts</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="data_diff.html#one-alert-per-failed-check-per-window">One alert per failed check per window</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="data_diff.html#coverage-and-remediation">Coverage and remediation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="data_diff.html#source-safety">Source safety</a></li>
+<li class="toctree-l3"><a class="reference internal" href="data_diff.html#preflight">Preflight</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="scheduling.html">Scheduling</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="scheduling.html#requirements">Requirements</a></li>
+<li class="toctree-l2"><a class="reference internal" href="scheduling.html#example">Example</a></li>
+<li class="toctree-l2"><a class="reference internal" href="scheduling.html#cadence-and-overlap">Cadence and overlap</a></li>
+<li class="toctree-l2"><a class="reference internal" href="scheduling.html#retries-and-recovery">Retries and recovery</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="multi_server_cluster.html">Multi-server operation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="multi_server_cluster.html#prerequisites">Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="multi_server_cluster.html#scheduling-boundary">Scheduling boundary</a></li>
+<li class="toctree-l2"><a class="reference internal" href="multi_server_cluster.html#failure-recovery">Failure recovery</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="logging.html">Logging</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="logging.html#filename-fields">Filename fields</a></li>
+<li class="toctree-l2"><a class="reference internal" href="logging.html#observe-a-run">Observe a run</a></li>
+<li class="toctree-l2"><a class="reference internal" href="logging.html#diagnose-failure">Diagnose failure</a></li>
+<li class="toctree-l2"><a class="reference internal" href="logging.html#retention">Retention</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="alerts.html">Alerts</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="alerts.html#handlers">Handlers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="alerts.html#slack">Slack</a></li>
+<li class="toctree-l2"><a class="reference internal" href="alerts.html#victorops">VictorOps</a></li>
+<li class="toctree-l2"><a class="reference internal" href="alerts.html#routing-and-suppression">Routing and suppression</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="resync.html">Resync and repair</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="resync.html#choose-an-operation">Choose an operation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="resync.html#preflight">Preflight</a></li>
+<li class="toctree-l2"><a class="reference internal" href="resync.html#full-resync">Full resync</a></li>
+<li class="toctree-l2"><a class="reference internal" href="resync.html#partial-repair">Partial repair</a></li>
+<li class="toctree-l2"><a class="reference internal" href="resync.html#failure-and-validation">Failure and validation</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="partial_sync.html">PartialSync behaviour</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="partial_sync.html#range-semantics">Range semantics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="partial_sync.html#native-table-merge-outcomes">Native-table merge outcomes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="partial_sync.html#managed-iceberg-v3-outcomes">Managed Iceberg v3 outcomes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="partial_sync.html#visual-examples">Visual examples</a></li>
+<li class="toctree-l2"><a class="reference internal" href="partial_sync.html#safety-and-validation">Safety and validation</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="schema_changes.html">Schema changes</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="schema_changes.html#change-outcomes">Change outcomes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="schema_changes.html#column-versioning">Column versioning</a></li>
+<li class="toctree-l2"><a class="reference internal" href="schema_changes.html#operational-procedure">Operational procedure</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="transformations.html">Load-time transformations</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="transformations.html#transformation-types">Transformation types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="transformations.html#configuration">Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="transformations.html#nested-json-fields">Nested JSON fields</a></li>
+<li class="toctree-l2"><a class="reference internal" href="transformations.html#conditions">Conditions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="transformations.html#validation-and-rollout">Validation and rollout</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="metadata_columns.html">Metadata columns and deletes</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="metadata_columns.html#columns">Columns</a></li>
+<li class="toctree-l2"><a class="reference internal" href="metadata_columns.html#configuration-outcomes">Configuration outcomes</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="troubleshooting.html">Troubleshooting</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="troubleshooting.html#symptom-index">Symptom index</a></li>
+<li class="toctree-l2"><a class="reference internal" href="troubleshooting.html#replication-checks">Replication checks</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="troubleshooting.html#when-to-resync">When to resync</a></li>
+<li class="toctree-l3"><a class="reference internal" href="troubleshooting.html#incremental-method-and-missing-updates">INCREMENTAL method and missing updates</a></li>
+<li class="toctree-l3"><a class="reference internal" href="troubleshooting.html#using-replica-host-for-large-table-resyncs-1-tb">Using replica_host for large table resyncs (1 TB+)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="troubleshooting.html#changes-to-transformations">Changes to transformations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="troubleshooting.html#resync-table-size-limit">Resync table size limit</a></li>
+<li class="toctree-l3"><a class="reference internal" href="troubleshooting.html#mariadb-mysql-errors">MariaDB / MySQL Errors</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="troubleshooting.html#lost-connection-to-mysql-server-errno-104-connection-reset-by-peer">Lost connection to MySQL server (Errno 104, Connection reset by peer)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="troubleshooting.html#unknown-encoding-utf8mb3">Unknown encoding: utf8mb3</a></li>
+<li class="toctree-l4"><a class="reference internal" href="troubleshooting.html#bogus-data-in-log-event">Bogus data in log event</a></li>
+<li class="toctree-l4"><a class="reference internal" href="troubleshooting.html#log-event-exceeded-max-allowed-packet">Log event exceeded max_allowed_packet</a></li>
+<li class="toctree-l4"><a class="reference internal" href="troubleshooting.html#missing-binlog">Missing binlog</a></li>
+<li class="toctree-l4"><a class="reference internal" href="troubleshooting.html#changing-the-binlog-position-in-state-json">Changing the binlog position in state.json</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="troubleshooting.html#postgresql-errors">PostgreSQL Errors</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="troubleshooting.html#requires-wal-level-logical">requires wal_level &gt;= logical</a></li>
+<li class="toctree-l4"><a class="reference internal" href="troubleshooting.html#pgres-copy-both-and-no-message-from-the-libpq">PGRES_COPY_BOTH and no message from the libpq</a></li>
+<li class="toctree-l4"><a class="reference internal" href="troubleshooting.html#log-based-replication-is-slow-or-falling-behind">LOG_BASED replication is slow or falling behind</a></li>
+<li class="toctree-l4"><a class="reference internal" href="troubleshooting.html#canceling-statement-due-to-conflict-with-recovery">Canceling statement due to conflict with recovery</a></li>
+<li class="toctree-l4"><a class="reference internal" href="troubleshooting.html#connection-already-closed">Connection already closed</a></li>
+<li class="toctree-l4"><a class="reference internal" href="troubleshooting.html#recovery-is-in-progress">recovery is in progress</a></li>
+<li class="toctree-l4"><a class="reference internal" href="troubleshooting.html#unable-to-find-replication-slot">Unable to find replication slot</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="troubleshooting.html#fastsync-errors">FastSync Errors</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="troubleshooting.html#snowflake-varchar-width-is-incompatible">Snowflake VARCHAR width is incompatible</a></li>
+<li class="toctree-l4"><a class="reference internal" href="troubleshooting.html#iceberg-publication-remains-ambiguous">Iceberg publication remains ambiguous</a></li>
+<li class="toctree-l4"><a class="reference internal" href="troubleshooting.html#native-to-iceberg-primary-name-is-absent">Native-to-Iceberg primary name is absent</a></li>
+<li class="toctree-l4"><a class="reference internal" href="troubleshooting.html#table-not-found">Table not found</a></li>
+<li class="toctree-l4"><a class="reference internal" href="troubleshooting.html#failure-to-import-tap-0-tables-discovered">Failure to import tap (0 tables discovered)</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="troubleshooting.html#logging-and-diagnostics">Logging and Diagnostics</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="troubleshooting.html#verify-recovery">Verify recovery</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Connectors</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../connectors/index.html">Connector overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../connectors/taps.html">Sources</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/taps/mysql.html">MariaDB and MySQL source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/taps/postgres.html">PostgreSQL source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/taps/snowflake.html">Snowflake source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/taps/mongodb.html">MongoDB source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/taps/s3_csv.html">S3 CSV source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/taps/kafka.html">Kafka source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/taps/zendesk.html">Zendesk source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/taps/jira.html">Jira source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/taps/github.html">GitHub source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/taps/slack.html">Slack source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/taps/mixpanel.html">Mixpanel source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/taps/salesforce.html">Salesforce source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/taps/twilio.html">Twilio source</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../connectors/targets.html">Targets</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/targets/postgres.html">PostgreSQL target</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/targets/snowflake.html">Snowflake target</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/targets/snowflake_iceberg.html">Snowflake Iceberg tables</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../connectors/targets/s3_csv.html">S3 CSV target</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Project</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../project/contribution.html">Contributing</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../project/contribution.html#development-environment">Development environment</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../project/contribution.html#add-or-update-a-source-connector">Add or update a source connector</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../project/contribution.html#add-or-update-a-target-connector">Add or update a target connector</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../project/contribution.html#support-status">Support status</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../project/contribution.html#validation">Validation</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../project/about.html">Project</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../project/about.html#history">History</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../project/about.html#early-contributors">Early contributors</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../project/about.html#contribution">Contribution</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../project/about.html#resources-and-links">Resources and links</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../project/licenses.html">Licenses</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../project/licenses.html#packaged-components">Packaged components</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">PipelineWise</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Data-diff backend database</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/user_guide/data_diff_backend.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="data-diff-backend-database">
+<span id="data-diff-backend"></span><h1>Data-diff backend database<a class="headerlink" href="#data-diff-backend-database" title="Link to this heading"></a></h1>
+<p>Data-diff uses a PostgreSQL control-plane database to store check definitions,
+execution history, results, and coverage. It is independent of source and target
+connections and must not also serve as a replication target.</p>
+<p>See <a class="reference internal" href="data_diff.html#data-diff"><span class="std std-ref">Data-diff checks</span></a> to define, schedule, and remediate data-diff checks.</p>
+<section id="configuration">
+<h2>Configuration<a class="headerlink" href="#configuration" title="Link to this heading"></a></h2>
+<p>Add <code class="docutils literal notranslate"><span class="pre">backend_db</span></code> to <code class="docutils literal notranslate"><span class="pre">config.yml</span></code>:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">backend_db</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">host</span><span class="p">:</span><span class="w"> </span><span class="s">"backend.example.com"</span>
+<span class="w">  </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5432</span>
+<span class="w">  </span><span class="nt">user</span><span class="p">:</span><span class="w"> </span><span class="s">"pipelinewise"</span>
+<span class="w">  </span><span class="nt">password</span><span class="p">:</span><span class="w"> </span><span class="s">"&lt;vault</span><span class="nv"> </span><span class="s">encrypted&gt;"</span>
+<span class="w">  </span><span class="nt">dbname</span><span class="p">:</span><span class="w"> </span><span class="s">"pipelinewise"</span>
+<span class="w">  </span><span class="nt">sslmode</span><span class="p">:</span><span class="w"> </span><span class="s">"verify-full"</span>
+<span class="w">  </span><span class="nt">ddl_user</span><span class="p">:</span><span class="w"> </span><span class="s">"pipelinewise_ddl"</span>
+<span class="w">  </span><span class="nt">ddl_password</span><span class="p">:</span><span class="w"> </span><span class="s">"&lt;vault</span><span class="nv"> </span><span class="s">encrypted&gt;"</span>
+</pre></div>
+</div>
+<p>When PostgreSQL is also the replication target, give the backend its own service
+or database.</p>
+<p><code class="docutils literal notranslate"><span class="pre">backend_db</span></code> enables data-diff. Without it, <code class="docutils literal notranslate"><span class="pre">import_config</span></code> warns and ignores
+every <code class="docutils literal notranslate"><span class="pre">data_diff</span></code> block. Replication never reads the backend, so an outage pauses
+reconciliation only. However, <code class="docutils literal notranslate"><span class="pre">import_config</span></code> fails when it cannot persist check
+definitions.</p>
+<p><code class="docutils literal notranslate"><span class="pre">ddl_user</span></code> runs Alembic migrations and owns the schema. The application <code class="docutils literal notranslate"><span class="pre">user</span></code>
+can therefore hold DML grants only. The migration grants <code class="docutils literal notranslate"><span class="pre">user</span></code> what it needs, so
+that role requires nothing beyond <code class="docutils literal notranslate"><span class="pre">CONNECT</span></code>. Set <code class="docutils literal notranslate"><span class="pre">ddl_user</span></code> to the application
+credentials when separate roles are not required.</p>
+</section>
+<section id="schema">
+<h2>Schema<a class="headerlink" href="#schema" title="Link to this heading"></a></h2>
+<figure class="align-center" id="id1">
+<pre data-zoom-id="id-b53ecbe9-ebc0-40e0-83e7-f862f08212ca" class="mermaid">
+        %%{init: {&quot;er&quot;: {&quot;diagramPadding&quot;: 8, &quot;entityPadding&quot;: 8}}}%%
+erDiagram
+    direction LR
+    dd_checks ||--o{ dd_preflights : check_id
+    dd_checks ||--o{ dd_runs : dd_check_id
+    dd_preflights o|--o{ dd_runs : preflight_id
+    dd_runs o|--o{ dd_runs : rerun_of_run_id
+    dd_runs ||--o{ dd_results : run_id
+    dd_checks ||--o{ dd_effective_attempts : check_id
+    dd_runs ||--o| dd_effective_attempts : run_id
+    dd_checks ||--o{ dd_coverage_events : check_id
+    dd_runs ||--o| dd_coverage_events : evaluated_run_id
+    dd_runs o|--o{ dd_coverage_events : blocking_run_id
+    dd_checks ||--o| dd_coverage_state : check_id
+    dd_runs ||--o{ dd_coverage_state : evaluated_run_id
+    dd_runs o|--o{ dd_coverage_state : blocking_run_id
+
+    dd_checks[&quot;dd_checks&lt;br/&gt;Versioned check definitions&lt;br/&gt;imported from YAML config&quot;] {
+        UUID check_id PK
+        TEXT full_check_name &quot;UQ with revision; UQ when current&quot;
+        INTEGER revision &quot;UQ with full_check_name&quot;
+        CHAR(64) config_hash
+        JSONB canonical_config
+        TEXT target_id
+        TEXT tap_id
+        TEXT source_type
+        TEXT target_type
+        TEXT source_database
+        TEXT target_database
+        TEXT source_schema
+        TEXT source_table
+        TEXT target_schema
+        TEXT target_table
+        TEXT source_key_column
+        TEXT target_key_column
+        TEXT source_timestamp_column
+        TEXT target_timestamp_column
+        JSONB checks
+        TEXT frequency
+        BIGINT window_start_seconds &quot;greater than 0&quot;
+        BIGINT window_end_seconds &quot;at least 0&quot;
+        BIGINT statement_timeout_seconds &quot;greater than 0&quot;
+        BOOLEAN current
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ superseded_at &quot;nullable&quot;
+    }
+
+    dd_preflights[&quot;dd_preflights&lt;br/&gt;Source size and index validation&lt;br/&gt;recorded before each check execution&quot;] {
+        UUID preflight_id PK
+        UUID check_id FK
+        TEXT status &quot;PASS, BLOCKED, or ERROR&quot;
+        TIMESTAMPTZ checked_at
+        CHAR(64) query_fingerprint
+        JSONB index_metadata
+        JSONB findings
+        TEXT error &quot;nullable&quot;
+        BIGINT table_rows &quot;nullable&quot;
+        BIGINT row_limit &quot;nullable&quot;
+        BOOLEAN has_leading_index &quot;nullable&quot;
+    }
+
+    dd_runs[&quot;dd_runs&lt;br/&gt;Shared execution log&lt;br/&gt;one row per scheduled job attempt&quot;] {
+        UUID run_id PK
+        UUID dd_check_id FK
+        TIMESTAMPTZ scheduled_for &quot;UQ with dd_check_id and attempt&quot;
+        TIMESTAMPTZ window_start &quot;before window_end&quot;
+        TIMESTAMPTZ window_end
+        INTEGER attempt &quot;UQ with dd_check_id and scheduled_for&quot;
+        TEXT trigger &quot;SCHEDULED, MANUAL, RETRY, or REMEDIATION&quot;
+        TEXT status &quot;RUNNING, PASS, FAIL, or ERROR&quot;
+        UUID rerun_of_run_id FK &quot;nullable self-reference&quot;
+        TEXT remediation_reference &quot;nullable&quot;
+        UUID preflight_id FK &quot;nullable&quot;
+        TIMESTAMPTZ started_at
+        TIMESTAMPTZ finished_at &quot;nullable&quot;
+        TEXT error &quot;nullable&quot;
+    }
+
+    dd_results[&quot;dd_results&lt;br/&gt;Per-check-type outcome detail&lt;br/&gt;for each data-diff run&quot;] {
+        UUID run_id PK, FK
+        TEXT check_type PK
+        TEXT status &quot;PASS, FAIL, or ERROR&quot;
+        JSONB source_value &quot;nullable&quot;
+        JSONB target_value &quot;nullable&quot;
+        DOUBLE_PRECISION source_query_seconds &quot;nullable&quot;
+        DOUBLE_PRECISION target_query_seconds &quot;nullable&quot;
+        TEXT error &quot;nullable&quot;
+    }
+
+    dd_effective_attempts[&quot;dd_effective_attempts&lt;br/&gt;Latest terminal attempt for each&lt;br/&gt;data-diff scheduled slot&quot;] {
+        UUID check_id PK, FK
+        TIMESTAMPTZ scheduled_for PK
+        UUID run_id FK, UK
+        INTEGER attempt &quot;greater than 0&quot;
+        TIMESTAMPTZ window_start &quot;before window_end&quot;
+        TIMESTAMPTZ window_end
+        TEXT status &quot;PASS, FAIL, or ERROR&quot;
+    }
+
+    dd_coverage_state[&quot;dd_coverage_state&lt;br/&gt;Materialized current verified-through&lt;br/&gt;watermark for each data-diff check&quot;] {
+        UUID check_id PK, FK
+        TIMESTAMPTZ coverage_start &quot;at most verified_through&quot;
+        TIMESTAMPTZ verified_through &quot;at most max_observed_end&quot;
+        TIMESTAMPTZ max_observed_end
+        TEXT coverage_status &quot;CONTIGUOUS or BLOCKED&quot;
+        UUID blocking_run_id FK &quot;nullable&quot;
+        UUID evaluated_run_id FK
+        TEXT event_type &quot;INITIALIZE, ADVANCE, INVALIDATE, BLOCK, or CONFIRM&quot;
+        BIGINT state_version &quot;greater than 0&quot;
+        TIMESTAMPTZ updated_at
+        TEXT reason
+    }
+
+    dd_coverage_events[&quot;dd_coverage_events&lt;br/&gt;Append-only log tracking the data-diff&lt;br/&gt;verified-through watermark&quot;] {
+        UUID coverage_event_id PK
+        BIGSERIAL event_sequence UK
+        UUID check_id FK
+        UUID evaluated_run_id FK, UK
+        TEXT event_type &quot;INITIALIZE, ADVANCE, INVALIDATE, BLOCK, or CONFIRM&quot;
+        TIMESTAMPTZ coverage_start &quot;at most verified_through&quot;
+        TIMESTAMPTZ previous_verified_through &quot;nullable&quot;
+        TIMESTAMPTZ verified_through &quot;at most max_observed_end&quot;
+        TIMESTAMPTZ max_observed_end
+        TEXT coverage_status &quot;CONTIGUOUS or BLOCKED&quot;
+        UUID blocking_run_id FK &quot;nullable&quot;
+        TIMESTAMPTZ recorded_at
+        TEXT reason
+    }
+
+    </pre><figcaption>
+<p><span class="caption-text">Data-diff backend schema after migration 001</span><a class="headerlink" href="#id1" title="Link to this image"></a></p>
+</figcaption>
+</figure>
+<p>PipelineWise keeps every attempt in <code class="docutils literal notranslate"><span class="pre">dd_runs</span></code> and every coverage transition in
+<code class="docutils literal notranslate"><span class="pre">dd_coverage_events</span></code>. <code class="docutils literal notranslate"><span class="pre">dd_effective_attempts</span></code> materializes only the highest
+terminal attempt for each scheduled slot, while <code class="docutils literal notranslate"><span class="pre">dd_coverage_state</span></code> stores the
+current watermark. A new chronological slot updates that state directly. A
+replacement or out-of-order slot recalculates it from the effective rows without
+rescanning superseded attempts.</p>
+</section>
+<section id="reporting-queries">
+<h2>Reporting queries<a class="headerlink" href="#reporting-queries" title="Link to this heading"></a></h2>
+<p>Run these queries against the PipelineWise backend database.</p>
+<p>Current coverage watermarks:</p>
+<div class="highlight-sql notranslate"><div class="highlight"><pre><span></span><span class="k">SELECT</span><span class="w"> </span><span class="k">state</span><span class="p">.</span><span class="n">check_id</span><span class="p">,</span><span class="w"> </span><span class="n">checks</span><span class="p">.</span><span class="n">full_check_name</span><span class="p">,</span>
+<span class="w">       </span><span class="n">checks</span><span class="p">.</span><span class="n">revision</span><span class="p">,</span><span class="w"> </span><span class="n">checks</span><span class="p">.</span><span class="n">source_schema</span><span class="p">,</span><span class="w"> </span><span class="n">checks</span><span class="p">.</span><span class="n">source_table</span><span class="p">,</span>
+<span class="w">       </span><span class="n">checks</span><span class="p">.</span><span class="n">source_timestamp_column</span><span class="p">,</span><span class="w"> </span><span class="k">state</span><span class="p">.</span><span class="n">coverage_start</span><span class="p">,</span>
+<span class="w">       </span><span class="k">state</span><span class="p">.</span><span class="n">verified_through</span><span class="p">,</span><span class="w"> </span><span class="k">state</span><span class="p">.</span><span class="n">max_observed_end</span><span class="p">,</span>
+<span class="w">       </span><span class="k">state</span><span class="p">.</span><span class="n">coverage_status</span><span class="p">,</span><span class="w"> </span><span class="k">state</span><span class="p">.</span><span class="n">blocking_run_id</span><span class="p">,</span>
+<span class="w">       </span><span class="k">state</span><span class="p">.</span><span class="n">evaluated_run_id</span><span class="p">,</span><span class="w"> </span><span class="k">state</span><span class="p">.</span><span class="n">event_type</span><span class="p">,</span>
+<span class="w">       </span><span class="k">state</span><span class="p">.</span><span class="n">updated_at</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">verified_at</span><span class="p">,</span><span class="w"> </span><span class="k">state</span><span class="p">.</span><span class="n">reason</span>
+<span class="w">  </span><span class="k">FROM</span><span class="w"> </span><span class="k">public</span><span class="p">.</span><span class="n">dd_coverage_state</span><span class="w"> </span><span class="k">state</span>
+<span class="w">  </span><span class="k">JOIN</span><span class="w"> </span><span class="k">public</span><span class="p">.</span><span class="n">dd_checks</span><span class="w"> </span><span class="n">checks</span>
+<span class="w">    </span><span class="k">ON</span><span class="w"> </span><span class="n">checks</span><span class="p">.</span><span class="n">check_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">state</span><span class="p">.</span><span class="n">check_id</span><span class="p">;</span>
+</pre></div>
+</div>
+<p>Failed runs and their remediation attempts:</p>
+<div class="highlight-sql notranslate"><div class="highlight"><pre><span></span><span class="k">SELECT</span><span class="w"> </span><span class="n">checks</span><span class="p">.</span><span class="n">full_check_name</span><span class="p">,</span><span class="w"> </span><span class="n">checks</span><span class="p">.</span><span class="n">revision</span><span class="p">,</span>
+<span class="w">       </span><span class="n">original</span><span class="p">.</span><span class="n">run_id</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">failed_run_id</span><span class="p">,</span>
+<span class="w">       </span><span class="n">original</span><span class="p">.</span><span class="n">status</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">failed_status</span><span class="p">,</span>
+<span class="w">       </span><span class="n">original</span><span class="p">.</span><span class="n">window_start</span><span class="p">,</span><span class="w"> </span><span class="n">original</span><span class="p">.</span><span class="n">window_end</span><span class="p">,</span>
+<span class="w">       </span><span class="n">original</span><span class="p">.</span><span class="n">finished_at</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">failed_at</span><span class="p">,</span>
+<span class="w">       </span><span class="n">remediation</span><span class="p">.</span><span class="n">run_id</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">remediation_run_id</span><span class="p">,</span>
+<span class="w">       </span><span class="n">remediation</span><span class="p">.</span><span class="n">attempt</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">remediation_attempt</span><span class="p">,</span>
+<span class="w">       </span><span class="n">remediation</span><span class="p">.</span><span class="n">status</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">remediation_status</span><span class="p">,</span>
+<span class="w">       </span><span class="n">remediation</span><span class="p">.</span><span class="n">remediation_reference</span><span class="p">,</span>
+<span class="w">       </span><span class="n">remediation</span><span class="p">.</span><span class="n">finished_at</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">remediation_finished_at</span><span class="p">,</span>
+<span class="w">       </span><span class="k">COALESCE</span><span class="p">(</span><span class="n">remediation</span><span class="p">.</span><span class="n">status</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'PASS'</span><span class="p">,</span><span class="w"> </span><span class="k">FALSE</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">recovered</span>
+<span class="w">  </span><span class="k">FROM</span><span class="w"> </span><span class="k">public</span><span class="p">.</span><span class="n">dd_runs</span><span class="w"> </span><span class="n">original</span>
+<span class="w">  </span><span class="k">JOIN</span><span class="w"> </span><span class="k">public</span><span class="p">.</span><span class="n">dd_checks</span><span class="w"> </span><span class="n">checks</span>
+<span class="w">    </span><span class="k">ON</span><span class="w"> </span><span class="n">checks</span><span class="p">.</span><span class="n">check_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">original</span><span class="p">.</span><span class="n">dd_check_id</span>
+<span class="w">  </span><span class="k">LEFT</span><span class="w"> </span><span class="k">JOIN</span><span class="w"> </span><span class="k">public</span><span class="p">.</span><span class="n">dd_runs</span><span class="w"> </span><span class="n">remediation</span>
+<span class="w">    </span><span class="k">ON</span><span class="w"> </span><span class="n">remediation</span><span class="p">.</span><span class="n">rerun_of_run_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">original</span><span class="p">.</span><span class="n">run_id</span>
+<span class="w"> </span><span class="k">WHERE</span><span class="w"> </span><span class="n">original</span><span class="p">.</span><span class="n">rerun_of_run_id</span><span class="w"> </span><span class="k">IS</span><span class="w"> </span><span class="k">NULL</span>
+<span class="w">   </span><span class="k">AND</span><span class="w"> </span><span class="n">original</span><span class="p">.</span><span class="n">status</span><span class="w"> </span><span class="k">IN</span><span class="w"> </span><span class="p">(</span><span class="s1">'FAIL'</span><span class="p">,</span><span class="w"> </span><span class="s1">'ERROR'</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="cli.html" class="btn btn-neutral float-left" title="Command-line interface" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="data_diff.html" class="btn btn-neutral float-right" title="Data-diff checks" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Wise Ltd..</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
