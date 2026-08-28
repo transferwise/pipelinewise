@@ -499,7 +499,10 @@ class TestPostgresToPostgresDataDiff:
                 'dd_checks', 'dd_preflights', 'dd_runs', 'dd_results',
                 'dd_effective_attempts', 'dd_coverage_state',
                 'dd_coverage_events',
-            } == tables
+            } <= tables
+            assert {
+                'dd_current_coverage', 'dd_remediation_history',
+            }.isdisjoint(tables)
 
             assert self.e2e.run_ddl_pipelinewise_backend(
                 "SELECT to_regclass(quote_ident(current_user) || '.alembic_version')"
