@@ -1,3 +1,15 @@
+Unversioned
+-----------
+
+**Test infrastructure**
+
+- Run Snowflake E2E coverage in four parallel, non-fail-fast CI shards instead
+  of serial source jobs
+- Namespace each shard's remote Snowflake and S3 fixtures and scope config
+  imports to one tap so concurrent jobs cannot interfere
+- Reduce dev-container startup time with bounded parallel connector installs,
+  and fail readiness polling early when the container stops
+
 0.81.0 (2026-08-24)
 -------------------
 
