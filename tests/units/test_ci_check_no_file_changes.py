@@ -184,7 +184,7 @@ def test_e2e_workflow_triggers_checks(tmp_path):
 
 
 def test_snowflake_e2e_matrix_contract():
-    """Snowflake shards cover every route with bounded parallelism."""
+    """Snowflake shards cover every route exactly once with full parallelism."""
     workflow = yaml.safe_load(E2E_WORKFLOW.read_text(encoding='utf-8'))
     jobs = workflow['jobs']
     job = jobs['e2e_tests_snowflake']
@@ -197,52 +197,72 @@ def test_snowflake_e2e_matrix_contract():
     assert 'needs' not in job
     assert job['name'] == '${{ matrix.check_name }}'
     assert strategy['fail-fast'] is False
-    assert strategy['max-parallel'] == 4
-    assert len(shards) == 4
+    assert 'max-parallel' not in strategy
+    assert len(shards) == 8
 
     expected_shards = {
-        'pg-core': (
-            'e2e_tests_sf_pg_core',
+        'conversion': (
+            'e2e_tests_sf_conversion',
+            (
+                'tests/end_to_end/target_snowflake/test_native_to_iceberg_converter.py',
+                'tests/end_to_end/data_diff/test_mysql_to_snowflake.py',
+            ),
+        ),
+        'publication': (
+            'e2e_tests_sf_publication',
+            (
+                'tests/end_to_end/target_snowflake/tap_postgres/test_snowflake_iceberg_publisher.py',
+                'tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_replica_to_sf.py',
+            ),
+        ),
+        'pg-partial': (
+            'e2e_tests_sf_pg_partial',
             (
                 'tests/end_to_end/target_snowflake/tap_postgres/test_partial_sync_pg_to_sf.py',
-                'tests/end_to_end/target_snowflake/tap_postgres/test_replicate_pg_to_sf.py',
-                'tests/end_to_end/target_snowflake/tap_postgres/test_resync_pg_to_sf_table_size_check.py',
-                'tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_replica_to_sf.py',
+                'tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_to_sf_with_custom_buffer_size.py',
                 'tests/end_to_end/data_diff/test_postgres_to_snowflake.py',
+            ),
+        ),
+        'mariadb-partial': (
+            'e2e_tests_sf_mariadb_partial',
+            (
+                'tests/end_to_end/target_snowflake/tap_mariadb/test_partial_sync_mariadb_to_sf.py',
+                'tests/end_to_end/target_snowflake/tap_postgres/test_defined_partial_sync_pg_to_sf.py',
+                'tests/end_to_end/target_snowflake/tap_postgres/test_resync_pg_to_sf_with_split_large_files.py',
+            ),
+        ),
+        'pg-iceberg': (
+            'e2e_tests_sf_pg_iceberg',
+            (
+                'tests/end_to_end/target_snowflake/tap_postgres/test_iceberg_v3_postgres_to_sf.py',
+                'tests/end_to_end/target_snowflake/tap_postgres/test_replicate_pg_to_sf.py',
                 'tests/end_to_end/target_snowflake/tap_s3/test_replicate_s3_to_sf.py',
             ),
         ),
-        'mariadb-core': (
-            'e2e_tests_sf_mariadb_core',
+        'mariadb-iceberg': (
+            'e2e_tests_sf_mariadb_iceberg',
             (
-                'tests/end_to_end/target_snowflake/tap_mariadb/test_partial_sync_mariadb_to_sf.py',
-                'tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_to_sf.py',
-                'tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_to_sf_soft_delete.py',
-                'tests/end_to_end/target_snowflake/tap_mariadb/test_resync_mariadb_to_sf.py',
-                'tests/end_to_end/target_snowflake/tap_mariadb/test_resync_mariadb_to_sf_table_size_check.py',
-                'tests/end_to_end/target_snowflake/tap_mysql/test_iceberg_v3_mysql_to_sf.py',
-            ),
-        ),
-        'publication-conversion': (
-            'e2e_tests_sf_publication_conversion',
-            (
-                'tests/end_to_end/target_snowflake/test_native_to_iceberg_converter.py',
-                'tests/end_to_end/target_snowflake/tap_postgres/test_snowflake_iceberg_publisher.py',
-                'tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_to_sf_with_custom_buffer_size.py',
-            ),
-        ),
-        'formats-aux': (
-            'e2e_tests_sf_formats_aux',
-            (
-                'tests/end_to_end/target_snowflake/tap_postgres/test_iceberg_v3_postgres_to_sf.py',
                 'tests/end_to_end/target_snowflake/tap_mariadb/test_iceberg_v3_mariadb_to_sf.py',
-                'tests/end_to_end/target_snowflake/tap_postgres/test_defined_partial_sync_pg_to_sf.py',
-                'tests/end_to_end/target_snowflake/tap_mariadb/test_defined_partial_sync_mariadb_to_sf.py',
-                'tests/end_to_end/target_snowflake/tap_postgres/test_replicate_pg_to_sf_with_archive_load_files.py',
-                'tests/end_to_end/target_snowflake/tap_postgres/test_resync_pg_to_sf_with_split_large_files.py',
-                'tests/end_to_end/target_snowflake/tap_mariadb/test_resync_mariadb_to_sf_with_split_large_files.py',
-                'tests/end_to_end/data_diff/test_mysql_to_snowflake.py',
+                'tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_to_sf_soft_delete.py',
                 'tests/end_to_end/target_snowflake/tap_mongodb/test_replicate_mongodb_to_sf.py',
+            ),
+        ),
+        'mysql-iceberg': (
+            'e2e_tests_sf_mysql_iceberg',
+            (
+                'tests/end_to_end/target_snowflake/tap_mysql/test_iceberg_v3_mysql_to_sf.py',
+                'tests/end_to_end/target_snowflake/tap_postgres/test_resync_pg_to_sf_table_size_check.py',
+                'tests/end_to_end/target_snowflake/tap_mariadb/test_resync_mariadb_to_sf.py',
+                'tests/end_to_end/target_snowflake/tap_postgres/test_replicate_pg_to_sf_with_archive_load_files.py',
+            ),
+        ),
+        'mariadb-native': (
+            'e2e_tests_sf_mariadb_native',
+            (
+                'tests/end_to_end/target_snowflake/tap_mariadb/test_resync_mariadb_to_sf_table_size_check.py',
+                'tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_to_sf.py',
+                'tests/end_to_end/target_snowflake/tap_mariadb/test_defined_partial_sync_mariadb_to_sf.py',
+                'tests/end_to_end/target_snowflake/tap_mariadb/test_resync_mariadb_to_sf_with_split_large_files.py',
             ),
         ),
     }

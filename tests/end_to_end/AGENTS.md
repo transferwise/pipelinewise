@@ -34,7 +34,7 @@ step ran and report pass/skip/fail counts.
 ## E2E matrix
 
 These groups mirror `.github/workflows/e2e_tests.yml`; update both together. CI
-runs the four Snowflake groups concurrently on isolated runners. Local groups
+runs the eight Snowflake groups concurrently on isolated runners. Local groups
 share/reset fixtures and config, so run them serially:
 
 ```bash
@@ -47,39 +47,47 @@ run_e2e \
   tests/end_to_end/data_diff/test_mysql_to_postgres.py
 
 run_e2e \
+  tests/end_to_end/target_snowflake/test_native_to_iceberg_converter.py \
+  tests/end_to_end/data_diff/test_mysql_to_snowflake.py
+
+run_e2e \
+  tests/end_to_end/target_snowflake/tap_postgres/test_snowflake_iceberg_publisher.py \
+  tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_replica_to_sf.py
+
+run_e2e \
   tests/end_to_end/target_snowflake/tap_postgres/test_partial_sync_pg_to_sf.py \
-  tests/end_to_end/target_snowflake/tap_postgres/test_replicate_pg_to_sf.py \
-  tests/end_to_end/target_snowflake/tap_postgres/test_resync_pg_to_sf_table_size_check.py \
-  tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_replica_to_sf.py \
-  tests/end_to_end/data_diff/test_postgres_to_snowflake.py \
-  tests/end_to_end/target_snowflake/tap_s3/test_replicate_s3_to_sf.py
+  tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_to_sf_with_custom_buffer_size.py \
+  tests/end_to_end/data_diff/test_postgres_to_snowflake.py
 
 run_e2e \
   tests/end_to_end/target_snowflake/tap_mariadb/test_partial_sync_mariadb_to_sf.py \
-  tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_to_sf.py \
-  tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_to_sf_soft_delete.py \
-  tests/end_to_end/target_snowflake/tap_mariadb/test_resync_mariadb_to_sf.py \
-  tests/end_to_end/target_snowflake/tap_mariadb/test_resync_mariadb_to_sf_table_size_check.py \
-  tests/end_to_end/target_snowflake/tap_mysql/test_iceberg_v3_mysql_to_sf.py
-
-run_e2e \
-  tests/end_to_end/target_snowflake/test_native_to_iceberg_converter.py \
-  tests/end_to_end/target_snowflake/tap_postgres/test_snowflake_iceberg_publisher.py \
-  tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_to_sf_with_custom_buffer_size.py
+  tests/end_to_end/target_snowflake/tap_postgres/test_defined_partial_sync_pg_to_sf.py \
+  tests/end_to_end/target_snowflake/tap_postgres/test_resync_pg_to_sf_with_split_large_files.py
 
 run_e2e \
   tests/end_to_end/target_snowflake/tap_postgres/test_iceberg_v3_postgres_to_sf.py \
+  tests/end_to_end/target_snowflake/tap_postgres/test_replicate_pg_to_sf.py \
+  tests/end_to_end/target_snowflake/tap_s3/test_replicate_s3_to_sf.py
+
+run_e2e \
   tests/end_to_end/target_snowflake/tap_mariadb/test_iceberg_v3_mariadb_to_sf.py \
-  tests/end_to_end/target_snowflake/tap_postgres/test_defined_partial_sync_pg_to_sf.py \
-  tests/end_to_end/target_snowflake/tap_mariadb/test_defined_partial_sync_mariadb_to_sf.py \
-  tests/end_to_end/target_snowflake/tap_postgres/test_replicate_pg_to_sf_with_archive_load_files.py \
-  tests/end_to_end/target_snowflake/tap_postgres/test_resync_pg_to_sf_with_split_large_files.py \
-  tests/end_to_end/target_snowflake/tap_mariadb/test_resync_mariadb_to_sf_with_split_large_files.py \
-  tests/end_to_end/data_diff/test_mysql_to_snowflake.py \
+  tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_to_sf_soft_delete.py \
   tests/end_to_end/target_snowflake/tap_mongodb/test_replicate_mongodb_to_sf.py
+
+run_e2e \
+  tests/end_to_end/target_snowflake/tap_mysql/test_iceberg_v3_mysql_to_sf.py \
+  tests/end_to_end/target_snowflake/tap_postgres/test_resync_pg_to_sf_table_size_check.py \
+  tests/end_to_end/target_snowflake/tap_mariadb/test_resync_mariadb_to_sf.py \
+  tests/end_to_end/target_snowflake/tap_postgres/test_replicate_pg_to_sf_with_archive_load_files.py
+
+run_e2e \
+  tests/end_to_end/target_snowflake/tap_mariadb/test_resync_mariadb_to_sf_table_size_check.py \
+  tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_to_sf.py \
+  tests/end_to_end/target_snowflake/tap_mariadb/test_defined_partial_sync_mariadb_to_sf.py \
+  tests/end_to_end/target_snowflake/tap_mariadb/test_resync_mariadb_to_sf_with_split_large_files.py
 ```
 
-Run all five only for a full suite; otherwise run every affected group. MariaDB
+Run all nine only for a full suite; otherwise run every affected group. MariaDB
 and PostgreSQL cover native and explicit v3; genuine MySQL covers explicit v3.
 Do not infer one format from the other. `SHOW PRIMARY KEYS` does not prove
 Iceberg identifier fields; inspect raw metadata and compare

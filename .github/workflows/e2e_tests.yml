@@ -95,45 +95,56 @@ jobs:
     environment: ci_tests
     strategy:
       fail-fast: false
-      max-parallel: 4
       matrix:
         include:
-          - shard: pg-core
-            check_name: e2e_tests_sf_pg_core
-            test_paths: >-
-              tests/end_to_end/target_snowflake/tap_postgres/test_partial_sync_pg_to_sf.py
-              tests/end_to_end/target_snowflake/tap_postgres/test_replicate_pg_to_sf.py
-              tests/end_to_end/target_snowflake/tap_postgres/test_resync_pg_to_sf_table_size_check.py
-              tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_replica_to_sf.py
-              tests/end_to_end/data_diff/test_postgres_to_snowflake.py
-              tests/end_to_end/target_snowflake/tap_s3/test_replicate_s3_to_sf.py
-          - shard: mariadb-core
-            check_name: e2e_tests_sf_mariadb_core
-            test_paths: >-
-              tests/end_to_end/target_snowflake/tap_mariadb/test_partial_sync_mariadb_to_sf.py
-              tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_to_sf.py
-              tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_to_sf_soft_delete.py
-              tests/end_to_end/target_snowflake/tap_mariadb/test_resync_mariadb_to_sf.py
-              tests/end_to_end/target_snowflake/tap_mariadb/test_resync_mariadb_to_sf_table_size_check.py
-              tests/end_to_end/target_snowflake/tap_mysql/test_iceberg_v3_mysql_to_sf.py
-          - shard: publication-conversion
-            check_name: e2e_tests_sf_publication_conversion
+          - shard: conversion
+            check_name: e2e_tests_sf_conversion
             test_paths: >-
               tests/end_to_end/target_snowflake/test_native_to_iceberg_converter.py
+              tests/end_to_end/data_diff/test_mysql_to_snowflake.py
+          - shard: publication
+            check_name: e2e_tests_sf_publication
+            test_paths: >-
               tests/end_to_end/target_snowflake/tap_postgres/test_snowflake_iceberg_publisher.py
+              tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_replica_to_sf.py
+          - shard: pg-partial
+            check_name: e2e_tests_sf_pg_partial
+            test_paths: >-
+              tests/end_to_end/target_snowflake/tap_postgres/test_partial_sync_pg_to_sf.py
               tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_to_sf_with_custom_buffer_size.py
-          - shard: formats-aux
-            check_name: e2e_tests_sf_formats_aux
+              tests/end_to_end/data_diff/test_postgres_to_snowflake.py
+          - shard: mariadb-partial
+            check_name: e2e_tests_sf_mariadb_partial
+            test_paths: >-
+              tests/end_to_end/target_snowflake/tap_mariadb/test_partial_sync_mariadb_to_sf.py
+              tests/end_to_end/target_snowflake/tap_postgres/test_defined_partial_sync_pg_to_sf.py
+              tests/end_to_end/target_snowflake/tap_postgres/test_resync_pg_to_sf_with_split_large_files.py
+          - shard: pg-iceberg
+            check_name: e2e_tests_sf_pg_iceberg
             test_paths: >-
               tests/end_to_end/target_snowflake/tap_postgres/test_iceberg_v3_postgres_to_sf.py
+              tests/end_to_end/target_snowflake/tap_postgres/test_replicate_pg_to_sf.py
+              tests/end_to_end/target_snowflake/tap_s3/test_replicate_s3_to_sf.py
+          - shard: mariadb-iceberg
+            check_name: e2e_tests_sf_mariadb_iceberg
+            test_paths: >-
               tests/end_to_end/target_snowflake/tap_mariadb/test_iceberg_v3_mariadb_to_sf.py
-              tests/end_to_end/target_snowflake/tap_postgres/test_defined_partial_sync_pg_to_sf.py
-              tests/end_to_end/target_snowflake/tap_mariadb/test_defined_partial_sync_mariadb_to_sf.py
-              tests/end_to_end/target_snowflake/tap_postgres/test_replicate_pg_to_sf_with_archive_load_files.py
-              tests/end_to_end/target_snowflake/tap_postgres/test_resync_pg_to_sf_with_split_large_files.py
-              tests/end_to_end/target_snowflake/tap_mariadb/test_resync_mariadb_to_sf_with_split_large_files.py
-              tests/end_to_end/data_diff/test_mysql_to_snowflake.py
+              tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_to_sf_soft_delete.py
               tests/end_to_end/target_snowflake/tap_mongodb/test_replicate_mongodb_to_sf.py
+          - shard: mysql-iceberg
+            check_name: e2e_tests_sf_mysql_iceberg
+            test_paths: >-
+              tests/end_to_end/target_snowflake/tap_mysql/test_iceberg_v3_mysql_to_sf.py
+              tests/end_to_end/target_snowflake/tap_postgres/test_resync_pg_to_sf_table_size_check.py
+              tests/end_to_end/target_snowflake/tap_mariadb/test_resync_mariadb_to_sf.py
+              tests/end_to_end/target_snowflake/tap_postgres/test_replicate_pg_to_sf_with_archive_load_files.py
+          - shard: mariadb-native
+            check_name: e2e_tests_sf_mariadb_native
+            test_paths: >-
+              tests/end_to_end/target_snowflake/tap_mariadb/test_resync_mariadb_to_sf_table_size_check.py
+              tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_to_sf.py
+              tests/end_to_end/target_snowflake/tap_mariadb/test_defined_partial_sync_mariadb_to_sf.py
+              tests/end_to_end/target_snowflake/tap_mariadb/test_resync_mariadb_to_sf_with_split_large_files.py
     env:
       E2E_TEST_PATHS: ${{ matrix.test_paths }}
       PIPELINEWISE_E2E_NAMESPACE: >-
