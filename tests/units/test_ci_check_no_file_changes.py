@@ -8,6 +8,7 @@ import yaml
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 DETECTOR = REPOSITORY_ROOT / 'scripts' / 'ci_check_no_file_changes.sh'
 E2E_WORKFLOW = REPOSITORY_ROOT / '.github' / 'workflows' / 'e2e_tests.yml'
+TW_RULES = REPOSITORY_ROOT / '.github' / 'tw-rules.yaml'
 
 FAKE_CURL = r'''#!/usr/bin/env bash
 set -u
@@ -336,6 +337,28 @@ def test_snowflake_e2e_matrix_contract():
         )
         assert 'PipelineWise container stopped with status' in readiness_step['run']
         assert 'exit 1' in readiness_step['run']
+
+
+def test_required_e2e_status_contract():
+    """Repository rules require every current Snowflake shard exactly once."""
+    workflow = yaml.safe_load(E2E_WORKFLOW.read_text(encoding='utf-8'))
+    rules = yaml.safe_load(TW_RULES.read_text(encoding='utf-8'))
+    shards = workflow['jobs']['e2e_tests_snowflake']['strategy']['matrix']['include']
+    expected_statuses = {shard['check_name'] for shard in shards}
+    configured_checks = rules['actions']['branch-protection-settings']['branches'][0]['checks']
+    configured_names = [check['name'] for check in configured_checks]
+    required_statuses = {
+        name for name in configured_names if name.startswith('e2e_tests_sf_')
+    }
+
+    assert len(configured_names) == len(set(configured_names))
+    assert required_statuses == expected_statuses
+    assert not {
+        'e2e_tests_mariadb_to_sf',
+        'e2e_tests_mg_to_sf',
+        'e2e_tests_pg_to_sf',
+        'e2e_tests_s3_to_sf',
+    }.intersection(configured_names)
 
 
 def test_snowflake_e2e_matrix_preflight_once():
