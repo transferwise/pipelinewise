@@ -184,7 +184,7 @@ class TestPostgresToPostgresDataDiff:
             f"""
             SELECT coverage_status, blocking_run_id::text,
                    evaluated_run_id::text, verified_through
-              FROM public.dd_current_coverage
+              FROM public.dd_coverage_state
              WHERE check_id = '{check_id}'
             """
         )[0]
@@ -273,7 +273,7 @@ class TestPostgresToPostgresDataDiff:
         blocked_coverage = self.run_backend_query(
             f"""
             SELECT coverage_status, blocking_run_id::text, verified_through
-              FROM public.dd_current_coverage
+              FROM public.dd_coverage_state
              WHERE check_id = '{check_id}'
             """
         )[0]
@@ -357,10 +357,12 @@ class TestPostgresToPostgresDataDiff:
         )[0][0] == 'FAIL'
         assert self.run_backend_query(
             f"""
-            SELECT recovered
-              FROM public.dd_remediation_history
-             WHERE failed_run_id = '{failed_run_id}'
-               AND remediation_run_id = '{remediation_run_id}'
+            SELECT COALESCE(remediation.status = 'PASS', FALSE) AS recovered
+              FROM public.dd_runs original
+              LEFT JOIN public.dd_runs remediation
+                ON remediation.rerun_of_run_id = original.run_id
+             WHERE original.run_id = '{failed_run_id}'
+               AND remediation.run_id = '{remediation_run_id}'
             """
         )[0][0]
         assert self.run_backend_query(
@@ -376,7 +378,7 @@ class TestPostgresToPostgresDataDiff:
             f"""
             SELECT coverage_status, blocking_run_id::text,
                    evaluated_run_id::text, verified_through
-              FROM public.dd_current_coverage
+              FROM public.dd_coverage_state
              WHERE check_id = '{check_id}'
             """
         )[0]
@@ -496,9 +498,11 @@ class TestPostgresToPostgresDataDiff:
             assert {
                 'dd_checks', 'dd_preflights', 'dd_runs', 'dd_results',
                 'dd_effective_attempts', 'dd_coverage_state',
-                'dd_coverage_events', 'dd_current_coverage',
-                'dd_remediation_history',
+                'dd_coverage_events',
             } <= tables
+            assert {
+                'dd_current_coverage', 'dd_remediation_history',
+            }.isdisjoint(tables)
 
             assert self.e2e.run_ddl_pipelinewise_backend(
                 "SELECT to_regclass(quote_ident(current_user) || '.alembic_version')"

@@ -1,0 +1,128 @@
+%%{init: {"er": {"diagramPadding": 8, "entityPadding": 8}}}%%
+erDiagram
+    direction LR
+    dd_checks ||--o{ dd_preflights : check_id
+    dd_checks ||--o{ dd_runs : dd_check_id
+    dd_preflights o|--o{ dd_runs : preflight_id
+    dd_runs o|--o{ dd_runs : rerun_of_run_id
+    dd_runs ||--o{ dd_results : run_id
+    dd_checks ||--o{ dd_effective_attempts : check_id
+    dd_runs ||--o| dd_effective_attempts : run_id
+    dd_checks ||--o{ dd_coverage_events : check_id
+    dd_runs ||--o| dd_coverage_events : evaluated_run_id
+    dd_runs o|--o{ dd_coverage_events : blocking_run_id
+    dd_checks ||--o| dd_coverage_state : check_id
+    dd_runs ||--o{ dd_coverage_state : evaluated_run_id
+    dd_runs o|--o{ dd_coverage_state : blocking_run_id
+
+    dd_checks["dd_checks<br/>Versioned check definitions<br/>imported from YAML config"] {
+        UUID check_id PK
+        TEXT full_check_name "UQ with revision; UQ when current"
+        INTEGER revision "UQ with full_check_name"
+        CHAR(64) config_hash
+        JSONB canonical_config
+        TEXT target_id
+        TEXT tap_id
+        TEXT source_type
+        TEXT target_type
+        TEXT source_database
+        TEXT target_database
+        TEXT source_schema
+        TEXT source_table
+        TEXT target_schema
+        TEXT target_table
+        TEXT source_key_column
+        TEXT target_key_column
+        TEXT source_timestamp_column
+        TEXT target_timestamp_column
+        JSONB checks
+        TEXT frequency
+        BIGINT window_start_seconds "greater than 0"
+        BIGINT window_end_seconds "at least 0"
+        BIGINT statement_timeout_seconds "greater than 0"
+        BOOLEAN current
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ superseded_at "nullable"
+    }
+
+    dd_preflights["dd_preflights<br/>Source size and index validation<br/>recorded before each check execution"] {
+        UUID preflight_id PK
+        UUID check_id FK
+        TEXT status "PASS, BLOCKED, or ERROR"
+        TIMESTAMPTZ checked_at
+        CHAR(64) query_fingerprint
+        JSONB index_metadata
+        JSONB findings
+        TEXT error "nullable"
+        BIGINT table_rows "nullable"
+        BIGINT row_limit "nullable"
+        BOOLEAN has_leading_index "nullable"
+    }
+
+    dd_runs["dd_runs<br/>Shared execution log<br/>one row per scheduled job attempt"] {
+        UUID run_id PK
+        UUID dd_check_id FK
+        TIMESTAMPTZ scheduled_for "UQ with dd_check_id and attempt"
+        TIMESTAMPTZ window_start "before window_end"
+        TIMESTAMPTZ window_end
+        INTEGER attempt "UQ with dd_check_id and scheduled_for"
+        TEXT trigger "SCHEDULED, MANUAL, RETRY, or REMEDIATION"
+        TEXT status "RUNNING, PASS, FAIL, or ERROR"
+        UUID rerun_of_run_id FK "nullable self-reference"
+        TEXT remediation_reference "nullable"
+        UUID preflight_id FK "nullable"
+        TIMESTAMPTZ started_at
+        TIMESTAMPTZ finished_at "nullable"
+        TEXT error "nullable"
+    }
+
+    dd_results["dd_results<br/>Per-check-type outcome detail<br/>for each data-diff run"] {
+        UUID run_id PK, FK
+        TEXT check_type PK
+        TEXT status "PASS, FAIL, or ERROR"
+        JSONB source_value "nullable"
+        JSONB target_value "nullable"
+        DOUBLE_PRECISION source_query_seconds "nullable"
+        DOUBLE_PRECISION target_query_seconds "nullable"
+        TEXT error "nullable"
+    }
+
+    dd_effective_attempts["dd_effective_attempts<br/>Latest terminal attempt for each<br/>data-diff scheduled slot"] {
+        UUID check_id PK, FK
+        TIMESTAMPTZ scheduled_for PK
+        UUID run_id FK, UK
+        INTEGER attempt "greater than 0"
+        TIMESTAMPTZ window_start "before window_end"
+        TIMESTAMPTZ window_end
+        TEXT status "PASS, FAIL, or ERROR"
+    }
+
+    dd_coverage_state["dd_coverage_state<br/>Materialized current verified-through<br/>watermark for each data-diff check"] {
+        UUID check_id PK, FK
+        TIMESTAMPTZ coverage_start "at most verified_through"
+        TIMESTAMPTZ verified_through "at most max_observed_end"
+        TIMESTAMPTZ max_observed_end
+        TEXT coverage_status "CONTIGUOUS or BLOCKED"
+        UUID blocking_run_id FK "nullable"
+        UUID evaluated_run_id FK
+        TEXT event_type "INITIALIZE, ADVANCE, INVALIDATE, BLOCK, or CONFIRM"
+        BIGINT state_version "greater than 0"
+        TIMESTAMPTZ updated_at
+        TEXT reason
+    }
+
+    dd_coverage_events["dd_coverage_events<br/>Append-only log tracking the data-diff<br/>verified-through watermark"] {
+        UUID coverage_event_id PK
+        BIGSERIAL event_sequence UK
+        UUID check_id FK
+        UUID evaluated_run_id FK, UK
+        TEXT event_type "INITIALIZE, ADVANCE, INVALIDATE, BLOCK, or CONFIRM"
+        TIMESTAMPTZ coverage_start "at most verified_through"
+        TIMESTAMPTZ previous_verified_through "nullable"
+        TIMESTAMPTZ verified_through "at most max_observed_end"
+        TIMESTAMPTZ max_observed_end
+        TEXT coverage_status "CONTIGUOUS or BLOCKED"
+        UUID blocking_run_id FK "nullable"
+        TIMESTAMPTZ recorded_at
+        TEXT reason
+    }

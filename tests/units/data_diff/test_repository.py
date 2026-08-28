@@ -156,12 +156,16 @@ def test_list_checks_exposes_compare_columns_from_version_snapshot():
             "target_compare_columns": ["STATUS", "AMOUNT"],
         },
     }
-    repository = _repository_with_cursor(ScriptedCursor([row]))
+    cursor = ScriptedCursor([row])
+    repository = _repository_with_cursor(cursor)
 
     checks = repository.list_checks()
 
     assert checks[0]["source_compare_columns"] == ["status", "amount"]
     assert checks[0]["target_compare_columns"] == ["STATUS", "AMOUNT"]
+    assert "LEFT JOIN public.dd_coverage_state coverage" in cursor.last_sql
+    assert "coverage.updated_at AS verified_at" in cursor.last_sql
+    assert "dd_current_coverage" not in cursor.last_sql
 
 
 def test_schema_migration_never_drops_shared_schema():

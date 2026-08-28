@@ -24,7 +24,7 @@ Prerequisites
 
 The target user needs to connect to the database and create or alter schemas,
 tables, and indexes used by its pipelines. Grant only the target schemas it owns;
-do not reuse the :ref:`data_diff` backend database or role as a replication
+do not reuse the :ref:`data_diff_backend` database or role as a replication
 target.
 
 

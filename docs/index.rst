@@ -81,6 +81,7 @@ Documentation
    user_guide/yaml_config
    user_guide/encrypting_passwords
    user_guide/cli
+   user_guide/data_diff_backend
    user_guide/data_diff
    user_guide/scheduling
    user_guide/multi_server_cluster

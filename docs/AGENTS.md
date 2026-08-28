@@ -6,8 +6,8 @@ Read root `AGENTS.md` and the guidance for the behavior being documented.
 
 `docs/Makefile` sets `SPHINXOPTS = -W`; warnings fail. The root test extra omits
 Sphinx, so the ready container needs the editable package, `sphinx`, and
-`sphinx-rtd-theme`. `scripts/publish_docs.sh` mutates Git; do not use it for
-validation.
+`sphinx-rtd-theme`, and `sphinxcontrib-mermaid`. `scripts/publish_docs.sh`
+mutates Git; do not use it for validation.
 
 After changing RST, Sphinx config, or assets:
 
@@ -53,7 +53,8 @@ Singer replication.
 | Singer replication | `concept/replication_methods.rst`; `concept/singer.rst` if relevant |
 | FastSync components/selection/pairs | `concept/fastsync.rst`; never list FastSync as a replication method |
 | Resync/`sync_start_from` | `concept/fastsync.rst`, `user_guide/resync.rst` |
-| Data-diff config/checks/coverage/remediation | `user_guide/data_diff.rst` |
+| Data-diff checks/config/coverage/remediation | `user_guide/data_diff.rst` |
+| Data-diff backend config/schema/reporting | `user_guide/data_diff_backend.rst` |
 | PartialSync edge cases | `user_guide/partial_sync.rst`, including visuals |
 | Alert handlers | `user_guide/alerts.rst` |
 | Operational diagnostics | `user_guide/troubleshooting.rst` |

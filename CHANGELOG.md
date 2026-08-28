@@ -1,5 +1,13 @@
-Unversioned
------------
+Documentation only
+------------------
+
+**Data-diff**
+
+- Add a dedicated backend database page with configuration, an embedded Mermaid
+  ERD, and direct coverage and remediation reporting queries
+
+Tests only
+----------
 
 **Test infrastructure**
 

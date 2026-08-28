@@ -235,11 +235,12 @@ class DataDiffRepository:
                 SELECT checks.*,
                        coverage.coverage_start, coverage.verified_through,
                        coverage.max_observed_end, coverage.coverage_status,
-                       coverage.blocking_run_id, coverage.verified_at,
+                       coverage.blocking_run_id,
+                       coverage.updated_at AS verified_at,
                        coverage.evaluated_run_id AS coverage_run_id,
                        coverage.reason AS coverage_reason
                   FROM {SCHEMA}.dd_checks checks
-                  LEFT JOIN {SCHEMA}.dd_current_coverage coverage
+                  LEFT JOIN {SCHEMA}.dd_coverage_state coverage
                     ON coverage.check_id = checks.check_id
                   {where_sql}
                  ORDER BY checks.target_id, checks.tap_id,
@@ -269,11 +270,12 @@ class DataDiffRepository:
                 SELECT checks.*,
                        coverage.coverage_start, coverage.verified_through,
                        coverage.max_observed_end, coverage.coverage_status,
-                       coverage.blocking_run_id, coverage.verified_at,
+                       coverage.blocking_run_id,
+                       coverage.updated_at AS verified_at,
                        coverage.evaluated_run_id AS coverage_run_id,
                        coverage.reason AS coverage_reason
                   FROM {SCHEMA}.dd_checks checks
-                  LEFT JOIN {SCHEMA}.dd_current_coverage coverage
+                  LEFT JOIN {SCHEMA}.dd_coverage_state coverage
                     ON coverage.check_id = checks.check_id
                  WHERE checks.check_id = %s
                 """,

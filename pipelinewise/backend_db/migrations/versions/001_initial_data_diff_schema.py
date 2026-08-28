@@ -195,42 +195,7 @@ def upgrade():
             ON {SCHEMA}.dd_coverage_events(check_id, event_sequence DESC)
     """)
 
-    op.execute(f"""
-        CREATE OR REPLACE VIEW {SCHEMA}.dd_current_coverage AS
-        SELECT state.check_id, checks.full_check_name,
-               checks.revision, checks.source_schema, checks.source_table,
-               checks.source_timestamp_column, state.coverage_start,
-               state.verified_through, state.max_observed_end,
-               state.coverage_status, state.blocking_run_id,
-               state.evaluated_run_id, state.event_type,
-               state.updated_at AS verified_at, state.reason
-          FROM {SCHEMA}.dd_coverage_state state
-          JOIN {SCHEMA}.dd_checks checks
-            ON checks.check_id = state.check_id
-    """)
-
-    op.execute(f"""
-        CREATE OR REPLACE VIEW {SCHEMA}.dd_remediation_history AS
-        SELECT checks.full_check_name, checks.revision,
-               original.run_id AS failed_run_id, original.status AS failed_status,
-               original.window_start, original.window_end,
-               original.finished_at AS failed_at,
-               remediation.run_id AS remediation_run_id,
-               remediation.attempt AS remediation_attempt,
-               remediation.status AS remediation_status,
-               remediation.remediation_reference,
-               remediation.finished_at AS remediation_finished_at,
-               COALESCE(remediation.status = 'PASS', FALSE) AS recovered
-          FROM {SCHEMA}.dd_runs original
-          JOIN {SCHEMA}.dd_checks checks
-            ON checks.check_id = original.dd_check_id
-          LEFT JOIN {SCHEMA}.dd_runs remediation
-            ON remediation.rerun_of_run_id = original.run_id
-         WHERE original.rerun_of_run_id IS NULL
-           AND original.status IN ('FAIL', 'ERROR')
-    """)
-
-    # Table and view comments
+    # Table comments
     op.execute(f"COMMENT ON TABLE {SCHEMA}.dd_checks IS 'Versioned check definitions imported from YAML config'")
     op.execute(
         f"COMMENT ON TABLE {SCHEMA}.dd_preflights IS "
@@ -250,12 +215,6 @@ def upgrade():
         f"COMMENT ON TABLE {SCHEMA}.dd_coverage_events IS "
         "'Append-only log tracking the data-diff verified-through watermark'"
     )
-    op.execute(f"COMMENT ON VIEW {SCHEMA}.dd_current_coverage IS 'Latest data-diff coverage watermark per check'")
-    op.execute(
-        f"COMMENT ON VIEW {SCHEMA}.dd_remediation_history IS "
-        "'Failed data-diff runs paired with their remediation attempts'"
-    )
-
     _grant_application_privileges()
 
 
@@ -280,9 +239,6 @@ def _grant_application_privileges():
         op.execute(
             f"GRANT SELECT, INSERT, UPDATE ON {SCHEMA}.{table} TO {role}"
         )
-    for view in ("dd_current_coverage", "dd_remediation_history"):
-        op.execute(f"GRANT SELECT ON {SCHEMA}.{view} TO {role}")
-
     # dd_coverage_events.event_sequence is a BIGSERIAL: inserting needs the
     # sequence, not just the table.
     op.execute(
@@ -301,8 +257,6 @@ def _quote_identifier(name):
 
 
 def downgrade():
-    op.execute(f"DROP VIEW IF EXISTS {SCHEMA}.dd_remediation_history")
-    op.execute(f"DROP VIEW IF EXISTS {SCHEMA}.dd_current_coverage")
     op.execute(f"DROP TABLE IF EXISTS {SCHEMA}.dd_coverage_events CASCADE")
     op.execute(f"DROP TABLE IF EXISTS {SCHEMA}.dd_coverage_state CASCADE")
     op.execute(f"DROP TABLE IF EXISTS {SCHEMA}.dd_effective_attempts CASCADE")

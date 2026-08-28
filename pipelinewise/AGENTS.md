@@ -13,7 +13,7 @@ Read root `AGENTS.md` first; also use scoped connector, test, E2E, and docs guid
 
 - PKs omit `dd_` (`dd_runs.run_id`); FKs normally reuse referenced PK names, except existing `dd_runs.dd_check_id`. Name role-qualified FKs clearly, e.g. `rerun_of_run_id`.
 - `public` is fixed across Alembic, runtime, tests, ERDs, and docs. Changing it requires a forward migration plan and synchronized updates.
-- Each `NNN_*.py` revision needs a matching `NNN_schema.erd.excalidraw` of the resulting `public` schema; preserve old ERDs. FK lines use right angles and `*`, `1`, `1:1`, or `0..1`; nullable is dashed, required solid.
+- Each `NNN_*.py` revision needs a matching `NNN_schema.erd.mmd` Mermaid ERD of the resulting `public` schema; preserve old ERDs and show foreign-key relationships on the tables diagram.
 - Never rewrite a released/applied migration. Before first deployment, amend an unshipped revision only after explicit confirmation that all databases are disposable; rebuild an empty backend and update its ERD.
 - History is append-oriented: preflights, results, and coverage events are inserts; checks, runs, effective attempts, and coverage state have controlled updates. The database does not enforce immutability.
 
