@@ -42,23 +42,17 @@ net_retry() {
 }
 
 apt-get update
-apt_retry apt-get install -y software-properties-common apt-utils
-
 echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections
 
 apt_retry apt-get install -y --no-install-recommends \
   wget \
-  gnupg \
   git \
-  alien \
   gettext-base \
-  libaio1t64 \
+  make \
   mariadb-client \
   mbuffer \
   postgresql-client \
-  python3.12-dev python3.12-venv
-
-apt_retry apt-get upgrade -y
+  python3 python3.12-venv
 
 # Do a bunch of Mongo things
 MONGOSH_DEB=mongodb-mongosh_${MONGOSH_VERSION}_amd64.deb
@@ -83,12 +77,92 @@ tests/db/tap_postgres_db.sh
 tests/db/tap_mongodb.sh
 tests/db/target_postgres.sh
 
-# Install PipelineWise and connectors in the container
-if ! make pipelinewise connectors -e pw_acceptlicenses=y -e pw_connector=target-snowflake,target-postgres,tap-mysql,tap-postgres,tap-mongodb,transform-field,tap-s3-csv; then
+# Install PipelineWise before the connectors so their concurrent pip installs
+# can reuse its warmed download cache. Each connector has its own virtualenv.
+if ! make pipelinewise -e pw_acceptlicenses=y; then
     echo
-    echo "ERROR: Docker container not started. Failed to install one or more PipelineWise components."
+    echo "ERROR: Docker container not started. Failed to install PipelineWise."
     exit 1
 fi
+
+CONNECTORS=(
+  target-snowflake
+  target-postgres
+  tap-mysql
+  tap-postgres
+  tap-mongodb
+  transform-field
+  tap-s3-csv
+)
+CONNECTOR_INSTALL_PARALLELISM=4
+CONNECTOR_INSTALL_LOG_DIR=${DOWNLOAD_DIR}/pipelinewise-connector-install
+CONNECTOR_INSTALL_PIDS=()
+
+stop_connector_installs() {
+  local pid
+  for pid in "${CONNECTOR_INSTALL_PIDS[@]}"; do
+    kill "$pid" 2>/dev/null || true
+  done
+  for pid in "${CONNECTOR_INSTALL_PIDS[@]}"; do
+    wait "$pid" 2>/dev/null || true
+  done
+}
+
+install_connector_batch() {
+  local connector
+  local failed=0
+  local index
+  local log_file
+  local -a batch_connectors=("$@")
+  local -a batch_logs=()
+
+  CONNECTOR_INSTALL_PIDS=()
+  for connector in "${batch_connectors[@]}"; do
+    log_file=${CONNECTOR_INSTALL_LOG_DIR}/${connector}.log
+    batch_logs+=("$log_file")
+    echo "Starting ${connector} connector installation..."
+    make connectors \
+      -e pw_acceptlicenses=y \
+      -e pw_connector="$connector" >"$log_file" 2>&1 &
+    CONNECTOR_INSTALL_PIDS+=("$!")
+  done
+
+  for index in "${!CONNECTOR_INSTALL_PIDS[@]}"; do
+    connector=${batch_connectors[$index]}
+    if wait "${CONNECTOR_INSTALL_PIDS[$index]}"; then
+      echo "Finished ${connector} connector installation."
+    else
+      echo "ERROR: Failed to install ${connector} connector."
+      failed=1
+    fi
+  done
+
+  for index in "${!batch_logs[@]}"; do
+    connector=${batch_connectors[$index]}
+    echo
+    echo "----- ${connector} connector install log -----"
+    sed "s/^/[${connector}] /" "${batch_logs[$index]}"
+  done
+
+  CONNECTOR_INSTALL_PIDS=()
+  return "$failed"
+}
+
+mkdir -p "$CONNECTOR_INSTALL_LOG_DIR"
+trap 'stop_connector_installs; exit 130' INT
+trap 'stop_connector_installs; exit 143' TERM
+
+connector_count=${#CONNECTORS[@]}
+for ((batch_start = 0; batch_start < connector_count; batch_start += CONNECTOR_INSTALL_PARALLELISM)); do
+  if ! install_connector_batch \
+    "${CONNECTORS[@]:batch_start:CONNECTOR_INSTALL_PARALLELISM}"; then
+    echo
+    echo "ERROR: Docker container not started. Failed to install one or more PipelineWise connectors."
+    exit 1
+  fi
+done
+
+trap - INT TERM
 
 # Activate CLI virtual environment at every login
 sed -i '/motd/d' ~/.bashrc  # Delete any existing old DO_AT_LOGIN line from bashrc

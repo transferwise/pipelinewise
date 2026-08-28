@@ -120,7 +120,9 @@ class TestMySqlToSnowflakeDataDiff:
             f'WHERE weight_unit_id = (SELECT MIN(weight_unit_id) FROM '
             f'(SELECT weight_unit_id FROM {SOURCE_TABLE}) inner_rows)'
         )
-        self._run_success(f'pipelinewise import_config --dir {PROJECT_DIR}')
+        self._run_success(
+            f'pipelinewise import_config --dir {PROJECT_DIR} --taps {TAP_ID}'
+        )
         self._run_success(
             f'pipelinewise run_tap --tap {TAP_ID} --target {TARGET_ID}'
         )

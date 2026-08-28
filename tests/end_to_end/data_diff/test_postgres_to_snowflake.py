@@ -93,7 +93,9 @@ class TestPostgresToSnowflakeDataDiff:
         )
 
         self._run_success(f'pipelinewise validate --dir {PROJECT_DIR}')
-        self._run_success(f'pipelinewise import_config --dir {PROJECT_DIR}')
+        self._run_success(
+            f'pipelinewise import_config --dir {PROJECT_DIR} --taps {TAP_ID}'
+        )
         self._run_success(
             f'pipelinewise run_tap --tap {TAP_ID} --target {TARGET_ID}'
         )
@@ -136,7 +138,9 @@ class TestPostgresToSnowflakeDataDiff:
             "SET updated_at = date_trunc('hour', CURRENT_TIMESTAMP) - interval '1 hour'"
         )
 
-        self._run_success(f'pipelinewise import_config --dir {PROJECT_DIR}')
+        self._run_success(
+            f'pipelinewise import_config --dir {PROJECT_DIR} --taps {TAP_ID}'
+        )
         self._run_success(
             f'pipelinewise run_tap --tap {TAP_ID} --target {TARGET_ID}'
         )

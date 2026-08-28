@@ -88,7 +88,9 @@ class TestPostgresToPostgresDataDiff:
         assert source_count == 4
 
         self._run_success(f'pipelinewise validate --dir {PROJECT_DIR}')
-        self._run_success(f'pipelinewise import_config --dir {PROJECT_DIR}')
+        self._run_success(
+            f'pipelinewise import_config --dir {PROJECT_DIR} --taps {TAP_ID}'
+        )
 
         checks = self._run_json(
             'pipelinewise list_data_diff_checks '
@@ -481,7 +483,9 @@ class TestPostgresToPostgresDataDiff:
                 " WHERE table_schema = 'public' AND table_name LIKE 'dd_%'"
             )[0][0] == 0
 
-            self._run_success(f'pipelinewise import_config --dir {PROJECT_DIR}')
+            self._run_success(
+                f'pipelinewise import_config --dir {PROJECT_DIR} --taps {TAP_ID}'
+            )
 
             tables = {
                 row[0] for row in self.run_backend_query(
@@ -503,7 +507,9 @@ class TestPostgresToPostgresDataDiff:
             assert self.run_backend_query(
                 'SELECT COUNT(*) FROM public.alembic_version'
             )[0][0] == 1
-            self._run_success(f'pipelinewise import_config --dir {PROJECT_DIR}')
+            self._run_success(
+                f'pipelinewise import_config --dir {PROJECT_DIR} --taps {TAP_ID}'
+            )
         finally:
             self.e2e.run_ddl_pipelinewise_backend(
                 f'DROP SCHEMA IF EXISTS {ddl_schema} CASCADE'

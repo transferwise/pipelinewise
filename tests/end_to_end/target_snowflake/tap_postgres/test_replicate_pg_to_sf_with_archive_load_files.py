@@ -15,7 +15,6 @@ ARCHIVE_STATE_EXPECTATIONS = {
 
 TAP_ID = 'postgres_to_sf_archive_load_files'
 TARGET_ID = 'snowflake'
-ARCHIVE_S3_PREFIX = 'archive_folder'
 
 
 class TestReplicatePGToSFWithArchiveLoadFiles(TapPostgres):
@@ -29,7 +28,13 @@ class TestReplicatePGToSFWithArchiveLoadFiles(TapPostgres):
 
         # pylint: disable=protected-access
         self.s3_bucket = self.e2e_env.get_conn_env_var('TARGET_SNOWFLAKE', 'S3_BUCKET')
+        self.archive_s3_prefix = self.e2e_env.get_conn_env_var(
+            'TARGET_SNOWFLAKE',
+            'ARCHIVE_LOAD_FILES_S3_PREFIX',
+        )
         self.s3_client = self.e2e_env.get_aws_session().client('s3')
+        if self.e2e_env.e2e_namespace:
+            self.addCleanup(self.delete_dangling_files_from_archive)
 
     def delete_dangling_files_from_archive(self):
         """
@@ -38,7 +43,7 @@ class TestReplicatePGToSFWithArchiveLoadFiles(TapPostgres):
 
         files_in_s3_archive = self.s3_client.list_objects(
             Bucket=self.s3_bucket,
-            Prefix=f'{ARCHIVE_S3_PREFIX}/postgres_to_sf_archive_load_files/',
+            Prefix=f'{self.archive_s3_prefix}/postgres_to_sf_archive_load_files/',
         ).get('Contents', [])
         for file_in_archive in files_in_s3_archive:
             self.s3_client.delete_object(
@@ -52,7 +57,9 @@ class TestReplicatePGToSFWithArchiveLoadFiles(TapPostgres):
 
         return self.s3_client.list_objects(
             Bucket=self.s3_bucket,
-            Prefix=(f'{ARCHIVE_S3_PREFIX}/postgres_to_sf_archive_load_files/{table}'),
+            Prefix=(
+                f'{self.archive_s3_prefix}/postgres_to_sf_archive_load_files/{table}'
+            ),
         ).get('Contents')
 
     def test_replicate_pg_to_sf_with_archive_load_files(self):

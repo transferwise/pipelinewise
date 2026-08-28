@@ -34,8 +34,8 @@ step ran and report pass/skip/fail counts.
 ## E2E matrix
 
 These groups mirror `.github/workflows/e2e_tests.yml`; update both together. CI
-isolates jobs, but local groups share/reset fixtures, config, Snowflake, and S3,
-so run serially:
+runs the eight Snowflake groups concurrently on isolated runners. Local groups
+share/reset fixtures and config, so run them serially:
 
 ```bash
 run_e2e() { docker exec -t pipelinewise pytest "$@" -vx --timer-top-n 10; }
@@ -47,22 +47,47 @@ run_e2e \
   tests/end_to_end/data_diff/test_mysql_to_postgres.py
 
 run_e2e \
-  tests/end_to_end/target_snowflake/tap_mariadb \
+  tests/end_to_end/target_snowflake/test_native_to_iceberg_converter.py \
   tests/end_to_end/data_diff/test_mysql_to_snowflake.py
 
 run_e2e \
-  tests/end_to_end/target_snowflake/tap_mysql \
-  tests/end_to_end/target_snowflake/test_native_to_iceberg_converter.py
+  tests/end_to_end/target_snowflake/tap_postgres/test_snowflake_iceberg_publisher.py \
+  tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_replica_to_sf.py
 
 run_e2e \
-  tests/end_to_end/target_snowflake/tap_postgres \
+  tests/end_to_end/target_snowflake/tap_postgres/test_partial_sync_pg_to_sf.py \
+  tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_to_sf_with_custom_buffer_size.py \
   tests/end_to_end/data_diff/test_postgres_to_snowflake.py
 
-run_e2e tests/end_to_end/target_snowflake/tap_mongodb
-run_e2e tests/end_to_end/target_snowflake/tap_s3
+run_e2e \
+  tests/end_to_end/target_snowflake/tap_mariadb/test_partial_sync_mariadb_to_sf.py \
+  tests/end_to_end/target_snowflake/tap_postgres/test_defined_partial_sync_pg_to_sf.py \
+  tests/end_to_end/target_snowflake/tap_postgres/test_resync_pg_to_sf_with_split_large_files.py
+
+run_e2e \
+  tests/end_to_end/target_snowflake/tap_postgres/test_iceberg_v3_postgres_to_sf.py \
+  tests/end_to_end/target_snowflake/tap_postgres/test_replicate_pg_to_sf.py \
+  tests/end_to_end/target_snowflake/tap_s3/test_replicate_s3_to_sf.py
+
+run_e2e \
+  tests/end_to_end/target_snowflake/tap_mariadb/test_iceberg_v3_mariadb_to_sf.py \
+  tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_to_sf_soft_delete.py \
+  tests/end_to_end/target_snowflake/tap_mongodb/test_replicate_mongodb_to_sf.py
+
+run_e2e \
+  tests/end_to_end/target_snowflake/tap_mysql/test_iceberg_v3_mysql_to_sf.py \
+  tests/end_to_end/target_snowflake/tap_postgres/test_resync_pg_to_sf_table_size_check.py \
+  tests/end_to_end/target_snowflake/tap_mariadb/test_resync_mariadb_to_sf.py \
+  tests/end_to_end/target_snowflake/tap_postgres/test_replicate_pg_to_sf_with_archive_load_files.py
+
+run_e2e \
+  tests/end_to_end/target_snowflake/tap_mariadb/test_resync_mariadb_to_sf_table_size_check.py \
+  tests/end_to_end/target_snowflake/tap_mariadb/test_replicate_mariadb_to_sf.py \
+  tests/end_to_end/target_snowflake/tap_mariadb/test_defined_partial_sync_mariadb_to_sf.py \
+  tests/end_to_end/target_snowflake/tap_mariadb/test_resync_mariadb_to_sf_with_split_large_files.py
 ```
 
-Run all six only for a full suite; otherwise run every affected group. MariaDB
+Run all nine only for a full suite; otherwise run every affected group. MariaDB
 and PostgreSQL cover native and explicit v3; genuine MySQL covers explicit v3.
 Do not infer one format from the other. `SHOW PRIMARY KEYS` does not prove
 Iceberg identifier fields; inspect raw metadata and compare
@@ -75,13 +100,14 @@ Iceberg identifier fields; inspect raw metadata and compare
   `TARGET_SNOWFLAKE_PRIVATE_KEY=/opt/pipelinewise/.ssh/snowflake.pem`,
   `helpers/env.py` fields, and staging credentials. Teardown drops only unique
   run schemas; never use production credentials.
+- CI sets `PIPELINEWISE_E2E_NAMESPACE` from the run, attempt, and shard. It must
+  contain only letters, digits, underscores, and hyphens. The namespace scopes
+  Snowflake staging, archive keys, and tap-S3 fixtures; local runs leave it unset.
 - Tap-S3 needs dedicated `TAP_S3_CSV_AWS_KEY`,
-  `TAP_S3_CSV_AWS_SECRET_ACCESS_KEY`, and `TAP_S3_CSV_BUCKET`. Fixtures overwrite
-  `ppw_e2e_tap_s3_csv/mock_data_{1,2}.csv`; pre-seed both in an empty bucket
-  because discovery precedes upload.
-- The archive route deletes
-  `archive_folder/postgres_to_sf_archive_load_files/` in
-  `TARGET_SNOWFLAKE_S3_BUCKET`; reserve it and avoid concurrent runs.
+  `TAP_S3_CSV_AWS_SECRET_ACCESS_KEY`, and `TAP_S3_CSV_BUCKET`. Setup uploads both
+  namespaced fixture objects before discovery, and teardown removes them.
+- The archive route removes its namespaced files after every test. Use only the
+  dedicated `TARGET_SNOWFLAKE_S3_BUCKET`.
 - Target-PostgreSQL includes S3 and may skip despite healthy databases;
   credential skips are not passes.
 

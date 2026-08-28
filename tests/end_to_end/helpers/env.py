@@ -14,6 +14,25 @@ from . import db
 USER_HOME = os.path.expanduser('~')
 CONFIG_DIR = os.path.join(USER_HOME, '.pipelinewise')
 DIR = os.path.dirname(os.path.realpath(__file__))
+E2E_NAMESPACE_ENV = 'PIPELINEWISE_E2E_NAMESPACE'
+TAP_S3_CSV_KEY_PREFIX = 'ppw_e2e_tap_s3_csv'
+SNOWFLAKE_ARCHIVE_S3_PREFIX = 'archive_folder'
+
+
+def _load_e2e_namespace():
+    """Return an optional S3-safe namespace for concurrent E2E jobs."""
+    namespace = os.environ.get(E2E_NAMESPACE_ENV, '')
+    if namespace and re.fullmatch(r'[A-Za-z0-9_-]+', namespace) is None:
+        raise ValueError(
+            f'{E2E_NAMESPACE_ENV} must contain only letters, digits, underscores, '
+            'and hyphens'
+        )
+    return namespace
+
+
+def _namespaced_s3_path(base_prefix, namespace):
+    """Append a namespace as one path segment without duplicating slashes."""
+    return f'{base_prefix.rstrip("/")}/{namespace}'
 
 
 # pylint: disable=too-many-public-methods
@@ -54,6 +73,23 @@ class E2EEnv:
         schema_postfix_override = os.environ.get('TARGET_SNOWFLAKE_SCHEMA_POSTFIX')
         self.sf_schema_postfix_is_override = bool(schema_postfix_override)
         self.sf_schema_postfix = schema_postfix_override or self.sf_schema_postfix
+        self.e2e_namespace = _load_e2e_namespace()
+        tap_s3_csv_key_prefix = TAP_S3_CSV_KEY_PREFIX
+        snowflake_archive_s3_prefix = SNOWFLAKE_ARCHIVE_S3_PREFIX
+        snowflake_s3_key_prefix = os.environ.get('TARGET_SNOWFLAKE_S3_KEY_PREFIX')
+        if self.e2e_namespace:
+            tap_s3_csv_key_prefix = _namespaced_s3_path(
+                tap_s3_csv_key_prefix,
+                self.e2e_namespace,
+            )
+            snowflake_archive_s3_prefix = _namespaced_s3_path(
+                snowflake_archive_s3_prefix,
+                self.e2e_namespace,
+            )
+            if snowflake_s3_key_prefix:
+                snowflake_s3_key_prefix = (
+                    f'{_namespaced_s3_path(snowflake_s3_key_prefix, self.e2e_namespace)}/'
+                )
         self.env = {
             # ------------------------------------------------------------------
             # Tap Postgres is a REQUIRED test connector and test database with test data available
@@ -173,6 +209,10 @@ class E2EEnv:
                         'value': os.environ.get('TAP_S3_CSV_AWS_SECRET_ACCESS_KEY')
                     },
                     'BUCKET': {'value': os.environ.get('TAP_S3_CSV_BUCKET')},
+                    'KEY_PREFIX': {
+                        'value': tap_s3_csv_key_prefix,
+                        'optional': True,
+                    },
                 },
             },
             # ------------------------------------------------------------------
@@ -259,7 +299,7 @@ class E2EEnv:
                         'value': os.environ.get('TARGET_SNOWFLAKE_S3_BUCKET')
                     },
                     'S3_KEY_PREFIX': {
-                        'value': os.environ.get('TARGET_SNOWFLAKE_S3_KEY_PREFIX')
+                        'value': snowflake_s3_key_prefix
                     },
                     'S3_ACL': {
                         'value': os.environ.get('TARGET_SNOWFLAKE_S3_ACL'),
@@ -278,7 +318,11 @@ class E2EEnv:
                     'SCHEMA_POSTFIX': {
                         'value': self.sf_schema_postfix,
                         'optional': True,
-                    }
+                    },
+                    'ARCHIVE_LOAD_FILES_S3_PREFIX': {
+                        'value': snowflake_archive_s3_prefix,
+                        'optional': True,
+                    },
                 },
             },
         }
@@ -582,6 +626,7 @@ class E2EEnv:
         )
 
         bucket = self.get_conn_env_var('TAP_S3_CSV', 'BUCKET')
+        key_prefix = self.get_conn_env_var('TAP_S3_CSV', 'KEY_PREFIX')
         s3 = boto3.client(
             's3',
             aws_access_key_id=self.get_conn_env_var('TAP_S3_CSV', 'AWS_KEY'),
@@ -590,8 +635,33 @@ class E2EEnv:
             ),
         )
 
-        s3.upload_file(mock_data_1, bucket, 'ppw_e2e_tap_s3_csv/mock_data_1.csv')
-        s3.upload_file(mock_data_2, bucket, 'ppw_e2e_tap_s3_csv/mock_data_2.csv')
+        s3.upload_file(mock_data_1, bucket, f'{key_prefix}/mock_data_1.csv')
+        s3.upload_file(mock_data_2, bucket, f'{key_prefix}/mock_data_2.csv')
+
+    def cleanup_tap_s3_csv(self):
+        """Delete this CI run's exact tap S3 CSV fixture objects."""
+        if not self.e2e_namespace:
+            return
+
+        bucket = self.get_conn_env_var('TAP_S3_CSV', 'BUCKET')
+        key_prefix = self.get_conn_env_var('TAP_S3_CSV', 'KEY_PREFIX')
+        s3 = boto3.client(
+            's3',
+            aws_access_key_id=self.get_conn_env_var('TAP_S3_CSV', 'AWS_KEY'),
+            aws_secret_access_key=self.get_conn_env_var(
+                'TAP_S3_CSV', 'AWS_SECRET_ACCESS_KEY'
+            ),
+        )
+        s3.delete_objects(
+            Bucket=bucket,
+            Delete={
+                'Objects': [
+                    {'Key': f'{key_prefix}/mock_data_1.csv'},
+                    {'Key': f'{key_prefix}/mock_data_2.csv'},
+                ],
+                'Quiet': True,
+            },
+        )
 
     def setup_target_postgres(self):
         """Clean postgres target database and prepare for test run"""

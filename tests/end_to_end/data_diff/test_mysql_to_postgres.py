@@ -101,7 +101,9 @@ class TestMySqlToPostgresDataDiff:
         assert source_count > 0
 
         self._run_success(f'pipelinewise validate --dir {PROJECT_DIR}')
-        self._run_success(f'pipelinewise import_config --dir {PROJECT_DIR}')
+        self._run_success(
+            f'pipelinewise import_config --dir {PROJECT_DIR} --taps {TAP_ID}'
+        )
 
         checks = self._run_json(
             'pipelinewise list_data_diff_checks '
@@ -137,7 +139,9 @@ class TestMySqlToPostgresDataDiff:
             f'UPDATE {SOURCE_TABLE} SET date_updated = NOW() - INTERVAL 1 HOUR'
         )
 
-        self._run_success(f'pipelinewise import_config --dir {PROJECT_DIR}')
+        self._run_success(
+            f'pipelinewise import_config --dir {PROJECT_DIR} --taps {TAP_ID}'
+        )
         # FULL_TABLE is handled entirely by FastSync, so no singer log is produced.
         assertions.assert_run_tap_success(TAP_ID, TARGET_ID, ['fastsync'])
 

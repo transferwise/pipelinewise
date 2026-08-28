@@ -14,8 +14,11 @@ def _create_ppw_config_file(table_mb):
         config_file.write('allowed_resync_max_size:\n')
         config_file.write(f'  table_mb: {table_mb}\n')
 
-    [return_code, _, _] = tasks.run_command(f'pipelinewise import_config --dir {TEST_PROJECTS_DIR_PATH}')
-    assert return_code == 0
+    return_code, stdout, stderr = tasks.run_command(
+        f'pipelinewise import_config --dir {TEST_PROJECTS_DIR_PATH} '
+        f'--taps {TAP_ID}'
+    )
+    assert return_code == 0, f'import_config failed\n{stdout}\n{stderr}'
 
 
 class TestResyncMariaDBToSF(TapMariaDB):
