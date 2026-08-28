@@ -1,5 +1,13 @@
-Unversioned
------------
+Documentation only
+------------------
+
+**Data-diff**
+
+- Add a dedicated backend database page with configuration, an embedded Mermaid
+  ERD, and direct coverage and remediation reporting queries
+
+Tests only
+----------
 
 **Test infrastructure**
 
@@ -9,14 +17,6 @@ Unversioned
   instead of serial source jobs
 - Namespace each shard's remote Snowflake and S3 fixtures and scope config
   imports to one tap so concurrent jobs cannot interfere
-
-Documentation-only (2026-08-26)
--------------------------------
-
-**Data-diff**
-
-- Add a dedicated backend database page with configuration, an embedded Mermaid
-  ERD, and direct coverage and remediation reporting queries
 
 0.81.0 (2026-08-24)
 -------------------
