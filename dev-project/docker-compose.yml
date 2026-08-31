@@ -121,6 +121,32 @@ services:
     networks:
       - pipelinewise_network
 
+
+  pipelinewise-yugabyte-source:
+    image: yugabytedb/yugabyte:2026.1.1.1-b2
+    container_name: pipelinewise-yugabyte-source
+    command: >
+      bin/yugabyted start --background=false
+    ports:
+      - ${TAP_POSTGRES_PORT_ON_HOST}:${TAP_POSTGRES_PORT}
+    environment:
+      POSTGRES_USER: ${TAP_YUGABYTE_USER}
+      POSTGRES_PASSWORD: ${TAP_YUGABYTE_PASSWORD}
+      POSTGRES_DB: ${TAP_YUGABYTE_DB}
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "bash",
+          "-c",
+          "bin/yugabyted status --base_dir=/home/yugabyte/yb_data | grep -q 'Status.*Running'",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+    networks:
+      - pipelinewise_network
+
   # MySQL service container used as test source database
   pipelinewise-mysql-source:
     image: mariadb:10.6.18
