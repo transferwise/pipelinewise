@@ -1,4 +1,3 @@
-import copy
 import datetime
 import json
 import decimal
@@ -17,6 +16,7 @@ CURSOR_ITER_SIZE = 20000
 
 
 def open_connection(conn_config, logical_replication=False):
+    """Open a psycopg2 connection to YSQL, optionally as a logical replication connection."""
     cfg = {
         'application_name': 'pipelinewise',
         'host': conn_config['host'],
@@ -37,8 +37,22 @@ def open_connection(conn_config, logical_replication=False):
 
     return conn
 
+
+def filter_schemas_sql_clause(sql, filer_schemas):
+    """Append a schema name IN clause to a discovery query."""
+    in_clause = " AND n.nspname in (" + ",".join([f"'{b.strip(' ')}'" for b in filer_schemas.split(',')]) + ")"
+    return sql + in_clause
+
+
+def filter_tables_sql_clause(sql, tables: List[str]):
+    """Append a table name IN clause to a discovery query."""
+    in_clause = " AND pg_class.relname in (" + ",".join([f"'{b.strip(' ')}'" for b in tables]) + ")"
+    return sql + in_clause
+
+
 # pylint: disable=too-many-branches,too-many-nested-blocks,too-many-statements
 def selected_value_to_singer_value_impl(elem, sql_datatype):
+    """Coerce a value read from YSQL into the Singer type implied by its sql_datatype."""
     sql_datatype = sql_datatype.replace('[]', '')
     if elem is None:
         cleaned_elem = elem
@@ -111,4 +125,51 @@ def selected_value_to_singer_value_impl(elem, sql_datatype):
 
 
 def compute_tap_stream_id(schema_name, table_name):
+    """Build the Singer stream id for a table."""
     return schema_name + '-' + table_name
+
+
+# NB> numeric/decimal columns in YSQL without a specified scale && precision
+# default to 'up to 131072 digits before the decimal point; up to 16383
+# digits after the decimal point'. For practical reasons, we are capping this at 74/38
+#  https://www.postgresql.org/docs/10/static/datatype-numeric.html#DATATYPE-NUMERIC-TABLE
+MAX_SCALE = 38
+MAX_PRECISION = 100
+
+
+def numeric_precision(col):
+    """Return the column precision, capped at MAX_PRECISION."""
+    if col.numeric_precision is None:
+        return MAX_PRECISION
+
+    if col.numeric_precision > MAX_PRECISION:
+        LOGGER.warning('capping decimal precision to 100.  THIS MAY CAUSE TRUNCATION')
+        return MAX_PRECISION
+
+    return col.numeric_precision
+
+
+def numeric_scale(col):
+    """Return the column scale, capped at MAX_SCALE."""
+    if col.numeric_scale is None:
+        return MAX_SCALE
+    if col.numeric_scale > MAX_SCALE:
+        LOGGER.warning('capping decimal scale to 38.  THIS MAY CAUSE TRUNCATION')
+        return MAX_SCALE
+
+    return col.numeric_scale
+
+
+def numeric_multiple_of(scale):
+    """Return the JSON schema multipleOf for a numeric column of the given scale."""
+    return 10 ** (0 - scale)
+
+
+def numeric_max(precision, scale):
+    """Return the JSON schema maximum for a numeric column of the given precision and scale."""
+    return 10 ** (precision - scale)
+
+
+def numeric_min(precision, scale):
+    """Return the JSON schema minimum for a numeric column of the given precision and scale."""
+    return -10 ** (precision - scale)
