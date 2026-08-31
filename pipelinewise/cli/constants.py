@@ -21,6 +21,7 @@ class ConnectorType(enum.Enum):
     TAP_SLACK = 'tap-slack'
     TAP_SNOWFLAKE = 'tap-snowflake'
     TAP_TWILIO = 'tap-twilio'
+    TAP_YUGABYTE = 'tap-yugabyte'
     TAP_ZENDESK = 'tap-zendesk'
     TAP_ZUORA = 'tap-zuora'
 

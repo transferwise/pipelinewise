@@ -89,18 +89,24 @@ COMMIT;
 
 
 
-BEGIN;
+-- No explicit transaction around this block: YSQL cannot batch COPY inside a
+-- transaction block, and loading the 4k-row world data set as a single
+-- transaction expires it before COMMIT.
 SET client_encoding = 'LATIN1';
 
 DROP TABLE IF EXISTS public.country CASCADE;
 DROP TABLE IF EXISTS public.city CASCADE;
 
+-- Primary keys are declared inline: in YSQL the primary key defines the DocDB row
+-- key, so ALTER TABLE ADD PRIMARY KEY forces a table rewrite that aborts the
+-- surrounding explicit transaction.
 CREATE TABLE city (
     id integer NOT NULL,
     name text NOT NULL,
     countrycode character(3) NOT NULL,
     district text NOT NULL,
-    population integer NOT NULL
+    population integer NOT NULL,
+    CONSTRAINT city_pkey PRIMARY KEY (id)
 );
 
 CREATE TABLE country (
@@ -119,6 +125,7 @@ CREATE TABLE country (
     headofstate text,
     capital integer,
     code2 character(2) NOT NULL,
+    CONSTRAINT country_pkey PRIMARY KEY (code),
     CONSTRAINT country_continent_check CHECK ((((((((continent = 'Asia'::text) OR (continent = 'Europe'::text)) OR (continent = 'North America'::text)) OR (continent = 'Africa'::text)) OR (continent = 'Oceania'::text)) OR (continent = 'Antarctica'::text)) OR (continent = 'South America'::text)))
 );
 
@@ -4452,16 +4459,8 @@ UMI	United States Minor Outlying Islands	Oceania	Micronesia/Caribbean	16	\N	0	\N
 \.
 
 
-ALTER TABLE ONLY city
-    ADD CONSTRAINT city_pkey PRIMARY KEY (id);
-
-ALTER TABLE ONLY country
-    ADD CONSTRAINT country_pkey PRIMARY KEY (code);
-
 ALTER TABLE ONLY country
     ADD CONSTRAINT country_capital_fkey FOREIGN KEY (capital) REFERENCES city(id);
-
-COMMIT;
 
 ANALYZE city;
 ANALYZE country;

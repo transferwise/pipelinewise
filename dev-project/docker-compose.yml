@@ -38,6 +38,8 @@ services:
     depends_on:
       pipelinewise-postgres-source:
         condition: service_healthy
+      pipelinewise-yugabyte-source:
+        condition: service_healthy
       pipelinewise-mysql-source:
         condition: service_healthy
       pipelinewise-oracle-mysql-source:
@@ -128,18 +130,14 @@ services:
     command: >
       bin/yugabyted start --background=false
     ports:
-      - ${TAP_POSTGRES_PORT_ON_HOST}:${TAP_POSTGRES_PORT}
-    environment:
-      POSTGRES_USER: ${TAP_YUGABYTE_USER}
-      POSTGRES_PASSWORD: ${TAP_YUGABYTE_PASSWORD}
-      POSTGRES_DB: ${TAP_YUGABYTE_DB}
+      - ${TAP_YUGABYTE_PORT_ON_HOST}:${TAP_YUGABYTE_PORT}
     healthcheck:
       test:
         [
           "CMD",
           "bash",
           "-c",
-          "bin/yugabyted status --base_dir=/home/yugabyte/yb_data | grep -q 'Status.*Running'",
+          "bin/yugabyted status | grep -q 'Status.*Running'",
         ]
       interval: 5s
       timeout: 5s
