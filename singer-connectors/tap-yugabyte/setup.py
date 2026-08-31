@@ -19,7 +19,9 @@ setup(name='pipelinewise-tap-yugabyte',
       python_requires=">=3.12.0, <3.13",
       install_requires=[
           'pipelinewise-singer-python==3.0.2',
-          'psycopg2-binary==2.9.12'
+          'psycopg2-binary==2.9.12',
+          'strict-rfc3339==0.7',
+          'simplejson==4.1.1'
       ],
       extras_require={
           "test": [
