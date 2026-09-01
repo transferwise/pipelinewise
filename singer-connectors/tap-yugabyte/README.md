@@ -22,10 +22,6 @@ In YSQL the primary key defines the DocDB row key, so `ALTER TABLE ... ADD CONST
 
 `COPY` cannot batch inside an explicit transaction block - YSQL warns `ROWS_PER_TRANSACTION is not supported in a transaction block` - and loading the 4,079-row `city` plus 239-row `country` data set as a single transaction expires it before `COMMIT`. The `BEGIN;`/`COMMIT;` pair around that block was removed so its statements autocommit. The two smaller transactions earlier in the file (the `public` and `public2` schema setup) load little enough data to keep their explicit transactions.
 
-### No logical replication
-
-There is no `wal2json` output plugin for YugabyteDB and its logical replication semantics diverge from PostgreSQL, so `LOG_BASED` is unavailable. `tap-yugabyte` defaults to `FULL_TABLE` in `pipelinewise/cli/tap_properties.py`. `tests/db/tap_yugabyte_data_logical.sql` is still loaded, but only so the `logical1`/`logical2` schemas exist as discovery targets - no replication slot is created.
-
 ### Role and database creation is done by the seed script
 
 The `yugabytedb/yugabyte` image entrypoint is `yugabyted`, not the `postgres` image entrypoint, so `POSTGRES_USER`/`POSTGRES_PASSWORD`/`POSTGRES_DB` are inert. Only the bootstrap `yugabyte` superuser and database exist on a fresh container. `tests/db/tap_yugabyte_db.sh` connects as that superuser (`TAP_YUGABYTE_SUPERUSER*`) to create the tap role and database before loading the fixtures, guarding both because YSQL has no `CREATE ROLE ... IF NOT EXISTS` or `CREATE DATABASE ... IF NOT EXISTS`.
