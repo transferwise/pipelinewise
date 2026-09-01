@@ -274,14 +274,16 @@ class TestDoSyncUnimplementedMethods(unittest.TestCase):
             ],
         })
 
-    def test_do_sync_raises_for_incremental_stream(self):
-        """Selecting an INCREMENTAL stream hard-fails: only FULL_TABLE is implemented"""
+    def test_do_sync_raises_for_log_based_stream(self):
+        """Selecting a LOG_BASED stream hard-fails: YugabyteDB's CDC is gRPC-based and
+        does not map onto Postgres logical decoding, so only FULL_TABLE and INCREMENTAL
+        are implemented"""
         conn_config = get_test_connection_config()
         stream = _discover_stream(conn_config, self.table_name)
         for entry in stream['metadata']:
             if not entry['breadcrumb']:
                 entry['metadata']['selected'] = True
-                entry['metadata']['replication-method'] = 'INCREMENTAL'
+                entry['metadata']['replication-method'] = 'LOG_BASED'
                 entry['metadata']['replication-key'] = 'updated_at'
 
         with self.assertRaises(NotImplementedError):

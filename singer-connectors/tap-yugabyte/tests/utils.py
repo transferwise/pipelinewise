@@ -19,6 +19,7 @@ def get_test_connection_config():
             'password': os.environ['TAP_YUGABYTE_PASSWORD'],
             'dbname': os.environ['TAP_YUGABYTE_DB'],
             'tap_id': 'tap_test',
+            'limit': None,
         }
     except KeyError as exc:
         raise Exception(

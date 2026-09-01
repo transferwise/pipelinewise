@@ -8,8 +8,10 @@
   since YugabyteDB's DocDB storage has no verified equivalent
 - Fall back to a plain, non-resumable full scan for tables without a primary
   key
-- Hard-fail with `NotImplementedError` when a selected stream requests
-  INCREMENTAL or LOG_BASED replication, since only FULL_TABLE is implemented
+- Add INCREMENTAL replication, resuming from a persisted replication-key
+  bookmark; hard-fail with `NotImplementedError` only for LOG_BASED, since
+  YugabyteDB's CDC is gRPC-based and does not map onto Postgres logical
+  decoding
 - Clamp out-of-range `date` columns to `9999-12-31` before selection, matching
   the existing `timestamp` clamp, since YSQL dates exceed Python's year-9999
   ceiling

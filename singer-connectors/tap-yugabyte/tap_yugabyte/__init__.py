@@ -9,6 +9,7 @@ import tap_yugabyte.db as post_db
 import tap_yugabyte.sync_strategies.common as sync_common
 
 from tap_yugabyte.sync_strategies import full_table
+from tap_yugabyte.sync_strategies import incremental
 from tap_yugabyte.discovery_utils import discover_db
 from tap_yugabyte.stream_utils import (
     dump_catalog, clear_state_on_replication_change,
@@ -55,9 +56,31 @@ def do_sync_full_table(conn_config, stream, state, desired_columns, md_map):
     return state
 
 
-def sync_stream(conn_config, stream, state):
-    """Sync one already-validated FULL_TABLE stream and flush the resulting state."""
+def do_sync_incremental(conn_config, stream, state, desired_columns, md_map):
+    """Run an INCREMENTAL sync for one stream."""
+    replication_key = md_map.get((), {}).get('replication-key')
+    LOGGER.info("Stream %s is using incremental replication with replication key %s",
+                stream['tap_stream_id'],
+                replication_key)
+
+    stream_state = state.get('bookmarks', {}).get(stream['tap_stream_id'])
+    illegal_bk_keys = set(stream_state.keys()).difference(
+        {'replication_key', 'replication_key_value', 'version', 'last_replication_method'})
+    if len(illegal_bk_keys) != 0:
+        raise Exception(f"invalid keys found in state: {illegal_bk_keys}")
+
+    state = singer.write_bookmark(state, stream['tap_stream_id'], 'replication_key', replication_key)
+
+    sync_common.send_schema_message(stream, [replication_key])
+    state = incremental.sync_table(conn_config, stream, state, desired_columns, md_map)
+
+    return state
+
+
+def sync_stream(conn_config, stream, state, default_replication_method):
+    """Sync one already-validated FULL_TABLE or INCREMENTAL stream and flush the resulting state."""
     md_map = metadata.to_map(stream['metadata'])
+    replication_method = md_map.get((), {}).get('replication-method', default_replication_method)
     desired_columns = [c for c in stream['schema']['properties'].keys() if
                        sync_common.should_sync_column(md_map, c)]
     desired_columns.sort()
@@ -67,17 +90,20 @@ def sync_stream(conn_config, stream, state):
         return state
 
     state = singer.set_currently_syncing(state, stream['tap_stream_id'])
-    state = do_sync_full_table(conn_config, stream, state, desired_columns, md_map)
+    if replication_method == 'INCREMENTAL':
+        state = do_sync_incremental(conn_config, stream, state, desired_columns, md_map)
+    else:
+        state = do_sync_full_table(conn_config, stream, state, desired_columns, md_map)
     state = singer.set_currently_syncing(state, None)
     singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
     return state
 
 
 def do_sync(conn_config, catalog, default_replication_method, state):
-    """Orchestrate FULL_TABLE sync of every selected stream.
+    """Orchestrate sync of every selected stream via FULL_TABLE or INCREMENTAL.
 
-    Only FULL_TABLE is implemented; any other selected replication method raises
-    NotImplementedError before any stream is synced.
+    Any other selected replication method raises NotImplementedError before
+    any stream is synced.
     """
     currently_syncing = singer.get_currently_syncing(state)
     streams = list(filter(is_selected_via_metadata, catalog['streams']))
@@ -93,7 +119,7 @@ def do_sync(conn_config, catalog, default_replication_method, state):
         state = clear_state_on_replication_change(
             state, stream['tap_stream_id'], replication_key, replication_method)
 
-        if replication_method != 'FULL_TABLE':
+        if replication_method not in {'FULL_TABLE', 'INCREMENTAL'}:
             raise NotImplementedError(
                 f"replication method {replication_method} is not yet implemented for tap-yugabyte, "
                 f"stream {stream['tap_stream_id']}")
@@ -107,7 +133,7 @@ def do_sync(conn_config, catalog, default_replication_method, state):
         LOGGER.info("No streams marked as currently_syncing in state file")
 
     for stream in streams:
-        state = sync_stream(conn_config, stream, state)
+        state = sync_stream(conn_config, stream, state, default_replication_method)
 
     return state
 

@@ -51,9 +51,9 @@ schemas:
     tables:
 
       ### Table with INCREMENTAL replication
-#      - table_name: "city"
-#        replication_method: "INCREMENTAL"
-#        replication_key: "id"
+      - table_name: "city"
+        replication_method: "INCREMENTAL"
+        replication_key: "id"
 
       ### Table with FULL_TABLE replication
       - table_name: "country"
@@ -64,14 +64,14 @@ schemas:
         replication_method: "FULL_TABLE"
 
       ### Table with reserved words and columns and special characters
-#      - table_name: "edgydata"
-#        replication_method: "INCREMENTAL"
-#        replication_key: "cid"
+      - table_name: "edgydata"
+        replication_method: "INCREMENTAL"
+        replication_key: "cid"
 
       ### Table with reserved word
-#      - table_name: "order"
-#        replication_method: "INCREMENTAL"
-#        replication_key: "id"
+      - table_name: "order"
+        replication_method: "INCREMENTAL"
+        replication_key: "id"
 
       ### Table with space and mixed upper and lowercase characters
       - table_name: "table_with_space and UPPERCase"
@@ -91,6 +91,6 @@ schemas:
         replication_method: "FULL_TABLE"
 
       ### Table with reserved words and columns and special characters
-#      - table_name: "public2_edgydata"
-#        replication_method: "INCREMENTAL"
-#        replication_key: "cid"
+      - table_name: "public2_edgydata"
+        replication_method: "INCREMENTAL"
+        replication_key: "cid"
