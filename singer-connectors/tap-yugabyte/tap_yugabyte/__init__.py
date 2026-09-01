@@ -1,13 +1,18 @@
 import argparse
+import copy
 import singer
 
-from singer import utils
+from singer import utils, metadata
 from singer.catalog import Catalog
 
 import tap_yugabyte.db as post_db
+import tap_yugabyte.sync_strategies.common as sync_common
 
+from tap_yugabyte.sync_strategies import full_table
 from tap_yugabyte.discovery_utils import discover_db
-from tap_yugabyte.stream_utils import dump_catalog
+from tap_yugabyte.stream_utils import (
+    dump_catalog, clear_state_on_replication_change,
+    is_selected_via_metadata, refresh_streams_schema)
 
 LOGGER = singer.get_logger('tap_yugabyte')
 
@@ -37,6 +42,74 @@ def do_discovery(conn_config):
 
     dump_catalog(streams)
     return streams
+
+
+def do_sync_full_table(conn_config, stream, state, desired_columns, md_map):
+    """Run a FULL_TABLE sync for one stream."""
+    LOGGER.info("Stream %s is using full_table replication", stream['tap_stream_id'])
+    sync_common.send_schema_message(stream, [])
+    if md_map.get((), {}).get('is-view'):
+        state = full_table.sync_view(conn_config, stream, state, desired_columns, md_map)
+    else:
+        state = full_table.sync_table(conn_config, stream, state, desired_columns, md_map)
+    return state
+
+
+def sync_stream(conn_config, stream, state):
+    """Sync one already-validated FULL_TABLE stream and flush the resulting state."""
+    md_map = metadata.to_map(stream['metadata'])
+    desired_columns = [c for c in stream['schema']['properties'].keys() if
+                       sync_common.should_sync_column(md_map, c)]
+    desired_columns.sort()
+
+    if len(desired_columns) == 0:
+        LOGGER.warning('There are no columns selected for stream %s, skipping it', stream['tap_stream_id'])
+        return state
+
+    state = singer.set_currently_syncing(state, stream['tap_stream_id'])
+    state = do_sync_full_table(conn_config, stream, state, desired_columns, md_map)
+    state = singer.set_currently_syncing(state, None)
+    singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
+    return state
+
+
+def do_sync(conn_config, catalog, default_replication_method, state):
+    """Orchestrate FULL_TABLE sync of every selected stream.
+
+    Only FULL_TABLE is implemented; any other selected replication method raises
+    NotImplementedError before any stream is synced.
+    """
+    currently_syncing = singer.get_currently_syncing(state)
+    streams = list(filter(is_selected_via_metadata, catalog['streams']))
+    streams.sort(key=lambda s: s['tap_stream_id'])
+    LOGGER.info("Selected streams: %s ", [s['tap_stream_id'] for s in streams])
+
+    refresh_streams_schema(conn_config, streams)
+
+    for stream in streams:
+        stream_metadata = metadata.to_map(stream['metadata'])
+        replication_method = stream_metadata.get((), {}).get('replication-method', default_replication_method)
+        replication_key = stream_metadata.get((), {}).get('replication-key')
+        state = clear_state_on_replication_change(
+            state, stream['tap_stream_id'], replication_key, replication_method)
+
+        if replication_method != 'FULL_TABLE':
+            raise NotImplementedError(
+                f"replication method {replication_method} is not yet implemented for tap-yugabyte, "
+                f"stream {stream['tap_stream_id']}")
+
+    if currently_syncing:
+        LOGGER.debug("Found currently_syncing: %s", currently_syncing)
+        currently_syncing_stream = [s for s in streams if s['tap_stream_id'] == currently_syncing]
+        other_streams = [s for s in streams if s['tap_stream_id'] != currently_syncing]
+        streams = currently_syncing_stream + other_streams
+    else:
+        LOGGER.info("No streams marked as currently_syncing in state file")
+
+    for stream in streams:
+        state = sync_stream(conn_config, stream, state)
+
+    return state
 
 
 def parse_args(required_config_keys):
@@ -135,7 +208,9 @@ def main_impl():
     if args.discover:
         do_discovery(conn_config)
     elif args.properties or args.catalog:
-        raise NotImplementedError('Sync mode is not implemented yet, only --discover is supported')
+        state = args.state
+        do_sync(conn_config, args.catalog.to_dict() if args.catalog else args.properties,
+                args.config.get('default_replication_method'), state)
     else:
         LOGGER.info("No properties were selected")
 

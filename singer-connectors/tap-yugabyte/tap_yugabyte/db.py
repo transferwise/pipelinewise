@@ -15,6 +15,52 @@ LOGGER = singer.get_logger('tap_yugabyte')
 CURSOR_ITER_SIZE = 20000
 
 
+# pylint: disable=invalid-name,missing-function-docstring
+def calculate_destination_stream_name(stream, md_map):
+    return f"{md_map.get((), {}).get('schema-name')}-{stream['stream']}"
+
+
+# from the postgres docs (YSQL follows the same identifier-quoting rules):
+# Quoted identifiers can contain any character, except the character with code zero.
+# (To include a double quote, write two double quotes.)
+def canonicalize_identifier(identifier):
+    return identifier.replace('"', '""')
+
+
+def fully_qualified_column_name(schema, table, column):
+    return f'"{canonicalize_identifier(schema)}"."{canonicalize_identifier(table)}"."{canonicalize_identifier(column)}"'
+
+
+def fully_qualified_table_name(schema, table):
+    return f'"{canonicalize_identifier(schema)}"."{canonicalize_identifier(table)}"'
+
+
+def prepare_columns_for_select_sql(c, md_map):
+    column_name = f' "{canonicalize_identifier(c)}" '
+
+    if ('properties', c) in md_map:
+        sql_datatype = md_map[('properties', c)]['sql-datatype']
+        # YSQL/Postgres dates go beyond year 9999; Python's datetime.date doesn't, so clamp same as timestamps
+        if sql_datatype == 'date':
+            return f'CASE ' \
+                   f'WHEN {column_name} < \'0001-01-01\' ' \
+                   f'OR {column_name} > \'9999-12-31\' THEN \'9999-12-31\' ' \
+                   f'ELSE {column_name} ' \
+                   f'END AS {column_name}'
+        if sql_datatype.startswith('timestamp') and not sql_datatype.endswith('[]'):
+            return f'CASE ' \
+                   f'WHEN {column_name} < \'0001-01-01 00:00:00.000\' ' \
+                   f'OR {column_name} > \'9999-12-31 23:59:59.999\' THEN \'9999-12-31 23:59:59.999\' ' \
+                   f'ELSE {column_name} ' \
+                   f'END AS {column_name}'
+    return column_name
+
+
+def prepare_columns_sql(c):
+    column_name = f""" "{canonicalize_identifier(c)}" """
+    return column_name
+
+
 def open_connection(conn_config, logical_replication=False):
     """Open a psycopg2 connection to YSQL, optionally as a logical replication connection."""
     cfg = {
@@ -59,15 +105,19 @@ def selected_value_to_singer_value_impl(elem, sql_datatype):
     elif sql_datatype == 'money':
         cleaned_elem = elem
     elif sql_datatype in ['json', 'jsonb']:
-        cleaned_elem = json.loads(elem)
+        # psycopg2 already deserializes json/jsonb columns by default; only parse if it didn't
+        cleaned_elem = json.loads(elem) if isinstance(elem, (str, bytes, bytearray)) else elem
     elif sql_datatype == 'time with time zone':
         # time with time zone values will be converted to UTC and time zone dropped
         # Replace hour=24 with hour=0
         elem = str(elem)
         if elem.startswith('24'):
             elem = elem.replace('24', '00', 1)
-        # convert to UTC
-        elem = datetime.datetime.strptime(elem, '%H:%M:%S%z')
+        # convert to UTC; current_timestamp-derived values carry microseconds, plain literals don't
+        try:
+            elem = datetime.datetime.strptime(elem, '%H:%M:%S.%f%z')
+        except ValueError:
+            elem = datetime.datetime.strptime(elem, '%H:%M:%S%z')
         if elem.utcoffset() != datetime.timedelta(seconds=0):
             LOGGER.warning('time with time zone values are converted to UTC')
         elem = elem.astimezone(pytz.utc)
@@ -122,6 +172,49 @@ def selected_value_to_singer_value_impl(elem, sql_datatype):
             f"do not know how to marshall value of class( {elem.__class__} ) and sql_datatype ( {sql_datatype} )")
 
     return cleaned_elem
+
+
+def selected_array_to_singer_value(elem, sql_datatype):
+    """Recursively coerce every element of an array column into its Singer type."""
+    if isinstance(elem, list):
+        return list(map(lambda e: selected_array_to_singer_value(e, sql_datatype), elem))
+    return selected_value_to_singer_value_impl(elem, sql_datatype)
+
+
+def selected_value_to_singer_value(elem, sql_datatype):
+    """Coerce a selected column value into its Singer type, handling array datatypes."""
+    if sql_datatype.find('[]') > 0:
+        return list(map(lambda e: selected_array_to_singer_value(e, sql_datatype), (elem or [])))
+    return selected_value_to_singer_value_impl(elem, sql_datatype)
+
+
+# pylint: disable-next=too-many-arguments,too-many-positional-arguments
+def selected_row_to_singer_message(stream, row, version, columns, time_extracted, md_map):
+    """Build a Singer RecordMessage for one selected row."""
+    row_to_persist = ()
+    for idx, elem in enumerate(row):
+        sql_datatype = md_map.get(('properties', columns[idx]))['sql-datatype']
+        cleaned_elem = selected_value_to_singer_value(elem, sql_datatype)
+        row_to_persist += (cleaned_elem,)
+
+    rec = dict(zip(columns, row_to_persist))
+    return singer.RecordMessage(
+        stream=calculate_destination_stream_name(stream, md_map),
+        record=rec,
+        version=version,
+        time_extracted=time_extracted)
+
+
+def hstore_available(conn_info):
+    """Return whether the hstore extension is installed in the connected database."""
+    with open_connection(conn_info) as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.DictCursor, name='stitch_cursor') as cur:
+            cur.execute(""" SELECT installed_version FROM pg_available_extensions WHERE name = 'hstore' """)
+
+            res = cur.fetchone()
+            if res and res[0]:
+                return True
+            return False
 
 
 def compute_tap_stream_id(schema_name, table_name):

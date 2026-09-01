@@ -1,3 +1,24 @@
+0.82.0 (2026-09-01)
+-------------------
+
+**tap-yugabyte**
+
+- Add FULL_TABLE replication, resuming an interrupted sync with parameterized
+  primary-key keyset pagination instead of Postgres heap-specific `xmin`,
+  since YugabyteDB's DocDB storage has no verified equivalent
+- Fall back to a plain, non-resumable full scan for tables without a primary
+  key
+- Hard-fail with `NotImplementedError` when a selected stream requests
+  INCREMENTAL or LOG_BASED replication, since only FULL_TABLE is implemented
+- Clamp out-of-range `date` columns to `9999-12-31` before selection, matching
+  the existing `timestamp` clamp, since YSQL dates exceed Python's year-9999
+  ceiling
+- Parse `time with time zone` values carrying microseconds (e.g.
+  `current_timestamp`-derived defaults), which previously raised a
+  `strptime` format error
+- Pass through `json`/`jsonb` column values that psycopg2 already
+  deserialized into `list`/`dict`, instead of always re-parsing as a string
+
 Documentation only
 ------------------
 

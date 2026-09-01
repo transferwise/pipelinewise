@@ -81,3 +81,45 @@ def drop_table(table_name):
     with get_test_connection() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
             cur.execute('DROP TABLE IF EXISTS {} cascade'.format(quote_ident(table_name, cur)))
+
+
+class MockedConnect:
+    """Mocks psycopg2.connect so full_table sync can be unit tested without a live DB."""
+
+    class cursor:  # noqa: N801 pylint: disable=invalid-name
+        return_value = 1234
+        counter_limit = 3
+        fetchone_return_value = [5]
+
+        def __init__(self, *args, **kwargs):
+            self.counter = 0
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args, **kwargs):
+            pass
+
+        def __iter__(self):
+            return self
+
+        def __next__(self):
+            self.counter += 1
+            if self.counter < self.counter_limit:
+                return [self.return_value]
+            raise StopIteration
+
+        def fetchone(self):
+            return self.fetchone_return_value
+
+        def execute(self, *args, **kwargs):
+            pass
+
+    def __enter__(self):
+        pass
+
+    def __exit__(self, *args, **kwargs):
+        pass
+
+    def __init__(self, *args, **kwargs):
+        pass
