@@ -1129,7 +1129,7 @@ class TestLogicalReplication(unittest.TestCase):
         state_file = 5
         rep_slot = 'foo_slot'
         mocked_locate_rep_slot.return_value = rep_slot
-        mocked_datetime.utcnow().__sub__().total_seconds.return_value = test_poll_duration
+        mocked_datetime.now().__sub__().total_seconds.return_value = test_poll_duration
         mocked_start_replication = mocked_connect.return_value.cursor.return_value.start_replication
 
         actual_output = logical_replication.sync_tables(self.conn_info,
@@ -1159,7 +1159,7 @@ class TestLogicalReplication(unittest.TestCase):
                                                     mocked_locate_rep_slot,
                                                     mocked_datetime):
         """Test sync_table if reached the max_run_seconds"""
-        mocked_datetime.utcnow.return_value = datetime(2022, 11, 11, 11, 11, 11, 11)
+        mocked_datetime.now.return_value = datetime(2022, 11, 11, 11, 11, 11, 11, tzinfo=timezone.utc)
         mocked_datetime.side_effect = lambda *args, **kwargs: datetime(*args, **kwargs)
         self.conn_info['max_run_seconds'] = 0
 

@@ -525,9 +525,8 @@ def locate_replication_slot(conn_info):
             return locate_replication_slot_by_cur(cur, conn_info['dbname'], conn_info['tap_id'])
 
 
-# pylint: disable=anomalous-backslash-in-string
 def streams_to_wal2json_tables(streams):
-    """Converts a list of singer stream dictionaries to wal2json plugin compatible string list.
+    r"""Converts a list of singer stream dictionaries to wal2json plugin compatible string list.
     The output is compatible with the 'filter-tables' and 'add-tables' option of wal2json plugin.
 
     Special characters (space, single quote, comma, period, asterisk) must be escaped with backslash.
@@ -595,7 +594,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file, *, wal_p
     lsn_last_processed = None
     lsn_currently_processing = None
     lsn_processed_count = 0
-    start_run_timestamp = datetime.datetime.utcnow()
+    start_run_timestamp = datetime.datetime.now(datetime.UTC)
     max_run_seconds = conn_info['max_run_seconds']
     break_at_end_lsn = conn_info['break_at_end_lsn']
     logical_poll_total_seconds = conn_info['logical_poll_total_seconds'] or 10800  # 3 hours
@@ -636,8 +635,8 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file, *, wal_p
     except psycopg2.ProgrammingError as ex:
         raise Exception(f"Unable to start replication with logical replication (slot {ex})") from ex
 
-    lsn_received_timestamp = datetime.datetime.utcnow()
-    poll_timestamp = datetime.datetime.utcnow()
+    lsn_received_timestamp = datetime.datetime.now(datetime.UTC)
+    poll_timestamp = datetime.datetime.now(datetime.UTC)
 
     wal_progress_message_seen = False
     completed_wal_progress_lsn = None
@@ -645,12 +644,13 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file, *, wal_p
         while True:
             # Disconnect when no data received for logical_poll_total_seconds
             # needs to be long enough to wait for the largest single wal payload to avoid unplanned timeouts
-            poll_duration = (datetime.datetime.utcnow() - lsn_received_timestamp).total_seconds()
+            poll_duration = (datetime.datetime.now(datetime.UTC) - lsn_received_timestamp).total_seconds()
             if poll_duration > logical_poll_total_seconds:
                 LOGGER.info('Breaking - %i seconds of polling with no data', poll_duration)
                 break
 
-            if datetime.datetime.utcnow() >= (start_run_timestamp + datetime.timedelta(seconds=max_run_seconds)):
+            if datetime.datetime.now(datetime.UTC) >= (start_run_timestamp
+                                                      + datetime.timedelta(seconds=max_run_seconds)):
                 LOGGER.info('Breaking - reached max_run_seconds of %i', max_run_seconds)
                 break
 
@@ -704,7 +704,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file, *, wal_p
                 elif int(msg.data_start) > lsn_currently_processing:
                     lsn_last_processed = lsn_currently_processing
                     lsn_currently_processing = msg.data_start
-                    lsn_received_timestamp = datetime.datetime.utcnow()
+                    lsn_received_timestamp = datetime.datetime.now(datetime.UTC)
                     lsn_processed_count = lsn_processed_count + 1
                     if lsn_processed_count >= UPDATE_BOOKMARK_PERIOD:
                         LOGGER.debug('Updating bookmarks for all streams to lsn = %s', lsn_last_processed)
@@ -728,7 +728,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file, *, wal_p
                     pass
 
             # Every poll_interval, update latest committed lsn position from the state_file
-            if datetime.datetime.utcnow() >= (poll_timestamp + datetime.timedelta(seconds=poll_interval)):
+            if datetime.datetime.now(datetime.UTC) >= (poll_timestamp + datetime.timedelta(seconds=poll_interval)):
                 if lsn_currently_processing is None:
                     LOGGER.info('Waiting for first wal message')
                 else:
@@ -745,7 +745,7 @@ def sync_tables(conn_info, logical_streams, state, end_lsn, state_file, *, wal_p
                         LOGGER.info('Confirming write up to %s, flush to %s', lsn_to_flush, lsn_to_flush)
                         cur.send_feedback(write_lsn=lsn_to_flush, flush_lsn=lsn_to_flush, reply=True, force=True)
 
-                poll_timestamp = datetime.datetime.utcnow()
+                poll_timestamp = datetime.datetime.now(datetime.UTC)
 
         # Close replication connection and cursor
         cur.close()
