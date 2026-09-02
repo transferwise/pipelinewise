@@ -25,6 +25,8 @@
 
 
 
+
+
 const initStyles = () => {
     const defaultStyle = document.createElement('style');
     defaultStyle.textContent = "pre.mermaid {\n    /* Same as .mermaid-container > pre */\n    display: block;\n    width: 100%;\n}\n\npre.mermaid > svg {\n    /* Same as .mermaid-container > pre > svg */\n    height: 500px;\n    width: 100%;\n    max-width: 100% !important;\n}";
@@ -182,7 +184,7 @@ const runMermaid = async (rerun) => {
                                     // Apply zoom to the now-rendered diagram, matching
                                     // the decoration visible diagrams receive.
                                     if (true) {
-                                        addZoomToSvgs(d3.selectAll(".mermaid[data-zoom-id=id-b53ecbe9-ebc0-40e0-83e7-f862f08212ca]").select(function() {
+                                        addZoomToSvgs(d3.selectAll(".mermaid[data-zoom-id=id-85ee52ef-c44f-4370-83ae-e65bddc9fee0]").select(function() {
                                             return this.querySelector("svg");
                                         }));
                                     }
@@ -208,7 +210,7 @@ const runMermaid = async (rerun) => {
     if (true) {
         const mermaids_to_add_zoom = 1 === -1 ? mermaids_active.length : 1;
         if(mermaids_to_add_zoom > 0) {
-            var svgs = d3.selectAll(".mermaid[data-zoom-id=id-b53ecbe9-ebc0-40e0-83e7-f862f08212ca]").select(function() {
+            var svgs = d3.selectAll(".mermaid[data-zoom-id=id-85ee52ef-c44f-4370-83ae-e65bddc9fee0]").select(function() {
                 return this.querySelector("svg");
             });
             // Wait until every active (visible) diagram has rendered. Deferred
@@ -757,7 +759,7 @@ credentials when separate roles are not required.</p>
 <section id="schema">
 <h2>Schema<a class="headerlink" href="#schema" title="Link to this heading"></a></h2>
 <figure class="align-center" id="id1">
-<pre data-zoom-id="id-b53ecbe9-ebc0-40e0-83e7-f862f08212ca" class="mermaid">
+<pre data-zoom-id="id-85ee52ef-c44f-4370-83ae-e65bddc9fee0" class="mermaid">
         %%{init: {&quot;er&quot;: {&quot;diagramPadding&quot;: 8, &quot;entityPadding&quot;: 8}}}%%
 erDiagram
     direction LR
