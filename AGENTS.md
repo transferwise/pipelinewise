@@ -102,6 +102,9 @@ Also follow scoped checks:
 - CHANGELOG bullets are atomic and outcome-focused: start with an action verb,
   name the component and operational result, and include implementation detail
   only to explain risk. Group related bullets under headings.
+- Before creating a PR, compare the complete branch diff with the current
+  release CHANGELOG entry. Do not create the PR while the CHANGELOG omits,
+  misstates, or claims changes that are not present in the diff.
 - PipelineWise stays in `0.x` and must never publish `1.0.0` or above. Use a
   patch for compatible fixes and the next `0.x` minor for features or intentional
   compatibility changes. Document material operator impact and keep `setup.py`

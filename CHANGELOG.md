@@ -1,7 +1,14 @@
-Documentation only
-------------------
+0.81.1 (2026-09-02)
+-------------------
 
 **Data-diff**
+
+- Read current coverage directly from `dd_coverage_state` so data-diff commands
+  no longer require the `dd_current_coverage` view
+- Stop creating the unused `dd_current_coverage` and
+  `dd_remediation_history` views in new backend databases
+
+**Documentation**
 
 - Add a dedicated backend database page with configuration, an embedded Mermaid
   ERD, and direct coverage and remediation reporting queries
