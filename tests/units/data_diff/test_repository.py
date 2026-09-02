@@ -11,20 +11,20 @@ from pipelinewise.data_diff.repository import DataDiffRepository
 # pylint: disable=protected-access
 
 
-def _definition(config_hash_seed="one"):
+def _definition(config_hash_seed="one", *, tap_id="tap", source_table="payments"):
     # The seed varies frequency to produce different config hashes.
     return CheckDefinition(
-        full_check_name="target/tap/public/payments",
+        full_check_name=f"target/{tap_id}/public/{source_table}",
         target_id="target",
-        tap_id="tap",
+        tap_id=tap_id,
         source_type="tap-postgres",
         target_type="target-snowflake",
         source_database="source",
         target_database="target",
         source_schema="public",
-        source_table="payments",
+        source_table=source_table,
         target_schema="PUBLIC",
-        target_table="PAYMENTS",
+        target_table=source_table.upper(),
         source_key_column="id",
         target_key_column="ID",
         source_timestamp_column="updated_at",
@@ -145,6 +145,50 @@ def test_partial_scope_only_deactivates_selected_tap():
     # dd_checks is keyed by check_id; dd_check_id only exists on dd_runs.
     assert "WHERE check_id = %s" in updates[0][0]
     assert "dd_check_id" not in updates[0][0]
+
+
+def test_full_scope_preserves_failed_tap_and_deactivates_deleted_tap():
+    failed_definition = _definition(tap_id="failed", source_table="new")
+    wildcard_definition = _definition(tap_id="*", source_table="new")
+    failed_check_id = uuid4()
+    deleted_check_id = uuid4()
+    current = [
+        {
+            "check_id": failed_check_id,
+            "full_check_name": "target/failed/public/old",
+            "config_hash": "a" * 64,
+            "tap_id": "failed",
+        },
+        {
+            "check_id": deleted_check_id,
+            "full_check_name": "target/deleted/public/old",
+            "config_hash": "b" * 64,
+            "tap_id": "deleted",
+        },
+    ]
+    cursor = ScriptedCursor(current)
+    repository = _repository_with_cursor(cursor)
+
+    stats = repository.sync_definitions(
+        [failed_definition, wildcard_definition],
+        selected_taps=["*"],
+        excluded_taps=["failed"],
+    )
+
+    assert stats == {
+        "created": 1,
+        "unchanged": 0,
+        "superseded": 0,
+        "deactivated": 1,
+    }
+    assert not any(
+        params and failed_check_id in params
+        for _sql, params in cursor.executions
+    )
+    assert any(
+        params and deleted_check_id in params
+        for _sql, params in cursor.executions
+    )
 
 
 def test_list_checks_exposes_compare_columns_from_version_snapshot():

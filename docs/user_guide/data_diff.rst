@@ -209,6 +209,11 @@ deactivates removed ones; unchanged definitions are skipped. ``--force`` creates
 another attempt for the current slot, while ``rerun_data_diff_check`` repairs a
 historical one — see `Coverage and remediation`_.
 
+Definitions are reconciled independently for taps whose discovery succeeds. If
+another selected tap fails discovery, successful taps are still reconciled and
+the failed tap's existing definitions remain unchanged. The import still exits
+non-zero so automation can report the discovery failure.
+
 A mismatch exits non-zero and sends an alert. See :ref:`data_diff_alerts`.
 
 

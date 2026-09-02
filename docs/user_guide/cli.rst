@@ -123,9 +123,11 @@ Useful options:
      - Reads the Ansible Vault password needed by encrypted YAML values.
 
 The command validates, connects to sources, performs discovery, and writes
-generated files below ``~/.pipelinewise``. Data-diff definitions are versioned
-only after connector generation and discovery succeed. ``import`` remains a
-deprecated alias.
+generated files below ``~/.pipelinewise``. Data-diff definitions are reconciled
+for each tap only after its connector generation and discovery succeed. A failed
+tap retains its existing definitions while successful taps are reconciled, but
+the command still exits non-zero when any selected tap fails. ``import`` remains
+a deprecated alias.
 
 .. warning::
 

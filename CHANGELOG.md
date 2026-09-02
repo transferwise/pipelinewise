@@ -1,3 +1,27 @@
+0.81.2 (2026-09-02)
+-------------------
+
+**Data-diff**
+
+- Reconcile data-diff definitions for taps that import successfully even when
+  other selected taps fail discovery
+- Preserve existing data-diff definitions for taps that fail discovery or are
+  not found
+- Treat `*` combined with named tap filters as a full import so discovery
+  and data-diff reconciliation use the same scope
+
+**Tests**
+
+- Cover mixed successful, failed, missing, and deleted taps during data-diff
+  definition imports
+- Cover removal of a successful tap's data-diff definition when another tap
+  fails discovery
+- Cover wildcard and named tap filters used together
+
+**Documentation**
+
+- Document per-tap data-diff reconciliation during partially failed imports
+
 0.81.1 (2026-09-02)
 -------------------
 
@@ -12,9 +36,6 @@
 
 - Add a dedicated backend database page with configuration, an embedded Mermaid
   ERD, and direct coverage and remediation reporting queries
-
-Tests only
-----------
 
 **Test infrastructure**
 

@@ -30,8 +30,8 @@ class RepositoryContext:
         self.filters = filters
         return self.checks
 
-    def sync_definitions(self, definitions, *, selected_taps):
-        self.synced = (definitions, selected_taps)
+    def sync_definitions(self, definitions, *, selected_taps, excluded_taps=None):
+        self.synced = (definitions, selected_taps, excluded_taps)
         return {"created": len(definitions)}
 
 
@@ -182,14 +182,15 @@ def test_import_persists_definitions_only_after_successful_discovery():
     ):
         pipelinewise.import_project()
 
-    assert repository.synced == ([definition], ["*"])
+    assert repository.synced == ([definition], ["*"], set())
 
 
-def test_import_does_not_activate_definitions_after_discovery_failure():
+def test_import_excludes_definitions_after_discovery_failure():
+    definition = Mock(tap_id="tap")
     imported = Mock()
     imported.global_config = {"backend_db": {"host": "backend"}}
     imported.targets = {"target": {"taps": [{"id": "tap"}]}}
-    imported.get_data_diff_definitions.return_value = [Mock()]
+    imported.get_data_diff_definitions.return_value = [definition]
     repository = RepositoryContext()
     pipelinewise = _pipelinewise(taps="*")
     pipelinewise.logger = Mock()
@@ -207,7 +208,116 @@ def test_import_does_not_activate_definitions_after_discovery_failure():
     ), pytest.raises(SystemExit):
         pipelinewise.import_project()
 
-    assert repository.synced is None
+    assert repository.synced == ([definition], ["*"], {"tap"})
+
+
+def test_import_persists_successful_tap_definitions_after_partial_failure():
+    successful_definition = Mock(tap_id="successful")
+    failed_definition = Mock(tap_id="failed")
+    imported = Mock()
+    imported.global_config = {"backend_db": {"host": "backend"}}
+    imported.targets = {
+        "target": {"taps": [{"id": "successful"}, {"id": "failed"}]}
+    }
+    imported.get_data_diff_definitions.return_value = [
+        successful_definition,
+        failed_definition,
+    ]
+    repository = RepositoryContext()
+    pipelinewise = _pipelinewise(taps="*")
+    pipelinewise.logger = Mock()
+    pipelinewise.config = {}
+    pipelinewise._discover_tap = Mock(
+        side_effect=lambda tap, **_kwargs: (
+            "discovery failed" if tap["id"] == "failed" else None
+        )
+    )
+    pipelinewise.load_config = Mock()
+    pipelinewise.cleanup_after_deleted_config = Mock(return_value=0)
+
+    with patch(
+        "pipelinewise.cli.pipelinewise.Config.from_yamls",
+        return_value=imported,
+    ), patch(
+        "pipelinewise.cli.pipelinewise.DataDiffRepository.from_backend_config",
+        return_value=repository,
+    ), pytest.raises(SystemExit) as exc:
+        pipelinewise.import_project()
+
+    assert exc.value.code == 1
+    assert repository.synced == (
+        [successful_definition, failed_definition],
+        ["*"],
+        {"failed"},
+    )
+    pipelinewise.logger.error.assert_called_once_with(
+        "Tap discovery failed: %s",
+        "discovery failed",
+    )
+
+
+def test_import_deactivates_removed_definition_for_successful_tap_after_partial_failure():
+    failed_definition = Mock(tap_id="failed")
+    imported = Mock()
+    imported.global_config = {"backend_db": {"host": "backend"}}
+    imported.targets = {
+        "target": {"taps": [{"id": "successful"}, {"id": "failed"}]}
+    }
+    imported.get_data_diff_definitions.return_value = [failed_definition]
+    repository = RepositoryContext()
+    pipelinewise = _pipelinewise(taps="*")
+    pipelinewise.logger = Mock()
+    pipelinewise.config = {}
+    pipelinewise._discover_tap = Mock(
+        side_effect=lambda tap, **_kwargs: (
+            "discovery failed" if tap["id"] == "failed" else None
+        )
+    )
+    pipelinewise.load_config = Mock()
+    pipelinewise.cleanup_after_deleted_config = Mock(return_value=0)
+
+    with patch(
+        "pipelinewise.cli.pipelinewise.Config.from_yamls",
+        return_value=imported,
+    ), patch(
+        "pipelinewise.cli.pipelinewise.DataDiffRepository.from_backend_config",
+        return_value=repository,
+    ), pytest.raises(SystemExit) as exc:
+        pipelinewise.import_project()
+
+    assert exc.value.code == 1
+    assert repository.synced == ([failed_definition], ["*"], {"failed"})
+
+
+def test_import_persists_found_tap_when_an_explicitly_selected_tap_is_missing():
+    definition = Mock(tap_id="found")
+    imported = Mock()
+    imported.global_config = {"backend_db": {"host": "backend"}}
+    imported.targets = {"target": {"taps": [{"id": "found"}]}}
+    imported.get_data_diff_definitions.return_value = [definition]
+    repository = RepositoryContext()
+    pipelinewise = _pipelinewise(taps="found,missing")
+    pipelinewise.logger = Mock()
+    pipelinewise.config = {}
+    pipelinewise._discover_tap = Mock(return_value=None)
+    pipelinewise.load_config = Mock()
+    pipelinewise.cleanup_after_deleted_config = Mock(return_value=0)
+
+    with patch(
+        "pipelinewise.cli.pipelinewise.Config.from_yamls",
+        return_value=imported,
+    ), patch(
+        "pipelinewise.cli.pipelinewise.DataDiffRepository.from_backend_config",
+        return_value=repository,
+    ), pytest.raises(SystemExit) as exc:
+        pipelinewise.import_project()
+
+    assert exc.value.code == 1
+    assert repository.synced == (
+        [definition],
+        ["found", "missing"],
+        {"missing"},
+    )
 
 
 def _alerting_pipelinewise(taps):
