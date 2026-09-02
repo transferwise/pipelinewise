@@ -148,6 +148,9 @@ def test_legacy_pair_views_are_immutable():
         ConnectorType.TAP_MONGODB: frozenset(
             {ConnectorType.TARGET_SNOWFLAKE, ConnectorType.TARGET_POSTGRES}
         ),
+        ConnectorType.TAP_YUGABYTE: frozenset(
+            {ConnectorType.TARGET_SNOWFLAKE, ConnectorType.TARGET_POSTGRES}
+        ),
     }
     assert ICEBERG_FASTSYNC_PAIRS == {
         ConnectorType.TAP_MYSQL: frozenset({ConnectorType.TARGET_SNOWFLAKE}),

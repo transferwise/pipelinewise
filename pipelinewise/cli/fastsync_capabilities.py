@@ -70,6 +70,16 @@ _FASTSYNC_CAPABILITIES: Mapping[CapabilityKey, FastSyncCapabilities] = MappingPr
         ConnectorType.TARGET_POSTGRES,
     ): FastSyncCapabilities(full_sync=True),
     (
+        TABLE_FORMAT_NATIVE,
+        ConnectorType.TAP_YUGABYTE,
+        ConnectorType.TARGET_SNOWFLAKE,
+    ): FastSyncCapabilities(full_sync=True),
+    (
+        TABLE_FORMAT_NATIVE,
+        ConnectorType.TAP_YUGABYTE,
+        ConnectorType.TARGET_POSTGRES,
+    ): FastSyncCapabilities(full_sync=True),
+    (
         TABLE_FORMAT_ICEBERG,
         ConnectorType.TAP_MYSQL,
         ConnectorType.TARGET_SNOWFLAKE,

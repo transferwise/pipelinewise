@@ -119,9 +119,17 @@ Iceberg identifier fields; inspect raw metadata and compare
   Oracle MySQL 8 service proves MySQL-specific behavior.
 - Keep MongoDB healthcheck as bare `ping`: the PipelineWise container initializes `rs0`, so `rs.status()` deadlocks startup. Keep container `PATH` literal to prevent host Compose interpolation.
 - `entrypoint.sh` explicitly runs `tap_mysql_db.sh`, `tap_oracle_mysql_db.sh`,
-  `tap_postgres_db.sh`, `tap_mongodb.sh`, and `target_postgres.sh`; wire new seed
-  scripts there. Alembic runs only after successful `import_config` persists
-  data-diff definitions.
+  `tap_postgres_db.sh`, `tap_yugabyte_db.sh`, `tap_mongodb.sh`, and
+  `target_postgres.sh`; wire new seed scripts there. Alembic runs only after
+  successful `import_config` persists data-diff definitions.
+- tap-yugabyte reuses tap-postgres's YSQL-compatible schema/row-count helpers in
+  `assertions.py` (`sql_get_columns_postgres`,
+  `sql_dynamic_row_count_postgres`) via its own `run_query_tap_yugabyte` entry in
+  `_map_tap_to_target_functions`; LOG_BASED coverage lives in
+  `test_target_postgres.py::test_replicate_yugabyte_to_pg` alongside
+  `test_replicate_pg_to_pg`, so both share group one's serial fixtures — a DML
+  value inserted by one test (e.g. `city.id = 4080`) must not collide with a
+  fixture the other reuses across reruns.
 - Docker `initdb.d` runs only on empty volumes. Deleting `pipelinewise-backend-data` destroys local state; identify it exactly and obtain permission first.
 - Use the shared TLS helper for dev MySQL. Check target-snowflake exit status rather than stderr.
 - Fixture resets are stateful; after cross-group failures, reset and rerun

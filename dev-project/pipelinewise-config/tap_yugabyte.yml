@@ -31,14 +31,13 @@ target: "target_postgres"              # ID of the target connector where the da
 batch_size_rows: 20000                 # Batch size for the stream to optimise load performance
 stream_buffer_size: 0                  # In-memory buffer size (MB) between taps and targets for asynchronous data pipes
 flush_all_streams: false               # Target to flush all streams if any stream reaches batch_size_rows. Default false
-primary_key_required: false            # tap-yugabyte has no FastSync route, so no_pk_table syncs via Singer
+primary_key_required: false            # Only enforced for INCREMENTAL/LOG_BASED; kept false so no_pk_table stays selectable
 
 
 # ------------------------------------------------------------------------------
 # Source to target Schema mapping for FULL_TABLE and INCREMENTAL replication
 #
-# LOG_BASED is deliberately absent: YugabyteDB has no wal2json output plugin and
-# its logical replication semantics diverge from PostgreSQL.
+# See tap_yugabyte_logical.yml for LOG_BASED (CDC) replication.
 # ------------------------------------------------------------------------------
 schemas:
 

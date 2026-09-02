@@ -1,0 +1,66 @@
+---
+
+# ------------------------------------------------------------------------------
+# General Properties
+# ------------------------------------------------------------------------------
+id: "tap_yugabyte_logical"             # Unique identifier of the tap
+name: "Sample YugabyteDB Database"     # Name of the tap
+type: "tap-yugabyte"                   # !! THIS SHOULD NOT CHANGE !!
+owner: "somebody@foo.com"              # Data owner to contact
+
+
+# ------------------------------------------------------------------------------
+# Source (Tap) - YugabyteDB YSQL connection details
+# ------------------------------------------------------------------------------
+db_conn:
+  host: "pipelinewise-yugabyte-source"
+  logical_poll_total_seconds: 3        # seconds before exiting if no changes received from source
+                                       #    Warning: this can cause a tap to exit before receiving any
+                                       #    data, because YugabyteDB can take a long time to find the
+                                       #    position of the start lsn in the WAL.
+  port: 5433                           # YSQL port, not the Postgres default 5432
+  user: "pipelinewise"                 # YSQL user
+  password: "secret"                   # Plain string or vault encrypted
+  dbname: "yugabyte_source_db"         # YSQL database name
+  #filter_schemas: "schema1,schema2"   # Optional: Scan only the required schemas
+                                       #    to improve the performance of
+                                       #    data extraction
+
+
+# ------------------------------------------------------------------------------
+# Destination (Target) - Target properties
+# Connection details should be in the relevant target YAML file
+# ------------------------------------------------------------------------------
+target: "target_postgres"              # ID of the target connector where the data will be loaded
+batch_size_rows: 20000                 # Batch size for the stream to optimize load performance
+stream_buffer_size: 0                  # In-memory buffer size (MB) between taps and targets for asynchronous data pipes
+flush_all_streams: true                # Target to flush all streams if any stream reaches batch_size_rows. Default false
+
+
+# ------------------------------------------------------------------------------
+# Source to target Schema mapping for LOG_BASED replication
+#   requires a wal2json HYBRID_TIME replication slot, created/owned by FastSync
+# ------------------------------------------------------------------------------
+schemas:
+
+  ### SOURCE SCHEMA 1: logical 1
+  - source_schema: "logical1"
+    target_schema: "ppw_dev_tap_yugabyte_logical1"
+
+    tables:
+      - table_name: "logical1_table1"
+        replication_method: "LOG_BASED"
+      - table_name: "logical1_table2"
+        replication_method: "LOG_BASED"
+      - table_name: "logical1_edgydata"
+        replication_method: "LOG_BASED"
+
+  ### SOURCE SCHEMA 2: logical2
+  - source_schema: "logical2"
+    target_schema: "ppw_dev_tap_yugabyte_logical2"
+    tables:
+      - table_name: "logical2_table1"
+        replication_method: "LOG_BASED"
+
+  # logical3 is omitted on purpose: the seed script drops it after writing to the
+  # WAL, so selecting it would break fast_sync.

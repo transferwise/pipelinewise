@@ -37,6 +37,7 @@ from .errors import (
 )
 
 from pipelinewise.fastsync.commons.tap_postgres import FastSyncTapPostgres
+from pipelinewise.fastsync.commons.tap_yugabyte import FastSyncTapYugabyte
 from pipelinewise.cli.multiprocess import Process
 from pipelinewise.data_diff.repository import DataDiffRepository
 from pipelinewise.data_diff.runner import rerun_failed_check, run_due_checks
@@ -2616,14 +2617,17 @@ TAP RUN SUMMARY
         """
         self.logger.info('Deleting tap "%s" config', tap_id)
 
-        if tap_type == 'tap-postgres':
+        if tap_type in ('tap-postgres', 'tap-yugabyte'):
             # drop the slot if it exists
             self.logger.info('Dropping tap "%s" slot on the DB', tap_id)
             tap_config = utils.load_json(Config.get_connector_config_file(
                 self.get_tap_dir(target_id, tap_id)
             ))
             if tap_config:
-                FastSyncTapPostgres.drop_slot(tap_config)
+                if tap_type == 'tap-postgres':
+                    FastSyncTapPostgres.drop_slot(tap_config)
+                else:
+                    FastSyncTapYugabyte.drop_slot(tap_config)
 
         utils.silentremove(self.get_tap_dir(target_id, tap_id))
 

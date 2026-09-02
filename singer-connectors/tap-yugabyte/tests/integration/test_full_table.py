@@ -259,32 +259,3 @@ class TestFullTableSyncTableNoPrimaryKey(unittest.TestCase):
         bookmarks = state['bookmarks'][stream['tap_stream_id']]
         self.assertNotIn('max_pk_values', bookmarks)
         self.assertNotIn('last_pk_fetched', bookmarks)
-
-
-class TestDoSyncUnimplementedMethods(unittest.TestCase):
-    maxDiff = None
-    table_name = 'ft_incremental_guard'
-
-    def setUp(self):
-        ensure_test_table({
-            'name': self.table_name,
-            'columns': [
-                {'name': 'id', 'type': 'integer', 'primary_key': True},
-                {'name': 'updated_at', 'type': 'timestamp'},
-            ],
-        })
-
-    def test_do_sync_raises_for_log_based_stream(self):
-        """Selecting a LOG_BASED stream hard-fails: YugabyteDB's CDC is gRPC-based and
-        does not map onto Postgres logical decoding, so only FULL_TABLE and INCREMENTAL
-        are implemented"""
-        conn_config = get_test_connection_config()
-        stream = _discover_stream(conn_config, self.table_name)
-        for entry in stream['metadata']:
-            if not entry['breadcrumb']:
-                entry['metadata']['selected'] = True
-                entry['metadata']['replication-method'] = 'LOG_BASED'
-                entry['metadata']['replication-key'] = 'updated_at'
-
-        with self.assertRaises(NotImplementedError):
-            tap_yugabyte.do_sync(conn_config, {'streams': [stream]}, None, {})

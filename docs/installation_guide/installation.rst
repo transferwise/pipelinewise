@@ -165,6 +165,9 @@ components. Install a subset with a comma-separated ``pw_connector`` value.
    * - ``tap-twilio``
      - Experimental
      - Twilio
+   * - ``tap-yugabyte``
+     - Experimental
+     - YugabyteDB
    * - ``tap-zendesk``
      - Experimental
      - Zendesk

@@ -1,3 +1,33 @@
+0.83.0 (2026-09-01)
+-------------------
+
+**tap-yugabyte**
+
+- Add LOG_BASED (CDC) replication using YugabyteDB's native `HYBRID_TIME`
+  logical-replication slots and the pre-packaged `wal2json` output plugin,
+  replacing the previous hard `NotImplementedError`
+- Capture replication-slot boundaries as HybridTime values via
+  `yb_get_current_hybrid_time_lsn()`/`pg_replication_slots.yb_restart_commit_ht`,
+  since YugabyteDB disables `pg_current_wal_lsn` and its LSNs are not
+  comparable byte offsets outside their own slot
+- Resume an interrupted LOG_BASED bootstrap with a `bootstrap_in_progress`
+  bookmark instead of Postgres's transaction-ID-based `xmin`, which has no
+  YugabyteDB equivalent
+- Bootstrap a LOG_BASED stream's initial scan on a `yb_read_time`-pinned
+  snapshot bound to its replication slot's own restart boundary, so the
+  snapshot and the streaming start position are provably consistent
+- Emit periodic WAL-progress heartbeat messages via
+  `pg_logical_emit_message` to advance an otherwise-idle slot's restart
+  position
+- Add FastSync FullSync support (`yugabyte-to-postgres`,
+  `yugabyte-to-snowflake`) for bulk full-table copies, replacing the
+  row-by-row Singer path for FULL_TABLE syncs
+- Create and drop replication slots from FastSync, retrying a "slot is
+  active" error on drop for up to 5 minutes to tolerate YugabyteDB's
+  post-disconnect active-slot window
+- Drop a tap's replication slot when its configuration is removed, matching
+  existing tap-postgres cleanup behavior
+
 0.82.0 (2026-09-01)
 -------------------
 
