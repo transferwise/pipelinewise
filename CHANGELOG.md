@@ -1,30 +1,39 @@
 0.81.2 (2026-09-02)
 -------------------
 
-**Data-diff**
+**Import and data-diff**
 
-- Reconcile data-diff definitions for taps that import successfully even when
+- Reconcile data-diff definitions for taps whose discovery succeeds even when
   other selected taps fail discovery
 - Preserve existing data-diff definitions for taps that fail discovery
-- Deactivate definitions for selected taps no longer present in project YAML
+- Deactivate definitions for explicitly selected taps no longer present in
+  project YAML
 - Keep the import summary and non-zero exit when backend definition
   reconciliation fails
-- Treat `*` combined with named tap filters as a full import so discovery
-  and data-diff reconciliation use the same scope
+- Fail the import before data-diff reconciliation when parallel discovery
+  returns incomplete results
+- Treat `*` combined with named tap filters as a full import across generated
+  configuration, discovery, and data-diff reconciliation
 
 **Tests**
 
-- Cover mixed successful, failed, missing, and deleted taps during data-diff
-  definition imports
+- Cover successful and failed tap discovery in the same import
+- Cover explicitly selected taps missing from project YAML
 - Cover removal of a successful tap's data-diff definition when another tap
   fails discovery
 - Cover wildcard and named tap filters used together
-- Cover backend reconciliation failures and incomplete discovery results
+- Cover backend reconciliation failures
+- Cover incomplete parallel discovery results
 - Verify failed-tap exclusion and deleted-tap deactivation against PostgreSQL
 
 **Documentation**
 
 - Document partial reconciliation, missing-tap cleanup, and backend failures
+
+**Contributor guidance**
+
+- Require verifying the complete branch diff against the CHANGELOG before
+  creating or updating a pull request
 
 0.81.1 (2026-09-02)
 -------------------
