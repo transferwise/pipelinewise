@@ -184,7 +184,7 @@ const runMermaid = async (rerun) => {
                                     // Apply zoom to the now-rendered diagram, matching
                                     // the decoration visible diagrams receive.
                                     if (true) {
-                                        addZoomToSvgs(d3.selectAll(".mermaid[data-zoom-id=id-e7bbc383-f350-4dd6-ab49-ac9ed631967a]").select(function() {
+                                        addZoomToSvgs(d3.selectAll(".mermaid[data-zoom-id=id-edf74cd5-cfa9-4708-a489-8451319708bf]").select(function() {
                                             return this.querySelector("svg");
                                         }));
                                     }
@@ -210,7 +210,7 @@ const runMermaid = async (rerun) => {
     if (true) {
         const mermaids_to_add_zoom = 1 === -1 ? mermaids_active.length : 1;
         if(mermaids_to_add_zoom > 0) {
-            var svgs = d3.selectAll(".mermaid[data-zoom-id=id-e7bbc383-f350-4dd6-ab49-ac9ed631967a]").select(function() {
+            var svgs = d3.selectAll(".mermaid[data-zoom-id=id-edf74cd5-cfa9-4708-a489-8451319708bf]").select(function() {
                 return this.querySelector("svg");
             });
             // Wait until every active (visible) diagram has rendered. Deferred
@@ -759,27 +759,27 @@ credentials when separate roles are not required.</p>
 <section id="schema">
 <h2>Schema<a class="headerlink" href="#schema" title="Link to this heading"></a></h2>
 <figure class="align-center" id="id1">
-<pre data-zoom-id="id-e7bbc383-f350-4dd6-ab49-ac9ed631967a" class="mermaid">
+<pre data-zoom-id="id-edf74cd5-cfa9-4708-a489-8451319708bf" class="mermaid">
         %%{init: {&quot;er&quot;: {&quot;diagramPadding&quot;: 8, &quot;entityPadding&quot;: 8}}}%%
 erDiagram
     direction LR
-    dd_checks ||--o{ dd_preflights : check_id
-    dd_checks ||--o{ dd_runs : dd_check_id
-    dd_preflights o|--o{ dd_runs : preflight_id
-    dd_runs o|--o{ dd_runs : rerun_of_run_id
-    dd_runs ||--o{ dd_results : run_id
-    dd_checks ||--o{ dd_effective_attempts : check_id
-    dd_runs ||--o| dd_effective_attempts : run_id
-    dd_checks ||--o{ dd_coverage_events : check_id
-    dd_runs ||--o| dd_coverage_events : evaluated_run_id
-    dd_runs o|--o{ dd_coverage_events : blocking_run_id
-    dd_checks ||--o| dd_coverage_state : check_id
-    dd_runs ||--o{ dd_coverage_state : evaluated_run_id
-    dd_runs o|--o{ dd_coverage_state : blocking_run_id
+    dd_check_definitions ||--o{ dd_preflight_log : check_id
+    dd_check_definitions ||--o{ dd_run_attempts : check_id
+    dd_preflight_log o|--o{ dd_run_attempts : preflight_id
+    dd_run_attempts o|--o{ dd_run_attempts : rerun_of_run_id
+    dd_run_attempts ||--o{ dd_run_results : run_id
+    dd_check_definitions ||--o{ dd_run_slot_state : check_id
+    dd_run_attempts ||--o| dd_run_slot_state : run_id
+    dd_check_definitions ||--o{ dd_watermark_events : check_id
+    dd_run_attempts ||--o| dd_watermark_events : evaluated_run_id
+    dd_run_attempts o|--o{ dd_watermark_events : blocking_run_id
+    dd_check_definitions ||--o| dd_watermark_state : check_id
+    dd_run_attempts ||--o{ dd_watermark_state : evaluated_run_id
+    dd_run_attempts o|--o{ dd_watermark_state : blocking_run_id
 
-    dd_checks[&quot;dd_checks&lt;br/&gt;Versioned check definitions&lt;br/&gt;imported from YAML config&quot;] {
+    dd_check_definitions[&quot;dd_check_definitions&lt;br/&gt;Versioned data-diff check definitions&lt;br/&gt;imported from YAML configuration&quot;] {
         UUID check_id PK
-        TEXT full_check_name &quot;UQ with revision; UQ when current&quot;
+        TEXT full_check_name &quot;UQ with revision; UQ when is_current&quot;
         INTEGER revision &quot;UQ with full_check_name&quot;
         CHAR(64) config_hash
         JSONB canonical_config
@@ -802,12 +802,12 @@ erDiagram
         BIGINT window_start_seconds &quot;greater than 0&quot;
         BIGINT window_end_seconds &quot;at least 0&quot;
         BIGINT statement_timeout_seconds &quot;greater than 0&quot;
-        BOOLEAN current
+        BOOLEAN is_current
         TIMESTAMPTZ created_at
         TIMESTAMPTZ superseded_at &quot;nullable&quot;
     }
 
-    dd_preflights[&quot;dd_preflights&lt;br/&gt;Source size and index validation&lt;br/&gt;recorded before each check execution&quot;] {
+    dd_preflight_log[&quot;dd_preflight_log&lt;br/&gt;Append-only preflight evidence and&lt;br/&gt;early validation errors for run attempts&quot;] {
         UUID preflight_id PK
         UUID check_id FK
         TEXT status &quot;PASS, BLOCKED, or ERROR&quot;
@@ -821,14 +821,14 @@ erDiagram
         BOOLEAN has_leading_index &quot;nullable&quot;
     }
 
-    dd_runs[&quot;dd_runs&lt;br/&gt;Shared execution log&lt;br/&gt;one row per scheduled job attempt&quot;] {
+    dd_run_attempts[&quot;dd_run_attempts&lt;br/&gt;Execution attempts updated from RUNNING&lt;br/&gt;to a terminal outcome&quot;] {
         UUID run_id PK
-        UUID dd_check_id FK
-        TIMESTAMPTZ scheduled_for &quot;UQ with dd_check_id and attempt&quot;
+        UUID check_id FK
+        TIMESTAMPTZ scheduled_for &quot;UQ with check_id and attempt&quot;
         TIMESTAMPTZ window_start &quot;before window_end&quot;
         TIMESTAMPTZ window_end
-        INTEGER attempt &quot;UQ with dd_check_id and scheduled_for&quot;
-        TEXT trigger &quot;SCHEDULED, MANUAL, RETRY, or REMEDIATION&quot;
+        INTEGER attempt &quot;UQ with check_id and scheduled_for&quot;
+        TEXT trigger_type &quot;SCHEDULED, MANUAL, RETRY, or REMEDIATION&quot;
         TEXT status &quot;RUNNING, PASS, FAIL, or ERROR&quot;
         UUID rerun_of_run_id FK &quot;nullable self-reference&quot;
         TEXT remediation_reference &quot;nullable&quot;
@@ -838,7 +838,7 @@ erDiagram
         TEXT error &quot;nullable&quot;
     }
 
-    dd_results[&quot;dd_results&lt;br/&gt;Per-check-type outcome detail&lt;br/&gt;for each data-diff run&quot;] {
+    dd_run_results[&quot;dd_run_results&lt;br/&gt;Append-only per-check-type outcomes&lt;br/&gt;for completed run attempts&quot;] {
         UUID run_id PK, FK
         TEXT check_type PK
         TEXT status &quot;PASS, FAIL, or ERROR&quot;
@@ -849,7 +849,7 @@ erDiagram
         TEXT error &quot;nullable&quot;
     }
 
-    dd_effective_attempts[&quot;dd_effective_attempts&lt;br/&gt;Latest terminal attempt for each&lt;br/&gt;data-diff scheduled slot&quot;] {
+    dd_run_slot_state[&quot;dd_run_slot_state&lt;br/&gt;Mutable selected terminal attempt for&lt;br/&gt;each check and scheduled slot&quot;] {
         UUID check_id PK, FK
         TIMESTAMPTZ scheduled_for PK
         UUID run_id FK, UK
@@ -859,7 +859,7 @@ erDiagram
         TEXT status &quot;PASS, FAIL, or ERROR&quot;
     }
 
-    dd_coverage_state[&quot;dd_coverage_state&lt;br/&gt;Materialized current verified-through&lt;br/&gt;watermark for each data-diff check&quot;] {
+    dd_watermark_state[&quot;dd_watermark_state&lt;br/&gt;Mutable current verified-through watermark&lt;br/&gt;for each check definition&quot;] {
         UUID check_id PK, FK
         TIMESTAMPTZ coverage_start &quot;at most verified_through&quot;
         TIMESTAMPTZ verified_through &quot;at most max_observed_end&quot;
@@ -873,8 +873,8 @@ erDiagram
         TEXT reason
     }
 
-    dd_coverage_events[&quot;dd_coverage_events&lt;br/&gt;Append-only log tracking the data-diff&lt;br/&gt;verified-through watermark&quot;] {
-        UUID coverage_event_id PK
+    dd_watermark_events[&quot;dd_watermark_events&lt;br/&gt;Append-only history of verified-through&lt;br/&gt;watermark transitions&quot;] {
+        UUID watermark_event_id PK
         BIGSERIAL event_sequence UK
         UUID check_id FK
         UUID evaluated_run_id FK, UK
@@ -893,12 +893,28 @@ erDiagram
 <p><span class="caption-text">Data-diff backend schema after migration 001</span><a class="headerlink" href="#id1" title="Link to this image"></a></p>
 </figcaption>
 </figure>
-<p>PipelineWise keeps every attempt in <code class="docutils literal notranslate"><span class="pre">dd_runs</span></code> and every coverage transition in
-<code class="docutils literal notranslate"><span class="pre">dd_coverage_events</span></code>. <code class="docutils literal notranslate"><span class="pre">dd_effective_attempts</span></code> materializes only the highest
-terminal attempt for each scheduled slot, while <code class="docutils literal notranslate"><span class="pre">dd_coverage_state</span></code> stores the
-current watermark. A new chronological slot updates that state directly. A
-replacement or out-of-order slot recalculates it from the effective rows without
-rescanning superseded attempts.</p>
+<p>The schema has two related paths. The first records definitions and execution
+evidence. The second selects one terminal attempt per scheduled slot, folds those
+slot outcomes into the current watermark, and records every watermark transition:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>dd_check_definitions
+    ├── dd_preflight_log
+    └── dd_run_attempts
+            └── dd_run_results
+
+dd_run_attempts
+    └── dd_run_slot_state
+            └── dd_watermark_state
+                    └── dd_watermark_events
+</pre></div>
+</div>
+<p>The second path describes processing rather than foreign-key ownership; the ERD
+above shows the exact database relationships.</p>
+<p>PipelineWise keeps every attempt in <code class="docutils literal notranslate"><span class="pre">dd_run_attempts</span></code> and every watermark
+transition in <code class="docutils literal notranslate"><span class="pre">dd_watermark_events</span></code>. <code class="docutils literal notranslate"><span class="pre">dd_run_slot_state</span></code> materializes only
+the highest terminal attempt for each scheduled slot, while
+<code class="docutils literal notranslate"><span class="pre">dd_watermark_state</span></code> stores the current watermark. A new chronological slot
+updates that state directly. A replacement or out-of-order slot recalculates it
+from the slot-state rows without rescanning superseded attempts.</p>
 </section>
 <section id="reporting-queries">
 <h2>Reporting queries<a class="headerlink" href="#reporting-queries" title="Link to this heading"></a></h2>
@@ -911,8 +927,8 @@ rescanning superseded attempts.</p>
 <span class="w">       </span><span class="k">state</span><span class="p">.</span><span class="n">coverage_status</span><span class="p">,</span><span class="w"> </span><span class="k">state</span><span class="p">.</span><span class="n">blocking_run_id</span><span class="p">,</span>
 <span class="w">       </span><span class="k">state</span><span class="p">.</span><span class="n">evaluated_run_id</span><span class="p">,</span><span class="w"> </span><span class="k">state</span><span class="p">.</span><span class="n">event_type</span><span class="p">,</span>
 <span class="w">       </span><span class="k">state</span><span class="p">.</span><span class="n">updated_at</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">verified_at</span><span class="p">,</span><span class="w"> </span><span class="k">state</span><span class="p">.</span><span class="n">reason</span>
-<span class="w">  </span><span class="k">FROM</span><span class="w"> </span><span class="k">public</span><span class="p">.</span><span class="n">dd_coverage_state</span><span class="w"> </span><span class="k">state</span>
-<span class="w">  </span><span class="k">JOIN</span><span class="w"> </span><span class="k">public</span><span class="p">.</span><span class="n">dd_checks</span><span class="w"> </span><span class="n">checks</span>
+<span class="w">  </span><span class="k">FROM</span><span class="w"> </span><span class="k">public</span><span class="p">.</span><span class="n">dd_watermark_state</span><span class="w"> </span><span class="k">state</span>
+<span class="w">  </span><span class="k">JOIN</span><span class="w"> </span><span class="k">public</span><span class="p">.</span><span class="n">dd_check_definitions</span><span class="w"> </span><span class="n">checks</span>
 <span class="w">    </span><span class="k">ON</span><span class="w"> </span><span class="n">checks</span><span class="p">.</span><span class="n">check_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">state</span><span class="p">.</span><span class="n">check_id</span><span class="p">;</span>
 </pre></div>
 </div>
@@ -928,10 +944,10 @@ rescanning superseded attempts.</p>
 <span class="w">       </span><span class="n">remediation</span><span class="p">.</span><span class="n">remediation_reference</span><span class="p">,</span>
 <span class="w">       </span><span class="n">remediation</span><span class="p">.</span><span class="n">finished_at</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">remediation_finished_at</span><span class="p">,</span>
 <span class="w">       </span><span class="k">COALESCE</span><span class="p">(</span><span class="n">remediation</span><span class="p">.</span><span class="n">status</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">'PASS'</span><span class="p">,</span><span class="w"> </span><span class="k">FALSE</span><span class="p">)</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="n">recovered</span>
-<span class="w">  </span><span class="k">FROM</span><span class="w"> </span><span class="k">public</span><span class="p">.</span><span class="n">dd_runs</span><span class="w"> </span><span class="n">original</span>
-<span class="w">  </span><span class="k">JOIN</span><span class="w"> </span><span class="k">public</span><span class="p">.</span><span class="n">dd_checks</span><span class="w"> </span><span class="n">checks</span>
-<span class="w">    </span><span class="k">ON</span><span class="w"> </span><span class="n">checks</span><span class="p">.</span><span class="n">check_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">original</span><span class="p">.</span><span class="n">dd_check_id</span>
-<span class="w">  </span><span class="k">LEFT</span><span class="w"> </span><span class="k">JOIN</span><span class="w"> </span><span class="k">public</span><span class="p">.</span><span class="n">dd_runs</span><span class="w"> </span><span class="n">remediation</span>
+<span class="w">  </span><span class="k">FROM</span><span class="w"> </span><span class="k">public</span><span class="p">.</span><span class="n">dd_run_attempts</span><span class="w"> </span><span class="n">original</span>
+<span class="w">  </span><span class="k">JOIN</span><span class="w"> </span><span class="k">public</span><span class="p">.</span><span class="n">dd_check_definitions</span><span class="w"> </span><span class="n">checks</span>
+<span class="w">    </span><span class="k">ON</span><span class="w"> </span><span class="n">checks</span><span class="p">.</span><span class="n">check_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">original</span><span class="p">.</span><span class="n">check_id</span>
+<span class="w">  </span><span class="k">LEFT</span><span class="w"> </span><span class="k">JOIN</span><span class="w"> </span><span class="k">public</span><span class="p">.</span><span class="n">dd_run_attempts</span><span class="w"> </span><span class="n">remediation</span>
 <span class="w">    </span><span class="k">ON</span><span class="w"> </span><span class="n">remediation</span><span class="p">.</span><span class="n">rerun_of_run_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">original</span><span class="p">.</span><span class="n">run_id</span>
 <span class="w"> </span><span class="k">WHERE</span><span class="w"> </span><span class="n">original</span><span class="p">.</span><span class="n">rerun_of_run_id</span><span class="w"> </span><span class="k">IS</span><span class="w"> </span><span class="k">NULL</span>
 <span class="w">   </span><span class="k">AND</span><span class="w"> </span><span class="n">original</span><span class="p">.</span><span class="n">status</span><span class="w"> </span><span class="k">IN</span><span class="w"> </span><span class="p">(</span><span class="s1">'FAIL'</span><span class="p">,</span><span class="w"> </span><span class="s1">'ERROR'</span><span class="p">);</span>

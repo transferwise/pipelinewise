@@ -49,12 +49,31 @@ Schema
    :caption: Data-diff backend schema after migration 001
    :zoom:
 
-PipelineWise keeps every attempt in ``dd_runs`` and every coverage transition in
-``dd_coverage_events``. ``dd_effective_attempts`` materializes only the highest
-terminal attempt for each scheduled slot, while ``dd_coverage_state`` stores the
-current watermark. A new chronological slot updates that state directly. A
-replacement or out-of-order slot recalculates it from the effective rows without
-rescanning superseded attempts.
+The schema has two related paths. The first records definitions and execution
+evidence. The second selects one terminal attempt per scheduled slot, folds those
+slot outcomes into the current watermark, and records every watermark transition:
+
+.. code-block:: text
+
+    dd_check_definitions
+        ├── dd_preflight_log
+        └── dd_run_attempts
+                └── dd_run_results
+
+    dd_run_attempts
+        └── dd_run_slot_state
+                └── dd_watermark_state
+                        └── dd_watermark_events
+
+The second path describes processing rather than foreign-key ownership; the ERD
+above shows the exact database relationships.
+
+PipelineWise keeps every attempt in ``dd_run_attempts`` and every watermark
+transition in ``dd_watermark_events``. ``dd_run_slot_state`` materializes only
+the highest terminal attempt for each scheduled slot, while
+``dd_watermark_state`` stores the current watermark. A new chronological slot
+updates that state directly. A replacement or out-of-order slot recalculates it
+from the slot-state rows without rescanning superseded attempts.
 
 
 Reporting queries
@@ -73,8 +92,8 @@ Current coverage watermarks:
            state.coverage_status, state.blocking_run_id,
            state.evaluated_run_id, state.event_type,
            state.updated_at AS verified_at, state.reason
-      FROM public.dd_coverage_state state
-      JOIN public.dd_checks checks
+      FROM public.dd_watermark_state state
+      JOIN public.dd_check_definitions checks
         ON checks.check_id = state.check_id;
 
 Failed runs and their remediation attempts:
@@ -92,10 +111,10 @@ Failed runs and their remediation attempts:
            remediation.remediation_reference,
            remediation.finished_at AS remediation_finished_at,
            COALESCE(remediation.status = 'PASS', FALSE) AS recovered
-      FROM public.dd_runs original
-      JOIN public.dd_checks checks
-        ON checks.check_id = original.dd_check_id
-      LEFT JOIN public.dd_runs remediation
+      FROM public.dd_run_attempts original
+      JOIN public.dd_check_definitions checks
+        ON checks.check_id = original.check_id
+      LEFT JOIN public.dd_run_attempts remediation
         ON remediation.rerun_of_run_id = original.run_id
      WHERE original.rerun_of_run_id IS NULL
        AND original.status IN ('FAIL', 'ERROR');

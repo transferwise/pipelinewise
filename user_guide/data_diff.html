@@ -654,7 +654,7 @@ which would otherwise advance the scheduler past the slot needing recovery.</p>
 </pre></div>
 </div>
 <p>The original run remains immutable. The rerun gets the next attempt number,
-<code class="docutils literal notranslate"><span class="pre">trigger</span> <span class="pre">=</span> <span class="pre">REMEDIATION</span></code>, and a <code class="docutils literal notranslate"><span class="pre">rerun_of_run_id</span></code> link. When it passes,
+<code class="docutils literal notranslate"><span class="pre">trigger_type</span> <span class="pre">=</span> <span class="pre">REMEDIATION</span></code>, and a <code class="docutils literal notranslate"><span class="pre">rerun_of_run_id</span></code> link. When it passes,
 the effective attempt for that scheduled slot changes and the watermark advances.</p>
 <p>The backend retains every run attempt and coverage transition. See
 <a class="reference internal" href="data_diff_backend.html#data-diff-backend"><span class="std std-ref">Data-diff backend database</span></a> for the schema, persistence model, and reporting queries.</p>
@@ -691,7 +691,7 @@ planned as a sequential scan — correctly, since that is the cheaper plan for i
 Keep windows narrow relative to table size, and treat <code class="docutils literal notranslate"><span class="pre">statement_timeout</span></code> as the
 real bound on source cost.</p>
 </div>
-<p>Each verdict is written to <code class="docutils literal notranslate"><span class="pre">dd_preflights</span></code> with the table size, the row limit, and
+<p>Each verdict is written to <code class="docutils literal notranslate"><span class="pre">dd_preflight_log</span></code> with the table size, the row limit, and
 the index verdict it decided from, so a <code class="docutils literal notranslate"><span class="pre">PASS</span></code> stays auditable after the table or
 the limit changes.</p>
 </section>
