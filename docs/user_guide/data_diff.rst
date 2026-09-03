@@ -211,8 +211,10 @@ historical one — see `Coverage and remediation`_.
 
 Definitions are reconciled independently for taps whose discovery succeeds. If
 another selected tap fails discovery, successful taps are still reconciled and
-the failed tap's existing definitions remain unchanged. The import still exits
-non-zero so automation can report the discovery failure.
+the failed tap's existing definitions remain unchanged. Definitions for an
+explicitly selected tap absent from the project YAML are deactivated. Discovery
+and backend reconciliation failures retain the import summary and a non-zero
+exit so automation can report them.
 
 A mismatch exits non-zero and sends an alert. See :ref:`data_diff_alerts`.
 

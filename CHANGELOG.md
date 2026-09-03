@@ -5,8 +5,10 @@
 
 - Reconcile data-diff definitions for taps that import successfully even when
   other selected taps fail discovery
-- Preserve existing data-diff definitions for taps that fail discovery or are
-  not found
+- Preserve existing data-diff definitions for taps that fail discovery
+- Deactivate definitions for selected taps no longer present in project YAML
+- Keep the import summary and non-zero exit when backend definition
+  reconciliation fails
 - Treat `*` combined with named tap filters as a full import so discovery
   and data-diff reconciliation use the same scope
 
@@ -17,10 +19,12 @@
 - Cover removal of a successful tap's data-diff definition when another tap
   fails discovery
 - Cover wildcard and named tap filters used together
+- Cover backend reconciliation failures and incomplete discovery results
+- Verify failed-tap exclusion and deleted-tap deactivation against PostgreSQL
 
 **Documentation**
 
-- Document per-tap data-diff reconciliation during partially failed imports
+- Document partial reconciliation, missing-tap cleanup, and backend failures
 
 0.81.1 (2026-09-02)
 -------------------

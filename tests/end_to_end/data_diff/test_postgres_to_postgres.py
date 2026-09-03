@@ -10,9 +10,11 @@ import json
 import os
 import shutil
 
+from dataclasses import replace
 from datetime import timedelta
 from pathlib import Path
 
+from pipelinewise.data_diff.config import CheckDefinition
 from pipelinewise.data_diff.repository import DataDiffRepository
 from pipelinewise.data_diff.runner import run_due_checks
 from pipelinewise.data_diff.runtime import RuntimeConnectorConfigLoader
@@ -39,6 +41,33 @@ EXPECTED_CHECKS = {
 }
 
 
+def _repository_definition(tap_id, source_table, *, frequency='0 * * * *'):
+    return CheckDefinition(
+        full_check_name=f'{TARGET_ID}/{tap_id}/logical1/{source_table}',
+        target_id=TARGET_ID,
+        tap_id=tap_id,
+        source_type='tap-postgres',
+        target_type='target-postgres',
+        source_database='postgres_source_db',
+        target_database='postgres_dwh',
+        source_schema='logical1',
+        source_table=source_table,
+        target_schema=TARGET_SCHEMA,
+        target_table=source_table,
+        source_key_column='cid',
+        target_key_column='cid',
+        source_timestamp_column='updated_at',
+        target_timestamp_column='updated_at',
+        source_compare_columns=(),
+        target_compare_columns=(),
+        checks=('row_count',),
+        frequency=frequency,
+        window_start_seconds=3600,
+        window_end_seconds=0,
+        statement_timeout_seconds=60,
+    )
+
+
 # pylint: disable=attribute-defined-outside-init
 class TestPostgresToPostgresDataDiff:
     """Exercise persisted checks, failures, remediation, and coverage."""
@@ -49,6 +78,25 @@ class TestPostgresToPostgresDataDiff:
         self.run_source_query = self.e2e.run_query_tap_postgres
         self.run_target_query = self.e2e.run_query_target_postgres
         self.run_backend_query = self.e2e.run_query_pipelinewise_backend
+
+    def _backend_config(self):
+        return {
+            'host': self.e2e.get_conn_env_var('PIPELINEWISE_BACKEND', 'HOST'),
+            'port': int(
+                self.e2e.get_conn_env_var('PIPELINEWISE_BACKEND', 'PORT')
+            ),
+            'user': self.e2e.get_conn_env_var('PIPELINEWISE_BACKEND', 'USER'),
+            'password': self.e2e.get_conn_env_var(
+                'PIPELINEWISE_BACKEND', 'PASSWORD'
+            ),
+            'dbname': self.e2e.get_conn_env_var('PIPELINEWISE_BACKEND', 'DB'),
+            'ddl_user': self.e2e.get_conn_env_var(
+                'PIPELINEWISE_BACKEND', 'DDL_USER'
+            ),
+            'ddl_password': self.e2e.get_conn_env_var(
+                'PIPELINEWISE_BACKEND', 'DDL_PASSWORD'
+            ),
+        }
 
     @staticmethod
     def _run_success(command):
@@ -406,18 +454,9 @@ class TestPostgresToPostgresDataDiff:
             'SELECT COUNT(*) FROM public.dd_runs'
         )[0][0] == 3
 
-        backend_config = {
-            'host': self.e2e.get_conn_env_var('PIPELINEWISE_BACKEND', 'HOST'),
-            'port': int(self.e2e.get_conn_env_var('PIPELINEWISE_BACKEND', 'PORT')),
-            'user': self.e2e.get_conn_env_var('PIPELINEWISE_BACKEND', 'USER'),
-            'password': self.e2e.get_conn_env_var('PIPELINEWISE_BACKEND', 'PASSWORD'),
-            'dbname': self.e2e.get_conn_env_var('PIPELINEWISE_BACKEND', 'DB'),
-            'ddl_user': self.e2e.get_conn_env_var('PIPELINEWISE_BACKEND', 'DDL_USER'),
-            'ddl_password': self.e2e.get_conn_env_var(
-                'PIPELINEWISE_BACKEND', 'DDL_PASSWORD'
-            ),
-        }
-        with DataDiffRepository.from_backend_config(backend_config) as repository:
+        with DataDiffRepository.from_backend_config(
+            self._backend_config()
+        ) as repository:
             appended = run_due_checks(
                 repository,
                 RuntimeConnectorConfigLoader(Path.home() / '.pipelinewise'),
@@ -460,6 +499,48 @@ class TestPostgresToPostgresDataDiff:
         assert self.run_backend_query(
             'SELECT COUNT(*) FROM public.dd_runs'
         )[0][0] == 4
+
+    def test_definition_sync_preserves_excluded_tap_in_postgres(self):
+        """Prove exclusion and deactivation against the real backend schema."""
+        self.e2e.setup_pipelinewise_backend()
+        failed = _repository_definition('failed', 'failed_table')
+        deleted = _repository_definition('deleted', 'deleted_table')
+        successful = _repository_definition('successful', 'successful_table')
+        changed_failed = replace(failed, frequency='30 * * * *')
+
+        with DataDiffRepository.from_backend_config(
+            self._backend_config()
+        ) as repository:
+            assert repository.sync_definitions([failed, deleted]) == {
+                'created': 2,
+                'unchanged': 0,
+                'superseded': 0,
+                'deactivated': 0,
+            }
+            stats = repository.sync_definitions(
+                [changed_failed, successful],
+                selected_taps=['*'],
+                excluded_taps=['failed'],
+            )
+
+        assert stats == {
+            'created': 1,
+            'unchanged': 0,
+            'superseded': 0,
+            'deactivated': 1,
+        }
+        assert self.run_backend_query(
+            """
+            SELECT tap_id, revision, config_hash, current,
+                   superseded_at IS NOT NULL
+              FROM public.dd_checks
+             ORDER BY tap_id, revision
+            """
+        ) == [
+            ('deleted', 1, deleted.config_hash, False, True),
+            ('failed', 1, failed.config_hash, True, False),
+            ('successful', 1, successful.config_hash, True, False),
+        ]
 
     def test_migrations_build_the_schema_on_an_empty_backend(self):
         """Prove Alembic pins its objects and version table to public."""

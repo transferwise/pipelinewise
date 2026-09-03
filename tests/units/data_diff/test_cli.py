@@ -15,8 +15,9 @@ from tests.units.cli.cli_args import CliArgs
 
 
 class RepositoryContext:
-    def __init__(self, checks=None):
+    def __init__(self, checks=None, sync_error=None):
         self.checks = checks or []
+        self.sync_error = sync_error
         self.filters = None
         self.synced = None
 
@@ -32,6 +33,8 @@ class RepositoryContext:
 
     def sync_definitions(self, definitions, *, selected_taps, excluded_taps=None):
         self.synced = (definitions, selected_taps, excluded_taps)
+        if self.sync_error:
+            raise self.sync_error
         return {"created": len(definitions)}
 
 
@@ -289,7 +292,7 @@ def test_import_deactivates_removed_definition_for_successful_tap_after_partial_
     assert repository.synced == ([failed_definition], ["*"], {"failed"})
 
 
-def test_import_persists_found_tap_when_an_explicitly_selected_tap_is_missing():
+def test_import_reconciles_an_explicitly_selected_tap_missing_from_yaml():
     definition = Mock(tap_id="found")
     imported = Mock()
     imported.global_config = {"backend_db": {"host": "backend"}}
@@ -316,8 +319,86 @@ def test_import_persists_found_tap_when_an_explicitly_selected_tap_is_missing():
     assert repository.synced == (
         [definition],
         ["found", "missing"],
-        {"missing"},
+        set(),
     )
+    pipelinewise.logger.error.assert_called_once_with(
+        "Tap not found in project YAML: %s",
+        "missing",
+    )
+
+
+def test_import_rejects_incomplete_parallel_discovery_results():
+    imported = Mock()
+    imported.global_config = {}
+    imported.targets = {
+        "target": {"taps": [{"id": "first"}, {"id": "second"}]}
+    }
+    imported.get_data_diff_definitions.return_value = []
+    pipelinewise = _pipelinewise(taps="*")
+
+    with patch(
+        "pipelinewise.cli.pipelinewise.Config.from_yamls",
+        return_value=imported,
+    ), patch("pipelinewise.cli.pipelinewise.Parallel") as parallel, pytest.raises(
+        ValueError, match="shorter"
+    ):
+        parallel.return_value.return_value = [None]
+        pipelinewise.import_project()
+
+
+def test_import_reports_backend_sync_failure_after_partial_discovery():
+    successful_definition = Mock(tap_id="successful")
+    failed_definition = Mock(tap_id="failed")
+    imported = Mock()
+    imported.global_config = {"backend_db": {"host": "backend"}}
+    imported.targets = {
+        "target": {"taps": [{"id": "successful"}, {"id": "failed"}]}
+    }
+    imported.get_data_diff_definitions.return_value = [
+        successful_definition,
+        failed_definition,
+    ]
+    backend_error = RuntimeError("backend unavailable")
+    repository = RepositoryContext(sync_error=backend_error)
+    pipelinewise = _pipelinewise(taps="*")
+    pipelinewise.config = {}
+    pipelinewise._discover_tap = Mock(
+        side_effect=lambda tap, **_kwargs: (
+            "discovery failed" if tap["id"] == "failed" else None
+        )
+    )
+    pipelinewise.load_config = Mock()
+    pipelinewise.cleanup_after_deleted_config = Mock(return_value=0)
+
+    with patch(
+        "pipelinewise.cli.pipelinewise.Config.from_yamls",
+        return_value=imported,
+    ), patch(
+        "pipelinewise.cli.pipelinewise.DataDiffRepository.from_backend_config",
+        return_value=repository,
+    ), pytest.raises(SystemExit) as exc:
+        pipelinewise.import_project()
+
+    assert exc.value.code == 1
+    assert repository.synced == (
+        [successful_definition, failed_definition],
+        ["*"],
+        {"failed"},
+    )
+    pipelinewise.logger.error.assert_called_once_with(
+        "Tap discovery failed: %s",
+        "discovery failed",
+    )
+    pipelinewise.logger.exception.assert_called_once_with(
+        "Failed to reconcile data-diff definitions: %s",
+        backend_error,
+    )
+    summary = next(
+        call
+        for call in pipelinewise.logger.info.call_args_list
+        if "IMPORTING YAML CONFIGS FINISHED" in call.args[0]
+    )
+    assert summary.args[1:6] == (1, 2, 1, 0, "['discovery failed']")
 
 
 def _alerting_pipelinewise(taps):

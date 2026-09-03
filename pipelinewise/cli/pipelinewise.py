@@ -1723,7 +1723,7 @@ class PipelineWise:
                     for tap in selected_taps
                 )
 
-            for tap, error in zip(selected_taps, discovery_results):
+            for tap, error in zip(selected_taps, discovery_results, strict=True):
                 if error:
                     self.logger.error('Tap discovery failed: %s', error)
                     discover_excs.append(error)
@@ -1734,29 +1734,36 @@ class PipelineWise:
             not_found_taps = set(selected_taps_id) - found_selected_taps
             for tap in not_found_taps:
                 error = f'tap "{tap}" not found!'
-                self.logger.error('Tap discovery failed: %s', error)
+                self.logger.error('Tap not found in project YAML: %s', tap)
                 discover_excs.append(error)
-                failed_tap_ids.add(tap)
 
         # reloading the new config
         self.load_config()
         deleted_taps_count = self.cleanup_after_deleted_config(old_config)
 
-        end_time = datetime.now()
-
+        data_diff_sync_failed = False
         if config.global_config.get('backend_db'):
-            with DataDiffRepository.from_backend_config(
-                config.global_config['backend_db']
-            ) as repository:
-                sync_stats = repository.sync_definitions(
-                    data_diff_definitions,
-                    selected_taps=selected_taps_id,
-                    excluded_taps=failed_tap_ids,
+            try:
+                with DataDiffRepository.from_backend_config(
+                    config.global_config['backend_db']
+                ) as repository:
+                    sync_stats = repository.sync_definitions(
+                        data_diff_definitions,
+                        selected_taps=selected_taps_id,
+                        excluded_taps=failed_tap_ids,
+                    )
+            except Exception as exc:  # pylint: disable=broad-except
+                data_diff_sync_failed = True
+                self.logger.exception(
+                    'Failed to reconcile data-diff definitions: %s', exc
                 )
-            self.logger.info(
-                'Persisted data-diff definitions: %s',
-                sync_stats,
-            )
+            else:
+                self.logger.info(
+                    'Persisted data-diff definitions: %s',
+                    sync_stats,
+                )
+
+        end_time = datetime.now()
 
         # Log summary
         # pylint: disable=logging-too-many-args
@@ -1780,7 +1787,7 @@ class PipelineWise:
             str(discover_excs),
             end_time - start_time,
         )
-        if len(discover_excs) > 0:
+        if discover_excs or data_diff_sync_failed:
             sys.exit(1)
 
     def _data_diff_repository(self):
