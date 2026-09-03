@@ -149,7 +149,7 @@ def test_partial_scope_only_deactivates_selected_tap():
 
 def test_full_scope_preserves_failed_tap_and_deactivates_deleted_tap():
     failed_definition = _definition(tap_id="failed", source_table="new")
-    wildcard_definition = _definition(tap_id="*", source_table="new")
+    successful_definition = _definition(tap_id="successful", source_table="new")
     failed_check_id = uuid4()
     deleted_check_id = uuid4()
     current = [
@@ -170,7 +170,7 @@ def test_full_scope_preserves_failed_tap_and_deactivates_deleted_tap():
     repository = _repository_with_cursor(cursor)
 
     stats = repository.sync_definitions(
-        [failed_definition, wildcard_definition],
+        [failed_definition, successful_definition],
         selected_taps=["*"],
         excluded_taps=["failed"],
     )
