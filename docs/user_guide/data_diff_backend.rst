@@ -68,7 +68,7 @@ slot outcomes into the current watermark, and records every watermark transition
 The second path describes processing rather than foreign-key ownership; the ERD
 above shows the exact database relationships.
 
-PipelineWise keeps every attempt in ``dd_run_attempts`` and every coverage
+PipelineWise keeps every attempt in ``dd_run_attempts`` and every watermark
 transition in ``dd_watermark_events``. ``dd_run_slot_state`` materializes only
 the highest terminal attempt for each scheduled slot, while
 ``dd_watermark_state`` stores the current watermark. A new chronological slot

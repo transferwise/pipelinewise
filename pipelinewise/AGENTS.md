@@ -25,9 +25,11 @@ Read root `AGENTS.md` first; also use scoped connector, test, E2E, and docs guid
   `_log` stores append-only history.
 - `public` is fixed across Alembic, runtime, tests, ERDs, and docs. Changing it requires a forward migration plan and synchronized updates.
 - Each `NNN_*.py` revision needs a matching `NNN_schema.erd.mmd` Mermaid ERD of the resulting `public` schema; preserve old ERDs and show foreign-key relationships on the tables diagram.
-- The data-diff backend schema first went live in PipelineWise `0.82.0`.
-  Migration 001 is immutable from that release onward; make every later schema
-  change in a new forward migration with a matching ERD.
+- Migration 001 originally shipped in PipelineWise `0.78.0`. Its `0.82.0`
+  schema finalization is an explicitly approved exception requiring coordinated
+  manual updates to existing databases. Treat migration 001 as immutable after
+  `0.82.0`; make every later schema change in a new forward migration with a
+  matching ERD.
 - History is append-oriented: preflight logs, results, and watermark events are
   inserts; definitions, run attempts, run-slot state, and watermark state have
   controlled updates. The database does not enforce immutability.
