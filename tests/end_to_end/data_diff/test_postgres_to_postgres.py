@@ -148,7 +148,7 @@ class TestPostgresToPostgresDataDiff:
         definition = checks[0]
         assert definition['full_check_name'] == FULL_CHECK_NAME
         assert definition['revision'] == 1
-        assert definition['current']
+        assert definition['is_current']
         assert definition['target_type'] == 'target-postgres'
         assert definition['frequency'] == '0 * * * *'
         assert definition['window_start_seconds'] == 86400
@@ -184,11 +184,11 @@ class TestPostgresToPostgresDataDiff:
 
         pass_run = self.run_backend_query(
             """
-            SELECT runs.run_id::text, runs.dd_check_id::text,
+            SELECT runs.run_id::text, runs.check_id::text,
                    runs.scheduled_for, runs.window_start, runs.window_end,
-                   runs.status, runs.attempt, runs.trigger, preflights.status
-              FROM public.dd_runs runs
-              JOIN public.dd_preflights preflights
+                   runs.status, runs.attempt, runs.trigger_type, preflights.status
+              FROM public.dd_run_attempts runs
+              JOIN public.dd_preflight_log preflights
                 ON preflights.preflight_id = runs.preflight_id
              ORDER BY runs.started_at DESC
              LIMIT 1
@@ -216,7 +216,7 @@ class TestPostgresToPostgresDataDiff:
         pass_results = self.run_backend_query(
             f"""
             SELECT check_type, status, source_value, target_value
-              FROM public.dd_results
+              FROM public.dd_run_results
              WHERE run_id = '{pass_run_id}'
              ORDER BY check_type
             """
@@ -232,7 +232,7 @@ class TestPostgresToPostgresDataDiff:
             f"""
             SELECT coverage_status, blocking_run_id::text,
                    evaluated_run_id::text, verified_through
-              FROM public.dd_coverage_state
+              FROM public.dd_watermark_state
              WHERE check_id = '{check_id}'
             """
         )[0]
@@ -245,14 +245,14 @@ class TestPostgresToPostgresDataDiff:
         assert self.run_backend_query(
             f"""
             SELECT run_id::text, attempt, status
-              FROM public.dd_effective_attempts
+              FROM public.dd_run_slot_state
              WHERE check_id = '{check_id}'
             """
         ) == [(pass_run_id, 1, 'PASS')]
         assert self.run_backend_query(
             f"""
             SELECT state_version, evaluated_run_id::text
-              FROM public.dd_coverage_state
+              FROM public.dd_watermark_state
              WHERE check_id = '{check_id}'
             """
         ) == [(1, pass_run_id)]
@@ -280,9 +280,9 @@ class TestPostgresToPostgresDataDiff:
         failed_run = self.run_backend_query(
             f"""
             SELECT run_id::text, scheduled_for, window_start, window_end,
-                   attempt, status, trigger
-              FROM public.dd_runs
-             WHERE dd_check_id = '{check_id}'
+                   attempt, status, trigger_type
+              FROM public.dd_run_attempts
+             WHERE check_id = '{check_id}'
                AND status = 'FAIL'
              ORDER BY started_at DESC
              LIMIT 1
@@ -303,7 +303,7 @@ class TestPostgresToPostgresDataDiff:
         failed_results = self.run_backend_query(
             f"""
             SELECT check_type, status
-              FROM public.dd_results
+              FROM public.dd_run_results
              WHERE run_id = '{failed_run_id}'
              ORDER BY check_type
             """
@@ -315,13 +315,13 @@ class TestPostgresToPostgresDataDiff:
             if check_type != 'row_checksum'
         } == {'PASS'}
         assert self.run_backend_query(
-            f"SELECT status FROM public.dd_runs WHERE run_id = '{pass_run_id}'"
+            f"SELECT status FROM public.dd_run_attempts WHERE run_id = '{pass_run_id}'"
         )[0][0] == 'PASS'
 
         blocked_coverage = self.run_backend_query(
             f"""
             SELECT coverage_status, blocking_run_id::text, verified_through
-              FROM public.dd_coverage_state
+              FROM public.dd_watermark_state
              WHERE check_id = '{check_id}'
             """
         )[0]
@@ -333,14 +333,14 @@ class TestPostgresToPostgresDataDiff:
         assert self.run_backend_query(
             f"""
             SELECT run_id::text, attempt, status
-              FROM public.dd_effective_attempts
+              FROM public.dd_run_slot_state
              WHERE check_id = '{check_id}'
             """
         ) == [(failed_run_id, failed_attempt, 'FAIL')]
         assert self.run_backend_query(
             f"""
             SELECT state_version, evaluated_run_id::text
-              FROM public.dd_coverage_state
+              FROM public.dd_watermark_state
              WHERE check_id = '{check_id}'
             """
         ) == [(2, failed_run_id)]
@@ -353,10 +353,10 @@ class TestPostgresToPostgresDataDiff:
 
         remediation = self.run_backend_query(
             f"""
-            SELECT run_id::text, dd_check_id::text, scheduled_for,
-                   window_start, window_end, attempt, status, trigger,
+            SELECT run_id::text, check_id::text, scheduled_for,
+                   window_start, window_end, attempt, status, trigger_type,
                    rerun_of_run_id::text, remediation_reference
-              FROM public.dd_runs
+              FROM public.dd_run_attempts
              WHERE rerun_of_run_id = '{failed_run_id}'
             """
         )[0]
@@ -385,7 +385,7 @@ class TestPostgresToPostgresDataDiff:
         remediation_results = self.run_backend_query(
             f"""
             SELECT check_type, status
-              FROM public.dd_results
+              FROM public.dd_run_results
              WHERE run_id = '{remediation_run_id}'
              ORDER BY check_type
             """
@@ -395,19 +395,19 @@ class TestPostgresToPostgresDataDiff:
         assert self.run_backend_query(
             f"""
             SELECT status
-              FROM public.dd_results
+              FROM public.dd_run_results
              WHERE run_id = '{failed_run_id}'
                AND check_type = 'row_checksum'
             """
         )[0][0] == 'FAIL'
         assert self.run_backend_query(
-            f"SELECT status FROM public.dd_runs WHERE run_id = '{failed_run_id}'"
+            f"SELECT status FROM public.dd_run_attempts WHERE run_id = '{failed_run_id}'"
         )[0][0] == 'FAIL'
         assert self.run_backend_query(
             f"""
             SELECT COALESCE(remediation.status = 'PASS', FALSE) AS recovered
-              FROM public.dd_runs original
-              LEFT JOIN public.dd_runs remediation
+              FROM public.dd_run_attempts original
+              LEFT JOIN public.dd_run_attempts remediation
                 ON remediation.rerun_of_run_id = original.run_id
              WHERE original.run_id = '{failed_run_id}'
                AND remediation.run_id = '{remediation_run_id}'
@@ -416,7 +416,7 @@ class TestPostgresToPostgresDataDiff:
         assert self.run_backend_query(
             f"""
             SELECT event_type
-              FROM public.dd_coverage_events
+              FROM public.dd_watermark_events
              WHERE check_id = '{check_id}'
              ORDER BY event_sequence
             """
@@ -426,7 +426,7 @@ class TestPostgresToPostgresDataDiff:
             f"""
             SELECT coverage_status, blocking_run_id::text,
                    evaluated_run_id::text, verified_through
-              FROM public.dd_coverage_state
+              FROM public.dd_watermark_state
              WHERE check_id = '{check_id}'
             """
         )[0]
@@ -439,19 +439,19 @@ class TestPostgresToPostgresDataDiff:
         assert self.run_backend_query(
             f"""
             SELECT run_id::text, attempt, status
-              FROM public.dd_effective_attempts
+              FROM public.dd_run_slot_state
              WHERE check_id = '{check_id}'
             """
         ) == [(remediation_run_id, remediation_attempt, 'PASS')]
         assert self.run_backend_query(
             f"""
             SELECT state_version, evaluated_run_id::text
-              FROM public.dd_coverage_state
+              FROM public.dd_watermark_state
              WHERE check_id = '{check_id}'
             """
         ) == [(3, remediation_run_id)]
         assert self.run_backend_query(
-            'SELECT COUNT(*) FROM public.dd_runs'
+            'SELECT COUNT(*) FROM public.dd_run_attempts'
         )[0][0] == 3
 
         with DataDiffRepository.from_backend_config(
@@ -475,7 +475,7 @@ class TestPostgresToPostgresDataDiff:
         assert self.run_backend_query(
             f"""
             SELECT run_id::text, attempt, status
-              FROM public.dd_effective_attempts
+              FROM public.dd_run_slot_state
              WHERE check_id = '{check_id}'
              ORDER BY scheduled_for
             """
@@ -487,7 +487,7 @@ class TestPostgresToPostgresDataDiff:
             f"""
             SELECT state_version, evaluated_run_id::text,
                    verified_through, event_type
-              FROM public.dd_coverage_state
+              FROM public.dd_watermark_state
              WHERE check_id = '{check_id}'
             """
         ) == [(
@@ -497,7 +497,7 @@ class TestPostgresToPostgresDataDiff:
             'ADVANCE',
         )]
         assert self.run_backend_query(
-            'SELECT COUNT(*) FROM public.dd_runs'
+            'SELECT COUNT(*) FROM public.dd_run_attempts'
         )[0][0] == 4
 
     def test_definition_sync_preserves_excluded_tap_in_postgres(self):
@@ -531,9 +531,9 @@ class TestPostgresToPostgresDataDiff:
         }
         assert self.run_backend_query(
             """
-            SELECT tap_id, revision, config_hash, current,
+            SELECT tap_id, revision, config_hash, is_current,
                    superseded_at IS NOT NULL
-              FROM public.dd_checks
+              FROM public.dd_check_definitions
              ORDER BY tap_id, revision
             """
         ) == [
@@ -577,9 +577,9 @@ class TestPostgresToPostgresDataDiff:
                 )
             }
             assert {
-                'dd_checks', 'dd_preflights', 'dd_runs', 'dd_results',
-                'dd_effective_attempts', 'dd_coverage_state',
-                'dd_coverage_events',
+                'dd_check_definitions', 'dd_preflight_log', 'dd_run_attempts', 'dd_run_results',
+                'dd_run_slot_state', 'dd_watermark_state',
+                'dd_watermark_events',
             } <= tables
             assert {
                 'dd_current_coverage', 'dd_remediation_history',

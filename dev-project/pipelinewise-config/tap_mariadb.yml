@@ -63,7 +63,6 @@ schemas:
                                           #            requires config adjustments
                                           # Doc: https://transferwise.github.io/pipelinewise/connectors/taps/mysql.html
         data_diff:
-          name: "weight-unit-reconciliation"
           checks:
             - schema_compatibility
             - row_count
@@ -95,7 +94,6 @@ schemas:
           - column: "date_created"
             type: "MASK-DATE"
         data_diff:
-          name: "address-reconciliation"
           checks:
             - schema_compatibility
             - row_count
@@ -111,7 +109,6 @@ schemas:
         replication_method: "FULL_TABLE"
         data_diff:
           # Example: fully inline timing — does NOT use data_diff_defaults
-          name: "order-full-table-check"
           frequency: "0 */12 * * *"
           window_start: "-7d"
           window_end: "-12h"

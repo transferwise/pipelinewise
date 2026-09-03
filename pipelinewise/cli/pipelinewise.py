@@ -1914,7 +1914,7 @@ class PipelineWise:
             [
                 str(check['check_id']),
                 check['revision'],
-                'yes' if check['current'] else 'no',
+                'yes' if check['is_current'] else 'no',
                 check['target_id'],
                 check['tap_id'],
                 f"{check['source_schema']}.{check['source_table']}",

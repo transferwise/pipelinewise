@@ -115,9 +115,9 @@ class TestPostgresToSnowflakeDataDiff:
         results = self.run_backend_query(
             f"""
             SELECT results.check_type, results.status
-              FROM public.dd_results results
-              JOIN public.dd_runs runs ON runs.run_id = results.run_id
-              JOIN public.dd_checks checks ON checks.check_id = runs.dd_check_id
+              FROM public.dd_run_results results
+              JOIN public.dd_run_attempts runs ON runs.run_id = results.run_id
+              JOIN public.dd_check_definitions checks ON checks.check_id = runs.check_id
              WHERE checks.full_check_name = '{FULL_CHECK_NAME}'
              ORDER BY results.check_type
             """
@@ -162,14 +162,14 @@ class TestPostgresToSnowflakeDataDiff:
             self.run_backend_query(
                 f"""
                 SELECT results.check_type, results.status
-                  FROM public.dd_results results
-                  JOIN public.dd_runs runs ON runs.run_id = results.run_id
-                  JOIN public.dd_checks checks
-                    ON checks.check_id = runs.dd_check_id
+                  FROM public.dd_run_results results
+                  JOIN public.dd_run_attempts runs ON runs.run_id = results.run_id
+                  JOIN public.dd_check_definitions checks
+                    ON checks.check_id = runs.check_id
                  WHERE checks.full_check_name = '{FULL_CHECK_NAME}'
                    AND runs.attempt = (
-                       SELECT MAX(attempt) FROM public.dd_runs inner_runs
-                        WHERE inner_runs.dd_check_id = runs.dd_check_id
+                       SELECT MAX(attempt) FROM public.dd_run_attempts inner_runs
+                        WHERE inner_runs.check_id = runs.check_id
                    )
                  ORDER BY results.check_type
                 """

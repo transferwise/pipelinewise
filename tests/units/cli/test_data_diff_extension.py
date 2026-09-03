@@ -87,6 +87,15 @@ def test_main_schema_accepts_data_diff_extension(tmp_path):
         utils.validate(tap, utils.load_schema("tap"))
 
 
+def test_main_schema_rejects_unused_data_diff_name(tmp_path):
+    config = _config(tmp_path)
+    tap = config.targets["postgres"]["taps"][0]
+    tap["schemas"][0]["tables"][0]["data_diff"]["name"] = "ignored"
+
+    with pytest.raises(Exception):
+        utils.validate(tap, utils.load_schema("tap"))
+
+
 def test_main_json_excludes_data_diff_extension(tmp_path):
     config = _config(tmp_path)
     config.save()

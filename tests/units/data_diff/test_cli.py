@@ -52,7 +52,7 @@ def _stored_check():
     return {
         "id": uuid4(),
         "revision": 2,
-        "current": True,
+        "is_current": True,
         "enabled": True,
         "target_id": "target",
         "tap_id": "tap",

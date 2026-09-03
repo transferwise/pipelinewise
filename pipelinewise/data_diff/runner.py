@@ -171,7 +171,7 @@ def _execute_and_persist(
             "results": results,
             "preflight": preflight,
             "attempt": run["attempt"],
-            "trigger": run["trigger"],
+            "trigger_type": run["trigger_type"],
         }
     except (KeyboardInterrupt, SystemExit) as exc:
         # Only for interpreter-raised cases, e.g. Ctrl-C with no handler installed.
@@ -192,7 +192,7 @@ def _execute_and_persist(
             "window_end": window_end,
             "error": str(exc),
             "attempt": run["attempt"],
-            "trigger": run["trigger"],
+            "trigger_type": run["trigger_type"],
         }
 
 
@@ -346,7 +346,7 @@ def rerun_failed_check(
 ) -> dict:
     """Re-execute the exact definition revision and window of a failed run."""
     original = backend.get_run(run_id)
-    check = backend.get_check_version(original["dd_check_id"])
+    check = backend.get_check_version(original["check_id"])
     run = backend.start_remediation_run(original, remediation_reference)
     return execute_started_run(
         backend, connection_config_loader, check, run,

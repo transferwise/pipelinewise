@@ -285,7 +285,7 @@ After repairing a failed window, rerun its exact definition and time boundaries:
       --remediation-ref "AP-1234"
 
 The original run remains immutable. The rerun gets the next attempt number,
-``trigger = REMEDIATION``, and a ``rerun_of_run_id`` link. When it passes,
+``trigger_type = REMEDIATION``, and a ``rerun_of_run_id`` link. When it passes,
 the effective attempt for that scheduled slot changes and the watermark advances.
 
 The backend retains every run attempt and coverage transition. See
@@ -328,6 +328,6 @@ estimate, so an unanalyzed large table blocks rather than slipping through. Runn
    Keep windows narrow relative to table size, and treat ``statement_timeout`` as the
    real bound on source cost.
 
-Each verdict is written to ``dd_preflights`` with the table size, the row limit, and
+Each verdict is written to ``dd_preflight_log`` with the table size, the row limit, and
 the index verdict it decided from, so a ``PASS`` stays auditable after the table or
 the limit changes.

@@ -699,13 +699,13 @@ class E2EEnv:
         # does not exist yet, and migrate() recreates it either way. Runs as the
         # DDL role because the application user has no DROP rights.
         self.run_ddl_pipelinewise_backend(
-            'DROP TABLE IF EXISTS public.dd_coverage_events CASCADE; '
-            'DROP TABLE IF EXISTS public.dd_coverage_state CASCADE; '
-            'DROP TABLE IF EXISTS public.dd_effective_attempts CASCADE; '
-            'DROP TABLE IF EXISTS public.dd_results CASCADE; '
-            'DROP TABLE IF EXISTS public.dd_runs CASCADE; '
-            'DROP TABLE IF EXISTS public.dd_preflights CASCADE; '
-            'DROP TABLE IF EXISTS public.dd_checks CASCADE; '
+            'DROP TABLE IF EXISTS public.dd_watermark_events CASCADE; '
+            'DROP TABLE IF EXISTS public.dd_watermark_state CASCADE; '
+            'DROP TABLE IF EXISTS public.dd_run_slot_state CASCADE; '
+            'DROP TABLE IF EXISTS public.dd_run_results CASCADE; '
+            'DROP TABLE IF EXISTS public.dd_run_attempts CASCADE; '
+            'DROP TABLE IF EXISTS public.dd_preflight_log CASCADE; '
+            'DROP TABLE IF EXISTS public.dd_check_definitions CASCADE; '
             'DROP TABLE IF EXISTS public.alembic_version CASCADE'
         )
 

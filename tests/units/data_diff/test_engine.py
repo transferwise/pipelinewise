@@ -701,7 +701,7 @@ def test_statement_timeout_never_reaches_zero(configured, expected):
 def test_every_preflight_branch_is_published_before_execution():
     """Including the metadata-only branch, which has no aggregates to order against.
 
-    A run that publishes nothing leaves dd_runs.preflight_id NULL on success, and
+    A run that publishes nothing leaves dd_run_attempts.preflight_id NULL on success, and
     the runner's placeholder logic then reports a computed preflight as never built.
     """
     published = []
