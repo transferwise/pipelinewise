@@ -73,8 +73,8 @@ class DataDiffRepository:
             cursor.execute(
                 f"""
                 SELECT *
-                  FROM {SCHEMA}.dd_checks
-                 WHERE current
+                  FROM {SCHEMA}.dd_check_definitions
+                 WHERE is_current
                  FOR UPDATE
                 """
             )
@@ -89,8 +89,8 @@ class DataDiffRepository:
                 if active:
                     cursor.execute(
                         f"""
-                        UPDATE {SCHEMA}.dd_checks
-                           SET current = FALSE, superseded_at = %s
+                        UPDATE {SCHEMA}.dd_check_definitions
+                           SET is_current = FALSE, superseded_at = %s
                          WHERE check_id = %s
                         """,
                         (now, active["check_id"]),
@@ -100,7 +100,7 @@ class DataDiffRepository:
                 cursor.execute(
                     f"""
                     SELECT COALESCE(MAX(revision), 0) + 1 AS revision
-                      FROM {SCHEMA}.dd_checks
+                      FROM {SCHEMA}.dd_check_definitions
                      WHERE full_check_name = %s
                     """,
                     (definition.full_check_name,),
@@ -117,8 +117,8 @@ class DataDiffRepository:
                 if in_scope and full_check_name not in incoming_keys:
                     cursor.execute(
                         f"""
-                        UPDATE {SCHEMA}.dd_checks
-                           SET current = FALSE, superseded_at = %s
+                        UPDATE {SCHEMA}.dd_check_definitions
+                           SET is_current = FALSE, superseded_at = %s
                          WHERE check_id = %s
                         """,
                         (now, active["check_id"]),
@@ -131,7 +131,7 @@ class DataDiffRepository:
     def _insert_check(cursor, revision, definition, now):
         cursor.execute(
             f"""
-            INSERT INTO {SCHEMA}.dd_checks(
+            INSERT INTO {SCHEMA}.dd_check_definitions(
                 check_id, full_check_name, revision, config_hash,
                 canonical_config, target_id, tap_id,
                 source_type, target_type, source_database, target_database,
@@ -140,7 +140,7 @@ class DataDiffRepository:
                 source_timestamp_column, target_timestamp_column, checks,
                 frequency, window_start_seconds, window_end_seconds,
                 statement_timeout_seconds,
-                current, created_at
+                is_current, created_at
             ) VALUES (
                 %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
                 %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
@@ -173,10 +173,10 @@ class DataDiffRepository:
             cursor.execute(
                 f"""
                 SELECT status
-                  FROM {SCHEMA}.dd_runs
-                 WHERE dd_check_id = %s
+                  FROM {SCHEMA}.dd_run_attempts
+                 WHERE check_id = %s
                    AND scheduled_for = %s
-                   AND trigger != 'REMEDIATION'
+                   AND trigger_type != 'REMEDIATION'
                  ORDER BY attempt DESC
                  LIMIT 1
                 """,
@@ -201,11 +201,11 @@ class DataDiffRepository:
         with self.cursor() as cursor:
             cursor.execute(
                 f"""
-                UPDATE {SCHEMA}.dd_runs
+                UPDATE {SCHEMA}.dd_run_attempts
                    SET status = 'ERROR',
                        finished_at = %s,
                        error = 'Scheduler lease expired before the worker completed'
-                 WHERE dd_check_id = %s
+                 WHERE check_id = %s
                    AND status = 'RUNNING'
                    AND started_at <= %s
                 RETURNING run_id
@@ -218,7 +218,7 @@ class DataDiffRepository:
             )
             run_ids = [row["run_id"] for row in cursor.fetchall()]
             for run_id in run_ids:
-                self._record_coverage_event(cursor, run_id, recorded_at)
+                self._record_watermark_transition(cursor, run_id, recorded_at)
             return len(run_ids)
 
     def list_checks(
@@ -229,7 +229,7 @@ class DataDiffRepository:
         include_versioned: bool = False,
     ) -> list:
         """List deterministic backend rows for current or historical checks."""
-        where = [] if include_versioned else ["checks.current"]
+        where = [] if include_versioned else ["checks.is_current"]
         params = []
         if target_id and target_id != "*":
             where.append("checks.target_id = %s")
@@ -248,8 +248,8 @@ class DataDiffRepository:
                        coverage.updated_at AS verified_at,
                        coverage.evaluated_run_id AS coverage_run_id,
                        coverage.reason AS coverage_reason
-                  FROM {SCHEMA}.dd_checks checks
-                  LEFT JOIN {SCHEMA}.dd_coverage_state coverage
+                  FROM {SCHEMA}.dd_check_definitions checks
+                  LEFT JOIN {SCHEMA}.dd_watermark_state coverage
                     ON coverage.check_id = checks.check_id
                   {where_sql}
                  ORDER BY checks.target_id, checks.tap_id,
@@ -283,8 +283,8 @@ class DataDiffRepository:
                        coverage.updated_at AS verified_at,
                        coverage.evaluated_run_id AS coverage_run_id,
                        coverage.reason AS coverage_reason
-                  FROM {SCHEMA}.dd_checks checks
-                  LEFT JOIN {SCHEMA}.dd_coverage_state coverage
+                  FROM {SCHEMA}.dd_check_definitions checks
+                  LEFT JOIN {SCHEMA}.dd_watermark_state coverage
                     ON coverage.check_id = checks.check_id
                  WHERE checks.check_id = %s
                 """,
@@ -311,9 +311,9 @@ class DataDiffRepository:
             cursor.execute(
                 f"""
                 SELECT MAX(scheduled_for) AS scheduled_for
-                  FROM {SCHEMA}.dd_runs
-                 WHERE dd_check_id = %s
-                   AND trigger != 'REMEDIATION'
+                  FROM {SCHEMA}.dd_run_attempts
+                 WHERE check_id = %s
+                   AND trigger_type != 'REMEDIATION'
                 """,
                 (check_id,),
             )
@@ -321,10 +321,10 @@ class DataDiffRepository:
             return row["scheduled_for"] if row else None
 
     def get_run(self, run_id) -> dict:
-        """Load one immutable run for reporting or exact-window remediation."""
+        """Load one run attempt for reporting or exact-window remediation."""
         with self.cursor() as cursor:
             cursor.execute(
-                f"SELECT * FROM {SCHEMA}.dd_runs WHERE run_id = %s",
+                f"SELECT * FROM {SCHEMA}.dd_run_attempts WHERE run_id = %s",
                 (run_id,),
             )
             row = cursor.fetchone()
@@ -344,19 +344,19 @@ class DataDiffRepository:
 
         with self.cursor() as cursor:
             lock_key = (
-                f"{original_run['dd_check_id']}:"
+                f"{original_run['check_id']}:"
                 f"{original_run['scheduled_for'].isoformat()}"
             )
             cursor.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", (lock_key,))
             cursor.execute(
                 f"""
                 SELECT status, COALESCE(MAX(attempt), 0) AS max_attempt
-                  FROM {SCHEMA}.dd_runs
-                 WHERE dd_check_id = %s AND scheduled_for = %s
+                  FROM {SCHEMA}.dd_run_attempts
+                 WHERE check_id = %s AND scheduled_for = %s
                  GROUP BY status
                 """,
                 (
-                    original_run['dd_check_id'],
+                    original_run['check_id'],
                     original_run["scheduled_for"],
                 ),
             )
@@ -369,14 +369,14 @@ class DataDiffRepository:
             started_at = datetime.now(timezone.utc)
             cursor.execute(
                 f"""
-                INSERT INTO {SCHEMA}.dd_runs(
-                    run_id, dd_check_id, scheduled_for, window_start,
-                    window_end, attempt, trigger, status, rerun_of_run_id,
+                INSERT INTO {SCHEMA}.dd_run_attempts(
+                    run_id, check_id, scheduled_for, window_start,
+                    window_end, attempt, trigger_type, status, rerun_of_run_id,
                     remediation_reference, started_at
                 ) VALUES (%s, %s, %s, %s, %s, %s, 'REMEDIATION', 'RUNNING', %s, %s, %s)
                 """,
                 (
-                    run_id, original_run['dd_check_id'],
+                    run_id, original_run['check_id'],
                     original_run["scheduled_for"], original_run["window_start"],
                     original_run["window_end"], attempt, root_run_id,
                     remediation_reference, started_at,
@@ -385,7 +385,7 @@ class DataDiffRepository:
             return {
                 "run_id": run_id,
                 "attempt": attempt,
-                "trigger": "REMEDIATION",
+                "trigger_type": "REMEDIATION",
                 "rerun_of_run_id": root_run_id,
                 "remediation_reference": remediation_reference,
             }
@@ -406,8 +406,8 @@ class DataDiffRepository:
             cursor.execute(
                 f"""
                 SELECT status, COALESCE(MAX(attempt), 0) AS max_attempt
-                  FROM {SCHEMA}.dd_runs
-                 WHERE dd_check_id = %s AND scheduled_for = %s
+                  FROM {SCHEMA}.dd_run_attempts
+                 WHERE check_id = %s AND scheduled_for = %s
                  GROUP BY status
                 """,
                 (check["check_id"], scheduled_for),
@@ -418,22 +418,28 @@ class DataDiffRepository:
             if not force and any(row["status"] in ("PASS", "FAIL") for row in previous):
                 return None
             attempt = max((row["max_attempt"] for row in previous), default=0) + 1
-            trigger = "MANUAL" if force else ("RETRY" if previous else "SCHEDULED")
+            trigger_type = "MANUAL" if force else (
+                "RETRY" if previous else "SCHEDULED"
+            )
             run_id = uuid.uuid4()
             started_at = datetime.now(timezone.utc)
             cursor.execute(
                 f"""
-                INSERT INTO {SCHEMA}.dd_runs(
-                    run_id, dd_check_id, scheduled_for, window_start,
-                    window_end, attempt, trigger, status, started_at
+                INSERT INTO {SCHEMA}.dd_run_attempts(
+                    run_id, check_id, scheduled_for, window_start,
+                    window_end, attempt, trigger_type, status, started_at
                 ) VALUES (%s, %s, %s, %s, %s, %s, %s, 'RUNNING', %s)
                 """,
                 (
                     run_id, check["check_id"], scheduled_for, window_start, window_end,
-                    attempt, trigger, started_at,
+                    attempt, trigger_type, started_at,
                 ),
             )
-            return {"run_id": run_id, "attempt": attempt, "trigger": trigger}
+            return {
+                "run_id": run_id,
+                "attempt": attempt,
+                "trigger_type": trigger_type,
+            }
 
     def record_preflight(self, check_id, preflight: dict):
         """Persist one immutable source-plan preflight attempt."""
@@ -441,7 +447,7 @@ class DataDiffRepository:
         with self.cursor() as cursor:
             cursor.execute(
                 f"""
-                INSERT INTO {SCHEMA}.dd_preflights(
+                INSERT INTO {SCHEMA}.dd_preflight_log(
                     preflight_id, check_id, status, checked_at,
                     query_fingerprint, index_metadata, findings, error,
                     table_rows, row_limit, has_leading_index
@@ -474,7 +480,7 @@ class DataDiffRepository:
             for result in results:
                 cursor.execute(
                     f"""
-                    INSERT INTO {SCHEMA}.dd_results(
+                    INSERT INTO {SCHEMA}.dd_run_results(
                         run_id, check_type, status, source_value, target_value,
                         source_query_seconds, target_query_seconds, error
                     ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
@@ -490,24 +496,24 @@ class DataDiffRepository:
             finished_at = datetime.now(timezone.utc)
             cursor.execute(
                 f"""
-                UPDATE {SCHEMA}.dd_runs
+                UPDATE {SCHEMA}.dd_run_attempts
                    SET status = %s, preflight_id = %s, finished_at = %s, error = %s
                  WHERE run_id = %s
                 """,
                 (status, preflight_id, finished_at, error, run_id),
             )
-            self._record_coverage_event(cursor, run_id, finished_at)
+            self._record_watermark_transition(cursor, run_id, finished_at)
 
     @staticmethod
-    def _record_coverage_event(cursor, run_id, recorded_at):
+    def _record_watermark_transition(cursor, run_id, recorded_at):
         cursor.execute(
             f"""
-            SELECT runs.run_id, runs.dd_check_id AS check_id,
+            SELECT runs.run_id, runs.check_id AS check_id,
                    runs.scheduled_for, runs.window_start, runs.window_end,
                    runs.attempt, runs.status, checks.checks
-              FROM {SCHEMA}.dd_runs runs
-              JOIN {SCHEMA}.dd_checks checks
-                ON checks.check_id = runs.dd_check_id
+              FROM {SCHEMA}.dd_run_attempts runs
+              JOIN {SCHEMA}.dd_check_definitions checks
+                ON checks.check_id = runs.check_id
              WHERE runs.run_id = %s
             """,
             (run_id,),
@@ -518,27 +524,32 @@ class DataDiffRepository:
             (f"pipelinewise.data_diff.coverage:{definition['check_id']}",),
         )
 
-        previous = DataDiffRepository._coverage_state_for_update(
+        previous = DataDiffRepository._watermark_state_for_update(
             cursor, definition["check_id"]
         )
-        existing = DataDiffRepository._effective_attempt_for_update(
+        existing_slot = DataDiffRepository._run_slot_state_for_update(
             cursor, definition["check_id"], definition["scheduled_for"]
         )
-        has_later_attempt = DataDiffRepository._has_later_effective_attempt(
+        has_later_slot = DataDiffRepository._has_later_run_slot(
             cursor, definition["check_id"], definition["scheduled_for"]
         )
-        effective_changed = DataDiffRepository._upsert_effective_attempt(
+        slot_state_changed = DataDiffRepository._upsert_run_slot_state(
             cursor, definition
         )
 
         data_checks_enabled = bool(set(definition["checks"]) - {"schema_compatibility"})
-        if effective_changed and previous and existing is None and not has_later_attempt:
+        if (
+            slot_state_changed
+            and previous
+            and existing_slot is None
+            and not has_later_slot
+        ):
             coverage = advance_coverage(
                 previous,
                 definition,
                 data_checks_enabled=data_checks_enabled,
             )
-        elif not effective_changed and previous:
+        elif not slot_state_changed and previous:
             coverage = {
                 key: previous[key]
                 for key in (
@@ -547,7 +558,7 @@ class DataDiffRepository:
                 )
             }
         else:
-            coverage = DataDiffRepository._recalculate_effective_coverage(
+            coverage = DataDiffRepository._recalculate_watermark(
                 cursor,
                 definition["check_id"],
                 data_checks_enabled=data_checks_enabled,
@@ -555,7 +566,7 @@ class DataDiffRepository:
 
         event_type = coverage_event_type(previous, coverage)
         state_version = int(previous["state_version"]) + 1 if previous else 1
-        DataDiffRepository._upsert_coverage_state(
+        DataDiffRepository._upsert_watermark_state(
             cursor,
             definition,
             coverage,
@@ -563,7 +574,7 @@ class DataDiffRepository:
             state_version,
             recorded_at,
         )
-        DataDiffRepository._insert_coverage_event(
+        DataDiffRepository._insert_watermark_event(
             cursor,
             definition,
             previous,
@@ -573,11 +584,11 @@ class DataDiffRepository:
         )
 
     @staticmethod
-    def _coverage_state_for_update(cursor, check_id):
+    def _watermark_state_for_update(cursor, check_id):
         cursor.execute(
             f"""
             SELECT *
-              FROM {SCHEMA}.dd_coverage_state
+              FROM {SCHEMA}.dd_watermark_state
              WHERE check_id = %s
              FOR UPDATE
             """,
@@ -586,11 +597,11 @@ class DataDiffRepository:
         return cursor.fetchone()
 
     @staticmethod
-    def _effective_attempt_for_update(cursor, check_id, scheduled_for):
+    def _run_slot_state_for_update(cursor, check_id, scheduled_for):
         cursor.execute(
             f"""
             SELECT run_id, attempt
-              FROM {SCHEMA}.dd_effective_attempts
+              FROM {SCHEMA}.dd_run_slot_state
              WHERE check_id = %s AND scheduled_for = %s
              FOR UPDATE
             """,
@@ -599,24 +610,24 @@ class DataDiffRepository:
         return cursor.fetchone()
 
     @staticmethod
-    def _has_later_effective_attempt(cursor, check_id, scheduled_for):
+    def _has_later_run_slot(cursor, check_id, scheduled_for):
         cursor.execute(
             f"""
             SELECT EXISTS(
                 SELECT 1
-                  FROM {SCHEMA}.dd_effective_attempts
+                  FROM {SCHEMA}.dd_run_slot_state
                  WHERE check_id = %s AND scheduled_for > %s
-            ) AS has_later_attempt
+            ) AS has_later_slot
             """,
             (check_id, scheduled_for),
         )
-        return cursor.fetchone()["has_later_attempt"]
+        return cursor.fetchone()["has_later_slot"]
 
     @staticmethod
-    def _upsert_effective_attempt(cursor, definition):
+    def _upsert_run_slot_state(cursor, definition):
         cursor.execute(
             f"""
-            INSERT INTO {SCHEMA}.dd_effective_attempts(
+            INSERT INTO {SCHEMA}.dd_run_slot_state(
                 check_id, scheduled_for, run_id, attempt,
                 window_start, window_end, status
             ) VALUES (%s, %s, %s, %s, %s, %s, %s)
@@ -626,7 +637,7 @@ class DataDiffRepository:
                    window_start = EXCLUDED.window_start,
                    window_end = EXCLUDED.window_end,
                    status = EXCLUDED.status
-             WHERE EXCLUDED.attempt > {SCHEMA}.dd_effective_attempts.attempt
+             WHERE EXCLUDED.attempt > {SCHEMA}.dd_run_slot_state.attempt
             RETURNING run_id
             """,
             (
@@ -639,11 +650,11 @@ class DataDiffRepository:
         return cursor.fetchone() is not None
 
     @staticmethod
-    def _recalculate_effective_coverage(cursor, check_id, *, data_checks_enabled):
+    def _recalculate_watermark(cursor, check_id, *, data_checks_enabled):
         cursor.execute(
             f"""
             SELECT run_id, scheduled_for, window_start, window_end, attempt, status
-              FROM {SCHEMA}.dd_effective_attempts
+              FROM {SCHEMA}.dd_run_slot_state
              WHERE check_id = %s
              ORDER BY scheduled_for
             """,
@@ -655,7 +666,7 @@ class DataDiffRepository:
         )
 
     @staticmethod
-    def _upsert_coverage_state(
+    def _upsert_watermark_state(
         cursor,
         definition,
         coverage,
@@ -665,7 +676,7 @@ class DataDiffRepository:
     ):
         cursor.execute(
             f"""
-            INSERT INTO {SCHEMA}.dd_coverage_state(
+            INSERT INTO {SCHEMA}.dd_watermark_state(
                 check_id, coverage_start, verified_through, max_observed_end,
                 coverage_status, blocking_run_id, evaluated_run_id, event_type,
                 state_version, updated_at, reason
@@ -692,7 +703,7 @@ class DataDiffRepository:
         )
 
     @staticmethod
-    def _insert_coverage_event(
+    def _insert_watermark_event(
         cursor,
         definition,
         previous,
@@ -702,8 +713,8 @@ class DataDiffRepository:
     ):
         cursor.execute(
             f"""
-            INSERT INTO {SCHEMA}.dd_coverage_events(
-                coverage_event_id, check_id, evaluated_run_id, event_type,
+            INSERT INTO {SCHEMA}.dd_watermark_events(
+                watermark_event_id, check_id, evaluated_run_id, event_type,
                 coverage_start, previous_verified_through, verified_through,
                 max_observed_end, coverage_status, blocking_run_id,
                 recorded_at, reason

@@ -50,7 +50,7 @@ class ScriptedCursor:
         self.executions.append((self.last_sql, params))
 
     def fetchall(self):
-        if "dd_checks" in self.last_sql:
+        if "dd_check_definitions" in self.last_sql:
             return self.current
         return []
 
@@ -79,7 +79,7 @@ def test_new_definition_is_inserted_as_revision_one():
     stats = repository.sync_definitions([_definition()])
 
     assert stats == {"created": 1, "unchanged": 0, "superseded": 0, "deactivated": 0}
-    assert any("INSERT INTO public.dd_checks" in sql for sql, _ in cursor.executions)
+    assert any("INSERT INTO public.dd_check_definitions" in sql for sql, _ in cursor.executions)
 
 
 def test_same_hash_is_idempotent():
@@ -96,7 +96,7 @@ def test_same_hash_is_idempotent():
     stats = repository.sync_definitions([definition])
 
     assert stats["unchanged"] == 1
-    assert not any("INSERT INTO public.dd_checks" in sql for sql, _ in cursor.executions)
+    assert not any("INSERT INTO public.dd_check_definitions" in sql for sql, _ in cursor.executions)
 
 
 def test_changed_definition_supersedes_active_revision():
@@ -117,12 +117,10 @@ def test_changed_definition_supersedes_active_revision():
     supersede = next(
         (sql, params)
         for sql, params in cursor.executions
-        if "SET current = FALSE" in sql
+        if "SET is_current = FALSE" in sql
     )
     assert supersede[1][1] == current[0]["check_id"]
-    # dd_checks is keyed by check_id; dd_check_id only exists on dd_runs.
     assert "WHERE check_id = %s" in supersede[0]
-    assert "dd_check_id" not in supersede[0]
 
 
 def test_partial_scope_only_deactivates_selected_tap():
@@ -139,12 +137,10 @@ def test_partial_scope_only_deactivates_selected_tap():
     updates = [
         (sql, params)
         for sql, params in cursor.executions
-        if "SET current = FALSE" in sql
+        if "SET is_current = FALSE" in sql
     ]
     assert updates[0][1][1] == current[0]["check_id"]
-    # dd_checks is keyed by check_id; dd_check_id only exists on dd_runs.
     assert "WHERE check_id = %s" in updates[0][0]
-    assert "dd_check_id" not in updates[0][0]
 
 
 def test_full_scope_preserves_failed_tap_and_deactivates_deleted_tap():
@@ -207,7 +203,7 @@ def test_list_checks_exposes_compare_columns_from_version_snapshot():
 
     assert checks[0]["source_compare_columns"] == ["status", "amount"]
     assert checks[0]["target_compare_columns"] == ["STATUS", "AMOUNT"]
-    assert "LEFT JOIN public.dd_coverage_state coverage" in cursor.last_sql
+    assert "LEFT JOIN public.dd_watermark_state coverage" in cursor.last_sql
     assert "coverage.updated_at AS verified_at" in cursor.last_sql
     assert "dd_current_coverage" not in cursor.last_sql
 
@@ -235,7 +231,7 @@ def test_schema_migration_never_drops_shared_schema():
     combined = "\n".join(all_upgrade_content)
     assert "DROP SCHEMA" not in combined
     assert "TIMESTAMPTZ" in combined
-    assert "DD_COVERAGE_EVENTS" in combined
+    assert "DD_WATERMARK_EVENTS" in combined
 
 
 def test_ensure_schema_calls_alembic_migrate():
@@ -256,7 +252,7 @@ def test_remediation_attempt_reuses_failed_window_and_links_original_run():
     scheduled_for = datetime(2026, 7, 22, 13, tzinfo=timezone.utc)
     original = {
         "run_id": original_id,
-        "dd_check_id": check_id,
+        "check_id": check_id,
         "scheduled_for": scheduled_for,
         "window_start": datetime(2026, 7, 22, 6, tzinfo=timezone.utc),
         "window_end": datetime(2026, 7, 22, 7, tzinfo=timezone.utc),
@@ -267,11 +263,11 @@ def test_remediation_attempt_reuses_failed_window_and_links_original_run():
     run = repository.start_remediation_run(original, "AP-1234")
 
     assert run["attempt"] == 2
-    assert run["trigger"] == "REMEDIATION"
+    assert run["trigger_type"] == "REMEDIATION"
     assert run["rerun_of_run_id"] == original_id
     insert_params = next(
         call_args.args[1] for call_args in cursor.execute.call_args_list
-        if "INSERT INTO public.dd_runs"
+        if "INSERT INTO public.dd_run_attempts"
         in " ".join(call_args.args[0].split())
     )
     assert insert_params[1] == check_id
@@ -285,7 +281,7 @@ def test_remediation_attempt_reuses_failed_window_and_links_original_run():
 def test_finish_run_updates_coverage_in_same_transaction():
     cursor = Mock()
     repository = _repository_with_cursor(cursor)
-    repository._record_coverage_event = Mock()
+    repository._record_watermark_transition = Mock()
     run_id = uuid4()
 
     repository.finish_run(
@@ -294,9 +290,9 @@ def test_finish_run_updates_coverage_in_same_transaction():
         [{"check_type": "row_count", "status": "PASS", "source_value": 1}],
     )
 
-    repository._record_coverage_event.assert_called_once()
-    assert repository._record_coverage_event.call_args.args[0] is cursor
-    assert repository._record_coverage_event.call_args.args[1] == run_id
+    repository._record_watermark_transition.assert_called_once()
+    assert repository._record_watermark_transition.call_args.args[0] is cursor
+    assert repository._record_watermark_transition.call_args.args[1] == run_id
 
 
 def _coverage_state(start, end, *, status="CONTIGUOUS", blocking_run_id=None):
@@ -333,21 +329,23 @@ def test_new_latest_slot_advances_coverage_without_history_scan():
     previous = _coverage_state(start, previous_end)
 
     with patch.object(
-        DataDiffRepository, "_coverage_state_for_update", return_value=previous
+        DataDiffRepository, "_watermark_state_for_update", return_value=previous
     ), patch.object(
-        DataDiffRepository, "_effective_attempt_for_update", return_value=None
+        DataDiffRepository, "_run_slot_state_for_update", return_value=None
     ), patch.object(
-        DataDiffRepository, "_has_later_effective_attempt", return_value=False
+        DataDiffRepository, "_has_later_run_slot", return_value=False
     ), patch.object(
-        DataDiffRepository, "_upsert_effective_attempt", return_value=True
+        DataDiffRepository, "_upsert_run_slot_state", return_value=True
     ), patch.object(
-        DataDiffRepository, "_recalculate_effective_coverage"
+        DataDiffRepository, "_recalculate_watermark"
     ) as recalculate, patch.object(
-        DataDiffRepository, "_upsert_coverage_state"
+        DataDiffRepository, "_upsert_watermark_state"
     ) as upsert_state, patch.object(
-        DataDiffRepository, "_insert_coverage_event"
+        DataDiffRepository, "_insert_watermark_event"
     ):
-        DataDiffRepository._record_coverage_event(cursor, attempt["run_id"], attempt["window_end"])
+        DataDiffRepository._record_watermark_transition(
+            cursor, attempt["run_id"], attempt["window_end"]
+        )
 
     recalculate.assert_not_called()
     coverage = upsert_state.call_args.args[2]
@@ -371,25 +369,27 @@ def test_replacement_attempt_recalculates_from_effective_slots():
     }
 
     with patch.object(
-        DataDiffRepository, "_coverage_state_for_update", return_value=previous
+        DataDiffRepository, "_watermark_state_for_update", return_value=previous
     ), patch.object(
         DataDiffRepository,
-        "_effective_attempt_for_update",
+        "_run_slot_state_for_update",
         return_value={"run_id": uuid4(), "attempt": 1},
     ), patch.object(
-        DataDiffRepository, "_has_later_effective_attempt", return_value=False
+        DataDiffRepository, "_has_later_run_slot", return_value=False
     ), patch.object(
-        DataDiffRepository, "_upsert_effective_attempt", return_value=True
+        DataDiffRepository, "_upsert_run_slot_state", return_value=True
     ), patch.object(
         DataDiffRepository,
-        "_recalculate_effective_coverage",
+        "_recalculate_watermark",
         return_value=recalculated,
     ) as recalculate, patch.object(
-        DataDiffRepository, "_upsert_coverage_state"
+        DataDiffRepository, "_upsert_watermark_state"
     ), patch.object(
-        DataDiffRepository, "_insert_coverage_event"
+        DataDiffRepository, "_insert_watermark_event"
     ):
-        DataDiffRepository._record_coverage_event(cursor, attempt["run_id"], end)
+        DataDiffRepository._record_watermark_transition(
+            cursor, attempt["run_id"], end
+        )
 
     recalculate.assert_called_once_with(
         cursor,
@@ -407,23 +407,25 @@ def test_out_of_order_new_slot_recalculates_from_effective_slots():
     previous = _coverage_state(start, end + timedelta(hours=2))
 
     with patch.object(
-        DataDiffRepository, "_coverage_state_for_update", return_value=previous
+        DataDiffRepository, "_watermark_state_for_update", return_value=previous
     ), patch.object(
-        DataDiffRepository, "_effective_attempt_for_update", return_value=None
+        DataDiffRepository, "_run_slot_state_for_update", return_value=None
     ), patch.object(
-        DataDiffRepository, "_has_later_effective_attempt", return_value=True
+        DataDiffRepository, "_has_later_run_slot", return_value=True
     ), patch.object(
-        DataDiffRepository, "_upsert_effective_attempt", return_value=True
+        DataDiffRepository, "_upsert_run_slot_state", return_value=True
     ), patch.object(
         DataDiffRepository,
-        "_recalculate_effective_coverage",
+        "_recalculate_watermark",
         return_value=previous,
     ) as recalculate, patch.object(
-        DataDiffRepository, "_upsert_coverage_state"
+        DataDiffRepository, "_upsert_watermark_state"
     ), patch.object(
-        DataDiffRepository, "_insert_coverage_event"
+        DataDiffRepository, "_insert_watermark_event"
     ):
-        DataDiffRepository._record_coverage_event(cursor, attempt["run_id"], end)
+        DataDiffRepository._record_watermark_transition(
+            cursor, attempt["run_id"], end
+        )
 
     recalculate.assert_called_once_with(
         cursor,
@@ -446,15 +448,15 @@ def test_exceptional_recalculation_reads_effective_slots_not_run_history():
         }
     ]
 
-    coverage = DataDiffRepository._recalculate_effective_coverage(
+    coverage = DataDiffRepository._recalculate_watermark(
         cursor,
         uuid4(),
         data_checks_enabled=True,
     )
 
     sql = " ".join(cursor.execute.call_args.args[0].split())
-    assert "FROM public.dd_effective_attempts" in sql
-    assert "FROM public.dd_runs" not in sql
+    assert "FROM public.dd_run_slot_state" in sql
+    assert "FROM public.dd_run_attempts" not in sql
     assert coverage["coverage_status"] == "CONTIGUOUS"
 
 

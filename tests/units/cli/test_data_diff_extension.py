@@ -6,6 +6,7 @@ import pytest
 
 from pipelinewise.cli import utils
 from pipelinewise.cli.config import Config
+from pipelinewise.cli.errors import InvalidConfigException
 
 
 # pylint: disable=missing-function-docstring,invalid-name
@@ -83,7 +84,16 @@ def test_main_schema_accepts_data_diff_extension(tmp_path):
     utils.validate(config.global_config, utils.load_schema("config"))
 
     tap["schemas"][0]["tables"][0]["data_diff"]["unknown"] = True
-    with pytest.raises(Exception):
+    with pytest.raises(InvalidConfigException):
+        utils.validate(tap, utils.load_schema("tap"))
+
+
+def test_main_schema_rejects_unused_data_diff_name(tmp_path):
+    config = _config(tmp_path)
+    tap = config.targets["postgres"]["taps"][0]
+    tap["schemas"][0]["tables"][0]["data_diff"]["name"] = "ignored"
+
+    with pytest.raises(InvalidConfigException):
         utils.validate(tap, utils.load_schema("tap"))
 
 

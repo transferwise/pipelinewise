@@ -1,3 +1,24 @@
+0.82.0 (2026-09-03)
+-------------------
+
+**Data-diff backend schema**
+
+- Rename the data-diff backend tables, keys, constraints, and indexes to
+  consistently distinguish definitions, attempt/result history, slot state,
+  and watermark state/events; existing backend databases require a coordinated
+  manual schema update before running this release
+- Use `check_id` consistently as the primary and foreign key for check
+  definitions and run attempts
+- Use `is_current` and `trigger_type` instead of cross-database reserved words
+  in the backend schema
+- Reject the unused table-level `data_diff.name` setting instead of silently
+  accepting and ignoring it
+
+**Documentation**
+
+- Update the data-diff ERD, backend reporting queries, and relationship guide
+  for the final migration 001 schema
+
 0.81.2 (2026-09-02)
 -------------------
 

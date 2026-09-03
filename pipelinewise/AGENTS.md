@@ -11,11 +11,28 @@ Read root `AGENTS.md` first; also use scoped connector, test, E2E, and docs guid
 
 ## Backend schema
 
-- PKs omit `dd_` (`dd_runs.run_id`); FKs normally reuse referenced PK names, except existing `dd_runs.dd_check_id`. Name role-qualified FKs clearly, e.g. `rerun_of_run_id`.
+- Primary keys use concise domain names such as `check_id`, `run_id`, and
+  `preflight_id`. Foreign keys reuse the referenced primary-key name. Add a role
+  prefix only when the relationship has a distinct meaning, such as
+  `rerun_of_run_id`, `evaluated_run_id`, or `blocking_run_id`.
+- Do not use PostgreSQL or Snowflake reserved or limited keywords as backend
+  table, column, constraint, or index identifiers. Prefer descriptive names
+  such as `is_current` and `trigger_type` even when quoting could make a keyword
+  legal in one database.
+- Data-diff table suffixes describe lifecycle: `_definitions` stores versioned
+  configuration, `_attempts` stores executions, `_results` stores execution
+  detail, `_state` stores mutable materialized projections, and `_events` or
+  `_log` stores append-only history.
 - `public` is fixed across Alembic, runtime, tests, ERDs, and docs. Changing it requires a forward migration plan and synchronized updates.
 - Each `NNN_*.py` revision needs a matching `NNN_schema.erd.mmd` Mermaid ERD of the resulting `public` schema; preserve old ERDs and show foreign-key relationships on the tables diagram.
-- Never rewrite a released/applied migration. Before first deployment, amend an unshipped revision only after explicit confirmation that all databases are disposable; rebuild an empty backend and update its ERD.
-- History is append-oriented: preflights, results, and coverage events are inserts; checks, runs, effective attempts, and coverage state have controlled updates. The database does not enforce immutability.
+- Migration 001 originally shipped in PipelineWise `0.78.0`. Its `0.82.0`
+  schema finalization is an explicitly approved exception requiring coordinated
+  manual updates to existing databases. Treat migration 001 as immutable after
+  `0.82.0`; make every later schema change in a new forward migration with a
+  matching ERD.
+- History is append-oriented: preflight logs, results, and watermark events are
+  inserts; definitions, run attempts, run-slot state, and watermark state have
+  controlled updates. The database does not enforce immutability.
 
 ## Runtime and data-diff constraints
 
@@ -33,7 +50,8 @@ Read root `AGENTS.md` first; also use scoped connector, test, E2E, and docs guid
   that separation intentionally.
 - Source preflight checks estimates and timestamp-index shape, not exact counts
   or actual index use; bound execution with a statement timeout. Treat
-  `dd_results.min_key`/`max_key` as sensitive and avoid casual logging.
+  `min_key`/`max_key` values in `dd_run_results` as sensitive and avoid casual
+  logging.
 
 ## Snowflake and Iceberg contract
 
