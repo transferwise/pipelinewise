@@ -497,9 +497,13 @@ target references. It does not connect to a source or target.</p>
 </tbody>
 </table>
 <p>The command validates, connects to sources, performs discovery, and writes
-generated files below <code class="docutils literal notranslate"><span class="pre">~/.pipelinewise</span></code>. Data-diff definitions are versioned
-only after connector generation and discovery succeed. <code class="docutils literal notranslate"><span class="pre">import</span></code> remains a
-deprecated alias.</p>
+generated files below <code class="docutils literal notranslate"><span class="pre">~/.pipelinewise</span></code>. Data-diff definitions are reconciled
+for each tap only after its connector generation and discovery succeed. A failed
+tap retains its existing definitions while successful taps are reconciled. An
+explicitly selected tap missing from the project YAML is treated as removed, so
+its definitions are deactivated. The command prints its summary and exits
+non-zero when a selected tap or backend reconciliation fails. <code class="docutils literal notranslate"><span class="pre">import</span></code> remains
+a deprecated alias.</p>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
 <p>Removing or renaming a tap or target in project YAML makes

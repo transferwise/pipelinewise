@@ -593,6 +593,12 @@ pipelinewise<span class="w"> </span>rerun_data_diff_check<span class="w"> </span
 deactivates removed ones; unchanged definitions are skipped. <code class="docutils literal notranslate"><span class="pre">--force</span></code> creates
 another attempt for the current slot, while <code class="docutils literal notranslate"><span class="pre">rerun_data_diff_check</span></code> repairs a
 historical one — see <a class="reference internal" href="#coverage-and-remediation">Coverage and remediation</a>.</p>
+<p>Definitions are reconciled independently for taps whose discovery succeeds. If
+another selected tap fails discovery, successful taps are still reconciled and
+the failed tap’s existing definitions remain unchanged. Definitions for an
+explicitly selected tap absent from the project YAML are deactivated. Discovery
+and backend reconciliation failures retain the import summary and a non-zero
+exit so automation can report them.</p>
 <p>A mismatch exits non-zero and sends an alert. See <a class="reference internal" href="#data-diff-alerts"><span class="std std-ref">Alerts</span></a>.</p>
 </section>
 <section id="alerts">
