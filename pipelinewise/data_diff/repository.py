@@ -49,9 +49,15 @@ class DataDiffRepository:
         definitions: Iterable[CheckDefinition],
         *,
         selected_taps: Optional[Iterable[str]] = None,
+        excluded_taps: Optional[Iterable[str]] = None,
     ) -> dict:
-        """Version definitions and deactivate YAML entries removed from this scope."""
-        definitions = list(definitions)
+        """Reconcile definitions in scope while preserving excluded taps."""
+        excluded = set(excluded_taps or [])
+        definitions = [
+            definition
+            for definition in definitions
+            if definition.tap_id not in excluded
+        ]
         selected = set(selected_taps or ["*"])
         include_all = "*" in selected
         now = datetime.now(timezone.utc)
@@ -104,7 +110,10 @@ class DataDiffRepository:
                 stats["created"] += 1
 
             for full_check_name, active in current.items():
-                in_scope = include_all or active["tap_id"] in selected
+                in_scope = (
+                    active["tap_id"] not in excluded
+                    and (include_all or active["tap_id"] in selected)
+                )
                 if in_scope and full_check_name not in incoming_keys:
                     cursor.execute(
                         f"""

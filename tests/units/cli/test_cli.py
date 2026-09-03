@@ -114,7 +114,7 @@ class TestCli:
         mocked_fastsync.assert_called_once()
 
     def _assert_import_command(self, args):
-        if args.taps == '*':
+        if '*' in args.taps.split(','):
             expected_taps = ['tap_one', 'tap_two', 'tap_three']
             expected_save_arg = ['*']
         else:
@@ -633,6 +633,14 @@ class TestCli:
     def test_command_import_selected_taps(self):
         """Test import_config command for selected taps"""
         args = CliArgs(dir=f'{os.path.dirname(__file__)}/resources/test_import_command', taps='tap_one,tap_three')
+        self._assert_import_command(args)
+
+    def test_command_import_wildcard_with_selected_tap(self):
+        """A wildcard combined with a tap still imports every tap."""
+        args = CliArgs(
+            dir=f'{os.path.dirname(__file__)}/resources/test_import_command',
+            taps='*,tap_one',
+        )
         self._assert_import_command(args)
 
     def test_import_accepts_salesforce_iceberg_and_generates_target_runtime(self, tmp_path):
