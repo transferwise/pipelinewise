@@ -35,7 +35,7 @@ setup(name="pipelinewise-target-snowflake",
               "pylint==4.0.6",
               'pytest==9.0.3',
               'pytest-cov==7.1.0',
-              "python-dotenv==1.2.2"
+              "python-dotenv==1.2.3"
           ]
       },
       entry_points="""
