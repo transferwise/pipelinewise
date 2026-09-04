@@ -241,7 +241,14 @@ def connect_source(check: dict, connection_config: dict) -> DatabaseAdapter:
                 ssl_temp_dir.cleanup()
         with connection.cursor() as cursor:
             cursor.execute("SET SESSION time_zone = '+00:00'")
-            if connection_config.get("engine", "mysql") == "mariadb":
+            engine = connection_config.get("engine")
+            if engine is None:
+                engine = (
+                    "mariadb"
+                    if "mariadb" in connection.get_server_info().lower()
+                    else "mysql"
+                )
+            if engine == "mariadb":
                 cursor.execute("SET SESSION max_statement_time = %s", (timeout,))
             else:
                 cursor.execute("SET SESSION max_execution_time = %s", (timeout * 1000,))

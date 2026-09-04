@@ -1,3 +1,11 @@
+0.83.1 (2026-09-04)
+-------------------
+
+**Data-diff**
+
+- Detect MariaDB sources from the server handshake when ``db_conn.engine`` is
+  omitted, so statement timeouts use MariaDB's supported ``max_statement_time`` session variable.
+
 0.83.0 (2026-09-04)
 -------------------
 

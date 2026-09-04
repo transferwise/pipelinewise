@@ -333,12 +333,13 @@ def test_canonical_value_normalizes_numbers_and_timestamps_to_utc():
     assert canonical_value(datetime(2026, 7, 22, 12, 0)) == "2026-07-22T12:00:00Z"
 
 
-def _connection_with_cursor():
+def _connection_with_cursor(server_version="8.0.39"):
     cursor = Mock()
     cursor_context = MagicMock()
     cursor_context.__enter__.return_value = cursor
     connection = Mock(closed=False)
     connection.cursor.return_value = cursor_context
+    connection.get_server_info.return_value = server_version
     return connection, cursor
 
 
@@ -368,8 +369,12 @@ def test_postgres_source_is_read_only_utc_and_time_limited():
     ]
 
 
-def test_mariadb_source_is_read_only_utc_and_time_limited():
-    connection, cursor = _connection_with_cursor()
+@pytest.mark.parametrize(
+    "server_version",
+    ["11.4.10-MariaDB-log", "5.5.5-10.6.18-MariaDB-ubu2004-log"],
+)
+def test_mariadb_source_is_detected_and_time_limited_without_engine(server_version):
+    connection, cursor = _connection_with_cursor(server_version)
     check = {"source_type": "tap-mysql", "statement_timeout_seconds": 120}
     config = {
         "host": "source",
@@ -377,7 +382,6 @@ def test_mariadb_source_is_read_only_utc_and_time_limited():
         "user": "reader",
         "password": "secret",
         "dbname": "payments",
-        "engine": "mariadb",
     }
 
     with patch(
@@ -389,6 +393,72 @@ def test_mariadb_source_is_read_only_utc_and_time_limited():
     assert cursor.execute.call_args_list == [
         call("SET SESSION time_zone = '+00:00'"),
         call("SET SESSION max_statement_time = %s", (120,)),
+        call("START TRANSACTION READ ONLY"),
+    ]
+
+
+def test_mysql_source_is_detected_and_time_limited_without_engine():
+    connection, cursor = _connection_with_cursor("8.0.39")
+    check = {"source_type": "tap-mysql", "statement_timeout_seconds": 120}
+    config = {
+        "host": "source",
+        "port": 3306,
+        "user": "reader",
+        "password": "secret",
+        "dbname": "payments",
+    }
+
+    with patch(
+        "pipelinewise.data_diff.engine.pymysql.connect",
+        return_value=connection,
+    ):
+        connect_source(check, config)
+
+    assert cursor.execute.call_args_list == [
+        call("SET SESSION time_zone = '+00:00'"),
+        call("SET SESSION max_execution_time = %s", (120_000,)),
+        call("START TRANSACTION READ ONLY"),
+    ]
+
+
+@pytest.mark.parametrize(
+    "engine,server_version,timeout_call",
+    [
+        (
+            "mariadb",
+            "8.0.39",
+            call("SET SESSION max_statement_time = %s", (120,)),
+        ),
+        (
+            "mysql",
+            "11.4.10-MariaDB-log",
+            call("SET SESSION max_execution_time = %s", (120_000,)),
+        ),
+    ],
+)
+def test_explicit_engine_overrides_server_version(
+    engine, server_version, timeout_call
+):
+    connection, cursor = _connection_with_cursor(server_version)
+    check = {"source_type": "tap-mysql", "statement_timeout_seconds": 120}
+    config = {
+        "host": "source",
+        "port": 3306,
+        "user": "reader",
+        "password": "secret",
+        "dbname": "payments",
+        "engine": engine,
+    }
+
+    with patch(
+        "pipelinewise.data_diff.engine.pymysql.connect",
+        return_value=connection,
+    ):
+        connect_source(check, config)
+
+    assert cursor.execute.call_args_list == [
+        call("SET SESSION time_zone = '+00:00'"),
+        timeout_call,
         call("START TRANSACTION READ ONLY"),
     ]
 

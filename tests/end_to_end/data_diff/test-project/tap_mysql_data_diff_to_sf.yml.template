@@ -11,7 +11,7 @@ db_conn:
   user: "${TAP_MYSQL_USER}"
   password: "${TAP_MYSQL_PASSWORD}"
   dbname: "${TAP_MYSQL_DB}"
-  # The dev container runs MariaDB, which has no max_execution_time variable.
+  # Keep this explicit; the PostgreSQL-target E2E covers handshake detection.
   engine: mariadb
   fastsync_parallelism: 1
 
