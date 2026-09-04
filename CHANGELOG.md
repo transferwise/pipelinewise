@@ -1,4 +1,4 @@
-0.83.0 (2026-09-04)
+0.84.0 (2026-09-04)
 -------------------
 
 **tap-yugabyte**
@@ -32,6 +32,14 @@
   post-disconnect active-slot window
 - Drop a tap's replication slot when its configuration is removed, matching
   existing tap-postgres cleanup behavior
+
+0.83.0 (2026-09-04)
+-------------------
+
+**Snowflake Iceberg**
+
+- Create managed Iceberg v3 tables with automatic target file sizing and
+  compatible storage serialization for third-party engine interoperability
 
 0.82.0 (2026-09-03)
 -------------------

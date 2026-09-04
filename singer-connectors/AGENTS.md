@@ -99,6 +99,9 @@ Parquet and a real client-side encryption master key.
 - Managed v3 requires table-level
   `ICEBERG_MERGE_ON_READ_BEHAVIOR = 'DISABLED'` in CREATE and before writes;
   keep core parity and never use deprecated `ENABLE_ICEBERG_MERGE_ON_READ`.
+- Create managed v3 with `TARGET_FILE_SIZE = 'AUTO'` and
+  `STORAGE_SERIALIZATION_POLICY = 'COMPATIBLE'`; keep the dependency-free
+  fixture and core FastSync/conversion contract aligned.
 - Emit new native/v3 strings as `VARCHAR(134217728)`. Keep compatible existing
   native widths; require exact v3 width and never widen existing Iceberg
   implicitly. Emit v3 binary explicitly as `BINARY(67108864)` in CREATE/ADD.
